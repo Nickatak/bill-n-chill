@@ -1,0 +1,138 @@
+.page {
+  --background: #f5f7fa;
+  --foreground: #ffffff;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --border: #d1d5db;
+  --ok: #047857;
+  --error: #b91c1c;
+
+  display: flex;
+  min-height: 100dvh;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background-color: var(--background);
+  font-family: var(--font-geist-sans);
+}
+
+.main {
+  display: flex;
+  width: min(680px, 100%);
+  flex-direction: column;
+  gap: 14px;
+  background-color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+}
+
+.title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 2rem;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.healthCard {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  background: #fbfdff;
+}
+
+.nextCard {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  background: #fbfdff;
+}
+
+.nextTitle {
+  margin: 0;
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.nextText {
+  margin: 8px 0 12px;
+  color: var(--text-secondary);
+}
+
+.nextLink {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.routeList {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 10px;
+}
+
+.routeList li {
+  color: var(--text-primary);
+}
+
+.routeHint {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+}
+
+.label {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.status {
+  margin: 6px 0 4px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--error);
+}
+
+.healthCard[data-ok="true"] .status {
+  color: var(--ok);
+}
+
+.message {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 600px) {
+  .main {
+    padding: 20px;
+  }
+
+  .title {
+    font-size: 1.6rem;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .page {
+    --background: #0b1220;
+    --foreground: #111827;
+    --text-primary: #f3f4f6;
+    --text-secondary: #cbd5e1;
+    --border: #334155;
+  }
+
+  .healthCard {
+    background: #0f172a;
+  }
+
+  .nextCard {
+    background: #0f172a;
+  }
+}
