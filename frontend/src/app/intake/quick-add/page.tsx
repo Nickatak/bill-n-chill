@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { QuickAddConsole } from "@/components/quick-add-console";
+import { QuickAddConsole } from "@/features/intake";
 import styles from "./page.module.css";
 
 export default function QuickAddPage() {

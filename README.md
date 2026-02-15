@@ -1,6 +1,6 @@
-# Buildr
+# bill-n-chill
 
-`Buildr` is an exploratory full-stack project using:
+`bill-n-chill` is an exploratory full-stack project using:
 
 - Backend: Django + Django REST Framework (DRF)
 - Frontend: Next.js
@@ -25,7 +25,7 @@ Next.js App  <----HTTP/JSON---->  Django/DRF API  <---->  Database
 ## Suggested Repository Layout
 
 ```text
-buildr/
+bill-n-chill/
   backend/         # Django project + DRF apps
   frontend/        # Next.js app
   docs/            # Additional project documentation

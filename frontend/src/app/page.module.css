@@ -119,20 +119,18 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .page {
-    --background: #0b1220;
-    --foreground: #111827;
-    --text-primary: #f3f4f6;
-    --text-secondary: #cbd5e1;
-    --border: #334155;
-  }
+:global(html[data-theme="dark"]) .page {
+  --background: #0b1220;
+  --foreground: #111827;
+  --text-primary: #f3f4f6;
+  --text-secondary: #cbd5e1;
+  --border: #334155;
+}
 
-  .healthCard {
-    background: #0f172a;
-  }
+:global(html[data-theme="dark"]) .healthCard {
+  background: #0f172a;
+}
 
-  .nextCard {
-    background: #0f172a;
-  }
+:global(html[data-theme="dark"]) .nextCard {
+  background: #0f172a;
 }

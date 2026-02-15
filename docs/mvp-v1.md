@@ -1,4 +1,4 @@
-# Buildr MVP v1
+# bill-n-chill MVP v1
 
 ## Goal
 
@@ -21,13 +21,13 @@ Teams lose margin and time when scope, cost, and billing changes are tracked in 
 
 ## v1 Product Promise
 
-Buildr is the operational and financial thread that keeps project scope changes and billing outcomes in sync.
+bill-n-chill is the operational and financial thread that keeps project scope changes and billing outcomes in sync.
 
 ## Scope Boundary (v1)
 
-- Buildr starts after initial sales conversation and high-level project intent.
-- Buildr owns project execution records and the financial lifecycle.
-- Buildr includes a light contact-intake path so field teams can quickly create the customer record needed to start a project.
+- bill-n-chill starts after initial sales conversation and high-level project intent.
+- bill-n-chill owns project execution records and the financial lifecycle.
+- bill-n-chill includes a light contact-intake path so field teams can quickly create the customer record needed to start a project.
 
 ## In Scope (v1)
 

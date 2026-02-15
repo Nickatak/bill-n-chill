@@ -34,7 +34,7 @@ export default async function Home() {
   return (
     <div className={styles.page}>
       <main className={styles.main}>
-        <h1 className={styles.title}>Buildr</h1>
+        <h1 className={styles.title}>bill-n-chill</h1>
         <p className={styles.subtitle}>
           Django/DRF backend and Next.js frontend scaffold is running.
         </p>
@@ -79,6 +79,54 @@ export default async function Home() {
               </Link>
               <span className={styles.routeHint}>
                 Author estimate versions and clone revisions.
+              </span>
+            </li>
+            <li>
+              <Link href="/budgets" className={styles.nextLink}>
+                /budgets
+              </Link>
+              <span className={styles.routeHint}>
+                Convert approved estimates into budget baseline + editable working lines.
+              </span>
+            </li>
+            <li>
+              <Link href="/change-orders" className={styles.nextLink}>
+                /change-orders
+              </Link>
+              <span className={styles.routeHint}>
+                Create and route change orders through lifecycle states.
+              </span>
+            </li>
+            <li>
+              <Link href="/invoices" className={styles.nextLink}>
+                /invoices
+              </Link>
+              <span className={styles.routeHint}>
+                Compose owner invoices, send them, and track invoice status lifecycle.
+              </span>
+            </li>
+            <li>
+              <Link href="/vendors" className={styles.nextLink}>
+                /vendors
+              </Link>
+              <span className={styles.routeHint}>
+                Manage vendor directory records for upcoming AP and commitment flows.
+              </span>
+            </li>
+            <li>
+              <Link href="/vendor-bills" className={styles.nextLink}>
+                /vendor-bills
+              </Link>
+              <span className={styles.routeHint}>
+                Capture vendor AP bills and move them through payable lifecycle statuses.
+              </span>
+            </li>
+            <li>
+              <Link href="/payments" className={styles.nextLink}>
+                /payments
+              </Link>
+              <span className={styles.routeHint}>
+                Record inbound and outbound payments with method/status/reference tracking.
               </span>
             </li>
           </ol>

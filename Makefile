@@ -10,7 +10,7 @@ BACKEND_MANAGE := $(BACKEND_PYTHON) backend/manage.py
 # ============================================================================
 
 help:
-	@echo "Buildr - Monorepo Development Commands"
+	@echo "bill-n-chill - Monorepo Development Commands"
 	@echo ""
 	@echo "Installation:"
 	@echo "  make install              - Install all dependencies (frontend + backend)"

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ThemeToggle } from "./theme-toggle";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,8 +24,28 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function () {
+                var key = 'bnc-theme';
+                var fallback = 'light';
+                try {
+                  var stored = window.localStorage.getItem(key);
+                  var theme = (stored === 'dark' || stored === 'light') ? stored : fallback;
+                  document.documentElement.setAttribute('data-theme', theme);
+                } catch (e) {
+                  document.documentElement.setAttribute('data-theme', fallback);
+                }
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        <ThemeToggle />
         {children}
       </body>
     </html>

@@ -47,8 +47,8 @@ Observed market pattern:
 3. Optional financial acceleration layer:
    - Beam-like AP/payment/compliance workflow layered on top of accounting + project data.
 
-Inference for Buildr:
-- Buildr should behave like a modular platform with one shared data model, not a single giant feature release.
+Inference for bill-n-chill:
+- bill-n-chill should behave like a modular platform with one shared data model, not a single giant feature release.
 
 ## Shared Workflow to Recreate
 
@@ -65,7 +65,7 @@ Inference for Buildr:
 6. Accounting close loop:
    - Sync transactions and statuses with accounting system.
 
-## Replacement Implications for Buildr
+## Replacement Implications for bill-n-chill
 
 - Required platform properties:
   - Single project-financial graph across estimates, budgets, commitments, invoices, payments.

@@ -92,6 +92,37 @@ Expected URLs:
 - Cost codes page: `http://localhost:3000/cost-codes`
 - Estimates page: `http://localhost:3000/estimates`
 
+## One-Command Demo Seed (Bob Bathroom Remodel)
+
+To load a full MVP walkthrough dataset (lead, project, estimate, budget, change order, invoice, vendor bill, payments, allocations, audit events):
+
+```bash
+backend/.venv/bin/python backend/manage.py seed_bob_demo
+```
+
+Optional overrides:
+
+```bash
+backend/.venv/bin/python backend/manage.py seed_bob_demo --email test@ex.com --password Qweqwe123 --project-name "Bathroom Remodel (Demo)"
+```
+
+The command is idempotent and prints demo login credentials + token for manual UI simulation.
+
+## Hard Reset to Fresh State (Testing)
+
+To fully reset local data (delete everything) and reseed the Bob demo:
+
+```bash
+backend/.venv/bin/python backend/manage.py reset_fresh_demo
+```
+
+Options:
+
+```bash
+backend/.venv/bin/python backend/manage.py reset_fresh_demo --skip-seed
+backend/.venv/bin/python backend/manage.py reset_fresh_demo --email test@ex.com --password Qweqwe123 --project-name "Bathroom Remodel (Demo)"
+```
+
 ## Makefile Shortcuts
 
 Run `make help` from repo root to see all commands.

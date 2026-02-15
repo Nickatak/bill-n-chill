@@ -1,8 +1,8 @@
-# Buildr Domain Model (v1 Draft)
+# bill-n-chill Domain Model (v1 Draft)
 
 ## Purpose
 
-Define the core construction and billing entities for the initial Buildr platform so backend and frontend can share one consistent language.
+Define the core construction and billing entities for the initial bill-n-chill platform so backend and frontend can share one consistent language.
 
 ## Modeling Principles
 
@@ -15,7 +15,7 @@ Define the core construction and billing entities for the initial Buildr platfor
 
 ## Company
 
-Represents an account/tenant using Buildr.
+Represents an account/tenant using bill-n-chill.
 
 Key fields:
 - `id`

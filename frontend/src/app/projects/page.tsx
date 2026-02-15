@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { ProjectsConsole } from "@/components/projects-console";
+import { ProjectsConsole } from "@/features/projects";
 import styles from "./page.module.css";
 
 export default function ProjectsPage() {

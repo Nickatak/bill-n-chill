@@ -1,19 +1,39 @@
 from django.urls import path
 
 from core.views import (
+    budget_line_detail_view,
+    change_order_detail_view,
     cost_code_detail_view,
     cost_codes_list_create_view,
     convert_lead_to_project_view,
+    estimate_convert_to_budget_view,
     estimate_clone_version_view,
     estimate_detail_view,
     estimate_status_events_view,
     health_view,
+    invoice_detail_view,
+    invoice_send_view,
     login_view,
     me_view,
+    accounting_sync_event_retry_view,
+    payment_detail_view,
+    payment_allocate_view,
+    project_budgets_view,
+    project_change_orders_view,
     project_estimates_view,
+    project_invoices_view,
+    project_payments_view,
+    project_vendor_bills_view,
     project_detail_view,
+    project_accounting_export_view,
+    project_audit_events_view,
+    project_accounting_sync_events_view,
+    project_financial_summary_view,
     projects_list_view,
     quick_add_lead_contact_view,
+    vendor_bill_detail_view,
+    vendor_detail_view,
+    vendors_list_create_view,
 )
 
 urlpatterns = [
@@ -29,9 +49,54 @@ urlpatterns = [
     path("projects/", projects_list_view, name="projects-list"),
     path("projects/<int:project_id>/", project_detail_view, name="project-detail"),
     path(
+        "projects/<int:project_id>/financial-summary/",
+        project_financial_summary_view,
+        name="project-financial-summary",
+    ),
+    path(
+        "projects/<int:project_id>/audit-events/",
+        project_audit_events_view,
+        name="project-audit-events",
+    ),
+    path(
+        "projects/<int:project_id>/accounting-export/",
+        project_accounting_export_view,
+        name="project-accounting-export",
+    ),
+    path(
+        "projects/<int:project_id>/accounting-sync-events/",
+        project_accounting_sync_events_view,
+        name="project-accounting-sync-events",
+    ),
+    path(
         "projects/<int:project_id>/estimates/",
         project_estimates_view,
         name="project-estimates",
+    ),
+    path(
+        "projects/<int:project_id>/budgets/",
+        project_budgets_view,
+        name="project-budgets",
+    ),
+    path(
+        "projects/<int:project_id>/change-orders/",
+        project_change_orders_view,
+        name="project-change-orders",
+    ),
+    path(
+        "projects/<int:project_id>/invoices/",
+        project_invoices_view,
+        name="project-invoices",
+    ),
+    path(
+        "projects/<int:project_id>/vendor-bills/",
+        project_vendor_bills_view,
+        name="project-vendor-bills",
+    ),
+    path(
+        "projects/<int:project_id>/payments/",
+        project_payments_view,
+        name="project-payments",
     ),
     path("estimates/<int:estimate_id>/", estimate_detail_view, name="estimate-detail"),
     path(
@@ -44,6 +109,37 @@ urlpatterns = [
         estimate_clone_version_view,
         name="estimate-clone-version",
     ),
+    path(
+        "estimates/<int:estimate_id>/convert-to-budget/",
+        estimate_convert_to_budget_view,
+        name="estimate-convert-to-budget",
+    ),
+    path(
+        "budgets/<int:budget_id>/lines/<int:line_id>/",
+        budget_line_detail_view,
+        name="budget-line-detail",
+    ),
+    path(
+        "change-orders/<int:change_order_id>/",
+        change_order_detail_view,
+        name="change-order-detail",
+    ),
+    path("invoices/<int:invoice_id>/", invoice_detail_view, name="invoice-detail"),
+    path("invoices/<int:invoice_id>/send/", invoice_send_view, name="invoice-send"),
+    path(
+        "vendor-bills/<int:vendor_bill_id>/",
+        vendor_bill_detail_view,
+        name="vendor-bill-detail",
+    ),
+    path("payments/<int:payment_id>/", payment_detail_view, name="payment-detail"),
+    path("payments/<int:payment_id>/allocate/", payment_allocate_view, name="payment-allocate"),
+    path(
+        "accounting-sync-events/<int:sync_event_id>/retry/",
+        accounting_sync_event_retry_view,
+        name="accounting-sync-event-retry",
+    ),
+    path("vendors/", vendors_list_create_view, name="vendors-list-create"),
+    path("vendors/<int:vendor_id>/", vendor_detail_view, name="vendors-detail"),
     path("cost-codes/", cost_codes_list_create_view, name="cost-codes-list-create"),
     path("cost-codes/<int:cost_code_id>/", cost_code_detail_view, name="cost-codes-detail"),
 ]

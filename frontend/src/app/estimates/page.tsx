@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { EstimatesConsole } from "@/components/estimates-console";
+import { EstimatesConsole } from "@/features/estimates";
 import styles from "./page.module.css";
 
 export default function EstimatesPage() {

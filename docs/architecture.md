@@ -7,7 +7,7 @@
 
 ## UX Channel Strategy
 
-- Buildr serves both field and office workflows with one shared backend/API.
+- bill-n-chill serves both field and office workflows with one shared backend/API.
 - Mobile-first focus:
   - Fast capture and updates in the field.
   - Low-friction forms and minimal required input.
