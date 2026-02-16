@@ -1,5 +1,7 @@
+from datetime import timedelta
 from decimal import Decimal
 
+from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -49,6 +51,58 @@ def project_estimates_view(request, project_id: int):
             },
             status=400,
         )
+
+    def _line_items_signature(items):
+        signature = []
+        for item in items:
+            signature.append(
+                (
+                    int(item["cost_code"]),
+                    (item.get("description") or "").strip(),
+                    str(item.get("quantity", "")),
+                    (item.get("unit") or "").strip(),
+                    str(item.get("unit_cost", "")),
+                    str(item.get("markup_percent", "")),
+                )
+            )
+        return signature
+
+    def _estimate_signature(estimate):
+        return [
+            (
+                item.cost_code_id,
+                (item.description or "").strip(),
+                str(item.quantity),
+                (item.unit or "").strip(),
+                str(item.unit_cost),
+                str(item.markup_percent),
+            )
+            for item in estimate.line_items.all()
+        ]
+
+    input_signature = _line_items_signature(line_items)
+    window_start = timezone.now() - timedelta(seconds=5)
+    recent_estimates = (
+        Estimate.objects.filter(
+            project=project,
+            created_by=request.user,
+            created_at__gte=window_start,
+        )
+        .prefetch_related("line_items")
+        .order_by("-created_at")
+    )
+    for candidate in recent_estimates:
+        if candidate.title != data.get("title", ""):
+            continue
+        if candidate.status != data.get("status", Estimate.Status.DRAFT):
+            continue
+        if candidate.tax_percent != data.get("tax_percent", Decimal("0")):
+            continue
+        if _estimate_signature(candidate) == input_signature:
+            return Response(
+                {"data": EstimateSerializer(candidate).data, "meta": {"deduped": True}},
+                status=200,
+            )
 
     latest = (
         Estimate.objects.filter(project=project, created_by=request.user)

@@ -4,11 +4,14 @@ from core.models import CostCode, Project
 
 
 class ProjectSerializer(serializers.ModelSerializer):
+    customer_display_name = serializers.CharField(source="customer.display_name", read_only=True)
+
     class Meta:
         model = Project
         fields = [
             "id",
             "customer",
+            "customer_display_name",
             "name",
             "status",
             "contract_value_original",

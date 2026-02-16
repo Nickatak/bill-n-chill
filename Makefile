@@ -38,6 +38,7 @@ help:
 	@echo "  make local-up              - Run local frontend + backend together"
 	@echo "  make local-migrate         - Apply Django migrations"
 	@echo "  make local-test            - Run backend tests + frontend lint"
+	@echo "  make local-kill-ports      - Kill processes listening on ports 3000-3005/8000"
 	@echo ""
 	@echo "Dev Docker Commands:"
 	@echo "  make dev-up                - Start full dev stack (frontend + backend + mysql)"
@@ -122,6 +123,17 @@ local-clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	@echo "Clean complete."
+
+local-kill-ports:
+	@for port in 3000 3001 3002 3003 3004 3005 8000; do \
+		pids=$$(sudo lsof -t -iTCP:$$port -sTCP:LISTEN 2>/dev/null); \
+		if [ -n "$$pids" ]; then \
+			echo "Killing $$pids on port $$port"; \
+			sudo kill $$pids; \
+		else \
+			echo "No process listening on port $$port"; \
+		fi; \
+	done
 
 # ============================================================================
 # DEV DOCKER (.env.local)

@@ -278,6 +278,10 @@ def convert_lead_to_project_view(request, lead_id: int):
             billing_address=lead.project_address,
             created_by=request.user,
         )
+    else:
+        if not (customer.display_name or "").strip():
+            customer.display_name = lead.full_name
+            customer.save(update_fields=["display_name", "updated_at"])
 
     project_name = data.get("project_name") or f"{lead.full_name} Project"
     project = Project.objects.create(

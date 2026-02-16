@@ -8,13 +8,10 @@ export default function CostCodesPage() {
         <header className={styles.header}>
           <h1>Cost Codes</h1>
           <p>
-            This route gives users a reusable cost classification catalog so line-level financial
-            records stay normalized and comparable.
+            Maintain the shared catalog used to classify line items across estimates, budgets, and
+            invoices.
           </p>
-          <p>
-            Those codes are shared across estimates, budgets, and invoice lines, so consistency
-            here directly improves downstream reporting, reconciliation, and audit traceability.
-          </p>
+          <p>Keep this list tight so downstream reporting and approvals stay consistent.</p>
         </header>
         <section className={styles.card}>
           <CostCodesConsole />

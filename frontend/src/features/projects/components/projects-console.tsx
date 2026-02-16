@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { loadClientSession } from "../../session/client-session";
+import styles from "./projects-console.module.css";
 import {
   AccountingSyncEventRecord,
   ApiResponse,
@@ -13,13 +14,8 @@ import {
 } from "../types";
 
 export function ProjectsConsole() {
-  const session = loadClientSession();
-  const [token] = useState(session?.token ?? "");
-  const [authMessage] = useState(
-    session
-      ? "Using shared session for " + (session.email || "user") + "."
-      : "No shared session found. Go to / and login first.",
-  );
+  const [token, setToken] = useState("");
+  const [authMessage, setAuthMessage] = useState("Checking session...");
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [statusMessage, setStatusMessage] = useState("");
@@ -43,6 +39,31 @@ export function ProjectsConsole() {
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const hasSelectedProject = Boolean(selectedProjectId);
+  const selectedProject =
+    projects.find((project) => String(project.id) === selectedProjectId) ?? null;
+  const summaryCounts = summary
+    ? {
+        changeOrders: summary.traceability.approved_change_orders.records.length,
+        invoices: summary.traceability.ar_invoices.records.length,
+        arPayments: summary.traceability.ar_payments.records.length,
+        vendorBills: summary.traceability.ap_vendor_bills.records.length,
+        apPayments: summary.traceability.ap_payments.records.length,
+      }
+    : null;
+  const contractOriginalDisplay =
+    summary?.contract_value_original ?? selectedProject?.contract_value_original ?? "--";
+  const contractCurrentDisplay =
+    summary?.contract_value_current ?? selectedProject?.contract_value_current ?? "--";
+  const arOutstandingDisplay = summary?.ar_outstanding ?? "--";
+  const apOutstandingDisplay = summary?.ap_outstanding ?? "--";
+  const invoicedDisplay = summary?.invoiced_to_date ?? "--";
+  const paidDisplay = summary?.paid_to_date ?? "--";
+  const inboundCreditDisplay = summary?.inbound_unapplied_credit ?? "--";
+  const outboundCreditDisplay = summary?.outbound_unapplied_credit ?? "--";
+
+  function formatCustomerName(project: ProjectRecord): string {
+    return project.customer_display_name || `Customer #${project.customer}`;
+  }
 
   function hydrateForm(project: ProjectRecord) {
     setProjectName(project.name);
@@ -53,7 +74,7 @@ export function ProjectsConsole() {
     setEndDate(project.end_date_planned ?? "");
   }
 
-  async function loadProjects() {
+  const loadProjects = useCallback(async () => {
     setStatusMessage("Loading projects...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/`, {
@@ -83,17 +104,67 @@ export function ProjectsConsole() {
     } catch {
       setStatusMessage("Could not reach projects endpoint.");
     }
-  }
+  }, [normalizedBaseUrl, token]);
 
-  async function handleSelectProject(projectId: string) {
-    setSelectedProjectId(projectId);
-    setSummary(null);
-    setAuditEvents([]);
-    const item = projects.find((project) => String(project.id) === projectId);
-    if (item) {
-      hydrateForm(item);
+  const loadFinancialSummary = useCallback(async () => {
+    const projectId = Number(selectedProjectId);
+    if (!projectId) {
+      setStatusMessage("Select a project first.");
+      return;
     }
-  }
+
+    setStatusMessage("Loading financial summary...");
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/financial-summary/`, {
+        headers: { Authorization: `Token ${token}` },
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setStatusMessage("Could not load financial summary.");
+        return;
+      }
+
+      setSummary(payload.data as ProjectFinancialSummary);
+      setStatusMessage("Financial summary loaded.");
+    } catch {
+      setStatusMessage("Could not reach financial summary endpoint.");
+    }
+  }, [normalizedBaseUrl, selectedProjectId, token]);
+
+  useEffect(() => {
+    const session = loadClientSession();
+    if (!session?.token) {
+      setToken("");
+      setAuthMessage("No shared session found. Go to / and login first.");
+      return;
+    }
+    setToken(session.token);
+    setAuthMessage(`Using shared session for ${session.email || "user"}.`);
+  }, []);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    void loadProjects();
+  }, [loadProjects, token]);
+
+  useEffect(() => {
+    if (!token || !selectedProjectId) {
+      return;
+    }
+    void loadFinancialSummary();
+  }, [loadFinancialSummary, selectedProjectId, token]);
+
+  const handleSelectProject = useCallback(
+    (project: ProjectRecord) => {
+      setSelectedProjectId(String(project.id));
+      setSummary(null);
+      setAuditEvents([]);
+      hydrateForm(project);
+    },
+    [],
+  );
 
   async function handleSaveProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -138,30 +209,6 @@ export function ProjectsConsole() {
     }
   }
 
-  async function loadFinancialSummary() {
-    const projectId = Number(selectedProjectId);
-    if (!projectId) {
-      setStatusMessage("Select a project first.");
-      return;
-    }
-
-    setStatusMessage("Loading financial summary...");
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/financial-summary/`, {
-        headers: { Authorization: `Token ${token}` },
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setStatusMessage("Could not load financial summary.");
-        return;
-      }
-
-      setSummary(payload.data as ProjectFinancialSummary);
-      setStatusMessage("Financial summary loaded.");
-    } catch {
-      setStatusMessage("Could not reach financial summary endpoint.");
-    }
-  }
 
   async function downloadAccountingExport() {
     const projectId = Number(selectedProjectId);
@@ -336,31 +383,185 @@ export function ProjectsConsole() {
 
       <p>{authMessage}</p>
 
-      <button type="button" onClick={loadProjects}>
-        Load Projects
-      </button>
-
-      {projects.length > 0 ? (
-        <label>
-          Project
-          <select
-            value={selectedProjectId}
-            onChange={(event) => handleSelectProject(event.target.value)}
-          >
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                #{project.id} - {project.name} ({project.customer_display_name})
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
-
       {projects.length === 0 ? (
         <p>
           No projects yet. Go to <code>/intake/quick-add</code>, create a lead, and convert it to
           a project shell.
         </p>
+      ) : null}
+
+      {projects.length > 0 ? (
+        <section>
+          <h3>Project List</h3>
+          <p>Quick scan of loaded project shells.</p>
+          <div className={styles.projectTableWrap}>
+            <table className={styles.projectTable}>
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Customer</th>
+                  <th>Status</th>
+                  <th>Contract (Current)</th>
+                  <th>Start</th>
+                  <th>End</th>
+                </tr>
+              </thead>
+              <tbody>
+                {projects.map((project) => {
+                  const isActive = String(project.id) === selectedProjectId;
+                  const startLabel = project.start_date_planned ?? "TBD";
+                  const endLabel = project.end_date_planned ?? "TBD";
+                  return (
+                    <tr
+                      key={project.id}
+                      className={`${styles.projectRow} ${isActive ? styles.projectRowActive : ""}`}
+                      onClick={() => handleSelectProject(project)}
+                    >
+                      <td>
+                        <div className={styles.projectCellTitle}>
+                          <strong>
+                            #{project.id} {project.name}
+                          </strong>
+                        </div>
+                      </td>
+                      <td>{formatCustomerName(project)}</td>
+                      <td>
+                        <span className={styles.projectStatus}>{project.status}</span>
+                      </td>
+                      <td>{project.contract_value_current}</td>
+                      <td>{startLabel}</td>
+                      <td>{endLabel}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
+      {selectedProject ? (
+        <p>
+          Active project: #{selectedProject.id} {selectedProject.name}
+        </p>
+      ) : null}
+
+      {selectedProject ? (
+        <section className={styles.overview}>
+          <div className={styles.overviewHeader}>
+            <div>
+              <h3>Project Map</h3>
+              <p>Downstream workflow map with quick financial context.</p>
+            </div>
+            <div className={styles.overviewActions}>
+              <button type="button" onClick={loadFinancialSummary}>
+                {summary ? "Refresh Summary" : "Load Summary"}
+              </button>
+              <button type="button" onClick={downloadAccountingExport}>
+                Download Accounting Export
+              </button>
+            </div>
+          </div>
+          <div className={styles.overviewGrid}>
+            <div className={styles.treePanel}>
+              <div className={styles.treeRoot}>
+                <span className={styles.rootLabel}>Project</span>
+                <span className={styles.rootTitle}>{selectedProject.name}</span>
+                <span className={styles.rootMeta}>
+                  {formatCustomerName(selectedProject)} • {selectedProject.status}
+                </span>
+              </div>
+              <div className={styles.treeBranches}>
+                <div className={styles.branch}>
+                  <span className={styles.branchLabel}>Scope</span>
+                  <div className={styles.node}>
+                    <Link href="/estimates">Estimates</Link>
+                    <span className={styles.nodeMeta}>Author</span>
+                  </div>
+                  <div className={styles.node}>
+                    <Link href="/budgets">Budgets</Link>
+                    <span className={styles.nodeMeta}>Baseline</span>
+                  </div>
+                  <div className={styles.node}>
+                    <Link href="/change-orders">Change Orders</Link>
+                    <span className={styles.nodeCount}>
+                      {summaryCounts ? summaryCounts.changeOrders : "--"}
+                    </span>
+                  </div>
+                </div>
+                <div className={styles.branch}>
+                  <span className={styles.branchLabel}>Receivables</span>
+                  <div className={styles.node}>
+                    <Link href="/invoices">Invoices</Link>
+                    <span className={styles.nodeCount}>
+                      {summaryCounts ? summaryCounts.invoices : "--"}
+                    </span>
+                  </div>
+                  <div className={styles.node}>
+                    <Link href="/payments">Payments (AR)</Link>
+                    <span className={styles.nodeCount}>
+                      {summaryCounts ? summaryCounts.arPayments : "--"}
+                    </span>
+                  </div>
+                </div>
+                <div className={styles.branch}>
+                  <span className={styles.branchLabel}>Payables</span>
+                  <div className={styles.node}>
+                    <Link href="/vendor-bills">Vendor Bills</Link>
+                    <span className={styles.nodeCount}>
+                      {summaryCounts ? summaryCounts.vendorBills : "--"}
+                    </span>
+                  </div>
+                  <div className={styles.node}>
+                    <Link href="/payments">Payments (AP)</Link>
+                    <span className={styles.nodeCount}>
+                      {summaryCounts ? summaryCounts.apPayments : "--"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className={styles.metricsPanel}>
+              <div className={styles.metricRow}>
+                <span>Contract original</span>
+                <strong>{contractOriginalDisplay}</strong>
+              </div>
+              <div className={styles.metricRow}>
+                <span>Contract current</span>
+                <strong>{contractCurrentDisplay}</strong>
+              </div>
+              <div className={styles.metricRow}>
+                <span>Invoiced to date</span>
+                <strong>{invoicedDisplay}</strong>
+              </div>
+              <div className={styles.metricRow}>
+                <span>Paid to date</span>
+                <strong>{paidDisplay}</strong>
+              </div>
+              <div className={styles.metricRow}>
+                <span>AR outstanding</span>
+                <strong>{arOutstandingDisplay}</strong>
+              </div>
+              <div className={styles.metricRow}>
+                <span>AP outstanding</span>
+                <strong>{apOutstandingDisplay}</strong>
+              </div>
+              <div className={styles.metricRow}>
+                <span>Inbound credit</span>
+                <strong>{inboundCreditDisplay}</strong>
+              </div>
+              <div className={styles.metricRow}>
+                <span>Outbound credit</span>
+                <strong>{outboundCreditDisplay}</strong>
+              </div>
+              <p className={styles.metricHint}>
+                {summary
+                  ? "Summary auto-refreshed on project selection."
+                  : "Load summary to populate totals."}
+              </p>
+            </div>
+          </div>
+        </section>
       ) : null}
 
       <form onSubmit={handleSaveProject}>

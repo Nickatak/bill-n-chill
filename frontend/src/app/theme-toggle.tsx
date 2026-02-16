@@ -3,6 +3,7 @@
 import { clearClientSession, loadClientSession } from "@/features/session/client-session";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const THEME_KEY = "bnc-theme";
 type ThemeMode = "light" | "dark";
@@ -19,10 +20,18 @@ function applyTheme(theme: ThemeMode) {
 export function ThemeToggle() {
   const pathname = usePathname();
   const router = useRouter();
-  const hasSession =
-    pathname !== null && typeof window !== "undefined" && Boolean(loadClientSession()?.token);
+  const [hasSession, setHasSession] = useState(false);
   const hasActiveNonWorkflow = pathname === "/contacts";
+  const hasActiveCostCodes = pathname === "/cost-codes";
   const hasActiveSettings = pathname === "/settings/intake";
+
+  useEffect(() => {
+    if (pathname === null) {
+      setHasSession(false);
+      return;
+    }
+    setHasSession(Boolean(loadClientSession()?.token));
+  }, [pathname]);
 
   function toggleTheme() {
     const current =
@@ -41,7 +50,11 @@ export function ThemeToggle() {
     <div className="themeControls">
       {hasSession ? (
         <details className="nonWorkflowMenu">
-          <summary className={`themeControlButton ${hasActiveNonWorkflow ? "isActive" : ""}`}>
+          <summary
+            className={`themeControlButton ${
+              hasActiveNonWorkflow || hasActiveCostCodes ? "isActive" : ""
+            }`}
+          >
             Non-Workflow
           </summary>
           <div className="nonWorkflowList" role="menu" aria-label="Non-workflow tools">
@@ -51,6 +64,13 @@ export function ThemeToggle() {
               role="menuitem"
             >
               Contacts
+            </Link>
+            <Link
+              href="/cost-codes"
+              className={`nonWorkflowItem ${hasActiveCostCodes ? "isActive" : ""}`}
+              role="menuitem"
+            >
+              Cost Codes
             </Link>
           </div>
         </details>

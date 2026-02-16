@@ -1,18 +1,13 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { loadClientSession } from "../../session/client-session";
 import { ApiResponse, CostCode } from "../types";
 
 export function CostCodesConsole() {
-  const session = loadClientSession();
-  const [token] = useState(session?.token ?? "");
-  const [authMessage] = useState(
-    session
-      ? "Using shared session for " + (session.email || "user") + "."
-      : "No shared session found. Go to / and login first.",
-  );
+  const [token, setToken] = useState("");
+  const [authMessage, setAuthMessage] = useState("Checking session...");
 
   const [rows, setRows] = useState<CostCode[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
@@ -26,13 +21,24 @@ export function CostCodesConsole() {
   const [newName, setNewName] = useState("");
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+  useEffect(() => {
+    const session = loadClientSession();
+    if (!session?.token) {
+      setToken("");
+      setAuthMessage("No shared session found. Go to / and login first.");
+      return;
+    }
+    setToken(session.token);
+    setAuthMessage(`Using shared session for ${session.email || "user"}.`);
+  }, []);
+
   function hydrate(item: CostCode) {
     setCode(item.code);
     setName(item.name);
     setIsActive(item.is_active);
   }
 
-  async function loadCostCodes() {
+  const loadCostCodes = useCallback(async () => {
     setStatusMessage("Loading cost codes...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/cost-codes/`, {
@@ -56,7 +62,14 @@ export function CostCodesConsole() {
     } catch {
       setStatusMessage("Could not reach cost code endpoint.");
     }
-  }
+  }, [normalizedBaseUrl, token]);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    void loadCostCodes();
+  }, [loadCostCodes, token]);
 
   function handleSelect(id: string) {
     setSelectedId(id);
@@ -133,7 +146,7 @@ export function CostCodesConsole() {
       <p>{authMessage}</p>
 
       <button type="button" onClick={loadCostCodes}>
-        Load Cost Codes
+        Reload Cost Codes
       </button>
 
       {rows.length > 0 ? (

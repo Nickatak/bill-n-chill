@@ -12,8 +12,8 @@ export default function EstimatesPage() {
             versions, and move statuses through approval decisions.
           </p>
           <p>
-            Approved estimates are the handoff source for budget baselines, making this the bridge
-            between early commercial intent and executable financial planning.
+            Approved estimates become budget baselines, so accuracy here protects downstream
+            planning and billing.
           </p>
         </header>
         <section className={styles.card}>

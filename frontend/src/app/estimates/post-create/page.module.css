@@ -1,0 +1,108 @@
+.page {
+  --background: #f5f7fa;
+  --foreground: #ffffff;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --border: #d1d5db;
+
+  min-height: 100dvh;
+  padding: 18px;
+  background: var(--background);
+  font-family: var(--font-geist-sans);
+}
+
+.main {
+  width: min(820px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 14px;
+}
+
+.header {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  background: var(--foreground);
+}
+
+.header h1 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.header p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  background: var(--foreground);
+}
+
+.card h2 {
+  margin: 0 0 8px;
+  color: var(--text-primary);
+}
+
+.card p {
+  margin: 8px 0 14px;
+  color: var(--text-secondary);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.linkButton,
+.ghostButton {
+  border-radius: 8px;
+  padding: 8px 14px;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.linkButton {
+  background: #1d4ed8;
+  color: #ffffff;
+  border: 1px solid #1d4ed8;
+}
+
+.ghostButton {
+  background: transparent;
+  color: #1d4ed8;
+  border: 1px solid #cbd5f5;
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 12px;
+  }
+
+  .header,
+  .card {
+    padding: 14px;
+  }
+}
+
+:global(html[data-theme="dark"]) .page {
+  --background: #0b1220;
+  --foreground: #111827;
+  --text-primary: #f3f4f6;
+  --text-secondary: #cbd5e1;
+  --border: #334155;
+}
+
+:global(html[data-theme="dark"]) .linkButton {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+:global(html[data-theme="dark"]) .ghostButton {
+  border-color: #334155;
+  color: #bfdbfe;
+}
