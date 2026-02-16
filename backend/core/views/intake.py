@@ -92,7 +92,7 @@ def contact_detail_view(request, contact_id: int):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def quick_add_lead_contact_view(request):
-    payload = {
+    raw_payload = {
         "full_name": request.data.get("full_name", ""),
         "phone": request.data.get("phone", ""),
         "project_address": request.data.get("project_address", ""),
@@ -103,10 +103,17 @@ def quick_add_lead_contact_view(request):
     duplicate_resolution = request.data.get("duplicate_resolution")
     duplicate_target_id = request.data.get("duplicate_target_id")
 
+    serializer = LeadContactQuickAddSerializer(
+        data=raw_payload,
+        context={"request": request},
+    )
+    serializer.is_valid(raise_exception=True)
+    payload = serializer.validated_data
+
     duplicates = _find_duplicate_leads(
         request.user,
-        phone=payload["phone"],
-        email=payload["email"],
+        phone=payload.get("phone", ""),
+        email=payload.get("email", ""),
     )
     duplicate_ids = {lead.id for lead in duplicates}
 
@@ -193,8 +200,6 @@ def quick_add_lead_contact_view(request):
             status=200,
         )
 
-    serializer = LeadContactQuickAddSerializer(data=payload, context={"request": request})
-    serializer.is_valid(raise_exception=True)
     lead = serializer.save()
 
     return Response(

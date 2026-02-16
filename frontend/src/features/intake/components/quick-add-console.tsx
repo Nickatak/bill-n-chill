@@ -10,7 +10,6 @@ import styles from "./quick-add-console.module.css";
 type LeadFieldErrors = {
   full_name?: string;
   phone?: string;
-  email?: string;
   project_address?: string;
   project_name?: string;
 };
@@ -41,7 +40,6 @@ export function QuickAddConsole() {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [projectAddress, setProjectAddress] = useState("");
-  const [email, setEmail] = useState("");
   const [source, setSource] = useState("field_manual");
   const [notes, setNotes] = useState("");
   const [projectName, setProjectName] = useState("");
@@ -87,15 +85,23 @@ export function QuickAddConsole() {
 
   function validateLeadFields(payload: LeadPayload, intent: SubmitIntent): LeadFieldErrors {
     const nextErrors: LeadFieldErrors = {};
+    const contactValue = payload.phone.trim();
+
     if (!payload.full_name.trim()) {
       nextErrors.full_name = "Full name is required.";
     }
-    if (!payload.phone.trim()) {
-      if (!payload.email.trim()) {
-        nextErrors.phone = "Provide phone or email.";
-        nextErrors.email = "Provide phone or email.";
+
+    if (!contactValue) {
+      nextErrors.phone = "Provide a valid phone number or email address.";
+    } else {
+      const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactValue);
+      const digits = contactValue.replace(/\D/g, "");
+      const looksLikePhone = /^[0-9+\-().\s]+$/.test(contactValue) && digits.length >= 7 && digits.length <= 15;
+      if (!looksLikeEmail && !looksLikePhone) {
+        nextErrors.phone = "Contact must be a valid phone number or email address.";
       }
     }
+
     if (!payload.project_address.trim()) {
       nextErrors.project_address = "Project address is required.";
     }
@@ -186,7 +192,6 @@ export function QuickAddConsole() {
     setFullName("");
     setPhone("");
     setProjectAddress("");
-    setEmail("");
     setSource("field_manual");
     setNotes("");
     setFieldErrors({});
@@ -213,7 +218,7 @@ export function QuickAddConsole() {
       full_name: fullName.trim(),
       phone: phone.trim(),
       project_address: projectAddress.trim(),
-      email: email.trim(),
+      email: "",
       notes: notes.trim(),
       source: source.trim() || "field_manual",
     };
@@ -295,8 +300,9 @@ export function QuickAddConsole() {
             value={phone}
             onChange={(event) => setPhone(event.target.value)}
             type="tel"
-            inputMode="tel"
-            autoComplete="tel"
+            inputMode="text"
+            autoComplete="off"
+            placeholder="(555) 123-4567 or name@example.com"
           />
           {fieldErrors.phone ? <p className={styles.errorText}>{fieldErrors.phone}</p> : null}
         </label>
@@ -341,17 +347,6 @@ export function QuickAddConsole() {
           <summary>Optional details</summary>
           <div className={styles.optionalBody}>
             <label className={styles.field}>
-              Email
-              <input
-                name="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                type="email"
-                autoComplete="email"
-              />
-              {fieldErrors.email ? <p className={styles.errorText}>{fieldErrors.email}</p> : null}
-            </label>
-            <label className={styles.field}>
               Source
               <select name="source" value={source} onChange={(event) => setSource(event.target.value)}>
                 <option value="field_manual">field_manual</option>
@@ -392,8 +387,8 @@ export function QuickAddConsole() {
               onChange={(event) => setSelectedDuplicateId(event.target.value)}
             >
               {duplicateCandidates.map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>
-                  #{candidate.id} - {candidate.full_name} ({candidate.phone})
+                  <option key={candidate.id} value={candidate.id}>
+                  #{candidate.id} - {candidate.full_name} ({candidate.phone || candidate.email})
                 </option>
               ))}
             </select>
@@ -412,7 +407,7 @@ export function QuickAddConsole() {
         <div className={styles.summaryCard}>
           <p className={styles.summaryTitle}>Lead created</p>
           <p className={styles.summaryText}>
-            #{lastLead.id} - {lastLead.full_name} ({lastLead.phone})
+            #{lastLead.id} - {lastLead.full_name} ({lastLead.phone || lastLead.email})
           </p>
         </div>
       ) : null}

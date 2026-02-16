@@ -39,13 +39,13 @@ class LeadContactQuickAddTests(TestCase):
         self.assertEqual(lead.created_by_id, self.user.id)
         self.assertEqual(lead.full_name, "Jane Doe")
 
-    def test_quick_add_allows_email_without_phone(self):
+    def test_quick_add_allows_email_in_phone_field(self):
         response = self.client.post(
             "/api/v1/lead-contacts/quick-add/",
             data={
                 "full_name": "Email Only",
+                "phone": "email-only@example.com",
                 "project_address": "99 Email St",
-                "email": "email-only@example.com",
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -68,7 +68,21 @@ class LeadContactQuickAddTests(TestCase):
         self.assertEqual(response.status_code, 400)
         payload = response.json()
         self.assertIn("phone", payload)
-        self.assertIn("email", payload)
+
+    def test_quick_add_rejects_invalid_contact_method_in_phone_field(self):
+        response = self.client.post(
+            "/api/v1/lead-contacts/quick-add/",
+            data={
+                "full_name": "Bad Contact",
+                "phone": "not-a-phone-and-not-an-email",
+                "project_address": "100 Invalid Contact St",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertIn("phone", payload)
 
     def test_quick_add_returns_duplicate_candidates_without_resolution(self):
         existing = LeadContact.objects.create(
@@ -236,4 +250,3 @@ class LeadConversionTests(TestCase):
         self.assertEqual(second.json()["meta"]["conversion_status"], "already_converted")
         self.assertEqual(Customer.objects.count(), 1)
         self.assertEqual(Project.objects.count(), 1)
-
