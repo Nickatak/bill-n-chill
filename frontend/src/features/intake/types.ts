@@ -10,6 +10,7 @@ export type LeadContactCandidate = {
   phone: string;
   project_address: string;
   email: string;
+  initial_contract_value?: string | null;
   notes: string;
   source: string;
   created_at: string;
@@ -20,6 +21,7 @@ export type LeadPayload = {
   phone: string;
   project_address: string;
   email: string;
+  initial_contract_value?: string | null;
   notes: string;
   source: string;
 };

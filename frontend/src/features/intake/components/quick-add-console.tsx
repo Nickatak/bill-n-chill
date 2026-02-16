@@ -40,6 +40,7 @@ export function QuickAddConsole() {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [projectAddress, setProjectAddress] = useState("");
+  const [initialContractValue, setInitialContractValue] = useState("");
   const [source, setSource] = useState("field_manual");
   const [notes, setNotes] = useState("");
   const [projectName, setProjectName] = useState("");
@@ -192,6 +193,7 @@ export function QuickAddConsole() {
     setFullName("");
     setPhone("");
     setProjectAddress("");
+    setInitialContractValue("");
     setSource("field_manual");
     setNotes("");
     setFieldErrors({});
@@ -219,6 +221,7 @@ export function QuickAddConsole() {
       phone: phone.trim(),
       project_address: projectAddress.trim(),
       email: "",
+      initial_contract_value: initialContractValue.trim() ? initialContractValue.trim() : null,
       notes: notes.trim(),
       source: source.trim() || "field_manual",
     };
@@ -347,15 +350,17 @@ export function QuickAddConsole() {
           <summary>Optional details</summary>
           <div className={styles.optionalBody}>
             <label className={styles.field}>
-              Source
-              <select name="source" value={source} onChange={(event) => setSource(event.target.value)}>
-                <option value="field_manual">field_manual</option>
-                <option value="office_manual">office_manual</option>
-                <option value="import">import</option>
-                <option value="web_form">web_form</option>
-                <option value="referral">referral</option>
-                <option value="other">other</option>
-              </select>
+              Initial contract value
+              <input
+                name="initial_contract_value"
+                value={initialContractValue}
+                onChange={(event) => setInitialContractValue(event.target.value)}
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                placeholder="25000.00"
+              />
             </label>
             <label className={styles.field}>
               Notes
@@ -365,6 +370,17 @@ export function QuickAddConsole() {
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
               />
+            </label>
+            <label className={styles.field}>
+              Source
+              <select name="source" value={source} onChange={(event) => setSource(event.target.value)}>
+                <option value="field_manual">field_manual</option>
+                <option value="office_manual">office_manual</option>
+                <option value="import">import</option>
+                <option value="web_form">web_form</option>
+                <option value="referral">referral</option>
+                <option value="other">other</option>
+              </select>
             </label>
           </div>
         </details>

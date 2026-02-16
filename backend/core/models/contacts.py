@@ -31,6 +31,12 @@ class LeadContact(models.Model):
     phone = models.CharField(max_length=50, blank=True)
     project_address = models.CharField(max_length=255)
     email = models.EmailField(blank=True)
+    initial_contract_value = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
     notes = models.TextField(blank=True)
     status = models.CharField(
         max_length=32,

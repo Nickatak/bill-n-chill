@@ -92,11 +92,16 @@ def contact_detail_view(request, contact_id: int):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def quick_add_lead_contact_view(request):
+    initial_contract_value = request.data.get("initial_contract_value", None)
+    if initial_contract_value == "":
+        initial_contract_value = None
+
     raw_payload = {
         "full_name": request.data.get("full_name", ""),
         "phone": request.data.get("phone", ""),
         "project_address": request.data.get("project_address", ""),
         "email": request.data.get("email", ""),
+        "initial_contract_value": initial_contract_value,
         "notes": request.data.get("notes", ""),
         "source": request.data.get("source", LeadContact.Source.FIELD_MANUAL),
     }
@@ -184,6 +189,8 @@ def quick_add_lead_contact_view(request):
                 target.project_address = payload["project_address"]
             if payload["email"]:
                 target.email = payload["email"]
+            if payload.get("initial_contract_value") is not None:
+                target.initial_contract_value = payload["initial_contract_value"]
             target.source = payload["source"] or target.source
             if payload["notes"]:
                 if target.notes:
@@ -277,6 +284,8 @@ def convert_lead_to_project_view(request, lead_id: int):
         customer=customer,
         name=project_name,
         status=data.get("project_status", Project.Status.PROSPECT),
+        contract_value_original=lead.initial_contract_value or 0,
+        contract_value_current=lead.initial_contract_value or 0,
         created_by=request.user,
     )
 

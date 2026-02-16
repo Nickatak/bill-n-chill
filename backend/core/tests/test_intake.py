@@ -39,6 +39,22 @@ class LeadContactQuickAddTests(TestCase):
         self.assertEqual(lead.created_by_id, self.user.id)
         self.assertEqual(lead.full_name, "Jane Doe")
 
+    def test_quick_add_accepts_optional_initial_contract_value(self):
+        response = self.client.post(
+            "/api/v1/lead-contacts/quick-add/",
+            data={
+                "full_name": "Valued Lead",
+                "phone": "555-0100",
+                "project_address": "123 Main St",
+                "initial_contract_value": "25000.00",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        lead = LeadContact.objects.get(id=response.json()["data"]["id"])
+        self.assertEqual(str(lead.initial_contract_value), "25000.00")
+
     def test_quick_add_allows_email_in_phone_field(self):
         response = self.client.post(
             "/api/v1/lead-contacts/quick-add/",
@@ -230,6 +246,21 @@ class LeadConversionTests(TestCase):
         self.assertIsNotNone(self.lead.converted_customer_id)
         self.assertIsNotNone(self.lead.converted_project_id)
         self.assertEqual(response.json()["meta"]["conversion_status"], "converted")
+
+    def test_convert_uses_initial_contract_value_when_present(self):
+        self.lead.initial_contract_value = "14500.00"
+        self.lead.save(update_fields=["initial_contract_value", "updated_at"])
+
+        response = self.client.post(
+            f"/api/v1/lead-contacts/{self.lead.id}/convert-to-project/",
+            data={"project_name": "Kitchen Remodel", "project_status": "active"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        project = Project.objects.get(id=response.json()["data"]["project"]["id"])
+        self.assertEqual(str(project.contract_value_original), "14500.00")
+        self.assertEqual(str(project.contract_value_current), "14500.00")
 
     def test_convert_is_idempotent_if_already_converted(self):
         first = self.client.post(
