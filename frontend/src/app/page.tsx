@@ -35,17 +35,10 @@ export default async function Home() {
       <main className={styles.main}>
         <h1 className={styles.title}>bill-n-chill</h1>
         <p className={styles.subtitle}>
-          Django/DRF backend and Next.js frontend scaffold is running. Use the ordered
-          workflow navbar at the top on every page during development.
+          Auth-gated home: unauthenticated users see a clean sign-in screen,
+          authenticated users are routed straight into Intake.
         </p>
-        <div className={styles.healthCard} data-ok={health.ok ? "true" : "false"}>
-          <p className={styles.label}>GET /api/v1/health/</p>
-          <p className={styles.status}>{health.ok ? "OK" : "ERROR"}</p>
-          <p className={styles.message}>{health.message}</p>
-        </div>
-        <div className={styles.nextCard}>
-          <HomeAuthConsole />
-        </div>
+        <HomeAuthConsole health={health} />
       </main>
     </div>
   );

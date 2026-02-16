@@ -1,0 +1,164 @@
+.shell {
+  display: grid;
+  gap: 14px;
+}
+
+.card {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: #fbfdff;
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.title {
+  margin: 0;
+  color: #111827;
+  font-size: 1.2rem;
+}
+
+.text {
+  margin: 0;
+  color: #4b5563;
+}
+
+.form {
+  display: grid;
+  gap: 10px;
+}
+
+.form label {
+  display: grid;
+  gap: 4px;
+  color: #111827;
+  font-weight: 600;
+}
+
+.form input {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  min-height: 40px;
+  padding: 0 10px;
+  background: #ffffff;
+  color: #111827;
+}
+
+.buttonRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.button {
+  border: 1px solid #111827;
+  border-radius: 999px;
+  min-height: 38px;
+  padding: 0 12px;
+  background: #111827;
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.buttonSecondary {
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  min-height: 38px;
+  padding: 0 12px;
+  background: #ffffff;
+  color: #111827;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.button:disabled,
+.buttonSecondary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.message {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.95rem;
+}
+
+.healthOk,
+.healthBad {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.healthOk {
+  color: #047857;
+}
+
+.healthBad {
+  color: #b91c1c;
+}
+
+.quickLinks {
+  display: grid;
+  gap: 8px;
+}
+
+.quickLink {
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #111827;
+  padding: 10px;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.quickHint {
+  display: block;
+  margin-top: 4px;
+  color: #4b5563;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+@media (min-width: 760px) {
+  .quickLinks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+:global(html[data-theme="dark"]) .card {
+  border-color: #334155;
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .title,
+:global(html[data-theme="dark"]) .form label,
+:global(html[data-theme="dark"]) .buttonSecondary,
+:global(html[data-theme="dark"]) .quickLink {
+  color: #e5e7eb;
+}
+
+:global(html[data-theme="dark"]) .text,
+:global(html[data-theme="dark"]) .message,
+:global(html[data-theme="dark"]) .quickHint {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .form input,
+:global(html[data-theme="dark"]) .buttonSecondary,
+:global(html[data-theme="dark"]) .quickLink {
+  border-color: #334155;
+  background: #111827;
+}
+
+:global(html[data-theme="dark"]) .form input {
+  color: #f3f4f6;
+}
+
+:global(html[data-theme="dark"]) .button {
+  border-color: #e5e7eb;
+  background: #e5e7eb;
+  color: #0f172a;
+}

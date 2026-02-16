@@ -43,10 +43,6 @@ html[data-theme="light"] {
 }
 
 .themeToggle {
-  position: fixed;
-  top: 12px;
-  right: 12px;
-  z-index: 1000;
   border: 1px solid #d1d5db;
   border-radius: 999px;
   background: #ffffff;
@@ -59,6 +55,34 @@ html[data-theme="light"] {
 }
 
 html[data-theme="dark"] .themeToggle {
+  border-color: #334155;
+  background: #111827;
+  color: #f3f4f6;
+}
+
+.themeControls {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.themeLogout {
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111827;
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+html[data-theme="dark"] .themeLogout {
   border-color: #334155;
   background: #111827;
   color: #f3f4f6;
@@ -115,4 +139,40 @@ html[data-theme="dark"] .workflowLink.isActive {
   border-color: #e5e7eb;
   background: #e5e7eb;
   color: #0f172a;
+}
+
+
+.authHintBar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 900;
+  border-bottom: 1px solid #d1d5db;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(6px);
+}
+
+.authHintInner {
+  min-height: 48px;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: #111827;
+}
+
+.authHintInner a {
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+html[data-theme="dark"] .authHintBar {
+  border-bottom-color: #334155;
+  background: rgba(11, 18, 32, 0.96);
+}
+
+html[data-theme="dark"] .authHintInner {
+  color: #e5e7eb;
 }

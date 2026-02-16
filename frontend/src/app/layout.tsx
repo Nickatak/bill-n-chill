@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeToggle } from "./theme-toggle";
-import { WorkflowNavbar } from "./workflow-navbar";
+import { WorkflowShell } from "./workflow-shell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -49,7 +49,7 @@ export default function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <ThemeToggle />
-        <WorkflowNavbar />
+        <WorkflowShell />
         {children}
       </body>
     </html>

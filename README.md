@@ -74,6 +74,8 @@ bill-n-chill/
 - `docs/domain-model.md`: core entities, lifecycles, and API direction for construction billing workflows.
 - `docs/gc-pm-use-case.md`: step-by-step GC/PM scenario with required features, device posture, and edge conditions.
 - `docs/feature-list.md`: complete ordered feature backlog with dependencies and acceptance checks.
+- `docs/phase-2-operational-hardening-and-product-development.md`: next-phase plan for operational hardening and UX/use-case product development.
+- `docs/dashboard-home-auth-gate.md`: auth-gated dashboard-home UX sketch and interaction rules.
 
 ## Notes
 

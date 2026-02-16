@@ -1,12 +1,14 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   clearClientSession,
   loadClientSession,
   saveClientSession,
 } from "../client-session";
+import styles from "./home-auth-console.module.css";
 
 type LoginResponse = {
   data?: {
@@ -26,62 +28,81 @@ type MeResponse = {
   };
 };
 
+type HomeAuthConsoleProps = {
+  health: {
+    ok: boolean;
+    message: string;
+  };
+};
+
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
-export function HomeAuthConsole() {
+export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
+  const router = useRouter();
   const initialSession = typeof window !== "undefined" ? loadClientSession() : null;
   const [email, setEmail] = useState(initialSession?.email ?? "");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState(initialSession?.token ?? "");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isChecking, setIsChecking] = useState(Boolean(initialSession?.token));
   const [message, setMessage] = useState(
-    initialSession ? `Loaded saved session for ${initialSession.email || "user"}.` : "",
+    initialSession ? "Checking saved session..." : "Sign in to open your dashboard.",
   );
 
-  const normalizedBaseUrl = defaultApiBaseUrl;
-
-  function persistSession(nextToken: string, nextEmail: string) {
-    saveClientSession({
-      token: nextToken,
-      email: nextEmail,
-    });
+  async function verifySession(activeToken: string, fallbackEmail: string) {
+    try {
+      const response = await fetch(`${defaultApiBaseUrl}/auth/me/`, {
+        headers: { Authorization: `Token ${activeToken}` },
+      });
+      const payload: MeResponse = await response.json();
+      if (!response.ok) {
+        clearClientSession();
+        setToken("");
+        setIsAuthenticated(false);
+        setMessage("Session expired. Sign in again.");
+        return;
+      }
+      const nextEmail = payload.data?.email ?? fallbackEmail;
+      if (nextEmail && nextEmail !== email) {
+        setEmail(nextEmail);
+      }
+      saveClientSession({ token: activeToken, email: nextEmail });
+      setIsAuthenticated(true);
+      setMessage(`Using shared session for ${nextEmail || "user"}.`);
+    } catch {
+      setIsAuthenticated(false);
+      setMessage("Could not reach auth/me endpoint.");
+    }
   }
 
   useEffect(() => {
-    async function verifySharedSession() {
+    async function init() {
       if (!token) {
+        setIsChecking(false);
         return;
       }
-      setMessage("Checking shared session...");
-      try {
-        const response = await fetch(`${normalizedBaseUrl}/auth/me/`, {
-          headers: { Authorization: `Token ${token}` },
-        });
-        const payload: MeResponse = await response.json();
-        if (!response.ok) {
-          setMessage("Saved session token is invalid. Login again.");
-          return;
-        }
-        const nextEmail = payload.data?.email ?? email;
-        if (nextEmail && nextEmail !== email) {
-          setEmail(nextEmail);
-        }
-        persistSession(token, nextEmail);
-        setMessage(`Using shared session for ${nextEmail || "user"}.`);
-      } catch {
-        setMessage("Could not reach auth/me endpoint.");
-      }
+      setIsChecking(true);
+      await verifySession(token, email);
+      setIsChecking(false);
     }
 
-    void verifySharedSession();
+    void init();
     // Intentionally runs once on initial load.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace("/intake/quick-add");
+    }
+  }, [isAuthenticated, router]);
+
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage("Logging in...");
+    setIsChecking(true);
+    setMessage("Signing in...");
     try {
-      const response = await fetch(`${normalizedBaseUrl}/auth/login/`, {
+      const response = await fetch(`${defaultApiBaseUrl}/auth/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -91,74 +112,81 @@ export function HomeAuthConsole() {
       const nextEmail = payload.data?.user?.email ?? email;
       if (!response.ok || !nextToken) {
         setMessage(payload.error?.message ?? "Login failed.");
+        setIsChecking(false);
         return;
       }
+
       setToken(nextToken);
-      persistSession(nextToken, nextEmail);
-      setMessage(`Logged in as ${nextEmail}. Session saved for all routes.`);
+      setPassword("");
+      await verifySession(nextToken, nextEmail);
     } catch {
       setMessage("Could not reach login endpoint.");
+    } finally {
+      setIsChecking(false);
     }
   }
 
-  function handleSaveManualToken() {
-    if (!token) {
-      setMessage("Token is empty.");
-      return;
-    }
-    persistSession(token, email);
-    setMessage("Manual token saved to shared session.");
-  }
-
-  function handleClearSession() {
+  function handleSignOut() {
     clearClientSession();
     setToken("");
     setPassword("");
-    setMessage("Session cleared.");
+    setIsAuthenticated(false);
+    setMessage("Signed out.");
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <section className={styles.shell}>
+        <div className={styles.card}>
+          <h2 className={styles.title}>Sign in</h2>
+          <p className={styles.text}>Home doubles as your dashboard once authenticated.</p>
+          <form className={styles.form} onSubmit={handleLogin}>
+            <label>
+              Email
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="email"
+                required
+              />
+            </label>
+            <label>
+              Password
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
+                required
+              />
+            </label>
+            <div className={styles.buttonRow}>
+              <button className={styles.button} type="submit" disabled={isChecking}>
+                {isChecking ? "Checking..." : "Sign in"}
+              </button>
+            </div>
+          </form>
+          <p className={styles.message}>{message}</p>
+          <p className={health.ok ? styles.healthOk : styles.healthBad}>API Health: {health.message}</p>
+        </div>
+      </section>
+    );
   }
 
   return (
-    <section>
-      <h2>Global Login</h2>
-      <p>Login once here. All route consoles reuse this session.</p>
-
-      <form onSubmit={handleLogin}>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            autoComplete="email"
-            required
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            autoComplete="current-password"
-            required
-          />
-        </label>
-        <button type="submit">Login + Save Session</button>
-      </form>
-
-      <label>
-        Auth token
-        <input value={token} onChange={(event) => setToken(event.target.value)} />
-      </label>
-      <div>
-        <button type="button" onClick={handleSaveManualToken}>
-          Save Token
-        </button>
-        <button type="button" onClick={handleClearSession}>
-          Clear Session
-        </button>
+    <section className={styles.shell}>
+      <div className={styles.card}>
+        <h2 className={styles.title}>Session ready</h2>
+        <p className={styles.text}>Signed in as {email || "user"}. Redirecting to Intake...</p>
+        <p className={styles.message}>{message}</p>
+        <p className={health.ok ? styles.healthOk : styles.healthBad}>API Health: {health.message}</p>
+        <div className={styles.buttonRow}>
+          <button className={styles.buttonSecondary} type="button" onClick={handleSignOut}>
+            Sign out
+          </button>
+        </div>
       </div>
-      <p>{message}</p>
     </section>
   );
 }

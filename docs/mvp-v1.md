@@ -83,10 +83,11 @@ bill-n-chill is the operational and financial thread that keeps project scope ch
 ## UX Principles for v1
 
 - Money state must be explainable in one screen per project.
+- Home route (`/`) should be auth-gated and act as both splash/login and dashboard entry.
 - Every financial number should trace back to source records.
 - Change orders must be impossible to miss in downstream billing.
 - Simple defaults first; advanced controls behind explicit toggles.
-- Support both light and dark mode in v1; default to light mode.
+- Support both light and dark mode in v1; default to dark mode (temporary, for current MVP demos).
 - Theme choice should be user-controlled and persisted per user.
 
 ## Mobile and Desktop Strategy (v1)
@@ -106,7 +107,7 @@ Primary desktop workflows:
 - Invoice composition, financial reconciliation, and reporting.
 
 Theme requirements:
-- Light mode is the default experience for broad user familiarity.
+- Dark mode is currently the default experience for MVP demos; switchable via user theme toggle.
 - Dark mode must maintain full readability and parity (no reduced feature visibility).
 
 ## Core Success Metrics

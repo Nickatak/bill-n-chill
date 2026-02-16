@@ -50,6 +50,7 @@ Distill current discovery into a complete, ordered feature list that can be impl
 - Acceptance checks:
   - Protected endpoints reject unauthenticated access.
   - Frontend supports authenticated API requests.
+  - Home route (`/`) is auth-gated: login splash for unauth users, operations dashboard for authed users.
 
 ### FND-03: Company/tenant context
 - Status: [x] Complete
