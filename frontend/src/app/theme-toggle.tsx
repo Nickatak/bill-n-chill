@@ -22,6 +22,7 @@ export function ThemeToggle() {
   const hasSession =
     pathname !== null && typeof window !== "undefined" && Boolean(loadClientSession()?.token);
   const hasActiveNonWorkflow = pathname === "/contacts";
+  const hasActiveSettings = pathname === "/settings/intake";
 
   function toggleTheme() {
     const current =
@@ -50,6 +51,22 @@ export function ThemeToggle() {
               role="menuitem"
             >
               Contacts
+            </Link>
+          </div>
+        </details>
+      ) : null}
+      {hasSession ? (
+        <details className="nonWorkflowMenu">
+          <summary className={`themeControlButton ${hasActiveSettings ? "isActive" : ""}`}>
+            Settings
+          </summary>
+          <div className="nonWorkflowList" role="menu" aria-label="Settings">
+            <Link
+              href="/settings/intake"
+              className={`nonWorkflowItem ${hasActiveSettings ? "isActive" : ""}`}
+              role="menuitem"
+            >
+              Intake Form
             </Link>
           </div>
         </details>
