@@ -70,8 +70,10 @@ Distill current discovery into a complete, ordered feature list that can be impl
   - implemented: `POST /api/v1/lead-contacts/quick-add/`
   - implemented: `http://localhost:3000/intake/quick-add`
 - Acceptance checks:
-  - Required fields: name, phone, project address.
-  - Optional fields: email, notes, source.
+  - Required fields: name, project address, and at least one contact method (phone or email).
+  - Optional fields: email, notes, source (collapsed by default in UI).
+  - Inline required-field errors are shown before submission.
+  - Created lead shows clear next-step path to conversion.
 
 ### INT-02: Duplicate detection and resolution
 - Status: [x] Complete

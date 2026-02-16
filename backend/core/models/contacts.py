@@ -28,7 +28,7 @@ class LeadContact(models.Model):
         OTHER = "other", "Other"
 
     full_name = models.CharField(max_length=255)
-    phone = models.CharField(max_length=50)
+    phone = models.CharField(max_length=50, blank=True)
     project_address = models.CharField(max_length=255)
     email = models.EmailField(blank=True)
     notes = models.TextField(blank=True)
@@ -69,7 +69,8 @@ class LeadContact(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        return f"{self.full_name} ({self.phone})"
+        contact_hint = self.phone or self.email or "no-contact"
+        return f"{self.full_name} ({contact_hint})"
 
 
 class Customer(models.Model):

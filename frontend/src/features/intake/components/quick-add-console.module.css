@@ -1,0 +1,104 @@
+.section {
+  display: grid;
+  gap: 14px;
+}
+
+.formGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 5px;
+}
+
+.errorText {
+  margin: 0;
+  color: #dc2626;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.optionalDetails {
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.optionalDetails summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.optionalBody {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.stickyActions {
+  position: sticky;
+  bottom: 0;
+  background: var(--foreground);
+  padding-top: 8px;
+}
+
+.summaryCard {
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.55);
+  display: grid;
+  gap: 8px;
+}
+
+.summaryTitle {
+  margin: 0;
+  font-weight: 700;
+}
+
+.summaryText {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.inlineActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.secondaryLink {
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+@media (max-width: 640px) {
+  .stickyActions {
+    margin-left: -4px;
+    margin-right: -4px;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+}
+
+:global(html[data-theme="dark"]) .optionalDetails,
+:global(html[data-theme="dark"]) .summaryCard {
+  border-color: #334155;
+  background: rgba(15, 23, 42, 0.65);
+}
+
+:global(html[data-theme="dark"]) .errorText {
+  color: #f87171;
+}
+
+:global(html[data-theme="dark"]) .secondaryLink {
+  border-color: #334155;
+  color: #e5e7eb;
+}

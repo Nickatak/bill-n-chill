@@ -1,28 +1,64 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { loadClientSession } from "../../session/client-session";
 import { ApiResponse, DuplicateData, LeadContactCandidate, LeadConvertResult, LeadPayload } from "../types";
+import styles from "./quick-add-console.module.css";
+
+type LeadFieldErrors = {
+  full_name?: string;
+  phone?: string;
+  email?: string;
+  project_address?: string;
+  project_name?: string;
+};
+
+type SubmitIntent = "contact_only" | "contact_and_project";
+
+type PendingSubmission = {
+  payload: LeadPayload;
+  intent: SubmitIntent;
+  projectName: string;
+  projectStatus: string;
+};
 
 export function QuickAddConsole() {
   const session = loadClientSession();
+  const fullNameRef = useRef<HTMLInputElement>(null);
+
   const [token] = useState(session?.token ?? "");
   const [authMessage, setAuthMessage] = useState(
     session
       ? "Using shared session for " + (session.email || "user") + "."
       : "No shared session found. Go to / and login first.",
   );
+
   const [leadMessage, setLeadMessage] = useState("");
   const [conversionMessage, setConversionMessage] = useState("");
-  const [duplicateCandidates, setDuplicateCandidates] = useState<LeadContactCandidate[]>([]);
-  const [selectedDuplicateId, setSelectedDuplicateId] = useState<string>("");
-  const [pendingLeadPayload, setPendingLeadPayload] = useState<LeadPayload | null>(null);
-  const [lastLeadId, setLastLeadId] = useState<number | null>(null);
+
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [projectAddress, setProjectAddress] = useState("");
+  const [email, setEmail] = useState("");
+  const [source, setSource] = useState("field_manual");
+  const [notes, setNotes] = useState("");
   const [projectName, setProjectName] = useState("");
   const [projectStatus, setProjectStatus] = useState("prospect");
+  const [fieldErrors, setFieldErrors] = useState<LeadFieldErrors>({});
 
-  const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+  const [duplicateCandidates, setDuplicateCandidates] = useState<LeadContactCandidate[]>([]);
+  const [selectedDuplicateId, setSelectedDuplicateId] = useState<string>("");
+  const [pendingSubmission, setPendingSubmission] = useState<PendingSubmission | null>(null);
+
+  const [lastLead, setLastLead] = useState<LeadContactCandidate | null>(null);
+
+  const normalizedBaseUrl = useMemo(() => normalizeApiBaseUrl(defaultApiBaseUrl), []);
+
+  useEffect(() => {
+    fullNameRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     async function verifySharedSession() {
@@ -47,12 +83,59 @@ export function QuickAddConsole() {
     }
 
     void verifySharedSession();
-    // Intentionally runs once on initial load.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [normalizedBaseUrl, token]);
+
+  function validateLeadFields(payload: LeadPayload, intent: SubmitIntent): LeadFieldErrors {
+    const nextErrors: LeadFieldErrors = {};
+    if (!payload.full_name.trim()) {
+      nextErrors.full_name = "Full name is required.";
+    }
+    if (!payload.phone.trim()) {
+      if (!payload.email.trim()) {
+        nextErrors.phone = "Provide phone or email.";
+        nextErrors.email = "Provide phone or email.";
+      }
+    }
+    if (!payload.project_address.trim()) {
+      nextErrors.project_address = "Project address is required.";
+    }
+    if (intent === "contact_and_project" && !projectName.trim()) {
+      nextErrors.project_name = "Project name is required when creating project + contact.";
+    }
+    return nextErrors;
+  }
+
+  async function convertLeadToProject(leadId: number, name: string, status: string): Promise<void> {
+    setConversionMessage("Converting lead to customer + project...");
+
+    const response = await fetch(`${normalizedBaseUrl}/lead-contacts/${leadId}/convert-to-project/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Token ${token}`,
+      },
+      body: JSON.stringify({
+        project_name: name,
+        project_status: status,
+      }),
+    });
+
+    const payload: ApiResponse = await response.json();
+    if (!response.ok) {
+      setConversionMessage(payload.error?.message ?? "Lead conversion failed.");
+      return;
+    }
+
+    const result = payload.data as LeadConvertResult;
+    const resultStatus = payload.meta?.conversion_status ?? "converted";
+    setConversionMessage(
+      `Conversion ${resultStatus}: customer #${result.customer?.id ?? "?"}, project #${result.project?.id ?? "?"}.`,
+    );
+  }
 
   async function submitQuickAdd(
     body: LeadPayload,
+    submission: PendingSubmission,
     options?: { duplicate_resolution?: string; duplicate_target_id?: number },
   ) {
     const requestBody = {
@@ -76,13 +159,13 @@ export function QuickAddConsole() {
       const candidates = data.duplicate_candidates ?? [];
       setDuplicateCandidates(candidates);
       setSelectedDuplicateId(candidates[0] ? String(candidates[0].id) : "");
-      setPendingLeadPayload(body);
+      setPendingSubmission(submission);
       setLeadMessage("Possible duplicate found. Choose a resolution below.");
       return;
     }
 
     if (!response.ok) {
-      setLeadMessage("Quick Add failed. Check token and required fields.");
+      setLeadMessage(payload.error?.message ?? "Quick Add failed. Check token and required fields.");
       return;
     }
 
@@ -91,47 +174,80 @@ export function QuickAddConsole() {
     setLeadMessage(`Lead contact saved (#${result.id}) via resolution: ${resolution}.`);
     setDuplicateCandidates([]);
     setSelectedDuplicateId("");
-    setPendingLeadPayload(null);
-    setLastLeadId(result.id);
-    if (!projectName) {
-      setProjectName(`${result.full_name} Project`);
+    setPendingSubmission(null);
+    setLastLead(result);
+
+    if (submission.intent === "contact_and_project") {
+      await convertLeadToProject(result.id, submission.projectName, submission.projectStatus);
+    } else {
+      setConversionMessage("");
     }
+
+    setFullName("");
+    setPhone("");
+    setProjectAddress("");
+    setEmail("");
+    setSource("field_manual");
+    setNotes("");
+    setFieldErrors({});
+    fullNameRef.current?.focus();
   }
 
   async function handleQuickAdd(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setLeadMessage("Submitting lead contact...");
-    const form = event.currentTarget;
 
-    const formData = new FormData(form);
+    const nativeEvent = event.nativeEvent as SubmitEvent;
+    const submitter = nativeEvent.submitter as HTMLButtonElement | null;
+    const intent: SubmitIntent = submitter?.value === "contact_and_project"
+      ? "contact_and_project"
+      : "contact_only";
+
+    setLeadMessage(intent === "contact_only" ? "Submitting lead contact..." : "Creating contact + project...");
+
+    if (!token) {
+      setLeadMessage("No shared session token found. Go to / and sign in.");
+      return;
+    }
+
     const body: LeadPayload = {
-      full_name: String(formData.get("full_name") ?? ""),
-      phone: String(formData.get("phone") ?? ""),
-      project_address: String(formData.get("project_address") ?? ""),
-      email: String(formData.get("email") ?? ""),
-      notes: String(formData.get("notes") ?? ""),
-      source: String(formData.get("source") ?? "field_manual"),
+      full_name: fullName.trim(),
+      phone: phone.trim(),
+      project_address: projectAddress.trim(),
+      email: email.trim(),
+      notes: notes.trim(),
+      source: source.trim() || "field_manual",
     };
 
+    const submission: PendingSubmission = {
+      payload: body,
+      intent,
+      projectName: projectName.trim() || `${fullName.trim()} Project`,
+      projectStatus,
+    };
+
+    const nextErrors = validateLeadFields(body, intent);
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      setLeadMessage("Fix the required fields and submit again.");
+      return;
+    }
+
     try {
-      await submitQuickAdd(body);
-      if (duplicateCandidates.length === 0) {
-        form.reset();
-      }
+      await submitQuickAdd(body, submission);
     } catch {
       setLeadMessage("Lead submission failed due to an unexpected UI error.");
     }
   }
 
   async function resolveDuplicate(resolution: "use_existing" | "merge_existing" | "create_anyway") {
-    if (!pendingLeadPayload) {
+    if (!pendingSubmission) {
       setLeadMessage("No pending duplicate payload to resolve.");
       return;
     }
 
     try {
       if (resolution === "create_anyway") {
-        await submitQuickAdd(pendingLeadPayload, { duplicate_resolution: resolution });
+        await submitQuickAdd(pendingSubmission.payload, pendingSubmission, { duplicate_resolution: resolution });
         return;
       }
 
@@ -141,7 +257,7 @@ export function QuickAddConsole() {
         return;
       }
 
-      await submitQuickAdd(pendingLeadPayload, {
+      await submitQuickAdd(pendingSubmission.payload, pendingSubmission, {
         duplicate_resolution: resolution,
         duplicate_target_id: targetId,
       });
@@ -150,88 +266,120 @@ export function QuickAddConsole() {
     }
   }
 
-  async function handleConvertLead(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!lastLeadId) {
-      setConversionMessage("Create or resolve a lead contact first.");
-      return;
-    }
-
-    setConversionMessage("Converting lead to customer + project...");
-
-    try {
-      const response = await fetch(
-        `${normalizedBaseUrl}/lead-contacts/${lastLeadId}/convert-to-project/`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Token ${token}`,
-          },
-          body: JSON.stringify({
-            project_name: projectName,
-            project_status: projectStatus,
-          }),
-        },
-      );
-
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setConversionMessage("Lead conversion failed.");
-        return;
-      }
-
-      const result = payload.data as LeadConvertResult;
-      const status = payload.meta?.conversion_status ?? "converted";
-      setConversionMessage(
-        `Conversion ${status}: customer #${result.customer?.id ?? "?"}, project #${result.project?.id ?? "?"}.`,
-      );
-    } catch {
-      setConversionMessage("Could not reach lead conversion endpoint.");
-    }
-  }
-
   return (
-    <section>
+    <section className={styles.section}>
       <h2>Quick Add Contact</h2>
-      <p>Use your shared session from /, then capture lead details from the field.</p>
+      <p>Use one form for both capture-only and capture-with-project actions.</p>
       <p>{authMessage}</p>
 
-      <form onSubmit={handleQuickAdd}>
-        <h3>Lead Capture</h3>
-        <label>
+      <form className={styles.formGrid} onSubmit={handleQuickAdd}>
+        <h3>Lead Capture + Optional Project</h3>
+
+        <label className={styles.field}>
           Full name
-          <input name="full_name" required />
+          <input
+            ref={fullNameRef}
+            name="full_name"
+            value={fullName}
+            onChange={(event) => setFullName(event.target.value)}
+            autoComplete="name"
+            required
+          />
+          {fieldErrors.full_name ? <p className={styles.errorText}>{fieldErrors.full_name}</p> : null}
         </label>
-        <label>
-          Phone
-          <input name="phone" required />
+
+        <label className={styles.field}>
+          Phone (or email)
+          <input
+            name="phone"
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+          />
+          {fieldErrors.phone ? <p className={styles.errorText}>{fieldErrors.phone}</p> : null}
         </label>
-        <label>
+
+        <label className={styles.field}>
           Project address
-          <input name="project_address" required />
+          <input
+            name="project_address"
+            value={projectAddress}
+            onChange={(event) => setProjectAddress(event.target.value)}
+            autoComplete="street-address"
+            required
+          />
+          {fieldErrors.project_address ? (
+            <p className={styles.errorText}>{fieldErrors.project_address}</p>
+          ) : null}
         </label>
-        <label>
-          Email
-          <input name="email" type="email" />
+
+        <label className={styles.field}>
+          Project name (required for Create Contact + Project)
+          <input
+            name="project_name"
+            value={projectName}
+            onChange={(event) => setProjectName(event.target.value)}
+            placeholder="Bathroom Remodel"
+          />
+          {fieldErrors.project_name ? <p className={styles.errorText}>{fieldErrors.project_name}</p> : null}
         </label>
-        <label>
-          Source
-          <select name="source" defaultValue="field_manual">
-            <option value="field_manual">field_manual</option>
-            <option value="office_manual">office_manual</option>
-            <option value="import">import</option>
-            <option value="web_form">web_form</option>
-            <option value="referral">referral</option>
-            <option value="other">other</option>
+
+        <label className={styles.field}>
+          Project status
+          <select value={projectStatus} onChange={(event) => setProjectStatus(event.target.value)}>
+            <option value="prospect">prospect</option>
+            <option value="active">active</option>
+            <option value="on_hold">on_hold</option>
+            <option value="completed">completed</option>
+            <option value="cancelled">cancelled</option>
           </select>
         </label>
-        <label>
-          Notes
-          <textarea name="notes" rows={3} />
-        </label>
-        <button type="submit">Create Lead Contact</button>
+
+        <details className={styles.optionalDetails}>
+          <summary>Optional details</summary>
+          <div className={styles.optionalBody}>
+            <label className={styles.field}>
+              Email
+              <input
+                name="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                type="email"
+                autoComplete="email"
+              />
+              {fieldErrors.email ? <p className={styles.errorText}>{fieldErrors.email}</p> : null}
+            </label>
+            <label className={styles.field}>
+              Source
+              <select name="source" value={source} onChange={(event) => setSource(event.target.value)}>
+                <option value="field_manual">field_manual</option>
+                <option value="office_manual">office_manual</option>
+                <option value="import">import</option>
+                <option value="web_form">web_form</option>
+                <option value="referral">referral</option>
+                <option value="other">other</option>
+              </select>
+            </label>
+            <label className={styles.field}>
+              Notes
+              <textarea
+                name="notes"
+                rows={3}
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+              />
+            </label>
+          </div>
+        </details>
+
+        <div className={styles.stickyActions}>
+          <div className={styles.inlineActions}>
+            <button type="submit" value="contact_only">Create Contact Only</button>
+            <button type="submit" value="contact_and_project">Create Contact + Project</button>
+          </div>
+        </div>
       </form>
 
       {duplicateCandidates.length > 0 ? (
@@ -260,33 +408,23 @@ export function QuickAddConsole() {
 
       <p>{leadMessage}</p>
 
-      <form onSubmit={handleConvertLead}>
-        <h3>Convert Lead to Project</h3>
-        <label>
-          Lead ID
-          <input
-            value={lastLeadId ?? ""}
-            onChange={(event) => setLastLeadId(Number(event.target.value) || null)}
-            placeholder="Lead ID"
-          />
-        </label>
-        <label>
-          Project name
-          <input value={projectName} onChange={(event) => setProjectName(event.target.value)} />
-        </label>
-        <label>
-          Project status
-          <select value={projectStatus} onChange={(event) => setProjectStatus(event.target.value)}>
-            <option value="prospect">prospect</option>
-            <option value="active">active</option>
-            <option value="on_hold">on_hold</option>
-            <option value="completed">completed</option>
-            <option value="cancelled">cancelled</option>
-          </select>
-        </label>
-        <button type="submit">Convert Lead</button>
-      </form>
+      {lastLead ? (
+        <div className={styles.summaryCard}>
+          <p className={styles.summaryTitle}>Lead created</p>
+          <p className={styles.summaryText}>
+            #{lastLead.id} - {lastLead.full_name} ({lastLead.phone})
+          </p>
+        </div>
+      ) : null}
+
       <p>{conversionMessage}</p>
+      {conversionMessage.includes("customer #") ? (
+        <div className={styles.inlineActions}>
+          <Link className={styles.secondaryLink} href="/projects">
+            Go to Projects
+          </Link>
+        </div>
+      ) : null}
     </section>
   );
 }

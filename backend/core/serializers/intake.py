@@ -33,6 +33,18 @@ class LeadContactQuickAddSerializer(serializers.ModelSerializer):
         request = self.context["request"]
         return LeadContact.objects.create(created_by=request.user, **validated_data)
 
+    def validate(self, attrs):
+        phone = (attrs.get("phone") or "").strip()
+        email = (attrs.get("email") or "").strip()
+        if not phone and not email:
+            raise serializers.ValidationError(
+                {
+                    "phone": ["Provide phone or email."],
+                    "email": ["Provide phone or email."],
+                }
+            )
+        return attrs
+
 
 class LeadConvertSerializer(serializers.Serializer):
     project_name = serializers.CharField(required=False, allow_blank=True, max_length=255)
