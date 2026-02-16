@@ -10,7 +10,12 @@ from core.serializers.estimates import (
     EstimateStatusEventSerializer,
     EstimateWriteSerializer,
 )
-from core.serializers.intake import CustomerSerializer, LeadContactQuickAddSerializer, LeadConvertSerializer
+from core.serializers.intake import (
+    CustomerSerializer,
+    LeadContactManageSerializer,
+    LeadContactQuickAddSerializer,
+    LeadConvertSerializer,
+)
 from core.serializers.invoices import (
     InvoiceLineItemInputSerializer,
     InvoiceLineSerializer,
@@ -39,6 +44,7 @@ __all__ = [
     "AccountingSyncEventWriteSerializer",
     "FinancialAuditEventSerializer",
     "LeadContactQuickAddSerializer",
+    "LeadContactManageSerializer",
     "LeadConvertSerializer",
     "CustomerSerializer",
     "ProjectSerializer",

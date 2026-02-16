@@ -62,12 +62,33 @@ html[data-theme="dark"] .themeToggle {
 
 .themeControls {
   position: fixed;
-  top: 12px;
+  top: 0;
   right: 12px;
+  height: 48px;
   z-index: 1000;
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.themeControlButton {
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111827;
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.themeControlButton.isActive {
+  border-color: #111827;
+  background: #111827;
+  color: #ffffff;
 }
 
 .themeLogout {
@@ -88,6 +109,18 @@ html[data-theme="dark"] .themeLogout {
   color: #f3f4f6;
 }
 
+html[data-theme="dark"] .themeControlButton {
+  border-color: #334155;
+  background: #111827;
+  color: #f3f4f6;
+}
+
+html[data-theme="dark"] .themeControlButton.isActive {
+  border-color: #e5e7eb;
+  background: #e5e7eb;
+  color: #0f172a;
+}
+
 .workflowNav {
   position: fixed;
   top: 0;
@@ -105,8 +138,16 @@ html[data-theme="dark"] .themeLogout {
   gap: 8px;
   min-height: 48px;
   padding: 6px 12px;
+}
+
+.workflowNavScroll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   overflow-x: auto;
   white-space: nowrap;
+  min-width: 0;
+  flex: 1;
 }
 
 .workflowLink {
@@ -175,4 +216,65 @@ html[data-theme="dark"] .authHintBar {
 
 html[data-theme="dark"] .authHintInner {
   color: #e5e7eb;
+}
+
+
+.nonWorkflowMenu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.nonWorkflowMenu summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.nonWorkflowMenu summary::-webkit-details-marker {
+  display: none;
+}
+
+.nonWorkflowList {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 1200;
+  min-width: 180px;
+  display: grid;
+  gap: 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 8px;
+}
+
+.nonWorkflowItem {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  color: #111827;
+  background: #ffffff;
+}
+
+.nonWorkflowItem.isActive {
+  border-color: #111827;
+  background: #111827;
+  color: #ffffff;
+}
+
+html[data-theme="dark"] .nonWorkflowList {
+  border-color: #334155;
+  background: #0f172a;
+}
+
+html[data-theme="dark"] .nonWorkflowItem {
+  border-color: #334155;
+  color: #e5e7eb;
+  background: #111827;
+}
+
+html[data-theme="dark"] .nonWorkflowItem.isActive {
+  border-color: #e5e7eb;
+  background: #e5e7eb;
+  color: #0f172a;
 }

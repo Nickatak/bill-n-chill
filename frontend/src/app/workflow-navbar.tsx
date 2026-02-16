@@ -22,24 +22,26 @@ export function WorkflowNavbar() {
   return (
     <nav className="workflowNav" aria-label="MVP workflow order">
       <div className="workflowNavInner">
-        <Link
-          href="/"
-          className={`workflowLink ${pathname === "/" ? "isActive" : ""}`}
-        >
-          Home
-        </Link>
-        {workflowRoutes.map((route) => {
-          const isActive = pathname === route.href;
-          return (
-            <Link
-              key={route.href}
-              href={route.href}
-              className={`workflowLink ${isActive ? "isActive" : ""}`}
-            >
-              {route.label}
-            </Link>
-          );
-        })}
+        <div className="workflowNavScroll">
+          <Link
+            href="/"
+            className={`workflowLink ${pathname === "/" ? "isActive" : ""}`}
+          >
+            Home
+          </Link>
+          {workflowRoutes.map((route) => {
+            const isActive = pathname === route.href;
+            return (
+              <Link
+                key={route.href}
+                href={route.href}
+                className={`workflowLink ${isActive ? "isActive" : ""}`}
+              >
+                {route.label}
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );

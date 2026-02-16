@@ -1,6 +1,7 @@
 "use client";
 
 import { clearClientSession, loadClientSession } from "@/features/session/client-session";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 const THEME_KEY = "bnc-theme";
@@ -20,6 +21,7 @@ export function ThemeToggle() {
   const router = useRouter();
   const hasSession =
     pathname !== null && typeof window !== "undefined" && Boolean(loadClientSession()?.token);
+  const hasActiveNonWorkflow = pathname === "/contacts";
 
   function toggleTheme() {
     const current =
@@ -36,6 +38,22 @@ export function ThemeToggle() {
 
   return (
     <div className="themeControls">
+      {hasSession ? (
+        <details className="nonWorkflowMenu">
+          <summary className={`themeControlButton ${hasActiveNonWorkflow ? "isActive" : ""}`}>
+            Non-Workflow
+          </summary>
+          <div className="nonWorkflowList" role="menu" aria-label="Non-workflow tools">
+            <Link
+              href="/contacts"
+              className={`nonWorkflowItem ${hasActiveNonWorkflow ? "isActive" : ""}`}
+              role="menuitem"
+            >
+              Contacts
+            </Link>
+          </div>
+        </details>
+      ) : null}
       <button type="button" className="themeToggle" onClick={toggleTheme} aria-label="Toggle theme">
         Toggle theme
       </button>

@@ -5,6 +5,8 @@ from core.views import (
     change_order_detail_view,
     cost_code_detail_view,
     cost_codes_list_create_view,
+    contact_detail_view,
+    contacts_list_view,
     convert_lead_to_project_view,
     estimate_convert_to_budget_view,
     estimate_clone_version_view,
@@ -41,6 +43,8 @@ urlpatterns = [
     path("auth/login/", login_view, name="auth-login"),
     path("auth/me/", me_view, name="auth-me"),
     path("lead-contacts/quick-add/", quick_add_lead_contact_view, name="lead-contact-quick-add"),
+    path("contacts/", contacts_list_view, name="contacts-list"),
+    path("contacts/<int:contact_id>/", contact_detail_view, name="contacts-detail"),
     path(
         "lead-contacts/<int:lead_id>/convert-to-project/",
         convert_lead_to_project_view,

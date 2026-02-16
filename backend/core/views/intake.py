@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from core.models import Customer, LeadContact, Project
 from core.serializers import (
     CustomerSerializer,
+    LeadContactManageSerializer,
     LeadContactQuickAddSerializer,
     LeadConvertSerializer,
     ProjectSerializer,
@@ -41,6 +42,52 @@ def _find_duplicate_leads(user, *, phone: str, email: str):
     deduped = {lead.id: lead for lead in [*direct, *phone_matches]}
     return list(deduped.values())
 
+
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def contacts_list_view(request):
+    rows = LeadContact.objects.filter(created_by=request.user).order_by("-created_at")
+    query = (request.query_params.get("q") or "").strip()
+    if query:
+        rows = rows.filter(
+            Q(full_name__icontains=query)
+            | Q(phone__icontains=query)
+            | Q(email__icontains=query)
+            | Q(project_address__icontains=query)
+        )
+    return Response({"data": LeadContactManageSerializer(rows, many=True).data})
+
+
+@api_view(["GET", "PATCH", "DELETE"])
+@permission_classes([IsAuthenticated])
+def contact_detail_view(request, contact_id: int):
+    try:
+        contact = LeadContact.objects.get(id=contact_id, created_by=request.user)
+    except LeadContact.DoesNotExist:
+        return Response(
+            {
+                "error": {
+                    "code": "not_found",
+                    "message": "Contact not found.",
+                    "fields": {},
+                }
+            },
+            status=404,
+        )
+
+    if request.method == "GET":
+        return Response({"data": LeadContactManageSerializer(contact).data})
+
+    if request.method == "DELETE":
+        contact.delete()
+        return Response(status=204)
+
+    serializer = LeadContactManageSerializer(contact, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response({"data": LeadContactManageSerializer(contact).data})
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])

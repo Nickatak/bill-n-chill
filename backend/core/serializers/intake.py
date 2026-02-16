@@ -46,6 +46,53 @@ class LeadContactQuickAddSerializer(serializers.ModelSerializer):
         return attrs
 
 
+class LeadContactManageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LeadContact
+        fields = [
+            "id",
+            "full_name",
+            "phone",
+            "project_address",
+            "email",
+            "notes",
+            "status",
+            "source",
+            "converted_customer",
+            "converted_project",
+            "converted_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "converted_customer",
+            "converted_project",
+            "converted_at",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate(self, attrs):
+        current_phone = ""
+        current_email = ""
+        if self.instance is not None:
+            current_phone = self.instance.phone or ""
+            current_email = self.instance.email or ""
+
+        phone = (attrs.get("phone", current_phone) or "").strip()
+        email = (attrs.get("email", current_email) or "").strip()
+
+        if not phone and not email:
+            raise serializers.ValidationError(
+                {
+                    "phone": ["Provide phone or email."],
+                    "email": ["Provide phone or email."],
+                }
+            )
+        return attrs
+
+
 class LeadConvertSerializer(serializers.Serializer):
     project_name = serializers.CharField(required=False, allow_blank=True, max_length=255)
     project_status = serializers.ChoiceField(

@@ -10,7 +10,12 @@ from core.views.estimates import (
     estimate_status_events_view,
     project_estimates_view,
 )
-from core.views.intake import convert_lead_to_project_view, quick_add_lead_contact_view
+from core.views.intake import (
+    contact_detail_view,
+    contacts_list_view,
+    convert_lead_to_project_view,
+    quick_add_lead_contact_view,
+)
 from core.views.invoices import invoice_detail_view, invoice_send_view, project_invoices_view
 from core.views.payments import payment_allocate_view, payment_detail_view, project_payments_view
 from core.views.projects import (
@@ -30,6 +35,8 @@ __all__ = [
     "project_accounting_sync_events_view",
     "accounting_sync_event_retry_view",
     "quick_add_lead_contact_view",
+    "contacts_list_view",
+    "contact_detail_view",
     "convert_lead_to_project_view",
     "projects_list_view",
     "project_detail_view",
