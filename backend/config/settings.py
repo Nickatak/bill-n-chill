@@ -12,6 +12,12 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+
+import pymysql
+
+pymysql.version_info = (2, 2, 1, "final", 0)
+pymysql.install_as_MySQLdb()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -82,15 +88,55 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 
+def database_config_from_url(database_url: str) -> dict:
+    parsed = urlparse(database_url)
+    scheme = parsed.scheme.lower()
+
+    if scheme in {"mysql", "mysql2"}:
+        query = parse_qs(parsed.query)
+        return {
+            "ENGINE": "django.db.backends.mysql",
+            "NAME": parsed.path.lstrip("/"),
+            "USER": parsed.username or "",
+            "PASSWORD": parsed.password or "",
+            "HOST": parsed.hostname or "127.0.0.1",
+            "PORT": str(parsed.port or 3306),
+            "OPTIONS": {
+                "charset": query.get("charset", ["utf8mb4"])[0],
+            },
+        }
+
+    if scheme == "sqlite":
+        sqlite_path = parsed.path or "/backend/db.sqlite3"
+        if sqlite_path.startswith("/"):
+            sqlite_path = sqlite_path[1:]
+        return {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / sqlite_path,
+        }
+
+    raise ValueError(f"Unsupported DATABASE_URL scheme: {scheme}")
+
+
+def load_database_config() -> dict:
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    if database_url:
+        return database_config_from_url(database_url)
+
+    return {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": os.getenv("MYSQL_DATABASE", "bill_n_chill"),
+        "USER": os.getenv("MYSQL_USER", "bnc"),
+        "PASSWORD": os.getenv("MYSQL_PASSWORD", "bnc_password"),
+        "HOST": os.getenv("MYSQL_HOST", "127.0.0.1"),
+        "PORT": os.getenv("MYSQL_PORT", "3306"),
+        "OPTIONS": {"charset": "utf8mb4"},
+    }
+
+
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
+DATABASES = {"default": load_database_config()}
 
 
 # Password validation

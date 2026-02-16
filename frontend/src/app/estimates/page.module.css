@@ -35,11 +35,6 @@
   color: var(--text-secondary);
 }
 
-.homeLink {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
 .card {
   border: 1px solid var(--border);
   border-radius: 14px;

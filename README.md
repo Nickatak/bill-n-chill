@@ -52,9 +52,9 @@ bill-n-chill/
 ## Local Development Strategy
 
 - Run backend and frontend independently during development.
+- Run MySQL in Docker for consistent local persistence.
 - Use environment variables for API base URLs and secrets.
 - Enable CORS in Django for local frontend origin.
-- Start with SQLite for speed; migrate to Postgres when data model stabilizes.
 
 ## Recommended First Milestones
 

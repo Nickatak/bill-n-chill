@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { BudgetsConsole } from "@/features/budgets";
 import styles from "./page.module.css";
 
@@ -9,10 +7,14 @@ export default function BudgetsPage() {
       <main className={styles.main}>
         <header className={styles.header}>
           <h1>Budgets</h1>
-          <p>Convert approved estimates into an immutable baseline and editable working budget.</p>
-          <Link href="/" className={styles.homeLink}>
-            Back to home
-          </Link>
+          <p>
+            This route gives users the internal execution baseline by converting approved estimate
+            scope into immutable snapshot + editable working budget lines.
+          </p>
+          <p>
+            It anchors downstream change-order financial propagation and cost tracking, keeping the
+            internal money plan aligned with approved client scope decisions.
+          </p>
         </header>
         <section className={styles.card}>
           <BudgetsConsole />

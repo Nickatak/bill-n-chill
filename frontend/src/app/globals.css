@@ -20,6 +20,7 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  padding-top: 56px;
 }
 
 * {
@@ -61,4 +62,57 @@ html[data-theme="dark"] .themeToggle {
   border-color: #334155;
   background: #111827;
   color: #f3f4f6;
+}
+
+.workflowNav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 900;
+  border-bottom: 1px solid #d1d5db;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(6px);
+}
+
+.workflowNavInner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 6px 12px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.workflowLink {
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  color: #111827;
+  background: #ffffff;
+}
+
+.workflowLink.isActive {
+  border-color: #111827;
+  background: #111827;
+  color: #ffffff;
+}
+
+html[data-theme="dark"] .workflowNav {
+  border-bottom-color: #334155;
+  background: rgba(11, 18, 32, 0.96);
+}
+
+html[data-theme="dark"] .workflowLink {
+  border-color: #334155;
+  color: #e5e7eb;
+  background: #0f172a;
+}
+
+html[data-theme="dark"] .workflowLink.isActive {
+  border-color: #e5e7eb;
+  background: #e5e7eb;
+  color: #0f172a;
 }

@@ -30,8 +30,8 @@
 
 ## Data & Persistence
 
-- Start with SQLite for local speed.
-- Plan migration to Postgres for production and team environments.
+- Use MySQL for local, dev, and prod-like environments.
+- Local host workflows can run Django/Next.js directly while MySQL runs in Docker.
 
 ## Auth (Initial Direction)
 

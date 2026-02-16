@@ -2,4 +2,6 @@ asgiref==3.11.1
 Django==6.0.2
 django-cors-headers==4.9.0
 djangorestframework==3.16.1
+PyMySQL==1.1.1
+cryptography==46.0.5
 sqlparse==0.5.5

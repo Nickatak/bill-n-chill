@@ -4,6 +4,17 @@ import os
 import sys
 
 
+def _print_mysql_connection_help() -> None:
+    print(
+        "\n[DB Connection Error] Could not connect to MySQL at 127.0.0.1.\n"
+        "Start the Dockerized database first:\n"
+        "  make dev-db-up\n\n"
+        "Then retry your command (for example):\n"
+        "  make run-backend\n",
+        file=sys.stderr,
+    )
+
+
 def main():
     """Run administrative tasks."""
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
@@ -15,7 +26,14 @@ def main():
             "available on your PYTHONPATH environment variable? Did you "
             "forget to activate a virtual environment?"
         ) from exc
-    execute_from_command_line(sys.argv)
+    try:
+        execute_from_command_line(sys.argv)
+    except Exception as exc:
+        message = str(exc)
+        if "Can't connect to MySQL server on '127.0.0.1'" in message:
+            _print_mysql_connection_help()
+            raise SystemExit(1) from exc
+        raise
 
 
 if __name__ == "__main__":

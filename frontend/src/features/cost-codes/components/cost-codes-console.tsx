@@ -1,15 +1,18 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
-import { ApiResponse, CostCode, UserData } from "../types";
+import { loadClientSession } from "../../session/client-session";
+import { ApiResponse, CostCode } from "../types";
 
 export function CostCodesConsole() {
-  const [apiBaseUrl, setApiBaseUrl] = useState(defaultApiBaseUrl);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [token, setToken] = useState("");
-  const [authMessage, setAuthMessage] = useState("");
+  const session = loadClientSession();
+  const [token] = useState(session?.token ?? "");
+  const [authMessage] = useState(
+    session
+      ? "Using shared session for " + (session.email || "user") + "."
+      : "No shared session found. Go to / and login first.",
+  );
 
   const [rows, setRows] = useState<CostCode[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
@@ -22,35 +25,11 @@ export function CostCodesConsole() {
   const [newCode, setNewCode] = useState("");
   const [newName, setNewName] = useState("");
 
-  const normalizedBaseUrl = useMemo(() => normalizeApiBaseUrl(apiBaseUrl), [apiBaseUrl]);
-
+  const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   function hydrate(item: CostCode) {
     setCode(item.code);
     setName(item.name);
     setIsActive(item.is_active);
-  }
-
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setAuthMessage("Logging in...");
-
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/auth/login/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const payload: ApiResponse = await response.json();
-      const user = payload.data as UserData;
-      if (!response.ok || !user?.token) {
-        setAuthMessage("Login failed.");
-        return;
-      }
-      setToken(user.token);
-      setAuthMessage(`Logged in as ${user.email ?? email}.`);
-    } catch {
-      setAuthMessage("Could not reach login endpoint.");
-    }
   }
 
   async function loadCostCodes() {
@@ -151,39 +130,6 @@ export function CostCodesConsole() {
       <h2>Cost Code Management</h2>
       <p>Create, update, and deactivate cost codes.</p>
 
-      <label>
-        API base URL
-        <input value={apiBaseUrl} onChange={(event) => setApiBaseUrl(event.target.value)} />
-      </label>
-
-      <form onSubmit={handleLogin}>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            autoComplete="email"
-            required
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            autoComplete="current-password"
-            required
-          />
-        </label>
-        <button type="submit">Login</button>
-      </form>
-
-      <label>
-        Auth token
-        <input value={token} onChange={(event) => setToken(event.target.value)} />
-      </label>
       <p>{authMessage}</p>
 
       <button type="button" onClick={loadCostCodes}>

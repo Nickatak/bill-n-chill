@@ -1,9 +1,23 @@
-.PHONY: help install install-frontend install-backend dev run run-frontend run-backend \
-	migrate makemigrations superuser test test-backend test-frontend build lint \
-	env-local env-prod clean
+.PHONY: help \
+	local-install local-install-frontend local-install-backend \
+	local-env-local local-env-prod \
+	local-up local-run local-run-frontend local-run-backend local-check-db \
+	local-migrate local-makemigrations local-superuser \
+	local-test local-test-backend local-test-frontend local-build local-lint local-clean \
+	dev-build dev-up dev-down dev-logs dev-ps dev-config dev-seed \
+	dev-db-up dev-db-down dev-db-logs dev-db-reset \
+	prod-build prod-up prod-down prod-logs prod-ps prod-config prod-seed \
+	prod-db-up prod-db-down prod-db-logs prod-db-reset \
+	install install-frontend install-backend env-local env-prod dev run run-frontend run-backend \
+	migrate makemigrations superuser test test-backend test-frontend build lint clean
 
 BACKEND_PYTHON := backend/.venv/bin/python
 BACKEND_MANAGE := $(BACKEND_PYTHON) backend/manage.py
+COMPOSE_BASE_FILE ?= docker-compose.yml
+COMPOSE_PROD_FILE ?= docker-compose.prod.yml
+DEV_COMPOSE ?= docker compose -f $(COMPOSE_BASE_FILE)
+PROD_COMPOSE ?= docker compose -f $(COMPOSE_BASE_FILE) -f $(COMPOSE_PROD_FILE)
+DB_SERVICE ?= db
 
 # ============================================================================
 # HELP
@@ -12,110 +26,95 @@ BACKEND_MANAGE := $(BACKEND_PYTHON) backend/manage.py
 help:
 	@echo "bill-n-chill - Monorepo Development Commands"
 	@echo ""
-	@echo "Installation:"
-	@echo "  make install              - Install all dependencies (frontend + backend)"
-	@echo "  make install-frontend     - Install frontend dependencies only"
-	@echo "  make install-backend      - Create backend venv and install dependencies"
+	@echo "Command Prefix Pattern:"
+	@echo "  local-*   direct local workflow commands (frontend/backend on host)"
+	@echo "  dev-*     Dockerized dev stack (.env.local)"
+	@echo "  prod-*    Dockerized prod-like stack (.env.prod)"
 	@echo ""
-	@echo "Environment:"
-	@echo "  make env-local            - Activate .env.local as .env"
-	@echo "  make env-prod             - Activate .env.prod as .env"
+	@echo "Local Commands:"
+	@echo "  make local-install         - Install all dependencies (frontend + backend)"
+	@echo "  make local-run-frontend    - Start Next.js development server on host"
+	@echo "  make local-run-backend     - Start Django development server on host"
+	@echo "  make local-up              - Run local frontend + backend together"
+	@echo "  make local-migrate         - Apply Django migrations"
+	@echo "  make local-test            - Run backend tests + frontend lint"
 	@echo ""
-	@echo "Development:"
-	@echo "  make dev                  - Run frontend and backend servers concurrently"
-	@echo "  make run-frontend         - Start Next.js development server"
-	@echo "  make run-backend          - Start Django development server"
+	@echo "Dev Docker Commands:"
+	@echo "  make dev-up                - Start full dev stack (frontend + backend + mysql)"
+	@echo "  make dev-down              - Stop dev stack"
+	@echo "  make dev-logs              - Stream dev stack logs"
+	@echo "  make dev-db-up             - Start only MySQL container (for local host workflow)"
+	@echo "  make dev-db-down           - Stop only MySQL container"
+	@echo "  make dev-db-reset          - Drop dev DB volume and recreate MySQL container"
+	@echo "  make dev-seed              - Seed Bob demo data into dev MySQL database"
 	@echo ""
-	@echo "Database:"
-	@echo "  make makemigrations       - Generate Django migrations"
-	@echo "  make migrate              - Apply Django migrations"
-	@echo "  make superuser            - Create Django superuser"
+	@echo "Prod-like Docker Commands:"
+	@echo "  make prod-up               - Start prod-like stack in detached mode"
+	@echo "  make prod-down             - Stop prod-like stack"
+	@echo "  make prod-logs             - Stream prod-like stack logs"
+	@echo "  make prod-db-up            - Start only prod-like MySQL container"
+	@echo "  make prod-seed             - Seed Bob demo data into prod-like MySQL database"
 	@echo ""
-	@echo "Quality:"
-	@echo "  make test                 - Run backend tests and frontend lint"
-	@echo "  make test-backend         - Run Django tests"
-	@echo "  make test-frontend        - Run frontend lint"
-	@echo "  make build                - Build frontend for production"
-	@echo "  make lint                 - Run frontend lint"
-	@echo ""
-	@echo "Utilities:"
-	@echo "  make clean                - Remove common local build/cache artifacts"
+	@echo "Legacy aliases retained: install, run, run-frontend, run-backend, migrate, test, build, lint, clean"
 
 # ============================================================================
-# INSTALLATION
+# LOCAL (HOST PROCESSES)
 # ============================================================================
 
-install: install-frontend install-backend
+local-install: local-install-frontend local-install-backend
 
-install-frontend:
+local-install-frontend:
 	npm install --prefix frontend
 
-install-backend:
+local-install-backend:
 	python3 -m venv backend/.venv
 	$(BACKEND_PYTHON) -m pip install -r backend/requirements.txt
 
-# ============================================================================
-# ENVIRONMENT
-# ============================================================================
-
-env-local:
+local-env-local:
 	./scripts/toggle-env.sh local
 
-env-prod:
+local-env-prod:
 	./scripts/toggle-env.sh prod
 
-# ============================================================================
-# DEVELOPMENT
-# ============================================================================
-
-dev:
+local-up:
 	@echo "Starting frontend and backend servers (press Ctrl+C to stop both)..."
-	@(trap 'kill 0' SIGINT; $(MAKE) run-frontend & $(MAKE) run-backend &)
+	@(trap 'kill 0' INT TERM; $(MAKE) local-run-frontend & $(MAKE) local-run-backend &)
 
-run: run-frontend
+local-run: local-run-frontend
 
-run-frontend:
+local-run-frontend:
 	npm run dev --prefix frontend
 
-run-backend:
+local-run-backend: local-check-db
 	$(BACKEND_MANAGE) runserver
 
-# ============================================================================
-# DATABASE
-# ============================================================================
+local-check-db:
+	@$(BACKEND_PYTHON) scripts/check_db_connection.py
 
-makemigrations:
+local-makemigrations:
 	$(BACKEND_MANAGE) makemigrations
 
-migrate:
+local-migrate:
 	$(BACKEND_MANAGE) migrate
 
-superuser:
+local-superuser:
 	$(BACKEND_MANAGE) createsuperuser
 
-# ============================================================================
-# QUALITY
-# ============================================================================
+local-test: local-test-backend local-test-frontend
 
-test: test-backend test-frontend
-
-test-backend:
+local-test-backend:
 	$(BACKEND_MANAGE) test
 
-test-frontend:
+local-test-frontend:
 	npm run lint --prefix frontend
 
-build:
+local-build:
 	npm run build --prefix frontend
 
-lint:
+local-lint:
 	npm run lint --prefix frontend
 
-# ============================================================================
-# UTILITIES
-# ============================================================================
-
-clean:
+local-clean:
 	find frontend/.next -type f -delete 2>/dev/null || true
 	find frontend/.next -depth -type d -exec rmdir {} \; 2>/dev/null || true
 	find frontend/node_modules -type f -delete 2>/dev/null || true
@@ -123,3 +122,105 @@ clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	@echo "Clean complete."
+
+# ============================================================================
+# DEV DOCKER (.env.local)
+# ============================================================================
+
+dev-build: local-env-local
+	$(DEV_COMPOSE) build
+
+dev-up: local-env-local
+	$(DEV_COMPOSE) up --build
+
+dev-down: local-env-local
+	$(DEV_COMPOSE) down --remove-orphans
+
+dev-logs: local-env-local
+	$(DEV_COMPOSE) logs -f --tail=200
+
+dev-ps: local-env-local
+	$(DEV_COMPOSE) ps
+
+dev-config: local-env-local
+	$(DEV_COMPOSE) config
+
+dev-seed: local-env-local local-check-db
+	$(BACKEND_MANAGE) seed_bob_demo
+
+dev-db-up: local-env-local
+	$(DEV_COMPOSE) up -d $(DB_SERVICE)
+
+dev-db-down: local-env-local
+	$(DEV_COMPOSE) stop $(DB_SERVICE)
+
+dev-db-logs: local-env-local
+	$(DEV_COMPOSE) logs -f --tail=200 $(DB_SERVICE)
+
+dev-db-reset: local-env-local
+	$(DEV_COMPOSE) down -v --remove-orphans
+	$(DEV_COMPOSE) up -d $(DB_SERVICE)
+
+# ============================================================================
+# PROD-LIKE DOCKER (.env.prod)
+# ============================================================================
+
+prod-build: local-env-prod
+	$(PROD_COMPOSE) build
+
+prod-up: local-env-prod
+	$(PROD_COMPOSE) up -d --build
+
+prod-down: local-env-prod
+	$(PROD_COMPOSE) down --remove-orphans
+
+prod-logs: local-env-prod
+	$(PROD_COMPOSE) logs -f --tail=200
+
+prod-ps: local-env-prod
+	$(PROD_COMPOSE) ps
+
+prod-config: local-env-prod
+	$(PROD_COMPOSE) config
+
+prod-seed: local-env-prod local-check-db
+	$(BACKEND_MANAGE) seed_bob_demo
+
+prod-db-up: local-env-prod
+	$(PROD_COMPOSE) up -d $(DB_SERVICE)
+
+prod-db-down: local-env-prod
+	$(PROD_COMPOSE) stop $(DB_SERVICE)
+
+prod-db-logs: local-env-prod
+	$(PROD_COMPOSE) logs -f --tail=200 $(DB_SERVICE)
+
+prod-db-reset: local-env-prod
+	$(PROD_COMPOSE) down -v --remove-orphans
+	$(PROD_COMPOSE) up -d $(DB_SERVICE)
+
+# ============================================================================
+# LEGACY ALIASES
+# ============================================================================
+
+install: local-install
+install-frontend: local-install-frontend
+install-backend: local-install-backend
+env-local: local-env-local
+env-prod: local-env-prod
+
+dev: local-up
+run: local-run
+run-frontend: local-run-frontend
+run-backend: local-run-backend
+
+makemigrations: local-makemigrations
+migrate: local-migrate
+superuser: local-superuser
+
+test: local-test
+test-backend: local-test-backend
+test-frontend: local-test-frontend
+build: local-build
+lint: local-lint
+clean: local-clean

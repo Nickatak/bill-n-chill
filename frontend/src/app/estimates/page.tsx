@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { EstimatesConsole } from "@/features/estimates";
 import styles from "./page.module.css";
 
@@ -9,10 +7,14 @@ export default function EstimatesPage() {
       <main className={styles.main}>
         <header className={styles.header}>
           <h1>Estimates</h1>
-          <p>Author estimate versions and clone revisions.</p>
-          <Link href="/" className={styles.homeLink}>
-            Back to home
-          </Link>
+          <p>
+            This route gives users the client-facing pricing lifecycle: author scope lines, revise
+            versions, and move statuses through approval decisions.
+          </p>
+          <p>
+            Approved estimates are the handoff source for budget baselines, making this the bridge
+            between early commercial intent and executable financial planning.
+          </p>
         </header>
         <section className={styles.card}>
           <EstimatesConsole />

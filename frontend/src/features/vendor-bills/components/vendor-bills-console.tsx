@@ -1,12 +1,12 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
+import { loadClientSession } from "../../session/client-session";
 import {
   ApiResponse,
   ProjectRecord,
-  UserData,
   VendorBillPayload,
   VendorBillRecord,
   VendorRecord,
@@ -23,11 +23,13 @@ function dueDateIsoDate(daysFromNow = 30) {
 }
 
 export function VendorBillsConsole() {
-  const [apiBaseUrl, setApiBaseUrl] = useState(defaultApiBaseUrl);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [token, setToken] = useState("");
-  const [authMessage, setAuthMessage] = useState("");
+  const session = loadClientSession();
+  const [token] = useState(session?.token ?? "");
+  const [authMessage] = useState(
+    session
+      ? "Using shared session for " + (session.email || "user") + "."
+      : "No shared session found. Go to / and login first.",
+  );
   const [statusMessage, setStatusMessage] = useState("");
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -58,8 +60,7 @@ export function VendorBillsConsole() {
   const [duplicateCandidates, setDuplicateCandidates] = useState<VendorBillRecord[]>([]);
   const [pendingCreatePayload, setPendingCreatePayload] = useState<VendorBillPayload | null>(null);
 
-  const normalizedBaseUrl = useMemo(() => normalizeApiBaseUrl(apiBaseUrl), [apiBaseUrl]);
-
+  const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   function hydrate(item: VendorBillRecord) {
     setVendorId(String(item.vendor));
     setBillNumber(item.bill_number);
@@ -68,29 +69,6 @@ export function VendorBillsConsole() {
     setTotal(item.total);
     setNotes(item.notes);
     setStatus(item.status);
-  }
-
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setAuthMessage("Logging in...");
-
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/auth/login/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const payload: ApiResponse = await response.json();
-      const user = payload.data as UserData;
-      if (!response.ok || !user?.token) {
-        setAuthMessage("Login failed.");
-        return;
-      }
-      setToken(user.token);
-      setAuthMessage(`Logged in as ${user.email ?? email}.`);
-    } catch {
-      setAuthMessage("Could not reach login endpoint.");
-    }
   }
 
   async function loadDependencies() {
@@ -322,39 +300,6 @@ export function VendorBillsConsole() {
       <h2>Vendor Bill Intake and Lifecycle</h2>
       <p>Record AP bills from vendors, detect duplicates, and progress payment workflow status.</p>
 
-      <label>
-        API base URL
-        <input value={apiBaseUrl} onChange={(event) => setApiBaseUrl(event.target.value)} />
-      </label>
-
-      <form onSubmit={handleLogin}>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            autoComplete="email"
-            required
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            autoComplete="current-password"
-            required
-          />
-        </label>
-        <button type="submit">Login</button>
-      </form>
-
-      <label>
-        Auth token
-        <input value={token} onChange={(event) => setToken(event.target.value)} />
-      </label>
       <p>{authMessage}</p>
 
       <button type="button" onClick={loadDependencies}>

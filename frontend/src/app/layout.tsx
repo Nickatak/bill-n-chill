@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeToggle } from "./theme-toggle";
+import { WorkflowNavbar } from "./workflow-navbar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,14 +25,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    // NOTE: default theme is intentionally dark for MVP demos.
+    // Revert later by changing this data-theme and the fallback below from "dark" to "light".
+    <html lang="en" data-theme="dark" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function () {
                 var key = 'bnc-theme';
-                var fallback = 'light';
+                var fallback = 'dark';
                 try {
                   var stored = window.localStorage.getItem(key);
                   var theme = (stored === 'dark' || stored === 'light') ? stored : fallback;
@@ -46,6 +49,7 @@ export default function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <ThemeToggle />
+        <WorkflowNavbar />
         {children}
       </body>
     </html>

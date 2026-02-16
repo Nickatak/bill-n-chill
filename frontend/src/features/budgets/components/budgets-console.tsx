@@ -1,15 +1,18 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
-import { ApiResponse, BudgetLineRecord, BudgetRecord, EstimateRecord, ProjectRecord, UserData } from "../types";
+import { loadClientSession } from "../../session/client-session";
+import { ApiResponse, BudgetLineRecord, BudgetRecord, EstimateRecord, ProjectRecord } from "../types";
 
 export function BudgetsConsole() {
-  const [apiBaseUrl, setApiBaseUrl] = useState(defaultApiBaseUrl);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [token, setToken] = useState("");
-  const [authMessage, setAuthMessage] = useState("");
+  const session = loadClientSession();
+  const [token] = useState(session?.token ?? "");
+  const [authMessage] = useState(
+    session
+      ? "Using shared session for " + (session.email || "user") + "."
+      : "No shared session found. Go to / and login first.",
+  );
   const [statusMessage, setStatusMessage] = useState("");
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -23,8 +26,7 @@ export function BudgetsConsole() {
   const [lineDescription, setLineDescription] = useState("");
   const [lineBudgetAmount, setLineBudgetAmount] = useState("");
 
-  const normalizedBaseUrl = useMemo(() => normalizeApiBaseUrl(apiBaseUrl), [apiBaseUrl]);
-
+  const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const selectedEstimate = estimates.find(
     (estimate) => String(estimate.id) === selectedEstimateId,
   );
@@ -43,28 +45,6 @@ export function BudgetsConsole() {
     setSelectedLineId(String(line.id));
     setLineDescription(line.description);
     setLineBudgetAmount(line.budget_amount);
-  }
-
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setAuthMessage("Logging in...");
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/auth/login/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const payload: ApiResponse = await response.json();
-      const user = payload.data as UserData;
-      if (!response.ok || !user?.token) {
-        setAuthMessage("Login failed.");
-        return;
-      }
-      setToken(user.token);
-      setAuthMessage(`Logged in as ${user.email ?? email}.`);
-    } catch {
-      setAuthMessage("Could not reach login endpoint.");
-    }
   }
 
   async function loadProjects() {
@@ -271,32 +251,6 @@ export function BudgetsConsole() {
       <h2>Budget Baseline Console</h2>
       <p>Convert approved estimates to budgets and edit working budget lines.</p>
 
-      <label>
-        API base URL
-        <input value={apiBaseUrl} onChange={(event) => setApiBaseUrl(event.target.value)} />
-      </label>
-
-      <form onSubmit={handleLogin}>
-        <label>
-          Email
-          <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
-        </label>
-        <button type="submit">Login</button>
-      </form>
-
-      <label>
-        Auth token
-        <input value={token} onChange={(event) => setToken(event.target.value)} />
-      </label>
       <p>{authMessage}</p>
 
       <button type="button" onClick={loadProjects}>

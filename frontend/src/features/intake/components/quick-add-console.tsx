@@ -1,15 +1,18 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
-import { ApiResponse, DuplicateData, LeadContactCandidate, LeadConvertResult, LeadPayload, UserData } from "../types";
+import { loadClientSession } from "../../session/client-session";
+import { ApiResponse, DuplicateData, LeadContactCandidate, LeadConvertResult, LeadPayload } from "../types";
 
 export function QuickAddConsole() {
-  const [apiBaseUrl, setApiBaseUrl] = useState(defaultApiBaseUrl);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [token, setToken] = useState("");
-  const [authMessage, setAuthMessage] = useState("");
+  const session = loadClientSession();
+  const [token] = useState(session?.token ?? "");
+  const [authMessage, setAuthMessage] = useState(
+    session
+      ? "Using shared session for " + (session.email || "user") + "."
+      : "No shared session found. Go to / and login first.",
+  );
   const [leadMessage, setLeadMessage] = useState("");
   const [conversionMessage, setConversionMessage] = useState("");
   const [duplicateCandidates, setDuplicateCandidates] = useState<LeadContactCandidate[]>([]);
@@ -19,50 +22,34 @@ export function QuickAddConsole() {
   const [projectName, setProjectName] = useState("");
   const [projectStatus, setProjectStatus] = useState("prospect");
 
-  const normalizedBaseUrl = useMemo(() => normalizeApiBaseUrl(apiBaseUrl), [apiBaseUrl]);
+  const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
 
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setAuthMessage("Logging in...");
-
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/auth/login/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const payload: ApiResponse = await response.json();
-      const userData = payload.data as UserData;
-
-      if (!response.ok || !userData?.token) {
-        setAuthMessage("Login failed.");
+  useEffect(() => {
+    async function verifySharedSession() {
+      if (!token) {
         return;
       }
-
-      setToken(userData.token);
-      setAuthMessage(`Logged in as ${userData.email ?? email}.`);
-    } catch {
-      setAuthMessage("Could not reach login endpoint.");
-    }
-  }
-
-  async function handleCheckMe() {
-    setAuthMessage("Checking token...");
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/auth/me/`, {
-        headers: { Authorization: `Token ${token}` },
-      });
-      const payload: ApiResponse = await response.json();
-      const userData = payload.data as UserData;
-      if (!response.ok) {
-        setAuthMessage("Token check failed.");
-        return;
+      setAuthMessage("Checking shared session...");
+      try {
+        const response = await fetch(`${normalizedBaseUrl}/auth/me/`, {
+          headers: { Authorization: `Token ${token}` },
+        });
+        const payload: ApiResponse = await response.json();
+        const userData = payload.data as { email?: string } | undefined;
+        if (!response.ok) {
+          setAuthMessage("Shared session token is invalid. Go to / and login again.");
+          return;
+        }
+        setAuthMessage("Using shared session for " + (userData?.email || "user") + ".");
+      } catch {
+        setAuthMessage("Could not reach auth/me endpoint.");
       }
-      setAuthMessage(`Token is valid for ${userData?.email ?? "user"}.`);
-    } catch {
-      setAuthMessage("Could not reach auth/me endpoint.");
     }
-  }
+
+    void verifySharedSession();
+    // Intentionally runs once on initial load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function submitQuickAdd(
     body: LeadPayload,
@@ -208,48 +195,7 @@ export function QuickAddConsole() {
   return (
     <section>
       <h2>Quick Add Contact</h2>
-      <p>Login with your account, then capture lead details from the field.</p>
-
-      <label>
-        API base URL
-        <input value={apiBaseUrl} onChange={(event) => setApiBaseUrl(event.target.value)} />
-      </label>
-
-      <form onSubmit={handleLogin}>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            autoComplete="email"
-            required
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            autoComplete="current-password"
-            required
-          />
-        </label>
-        <button type="submit">Login</button>
-      </form>
-
-      <label>
-        Auth token
-        <input
-          value={token}
-          onChange={(event) => setToken(event.target.value)}
-          placeholder="Token ..."
-        />
-      </label>
-      <button type="button" onClick={handleCheckMe}>
-        Check /auth/me
-      </button>
+      <p>Use your shared session from /, then capture lead details from the field.</p>
       <p>{authMessage}</p>
 
       <form onSubmit={handleQuickAdd}>

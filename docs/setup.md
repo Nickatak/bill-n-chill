@@ -19,6 +19,11 @@ Backend:
 - `DJANGO_SECRET_KEY`
 - `DJANGO_DEBUG`
 - `DATABASE_URL`
+- `MYSQL_DATABASE`
+- `MYSQL_USER`
+- `MYSQL_PASSWORD`
+- `MYSQL_ROOT_PASSWORD`
+- `MYSQL_PORT`
 - `CORS_ALLOWED_ORIGINS`
 
 Frontend:
@@ -68,6 +73,16 @@ npx create-next-app@latest frontend
 
 ## Run Plan
 
+### 1) Start MySQL only (recommended for local host workflows)
+
+```bash
+make dev-db-up
+```
+
+This starts only the Dockerized MySQL container while you continue to run backend/frontend directly on your host.
+
+### 2) Run backend + frontend locally
+
 Backend:
 
 ```bash
@@ -81,6 +96,12 @@ Frontend:
 ```bash
 cd frontend
 npm run dev
+```
+
+### 3) Optional full Docker stack
+
+```bash
+make dev-up
 ```
 
 Expected URLs:
@@ -127,10 +148,19 @@ backend/.venv/bin/python backend/manage.py reset_fresh_demo --email test@ex.com 
 
 Run `make help` from repo root to see all commands.
 
-Common commands:
+### Command Prefix Pattern
 
-- `make install`
-- `make env-local`
-- `make dev`
-- `make migrate`
-- `make test`
+The Makefile now uses three command prefixes:
+
+- `local-*`: direct local host workflows (frontend/backend run on host).
+- `dev-*`: Dockerized development stack using `.env.local`.
+- `prod-*`: Dockerized prod-like stack using `.env.prod`.
+
+Examples:
+
+- `make local-up`
+- `make dev-up`
+- `make prod-up`
+- `make dev-db-up` (MySQL only)
+
+Legacy unprefixed commands are still available as aliases (for example `make install`, `make run-backend`, `make migrate`, `make test`).

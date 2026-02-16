@@ -1,16 +1,19 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
-import { ApiResponse, UserData, VendorPayload, VendorRecord } from "../types";
+import { loadClientSession } from "../../session/client-session";
+import { ApiResponse, VendorPayload, VendorRecord } from "../types";
 
 export function VendorsConsole() {
-  const [apiBaseUrl, setApiBaseUrl] = useState(defaultApiBaseUrl);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [token, setToken] = useState("");
-  const [authMessage, setAuthMessage] = useState("");
+  const session = loadClientSession();
+  const [token] = useState(session?.token ?? "");
+  const [authMessage] = useState(
+    session
+      ? "Using shared session for " + (session.email || "user") + "."
+      : "No shared session found. Go to / and login first.",
+  );
 
   const [rows, setRows] = useState<VendorRecord[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -34,8 +37,7 @@ export function VendorsConsole() {
   const [duplicateCandidates, setDuplicateCandidates] = useState<VendorRecord[]>([]);
   const [pendingCreatePayload, setPendingCreatePayload] = useState<VendorPayload | null>(null);
 
-  const normalizedBaseUrl = useMemo(() => normalizeApiBaseUrl(apiBaseUrl), [apiBaseUrl]);
-
+  const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   function hydrate(item: VendorRecord) {
     setName(item.name);
     setVendorEmail(item.email);
@@ -43,29 +45,6 @@ export function VendorsConsole() {
     setTaxIdLast4(item.tax_id_last4);
     setNotes(item.notes);
     setIsActive(item.is_active);
-  }
-
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setAuthMessage("Logging in...");
-
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/auth/login/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const payload: ApiResponse = await response.json();
-      const user = payload.data as UserData;
-      if (!response.ok || !user?.token) {
-        setAuthMessage("Login failed.");
-        return;
-      }
-      setToken(user.token);
-      setAuthMessage(`Logged in as ${user.email ?? email}.`);
-    } catch {
-      setAuthMessage("Could not reach login endpoint.");
-    }
   }
 
   async function loadVendors() {
@@ -223,39 +202,6 @@ export function VendorsConsole() {
       <h2>Vendor Directory</h2>
       <p>Create, search, and update reusable vendors for AP and commitments.</p>
 
-      <label>
-        API base URL
-        <input value={apiBaseUrl} onChange={(event) => setApiBaseUrl(event.target.value)} />
-      </label>
-
-      <form onSubmit={handleLogin}>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            autoComplete="email"
-            required
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            autoComplete="current-password"
-            required
-          />
-        </label>
-        <button type="submit">Login</button>
-      </form>
-
-      <label>
-        Auth token
-        <input value={token} onChange={(event) => setToken(event.target.value)} />
-      </label>
       <p>{authMessage}</p>
 
       <label>

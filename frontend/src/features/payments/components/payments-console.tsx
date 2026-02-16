@@ -3,6 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
+import { loadClientSession } from "../../session/client-session";
 import {
   ApiResponse,
   InvoiceRecord,
@@ -13,7 +14,6 @@ import {
   PaymentRecord,
   PaymentStatus,
   ProjectRecord,
-  UserData,
   VendorBillRecord,
 } from "../types";
 
@@ -22,11 +22,13 @@ function todayIsoDate() {
 }
 
 export function PaymentsConsole() {
-  const [apiBaseUrl, setApiBaseUrl] = useState(defaultApiBaseUrl);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [token, setToken] = useState("");
-  const [authMessage, setAuthMessage] = useState("");
+  const session = loadClientSession();
+  const [token] = useState(session?.token ?? "");
+  const [authMessage] = useState(
+    session
+      ? "Using shared session for " + (session.email || "user") + "."
+      : "No shared session found. Go to / and login first.",
+  );
   const [statusMessage, setStatusMessage] = useState("");
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -56,7 +58,7 @@ export function PaymentsConsole() {
   const [allocationTargetId, setAllocationTargetId] = useState("");
   const [allocationAmount, setAllocationAmount] = useState("0.00");
 
-  const normalizedBaseUrl = useMemo(() => normalizeApiBaseUrl(apiBaseUrl), [apiBaseUrl]);
+  const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const selectedPayment = useMemo(
     () => payments.find((payment) => String(payment.id) === selectedPaymentId),
     [payments, selectedPaymentId],
@@ -81,30 +83,6 @@ export function PaymentsConsole() {
     setNewPaymentDate(todayIsoDate());
     setNewReferenceNumber("");
     setNewNotes("");
-  }
-
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setAuthMessage("Logging in...");
-
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/auth/login/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const payload: ApiResponse = await response.json();
-      const user = payload.data as UserData;
-      if (!response.ok || !user?.token) {
-        setAuthMessage("Login failed.");
-        return;
-      }
-
-      setToken(user.token);
-      setAuthMessage(`Logged in as ${user.email ?? email}.`);
-    } catch {
-      setAuthMessage("Could not reach login endpoint.");
-    }
   }
 
   async function loadProjects() {
@@ -371,37 +349,6 @@ export function PaymentsConsole() {
       <h2>Payment Recording</h2>
       <p>Record inbound and outbound money movement with method, status, and reference tracking.</p>
 
-      <label>
-        API base URL
-        <input value={apiBaseUrl} onChange={(event) => setApiBaseUrl(event.target.value)} />
-      </label>
-
-      <form onSubmit={handleLogin}>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
-        </label>
-        <button type="submit">Login</button>
-      </form>
-
-      <label>
-        Auth token
-        <input value={token} onChange={(event) => setToken(event.target.value)} />
-      </label>
       <p>{authMessage}</p>
 
       <button type="button" onClick={loadProjects}>
