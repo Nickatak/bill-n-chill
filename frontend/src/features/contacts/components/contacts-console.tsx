@@ -2,17 +2,11 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
-import { loadClientSession } from "../../session/client-session";
+import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { ApiResponse, ContactRecord } from "../types";
 
 export function ContactsConsole() {
-  const session = loadClientSession();
-  const [token] = useState(session?.token ?? "");
-  const [authMessage] = useState(
-    session
-      ? "Using shared session for " + (session.email || "user") + "."
-      : "No shared session found. Go to / and login first.",
-  );
+  const { token, authMessage } = useSharedSessionAuth();
 
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<ContactRecord[]>([]);

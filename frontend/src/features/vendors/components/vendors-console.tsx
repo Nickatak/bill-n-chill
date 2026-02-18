@@ -3,17 +3,11 @@
 import { FormEvent, useState } from "react";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
-import { loadClientSession } from "../../session/client-session";
+import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { ApiResponse, VendorPayload, VendorRecord } from "../types";
 
 export function VendorsConsole() {
-  const session = loadClientSession();
-  const [token] = useState(session?.token ?? "");
-  const [authMessage] = useState(
-    session
-      ? "Using shared session for " + (session.email || "user") + "."
-      : "No shared session found. Go to / and login first.",
-  );
+  const { token, authMessage } = useSharedSessionAuth();
 
   const [rows, setRows] = useState<VendorRecord[]>([]);
   const [selectedId, setSelectedId] = useState("");

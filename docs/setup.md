@@ -46,6 +46,12 @@ scripts/toggle-env.sh local
 scripts/toggle-env.sh prod
 ```
 
+Or using Makefile alias:
+
+```bash
+make env-init
+```
+
 Notes:
 
 - If `.env` already exists, toggle script creates a timestamped backup unless `--force` is passed.
@@ -160,7 +166,7 @@ Examples:
 
 - `make local-up`
 - `make dev-up`
+- `make docker-up` (alias of `make dev-up`)
 - `make prod-up`
 - `make dev-db-up` (MySQL only)
-
-Legacy unprefixed commands are still available as aliases (for example `make install`, `make run-backend`, `make migrate`, `make test`).
+- `make db-up` (alias of `make dev-db-up`)

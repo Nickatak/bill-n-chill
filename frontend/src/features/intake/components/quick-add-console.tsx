@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
-import { loadClientSession } from "../../session/client-session";
+import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { ApiResponse, DuplicateData, LeadContactCandidate, LeadConvertResult, LeadPayload } from "../types";
 import styles from "./quick-add-console.module.css";
 
@@ -24,15 +24,10 @@ type PendingSubmission = {
 };
 
 export function QuickAddConsole() {
-  const session = loadClientSession();
   const fullNameRef = useRef<HTMLInputElement>(null);
 
-  const [token] = useState(session?.token ?? "");
-  const [authMessage, setAuthMessage] = useState(
-    session
-      ? "Using shared session for " + (session.email || "user") + "."
-      : "No shared session found. Go to / and login first.",
-  );
+  const { token, authMessage: baseAuthMessage } = useSharedSessionAuth();
+  const [authVerificationMessage, setAuthVerificationMessage] = useState("");
 
   const [leadMessage, setLeadMessage] = useState("");
   const [conversionMessage, setConversionMessage] = useState("");
@@ -62,9 +57,10 @@ export function QuickAddConsole() {
   useEffect(() => {
     async function verifySharedSession() {
       if (!token) {
+        setAuthVerificationMessage("");
         return;
       }
-      setAuthMessage("Checking shared session...");
+      setAuthVerificationMessage("Checking shared session...");
       try {
         const response = await fetch(`${normalizedBaseUrl}/auth/me/`, {
           headers: { Authorization: `Token ${token}` },
@@ -72,12 +68,12 @@ export function QuickAddConsole() {
         const payload: ApiResponse = await response.json();
         const userData = payload.data as { email?: string } | undefined;
         if (!response.ok) {
-          setAuthMessage("Shared session token is invalid. Go to / and login again.");
+          setAuthVerificationMessage("Shared session token is invalid. Go to / and login again.");
           return;
         }
-        setAuthMessage("Using shared session for " + (userData?.email || "user") + ".");
+        setAuthVerificationMessage("Using shared session for " + (userData?.email || "user") + ".");
       } catch {
-        setAuthMessage("Could not reach auth/me endpoint.");
+        setAuthVerificationMessage("Could not reach auth/me endpoint.");
       }
     }
 
@@ -278,7 +274,7 @@ export function QuickAddConsole() {
     <section className={styles.section}>
       <h2>Quick Add Contact</h2>
       <p>Use one form for both capture-only and capture-with-project actions.</p>
-      <p>{authMessage}</p>
+      <p>{authVerificationMessage || baseAuthMessage}</p>
 
       <form className={styles.formGrid} onSubmit={handleQuickAdd}>
         <h3>Lead Capture + Optional Project</h3>

@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
-import { loadClientSession } from "../../session/client-session";
+import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { ApiResponse, CostCode, InvoiceLineInput, InvoiceRecord, ProjectRecord } from "../types";
 
 function todayIsoDate() {
@@ -27,13 +27,7 @@ function emptyLine(localId: number, defaultCostCodeId = ""): InvoiceLineInput {
 }
 
 export function InvoicesConsole() {
-  const session = loadClientSession();
-  const [token] = useState(session?.token ?? "");
-  const [authMessage] = useState(
-    session
-      ? "Using shared session for " + (session.email || "user") + "."
-      : "No shared session found. Go to / and login first.",
-  );
+  const { token, authMessage } = useSharedSessionAuth();
   const [statusMessage, setStatusMessage] = useState("");
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);

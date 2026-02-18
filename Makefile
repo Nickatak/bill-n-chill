@@ -1,4 +1,5 @@
 .PHONY: help \
+	env-init \
 	local-install local-install-frontend local-install-backend \
 	local-env-local local-env-prod \
 	local-up local-run local-run-frontend local-run-backend local-check-db \
@@ -8,8 +9,8 @@
 	dev-db-up dev-db-down dev-db-logs dev-db-reset \
 	prod-build prod-up prod-down prod-logs prod-ps prod-config prod-seed \
 	prod-db-up prod-db-down prod-db-logs prod-db-reset \
-	install install-frontend install-backend env-local env-prod dev run run-frontend run-backend \
-	migrate makemigrations superuser test test-backend test-frontend build lint clean
+	docker-build docker-up docker-down docker-logs docker-ps docker-config \
+	db-up db-down db-logs db-reset
 
 BACKEND_PYTHON := backend/.venv/bin/python
 BACKEND_MANAGE := $(BACKEND_PYTHON) backend/manage.py
@@ -19,6 +20,7 @@ COMPOSE_PROD_FILE ?= docker-compose.prod.yml
 DEV_COMPOSE ?= docker compose -f $(COMPOSE_BASE_FILE) -f $(COMPOSE_LOCAL_FILE)
 PROD_COMPOSE ?= docker compose -f $(COMPOSE_BASE_FILE) -f $(COMPOSE_LOCAL_FILE) -f $(COMPOSE_PROD_FILE)
 DB_SERVICE ?= db
+LOCAL_KILL_PORTS ?= 3000 3001 3002 3003 3004 3005 8000
 
 # ============================================================================
 # HELP
@@ -49,6 +51,8 @@ help:
 	@echo "  make dev-db-down           - Stop only MySQL container"
 	@echo "  make dev-db-reset          - Drop dev DB volume and recreate MySQL container"
 	@echo "  make dev-seed              - Seed Bob demo data into dev MySQL database"
+	@echo "  make docker-up             - Alias for make dev-up"
+	@echo "  make db-up                 - Alias for make dev-db-up"
 	@echo ""
 	@echo "Prod-like Docker Commands:"
 	@echo "  make prod-up               - Start prod-like stack in detached mode"
@@ -56,12 +60,12 @@ help:
 	@echo "  make prod-logs             - Stream prod-like stack logs"
 	@echo "  make prod-db-up            - Start only prod-like MySQL container"
 	@echo "  make prod-seed             - Seed Bob demo data into prod-like MySQL database"
-	@echo ""
-	@echo "Legacy aliases retained: install, run, run-frontend, run-backend, migrate, test, build, lint, clean"
 
 # ============================================================================
 # LOCAL (HOST PROCESSES)
 # ============================================================================
+
+env-init: local-env-local
 
 local-install: local-install-frontend local-install-backend
 
@@ -126,13 +130,32 @@ local-clean:
 	@echo "Clean complete."
 
 local-kill-ports:
-	@for port in 3000 3001 3002 3003 3004 3005 8000; do \
-		pids=$$(sudo lsof -t -iTCP:$$port -sTCP:LISTEN 2>/dev/null); \
-		if [ -n "$$pids" ]; then \
-			echo "Killing $$pids on port $$port"; \
-			sudo kill $$pids; \
+	@echo "Stopping listeners on ports: $(LOCAL_KILL_PORTS)"
+	@for port in $(LOCAL_KILL_PORTS); do \
+		if command -v fuser >/dev/null 2>&1; then \
+			echo "Port $$port: sending TERM"; \
+			fuser -k -TERM $$port/tcp 2>/dev/null || true; \
+			sleep 1; \
+			if fuser $$port/tcp >/dev/null 2>&1; then \
+				echo "Port $$port: still busy, sending KILL"; \
+				fuser -k -KILL $$port/tcp 2>/dev/null || true; \
+			fi; \
+		elif command -v lsof >/dev/null 2>&1; then \
+			pids=$$(lsof -tiTCP:$$port -sTCP:LISTEN 2>/dev/null || true); \
+			if [ -n "$$pids" ]; then \
+				echo "Port $$port: sending TERM to PID(s) $$pids"; \
+				kill -TERM $$pids 2>/dev/null || true; \
+				sleep 1; \
+				pids=$$(lsof -tiTCP:$$port -sTCP:LISTEN 2>/dev/null || true); \
+				if [ -n "$$pids" ]; then \
+					echo "Port $$port: still busy, sending KILL to PID(s) $$pids"; \
+					kill -KILL $$pids 2>/dev/null || true; \
+				fi; \
+			else \
+				echo "Port $$port: no listener"; \
+			fi; \
 		else \
-			echo "No process listening on port $$port"; \
+			echo "Port $$port: skipped (install fuser or lsof)"; \
 		fi; \
 	done
 
@@ -212,28 +235,17 @@ prod-db-reset: local-env-prod
 	$(PROD_COMPOSE) down -v --remove-orphans
 	$(PROD_COMPOSE) up -d $(DB_SERVICE)
 
-# ============================================================================
-# LEGACY ALIASES
-# ============================================================================
+# Cross-repo compatibility aliases (other orchestrated repos commonly use docker-* and db-* naming)
+docker-build: dev-build
+docker-up: dev-up
+docker-down: dev-down
+docker-logs: dev-logs
+docker-ps: dev-ps
+docker-config: dev-config
 
-install: local-install
-install-frontend: local-install-frontend
-install-backend: local-install-backend
-env-local: local-env-local
-env-prod: local-env-prod
+db-up: dev-db-up
+db-down: dev-db-down
+db-logs: dev-db-logs
+db-reset: dev-db-reset
 
-dev: local-up
-run: local-run
-run-frontend: local-run-frontend
-run-backend: local-run-backend
-
-makemigrations: local-makemigrations
-migrate: local-migrate
-superuser: local-superuser
-
-test: local-test
-test-backend: local-test-backend
-test-frontend: local-test-frontend
-build: local-build
-lint: local-lint
-clean: local-clean
+.DEFAULT_GOAL := help
