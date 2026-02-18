@@ -56,6 +56,24 @@ bill-n-chill/
 - Use environment variables for API base URLs and secrets.
 - Enable CORS in Django for local frontend origin.
 
+## Orchestration Contract
+
+This repo is orchestration-ready as a base Docker Compose app repo.
+
+- Base stack is defined in `docker-compose.yml`.
+- Local host port publishing is defined separately in `docker-compose.local.yml`.
+- Runtime config is environment-variable driven (no required service `env_file`).
+- Local host ports are configurable with `FRONTEND_PORT`, `BACKEND_PORT`, and `MYSQL_PORT`.
+- External orchestration (for example `ntakemori-deploy`) should apply an override file to:
+  - attach services to the shared ingress network (for example `edge`)
+  - set environment-specific values via `--env-file`
+
+Stable service names for overrides:
+
+- `frontend`
+- `backend`
+- `db`
+
 ## Recommended First Milestones
 
 1. Scaffold both apps (`backend/` and `frontend/`).

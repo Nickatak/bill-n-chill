@@ -18,6 +18,34 @@ from core.views.helpers import (
 )
 
 
+def _archive_estimate_family(*, project, user, title, exclude_ids, note):
+    normalized_title = (title or "").strip()
+    if not normalized_title:
+        return
+
+    candidates = (
+        Estimate.objects.filter(project=project, created_by=user, title=normalized_title)
+        .exclude(id__in=exclude_ids)
+        .exclude(status=Estimate.Status.ARCHIVED)
+    )
+    for candidate in candidates:
+        if not _validate_estimate_status_transition(
+            current_status=candidate.status,
+            next_status=Estimate.Status.ARCHIVED,
+        ):
+            continue
+        previous_status = candidate.status
+        candidate.status = Estimate.Status.ARCHIVED
+        candidate.save(update_fields=["status", "updated_at"])
+        _record_estimate_status_event(
+            estimate=candidate,
+            from_status=previous_status,
+            to_status=Estimate.Status.ARCHIVED,
+            note=note,
+            changed_by=user,
+        )
+
+
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_estimates_view(request, project_id: int):
@@ -147,6 +175,13 @@ def project_estimates_view(request, project_id: int):
         note="Estimate created.",
         changed_by=request.user,
     )
+    _archive_estimate_family(
+        project=project,
+        user=request.user,
+        title=estimate.title,
+        exclude_ids=[estimate.id],
+        note=f"Archived because estimate #{estimate.id} superseded this version.",
+    )
     return Response({"data": EstimateSerializer(estimate).data}, status=201)
 
 
@@ -167,6 +202,23 @@ def estimate_detail_view(request, estimate_id: int):
     serializer = EstimateWriteSerializer(data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
+    is_locked = estimate.status != Estimate.Status.DRAFT
+    mutating_fields = {"title", "tax_percent", "line_items"}
+    if is_locked and any(field in data for field in mutating_fields):
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Estimate values are locked after being sent.",
+                    "fields": {
+                        "title": ["Cannot edit non-draft estimate values."],
+                        "tax_percent": ["Cannot edit non-draft estimate values."],
+                        "line_items": ["Cannot edit non-draft estimate values."],
+                    },
+                }
+            },
+            status=400,
+        )
     status_note = data.get("status_note", "")
     status_changing = "status" in data
     next_status = data.get("status", estimate.status)
@@ -318,6 +370,13 @@ def estimate_clone_version_view(request, estimate_id: int):
         to_status=cloned.status,
         note=f"Cloned from estimate #{estimate.id}.",
         changed_by=request.user,
+    )
+    _archive_estimate_family(
+        project=estimate.project,
+        user=request.user,
+        title=cloned.title,
+        exclude_ids=[cloned.id],
+        note=f"Archived because estimate #{cloned.id} superseded this version.",
     )
     return Response(
         {"data": EstimateSerializer(cloned).data, "meta": {"cloned_from": estimate.id}},

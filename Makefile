@@ -14,9 +14,10 @@
 BACKEND_PYTHON := backend/.venv/bin/python
 BACKEND_MANAGE := $(BACKEND_PYTHON) backend/manage.py
 COMPOSE_BASE_FILE ?= docker-compose.yml
+COMPOSE_LOCAL_FILE ?= docker-compose.local.yml
 COMPOSE_PROD_FILE ?= docker-compose.prod.yml
-DEV_COMPOSE ?= docker compose -f $(COMPOSE_BASE_FILE)
-PROD_COMPOSE ?= docker compose -f $(COMPOSE_BASE_FILE) -f $(COMPOSE_PROD_FILE)
+DEV_COMPOSE ?= docker compose -f $(COMPOSE_BASE_FILE) -f $(COMPOSE_LOCAL_FILE)
+PROD_COMPOSE ?= docker compose -f $(COMPOSE_BASE_FILE) -f $(COMPOSE_LOCAL_FILE) -f $(COMPOSE_PROD_FILE)
 DB_SERVICE ?= db
 
 # ============================================================================

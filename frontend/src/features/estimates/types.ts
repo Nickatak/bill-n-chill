@@ -10,7 +10,20 @@ export type EstimateRecord = {
   status: string;
   title: string;
   subtotal: string;
+  tax_percent: string;
   grand_total: string;
+  created_at: string;
+  line_items?: EstimateLineItemRecord[];
+};
+
+export type EstimateLineItemRecord = {
+  id: number;
+  cost_code: number;
+  description: string;
+  quantity: string;
+  unit: string;
+  unit_cost: string;
+  markup_percent: string;
 };
 
 export type EstimateStatusEventRecord = {

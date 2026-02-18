@@ -22,12 +22,6 @@
   color: var(--text-secondary);
 }
 
-.toolbarActions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 .authMessage {
   margin: 0;
   color: var(--text-secondary);
@@ -38,6 +32,13 @@
   margin: 0;
   color: var(--text-secondary);
   font-size: 0.9rem;
+}
+
+.estimateSelector {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--foreground);
 }
 
 .sheet {
@@ -269,6 +270,11 @@
   font-size: 0.75rem;
 }
 
+.actionDisabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .lineActions {
   display: flex;
   justify-content: space-between;
@@ -341,6 +347,12 @@
   border-top: 1px solid #cbd5f5;
 }
 
+.readOnlyHint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
 .terms {
   border-top: 1px solid #e2e8f0;
   padding-top: 16px;
@@ -388,12 +400,56 @@
 }
 
 .lifecycleField select,
-.lifecycleField input {
+.lifecycleField input,
+.lifecycleField textarea {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 10px;
   background: var(--foreground);
   color: var(--text-primary);
+}
+
+.lifecycleFieldLabel {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.statusPicker {
+  display: grid;
+  gap: 8px;
+}
+
+.statusPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.statusPill {
+  border: 1px solid #cbd5f5;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.statusPillInactive {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.statusPillActive {
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+}
+
+.statusNote {
+  min-height: 96px;
+  resize: vertical;
 }
 
 .lifecycleActions {
@@ -437,39 +493,127 @@
   background: #f8fafc;
 }
 
-.timelineRow {
+.familyGroup {
   display: grid;
-  grid-template-columns: 24px 1fr;
-  gap: 12px;
+  gap: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.familyGroupActive {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.15);
+}
+
+.familyRow {
+  display: flex;
   align-items: stretch;
+  gap: 12px;
+  overflow-x: auto;
 }
 
-.timelineColumn {
-  display: grid;
-  justify-items: center;
-  position: relative;
-  padding-top: 4px;
+.familyMain {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 260px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
 }
 
-.timelineDot {
-  width: 12px;
-  height: 12px;
+.familyTitle {
+  font-weight: 600;
+  color: var(--text-primary);
+  display: block;
+}
+
+.familyMeta {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  display: block;
+}
+
+.familyFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 8px;
+}
+
+.historyNotice {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.historyToggle {
+  border: 1px solid #cbd5f5;
   border-radius: 999px;
-  background: #cbd5f5;
-  border: 2px solid #ffffff;
-  z-index: 1;
+  background: #eef2ff;
+  color: #1e3a8a;
+  padding: 4px 10px;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
 }
 
-.timelineDotActive {
-  background: #1d4ed8;
+.historyRow {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  padding-bottom: 4px;
 }
 
-.timelineLine {
-  position: absolute;
-  top: 16px;
-  bottom: -8px;
-  width: 2px;
-  background: #cbd5f5;
+.historyCard {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  min-width: 140px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.historyVersion {
+  display: block;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.historyMeta {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.historyAmount {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  margin-top: 4px;
+}
+
+.historyEmpty {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
 }
 
 .versionNode {
@@ -518,6 +662,31 @@
   background: #e0e7ff;
   color: #1e3a8a;
   font-weight: 600;
+}
+
+.statusDraft {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.statusSent {
+  background: #fde68a;
+  color: #92400e;
+}
+
+.statusApproved {
+  background: #bbf7d0;
+  color: #166534;
+}
+
+.statusRejected {
+  background: #fecaca;
+  color: #b91c1c;
+}
+
+.statusArchived {
+  background: #e5e7eb;
+  color: #6b7280;
 }
 
 .versionAmount {
@@ -648,6 +817,41 @@
   border-color: #1f2937;
 }
 
+:global(html[data-theme="dark"]) .familyGroup {
+  background: #0b1220;
+  border-color: #1f2937;
+}
+
+:global(html[data-theme="dark"]) .familyGroupActive {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+:global(html[data-theme="dark"]) .familyMeta,
+:global(html[data-theme="dark"]) .historyEmpty,
+:global(html[data-theme="dark"]) .historyMeta {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .familyFooter {
+  border-color: #1f2937;
+}
+
+:global(html[data-theme="dark"]) .historyToggle {
+  background: #1e293b;
+  border-color: #334155;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .historyNotice {
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .historyCard {
+  background: #0b1220;
+  border-color: #1f2937;
+}
+
 :global(html[data-theme="dark"]) .versionNode {
   background: #0b1220;
   border-color: #1f2937;
@@ -658,17 +862,38 @@
   color: #bfdbfe;
 }
 
-:global(html[data-theme="dark"]) .timelineDot {
-  background: #334155;
-  border-color: #0b1220;
+:global(html[data-theme="dark"]) .statusPill {
+  border-color: #334155;
 }
 
-:global(html[data-theme="dark"]) .timelineDotActive {
-  background: #3b82f6;
+:global(html[data-theme="dark"]) .statusPillInactive {
+  background: #0b1220;
+  color: #94a3b8;
 }
 
-:global(html[data-theme="dark"]) .timelineLine {
-  background: #334155;
+:global(html[data-theme="dark"]) .statusDraft {
+  background: #1f2937;
+  color: #cbd5f5;
+}
+
+:global(html[data-theme="dark"]) .statusSent {
+  background: #3f2f0b;
+  color: #fcd34d;
+}
+
+:global(html[data-theme="dark"]) .statusApproved {
+  background: #0f3d22;
+  color: #86efac;
+}
+
+:global(html[data-theme="dark"]) .statusRejected {
+  background: #4c1d1d;
+  color: #fca5a5;
+}
+
+:global(html[data-theme="dark"]) .statusArchived {
+  background: #111827;
+  color: #9ca3af;
 }
 
 :global(html[data-theme="dark"]) .summaryTaxInput {

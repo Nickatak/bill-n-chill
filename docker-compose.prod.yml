@@ -1,17 +1,4 @@
 services:
-  db:
-    container_name: bnc-mysql-prod
-    ports:
-      - "${MYSQL_PORT:-3306}:3306"
-
   backend:
-    container_name: bnc-backend-prod
     environment:
       DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
-    ports:
-      - "8000:8000"
-
-  frontend:
-    container_name: bnc-frontend-prod
-    ports:
-      - "3000:3000"

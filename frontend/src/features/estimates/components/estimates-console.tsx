@@ -9,10 +9,12 @@ import {
   ApiResponse,
   CostCode,
   EstimateLineInput,
+  EstimateLineItemRecord,
   EstimateRecord,
   EstimateStatusEventRecord,
   ProjectRecord,
 } from "../types";
+import { EstimateSheet } from "./estimate-sheet";
 
 function emptyLine(localId: number, defaultCostCodeId = ""): EstimateLineInput {
   return {
@@ -50,10 +52,29 @@ export function EstimatesConsole() {
   const [dueDate, setDueDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submitGuard = useRef(false);
+  const [openFamilyHistory, setOpenFamilyHistory] = useState<Set<string>>(() => new Set());
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const selectedProject =
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;
+  const selectedEstimate =
+    estimates.find((estimate) => String(estimate.id) === selectedEstimateId) ?? null;
+  const isEditingDraft = Boolean(selectedEstimate && selectedEstimate.status === "draft");
+  const isReadOnly = Boolean(selectedEstimate && selectedEstimate.status !== "draft");
+  const statusClasses: Record<string, string> = {
+    draft: styles.statusDraft,
+    sent: styles.statusSent,
+    approved: styles.statusApproved,
+    rejected: styles.statusRejected,
+    archived: styles.statusArchived,
+  };
+  const statusOptions = [
+    { value: "draft", label: "Draft" },
+    { value: "sent", label: "Sent" },
+    { value: "approved", label: "Approved" },
+    { value: "rejected", label: "Rejected" },
+    { value: "archived", label: "Archived" },
+  ];
 
   function toNumber(value: string): number {
     const parsed = Number(value);
@@ -76,10 +97,22 @@ export function EstimatesConsole() {
   const taxRate = toNumber(taxPercent);
   const taxAmount = subtotal * (taxRate / 100);
   const totalAmount = subtotal + taxAmount;
-  const orderedEstimates = useMemo(
-    () => [...estimates].sort((a, b) => a.version - b.version),
-    [estimates],
-  );
+  const estimateFamilies = useMemo(() => {
+    const families = new Map<string, EstimateRecord[]>();
+    for (const estimate of estimates) {
+      const title = (estimate.title || "").trim() || "Untitled";
+      const existing = families.get(title);
+      if (existing) {
+        existing.push(estimate);
+      } else {
+        families.set(title, [estimate]);
+      }
+    }
+    return Array.from(families.entries()).map(([title, items]) => ({
+      title,
+      items: [...items].sort((a, b) => a.version - b.version),
+    }));
+  }, [estimates]);
 
   function formatMoney(value: number): string {
     return value.toFixed(2);
@@ -87,6 +120,77 @@ export function EstimatesConsole() {
 
   function formatDateInput(date: Date): string {
     return date.toISOString().slice(0, 10);
+  }
+
+  function formatDateFromIso(dateValue?: string): string {
+    if (!dateValue) {
+      return "";
+    }
+    const parsed = new Date(dateValue);
+    if (Number.isNaN(parsed.getTime())) {
+      return "";
+    }
+    return formatDateInput(parsed);
+  }
+
+  function mapLineItemsToInputs(items: EstimateLineItemRecord[] = []): EstimateLineInput[] {
+    if (!items.length) {
+      return [emptyLine(1)];
+    }
+    return items.map((item, index) => ({
+      localId: index + 1,
+      costCodeId: String(item.cost_code ?? ""),
+      description: item.description || "",
+      quantity: String(item.quantity ?? ""),
+      unit: item.unit || "ea",
+      unitCost: String(item.unit_cost ?? ""),
+      markupPercent: String(item.markup_percent ?? ""),
+    }));
+  }
+
+  function loadEstimateIntoForm(estimate: EstimateRecord) {
+    setEstimateTitle(estimate.title || "Untitled");
+    setTaxPercent(String(estimate.tax_percent ?? "0"));
+    const mapped = mapLineItemsToInputs(estimate.line_items ?? []);
+    setLineItems(mapped);
+    setNextLineId(mapped.length + 1);
+    const createdDate = formatDateFromIso(estimate.created_at);
+    if (createdDate) {
+      setEstimateDate(createdDate);
+    }
+  }
+
+  function handleSelectEstimate(estimate: EstimateRecord) {
+    setSelectedEstimateId(String(estimate.id));
+    setSelectedStatus(estimate.status);
+    setStatusEvents([]);
+    loadEstimateIntoForm(estimate);
+  }
+
+  function startNewEstimate() {
+    const defaultCostCodeId = costCodes[0] ? String(costCodes[0].id) : "";
+    setSelectedEstimateId("");
+    setSelectedStatus("draft");
+    setStatusNote("");
+    setStatusEvents([]);
+    setEstimateTitle("New Estimate");
+    setTaxPercent("0");
+    setLineItems([emptyLine(1, defaultCostCodeId)]);
+    setNextLineId(2);
+    setEstimateDate("");
+    setDueDate("");
+  }
+
+  function toggleFamilyHistory(title: string) {
+    setOpenFamilyHistory((current) => {
+      const next = new Set(current);
+      if (next.has(title)) {
+        next.delete(title);
+      } else {
+        next.add(title);
+      }
+      return next;
+    });
   }
 
   useEffect(() => {
@@ -177,8 +281,7 @@ export function EstimatesConsole() {
       const rows = (payload.data as EstimateRecord[]) ?? [];
       setEstimates(rows);
       if (rows[0]) {
-        setSelectedEstimateId(String(rows[0].id));
-        setSelectedStatus(rows[0].status);
+        handleSelectEstimate(rows[0]);
       }
       setStatusMessage(`Loaded ${rows.length} estimate version(s).`);
     } catch {
@@ -261,15 +364,69 @@ export function EstimatesConsole() {
     if (submitGuard.current) {
       return;
     }
+    if (isReadOnly) {
+      setStatusMessage("This estimate is read-only. Clone or add a new draft to edit.");
+      return;
+    }
     const projectId = Number(selectedProjectId);
     if (!projectId) {
       setStatusMessage("Select a project first.");
       return;
     }
 
+    const trimmedTitle = estimateTitle.trim();
+    if (!trimmedTitle) {
+      setStatusMessage("Estimate title is required.");
+      return;
+    }
+
     const hasMissingCostCode = lineItems.some((line) => !line.costCodeId);
     if (hasMissingCostCode) {
       setStatusMessage("Every line item must have a cost code.");
+      return;
+    }
+
+    if (isEditingDraft && selectedEstimate) {
+      setStatusMessage("Saving draft changes...");
+      submitGuard.current = true;
+      setIsSubmitting(true);
+      try {
+        const response = await fetch(`${normalizedBaseUrl}/estimates/${selectedEstimate.id}/`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Token ${token}`,
+          },
+          body: JSON.stringify({
+            title: trimmedTitle,
+            tax_percent: taxPercent,
+            line_items: lineItems.map((line) => ({
+              cost_code: Number(line.costCodeId),
+              description: line.description,
+              quantity: line.quantity,
+              unit: line.unit,
+              unit_cost: line.unitCost,
+              markup_percent: line.markupPercent,
+            })),
+          }),
+        });
+        const payload: ApiResponse = await response.json();
+        if (!response.ok) {
+          setStatusMessage("Save draft failed.");
+          return;
+        }
+        const updated = payload.data as EstimateRecord;
+        setEstimates((current) =>
+          current.map((estimate) => (estimate.id === updated.id ? updated : estimate)),
+        );
+        loadEstimateIntoForm(updated);
+        setStatusMessage(`Saved draft estimate #${updated.id}.`);
+      } catch {
+        setStatusMessage("Could not reach estimate update endpoint.");
+      } finally {
+        submitGuard.current = false;
+        setIsSubmitting(false);
+      }
       return;
     }
 
@@ -284,7 +441,7 @@ export function EstimatesConsole() {
           Authorization: `Token ${token}`,
         },
         body: JSON.stringify({
-          title: estimateTitle,
+          title: trimmedTitle,
           tax_percent: taxPercent,
           line_items: lineItems.map((line) => ({
             cost_code: Number(line.costCodeId),
@@ -303,10 +460,10 @@ export function EstimatesConsole() {
       }
       const created = payload.data as EstimateRecord;
       setEstimates((current) => [created, ...current]);
-      setSelectedEstimateId(String(created.id));
-      setSelectedStatus(created.status);
+      handleSelectEstimate(created);
       setStatusEvents([]);
       setStatusMessage(`Created estimate #${created.id} v${created.version}.`);
+      loadEstimateIntoForm(created);
       router.push(`/estimates/post-create?estimate=${created.id}`);
     } catch {
       setStatusMessage("Could not reach estimate create endpoint.");
@@ -340,8 +497,7 @@ export function EstimatesConsole() {
       }
       const cloned = payload.data as EstimateRecord;
       setEstimates((current) => [cloned, ...current]);
-      setSelectedEstimateId(String(cloned.id));
-      setSelectedStatus(cloned.status);
+      handleSelectEstimate(cloned);
       setStatusEvents([]);
       setStatusMessage(`Cloned estimate to version ${cloned.version}.`);
     } catch {
@@ -414,342 +570,129 @@ export function EstimatesConsole() {
           <h2>Estimate Builder</h2>
           <p>One-page editor with smart defaults and quick project context.</p>
         </div>
-        <div className={styles.toolbarActions}>
-          <button type="button" className={styles.secondaryButton} onClick={loadDependencies}>
-            Reload Projects + Cost Codes
-          </button>
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            onClick={loadEstimates}
-            disabled={!selectedProjectId}
-          >
-            Reload Estimates
-          </button>
-        </div>
       </div>
 
       <p className={styles.authMessage}>{authMessage}</p>
       {statusMessage ? <p className={styles.statusMessage}>{statusMessage}</p> : null}
 
-      <form className={styles.sheet} onSubmit={handleCreateEstimate}>
-        <div className={styles.sheetHeader}>
-          <div className={styles.fromBlock}>
-            <span className={styles.blockLabel}>From</span>
-            <p className={styles.blockText}>Your Company</p>
-            <p className={styles.blockMuted}>Your Address 1234</p>
-            <p className={styles.blockMuted}>City, ST 12345</p>
-          </div>
-          <div className={styles.headerRight}>
-            <div className={styles.logoBox}>Upload Logo</div>
-            <div className={styles.sheetTitle}>Estimate</div>
-          </div>
-        </div>
-
-        <div className={styles.partyGrid}>
-          <div className={styles.toBlock}>
-            <span className={styles.blockLabel}>To</span>
-            {projects.length > 0 ? (
-              <label className={styles.inlineField}>
-                Project
-                <select
-                  className={styles.fieldSelect}
-                  value={selectedProjectId}
-                  onChange={(event) => setSelectedProjectId(event.target.value)}
-                  required
-                >
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      #{project.id} - {project.name} ({project.customer_display_name})
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : (
-              <p className={styles.inlineHint}>
-                No projects yet. Create one from Intake so we can bill against it.
-              </p>
-            )}
-            <div className={styles.metaLine}>
-              <span>Customer</span>
-              <span>{selectedProject?.customer_display_name ?? "Customer name"}</span>
-            </div>
-            <div className={styles.metaLine}>
-              <span>Status</span>
-              <span>{selectedProject?.status ?? "-"}</span>
-            </div>
-          </div>
-
-          <div className={styles.metaBlock}>
-            <div className={styles.metaTitle}>Estimate Details</div>
-            <label className={styles.inlineField}>
-              Estimate title
-              <input
-                className={styles.fieldInput}
-                value={estimateTitle}
-                onChange={(event) => setEstimateTitle(event.target.value)}
-                required
-              />
-            </label>
-            <div className={styles.metaLine}>
-              <span>Estimate #</span>
-              <span>{selectedEstimateId ? `#${selectedEstimateId}` : "Draft"}</span>
-            </div>
-            <div className={styles.metaLine}>
-              <span>Estimate date</span>
-              <input
-                className={styles.fieldInput}
-                type="date"
-                value={estimateDate}
-                readOnly
-                aria-readonly="true"
-              />
-            </div>
-            <div className={styles.metaLine}>
-              <span>Due date</span>
-              <input
-                className={styles.fieldInput}
-                type="date"
-                value={dueDate}
-                onChange={(event) => setDueDate(event.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-
-        {costCodes.length === 0 ? (
-          <p className={styles.inlineHint}>
-            Cost codes are required for line items. Create them on the Cost Codes page.
-          </p>
-        ) : null}
-
-        <div className={styles.lineTable}>
-          <div className={styles.lineHeader}>
-            <span>Qty</span>
-            <span>Description</span>
-            <span>Cost Code</span>
-            <span>Unit</span>
-            <span>Unit Price</span>
-            <span>Markup</span>
-            <span>Amount</span>
-            <span>Actions</span>
-          </div>
-          {lineItems.map((line, index) => (
-            <div key={line.localId} className={styles.lineRow}>
-              <input
-                className={styles.lineInput}
-                aria-label="Quantity"
-                value={line.quantity}
-                onChange={(event) => updateLineItem(line.localId, "quantity", event.target.value)}
-                inputMode="decimal"
-                required
-              />
-              <input
-                className={styles.lineInput}
-                aria-label="Description"
-                value={line.description}
-                onChange={(event) =>
-                  updateLineItem(line.localId, "description", event.target.value)
-                }
-                required
-              />
-              <select
-                className={styles.lineSelect}
-                aria-label="Cost code"
-                value={line.costCodeId}
-                onChange={(event) => updateLineItem(line.localId, "costCodeId", event.target.value)}
-                required
-              >
-                <option value="">Select</option>
-                {costCodes.map((code) => (
-                  <option key={code.id} value={code.id}>
-                    {code.code} - {code.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                className={styles.lineInput}
-                aria-label="Unit"
-                value={line.unit}
-                onChange={(event) => updateLineItem(line.localId, "unit", event.target.value)}
-                required
-              />
-              <input
-                className={styles.lineInput}
-                aria-label="Unit cost"
-                value={line.unitCost}
-                onChange={(event) => updateLineItem(line.localId, "unitCost", event.target.value)}
-                inputMode="decimal"
-                required
-              />
-              <div className={styles.percentField}>
-                <input
-                  className={styles.lineInput}
-                  aria-label="Markup percent"
-                  value={line.markupPercent}
-                  onChange={(event) =>
-                    updateLineItem(line.localId, "markupPercent", event.target.value)
-                  }
-                  inputMode="decimal"
-                  required
-                />
-                <span className={styles.percentSuffix}>%</span>
-              </div>
-              <div className={styles.amountCell}>${formatMoney(lineTotals[index] || 0)}</div>
-              <div className={styles.lineActionsCell}>
-                <button
-                  type="button"
-                  className={styles.smallButton}
-                  onClick={() => moveLineItem(line.localId, "up")}
-                  disabled={index === 0}
-                >
-                  Up
-                </button>
-                <button
-                  type="button"
-                  className={styles.smallButton}
-                  onClick={() => moveLineItem(line.localId, "down")}
-                  disabled={index === lineItems.length - 1}
-                >
-                  Down
-                </button>
-                <button
-                  type="button"
-                  className={styles.smallButton}
-                  onClick={() => duplicateLineItem(line.localId)}
-                >
-                  Duplicate
-                </button>
-                <button
-                  type="button"
-                  className={styles.removeButton}
-                  onClick={() => removeLineItem(line.localId)}
-                >
-                  Remove
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className={styles.lineActions}>
-          <button type="button" className={styles.secondaryButton} onClick={addLineItem}>
-            Add Line Item
-          </button>
-          <button
-            type="submit"
-            className={styles.primaryButton}
-            disabled={!canCreateEstimate || isSubmitting}
-          >
-            {isSubmitting ? "Creating..." : "Create Estimate"}
-          </button>
-        </div>
-
-        <div className={styles.summary}>
-          <div className={styles.summaryRow}>
-            <span>Subtotal</span>
-            <span>${formatMoney(subtotal)}</span>
-          </div>
-          <div className={styles.summaryRow}>
-            <span>Sales Tax</span>
-            <div className={styles.summaryTaxLine}>
-              <input
-                className={styles.summaryTaxInput}
-                value={taxPercent}
-                onChange={(event) => setTaxPercent(event.target.value)}
-                inputMode="decimal"
-                aria-label="Sales tax percent"
-              />
-              <span className={styles.summaryTaxSuffix}>%</span>
-              <span>${formatMoney(taxAmount)}</span>
-            </div>
-          </div>
-          <div className={`${styles.summaryRow} ${styles.summaryTotal}`}>
-            <span>Total</span>
-            <span>${formatMoney(totalAmount)}</span>
-          </div>
-        </div>
-
-        <div className={styles.terms}>
-          <h4>Terms and Conditions</h4>
-          <p>Payment is due within 14 days of project completion.</p>
-          <p>All checks to be made out to __________________.</p>
-          <p>Thank you for your business.</p>
-        </div>
-
-        <div className={styles.footer}>
-          <span>Tel: +1 234 567 8901</span>
-          <span>Email: company@email.com</span>
-          <span>Web: company.com</span>
-        </div>
-      </form>
-
-      <section className={styles.lifecycle}>
-        <h3>Estimate Versions & Status</h3>
-
-        {estimates.length > 0 ? (
+      <div className={styles.estimateSelector}>
+        {projects.length > 0 ? (
           <label className={styles.lifecycleField}>
-            Estimate version
+            Project
             <select
-              value={selectedEstimateId}
-              onChange={(event) => {
-                const nextId = event.target.value;
-                setSelectedEstimateId(nextId);
-                const selected = estimates.find((estimate) => String(estimate.id) === nextId);
-                if (selected) setSelectedStatus(selected.status);
-                setStatusEvents([]);
-              }}
+              value={selectedProjectId}
+              onChange={(event) => setSelectedProjectId(event.target.value)}
+              required
             >
-              {estimates.map((estimate) => (
-                <option key={estimate.id} value={estimate.id}>
-                  #{estimate.id} v{estimate.version} - {estimate.title} ({estimate.status})
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  #{project.id} - {project.name} ({project.customer_display_name})
                 </option>
               ))}
             </select>
           </label>
         ) : (
-          <p className={styles.inlineHint}>No estimate versions loaded yet.</p>
+          <p className={styles.inlineHint}>
+            No projects yet. Create one from Intake so we can bill against it.
+          </p>
         )}
+      </div>
+
+      <section className={styles.lifecycle}>
+        <h3>Estimate Versions & Status</h3>
 
         <div className={styles.lifecycleActions}>
+          <button type="button" onClick={startNewEstimate}>
+            Add New Estimate
+          </button>
           <button type="button" onClick={handleCloneEstimate} disabled={!selectedEstimateId}>
             Clone Selected Estimate Version
           </button>
         </div>
 
         <div className={styles.versionTree}>
-          {orderedEstimates.length > 0 ? (
-            orderedEstimates.map((estimate) => {
-              const isActive = String(estimate.id) === selectedEstimateId;
-              const total = formatMoney(toNumber(estimate.grand_total || "0"));
+          {estimateFamilies.length > 0 ? (
+            estimateFamilies.map((family) => {
+              const latest = family.items[family.items.length - 1];
+              const history = family.items.slice(0, -1).reverse();
+              const selectedInFamily = family.items.find(
+                (estimate) => String(estimate.id) === selectedEstimateId,
+              );
+              const isFamilyActive = Boolean(selectedInFamily);
+              const isViewingHistory =
+                selectedInFamily && String(selectedInFamily.id) !== String(latest.id);
+              const isHistoryOpen = openFamilyHistory.has(family.title);
+              const latestTotal = formatMoney(toNumber(latest.grand_total || "0"));
               return (
-                <div key={estimate.id} className={styles.timelineRow}>
-                  <div className={styles.timelineColumn}>
-                    <span
-                      className={`${styles.timelineDot} ${isActive ? styles.timelineDotActive : ""}`}
-                    />
-                    <span className={styles.timelineLine} />
+                <div
+                  key={family.title}
+                  className={`${styles.familyGroup} ${
+                    isFamilyActive ? styles.familyGroupActive : ""
+                  }`}
+                >
+                  <div className={styles.familyRow}>
+                    <button
+                      type="button"
+                      className={styles.familyMain}
+                      onClick={() => handleSelectEstimate(latest)}
+                    >
+                      <div>
+                        <span className={styles.familyTitle}>{family.title}</span>
+                        <span className={styles.familyMeta}>
+                          Estimate #{latest.id} · v{latest.version}
+                        </span>
+                      </div>
+                      <div className={styles.versionRight}>
+                        <span
+                          className={`${styles.versionStatus} ${
+                            statusClasses[latest.status] ?? ""
+                          }`}
+                        >
+                          {latest.status}
+                        </span>
+                        <span className={styles.versionAmount}>${latestTotal}</span>
+                      </div>
+                    </button>
+                    {isHistoryOpen && history.length > 0 ? (
+                      <div className={styles.historyRow}>
+                        {history.map((estimate) => {
+                          const total = formatMoney(toNumber(estimate.grand_total || "0"));
+                          return (
+                            <button
+                              key={estimate.id}
+                              type="button"
+                              className={styles.historyCard}
+                              onClick={() => handleSelectEstimate(estimate)}
+                            >
+                              <span className={styles.historyVersion}>v{estimate.version}</span>
+                              <span className={styles.historyMeta}>
+                                #{estimate.id} · {estimate.status}
+                              </span>
+                              <span className={styles.historyAmount}>${total}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
                   </div>
-                  <button
-                    type="button"
-                    className={`${styles.versionNode} ${isActive ? styles.versionNodeActive : ""}`}
-                    onClick={() => {
-                      setSelectedEstimateId(String(estimate.id));
-                      setSelectedStatus(estimate.status);
-                      setStatusEvents([]);
-                    }}
-                  >
-                    <div>
-                      <span className={styles.versionTitle}>
-                        v{estimate.version} {estimate.title || "Untitled"}
+                  <div className={styles.familyFooter}>
+                    {history.length > 0 ? (
+                      <button
+                        type="button"
+                        className={styles.historyToggle}
+                        onClick={() => toggleFamilyHistory(family.title)}
+                      >
+                        {isHistoryOpen ? "Hide history" : "Show history"} ({history.length})
+                      </button>
+                    ) : (
+                      <span className={styles.historyEmpty}>No history</span>
+                    )}
+                    {isViewingHistory ? (
+                      <span className={styles.historyNotice}>
+                        Viewing v{selectedInFamily?.version}
                       </span>
-                      <span className={styles.versionMeta}>Estimate #{estimate.id}</span>
-                    </div>
-                    <div className={styles.versionRight}>
-                      <span className={styles.versionStatus}>{estimate.status}</span>
-                      <span className={styles.versionAmount}>${total}</span>
-                    </div>
-                  </button>
+                    ) : null}
+                  </div>
                 </div>
               );
             })
@@ -759,22 +702,35 @@ export function EstimatesConsole() {
         </div>
 
         <div className={styles.lifecycleGrid}>
-          <label className={styles.lifecycleField}>
-            Next status
-            <select value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value)}>
-              <option value="draft">draft</option>
-              <option value="sent">sent</option>
-              <option value="approved">approved</option>
-              <option value="rejected">rejected</option>
-              <option value="archived">archived</option>
-            </select>
-          </label>
+          <div className={styles.statusPicker}>
+            <span className={styles.lifecycleFieldLabel}>Next status</span>
+            <div className={styles.statusPills}>
+              {statusOptions.map((option) => {
+                const isSelected = selectedStatus === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`${styles.statusPill} ${
+                      isSelected ? statusClasses[option.value] ?? "" : styles.statusPillInactive
+                    } ${isSelected ? styles.statusPillActive : ""}`}
+                    onClick={() => setSelectedStatus(option.value)}
+                    aria-pressed={isSelected}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <label className={styles.lifecycleField}>
             Status note
-            <input
+            <textarea
+              className={styles.statusNote}
               value={statusNote}
               onChange={(event) => setStatusNote(event.target.value)}
               placeholder="Optional note for this transition"
+              rows={3}
             />
           </label>
         </div>
@@ -802,6 +758,34 @@ export function EstimatesConsole() {
           </div>
         ) : null}
       </section>
+
+      <EstimateSheet
+        project={selectedProject}
+        estimateId={selectedEstimateId}
+        estimateTitle={estimateTitle}
+        estimateDate={estimateDate}
+        dueDate={dueDate}
+        taxPercent={taxPercent}
+        lineItems={lineItems}
+        lineTotals={lineTotals}
+        subtotal={subtotal}
+        taxAmount={taxAmount}
+        totalAmount={totalAmount}
+        costCodes={costCodes}
+        canSubmit={canCreateEstimate}
+        isSubmitting={isSubmitting}
+        isEditingDraft={isEditingDraft}
+        readOnly={isReadOnly}
+        onTitleChange={setEstimateTitle}
+        onDueDateChange={setDueDate}
+        onTaxPercentChange={setTaxPercent}
+        onLineItemChange={updateLineItem}
+        onAddLineItem={addLineItem}
+        onMoveLineItem={moveLineItem}
+        onDuplicateLineItem={duplicateLineItem}
+        onRemoveLineItem={removeLineItem}
+        onSubmit={handleCreateEstimate}
+      />
     </section>
   );
 }

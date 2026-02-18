@@ -93,8 +93,14 @@ class EstimateLineItemInputSerializer(serializers.Serializer):
 
 
 class EstimateWriteSerializer(serializers.Serializer):
-    title = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    title = serializers.CharField(max_length=255, required=True, allow_blank=False)
     status = serializers.ChoiceField(choices=Estimate.Status.choices, required=False)
     status_note = serializers.CharField(max_length=5000, required=False, allow_blank=True, default="")
     tax_percent = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, default=0)
     line_items = EstimateLineItemInputSerializer(many=True, required=False)
+
+    def validate_title(self, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise serializers.ValidationError("Title cannot be blank.")
+        return trimmed
