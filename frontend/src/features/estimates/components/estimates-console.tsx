@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { loadClientSession } from "../../session/client-session";
 import styles from "./estimates-console.module.css";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ApiResponse,
   CostCode,
@@ -15,6 +15,8 @@ import {
   ProjectRecord,
 } from "../types";
 import { EstimateSheet } from "./estimate-sheet";
+
+type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amount";
 
 function emptyLine(localId: number, defaultCostCodeId = ""): EstimateLineInput {
   return {
@@ -30,9 +32,11 @@ function emptyLine(localId: number, defaultCostCodeId = ""): EstimateLineInput {
 
 export function EstimatesConsole() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [token, setToken] = useState("");
   const [authMessage, setAuthMessage] = useState("Checking session...");
   const [statusMessage, setStatusMessage] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -47,14 +51,23 @@ export function EstimatesConsole() {
   const [estimateTitle, setEstimateTitle] = useState("Initial Estimate");
   const [taxPercent, setTaxPercent] = useState("0");
   const [lineItems, setLineItems] = useState<EstimateLineInput[]>([emptyLine(1)]);
+  const [lineSortKey, setLineSortKey] = useState<LineSortKey | null>(null);
+  const [lineSortDirection, setLineSortDirection] = useState<"asc" | "desc">("asc");
   const [nextLineId, setNextLineId] = useState(2);
   const [estimateDate, setEstimateDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submitGuard = useRef(false);
   const [openFamilyHistory, setOpenFamilyHistory] = useState<Set<string>>(() => new Set());
+  const [showDuplicatePanel, setShowDuplicatePanel] = useState(false);
+  const [duplicateTitle, setDuplicateTitle] = useState("");
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+  const scopedProjectIdParam = searchParams.get("project");
+  const scopedProjectId =
+    scopedProjectIdParam && /^\d+$/.test(scopedProjectIdParam)
+      ? Number(scopedProjectIdParam)
+      : null;
   const selectedProject =
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;
   const selectedEstimate =
@@ -73,8 +86,24 @@ export function EstimatesConsole() {
     { value: "sent", label: "Sent" },
     { value: "approved", label: "Approved" },
     { value: "rejected", label: "Rejected" },
-    { value: "archived", label: "Archived" },
   ];
+  const allowedStatusTransitions: Record<string, string[]> = {
+    draft: ["sent"],
+    sent: ["approved", "rejected"],
+    approved: [],
+    rejected: ["draft"],
+    archived: [],
+  };
+  const revisableStatuses = new Set(["sent", "rejected"]);
+  const canCreateRevision = Boolean(
+    selectedEstimate && revisableStatuses.has(selectedEstimate.status),
+  );
+  const selectableStatuses = !selectedEstimate
+    ? new Set(statusOptions.map((option) => option.value))
+    : new Set([
+        selectedEstimate.status,
+        ...(allowedStatusTransitions[selectedEstimate.status] ?? []),
+      ]);
 
   function toNumber(value: string): number {
     const parsed = Number(value);
@@ -161,10 +190,17 @@ export function EstimatesConsole() {
   }
 
   function handleSelectEstimate(estimate: EstimateRecord) {
-    setSelectedEstimateId(String(estimate.id));
+    const nextEstimateId = String(estimate.id);
+    const isSameEstimate = nextEstimateId === selectedEstimateId;
+    setSelectedEstimateId(nextEstimateId);
     setSelectedStatus(estimate.status);
-    setStatusEvents([]);
+    if (!isSameEstimate) {
+      setStatusEvents([]);
+    }
+    setLineSortKey(null);
+    setLineSortDirection("asc");
     loadEstimateIntoForm(estimate);
+    setDuplicateTitle(`${estimate.title || "Estimate"} Copy`);
   }
 
   function startNewEstimate() {
@@ -176,9 +212,13 @@ export function EstimatesConsole() {
     setEstimateTitle("New Estimate");
     setTaxPercent("0");
     setLineItems([emptyLine(1, defaultCostCodeId)]);
+    setLineSortKey(null);
+    setLineSortDirection("asc");
     setNextLineId(2);
     setEstimateDate("");
     setDueDate("");
+    setShowDuplicatePanel(false);
+    setActionMessage("");
   }
 
   function toggleFamilyHistory(title: string) {
@@ -241,7 +281,12 @@ export function EstimatesConsole() {
       setCostCodes(codeRows);
 
       if (projectRows[0]) {
-        setSelectedProjectId(String(projectRows[0].id));
+        const scopedMatch = scopedProjectId
+          ? projectRows.find((project) => project.id === scopedProjectId)
+          : null;
+        setSelectedProjectId(String(scopedMatch?.id ?? projectRows[0].id));
+      } else {
+        setSelectedProjectId("");
       }
 
       if (codeRows[0]) {
@@ -259,7 +304,7 @@ export function EstimatesConsole() {
     } catch {
       setStatusMessage("Could not reach dependency endpoints.");
     }
-  }, [normalizedBaseUrl, token]);
+  }, [normalizedBaseUrl, scopedProjectId, token]);
 
   const loadEstimates = useCallback(async () => {
     const projectId = Number(selectedProjectId);
@@ -303,6 +348,20 @@ export function EstimatesConsole() {
     void loadEstimates();
   }, [loadEstimates, selectedProjectId, token]);
 
+  useEffect(() => {
+    if (!projects.length || !scopedProjectId) {
+      return;
+    }
+    const scopedMatch = projects.find((project) => project.id === scopedProjectId);
+    if (!scopedMatch) {
+      return;
+    }
+    const nextId = String(scopedMatch.id);
+    if (nextId !== selectedProjectId) {
+      setSelectedProjectId(nextId);
+    }
+  }, [projects, scopedProjectId, selectedProjectId]);
+
   function addLineItem() {
     const defaultCostCodeId = costCodes[0] ? String(costCodes[0].id) : "";
     setLineItems((current) => [...current, emptyLine(nextLineId, defaultCostCodeId)]);
@@ -333,6 +392,8 @@ export function EstimatesConsole() {
       next.splice(targetIndex, 0, item);
       return next;
     });
+    setLineSortKey(null);
+    setLineSortDirection("asc");
   }
 
   function removeLineItem(localId: number) {
@@ -352,6 +413,52 @@ export function EstimatesConsole() {
     setLineItems((current) =>
       current.map((line) => (line.localId === localId ? { ...line, [key]: value } : line)),
     );
+  }
+
+  function handleSortLineItems(key: LineSortKey) {
+    if (isReadOnly) {
+      return;
+    }
+    const nextDirection = lineSortKey === key && lineSortDirection === "asc" ? "desc" : "asc";
+    const directionFactor = nextDirection === "asc" ? 1 : -1;
+
+    function lineAmount(line: EstimateLineInput): number {
+      const quantity = toNumber(line.quantity);
+      const unitCost = toNumber(line.unitCost);
+      const markup = toNumber(line.markupPercent);
+      const base = quantity * unitCost;
+      return base + base * (markup / 100);
+    }
+
+    function costCodeLabel(line: EstimateLineInput): string {
+      const code = costCodes.find((candidate) => String(candidate.id) === line.costCodeId);
+      if (!code) {
+        return "";
+      }
+      return `${code.code} ${code.name}`.toLowerCase();
+    }
+
+    setLineItems((current) => {
+      const sorted = [...current].sort((a, b) => {
+        switch (key) {
+          case "quantity":
+            return (toNumber(a.quantity) - toNumber(b.quantity)) * directionFactor;
+          case "unitCost":
+            return (toNumber(a.unitCost) - toNumber(b.unitCost)) * directionFactor;
+          case "markupPercent":
+            return (toNumber(a.markupPercent) - toNumber(b.markupPercent)) * directionFactor;
+          case "amount":
+            return (lineAmount(a) - lineAmount(b)) * directionFactor;
+          case "costCode":
+            return costCodeLabel(a).localeCompare(costCodeLabel(b)) * directionFactor;
+          default:
+            return 0;
+        }
+      });
+      return sorted;
+    });
+    setLineSortKey(key);
+    setLineSortDirection(nextDirection);
   }
 
   const canCreateEstimate = useMemo(
@@ -476,9 +583,16 @@ export function EstimatesConsole() {
   async function handleCloneEstimate() {
     const estimateId = Number(selectedEstimateId);
     if (!estimateId) {
-      setStatusMessage("Select an estimate first.");
+      setStatusMessage("Select an existing estimate version before creating a revision.");
+      setActionMessage("Select an existing estimate version before creating a revision.");
       return;
     }
+    if (!canCreateRevision) {
+      setStatusMessage("Revisions are only available for sent or rejected estimates.");
+      setActionMessage("Revisions are only available for sent or rejected estimates.");
+      return;
+    }
+    const sourceWasSent = selectedEstimate?.status === "sent";
 
     setStatusMessage("Cloning estimate version...");
     try {
@@ -496,12 +610,68 @@ export function EstimatesConsole() {
         return;
       }
       const cloned = payload.data as EstimateRecord;
-      setEstimates((current) => [cloned, ...current]);
+      setEstimates((current) => {
+        const updated = current.map((estimate) =>
+          sourceWasSent && estimate.id === estimateId
+            ? { ...estimate, status: "rejected" }
+            : estimate,
+        );
+        return [cloned, ...updated];
+      });
       handleSelectEstimate(cloned);
       setStatusEvents([]);
       setStatusMessage(`Cloned estimate to version ${cloned.version}.`);
+      setActionMessage("");
     } catch {
       setStatusMessage("Could not reach clone endpoint.");
+    }
+  }
+
+  async function handleDuplicateEstimate() {
+    const estimateId = Number(selectedEstimateId);
+    if (!estimateId) {
+      setStatusMessage("Select an estimate first.");
+      setActionMessage("Select an existing estimate version before duplicating.");
+      return;
+    }
+    if (!duplicateTitle.trim()) {
+      setStatusMessage("Duplicate title is required.");
+      return;
+    }
+
+    setStatusMessage("Duplicating estimate as a new draft...");
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/estimates/${estimateId}/duplicate/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Token ${token}`,
+        },
+        body: JSON.stringify({
+          title: duplicateTitle.trim(),
+        }),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        const message = payload.error?.message ?? "Duplicate failed.";
+        setStatusMessage(message);
+        setActionMessage(message);
+        return;
+      }
+      const duplicated = payload.data as EstimateRecord;
+      if (String(duplicated.project) === selectedProjectId) {
+        setEstimates((current) => [duplicated, ...current]);
+      }
+      if (String(duplicated.project) !== selectedProjectId) {
+        setSelectedProjectId(String(duplicated.project));
+      }
+      handleSelectEstimate(duplicated);
+      setShowDuplicatePanel(false);
+      setStatusEvents([]);
+      setStatusMessage(`Duplicated estimate to #${duplicated.id} v${duplicated.version} as draft.`);
+      setActionMessage("");
+    } catch {
+      setStatusMessage("Could not reach duplicate endpoint.");
     }
   }
 
@@ -538,30 +708,51 @@ export function EstimatesConsole() {
     }
   }
 
-  async function loadStatusEvents() {
-    const estimateId = Number(selectedEstimateId);
-    if (!estimateId) {
-      setStatusMessage("Select an estimate first.");
-      return;
-    }
-
-    setStatusMessage("Loading status events...");
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/estimates/${estimateId}/status-events/`, {
-        headers: { Authorization: `Token ${token}` },
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setStatusMessage("Failed loading status events.");
+  const loadStatusEvents = useCallback(
+    async (options?: { estimateId?: number; quiet?: boolean }) => {
+      const estimateId = options?.estimateId ?? Number(selectedEstimateId);
+      const quiet = options?.quiet ?? false;
+      if (!estimateId) {
+        if (!quiet) {
+          setStatusMessage("Select an estimate first.");
+        }
         return;
       }
-      const rows = (payload.data as EstimateStatusEventRecord[]) ?? [];
-      setStatusEvents(rows);
-      setStatusMessage(`Loaded ${rows.length} status event(s).`);
-    } catch {
-      setStatusMessage("Could not reach status events endpoint.");
+
+      if (!quiet) {
+        setStatusMessage("Loading status events...");
+      }
+      try {
+        const response = await fetch(`${normalizedBaseUrl}/estimates/${estimateId}/status-events/`, {
+          headers: { Authorization: `Token ${token}` },
+        });
+        const payload: ApiResponse = await response.json();
+        if (!response.ok) {
+          if (!quiet) {
+            setStatusMessage("Failed loading status events.");
+          }
+          return;
+        }
+        const rows = (payload.data as EstimateStatusEventRecord[]) ?? [];
+        setStatusEvents(rows);
+        if (!quiet) {
+          setStatusMessage(`Loaded ${rows.length} status event(s).`);
+        }
+      } catch {
+        if (!quiet) {
+          setStatusMessage("Could not reach status events endpoint.");
+        }
+      }
+    },
+    [normalizedBaseUrl, selectedEstimateId, token],
+  );
+
+  useEffect(() => {
+    if (!token || !selectedEstimateId) {
+      return;
     }
-  }
+    void loadStatusEvents({ quiet: true });
+  }, [loadStatusEvents, selectedEstimateId, token]);
 
   return (
     <section className={styles.console}>
@@ -576,24 +767,23 @@ export function EstimatesConsole() {
       {statusMessage ? <p className={styles.statusMessage}>{statusMessage}</p> : null}
 
       <div className={styles.estimateSelector}>
-        {projects.length > 0 ? (
-          <label className={styles.lifecycleField}>
-            Project
-            <select
-              value={selectedProjectId}
-              onChange={(event) => setSelectedProjectId(event.target.value)}
-              required
-            >
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  #{project.id} - {project.name} ({project.customer_display_name})
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : (
+        {selectedProject ? (
+          <>
+            <p className={styles.scopeLabel}>Project Context</p>
+            <p className={styles.scopeProjectName}>
+              #{selectedProject.id} {selectedProject.name}
+            </p>
+            <p className={styles.scopeProjectMeta}>
+              {selectedProject.customer_display_name} · {selectedProject.status}
+            </p>
+          </>
+        ) : projects.length === 0 ? (
           <p className={styles.inlineHint}>
             No projects yet. Create one from Intake so we can bill against it.
+          </p>
+        ) : (
+          <p className={styles.inlineHint}>
+            No project selected. Open estimates from <code>/projects</code>.
           </p>
         )}
       </div>
@@ -605,10 +795,59 @@ export function EstimatesConsole() {
           <button type="button" onClick={startNewEstimate}>
             Add New Estimate
           </button>
-          <button type="button" onClick={handleCloneEstimate} disabled={!selectedEstimateId}>
-            Clone Selected Estimate Version
+          <button
+            type="button"
+            onClick={() => {
+              if (!selectedEstimate) {
+                setStatusMessage("Select an existing estimate version before duplicating.");
+                setActionMessage("Select an existing estimate version before duplicating.");
+                return;
+              }
+              setDuplicateTitle(`${selectedEstimate.title || "Estimate"} Copy`);
+              setShowDuplicatePanel((current) => !current);
+            }}
+          >
+            Duplicate as New Estimate
+          </button>
+          <button
+            type="button"
+            onClick={handleCloneEstimate}
+            title={
+              selectedEstimate && !canCreateRevision
+                ? "Revisions are only available for sent or rejected estimates."
+                : undefined
+            }
+          >
+            Create Revision From Selected
           </button>
         </div>
+        {actionMessage ? <p className={styles.actionError}>{actionMessage}</p> : null}
+        {showDuplicatePanel ? (
+          <div className={styles.duplicatePanel}>
+            <p className={styles.inlineHint}>
+              Duplicating in project{" "}
+              {selectedProject
+                ? `#${selectedProject.id} - ${selectedProject.name} (${selectedProject.customer_display_name})`
+                : "current selection"}.
+            </p>
+            <label className={styles.lifecycleField}>
+              New estimate title
+              <input
+                value={duplicateTitle}
+                onChange={(event) => setDuplicateTitle(event.target.value)}
+                placeholder="Estimate title"
+              />
+            </label>
+            <div className={styles.lifecycleActions}>
+              <button type="button" onClick={handleDuplicateEstimate}>
+                Confirm Duplicate
+              </button>
+              <button type="button" onClick={() => setShowDuplicatePanel(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <div className={styles.versionTree}>
           {estimateFamilies.length > 0 ? (
@@ -621,6 +860,7 @@ export function EstimatesConsole() {
               const isFamilyActive = Boolean(selectedInFamily);
               const isViewingHistory =
                 selectedInFamily && String(selectedInFamily.id) !== String(latest.id);
+              const isLatestSelected = String(latest.id) === selectedEstimateId;
               const isHistoryOpen = openFamilyHistory.has(family.title);
               const latestTotal = formatMoney(toNumber(latest.grand_total || "0"));
               return (
@@ -633,7 +873,9 @@ export function EstimatesConsole() {
                   <div className={styles.familyRow}>
                     <button
                       type="button"
-                      className={styles.familyMain}
+                      className={`${styles.familyMain} ${
+                        isLatestSelected ? styles.familyMainActive : ""
+                      }`}
                       onClick={() => handleSelectEstimate(latest)}
                     >
                       <div>
@@ -657,16 +899,26 @@ export function EstimatesConsole() {
                       <div className={styles.historyRow}>
                         {history.map((estimate) => {
                           const total = formatMoney(toNumber(estimate.grand_total || "0"));
+                          const isSelected = String(estimate.id) === selectedEstimateId;
                           return (
                             <button
                               key={estimate.id}
                               type="button"
-                              className={styles.historyCard}
+                              className={`${styles.historyCard} ${
+                                isSelected ? styles.historyCardActive : ""
+                              }`}
                               onClick={() => handleSelectEstimate(estimate)}
                             >
                               <span className={styles.historyVersion}>v{estimate.version}</span>
-                              <span className={styles.historyMeta}>
-                                #{estimate.id} · {estimate.status}
+                              <span className={styles.historyMetaRow}>
+                                <span className={styles.historyMeta}>#{estimate.id}</span>
+                                <span
+                                  className={`${styles.versionStatus} ${
+                                    statusClasses[estimate.status] ?? ""
+                                  } ${styles.historyStatus}`}
+                                >
+                                  {estimate.status}
+                                </span>
                               </span>
                               <span className={styles.historyAmount}>${total}</span>
                             </button>
@@ -707,15 +959,19 @@ export function EstimatesConsole() {
             <div className={styles.statusPills}>
               {statusOptions.map((option) => {
                 const isSelected = selectedStatus === option.value;
+                const isSelectable = selectableStatuses.has(option.value);
                 return (
                   <button
                     key={option.value}
                     type="button"
                     className={`${styles.statusPill} ${
                       isSelected ? statusClasses[option.value] ?? "" : styles.statusPillInactive
-                    } ${isSelected ? styles.statusPillActive : ""}`}
+                    } ${isSelected ? styles.statusPillActive : ""} ${
+                      !isSelectable ? styles.actionDisabled : ""
+                    }`}
                     onClick={() => setSelectedStatus(option.value)}
                     aria-pressed={isSelected}
+                    disabled={!isSelectable}
                   >
                     {option.label}
                   </button>
@@ -738,23 +994,50 @@ export function EstimatesConsole() {
           <button type="button" onClick={handleUpdateEstimateStatus} disabled={!selectedEstimateId}>
             Update Selected Estimate Status
           </button>
-          <button type="button" onClick={loadStatusEvents} disabled={!selectedEstimateId}>
-            Load Status Events
-          </button>
         </div>
 
         {statusEvents.length > 0 ? (
           <div className={styles.statusEvents}>
             <h4>Status Events</h4>
-            <ul>
-              {statusEvents.map((event) => (
-                <li key={event.id}>
-                  {event.from_status ?? "none"} -&gt; {event.to_status} by {event.changed_by_email} at{" "}
-                  {new Date(event.changed_at).toLocaleString()}
-                  {event.note ? ` (${event.note})` : ""}
-                </li>
-              ))}
-            </ul>
+            <div className={styles.statusEventsTableWrap}>
+              <table className={styles.statusEventsTable}>
+                <thead>
+                  <tr>
+                    <th>From</th>
+                    <th>To</th>
+                    <th>By</th>
+                    <th>When</th>
+                    <th>Note</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {statusEvents.map((event) => {
+                    const fromStatus = event.from_status ?? "created";
+                    const fromStatusClass = event.from_status
+                      ? statusClasses[event.from_status] ?? ""
+                      : styles.statusCreated;
+                    const toStatusClass = statusClasses[event.to_status] ?? "";
+                    return (
+                      <tr key={event.id}>
+                        <td>
+                          <span className={`${styles.versionStatus} ${fromStatusClass}`}>
+                            {fromStatus}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`${styles.versionStatus} ${toStatusClass}`}>
+                            {event.to_status}
+                          </span>
+                        </td>
+                        <td>{event.changed_by_email}</td>
+                        <td>{new Date(event.changed_at).toLocaleString()}</td>
+                        <td>{event.note || "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : null}
       </section>
@@ -776,6 +1059,8 @@ export function EstimatesConsole() {
         isSubmitting={isSubmitting}
         isEditingDraft={isEditingDraft}
         readOnly={isReadOnly}
+        lineSortKey={lineSortKey}
+        lineSortDirection={lineSortDirection}
         onTitleChange={setEstimateTitle}
         onDueDateChange={setDueDate}
         onTaxPercentChange={setTaxPercent}
@@ -784,6 +1069,7 @@ export function EstimatesConsole() {
         onMoveLineItem={moveLineItem}
         onDuplicateLineItem={duplicateLineItem}
         onRemoveLineItem={removeLineItem}
+        onSortLineItems={handleSortLineItems}
         onSubmit={handleCreateEstimate}
       />
     </section>

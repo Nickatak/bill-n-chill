@@ -7,6 +7,7 @@ from core.views.estimates import (
     estimate_clone_version_view,
     estimate_convert_to_budget_view,
     estimate_detail_view,
+    estimate_duplicate_view,
     estimate_status_events_view,
     project_estimates_view,
 )
@@ -48,6 +49,7 @@ __all__ = [
     "project_estimates_view",
     "estimate_detail_view",
     "estimate_clone_version_view",
+    "estimate_duplicate_view",
     "estimate_status_events_view",
     "estimate_convert_to_budget_view",
     "project_budgets_view",

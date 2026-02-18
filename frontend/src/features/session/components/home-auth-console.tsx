@@ -49,6 +49,14 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
     initialSession ? "Checking saved session..." : "Sign in to open your dashboard.",
   );
 
+  function normalizeLoginError(message?: string): string {
+    const normalized = (message ?? "").trim().toLowerCase();
+    if (!normalized || normalized === "login failed." || normalized === "login failed") {
+      return "Invalid username/password combination.";
+    }
+    return message ?? "Invalid username/password combination.";
+  }
+
   async function verifySession(activeToken: string, fallbackEmail: string) {
     try {
       const response = await fetch(`${defaultApiBaseUrl}/auth/me/`, {
@@ -111,7 +119,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
       const nextToken = payload.data?.token ?? "";
       const nextEmail = payload.data?.user?.email ?? email;
       if (!response.ok || !nextToken) {
-        setMessage(payload.error?.message ?? "Login failed.");
+        setMessage(normalizeLoginError(payload.error?.message));
         setIsChecking(false);
         return;
       }

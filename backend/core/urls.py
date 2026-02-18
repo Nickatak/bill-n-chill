@@ -10,6 +10,7 @@ from core.views import (
     convert_lead_to_project_view,
     estimate_convert_to_budget_view,
     estimate_clone_version_view,
+    estimate_duplicate_view,
     estimate_detail_view,
     estimate_status_events_view,
     health_view,
@@ -112,6 +113,11 @@ urlpatterns = [
         "estimates/<int:estimate_id>/clone-version/",
         estimate_clone_version_view,
         name="estimate-clone-version",
+    ),
+    path(
+        "estimates/<int:estimate_id>/duplicate/",
+        estimate_duplicate_view,
+        name="estimate-duplicate",
     ),
     path(
         "estimates/<int:estimate_id>/convert-to-budget/",

@@ -22,11 +22,9 @@ from core.models import (
 ALLOWED_ESTIMATE_STATUS_TRANSITIONS = {
     Estimate.Status.DRAFT: {
         Estimate.Status.SENT,
-        Estimate.Status.APPROVED,
         Estimate.Status.ARCHIVED,
     },
     Estimate.Status.SENT: {
-        Estimate.Status.DRAFT,
         Estimate.Status.APPROVED,
         Estimate.Status.REJECTED,
         Estimate.Status.ARCHIVED,

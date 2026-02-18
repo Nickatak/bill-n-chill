@@ -5,6 +5,7 @@ from core.models import CostCode, Project
 
 class ProjectSerializer(serializers.ModelSerializer):
     customer_display_name = serializers.CharField(source="customer.display_name", read_only=True)
+    customer_billing_address = serializers.CharField(source="customer.billing_address", read_only=True)
 
     class Meta:
         model = Project
@@ -12,6 +13,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "id",
             "customer",
             "customer_display_name",
+            "customer_billing_address",
             "name",
             "status",
             "contract_value_original",
@@ -24,6 +26,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 class ProjectProfileSerializer(serializers.ModelSerializer):
     customer_display_name = serializers.CharField(source="customer.display_name", read_only=True)
+    customer_billing_address = serializers.CharField(source="customer.billing_address", read_only=True)
 
     class Meta:
         model = Project
@@ -31,6 +34,7 @@ class ProjectProfileSerializer(serializers.ModelSerializer):
             "id",
             "customer",
             "customer_display_name",
+            "customer_billing_address",
             "name",
             "status",
             "contract_value_original",
@@ -43,6 +47,7 @@ class ProjectProfileSerializer(serializers.ModelSerializer):
             "id",
             "customer",
             "customer_display_name",
+            "customer_billing_address",
             "created_at",
         ]
 

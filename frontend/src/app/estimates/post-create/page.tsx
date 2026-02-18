@@ -25,8 +25,8 @@ export default function EstimatePostCreatePage({ searchParams }: PageProps) {
           <h2>Next Steps (Placeholder)</h2>
           <p>Planned: send to customer, download PDF, collect approvals, and convert to budget.</p>
           <div className={styles.actions}>
-            <Link href="/estimates" className={styles.linkButton}>
-              Back to Estimates
+            <Link href="/projects" className={styles.linkButton}>
+              Back to Projects
             </Link>
             <Link href="/projects" className={styles.ghostButton}>
               Go to Projects

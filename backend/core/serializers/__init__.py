@@ -4,6 +4,7 @@ from core.serializers.auth import LoginSerializer
 from core.serializers.budgets import BudgetLineSerializer, BudgetLineUpdateSerializer, BudgetSerializer
 from core.serializers.change_orders import ChangeOrderSerializer, ChangeOrderWriteSerializer
 from core.serializers.estimates import (
+    EstimateDuplicateSerializer,
     EstimateLineItemInputSerializer,
     EstimateLineItemSerializer,
     EstimateSerializer,
@@ -58,6 +59,7 @@ __all__ = [
     "EstimateLineItemSerializer",
     "EstimateSerializer",
     "EstimateStatusEventSerializer",
+    "EstimateDuplicateSerializer",
     "EstimateLineItemInputSerializer",
     "EstimateWriteSerializer",
     "BudgetLineSerializer",

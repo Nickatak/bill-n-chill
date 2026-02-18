@@ -5,6 +5,28 @@
   background: #ffffff;
 }
 
+.searchField {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.searchField input {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--foreground);
+  color: var(--text-primary);
+}
+
+.searchEmpty {
+  margin-top: 8px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
 .projectTable {
   width: 100%;
   border-collapse: collapse;
@@ -61,9 +83,25 @@
   font-weight: 600;
 }
 
+.projectActionLink {
+  color: #1d4ed8;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.projectActionLink:hover {
+  text-decoration: underline;
+}
+
 :global(html[data-theme="dark"]) .projectTableWrap {
   background: #0f172a;
   border-color: #1f2937;
+}
+
+:global(html[data-theme="dark"]) .searchField input {
+  background: #0b1220;
+  border-color: #334155;
+  color: #e2e8f0;
 }
 
 :global(html[data-theme="dark"]) .projectTable thead th {
@@ -91,6 +129,10 @@
 :global(html[data-theme="dark"]) .projectStatus {
   background: #1e293b;
   color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .projectActionLink {
+  color: #93c5fd;
 }
 
 .overview {

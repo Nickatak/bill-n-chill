@@ -36,7 +36,6 @@ export function QuickAddConsole() {
   const [phone, setPhone] = useState("");
   const [projectAddress, setProjectAddress] = useState("");
   const [initialContractValue, setInitialContractValue] = useState("");
-  const [source, setSource] = useState("field_manual");
   const [notes, setNotes] = useState("");
   const [projectName, setProjectName] = useState("");
   const [projectStatus, setProjectStatus] = useState("prospect");
@@ -190,7 +189,6 @@ export function QuickAddConsole() {
     setPhone("");
     setProjectAddress("");
     setInitialContractValue("");
-    setSource("field_manual");
     setNotes("");
     setFieldErrors({});
     fullNameRef.current?.focus();
@@ -219,7 +217,7 @@ export function QuickAddConsole() {
       email: "",
       initial_contract_value: initialContractValue.trim() ? initialContractValue.trim() : null,
       notes: notes.trim(),
-      source: source.trim() || "field_manual",
+      source: "field_manual",
     };
 
     const submission: PendingSubmission = {
@@ -331,17 +329,6 @@ export function QuickAddConsole() {
           {fieldErrors.project_name ? <p className={styles.errorText}>{fieldErrors.project_name}</p> : null}
         </label>
 
-        <label className={styles.field}>
-          Project status
-          <select value={projectStatus} onChange={(event) => setProjectStatus(event.target.value)}>
-            <option value="prospect">prospect</option>
-            <option value="active">active</option>
-            <option value="on_hold">on_hold</option>
-            <option value="completed">completed</option>
-            <option value="cancelled">cancelled</option>
-          </select>
-        </label>
-
         <details className={styles.optionalDetails}>
           <summary>Optional details</summary>
           <div className={styles.optionalBody}>
@@ -359,6 +346,16 @@ export function QuickAddConsole() {
               />
             </label>
             <label className={styles.field}>
+              Project status
+              <select value={projectStatus} onChange={(event) => setProjectStatus(event.target.value)}>
+                <option value="prospect">prospect</option>
+                <option value="active">active</option>
+                <option value="on_hold">on_hold</option>
+                <option value="completed">completed</option>
+                <option value="cancelled">cancelled</option>
+              </select>
+            </label>
+            <label className={styles.field}>
               Notes
               <textarea
                 name="notes"
@@ -366,17 +363,6 @@ export function QuickAddConsole() {
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
               />
-            </label>
-            <label className={styles.field}>
-              Source
-              <select name="source" value={source} onChange={(event) => setSource(event.target.value)}>
-                <option value="field_manual">field_manual</option>
-                <option value="office_manual">office_manual</option>
-                <option value="import">import</option>
-                <option value="web_form">web_form</option>
-                <option value="referral">referral</option>
-                <option value="other">other</option>
-              </select>
             </label>
           </div>
         </details>

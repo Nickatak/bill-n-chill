@@ -1,7 +1,17 @@
 import { EstimatesConsole } from "@/features/estimates";
+import { redirect } from "next/navigation";
 import styles from "./page.module.css";
 
-export default function EstimatesPage() {
+type EstimatesPageProps = {
+  searchParams: Promise<{ project?: string }>;
+};
+
+export default async function EstimatesPage({ searchParams }: EstimatesPageProps) {
+  const { project } = await searchParams;
+  if (!project || !/^\d+$/.test(project)) {
+    redirect("/projects");
+  }
+
   return (
     <div className={styles.page}>
       <main className={styles.main}>

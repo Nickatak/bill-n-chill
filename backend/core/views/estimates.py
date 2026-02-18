@@ -7,7 +7,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.models import Budget, Estimate, EstimateStatusEvent, FinancialAuditEvent
-from core.serializers import BudgetSerializer, EstimateSerializer, EstimateStatusEventSerializer, EstimateWriteSerializer
+from core.serializers import (
+    BudgetSerializer,
+    EstimateDuplicateSerializer,
+    EstimateSerializer,
+    EstimateStatusEventSerializer,
+    EstimateWriteSerializer,
+)
 from core.views.helpers import (
     _apply_estimate_lines_and_totals,
     _create_budget_from_estimate,
@@ -202,6 +208,17 @@ def estimate_detail_view(request, estimate_id: int):
     serializer = EstimateWriteSerializer(data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
+    if "title" in data and data["title"] != estimate.title:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Estimate title cannot be changed after creation.",
+                    "fields": {"title": ["Create a new estimate if the title needs to change."]},
+                }
+            },
+            status=400,
+        )
     is_locked = estimate.status != Estimate.Status.DRAFT
     mutating_fields = {"title", "tax_percent", "line_items"}
     if is_locked and any(field in data for field in mutating_fields):
@@ -227,11 +244,18 @@ def estimate_detail_view(request, estimate_id: int):
         current_status=estimate.status,
         next_status=next_status,
     ):
+        if estimate.status == Estimate.Status.DRAFT and next_status in {
+            Estimate.Status.APPROVED,
+            Estimate.Status.REJECTED,
+        }:
+            message = "Estimate must be sent before it can be approved or rejected."
+        else:
+            message = f"Invalid estimate status transition: {estimate.status} -> {next_status}."
         return Response(
             {
                 "error": {
                     "code": "validation_error",
-                    "message": f"Invalid estimate status transition: {estimate.status} -> {next_status}.",
+                    "message": message,
                     "fields": {"status": ["This transition is not allowed."]},
                 }
             },
@@ -328,6 +352,20 @@ def estimate_clone_version_view(request, estimate_id: int):
             status=404,
         )
 
+    if estimate.status not in {Estimate.Status.SENT, Estimate.Status.REJECTED}:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Revisions can only be created from sent or rejected estimates.",
+                    "fields": {
+                        "status": ["Only sent or rejected estimates can create revisions."]
+                    },
+                }
+            },
+            status=400,
+        )
+
     latest = (
         Estimate.objects.filter(project=estimate.project, created_by=request.user)
         .order_by("-version")
@@ -371,15 +409,121 @@ def estimate_clone_version_view(request, estimate_id: int):
         note=f"Cloned from estimate #{estimate.id}.",
         changed_by=request.user,
     )
-    _archive_estimate_family(
-        project=estimate.project,
-        user=request.user,
-        title=cloned.title,
-        exclude_ids=[cloned.id],
-        note=f"Archived because estimate #{cloned.id} superseded this version.",
-    )
+    if estimate.status == Estimate.Status.SENT:
+        estimate.status = Estimate.Status.REJECTED
+        estimate.save(update_fields=["status", "updated_at"])
+        _record_estimate_status_event(
+            estimate=estimate,
+            from_status=Estimate.Status.SENT,
+            to_status=Estimate.Status.REJECTED,
+            note=f"Auto-rejected because revision #{cloned.id} was created.",
+            changed_by=request.user,
+        )
     return Response(
         {"data": EstimateSerializer(cloned).data, "meta": {"cloned_from": estimate.id}},
+        status=201,
+    )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def estimate_duplicate_view(request, estimate_id: int):
+    try:
+        estimate = Estimate.objects.prefetch_related("line_items").get(
+            id=estimate_id,
+            created_by=request.user,
+        )
+    except Estimate.DoesNotExist:
+        return Response(
+            {"error": {"code": "not_found", "message": "Estimate not found.", "fields": {}}},
+            status=404,
+        )
+
+    serializer = EstimateDuplicateSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+
+    target_project = estimate.project
+    target_project_id = data.get("project_id")
+    if target_project_id:
+        target_project = _validate_project_for_user(target_project_id, request.user)
+        if not target_project:
+            return Response(
+                {
+                    "error": {
+                        "code": "not_found",
+                        "message": "Target project not found.",
+                        "fields": {"project_id": ["Project not found."]},
+                    }
+                },
+                status=404,
+            )
+
+    target_title = data["title"]
+    if target_project.id == estimate.project.id and target_title == estimate.title:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Use clone version for same-project same-title revisions.",
+                    "fields": {
+                        "title": [
+                            "Provide a different title or choose another project when duplicating."
+                        ]
+                    },
+                }
+            },
+            status=400,
+        )
+
+    latest = (
+        Estimate.objects.filter(project=target_project, created_by=request.user)
+        .order_by("-version")
+        .first()
+    )
+    next_version = (latest.version + 1) if latest else 1
+
+    duplicated = Estimate.objects.create(
+        project=target_project,
+        created_by=request.user,
+        version=next_version,
+        status=Estimate.Status.DRAFT,
+        title=target_title,
+        tax_percent=estimate.tax_percent,
+    )
+
+    line_items = [
+        {
+            "cost_code": line.cost_code_id,
+            "description": line.description,
+            "quantity": line.quantity,
+            "unit": line.unit,
+            "unit_cost": line.unit_cost,
+            "markup_percent": line.markup_percent,
+        }
+        for line in estimate.line_items.all()
+    ]
+    if line_items:
+        _apply_estimate_lines_and_totals(
+            estimate=duplicated,
+            line_items_data=line_items,
+            tax_percent=estimate.tax_percent,
+            user=request.user,
+        )
+
+    duplicated.refresh_from_db()
+    _record_estimate_status_event(
+        estimate=duplicated,
+        from_status=None,
+        to_status=duplicated.status,
+        note=f"Duplicated from estimate #{estimate.id}.",
+        changed_by=request.user,
+    )
+    return Response(
+        {
+            "data": EstimateSerializer(duplicated).data,
+            "meta": {"duplicated_from": estimate.id},
+        },
         status=201,
     )
 

@@ -19,6 +19,7 @@ export function ProjectsConsole() {
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [statusMessage, setStatusMessage] = useState("");
+  const [projectSearch, setProjectSearch] = useState("");
   const [summary, setSummary] = useState<ProjectFinancialSummary | null>(null);
   const [auditEvents, setAuditEvents] = useState<FinancialAuditEventRecord[]>([]);
   const [syncEvents, setSyncEvents] = useState<AccountingSyncEventRecord[]>([]);
@@ -41,6 +42,20 @@ export function ProjectsConsole() {
   const hasSelectedProject = Boolean(selectedProjectId);
   const selectedProject =
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;
+  const needle = projectSearch.trim().toLowerCase();
+  const filteredProjects = !needle
+    ? projects
+    : projects.filter((project) => {
+        const haystack = [
+          String(project.id),
+          project.name,
+          formatCustomerName(project),
+          project.status,
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(needle);
+      });
   const summaryCounts = summary
     ? {
         changeOrders: summary.traceability.approved_change_orders.records.length,
@@ -394,6 +409,14 @@ export function ProjectsConsole() {
         <section>
           <h3>Project List</h3>
           <p>Quick scan of loaded project shells.</p>
+          <label className={styles.searchField}>
+            Search projects
+            <input
+              value={projectSearch}
+              onChange={(event) => setProjectSearch(event.target.value)}
+              placeholder="ID, name, customer, or status"
+            />
+          </label>
           <div className={styles.projectTableWrap}>
             <table className={styles.projectTable}>
               <thead>
@@ -401,13 +424,14 @@ export function ProjectsConsole() {
                   <th>Project</th>
                   <th>Customer</th>
                   <th>Status</th>
+                  <th>Workflow</th>
                   <th>Contract (Current)</th>
                   <th>Start</th>
                   <th>End</th>
                 </tr>
               </thead>
               <tbody>
-                {projects.map((project) => {
+                {filteredProjects.map((project) => {
                   const isActive = String(project.id) === selectedProjectId;
                   const startLabel = project.start_date_planned ?? "TBD";
                   const endLabel = project.end_date_planned ?? "TBD";
@@ -428,6 +452,14 @@ export function ProjectsConsole() {
                       <td>
                         <span className={styles.projectStatus}>{project.status}</span>
                       </td>
+                      <td>
+                        <Link
+                          href={`/estimates?project=${project.id}`}
+                          className={styles.projectActionLink}
+                        >
+                          Open Estimates
+                        </Link>
+                      </td>
                       <td>{project.contract_value_current}</td>
                       <td>{startLabel}</td>
                       <td>{endLabel}</td>
@@ -437,6 +469,9 @@ export function ProjectsConsole() {
               </tbody>
             </table>
           </div>
+          {filteredProjects.length === 0 ? (
+            <p className={styles.searchEmpty}>No projects match your search.</p>
+          ) : null}
         </section>
       ) : null}
 
@@ -475,7 +510,7 @@ export function ProjectsConsole() {
                 <div className={styles.branch}>
                   <span className={styles.branchLabel}>Scope</span>
                   <div className={styles.node}>
-                    <Link href="/estimates">Estimates</Link>
+                    <Link href={`/estimates?project=${selectedProject.id}`}>Estimates</Link>
                     <span className={styles.nodeMeta}>Author</span>
                   </div>
                   <div className={styles.node}>

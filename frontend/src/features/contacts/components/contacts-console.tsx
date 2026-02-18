@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { ApiResponse, ContactRecord } from "../types";
@@ -43,12 +43,12 @@ export function ContactsConsole() {
     setLeadStatus("new_contact");
   }
 
-  async function loadContacts() {
+  async function loadContacts(searchQuery: string) {
     setStatusMessage("Loading contacts...");
     try {
       const params = new URLSearchParams();
-      if (query.trim()) {
-        params.set("q", query.trim());
+      if (searchQuery.trim()) {
+        params.set("q", searchQuery.trim());
       }
       const url = `${normalizedBaseUrl}/contacts/${params.toString() ? `?${params.toString()}` : ""}`;
       const response = await fetch(url, {
@@ -62,17 +62,35 @@ export function ContactsConsole() {
 
       const items = (payload.data as ContactRecord[]) ?? [];
       setRows(items);
-      if (items[0]) {
+      const activeId = selectedId ? Number(selectedId) : null;
+      const selected = activeId ? items.find((entry) => entry.id === activeId) : null;
+      if (selected) {
+        setSelectedId(String(selected.id));
+        hydrate(selected);
+      } else if (items[0]) {
         setSelectedId(String(items[0].id));
         hydrate(items[0]);
       } else {
         setSelectedId("");
+        clearForm();
       }
       setStatusMessage(`Loaded ${items.length} contact(s).`);
     } catch {
       setStatusMessage("Could not reach contacts endpoint.");
     }
   }
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void loadContacts(query);
+    }, 250);
+    return () => window.clearTimeout(timer);
+    // Intentionally excludes selectedId to avoid reload loops when selecting.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, query, normalizedBaseUrl]);
 
   function handleSelect(id: string) {
     setSelectedId(id);
@@ -189,20 +207,44 @@ export function ContactsConsole() {
           placeholder="Name, phone, email, or address"
         />
       </label>
-      <button type="button" onClick={loadContacts}>Load Contacts</button>
 
       {rows.length > 0 ? (
-        <label>
-          Contact
-          <select value={selectedId} onChange={(event) => handleSelect(event.target.value)}>
-            {rows.map((row) => (
-              <option key={row.id} value={row.id}>
-                #{row.id} - {row.full_name} ({row.phone || row.email || "no contact"})
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
+        <>
+          <p>Contacts</p>
+          <ul style={{ display: "grid", gap: 6, listStyle: "none", padding: 0, margin: 0 }}>
+            {rows.map((row) => {
+              const isActive = selectedId === String(row.id);
+              return (
+                <li key={row.id}>
+                  <button
+                    type="button"
+                    onClick={() => handleSelect(String(row.id))}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      border: isActive ? "1px solid var(--text-primary)" : "1px solid var(--border)",
+                      borderRadius: 8,
+                      padding: "8px 10px",
+                      background: "var(--foreground)",
+                      color: "var(--text-primary)",
+                      boxShadow: isActive
+                        ? "inset 0 0 0 1px var(--text-primary)"
+                        : "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    #{row.id} - {row.full_name} ({row.phone || row.email || "no contact"})
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      ) : query ? (
+        <p>No contacts matched your search.</p>
+      ) : (
+        <p>No contacts yet.</p>
+      )}
 
       <form onSubmit={handleSave}>
         <h3>Edit Contact</h3>

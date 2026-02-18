@@ -104,3 +104,14 @@ class EstimateWriteSerializer(serializers.Serializer):
         if not trimmed:
             raise serializers.ValidationError("Title cannot be blank.")
         return trimmed
+
+
+class EstimateDuplicateSerializer(serializers.Serializer):
+    project_id = serializers.IntegerField(required=False)
+    title = serializers.CharField(max_length=255, required=True, allow_blank=False)
+
+    def validate_title(self, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise serializers.ValidationError("Title cannot be blank.")
+        return trimmed

@@ -3,6 +3,8 @@ import { FormEvent } from "react";
 import styles from "./estimates-console.module.css";
 import { CostCode, EstimateLineInput, ProjectRecord } from "../types";
 
+type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amount";
+
 type EstimateSheetProps = {
   project: ProjectRecord | null;
   estimateId: string;
@@ -20,6 +22,8 @@ type EstimateSheetProps = {
   isSubmitting: boolean;
   isEditingDraft: boolean;
   readOnly: boolean;
+  lineSortKey: LineSortKey | null;
+  lineSortDirection: "asc" | "desc";
   onTitleChange: (value: string) => void;
   onDueDateChange: (value: string) => void;
   onTaxPercentChange: (value: string) => void;
@@ -32,6 +36,7 @@ type EstimateSheetProps = {
   onMoveLineItem: (localId: number, direction: "up" | "down") => void;
   onDuplicateLineItem: (localId: number) => void;
   onRemoveLineItem: (localId: number) => void;
+  onSortLineItems: (key: LineSortKey) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
@@ -56,6 +61,8 @@ export function EstimateSheet({
   isSubmitting,
   isEditingDraft,
   readOnly,
+  lineSortKey,
+  lineSortDirection,
   onTitleChange,
   onDueDateChange,
   onTaxPercentChange,
@@ -64,10 +71,41 @@ export function EstimateSheet({
   onMoveLineItem,
   onDuplicateLineItem,
   onRemoveLineItem,
+  onSortLineItems,
   onSubmit,
 }: EstimateSheetProps) {
+  const customerName = (project?.customer_display_name || "Customer name").trim();
+  const rawBillingAddress = (project?.customer_billing_address || "").trim();
+  const isExistingEstimate = Boolean(estimateId);
+  const titleReadOnly = readOnly || isExistingEstimate;
+  const mailingLines = rawBillingAddress
+    ? rawBillingAddress
+        .replace(/\s*,\s*/g, "\n")
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+    : ["Customer address"];
+  const sortIndicator = lineSortDirection === "asc" ? "▲" : "▼";
+
+  function renderSortableHeader(label: string, key: LineSortKey) {
+    const isActive = lineSortKey === key;
+    return (
+      <button
+        type="button"
+        className={`${styles.lineHeaderButton} ${
+          isActive ? styles.lineHeaderButtonActive : ""
+        } ${readOnly ? styles.actionDisabled : ""}`}
+        onClick={() => onSortLineItems(key)}
+        disabled={readOnly}
+      >
+        <span>{label}</span>
+        <span className={styles.sortIndicator}>{isActive ? sortIndicator : "↕"}</span>
+      </button>
+    );
+  }
+
   return (
-    <form className={styles.sheet} onSubmit={onSubmit}>
+    <form className={`${styles.sheet} ${readOnly ? styles.sheetReadOnly : ""}`} onSubmit={onSubmit}>
       <div className={styles.sheetHeader}>
         <div className={styles.fromBlock}>
           <span className={styles.blockLabel}>From</span>
@@ -84,26 +122,12 @@ export function EstimateSheet({
       <div className={styles.partyGrid}>
         <div className={styles.toBlock}>
           <span className={styles.blockLabel}>To</span>
-          {project ? (
-            <div className={styles.metaLine}>
-              <span>Project</span>
-              <span>
-                #{project.id} - {project.name}
-              </span>
-            </div>
-          ) : (
-            <p className={styles.inlineHint}>
-              No projects yet. Create one from Intake so we can bill against it.
+          <p className={styles.blockText}>{customerName}</p>
+          {mailingLines.map((line, index) => (
+            <p key={`${line}-${index}`} className={styles.blockMuted}>
+              {line}
             </p>
-          )}
-          <div className={styles.metaLine}>
-            <span>Customer</span>
-            <span>{project?.customer_display_name ?? "Customer name"}</span>
-          </div>
-          <div className={styles.metaLine}>
-            <span>Status</span>
-            <span>{project?.status ?? "-"}</span>
-          </div>
+          ))}
         </div>
 
         <div className={styles.metaBlock}>
@@ -114,8 +138,8 @@ export function EstimateSheet({
               className={styles.fieldInput}
               value={estimateTitle}
               onChange={(event) => onTitleChange(event.target.value)}
-              readOnly={readOnly}
-              aria-readonly={readOnly}
+              disabled={titleReadOnly}
+              aria-disabled={titleReadOnly}
               required
             />
           </label>
@@ -129,8 +153,8 @@ export function EstimateSheet({
               className={styles.fieldInput}
               type="date"
               value={estimateDate}
-              readOnly
-              aria-readonly="true"
+              disabled
+              aria-disabled="true"
             />
           </div>
           <div className={styles.metaLine}>
@@ -140,8 +164,8 @@ export function EstimateSheet({
               type="date"
               value={dueDate}
               onChange={(event) => onDueDateChange(event.target.value)}
-              readOnly={readOnly}
-              aria-readonly={readOnly}
+              disabled={readOnly}
+              aria-disabled={readOnly}
             />
           </div>
         </div>
@@ -154,121 +178,160 @@ export function EstimateSheet({
       ) : null}
 
       <div className={styles.lineTable}>
-        <div className={styles.lineHeader}>
-          <span>Qty</span>
-          <span>Description</span>
-          <span>Cost Code</span>
-          <span>Unit</span>
-          <span>Unit Price</span>
-          <span>Markup</span>
-          <span>Amount</span>
-          <span>Actions</span>
+        <div className={`${styles.lineHeader} ${readOnly ? styles.lineHeaderReadOnly : ""}`}>
+          <div className={styles.lineHeaderCell}>{renderSortableHeader("Qty", "quantity")}</div>
+          <div className={styles.lineHeaderCell}>
+            <span>Description</span>
+          </div>
+          <div className={styles.lineHeaderCell}>{renderSortableHeader("Cost Code", "costCode")}</div>
+          <div className={styles.lineHeaderCell}>
+            <span>Unit</span>
+          </div>
+          <div className={styles.lineHeaderCell}>
+            {renderSortableHeader("Unit Price", "unitCost")}
+          </div>
+          <div className={styles.lineHeaderCell}>
+            {renderSortableHeader("Markup", "markupPercent")}
+          </div>
+          <div className={styles.lineHeaderCell}>{renderSortableHeader("Amount", "amount")}</div>
+          {!readOnly ? (
+            <div className={styles.lineHeaderCell}>
+              <span>Actions</span>
+            </div>
+          ) : null}
         </div>
         {lineItems.map((line, index) => (
-          <div key={line.localId} className={styles.lineRow}>
-            <input
-              className={styles.lineInput}
-              aria-label="Quantity"
-              value={line.quantity}
-              onChange={(event) => onLineItemChange(line.localId, "quantity", event.target.value)}
-              inputMode="decimal"
-              readOnly={readOnly}
-              aria-readonly={readOnly}
-              required
-            />
-            <input
-              className={styles.lineInput}
-              aria-label="Description"
-              value={line.description}
-              onChange={(event) => onLineItemChange(line.localId, "description", event.target.value)}
-              readOnly={readOnly}
-              aria-readonly={readOnly}
-              required
-            />
-            <select
-              className={styles.lineSelect}
-              aria-label="Cost code"
-              value={line.costCodeId}
-              onChange={(event) => onLineItemChange(line.localId, "costCodeId", event.target.value)}
-              disabled={readOnly}
-              required
-            >
-              <option value="">Select</option>
-              {costCodes.map((code) => (
-                <option key={code.id} value={code.id}>
-                  {code.code} - {code.name}
-                </option>
-              ))}
-            </select>
-            <input
-              className={styles.lineInput}
-              aria-label="Unit"
-              value={line.unit}
-              onChange={(event) => onLineItemChange(line.localId, "unit", event.target.value)}
-              readOnly={readOnly}
-              aria-readonly={readOnly}
-              required
-            />
-            <input
-              className={styles.lineInput}
-              aria-label="Unit cost"
-              value={line.unitCost}
-              onChange={(event) => onLineItemChange(line.localId, "unitCost", event.target.value)}
-              inputMode="decimal"
-              readOnly={readOnly}
-              aria-readonly={readOnly}
-              required
-            />
-            <div className={styles.percentField}>
+          <div
+            key={line.localId}
+            className={`${styles.lineRow} ${readOnly ? styles.lineRowReadOnly : ""}`}
+          >
+            <div className={styles.lineCell}>
               <input
                 className={styles.lineInput}
-                aria-label="Markup percent"
-                value={line.markupPercent}
-                onChange={(event) =>
-                  onLineItemChange(line.localId, "markupPercent", event.target.value)
-                }
+                aria-label="Quantity"
+                value={line.quantity}
+                onChange={(event) => onLineItemChange(line.localId, "quantity", event.target.value)}
                 inputMode="decimal"
-                readOnly={readOnly}
-                aria-readonly={readOnly}
+                disabled={readOnly}
+                aria-disabled={readOnly}
                 required
               />
-              <span className={styles.percentSuffix}>%</span>
             </div>
-            <div className={styles.amountCell}>${formatMoney(lineTotals[index] || 0)}</div>
-            <div className={styles.lineActionsCell}>
-              <button
-                type="button"
-                className={`${styles.smallButton} ${readOnly ? styles.actionDisabled : ""}`}
-                onClick={() => onMoveLineItem(line.localId, "up")}
-                disabled={readOnly || index === 0}
-              >
-                Up
-              </button>
-              <button
-                type="button"
-                className={`${styles.smallButton} ${readOnly ? styles.actionDisabled : ""}`}
-                onClick={() => onMoveLineItem(line.localId, "down")}
-                disabled={readOnly || index === lineItems.length - 1}
-              >
-                Down
-              </button>
-              <button
-                type="button"
-                className={`${styles.smallButton} ${readOnly ? styles.actionDisabled : ""}`}
-                onClick={() => onDuplicateLineItem(line.localId)}
+            <div className={styles.lineCell}>
+              <input
+                className={styles.lineInput}
+                aria-label="Description"
+                value={line.description}
+                onChange={(event) => onLineItemChange(line.localId, "description", event.target.value)}
                 disabled={readOnly}
-              >
-                Duplicate
-              </button>
-              <button
-                type="button"
-                className={`${styles.removeButton} ${readOnly ? styles.actionDisabled : ""}`}
-                onClick={() => onRemoveLineItem(line.localId)}
-                disabled={readOnly}
-              >
-                Remove
-              </button>
+                aria-disabled={readOnly}
+                required
+              />
             </div>
+            <div className={styles.lineCell}>
+              <select
+                className={styles.lineSelect}
+                aria-label="Cost code"
+                value={line.costCodeId}
+                onChange={(event) =>
+                  onLineItemChange(line.localId, "costCodeId", event.target.value)
+                }
+                disabled={readOnly}
+                required
+              >
+                <option value="">Select</option>
+                {costCodes.map((code) => (
+                  <option key={code.id} value={code.id}>
+                    {code.code} - {code.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.lineCell}>
+              <input
+                className={styles.lineInput}
+                aria-label="Unit"
+                value={line.unit}
+                onChange={(event) => onLineItemChange(line.localId, "unit", event.target.value)}
+                disabled={readOnly}
+                aria-disabled={readOnly}
+                required
+              />
+            </div>
+            <div className={styles.lineCell}>
+              <input
+                className={styles.lineInput}
+                aria-label="Unit cost"
+                value={line.unitCost}
+                onChange={(event) => onLineItemChange(line.localId, "unitCost", event.target.value)}
+                inputMode="decimal"
+                disabled={readOnly}
+                aria-disabled={readOnly}
+                required
+              />
+            </div>
+            <div className={styles.lineCell}>
+              <div className={styles.percentField}>
+                <input
+                  className={styles.lineInput}
+                  aria-label="Markup percent"
+                  value={line.markupPercent}
+                  onChange={(event) =>
+                    onLineItemChange(line.localId, "markupPercent", event.target.value)
+                  }
+                  inputMode="decimal"
+                  disabled={readOnly}
+                  aria-disabled={readOnly}
+                  required
+                />
+                <span className={styles.percentSuffix}>%</span>
+              </div>
+            </div>
+            <div className={styles.lineCell}>
+              <div className={styles.amountCell}>${formatMoney(lineTotals[index] || 0)}</div>
+            </div>
+            {!readOnly ? (
+              <div className={styles.lineCell}>
+                <div className={styles.lineActionsCell}>
+                  <button
+                    type="button"
+                    className={`${styles.smallButton} ${
+                      readOnly || index === 0 ? styles.actionDisabled : ""
+                    }`}
+                    onClick={() => onMoveLineItem(line.localId, "up")}
+                    disabled={readOnly || index === 0}
+                  >
+                    Up
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.smallButton} ${
+                      readOnly || index === lineItems.length - 1 ? styles.actionDisabled : ""
+                    }`}
+                    onClick={() => onMoveLineItem(line.localId, "down")}
+                    disabled={readOnly || index === lineItems.length - 1}
+                  >
+                    Down
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.smallButton} ${readOnly ? styles.actionDisabled : ""}`}
+                    onClick={() => onDuplicateLineItem(line.localId)}
+                    disabled={readOnly}
+                  >
+                    Duplicate
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.removeButton} ${readOnly ? styles.actionDisabled : ""}`}
+                    onClick={() => onRemoveLineItem(line.localId)}
+                    disabled={readOnly}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         ))}
       </div>
@@ -281,19 +344,6 @@ export function EstimateSheet({
           disabled={readOnly}
         >
           Add Line Item
-        </button>
-        <button
-          type="submit"
-          className={`${styles.primaryButton} ${readOnly ? styles.actionDisabled : ""}`}
-          disabled={readOnly || !canSubmit || isSubmitting}
-        >
-          {isSubmitting
-            ? isEditingDraft
-              ? "Saving..."
-              : "Creating..."
-            : isEditingDraft
-              ? "Save Draft Changes"
-              : "Create Estimate"}
         </button>
       </div>
 
@@ -315,8 +365,8 @@ export function EstimateSheet({
               onChange={(event) => onTaxPercentChange(event.target.value)}
               inputMode="decimal"
               aria-label="Sales tax percent"
-              readOnly={readOnly}
-              aria-readonly={readOnly}
+              disabled={readOnly}
+              aria-disabled={readOnly}
             />
             <span className={styles.summaryTaxSuffix}>%</span>
             <span>${formatMoney(taxAmount)}</span>
@@ -327,6 +377,23 @@ export function EstimateSheet({
           <span>${formatMoney(totalAmount)}</span>
         </div>
       </div>
+      {!readOnly ? (
+        <div className={styles.finalizeActions}>
+          <button
+            type="submit"
+            className={styles.primaryButton}
+            disabled={!canSubmit || isSubmitting}
+          >
+            {isSubmitting
+              ? isEditingDraft
+                ? "Saving..."
+                : "Creating..."
+              : isEditingDraft
+                ? "Save Draft Changes"
+                : "Create Estimate"}
+          </button>
+        </div>
+      ) : null}
 
       <div className={styles.terms}>
         <h4>Terms and Conditions</h4>

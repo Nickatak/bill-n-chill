@@ -1,8 +1,8 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 
-import { loadClientSession } from "./client-session";
+import { SESSION_STORAGE_KEY, type ClientSession } from "./client-session";
 
 const NO_SHARED_SESSION_MESSAGE = "No shared session found. Go to / and login first.";
 
@@ -22,7 +22,10 @@ function subscribe(onStoreChange: () => void) {
 }
 
 function getSnapshot() {
-  return loadClientSession();
+  if (typeof window === "undefined") {
+    return null;
+  }
+  return window.localStorage.getItem(SESSION_STORAGE_KEY);
 }
 
 function getServerSnapshot() {
@@ -30,7 +33,24 @@ function getServerSnapshot() {
 }
 
 export function useSharedSessionAuth() {
-  const session = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const sessionSnapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const session = useMemo<ClientSession | null>(() => {
+    if (!sessionSnapshot) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(sessionSnapshot) as Partial<ClientSession>;
+      if (!parsed?.token) {
+        return null;
+      }
+      return {
+        token: parsed.token,
+        email: parsed.email ?? "",
+      };
+    } catch {
+      return null;
+    }
+  }, [sessionSnapshot]);
   const token = session?.token ?? "";
   const authMessage = session
     ? `Using shared session for ${session.email || "user"}.`

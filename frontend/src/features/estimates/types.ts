@@ -1,11 +1,18 @@
 export type UserData = { token?: string; email?: string };
 
-export type ProjectRecord = { id: number; name: string; customer_display_name: string };
+export type ProjectRecord = {
+  id: number;
+  name: string;
+  status: string;
+  customer_display_name: string;
+  customer_billing_address?: string;
+};
 
 export type CostCode = { id: number; code: string; name: string; is_active: boolean };
 
 export type EstimateRecord = {
   id: number;
+  project: number;
   version: number;
   status: string;
   title: string;
@@ -53,5 +60,6 @@ export type ApiResponse = {
     | EstimateRecord
     | EstimateRecord[]
     | EstimateStatusEventRecord[];
-  meta?: { cloned_from?: number };
+  meta?: { cloned_from?: number; duplicated_from?: number };
+  error?: { code?: string; message?: string; fields?: Record<string, string[]> };
 };
