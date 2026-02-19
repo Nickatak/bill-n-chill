@@ -80,6 +80,7 @@ def vendors_list_create_view(request):
 
     vendor = Vendor.objects.create(
         name=data["name"],
+        vendor_type=data.get("vendor_type", Vendor.VendorType.TRADE),
         email=data.get("email", ""),
         phone=data.get("phone", ""),
         tax_id_last4=data.get("tax_id_last4", ""),
@@ -143,6 +144,9 @@ def vendor_detail_view(request, vendor_id: int):
     if "name" in data:
         vendor.name = data["name"]
         update_fields.append("name")
+    if "vendor_type" in data:
+        vendor.vendor_type = data["vendor_type"]
+        update_fields.append("vendor_type")
     if "email" in data:
         vendor.email = data["email"]
         update_fields.append("email")

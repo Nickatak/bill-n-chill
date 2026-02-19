@@ -21,7 +21,8 @@ export function ThemeToggle() {
   const router = useRouter();
   const hasSession = Boolean(loadClientSession()?.token);
   const isPublicEstimateRoute = Boolean(pathname && /^\/estimate\/[^/]+\/?$/.test(pathname));
-  const hasActiveNonWorkflow = pathname === "/contacts";
+  const hasActiveContacts = pathname === "/contacts";
+  const hasActiveVendors = pathname === "/vendors";
   const hasActiveCostCodes = pathname === "/cost-codes";
   const hasActiveSettings = pathname === "/settings/intake";
 
@@ -49,7 +50,7 @@ export function ThemeToggle() {
         <details className="nonWorkflowMenu">
           <summary
             className={`themeControlButton ${
-              hasActiveNonWorkflow || hasActiveCostCodes ? "isActive" : ""
+              hasActiveContacts || hasActiveVendors || hasActiveCostCodes ? "isActive" : ""
             }`}
           >
             Non-Workflow
@@ -57,10 +58,17 @@ export function ThemeToggle() {
           <div className="nonWorkflowList" role="menu" aria-label="Non-workflow tools">
             <Link
               href="/contacts"
-              className={`nonWorkflowItem ${hasActiveNonWorkflow ? "isActive" : ""}`}
+              className={`nonWorkflowItem ${hasActiveContacts ? "isActive" : ""}`}
               role="menuitem"
             >
               Contacts
+            </Link>
+            <Link
+              href="/vendors"
+              className={`nonWorkflowItem ${hasActiveVendors ? "isActive" : ""}`}
+              role="menuitem"
+            >
+              Vendors
             </Link>
             <Link
               href="/cost-codes"

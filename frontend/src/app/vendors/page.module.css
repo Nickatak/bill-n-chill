@@ -53,6 +53,17 @@
   color: var(--text-secondary);
 }
 
+.linkButton {
+  display: inline-flex;
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #111827;
+  color: #f9fafb;
+  text-decoration: none;
+}
+
 .card form {
   display: grid;
   gap: 10px;
@@ -103,5 +114,9 @@
 }
 
 :global(html[data-theme="dark"]) .card button {
+  background: #1f2937;
+}
+
+:global(html[data-theme="dark"]) .linkButton {
   background: #1f2937;
 }

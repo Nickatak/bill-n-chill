@@ -6,6 +6,8 @@ export type UserData = {
 export type VendorRecord = {
   id: number;
   name: string;
+  vendor_type: "trade" | "retail";
+  is_canonical: boolean;
   email: string;
   phone: string;
   tax_id_last4: string;
@@ -17,6 +19,7 @@ export type VendorRecord = {
 
 export type VendorPayload = {
   name: string;
+  vendor_type: "trade" | "retail";
   email: string;
   phone: string;
   tax_id_last4: string;

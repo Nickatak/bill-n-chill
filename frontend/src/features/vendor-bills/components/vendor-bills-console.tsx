@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
@@ -23,7 +23,7 @@ function dueDateIsoDate(daysFromNow = 30) {
 }
 
 export function VendorBillsConsole() {
-  const { token, authMessage } = useSharedSessionAuth();
+  const { token } = useSharedSessionAuth();
   const [statusMessage, setStatusMessage] = useState("");
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -35,15 +35,15 @@ export function VendorBillsConsole() {
 
   const [newVendorId, setNewVendorId] = useState("");
   const [newBillNumber, setNewBillNumber] = useState("");
-  const [newIssueDate, setNewIssueDate] = useState(todayIsoDate());
-  const [newDueDate, setNewDueDate] = useState(dueDateIsoDate());
+  const [newIssueDate, setNewIssueDate] = useState("");
+  const [newDueDate, setNewDueDate] = useState("");
   const [newTotal, setNewTotal] = useState("0.00");
   const [newNotes, setNewNotes] = useState("");
 
   const [vendorId, setVendorId] = useState("");
   const [billNumber, setBillNumber] = useState("");
-  const [issueDate, setIssueDate] = useState(todayIsoDate());
-  const [dueDate, setDueDate] = useState(dueDateIsoDate());
+  const [issueDate, setIssueDate] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [total, setTotal] = useState("0.00");
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState<
@@ -289,16 +289,41 @@ export function VendorBillsConsole() {
     }
   }
 
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void loadDependencies();
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  useEffect(() => {
+    const today = todayIsoDate();
+    const due = dueDateIsoDate();
+    setNewIssueDate((current) => current || today);
+    setNewDueDate((current) => current || due);
+    setIssueDate((current) => current || today);
+    setDueDate((current) => current || due);
+  }, []);
+
+  useEffect(() => {
+    if (!token || !selectedProjectId) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void loadVendorBills();
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, selectedProjectId]);
+
   return (
     <section>
       <h2>Vendor Bill Intake and Lifecycle</h2>
       <p>Record AP bills from vendors, detect duplicates, and progress payment workflow status.</p>
-
-      <p>{authMessage}</p>
-
-      <button type="button" onClick={loadDependencies}>
-        Load Projects + Vendors
-      </button>
 
       {projects.length > 0 ? (
         <label>
@@ -321,7 +346,8 @@ export function VendorBillsConsole() {
             <option value="">Select vendor</option>
             {vendors.map((vendor) => (
               <option key={vendor.id} value={vendor.id}>
-                #{vendor.id} - {vendor.name}
+                #{vendor.id} - {vendor.name} [{vendor.vendor_type}]
+                {vendor.is_canonical ? " [canonical]" : ""}
               </option>
             ))}
           </select>
@@ -388,10 +414,6 @@ export function VendorBillsConsole() {
         </>
       ) : null}
 
-      <button type="button" onClick={loadVendorBills} disabled={!selectedProjectId}>
-        Load Vendor Bills for Selected Project
-      </button>
-
       {vendorBills.length > 0 ? (
         <label>
           Vendor bill
@@ -416,7 +438,8 @@ export function VendorBillsConsole() {
             <option value="">Select vendor</option>
             {vendors.map((vendorRow) => (
               <option key={vendorRow.id} value={vendorRow.id}>
-                #{vendorRow.id} - {vendorRow.name}
+                #{vendorRow.id} - {vendorRow.name} [{vendorRow.vendor_type}]
+                {vendorRow.is_canonical ? " [canonical]" : ""}
               </option>
             ))}
           </select>

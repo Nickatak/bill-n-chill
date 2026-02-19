@@ -420,8 +420,43 @@ class Command(BaseCommand):
         vendor, _ = Vendor.objects.get_or_create(
             created_by=user,
             name="Tile Vendor Co",
-            defaults={"email": "ap@tilevendor.example"},
+            defaults={
+                "email": "ap@tilevendor.example",
+                "vendor_type": Vendor.VendorType.TRADE,
+                "is_canonical": False,
+            },
         )
+        vendor.vendor_type = Vendor.VendorType.TRADE
+        vendor.is_canonical = False
+        vendor.save(update_fields=["vendor_type", "is_canonical", "updated_at"])
+
+        canonical_retail_vendors = [
+            "Home Depot",
+            "Lowe's",
+            "Menards",
+            "Amazon Business",
+            "Sherwin-Williams",
+            "Floor & Decor",
+            "Ferguson",
+            "Ace Hardware",
+        ]
+        for canonical_name in canonical_retail_vendors:
+            canonical_vendor, _ = Vendor.objects.get_or_create(
+                created_by=user,
+                name=canonical_name,
+                defaults={
+                    "vendor_type": Vendor.VendorType.RETAIL,
+                    "is_canonical": True,
+                    "is_active": True,
+                },
+            )
+            canonical_vendor.vendor_type = Vendor.VendorType.RETAIL
+            canonical_vendor.is_canonical = True
+            canonical_vendor.is_active = True
+            canonical_vendor.save(
+                update_fields=["vendor_type", "is_canonical", "is_active", "updated_at"]
+            )
+
         vendor_bill, _ = VendorBill.objects.get_or_create(
             project=project,
             vendor=vendor,

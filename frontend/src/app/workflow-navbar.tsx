@@ -10,9 +10,8 @@ const workflowRoutes = [
   { href: "/budgets-placeholder", label: "4 Budgets" },
   { href: "/change-orders", label: "5 Change Orders" },
   { href: "/invoices", label: "6 Invoices" },
-  { href: "/vendors", label: "7 Vendors" },
-  { href: "/vendor-bills", label: "8 Vendor Bills" },
-  { href: "/payments", label: "9 Payments" },
+  { href: "/vendor-bills", label: "7 Vendor Bills" },
+  { href: "/payments", label: "8 Payments" },
 ];
 
 export function WorkflowNavbar() {

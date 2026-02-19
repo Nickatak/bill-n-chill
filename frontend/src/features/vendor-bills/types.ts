@@ -12,6 +12,8 @@ export type ProjectRecord = {
 export type VendorRecord = {
   id: number;
   name: string;
+  vendor_type: "trade" | "retail";
+  is_canonical: boolean;
   email: string;
   is_active: boolean;
 };

@@ -1,4 +1,5 @@
 import { VendorBillsConsole } from "@/features/vendor-bills";
+import { VendorsConsole } from "@/features/vendors";
 import styles from "./page.module.css";
 
 export default function VendorBillsPage() {
@@ -17,6 +18,19 @@ export default function VendorBillsPage() {
           </p>
         </header>
         <section className={styles.card}>
+          <h2>Vendors</h2>
+          <p>
+            Maintain your vendor directory here first so AP entries tie to canonical payees with
+            duplicate safeguards.
+          </p>
+          <VendorsConsole />
+        </section>
+        <section className={styles.card}>
+          <h2>Vendor Bills</h2>
+          <p>
+            Capture expense transactions and lifecycle status so AP liabilities can be settled and
+            reported accurately.
+          </p>
           <VendorBillsConsole />
         </section>
       </main>

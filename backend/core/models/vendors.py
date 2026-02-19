@@ -13,7 +13,17 @@ class Vendor(models.Model):
     - Duplicate warnings are handled at application level by name/email.
     """
 
+    class VendorType(models.TextChoices):
+        TRADE = "trade", "Trade"
+        RETAIL = "retail", "Retail"
+
     name = models.CharField(max_length=255)
+    vendor_type = models.CharField(
+        max_length=20,
+        choices=VendorType.choices,
+        default=VendorType.TRADE,
+    )
+    is_canonical = models.BooleanField(default=False)
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=50, blank=True)
     tax_id_last4 = models.CharField(max_length=4, blank=True)

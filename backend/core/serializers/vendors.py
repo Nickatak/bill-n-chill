@@ -9,6 +9,8 @@ class VendorSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
+            "vendor_type",
+            "is_canonical",
             "email",
             "phone",
             "tax_id_last4",
@@ -17,11 +19,12 @@ class VendorSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "is_canonical", "created_at", "updated_at"]
 
 
 class VendorWriteSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255, required=False, allow_blank=False)
+    vendor_type = serializers.ChoiceField(choices=Vendor.VendorType.choices, required=False)
     email = serializers.EmailField(required=False, allow_blank=True)
     phone = serializers.CharField(max_length=50, required=False, allow_blank=True)
     tax_id_last4 = serializers.CharField(max_length=4, required=False, allow_blank=True)

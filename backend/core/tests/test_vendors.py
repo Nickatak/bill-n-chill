@@ -33,6 +33,8 @@ class VendorTests(TestCase):
         payload = create.json()["data"]
         self.assertEqual(payload["name"], "Stone Supply LLC")
         self.assertEqual(payload["tax_id_last4"], "7788")
+        self.assertEqual(payload["vendor_type"], Vendor.VendorType.TRADE)
+        self.assertFalse(payload["is_canonical"])
 
         list_all = self.client.get(
             "/api/v1/vendors/",
@@ -193,3 +195,35 @@ class VendorTests(TestCase):
         self.assertEqual(vendor.tax_id_last4, "5678")
         self.assertEqual(vendor.notes, "Updated note")
         self.assertFalse(vendor.is_active)
+
+    def test_vendor_create_accepts_retail_vendor_type(self):
+        create = self.client.post(
+            "/api/v1/vendors/",
+            data={
+                "name": "Home Depot",
+                "vendor_type": Vendor.VendorType.RETAIL,
+                "email": "",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(create.status_code, 201)
+        payload = create.json()["data"]
+        self.assertEqual(payload["vendor_type"], Vendor.VendorType.RETAIL)
+        self.assertFalse(payload["is_canonical"])
+
+    def test_vendor_patch_updates_vendor_type(self):
+        vendor = Vendor.objects.create(
+            name="Switchable Vendor",
+            vendor_type=Vendor.VendorType.TRADE,
+            created_by=self.user,
+        )
+        response = self.client.patch(
+            f"/api/v1/vendors/{vendor.id}/",
+            data={"vendor_type": Vendor.VendorType.RETAIL},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        vendor.refresh_from_db()
+        self.assertEqual(vendor.vendor_type, Vendor.VendorType.RETAIL)

@@ -1,13 +1,13 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { ApiResponse, VendorPayload, VendorRecord } from "../types";
 
 export function VendorsConsole() {
-  const { token, authMessage } = useSharedSessionAuth();
+  const { token } = useSharedSessionAuth();
 
   const [rows, setRows] = useState<VendorRecord[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -23,10 +23,12 @@ export function VendorsConsole() {
   const [duplicateOverrideOnSave, setDuplicateOverrideOnSave] = useState(false);
 
   const [newName, setNewName] = useState("");
+  const [newVendorType, setNewVendorType] = useState<"trade" | "retail">("trade");
   const [newVendorEmail, setNewVendorEmail] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newTaxIdLast4, setNewTaxIdLast4] = useState("");
   const [newNotes, setNewNotes] = useState("");
+  const [vendorType, setVendorType] = useState<"trade" | "retail">("trade");
 
   const [duplicateCandidates, setDuplicateCandidates] = useState<VendorRecord[]>([]);
   const [pendingCreatePayload, setPendingCreatePayload] = useState<VendorPayload | null>(null);
@@ -34,6 +36,7 @@ export function VendorsConsole() {
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   function hydrate(item: VendorRecord) {
     setName(item.name);
+    setVendorType(item.vendor_type);
     setVendorEmail(item.email);
     setPhone(item.phone);
     setTaxIdLast4(item.tax_id_last4);
@@ -127,6 +130,7 @@ export function VendorsConsole() {
 
     await createVendor({
       name: newName,
+      vendor_type: newVendorType,
       email: newVendorEmail,
       phone: newPhone,
       tax_id_last4: newTaxIdLast4,
@@ -163,6 +167,7 @@ export function VendorsConsole() {
         },
         body: JSON.stringify({
           name,
+          vendor_type: vendorType,
           email: vendorEmail,
           phone,
           tax_id_last4: taxIdLast4,
@@ -191,12 +196,21 @@ export function VendorsConsole() {
     }
   }
 
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void loadVendors();
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
   return (
     <section>
       <h2>Vendor Directory</h2>
       <p>Create, search, and update reusable vendors for AP and commitments.</p>
-
-      <p>{authMessage}</p>
 
       <label>
         Search query
@@ -206,7 +220,7 @@ export function VendorsConsole() {
           placeholder="name, email, phone, or tax id"
         />
       </label>
-      <button type="button" onClick={loadVendors}>
+      <button type="button" onClick={loadVendors} disabled={!token}>
         Load Vendors
       </button>
 
@@ -216,7 +230,9 @@ export function VendorsConsole() {
           <select value={selectedId} onChange={(event) => handleSelect(event.target.value)}>
             {rows.map((row) => (
               <option key={row.id} value={row.id}>
-                #{row.id} - {row.name} ({row.email || "no-email"}) {row.is_active ? "active" : "inactive"}
+                #{row.id} - {row.name} [{row.vendor_type}]
+                {row.is_canonical ? " [canonical]" : ""} ({row.email || "no-email"}){" "}
+                {row.is_active ? "active" : "inactive"}
               </option>
             ))}
           </select>
@@ -248,6 +264,16 @@ export function VendorsConsole() {
           <input value={newName} onChange={(event) => setNewName(event.target.value)} required />
         </label>
         <label>
+          Vendor type
+          <select
+            value={newVendorType}
+            onChange={(event) => setNewVendorType(event.target.value as "trade" | "retail")}
+          >
+            <option value="trade">trade</option>
+            <option value="retail">retail</option>
+          </select>
+        </label>
+        <label>
           Email
           <input value={newVendorEmail} onChange={(event) => setNewVendorEmail(event.target.value)} />
         </label>
@@ -276,6 +302,16 @@ export function VendorsConsole() {
         <label>
           Name
           <input value={name} onChange={(event) => setName(event.target.value)} required />
+        </label>
+        <label>
+          Vendor type
+          <select
+            value={vendorType}
+            onChange={(event) => setVendorType(event.target.value as "trade" | "retail")}
+          >
+            <option value="trade">trade</option>
+            <option value="retail">retail</option>
+          </select>
         </label>
         <label>
           Email

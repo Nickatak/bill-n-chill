@@ -17,6 +17,7 @@ export default async function BudgetsPage({ searchParams }: BudgetsPageProps) {
       <main className={styles.main}>
         <header className={styles.header}>
           <h1>Budgets</h1>
+          <p>This is the internal “are we still making money on this job?” screen.</p>
           <p>
             This route gives users the internal execution baseline by converting approved estimate
             scope into immutable snapshot + editable working budget lines.
