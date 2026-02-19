@@ -29,8 +29,8 @@ ALLOWED_ESTIMATE_STATUS_TRANSITIONS = {
         Estimate.Status.REJECTED,
         Estimate.Status.ARCHIVED,
     },
-    Estimate.Status.APPROVED: {Estimate.Status.ARCHIVED},
-    Estimate.Status.REJECTED: {Estimate.Status.DRAFT, Estimate.Status.ARCHIVED},
+    Estimate.Status.APPROVED: set(),
+    Estimate.Status.REJECTED: set(),
     Estimate.Status.ARCHIVED: set(),
 }
 

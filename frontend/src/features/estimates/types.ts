@@ -20,6 +20,7 @@ export type EstimateRecord = {
   tax_percent: string;
   grand_total: string;
   created_at: string;
+  updated_at: string;
   line_items?: EstimateLineItemRecord[];
 };
 

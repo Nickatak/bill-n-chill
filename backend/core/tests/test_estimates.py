@@ -363,7 +363,7 @@ class EstimateTests(TestCase):
         self.assertEqual(clone.status_code, 400)
         self.assertEqual(clone.json()["error"]["code"], "validation_error")
 
-    def test_estimate_clone_blocked_when_source_is_archived(self):
+    def test_estimate_clone_allowed_when_source_is_archived(self):
         source = Estimate.objects.create(
             project=self.project,
             version=1,
@@ -378,8 +378,10 @@ class EstimateTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(clone.status_code, 400)
-        self.assertEqual(clone.json()["error"]["code"], "validation_error")
+        self.assertEqual(clone.status_code, 201)
+        cloned = clone.json()["data"]
+        self.assertEqual(cloned["status"], Estimate.Status.DRAFT)
+        self.assertEqual(cloned["title"], source.title)
 
     def test_estimate_status_transition_validates_allowed_paths(self):
         create = self.client.post(
@@ -493,6 +495,50 @@ class EstimateTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()["data"]), 3)
+
+    def test_estimate_resend_records_sent_to_sent_status_event(self):
+        create = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Resend Estimate",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo and prep",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        estimate_id = create.json()["data"]["id"]
+
+        sent = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"status": "sent", "status_note": "Initial send."},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(sent.status_code, 200)
+
+        resent = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"status": "sent", "status_note": "Re-sent after follow-up call."},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(resent.status_code, 200)
+
+        events = EstimateStatusEvent.objects.filter(estimate_id=estimate_id)
+        self.assertEqual(events.count(), 3)
+        latest = events.first()
+        self.assertEqual(latest.from_status, Estimate.Status.SENT)
+        self.assertEqual(latest.to_status, Estimate.Status.SENT)
+        self.assertEqual(latest.note, "Re-sent after follow-up call.")
 
     def test_estimate_values_locked_after_send(self):
         create = self.client.post(
@@ -683,3 +729,54 @@ class EstimateTests(TestCase):
         )
         self.assertEqual(invalid.status_code, 400)
         self.assertEqual(invalid.json()["error"]["code"], "validation_error")
+
+    def test_estimate_duplicate_new_titles_start_new_family_at_version_one(self):
+        create = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Title",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo and prep",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(create.status_code, 201)
+        self.assertEqual(create.json()["data"]["version"], 1)
+        source_id = create.json()["data"]["id"]
+
+        duplicate_one = self.client.post(
+            f"/api/v1/estimates/{source_id}/duplicate/",
+            data={
+                "project_id": self.project.id,
+                "title": "Title2",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(duplicate_one.status_code, 201)
+        first_copy = duplicate_one.json()["data"]
+        self.assertEqual(first_copy["title"], "Title2")
+        self.assertEqual(first_copy["version"], 1)
+
+        duplicate_two = self.client.post(
+            f"/api/v1/estimates/{first_copy['id']}/duplicate/",
+            data={
+                "project_id": self.project.id,
+                "title": "Title3",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(duplicate_two.status_code, 201)
+        second_copy = duplicate_two.json()["data"]
+        self.assertEqual(second_copy["title"], "Title3")
+        self.assertEqual(second_copy["version"], 1)

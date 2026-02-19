@@ -52,6 +52,16 @@ def _archive_estimate_family(*, project, user, title, exclude_ids, note):
         )
 
 
+def _next_estimate_family_version(*, project, user, title):
+    normalized_title = (title or "").strip()
+    latest = (
+        Estimate.objects.filter(project=project, created_by=user, title=normalized_title)
+        .order_by("-version")
+        .first()
+    )
+    return (latest.version + 1) if latest else 1
+
+
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_estimates_view(request, project_id: int):
@@ -138,12 +148,11 @@ def project_estimates_view(request, project_id: int):
                 status=200,
             )
 
-    latest = (
-        Estimate.objects.filter(project=project, created_by=request.user)
-        .order_by("-version")
-        .first()
+    next_version = _next_estimate_family_version(
+        project=project,
+        user=request.user,
+        title=data.get("title", ""),
     )
-    next_version = (latest.version + 1) if latest else 1
 
     estimate = Estimate.objects.create(
         project=project,
@@ -325,7 +334,14 @@ def estimate_detail_view(request, estimate_id: int):
             user=request.user,
         )
 
-    if status_changing and previous_status != estimate.status:
+    should_record_status_event = status_changing and (
+        previous_status != estimate.status
+        or (
+            previous_status == Estimate.Status.SENT
+            and estimate.status == Estimate.Status.SENT
+        )
+    )
+    if should_record_status_event:
         _record_estimate_status_event(
             estimate=estimate,
             from_status=previous_status,
@@ -352,26 +368,31 @@ def estimate_clone_version_view(request, estimate_id: int):
             status=404,
         )
 
-    if estimate.status not in {Estimate.Status.SENT, Estimate.Status.REJECTED}:
+    if estimate.status not in {
+        Estimate.Status.SENT,
+        Estimate.Status.REJECTED,
+        Estimate.Status.ARCHIVED,
+    }:
         return Response(
             {
                 "error": {
                     "code": "validation_error",
-                    "message": "Revisions can only be created from sent or rejected estimates.",
+                    "message": "Revisions can only be created from sent, rejected, or voided estimates. Draft estimates can be edited directly in the estimate viewer.",
                     "fields": {
-                        "status": ["Only sent or rejected estimates can create revisions."]
+                        "status": [
+                            "Only sent, rejected, or voided estimates can create revisions. Edit draft estimates directly."
+                        ]
                     },
                 }
             },
             status=400,
         )
 
-    latest = (
-        Estimate.objects.filter(project=estimate.project, created_by=request.user)
-        .order_by("-version")
-        .first()
+    next_version = _next_estimate_family_version(
+        project=estimate.project,
+        user=request.user,
+        title=estimate.title,
     )
-    next_version = (latest.version + 1) if latest else (estimate.version + 1)
 
     cloned = Estimate.objects.create(
         project=estimate.project,
@@ -476,12 +497,11 @@ def estimate_duplicate_view(request, estimate_id: int):
             status=400,
         )
 
-    latest = (
-        Estimate.objects.filter(project=target_project, created_by=request.user)
-        .order_by("-version")
-        .first()
+    next_version = _next_estimate_family_version(
+        project=target_project,
+        user=request.user,
+        title=target_title,
     )
-    next_version = (latest.version + 1) if latest else 1
 
     duplicated = Estimate.objects.create(
         project=target_project,

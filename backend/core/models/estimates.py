@@ -26,6 +26,8 @@ class Estimate(models.Model):
         on_delete=models.PROTECT,
         related_name="estimates",
     )
+    # Family version is 1-based (v1 is the first estimate) and unique per
+    # (project, title) estimate family.
     version = models.PositiveIntegerField()
     status = models.CharField(
         max_length=32,
@@ -48,7 +50,7 @@ class Estimate(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
-        unique_together = ("project", "version")
+        unique_together = ("project", "title", "version")
 
     def __str__(self) -> str:
         return f"{self.project.name} v{self.version}"

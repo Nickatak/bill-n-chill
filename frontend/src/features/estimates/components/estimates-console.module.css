@@ -719,6 +719,11 @@
   background: #f8fafc;
 }
 
+.versionFilters {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .familyGroup {
   display: grid;
   gap: 8px;
@@ -742,10 +747,11 @@
 
 .familyMain {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
-  min-width: 260px;
+  gap: 18px;
+  min-width: 320px;
+  min-height: 86px;
   border: 0;
   padding: 0;
   background: transparent;
@@ -753,10 +759,19 @@
   cursor: pointer;
 }
 
+.familyMainContent {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-self: stretch;
+  min-height: 100%;
+  gap: 6px;
+}
+
 .familyMainActive {
   border: 1px solid #3b82f6;
   border-radius: 10px;
-  padding: 8px 10px;
+  padding: 12px 14px;
   background: #eff6ff;
 }
 
@@ -767,11 +782,20 @@
 }
 
 .familyMeta {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  font-size: 0.8rem;
+  color: #475569;
+  letter-spacing: 0.01em;
   display: block;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.familyDate {
+  display: block;
+  margin-top: auto;
+  font-size: 0.8rem;
+  color: #334155;
+  font-weight: 500;
 }
 
 .familyFooter {
@@ -802,6 +826,19 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   cursor: pointer;
+}
+
+.filterToggleOn {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.18);
+}
+
+.filterToggleOff {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
 }
 
 .historyRow {
@@ -836,10 +873,11 @@
 
 .historyMeta {
   display: block;
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-size: 0.74rem;
+  color: #475569;
+  letter-spacing: 0.01em;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 .historyMetaRow {
@@ -861,6 +899,14 @@
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
   margin-top: 4px;
+}
+
+.historyDate {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.76rem;
+  color: #334155;
+  font-weight: 500;
 }
 
 .historyEmpty {
@@ -902,7 +948,9 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 4px;
+  justify-content: space-between;
+  align-self: stretch;
+  gap: 8px;
 }
 
 .versionStatus {
@@ -917,8 +965,8 @@
 }
 
 .statusDraft {
-  background: #e2e8f0;
-  color: #475569;
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .statusSent {
@@ -937,8 +985,8 @@
 }
 
 .statusArchived {
-  background: #e5e7eb;
-  color: #6b7280;
+  background: #9ca3af;
+  color: #111827;
 }
 
 .statusCreated {
@@ -1194,7 +1242,12 @@
 :global(html[data-theme="dark"]) .familyMeta,
 :global(html[data-theme="dark"]) .historyEmpty,
 :global(html[data-theme="dark"]) .historyMeta {
-  color: #94a3b8;
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .familyDate,
+:global(html[data-theme="dark"]) .historyDate {
+  color: #e2e8f0;
 }
 
 :global(html[data-theme="dark"]) .familyFooter {
@@ -1205,6 +1258,19 @@
   background: #1e293b;
   border-color: #334155;
   color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .filterToggleOn {
+  background: #2563eb;
+  border-color: #3b82f6;
+  color: #eff6ff;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+:global(html[data-theme="dark"]) .filterToggleOff {
+  background: #0f172a;
+  border-color: #334155;
+  color: #94a3b8;
 }
 
 :global(html[data-theme="dark"]) .historyNotice {
@@ -1242,8 +1308,8 @@
 }
 
 :global(html[data-theme="dark"]) .statusDraft {
-  background: #1f2937;
-  color: #cbd5f5;
+  background: #1e3a8a;
+  color: #bfdbfe;
 }
 
 :global(html[data-theme="dark"]) .statusSent {
@@ -1262,8 +1328,8 @@
 }
 
 :global(html[data-theme="dark"]) .statusArchived {
-  background: #111827;
-  color: #9ca3af;
+  background: #4b5563;
+  color: #f3f4f6;
 }
 
 :global(html[data-theme="dark"]) .statusCreated {

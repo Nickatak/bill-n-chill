@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 const workflowRoutes = [
   { href: "/intake/quick-add", label: "1 Intake" },
   { href: "/projects", label: "2 Projects" },
-  { href: "/estimates", label: "3 Estimates" },
+  { href: "/estimates-placeholder", label: "3 Estimates" },
   { href: "/budgets", label: "4 Budgets" },
   { href: "/change-orders", label: "5 Change Orders" },
   { href: "/invoices", label: "6 Invoices" },
@@ -29,7 +29,10 @@ export function WorkflowNavbar() {
             Home
           </Link>
           {workflowRoutes.map((route) => {
-            const isActive = pathname === route.href;
+            const isActive =
+              route.href === "/estimates-placeholder"
+                ? pathname === "/estimates-placeholder" || pathname === "/estimates"
+                : pathname === route.href;
             return (
               <Link
                 key={route.href}

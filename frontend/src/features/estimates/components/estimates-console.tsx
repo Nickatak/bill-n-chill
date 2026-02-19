@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { loadClientSession } from "../../session/client-session";
 import styles from "./estimates-console.module.css";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   ApiResponse,
   CostCode,
@@ -31,7 +31,6 @@ function emptyLine(localId: number, defaultCostCodeId = ""): EstimateLineInput {
 }
 
 export function EstimatesConsole() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [token, setToken] = useState("");
   const [authMessage, setAuthMessage] = useState("Checking session...");
@@ -61,6 +60,7 @@ export function EstimatesConsole() {
   const [openFamilyHistory, setOpenFamilyHistory] = useState<Set<string>>(() => new Set());
   const [showDuplicatePanel, setShowDuplicatePanel] = useState(false);
   const [duplicateTitle, setDuplicateTitle] = useState("");
+  const [hideVoidedFamilies, setHideVoidedFamilies] = useState(true);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const scopedProjectIdParam = searchParams.get("project");
@@ -86,24 +86,74 @@ export function EstimatesConsole() {
     { value: "sent", label: "Sent" },
     { value: "approved", label: "Approved" },
     { value: "rejected", label: "Rejected" },
+    { value: "archived", label: "Voided" },
   ];
+  const statusLabelByValue = statusOptions.reduce<Record<string, string>>((labels, option) => {
+    labels[option.value] = option.label;
+    return labels;
+  }, {});
   const allowedStatusTransitions: Record<string, string[]> = {
-    draft: ["sent"],
-    sent: ["approved", "rejected"],
+    draft: ["sent", "archived"],
+    sent: ["sent", "approved", "rejected", "archived"],
     approved: [],
-    rejected: ["draft"],
+    rejected: [],
     archived: [],
   };
-  const revisableStatuses = new Set(["sent", "rejected"]);
+  const revisableStatuses = new Set(["sent", "rejected", "archived"]);
   const canCreateRevision = Boolean(
     selectedEstimate && revisableStatuses.has(selectedEstimate.status),
   );
-  const selectableStatuses = !selectedEstimate
-    ? new Set(statusOptions.map((option) => option.value))
-    : new Set([
-        selectedEstimate.status,
-        ...(allowedStatusTransitions[selectedEstimate.status] ?? []),
-      ]);
+  const revisionUnavailableMessage =
+    "Revisions are only for sent, rejected, or voided estimates. If this estimate is still draft, select it in the viewer and edit it directly.";
+  const nextStatusValues = selectedEstimate
+    ? allowedStatusTransitions[selectedEstimate.status] ?? []
+    : [];
+  const nextStatusOptions = statusOptions
+    .filter((option) => nextStatusValues.includes(option.value))
+    .map((option) =>
+      selectedEstimate?.status === "sent" && option.value === "sent"
+        ? { ...option, label: "Re-send" }
+        : option,
+    );
+
+  function formatEstimateStatus(status?: string): string {
+    if (!status) {
+      return "";
+    }
+    return statusLabelByValue[status] ?? status;
+  }
+
+  function formatStatusAction(event: EstimateStatusEventRecord): string {
+    if (event.from_status === "sent" && event.to_status === "sent") {
+      return "Re-sent";
+    }
+    const actionByStatus: Record<string, string> = {
+      draft: "Created",
+      sent: "Sent",
+      approved: "Approved",
+      rejected: "Rejected",
+      archived: "Voided",
+    };
+    return actionByStatus[event.to_status] ?? formatEstimateStatus(event.to_status);
+  }
+
+  function formatEventDate(dateValue: string): string {
+    const parsed = new Date(dateValue);
+    if (Number.isNaN(parsed.getTime())) {
+      return dateValue;
+    }
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(parsed);
+  }
+
+  function formatEstimateLastActionDate(estimate: EstimateRecord): string {
+    return formatEventDate(estimate.updated_at || estimate.created_at);
+  }
 
   function toNumber(value: string): number {
     const parsed = Number(value);
@@ -142,6 +192,23 @@ export function EstimatesConsole() {
       items: [...items].sort((a, b) => a.version - b.version),
     }));
   }, [estimates]);
+  const hiddenVoidedFamilyCount = useMemo(
+    () =>
+      estimateFamilies.filter((family) => {
+        const latest = family.items[family.items.length - 1];
+        return latest?.status === "archived";
+      }).length,
+    [estimateFamilies],
+  );
+  const visibleEstimateFamilies = useMemo(() => {
+    if (!hideVoidedFamilies) {
+      return estimateFamilies;
+    }
+    return estimateFamilies.filter((family) => {
+      const latest = family.items[family.items.length - 1];
+      return latest?.status !== "archived";
+    });
+  }, [estimateFamilies, hideVoidedFamilies]);
 
   function formatMoney(value: number): string {
     return value.toFixed(2);
@@ -193,7 +260,8 @@ export function EstimatesConsole() {
     const nextEstimateId = String(estimate.id);
     const isSameEstimate = nextEstimateId === selectedEstimateId;
     setSelectedEstimateId(nextEstimateId);
-    setSelectedStatus(estimate.status);
+    const nextStatuses = allowedStatusTransitions[estimate.status] ?? [];
+    setSelectedStatus(nextStatuses[0] ?? estimate.status);
     if (!isSameEstimate) {
       setStatusEvents([]);
     }
@@ -221,15 +289,13 @@ export function EstimatesConsole() {
     setActionMessage("");
   }
 
-  function toggleFamilyHistory(title: string) {
+  function handleSelectFamilyLatest(title: string, latest: EstimateRecord) {
+    handleSelectEstimate(latest);
     setOpenFamilyHistory((current) => {
-      const next = new Set(current);
-      if (next.has(title)) {
-        next.delete(title);
-      } else {
-        next.add(title);
+      if (current.has(title)) {
+        return new Set<string>();
       }
-      return next;
+      return new Set<string>([title]);
     });
   }
 
@@ -571,7 +637,6 @@ export function EstimatesConsole() {
       setStatusEvents([]);
       setStatusMessage(`Created estimate #${created.id} v${created.version}.`);
       loadEstimateIntoForm(created);
-      router.push(`/estimates/post-create?estimate=${created.id}`);
     } catch {
       setStatusMessage("Could not reach estimate create endpoint.");
     } finally {
@@ -588,8 +653,8 @@ export function EstimatesConsole() {
       return;
     }
     if (!canCreateRevision) {
-      setStatusMessage("Revisions are only available for sent or rejected estimates.");
-      setActionMessage("Revisions are only available for sent or rejected estimates.");
+      setStatusMessage(revisionUnavailableMessage);
+      setActionMessage(revisionUnavailableMessage);
       return;
     }
     const sourceWasSent = selectedEstimate?.status === "sent";
@@ -701,8 +766,13 @@ export function EstimatesConsole() {
       setEstimates((current) =>
         current.map((estimate) => (estimate.id === updated.id ? updated : estimate)),
       );
+      const updatedNextStatuses = allowedStatusTransitions[updated.status] ?? [];
+      setSelectedStatus(updatedNextStatuses[0] ?? updated.status);
       setStatusNote("");
-      setStatusMessage(`Updated estimate #${updated.id} to ${updated.status}.`);
+      await loadStatusEvents({ estimateId: updated.id, quiet: true });
+      setStatusMessage(
+        `Updated estimate #${updated.id} to ${formatEstimateStatus(updated.status)}.`,
+      );
     } catch {
       setStatusMessage("Could not reach estimate status endpoint.");
     }
@@ -814,7 +884,7 @@ export function EstimatesConsole() {
             onClick={handleCloneEstimate}
             title={
               selectedEstimate && !canCreateRevision
-                ? "Revisions are only available for sent or rejected estimates."
+                ? revisionUnavailableMessage
                 : undefined
             }
           >
@@ -849,9 +919,22 @@ export function EstimatesConsole() {
           </div>
         ) : null}
 
+        <div className={styles.versionFilters}>
+          <button
+            type="button"
+            className={`${styles.historyToggle} ${
+              hideVoidedFamilies ? styles.filterToggleOn : styles.filterToggleOff
+            }`}
+            aria-pressed={hideVoidedFamilies}
+            onClick={() => setHideVoidedFamilies((current) => !current)}
+          >
+            Hide Voided: {hideVoidedFamilies ? "ON" : "OFF"} ({hiddenVoidedFamilyCount})
+          </button>
+        </div>
+
         <div className={styles.versionTree}>
-          {estimateFamilies.length > 0 ? (
-            estimateFamilies.map((family) => {
+          {visibleEstimateFamilies.length > 0 ? (
+            visibleEstimateFamilies.map((family) => {
               const latest = family.items[family.items.length - 1];
               const history = family.items.slice(0, -1).reverse();
               const selectedInFamily = family.items.find(
@@ -876,12 +959,16 @@ export function EstimatesConsole() {
                       className={`${styles.familyMain} ${
                         isLatestSelected ? styles.familyMainActive : ""
                       }`}
-                      onClick={() => handleSelectEstimate(latest)}
+                      onClick={() => handleSelectFamilyLatest(family.title, latest)}
                     >
-                      <div>
+                      <div className={styles.familyMainContent}>
                         <span className={styles.familyTitle}>{family.title}</span>
                         <span className={styles.familyMeta}>
-                          Estimate #{latest.id} · v{latest.version}
+                          Estimate #{latest.id} · {history.length} history{" "}
+                          {history.length === 1 ? "entry" : "entries"}
+                        </span>
+                        <span className={styles.familyDate}>
+                          Last action: {formatEstimateLastActionDate(latest)}
                         </span>
                       </div>
                       <div className={styles.versionRight}>
@@ -890,7 +977,7 @@ export function EstimatesConsole() {
                             statusClasses[latest.status] ?? ""
                           }`}
                         >
-                          {latest.status}
+                          {formatEstimateStatus(latest.status)}
                         </span>
                         <span className={styles.versionAmount}>${latestTotal}</span>
                       </div>
@@ -917,10 +1004,13 @@ export function EstimatesConsole() {
                                     statusClasses[estimate.status] ?? ""
                                   } ${styles.historyStatus}`}
                                 >
-                                  {estimate.status}
+                                  {formatEstimateStatus(estimate.status)}
                                 </span>
                               </span>
                               <span className={styles.historyAmount}>${total}</span>
+                              <span className={styles.historyDate}>
+                                {formatEstimateLastActionDate(estimate)}
+                              </span>
                             </button>
                           );
                         })}
@@ -928,17 +1018,6 @@ export function EstimatesConsole() {
                     ) : null}
                   </div>
                   <div className={styles.familyFooter}>
-                    {history.length > 0 ? (
-                      <button
-                        type="button"
-                        className={styles.historyToggle}
-                        onClick={() => toggleFamilyHistory(family.title)}
-                      >
-                        {isHistoryOpen ? "Hide history" : "Show history"} ({history.length})
-                      </button>
-                    ) : (
-                      <span className={styles.historyEmpty}>No history</span>
-                    )}
                     {isViewingHistory ? (
                       <span className={styles.historyNotice}>
                         Viewing v{selectedInFamily?.version}
@@ -948,6 +1027,8 @@ export function EstimatesConsole() {
                 </div>
               );
             })
+          ) : hiddenVoidedFamilyCount > 0 && hideVoidedFamilies ? (
+            <p className={styles.inlineHint}>All estimate families are currently voided and hidden.</p>
           ) : (
             <p className={styles.inlineHint}>No estimate versions loaded yet.</p>
           )}
@@ -957,27 +1038,27 @@ export function EstimatesConsole() {
           <div className={styles.statusPicker}>
             <span className={styles.lifecycleFieldLabel}>Next status</span>
             <div className={styles.statusPills}>
-              {statusOptions.map((option) => {
+              {nextStatusOptions.map((option) => {
                 const isSelected = selectedStatus === option.value;
-                const isSelectable = selectableStatuses.has(option.value);
                 return (
                   <button
                     key={option.value}
                     type="button"
                     className={`${styles.statusPill} ${
                       isSelected ? statusClasses[option.value] ?? "" : styles.statusPillInactive
-                    } ${isSelected ? styles.statusPillActive : ""} ${
-                      !isSelectable ? styles.actionDisabled : ""
-                    }`}
+                    } ${isSelected ? styles.statusPillActive : ""}`}
                     onClick={() => setSelectedStatus(option.value)}
                     aria-pressed={isSelected}
-                    disabled={!isSelectable}
+                    disabled={!selectedEstimateId}
                   >
                     {option.label}
                   </button>
                 );
               })}
             </div>
+            {selectedEstimateId && nextStatusOptions.length === 0 ? (
+              <p className={styles.inlineHint}>No next statuses available for this estimate.</p>
+            ) : null}
           </div>
           <label className={styles.lifecycleField}>
             Status note
@@ -991,7 +1072,11 @@ export function EstimatesConsole() {
           </label>
         </div>
         <div className={styles.lifecycleActions}>
-          <button type="button" onClick={handleUpdateEstimateStatus} disabled={!selectedEstimateId}>
+          <button
+            type="button"
+            onClick={handleUpdateEstimateStatus}
+            disabled={!selectedEstimateId || nextStatusOptions.length === 0}
+          >
             Update Selected Estimate Status
           </button>
         </div>
@@ -1003,35 +1088,31 @@ export function EstimatesConsole() {
               <table className={styles.statusEventsTable}>
                 <thead>
                   <tr>
-                    <th>From</th>
-                    <th>To</th>
-                    <th>By</th>
-                    <th>When</th>
+                    <th>Action</th>
+                    <th>Status</th>
+                    <th>Occurred</th>
                     <th>Note</th>
+                    <th>Who</th>
                   </tr>
                 </thead>
                 <tbody>
                   {statusEvents.map((event) => {
-                    const fromStatus = event.from_status ?? "created";
-                    const fromStatusClass = event.from_status
-                      ? statusClasses[event.from_status] ?? ""
-                      : styles.statusCreated;
                     const toStatusClass = statusClasses[event.to_status] ?? "";
                     return (
                       <tr key={event.id}>
                         <td>
-                          <span className={`${styles.versionStatus} ${fromStatusClass}`}>
-                            {fromStatus}
+                          <span className={`${styles.versionStatus} ${toStatusClass}`}>
+                            {formatStatusAction(event)}
                           </span>
                         </td>
                         <td>
                           <span className={`${styles.versionStatus} ${toStatusClass}`}>
-                            {event.to_status}
+                            {formatEstimateStatus(event.to_status)}
                           </span>
                         </td>
-                        <td>{event.changed_by_email}</td>
-                        <td>{new Date(event.changed_at).toLocaleString()}</td>
+                        <td>{formatEventDate(event.changed_at)}</td>
                         <td>{event.note || "—"}</td>
+                        <td>{event.changed_by_email}</td>
                       </tr>
                     );
                   })}

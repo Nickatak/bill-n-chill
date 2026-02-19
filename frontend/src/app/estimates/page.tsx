@@ -9,7 +9,7 @@ type EstimatesPageProps = {
 export default async function EstimatesPage({ searchParams }: EstimatesPageProps) {
   const { project } = await searchParams;
   if (!project || !/^\d+$/.test(project)) {
-    redirect("/projects");
+    redirect("/estimates-placeholder");
   }
 
   return (
