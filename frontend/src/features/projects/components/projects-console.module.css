@@ -248,9 +248,35 @@
   text-decoration: underline;
 }
 
-.nodeMeta {
-  font-size: 0.75rem;
-  color: #64748b;
+.nodeEstimateMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.estimateCountPill {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.estimateCountDraft {
+  background: #e0e7ff;
+  color: #1e3a8a;
+}
+
+.estimateCountSent {
+  background: #fde68a;
+  color: #92400e;
+}
+
+.estimateCountApproved {
+  background: #bbf7d0;
+  color: #166534;
 }
 
 .nodeCount {
@@ -327,13 +353,31 @@
   color: #bfdbfe;
 }
 
-:global(html[data-theme="dark"]) .nodeMeta {
-  color: #94a3b8;
-}
-
 :global(html[data-theme="dark"]) .nodeCount {
   background: #1e293b;
   color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .estimateCountPill {
+  border: 1px solid transparent;
+}
+
+:global(html[data-theme="dark"]) .estimateCountDraft {
+  background: #1e3a8a;
+  color: #dbeafe;
+  border-color: #1d4ed8;
+}
+
+:global(html[data-theme="dark"]) .estimateCountSent {
+  background: #78350f;
+  color: #fde68a;
+  border-color: #92400e;
+}
+
+:global(html[data-theme="dark"]) .estimateCountApproved {
+  background: #14532d;
+  color: #bbf7d0;
+  border-color: #166534;
 }
 
 :global(html[data-theme="dark"]) .metricsPanel {

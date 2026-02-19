@@ -21,6 +21,11 @@ export function ProjectsConsole() {
   const [statusMessage, setStatusMessage] = useState("");
   const [projectSearch, setProjectSearch] = useState("");
   const [summary, setSummary] = useState<ProjectFinancialSummary | null>(null);
+  const [estimateStatusCounts, setEstimateStatusCounts] = useState<{
+    draft: number;
+    sent: number;
+    approved: number;
+  } | null>(null);
   const [auditEvents, setAuditEvents] = useState<FinancialAuditEventRecord[]>([]);
   const [syncEvents, setSyncEvents] = useState<AccountingSyncEventRecord[]>([]);
   const [syncProvider, setSyncProvider] = useState<"quickbooks_online">("quickbooks_online");
@@ -136,13 +141,44 @@ export function ProjectsConsole() {
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
         setStatusMessage("Could not load financial summary.");
+        setEstimateStatusCounts(null);
         return;
       }
 
       setSummary(payload.data as ProjectFinancialSummary);
+      try {
+        const estimatesResponse = await fetch(
+          `${normalizedBaseUrl}/projects/${projectId}/estimates/`,
+          {
+            headers: { Authorization: `Token ${token}` },
+          },
+        );
+        const estimatesPayload: ApiResponse = await estimatesResponse.json();
+        if (!estimatesResponse.ok) {
+          setEstimateStatusCounts(null);
+        } else {
+          const rows = (estimatesPayload.data as Array<{ status?: string }>) ?? [];
+          let draft = 0;
+          let sent = 0;
+          let approved = 0;
+          for (const estimate of rows) {
+            if (estimate.status === "draft") {
+              draft += 1;
+            } else if (estimate.status === "sent") {
+              sent += 1;
+            } else if (estimate.status === "approved") {
+              approved += 1;
+            }
+          }
+          setEstimateStatusCounts({ draft, sent, approved });
+        }
+      } catch {
+        setEstimateStatusCounts(null);
+      }
       setStatusMessage("Financial summary loaded.");
     } catch {
       setStatusMessage("Could not reach financial summary endpoint.");
+      setEstimateStatusCounts(null);
     }
   }, [normalizedBaseUrl, selectedProjectId, token]);
 
@@ -175,6 +211,7 @@ export function ProjectsConsole() {
     (project: ProjectRecord) => {
       setSelectedProjectId(String(project.id));
       setSummary(null);
+      setEstimateStatusCounts(null);
       setAuditEvents([]);
       hydrateForm(project);
     },
@@ -511,11 +548,20 @@ export function ProjectsConsole() {
                   <span className={styles.branchLabel}>Scope</span>
                   <div className={styles.node}>
                     <Link href={`/estimates?project=${selectedProject.id}`}>Estimates</Link>
-                    <span className={styles.nodeMeta}>Author</span>
+                    <span className={styles.nodeEstimateMeta}>
+                      <span className={`${styles.estimateCountPill} ${styles.estimateCountDraft}`}>
+                        D {estimateStatusCounts ? estimateStatusCounts.draft : "--"}
+                      </span>
+                      <span className={`${styles.estimateCountPill} ${styles.estimateCountSent}`}>
+                        S {estimateStatusCounts ? estimateStatusCounts.sent : "--"}
+                      </span>
+                      <span className={`${styles.estimateCountPill} ${styles.estimateCountApproved}`}>
+                        A {estimateStatusCounts ? estimateStatusCounts.approved : "--"}
+                      </span>
+                    </span>
                   </div>
                   <div className={styles.node}>
                     <Link href="/budgets">Budgets</Link>
-                    <span className={styles.nodeMeta}>Baseline</span>
                   </div>
                   <div className={styles.node}>
                     <Link href="/change-orders">Change Orders</Link>

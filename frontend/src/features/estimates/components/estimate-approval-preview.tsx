@@ -163,7 +163,8 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
           <div className={styles.lifecycle}>
             <h3>Decision</h3>
             <p className={styles.inlineHint}>
-              Approval actions are visual-only in this pass. Wiring and status transitions come next.
+              Approval/decline is not wired yet. These buttons are preview-only and will remain
+              inactive for now.
             </p>
             <div className={styles.lifecycleActions}>
               <button type="button" className={styles.primaryButton}>
