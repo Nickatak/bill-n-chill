@@ -5,7 +5,11 @@ import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { ApiResponse, BudgetLineRecord, BudgetRecord, EstimateRecord, ProjectRecord } from "../types";
 
-export function BudgetsConsole() {
+type BudgetsConsoleProps = {
+  scopedProjectId: string;
+};
+
+export function BudgetsConsole({ scopedProjectId }: BudgetsConsoleProps) {
   const { token, authMessage } = useSharedSessionAuth();
   const [statusMessage, setStatusMessage] = useState("");
 
@@ -21,6 +25,7 @@ export function BudgetsConsole() {
   const [lineBudgetAmount, setLineBudgetAmount] = useState("");
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+  const approvedEstimates = estimates.filter((estimate) => estimate.status === "approved");
   const selectedEstimate = estimates.find(
     (estimate) => String(estimate.id) === selectedEstimateId,
   );
@@ -55,7 +60,8 @@ export function BudgetsConsole() {
       const rows = (payload.data as ProjectRecord[]) ?? [];
       setProjects(rows);
       if (rows[0]) {
-        setSelectedProjectId(String(rows[0].id));
+        const scopedMatch = rows.find((project) => String(project.id) === scopedProjectId);
+        setSelectedProjectId(String(scopedMatch?.id ?? rows[0].id));
       } else {
         setSelectedProjectId("");
       }
@@ -89,12 +95,15 @@ export function BudgetsConsole() {
       }
       const rows = (payload.data as EstimateRecord[]) ?? [];
       setEstimates(rows);
-      if (rows[0]) {
-        setSelectedEstimateId(String(rows[0].id));
+      const approved = rows.filter((estimate) => estimate.status === "approved");
+      if (approved[0]) {
+        setSelectedEstimateId(String(approved[0].id));
       } else {
         setSelectedEstimateId("");
       }
-      setStatusMessage(`Loaded ${rows.length} estimate version(s).`);
+      setStatusMessage(
+        `Loaded ${rows.length} estimate version(s); ${approved.length} approved and eligible for conversion.`,
+      );
     } catch {
       setStatusMessage("Could not reach estimates endpoint.");
     }
@@ -271,20 +280,23 @@ export function BudgetsConsole() {
         Load Estimates for Selected Project
       </button>
 
-      {estimates.length > 0 ? (
+      {approvedEstimates.length > 0 ? (
         <label>
-          Estimate version
+          Approved estimate version
           <select
             value={selectedEstimateId}
             onChange={(event) => setSelectedEstimateId(event.target.value)}
           >
-            {estimates.map((estimate) => (
+            {approvedEstimates.map((estimate) => (
               <option key={estimate.id} value={estimate.id}>
                 #{estimate.id} v{estimate.version} - {estimate.title} ({estimate.status})
               </option>
             ))}
           </select>
         </label>
+      ) : null}
+      {estimates.length > 0 && approvedEstimates.length === 0 ? (
+        <p>No approved estimates for this project yet. Approve one in Estimates before conversion.</p>
       ) : null}
 
       <button

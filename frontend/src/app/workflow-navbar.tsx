@@ -7,7 +7,7 @@ const workflowRoutes = [
   { href: "/intake/quick-add", label: "1 Intake" },
   { href: "/projects", label: "2 Projects" },
   { href: "/estimates-placeholder", label: "3 Estimates" },
-  { href: "/budgets", label: "4 Budgets" },
+  { href: "/budgets-placeholder", label: "4 Budgets" },
   { href: "/change-orders", label: "5 Change Orders" },
   { href: "/invoices", label: "6 Invoices" },
   { href: "/vendors", label: "7 Vendors" },
@@ -34,6 +34,8 @@ export function WorkflowNavbar() {
                 ? pathname === "/estimates-placeholder" ||
                   pathname === "/estimates" ||
                   pathname.startsWith("/estimates/")
+                : route.href === "/budgets-placeholder"
+                  ? pathname === "/budgets-placeholder" || pathname === "/budgets"
                 : pathname === route.href;
             return (
               <Link

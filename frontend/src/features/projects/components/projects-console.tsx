@@ -561,7 +561,7 @@ export function ProjectsConsole() {
                     </span>
                   </div>
                   <div className={styles.node}>
-                    <Link href="/budgets">Budgets</Link>
+                    <Link href={`/budgets?project=${selectedProject.id}`}>Budgets</Link>
                   </div>
                   <div className={styles.node}>
                     <Link href="/change-orders">Change Orders</Link>

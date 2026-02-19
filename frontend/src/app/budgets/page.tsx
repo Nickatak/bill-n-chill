@@ -1,7 +1,17 @@
 import { BudgetsConsole } from "@/features/budgets";
+import { redirect } from "next/navigation";
 import styles from "./page.module.css";
 
-export default function BudgetsPage() {
+type BudgetsPageProps = {
+  searchParams: Promise<{ project?: string }>;
+};
+
+export default async function BudgetsPage({ searchParams }: BudgetsPageProps) {
+  const { project } = await searchParams;
+  if (!project || !/^\d+$/.test(project)) {
+    redirect("/budgets-placeholder");
+  }
+
   return (
     <div className={styles.page}>
       <main className={styles.main}>
@@ -17,7 +27,7 @@ export default function BudgetsPage() {
           </p>
         </header>
         <section className={styles.card}>
-          <BudgetsConsole />
+          <BudgetsConsole scopedProjectId={project} />
         </section>
       </main>
     </div>
