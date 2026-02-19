@@ -210,6 +210,32 @@ class EstimateTests(TestCase):
             ).exists()
         )
 
+    def test_project_estimates_create_rejects_user_archived_status(self):
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Should Fail",
+                "status": "archived",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo and prep",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["status"][0],
+            "Archived status is system-controlled and cannot be set directly.",
+        )
+
     def test_project_estimates_list_scoped_by_project_and_user(self):
         Estimate.objects.create(
             project=self.project,
@@ -483,6 +509,47 @@ class EstimateTests(TestCase):
         )
         self.assertEqual(to_approved.status_code, 200)
         self.assertEqual(to_approved.json()["data"]["status"], "approved")
+
+    def test_estimate_status_transition_rejects_user_archived_status(self):
+        create = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Archived Block",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo and prep",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        estimate_id = create.json()["data"]["id"]
+
+        sent = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(sent.status_code, 200)
+
+        archived = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"status": "archived"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(archived.status_code, 400)
+        self.assertEqual(
+            archived.json()["status"][0],
+            "Archived status is system-controlled and cannot be set directly.",
+        )
 
     def test_estimate_status_transition_creates_audit_events(self):
         create = self.client.post(

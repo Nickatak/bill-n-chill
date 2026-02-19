@@ -28,6 +28,7 @@ class Estimate(models.Model):
         SENT = "sent", "Sent"
         APPROVED = "approved", "Approved"
         REJECTED = "rejected", "Rejected"
+        # System-controlled lifecycle state for superseded historical versions.
         ARCHIVED = "archived", "Archived"
 
     project = models.ForeignKey(

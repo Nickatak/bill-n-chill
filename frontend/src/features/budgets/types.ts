@@ -33,6 +33,7 @@ export type BudgetRecord = {
 export type ApiResponse = {
   data?:
     | UserData
+    | ProjectRecord
     | ProjectRecord[]
     | EstimateRecord[]
     | BudgetRecord[]

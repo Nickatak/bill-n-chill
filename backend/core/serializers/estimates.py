@@ -107,6 +107,13 @@ class EstimateWriteSerializer(serializers.Serializer):
             raise serializers.ValidationError("Title cannot be blank.")
         return trimmed
 
+    def validate_status(self, value: str) -> str:
+        if value == Estimate.Status.ARCHIVED:
+            raise serializers.ValidationError(
+                "Archived status is system-controlled and cannot be set directly."
+            )
+        return value
+
 
 class EstimateDuplicateSerializer(serializers.Serializer):
     project_id = serializers.IntegerField(required=False)

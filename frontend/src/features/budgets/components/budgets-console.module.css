@@ -1,0 +1,133 @@
+.console {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.inlineButton {
+  width: fit-content;
+}
+
+.fieldLabel {
+  display: grid;
+  gap: 0.4rem;
+  width: fit-content;
+}
+
+.select {
+  min-width: 20rem;
+}
+
+.summaryGrid {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  margin-top: 0.5rem;
+}
+
+.metricCard {
+  border: 1px solid #d4dde8;
+  border-radius: 0.6rem;
+  background: #f7fafc;
+  padding: 0.7rem 0.8rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.metricLabel {
+  font-size: 0.78rem;
+  color: #4a5a6a;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.metricValue {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #10243a;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid #d4dde8;
+}
+
+.table th,
+.table td {
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid #e4ebf2;
+  text-align: left;
+  vertical-align: top;
+}
+
+.table th {
+  font-size: 0.78rem;
+  color: #4a5a6a;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: #f1f5f9;
+}
+
+.positive {
+  color: #166534;
+  font-weight: 700;
+}
+
+.negative {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.actionError {
+  color: #b91c1c;
+  font-weight: 600;
+  margin-top: -0.35rem;
+}
+
+:global(html[data-theme="dark"]) .metricCard {
+  border-color: #334155;
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .metricLabel {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .metricValue {
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .table {
+  background: #0b1220;
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .table th,
+:global(html[data-theme="dark"]) .table td {
+  border-bottom-color: #334155;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .table th {
+  background: #111827;
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .select {
+  background: #111827;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .positive {
+  color: #4ade80;
+}
+
+:global(html[data-theme="dark"]) .negative {
+  color: #f87171;
+}
+
+:global(html[data-theme="dark"]) .actionError {
+  color: #fca5a5;
+}

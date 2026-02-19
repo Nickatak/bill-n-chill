@@ -86,15 +86,18 @@ export function EstimatesConsole() {
     { value: "sent", label: "Sent" },
     { value: "approved", label: "Approved" },
     { value: "rejected", label: "Rejected" },
+  ];
+  const statusDisplayOptions = [
+    ...statusOptions,
     { value: "archived", label: "Voided" },
   ];
-  const statusLabelByValue = statusOptions.reduce<Record<string, string>>((labels, option) => {
+  const statusLabelByValue = statusDisplayOptions.reduce<Record<string, string>>((labels, option) => {
     labels[option.value] = option.label;
     return labels;
   }, {});
   const allowedStatusTransitions: Record<string, string[]> = {
-    draft: ["sent", "archived"],
-    sent: ["sent", "approved", "rejected", "archived"],
+    draft: ["sent"],
+    sent: ["sent", "approved", "rejected"],
     approved: [],
     rejected: [],
     archived: [],

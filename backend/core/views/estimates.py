@@ -375,6 +375,8 @@ def estimate_detail_view(request, estimate_id: int):
             note=status_note,
             changed_by=request.user,
         )
+        # TODO: Consider optional auto-convert on approval (sent -> approved) once workflow policy is finalized.
+        # Current intentional behavior is manual budget conversion from the Budgets console.
 
     estimate.refresh_from_db()
     return Response({"data": EstimateSerializer(estimate).data})

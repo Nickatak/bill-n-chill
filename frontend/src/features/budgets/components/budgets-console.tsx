@@ -1,157 +1,206 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useEffect, useState } from "react";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
-import { ApiResponse, BudgetLineRecord, BudgetRecord, EstimateRecord, ProjectRecord } from "../types";
+import { ApiResponse, BudgetRecord, EstimateRecord, ProjectRecord } from "../types";
+import styles from "./budgets-console.module.css";
 
 type BudgetsConsoleProps = {
   scopedProjectId: string;
 };
 
 export function BudgetsConsole({ scopedProjectId }: BudgetsConsoleProps) {
-  const { token, authMessage } = useSharedSessionAuth();
+  const { token } = useSharedSessionAuth();
   const [statusMessage, setStatusMessage] = useState("");
+  const [convertErrorMessage, setConvertErrorMessage] = useState("");
 
-  const [projects, setProjects] = useState<ProjectRecord[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [project, setProject] = useState<ProjectRecord | null>(null);
   const [estimates, setEstimates] = useState<EstimateRecord[]>([]);
   const [selectedEstimateId, setSelectedEstimateId] = useState("");
 
   const [budgets, setBudgets] = useState<BudgetRecord[]>([]);
   const [selectedBudgetId, setSelectedBudgetId] = useState("");
-  const [selectedLineId, setSelectedLineId] = useState("");
-  const [lineDescription, setLineDescription] = useState("");
-  const [lineBudgetAmount, setLineBudgetAmount] = useState("");
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+  const projectId = Number(scopedProjectId);
   const approvedEstimates = estimates.filter((estimate) => estimate.status === "approved");
+  const budgetSourceEstimateIds = new Set(budgets.map((budget) => budget.source_estimate));
+  const conversionCandidates = approvedEstimates.filter(
+    (estimate) => !budgetSourceEstimateIds.has(estimate.id),
+  );
   const selectedEstimate = estimates.find(
     (estimate) => String(estimate.id) === selectedEstimateId,
   );
-  const selectedBudget = budgets.find((budget) => String(budget.id) === selectedBudgetId);
-  const selectedBudgetLine = selectedBudget?.line_items.find(
-    (line) => String(line.id) === selectedLineId,
+  const selectedEstimateCandidate = conversionCandidates.find(
+    (estimate) => String(estimate.id) === selectedEstimateId,
   );
+  const selectedBudget = budgets.find((budget) => String(budget.id) === selectedBudgetId);
+  const selectedBudgetTotals = selectedBudget
+    ? selectedBudget.line_items.reduce(
+        (totals, line) => {
+          totals.budget += toAmount(line.budget_amount);
+          totals.committed += toAmount(line.committed_amount);
+          totals.actual += toAmount(line.actual_amount);
+          return totals;
+        },
+        { budget: 0, committed: 0, actual: 0 },
+      )
+    : null;
+  const selectedBudgetVariance = selectedBudgetTotals
+    ? selectedBudgetTotals.budget - selectedBudgetTotals.actual
+    : 0;
 
-  function hydrateLineForm(line: BudgetLineRecord | undefined) {
-    if (!line) {
-      setSelectedLineId("");
-      setLineDescription("");
-      setLineBudgetAmount("");
-      return;
+  function formatBudgetStatus(status: string): string {
+    if (status === "superseded") {
+      return "voided";
     }
-    setSelectedLineId(String(line.id));
-    setLineDescription(line.description);
-    setLineBudgetAmount(line.budget_amount);
+    return status;
   }
 
-  async function loadProjects() {
-    setStatusMessage("Loading projects...");
+  function toAmount(value: string): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function formatMoney(value: number): string {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  }
+
+  async function ensureScopedProjectLoaded() {
+    if (project?.id === projectId) {
+      return true;
+    }
+    if (!token) {
+      setStatusMessage("No shared session found. Go to / and login first.");
+      return false;
+    }
+
+    setStatusMessage("Loading project...");
     try {
-      const response = await fetch(`${normalizedBaseUrl}/projects/`, {
+      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/`, {
         headers: { Authorization: `Token ${token}` },
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setStatusMessage("Could not load projects.");
-        return;
+        setProject(null);
+        setStatusMessage("Could not load project.");
+        return false;
       }
-      const rows = (payload.data as ProjectRecord[]) ?? [];
-      setProjects(rows);
-      if (rows[0]) {
-        const scopedMatch = rows.find((project) => String(project.id) === scopedProjectId);
-        setSelectedProjectId(String(scopedMatch?.id ?? rows[0].id));
-      } else {
-        setSelectedProjectId("");
-      }
+
+      setProject(payload.data as ProjectRecord);
       setEstimates([]);
       setBudgets([]);
       setSelectedEstimateId("");
       setSelectedBudgetId("");
-      hydrateLineForm(undefined);
-      setStatusMessage(`Loaded ${rows.length} project(s).`);
+      setStatusMessage(`Loaded project #${projectId}.`);
+      return true;
     } catch {
-      setStatusMessage("Could not reach projects endpoint.");
+      setProject(null);
+      setStatusMessage("Could not reach project endpoint.");
+      return false;
     }
   }
 
-  async function loadEstimates() {
-    const projectId = Number(selectedProjectId);
-    if (!projectId) {
-      setStatusMessage("Select a project first.");
+  async function loadConversionCandidates() {
+    const scopedReady = await ensureScopedProjectLoaded();
+    if (!scopedReady) {
       return;
     }
 
-    setStatusMessage("Loading estimates...");
+    setStatusMessage("Loading estimates and budgets...");
     try {
-      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
-        headers: { Authorization: `Token ${token}` },
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setStatusMessage("Could not load estimates.");
+      const [estimatesResponse, budgetsResponse] = await Promise.all([
+        fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
+          headers: { Authorization: `Token ${token}` },
+        }),
+        fetch(`${normalizedBaseUrl}/projects/${projectId}/budgets/`, {
+          headers: { Authorization: `Token ${token}` },
+        }),
+      ]);
+      const estimatesPayload: ApiResponse = await estimatesResponse.json();
+      const budgetsPayload: ApiResponse = await budgetsResponse.json();
+
+      if (!estimatesResponse.ok || !budgetsResponse.ok) {
+        setStatusMessage("Could not load conversion candidates.");
         return;
       }
-      const rows = (payload.data as EstimateRecord[]) ?? [];
-      setEstimates(rows);
-      const approved = rows.filter((estimate) => estimate.status === "approved");
-      if (approved[0]) {
-        setSelectedEstimateId(String(approved[0].id));
+
+      const estimateRows = (estimatesPayload.data as EstimateRecord[]) ?? [];
+      const budgetRows = (budgetsPayload.data as BudgetRecord[]) ?? [];
+      setEstimates(estimateRows);
+      setBudgets(budgetRows);
+      if (budgetRows[0]) {
+        setSelectedBudgetId(String(budgetRows[0].id));
+      } else {
+        setSelectedBudgetId("");
+      }
+
+      const sourceEstimateIds = new Set(budgetRows.map((budget) => budget.source_estimate));
+      const approved = estimateRows.filter((estimate) => estimate.status === "approved");
+      const candidates = approved.filter((estimate) => !sourceEstimateIds.has(estimate.id));
+      if (candidates[0]) {
+        setSelectedEstimateId(String(candidates[0].id));
       } else {
         setSelectedEstimateId("");
       }
+
       setStatusMessage(
-        `Loaded ${rows.length} estimate version(s); ${approved.length} approved and eligible for conversion.`,
+        `Loaded ${approved.length} approved estimate(s); ${candidates.length} available for conversion.`,
       );
     } catch {
-      setStatusMessage("Could not reach estimates endpoint.");
+      setStatusMessage("Could not reach conversion-candidate endpoints.");
     }
   }
 
-  async function loadBudgets() {
-    const projectId = Number(selectedProjectId);
-    if (!projectId) {
-      setStatusMessage("Select a project first.");
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void loadConversionCandidates();
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, scopedProjectId]);
+
+  async function handleConvertToBudget() {
+    if (conversionCandidates.length === 0) {
+      if (approvedEstimates.length === 0) {
+        setConvertErrorMessage("No approved estimates are available for conversion.");
+      } else {
+        setConvertErrorMessage(
+          "No estimates are available for conversion. All approved estimates already have budgets.",
+        );
+      }
       return;
     }
 
-    setStatusMessage("Loading budgets...");
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/budgets/`, {
-        headers: { Authorization: `Token ${token}` },
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setStatusMessage("Could not load budgets.");
-        return;
-      }
-      const rows = (payload.data as BudgetRecord[]) ?? [];
-      setBudgets(rows);
-      if (rows[0]) {
-        setSelectedBudgetId(String(rows[0].id));
-        hydrateLineForm(rows[0].line_items[0]);
-      } else {
-        setSelectedBudgetId("");
-        hydrateLineForm(undefined);
-      }
-      setStatusMessage(`Loaded ${rows.length} budget(s).`);
-    } catch {
-      setStatusMessage("Could not reach budgets endpoint.");
+    if (!selectedEstimateId) {
+      setConvertErrorMessage("Select an origin estimate from the conversion table first.");
+      return;
     }
-  }
 
-  async function handleConvertToBudget() {
     const estimateId = Number(selectedEstimateId);
     if (!estimateId) {
-      setStatusMessage("Select an estimate first.");
+      setConvertErrorMessage("Select an origin estimate from the conversion table first.");
+      return;
+    }
+    if (!selectedEstimateCandidate) {
+      setConvertErrorMessage("Selected estimate is not available for conversion.");
       return;
     }
     if (selectedEstimate?.status !== "approved") {
-      setStatusMessage("Selected estimate must be approved before conversion.");
+      setConvertErrorMessage("Selected estimate must be approved before conversion.");
       return;
     }
 
+    setConvertErrorMessage("");
     setStatusMessage("Converting estimate to budget...");
     try {
       const response = await fetch(
@@ -172,155 +221,90 @@ export function BudgetsConsole({ scopedProjectId }: BudgetsConsoleProps) {
         return;
       }
       const conversionStatus = payload.meta?.conversion_status ?? "converted";
-      await loadBudgets();
+      await loadConversionCandidates();
       setStatusMessage(`Estimate conversion ${conversionStatus}.`);
     } catch {
       setStatusMessage("Could not reach estimate conversion endpoint.");
     }
   }
 
-  function handleProjectSelection(projectId: string) {
-    setSelectedProjectId(projectId);
-    setEstimates([]);
-    setBudgets([]);
-    setSelectedEstimateId("");
-    setSelectedBudgetId("");
-    hydrateLineForm(undefined);
-  }
-
   function handleBudgetSelection(budgetId: string) {
     setSelectedBudgetId(budgetId);
-    const budget = budgets.find((row) => String(row.id) === budgetId);
-    hydrateLineForm(budget?.line_items[0]);
-  }
-
-  function handleLineSelection(lineId: string) {
-    const line = selectedBudget?.line_items.find((row) => String(row.id) === lineId);
-    hydrateLineForm(line);
-  }
-
-  async function handleSaveBudgetLine(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const budgetId = Number(selectedBudgetId);
-    const lineId = Number(selectedLineId);
-    if (!budgetId || !lineId) {
-      setStatusMessage("Select a budget line first.");
-      return;
-    }
-
-    setStatusMessage("Saving budget line...");
-    try {
-      const response = await fetch(
-        `${normalizedBaseUrl}/budgets/${budgetId}/lines/${lineId}/`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Token ${token}`,
-          },
-          body: JSON.stringify({
-            description: lineDescription,
-            budget_amount: lineBudgetAmount,
-          }),
-        },
-      );
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        const message = payload.error?.message ?? "Budget line update failed.";
-        setStatusMessage(message);
-        return;
-      }
-
-      const updated = payload.data as BudgetLineRecord;
-      setBudgets((current) =>
-        current.map((budget) => {
-          if (budget.id !== budgetId) return budget;
-          return {
-            ...budget,
-            line_items: budget.line_items.map((line) =>
-              line.id === updated.id ? updated : line,
-            ),
-          };
-        }),
-      );
-      setStatusMessage(`Updated budget line #${updated.id}.`);
-    } catch {
-      setStatusMessage("Could not reach budget line endpoint.");
-    }
   }
 
   return (
-    <section>
+    <section className={styles.console}>
       <h2>Budget Baseline Console</h2>
       <p>Convert approved estimates to budgets and edit working budget lines.</p>
 
-      <p>{authMessage}</p>
-
-      <button type="button" onClick={loadProjects}>
-        Load Projects
-      </button>
-
-      {projects.length > 0 ? (
-        <label>
-          Project
-          <select
-            value={selectedProjectId}
-            onChange={(event) => handleProjectSelection(event.target.value)}
-          >
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                #{project.id} - {project.name} ({project.customer_display_name})
-              </option>
-            ))}
-          </select>
-        </label>
+      {project ? (
+        <p>
+          Scoped project: #{project.id} - {project.name} ({project.customer_display_name})
+        </p>
       ) : null}
 
-      <button type="button" onClick={loadEstimates} disabled={!selectedProjectId}>
-        Load Estimates for Selected Project
-      </button>
-
-      {approvedEstimates.length > 0 ? (
-        <label>
-          Approved estimate version
-          <select
-            value={selectedEstimateId}
-            onChange={(event) => setSelectedEstimateId(event.target.value)}
-          >
-            {approvedEstimates.map((estimate) => (
-              <option key={estimate.id} value={estimate.id}>
-                #{estimate.id} v{estimate.version} - {estimate.title} ({estimate.status})
-              </option>
-            ))}
-          </select>
-        </label>
+      {conversionCandidates.length > 0 ? (
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>Estimate</th>
+              <th>Version</th>
+              <th>Title</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {conversionCandidates.map((estimate) => {
+              const isSelected = String(estimate.id) === selectedEstimateId;
+              return (
+                <tr key={estimate.id}>
+                  <td>#{estimate.id}</td>
+                  <td>v{estimate.version}</td>
+                  <td>{estimate.title}</td>
+                  <td>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedEstimateId(String(estimate.id))}
+                      disabled={isSelected}
+                    >
+                      {isSelected ? "Selected" : "Select"}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       ) : null}
       {estimates.length > 0 && approvedEstimates.length === 0 ? (
         <p>No approved estimates for this project yet. Approve one in Estimates before conversion.</p>
       ) : null}
+      {approvedEstimates.length > 0 && conversionCandidates.length === 0 ? (
+        <p>All approved estimates already have a budget conversion.</p>
+      ) : null}
 
       <button
         type="button"
+        className={styles.inlineButton}
         onClick={handleConvertToBudget}
-        disabled={!selectedEstimateId || selectedEstimate?.status !== "approved"}
+        disabled={!token}
       >
         Convert Selected Approved Estimate to Budget
       </button>
-
-      <button type="button" onClick={loadBudgets} disabled={!selectedProjectId}>
-        Load Budgets for Selected Project
-      </button>
+      {convertErrorMessage ? <p className={styles.actionError}>{convertErrorMessage}</p> : null}
 
       {budgets.length > 0 ? (
-        <label>
+        <label className={styles.fieldLabel}>
           Budget
           <select
+            className={styles.select}
             value={selectedBudgetId}
             onChange={(event) => handleBudgetSelection(event.target.value)}
           >
             {budgets.map((budget) => (
               <option key={budget.id} value={budget.id}>
-                #{budget.id} ({budget.status}) from estimate #{budget.source_estimate} v
+                #{budget.id} ({formatBudgetStatus(budget.status)}) from estimate #
+                {budget.source_estimate} v
                 {budget.source_estimate_version}
               </option>
             ))}
@@ -330,40 +314,66 @@ export function BudgetsConsole({ scopedProjectId }: BudgetsConsoleProps) {
 
       {selectedBudget ? (
         <>
-          <label>
-            Budget line
-            <select value={selectedLineId} onChange={(event) => handleLineSelection(event.target.value)}>
-              {selectedBudget.line_items.map((line) => (
-                <option key={line.id} value={line.id}>
-                  #{line.id} {line.cost_code_code} - {line.description}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className={styles.summaryGrid}>
+            <div className={styles.metricCard}>
+              <span className={styles.metricLabel}>Budget Total</span>
+              <span className={styles.metricValue}>{formatMoney(selectedBudgetTotals?.budget ?? 0)}</span>
+            </div>
+            <div className={styles.metricCard}>
+              <span className={styles.metricLabel}>Committed Total</span>
+              <span className={styles.metricValue}>{formatMoney(selectedBudgetTotals?.committed ?? 0)}</span>
+            </div>
+            <div className={styles.metricCard}>
+              <span className={styles.metricLabel}>Actual Total</span>
+              <span className={styles.metricValue}>{formatMoney(selectedBudgetTotals?.actual ?? 0)}</span>
+            </div>
+            <div className={styles.metricCard}>
+              <span className={styles.metricLabel}>Variance</span>
+              <span
+                className={`${styles.metricValue} ${
+                  selectedBudgetVariance < 0 ? styles.negative : styles.positive
+                }`}
+              >
+                {formatMoney(selectedBudgetVariance)}
+              </span>
+            </div>
+          </div>
 
-          {selectedBudgetLine ? (
-            <form onSubmit={handleSaveBudgetLine}>
-              <h3>Edit Working Budget Line</h3>
-              <label>
-                Description
-                <input
-                  value={lineDescription}
-                  onChange={(event) => setLineDescription(event.target.value)}
-                  required
-                />
-              </label>
-              <label>
-                Budget amount
-                <input
-                  value={lineBudgetAmount}
-                  onChange={(event) => setLineBudgetAmount(event.target.value)}
-                  inputMode="decimal"
-                  required
-                />
-              </label>
-              <button type="submit">Save Budget Line</button>
-            </form>
-          ) : null}
+          <h3>Budget Lines</h3>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Line</th>
+                <th>Cost Code</th>
+                <th>Description</th>
+                <th>Budget</th>
+                <th>Committed</th>
+                <th>Actual</th>
+                <th>Variance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {selectedBudget.line_items.map((line) => {
+                const budgetAmount = toAmount(line.budget_amount);
+                const committedAmount = toAmount(line.committed_amount);
+                const actualAmount = toAmount(line.actual_amount);
+                const variance = budgetAmount - actualAmount;
+                return (
+                  <tr key={line.id}>
+                    <td>#{line.id}</td>
+                    <td>{line.cost_code_code}</td>
+                    <td>{line.description}</td>
+                    <td>{formatMoney(budgetAmount)}</td>
+                    <td>{formatMoney(committedAmount)}</td>
+                    <td>{formatMoney(actualAmount)}</td>
+                    <td className={variance < 0 ? styles.negative : styles.positive}>
+                      {formatMoney(variance)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </>
       ) : null}
 
