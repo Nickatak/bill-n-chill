@@ -3,7 +3,6 @@
 import { clearClientSession, loadClientSession } from "@/features/session/client-session";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 
 const THEME_KEY = "bnc-theme";
 type ThemeMode = "light" | "dark";
@@ -20,18 +19,11 @@ function applyTheme(theme: ThemeMode) {
 export function ThemeToggle() {
   const pathname = usePathname();
   const router = useRouter();
-  const [hasSession, setHasSession] = useState(false);
+  const hasSession = Boolean(loadClientSession()?.token);
+  const isPublicEstimateRoute = Boolean(pathname && /^\/estimate\/[^/]+\/?$/.test(pathname));
   const hasActiveNonWorkflow = pathname === "/contacts";
   const hasActiveCostCodes = pathname === "/cost-codes";
   const hasActiveSettings = pathname === "/settings/intake";
-
-  useEffect(() => {
-    if (pathname === null) {
-      setHasSession(false);
-      return;
-    }
-    setHasSession(Boolean(loadClientSession()?.token));
-  }, [pathname]);
 
   function toggleTheme() {
     const current =
@@ -48,7 +40,12 @@ export function ThemeToggle() {
 
   return (
     <div className="themeControls">
-      {hasSession ? (
+      {hasSession && isPublicEstimateRoute ? (
+        <Link href="/" className="themeControlButton">
+          Home
+        </Link>
+      ) : null}
+      {hasSession && !isPublicEstimateRoute ? (
         <details className="nonWorkflowMenu">
           <summary
             className={`themeControlButton ${
@@ -75,7 +72,7 @@ export function ThemeToggle() {
           </div>
         </details>
       ) : null}
-      {hasSession ? (
+      {hasSession && !isPublicEstimateRoute ? (
         <details className="nonWorkflowMenu">
           <summary className={`themeControlButton ${hasActiveSettings ? "isActive" : ""}`}>
             Settings

@@ -31,6 +31,7 @@ class EstimateLineItemSerializer(serializers.ModelSerializer):
 
 class EstimateSerializer(serializers.ModelSerializer):
     line_items = EstimateLineItemSerializer(many=True, read_only=True)
+    public_ref = serializers.CharField(read_only=True)
 
     class Meta:
         model = Estimate
@@ -45,6 +46,7 @@ class EstimateSerializer(serializers.ModelSerializer):
             "tax_percent",
             "tax_total",
             "grand_total",
+            "public_ref",
             "line_items",
             "created_at",
             "updated_at",

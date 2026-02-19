@@ -55,6 +55,42 @@ class EstimateTests(TestCase):
             created_by=self.user,
         )
 
+    def test_public_estimate_detail_view_allows_unauthenticated_access(self):
+        estimate = Estimate.objects.create(
+            project=self.project,
+            version=1,
+            title="Public Estimate",
+            created_by=self.user,
+            status=Estimate.Status.SENT,
+        )
+        EstimateLineItem.objects.create(
+            estimate=estimate,
+            cost_code=self.cost_code,
+            description="Demo and prep",
+            quantity="2",
+            unit="day",
+            unit_cost="500",
+            markup_percent="10",
+            line_total="1100",
+        )
+
+        response = self.client.get(f"/api/v1/public/estimates/{estimate.public_token}/")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        self.assertEqual(payload["id"], estimate.id)
+        self.assertEqual(payload["title"], "Public Estimate")
+        self.assertTrue(payload["public_ref"].endswith(f"--{estimate.public_token}"))
+        self.assertEqual(payload["project_context"]["id"], self.project.id)
+        self.assertEqual(
+            payload["project_context"]["customer_display_name"],
+            self.customer.display_name,
+        )
+        self.assertEqual(len(payload["line_items"]), 1)
+
+    def test_public_estimate_detail_view_not_found(self):
+        response = self.client.get("/api/v1/public/estimates/notarealtoken/")
+        self.assertEqual(response.status_code, 404)
+
     def test_project_estimates_create(self):
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/estimates/",

@@ -182,6 +182,18 @@
   font-weight: 600;
 }
 
+.sheetTitleValue {
+  color: #0f172a;
+  font-size: clamp(1.05rem, 2.1vw, 1.75rem);
+  font-weight: 700;
+  line-height: 1.2;
+  max-width: none;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .partyGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -199,6 +211,29 @@
   gap: 6px;
   font-size: 0.85rem;
   color: var(--text-secondary);
+}
+
+.staticFieldValue {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.staticFieldInlineValue {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 2px 0;
+  border-bottom: 1px solid #cbd5e1;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 500;
 }
 
 .fieldInput,
@@ -284,6 +319,12 @@
   padding: 6px 0;
 }
 
+.staticMetaValue {
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
 .lineTable {
   border: 1px solid #c7d2fe;
   border-radius: 12px;
@@ -309,6 +350,11 @@
 .lineHeaderReadOnly {
   grid-template-columns: 70px 1.4fr 160px 80px 110px 100px 110px;
   min-width: 790px;
+}
+
+.lineHeaderNoMarkup {
+  grid-template-columns: 70px 1.5fr 170px 90px 130px 120px;
+  min-width: 760px;
 }
 
 .lineHeaderCell {
@@ -363,6 +409,11 @@
   min-width: 790px;
 }
 
+.lineRowNoMarkup {
+  grid-template-columns: 70px 1.5fr 170px 90px 130px 120px;
+  min-width: 760px;
+}
+
 .lineRow:nth-child(even) {
   background: #f4f7fc;
 }
@@ -372,6 +423,12 @@
   min-width: 0;
   display: flex;
   align-items: center;
+}
+
+.staticCellValue {
+  color: #0f172a;
+  font-size: 0.85rem;
+  line-height: 1.35;
 }
 
 .lineHeaderCell:not(:last-child)::after {
@@ -509,7 +566,9 @@
 .summaryTaxLine {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
+  font-variant-numeric: tabular-nums;
 }
 
 .summaryTaxInput {
@@ -526,6 +585,11 @@
 .summaryTaxSuffix {
   font-size: 0.85rem;
   color: var(--text-secondary);
+}
+
+.summaryTaxAmount {
+  min-width: 84px;
+  text-align: right;
 }
 
 .summaryTotal {
@@ -848,6 +912,11 @@
   padding-bottom: 4px;
 }
 
+.versionCardWrap {
+  position: relative;
+  display: block;
+}
+
 .historyCard {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
@@ -871,8 +940,16 @@
   margin-bottom: 2px;
 }
 
+.historyVersionMeta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 .historyMeta {
-  display: block;
+  display: inline;
   font-size: 0.74rem;
   color: #475569;
   letter-spacing: 0.01em;
@@ -907,6 +984,33 @@
   font-size: 0.76rem;
   color: #334155;
   font-weight: 500;
+}
+
+.publicEstimateLinkIcon {
+  position: absolute;
+  top: 0;
+  right: 6px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 0;
+  background: #1f2937;
+  color: #60a5fa;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1;
+  z-index: 2;
+}
+
+.versionCardWrap .familyMain {
+  padding-right: 34px;
+}
+
+.versionCardWrap .historyCard {
+  padding-right: 36px;
 }
 
 .historyEmpty {
@@ -1015,6 +1119,12 @@
     margin-left: 0;
     width: 100%;
   }
+
+  .sheetTitleValue {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
 }
 
 :global(html[data-theme="dark"]) .sheet {
@@ -1030,10 +1140,30 @@
   color: #93c5fd;
 }
 
+:global(html[data-theme="dark"]) .sheetTitleValue {
+  color: #e2e8f0;
+}
+
 :global(html[data-theme="dark"]) .blockMuted,
 :global(html[data-theme="dark"]) .inlineHint,
 :global(html[data-theme="dark"]) .footer {
   color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .staticFieldValue {
+  background: #111827;
+  border-color: #1f2937;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .staticFieldInlineValue {
+  border-bottom-color: #334155;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .staticMetaValue,
+:global(html[data-theme="dark"]) .staticCellValue {
+  color: #cbd5f5;
 }
 
 :global(html[data-theme="dark"]) .actionError {
@@ -1274,6 +1404,11 @@
 }
 
 :global(html[data-theme="dark"]) .historyNotice {
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .publicEstimateLinkIcon {
+  background: #1f2937;
   color: #93c5fd;
 }
 

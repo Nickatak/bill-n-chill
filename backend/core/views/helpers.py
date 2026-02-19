@@ -141,6 +141,8 @@ def _calculate_line_totals(line_items_data):
         quantity = Decimal(str(item["quantity"]))
         unit_cost = Decimal(str(item["unit_cost"]))
         markup_percent = Decimal(str(item.get("markup_percent", 0)))
+        # Markup can be applied before or after quantity multiplication:
+        # q * u * (1 + m) == q * (u * (1 + m))
         base_total = quantity * unit_cost
         line_markup = base_total * (markup_percent / Decimal("100"))
         line_total = base_total + line_markup

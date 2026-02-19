@@ -19,14 +19,18 @@ export type EstimateRecord = {
   subtotal: string;
   tax_percent: string;
   grand_total: string;
+  public_ref?: string;
   created_at: string;
   updated_at: string;
   line_items?: EstimateLineItemRecord[];
+  project_context?: ProjectRecord;
 };
 
 export type EstimateLineItemRecord = {
   id: number;
   cost_code: number;
+  cost_code_code?: string;
+  cost_code_name?: string;
   description: string;
   quantity: string;
   unit: string;

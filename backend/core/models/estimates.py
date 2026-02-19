@@ -1,7 +1,16 @@
+import secrets
+import string
+
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.utils.text import slugify
 
 User = get_user_model()
+
+
+def _generate_public_token(length: int = 12) -> str:
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
 class Estimate(models.Model):
@@ -35,6 +44,7 @@ class Estimate(models.Model):
         default=Status.DRAFT,
     )
     title = models.CharField(max_length=255, blank=True)
+    public_token = models.CharField(max_length=24, unique=True, blank=True, default="")
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     markup_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     tax_percent = models.DecimalField(max_digits=6, decimal_places=2, default=0)
@@ -54,6 +64,24 @@ class Estimate(models.Model):
 
     def __str__(self) -> str:
         return f"{self.project.name} v{self.version}"
+
+    @property
+    def public_slug(self) -> str:
+        normalized = slugify((self.title or "").strip())
+        return normalized or "estimate"
+
+    @property
+    def public_ref(self) -> str:
+        return f"{self.public_slug}--{self.public_token}"
+
+    def save(self, *args, **kwargs):
+        if not self.public_token:
+            while True:
+                candidate = _generate_public_token()
+                if not Estimate.objects.filter(public_token=candidate).exists():
+                    self.public_token = candidate
+                    break
+        return super().save(*args, **kwargs)
 
 
 class EstimateLineItem(models.Model):

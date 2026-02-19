@@ -31,7 +31,9 @@ export function WorkflowNavbar() {
           {workflowRoutes.map((route) => {
             const isActive =
               route.href === "/estimates-placeholder"
-                ? pathname === "/estimates-placeholder" || pathname === "/estimates"
+                ? pathname === "/estimates-placeholder" ||
+                  pathname === "/estimates" ||
+                  pathname.startsWith("/estimates/")
                 : pathname === route.href;
             return (
               <Link

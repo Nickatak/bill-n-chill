@@ -9,6 +9,7 @@ from core.views.estimates import (
     estimate_detail_view,
     estimate_duplicate_view,
     estimate_status_events_view,
+    public_estimate_detail_view,
     project_estimates_view,
 )
 from core.views.intake import (
@@ -47,6 +48,7 @@ __all__ = [
     "cost_codes_list_create_view",
     "cost_code_detail_view",
     "project_estimates_view",
+    "public_estimate_detail_view",
     "estimate_detail_view",
     "estimate_clone_version_view",
     "estimate_duplicate_view",

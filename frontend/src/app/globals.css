@@ -20,7 +20,7 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  padding-top: 56px;
+  padding-top: 0;
 }
 
 * {
@@ -69,6 +69,10 @@ html[data-theme="dark"] .themeToggle {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.workflowShellSpacer {
+  min-height: 56px;
 }
 
 .themeControlButton {
@@ -181,7 +185,6 @@ html[data-theme="dark"] .workflowLink.isActive {
   background: #e5e7eb;
   color: #0f172a;
 }
-
 
 .authHintBar {
   position: fixed;

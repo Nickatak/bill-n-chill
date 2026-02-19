@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from core.models import Budget, Estimate, EstimateStatusEvent, FinancialAuditEvent
@@ -22,6 +22,32 @@ from core.views.helpers import (
     _validate_estimate_status_transition,
     _validate_project_for_user,
 )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def public_estimate_detail_view(request, public_token: str):
+    try:
+        estimate = (
+            Estimate.objects.select_related("project__customer")
+            .prefetch_related("line_items", "line_items__cost_code")
+            .get(public_token=public_token)
+        )
+    except Estimate.DoesNotExist:
+        return Response(
+            {"error": {"code": "not_found", "message": "Estimate not found.", "fields": {}}},
+            status=404,
+        )
+
+    serialized = EstimateSerializer(estimate).data
+    serialized["project_context"] = {
+        "id": estimate.project.id,
+        "name": estimate.project.name,
+        "status": estimate.project.status,
+        "customer_display_name": estimate.project.customer.display_name,
+        "customer_billing_address": estimate.project.customer.billing_address,
+    }
+    return Response({"data": serialized})
 
 
 def _archive_estimate_family(*, project, user, title, exclude_ids, note):

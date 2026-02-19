@@ -5,6 +5,7 @@ import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { loadClientSession } from "../../session/client-session";
 import styles from "./estimates-console.module.css";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   ApiResponse,
   CostCode,
@@ -33,8 +34,7 @@ function emptyLine(localId: number, defaultCostCodeId = ""): EstimateLineInput {
 export function EstimatesConsole() {
   const searchParams = useSearchParams();
   const [token, setToken] = useState("");
-  const [authMessage, setAuthMessage] = useState("Checking session...");
-  const [statusMessage, setStatusMessage] = useState("");
+  const [, setStatusMessage] = useState("");
   const [actionMessage, setActionMessage] = useState("");
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -187,10 +187,18 @@ export function EstimatesConsole() {
         families.set(title, [estimate]);
       }
     }
-    return Array.from(families.entries()).map(([title, items]) => ({
-      title,
-      items: [...items].sort((a, b) => a.version - b.version),
-    }));
+    return Array.from(families.entries())
+      .map(([title, items]) => ({
+        title,
+        items: [...items].sort((a, b) => a.version - b.version),
+      }))
+      .sort((a, b) => {
+        const latestA = a.items[a.items.length - 1];
+        const latestB = b.items[b.items.length - 1];
+        const lastActionA = new Date(latestA?.updated_at || latestA?.created_at || 0).getTime();
+        const lastActionB = new Date(latestB?.updated_at || latestB?.created_at || 0).getTime();
+        return lastActionB - lastActionA;
+      });
   }, [estimates]);
   const hiddenVoidedFamilyCount = useMemo(
     () =>
@@ -212,6 +220,13 @@ export function EstimatesConsole() {
 
   function formatMoney(value: number): string {
     return value.toFixed(2);
+  }
+
+  function publicEstimateHref(publicRef?: string): string {
+    if (!publicRef) {
+      return "";
+    }
+    return `/estimate/${publicRef}`;
   }
 
   function formatDateInput(date: Date): string {
@@ -303,11 +318,9 @@ export function EstimatesConsole() {
     const session = loadClientSession();
     if (!session?.token) {
       setToken("");
-      setAuthMessage("No shared session found. Go to / and login first.");
       return;
     }
     setToken(session.token);
-    setAuthMessage(`Using shared session for ${session.email || "user"}.`);
   }, []);
 
   useEffect(() => {
@@ -826,16 +839,6 @@ export function EstimatesConsole() {
 
   return (
     <section className={styles.console}>
-      <div className={styles.toolbar}>
-        <div>
-          <h2>Estimate Builder</h2>
-          <p>One-page editor with smart defaults and quick project context.</p>
-        </div>
-      </div>
-
-      <p className={styles.authMessage}>{authMessage}</p>
-      {statusMessage ? <p className={styles.statusMessage}>{statusMessage}</p> : null}
-
       <div className={styles.estimateSelector}>
         {selectedProject ? (
           <>
@@ -954,64 +957,92 @@ export function EstimatesConsole() {
                   }`}
                 >
                   <div className={styles.familyRow}>
-                    <button
-                      type="button"
-                      className={`${styles.familyMain} ${
-                        isLatestSelected ? styles.familyMainActive : ""
-                      }`}
-                      onClick={() => handleSelectFamilyLatest(family.title, latest)}
-                    >
-                      <div className={styles.familyMainContent}>
-                        <span className={styles.familyTitle}>{family.title}</span>
-                        <span className={styles.familyMeta}>
-                          Estimate #{latest.id} · {history.length} history{" "}
-                          {history.length === 1 ? "entry" : "entries"}
-                        </span>
-                        <span className={styles.familyDate}>
-                          Last action: {formatEstimateLastActionDate(latest)}
-                        </span>
-                      </div>
-                      <div className={styles.versionRight}>
-                        <span
-                          className={`${styles.versionStatus} ${
-                            statusClasses[latest.status] ?? ""
-                          }`}
+                    <div className={styles.versionCardWrap}>
+                      {latest.public_ref ? (
+                        <Link
+                          href={publicEstimateHref(latest.public_ref)}
+                          className={styles.publicEstimateLinkIcon}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Open public view for estimate #${latest.id}`}
+                          title="Open public view"
                         >
-                          {formatEstimateStatus(latest.status)}
-                        </span>
-                        <span className={styles.versionAmount}>${latestTotal}</span>
-                      </div>
-                    </button>
+                          ↗
+                        </Link>
+                      ) : null}
+                      <button
+                        type="button"
+                        className={`${styles.familyMain} ${
+                          isLatestSelected ? styles.familyMainActive : ""
+                        }`}
+                        onClick={() => handleSelectFamilyLatest(family.title, latest)}
+                      >
+                        <div className={styles.familyMainContent}>
+                          <span className={styles.familyTitle}>{family.title}</span>
+                          <span className={styles.familyMeta}>
+                            Estimate #{latest.id} · {history.length} history{" "}
+                            {history.length === 1 ? "entry" : "entries"}
+                          </span>
+                          <span className={styles.familyDate}>
+                            Last action: {formatEstimateLastActionDate(latest)}
+                          </span>
+                        </div>
+                        <div className={styles.versionRight}>
+                          <span
+                            className={`${styles.versionStatus} ${
+                              statusClasses[latest.status] ?? ""
+                            }`}
+                          >
+                            {formatEstimateStatus(latest.status)}
+                          </span>
+                          <span className={styles.versionAmount}>${latestTotal}</span>
+                        </div>
+                      </button>
+                    </div>
                     {isHistoryOpen && history.length > 0 ? (
                       <div className={styles.historyRow}>
                         {history.map((estimate) => {
                           const total = formatMoney(toNumber(estimate.grand_total || "0"));
                           const isSelected = String(estimate.id) === selectedEstimateId;
                           return (
-                            <button
-                              key={estimate.id}
-                              type="button"
-                              className={`${styles.historyCard} ${
-                                isSelected ? styles.historyCardActive : ""
-                              }`}
-                              onClick={() => handleSelectEstimate(estimate)}
-                            >
-                              <span className={styles.historyVersion}>v{estimate.version}</span>
-                              <span className={styles.historyMetaRow}>
-                                <span className={styles.historyMeta}>#{estimate.id}</span>
-                                <span
-                                  className={`${styles.versionStatus} ${
-                                    statusClasses[estimate.status] ?? ""
-                                  } ${styles.historyStatus}`}
+                            <div key={estimate.id} className={styles.versionCardWrap}>
+                              {estimate.public_ref ? (
+                                <Link
+                                  href={publicEstimateHref(estimate.public_ref)}
+                                  className={styles.publicEstimateLinkIcon}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  aria-label={`Open public view for estimate #${estimate.id}`}
+                                  title="Open public view"
                                 >
-                                  {formatEstimateStatus(estimate.status)}
+                                  ↗
+                                </Link>
+                              ) : null}
+                              <button
+                                type="button"
+                                className={`${styles.historyCard} ${
+                                  isSelected ? styles.historyCardActive : ""
+                                }`}
+                                onClick={() => handleSelectEstimate(estimate)}
+                              >
+                                <span className={styles.historyMetaRow}>
+                                  <span className={styles.historyVersionMeta}>
+                                    v{estimate.version} <span className={styles.historyMeta}>#{estimate.id}</span>
+                                  </span>
+                                  <span
+                                    className={`${styles.versionStatus} ${
+                                      statusClasses[estimate.status] ?? ""
+                                    } ${styles.historyStatus}`}
+                                  >
+                                    {formatEstimateStatus(estimate.status)}
+                                  </span>
                                 </span>
-                              </span>
-                              <span className={styles.historyAmount}>${total}</span>
-                              <span className={styles.historyDate}>
-                                {formatEstimateLastActionDate(estimate)}
-                              </span>
-                            </button>
+                                <span className={styles.historyAmount}>${total}</span>
+                                <span className={styles.historyDate}>
+                                  {formatEstimateLastActionDate(estimate)}
+                                </span>
+                              </button>
+                            </div>
                           );
                         })}
                       </div>
