@@ -17,39 +17,28 @@ export const workflowRoutes: NavRoute[] = [
     exact: ["/projects"],
   },
   {
-    href: "/estimates",
-    label: "3 Estimates",
-    exact: ["/estimates", "/estimates-placeholder"],
-    startsWith: ["/estimates/"],
-  },
-  {
-    href: "/budgets",
-    label: "4 Budgets",
-    exact: ["/budgets", "/budgets-placeholder"],
-  },
-  {
     href: "/change-orders",
-    label: "5 Change Orders",
+    label: "3 Change Orders",
     exact: ["/change-orders"],
   },
   {
     href: "/invoices",
-    label: "6 Invoices",
+    label: "4 Invoices",
     exact: ["/invoices"],
   },
   {
     href: "/vendor-bills",
-    label: "7 Vendor Bills",
+    label: "5 Vendor Bills",
     exact: ["/vendor-bills", "/vendor-bills-placeholder"],
   },
   {
     href: "/expenses",
-    label: "8 Expenses",
+    label: "6 Expenses",
     exact: ["/expenses", "/expenses-placeholder"],
   },
   {
     href: "/payments",
-    label: "9 Payments",
+    label: "7 Payments",
     exact: ["/payments"],
   },
 ];
@@ -67,6 +56,18 @@ export const opsMetaRoutes: NavRoute[] = [
 ];
 
 export function isRouteActive(pathname: string, route: NavRoute): boolean {
+  if (
+    route.href === "/vendor-bills" &&
+    (pathname === "/vendor-bills" || pathname === "/vendor-bills-placeholder" || /^\/projects\/\d+\/vendor-bills$/.test(pathname))
+  ) {
+    return true;
+  }
+  if (
+    route.href === "/expenses" &&
+    (pathname === "/expenses" || pathname === "/expenses-placeholder" || /^\/projects\/\d+\/expenses$/.test(pathname))
+  ) {
+    return true;
+  }
   const exactMatches = route.exact ?? [route.href];
   if (exactMatches.includes(pathname)) {
     return true;

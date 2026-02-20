@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
@@ -58,8 +57,11 @@ function dueDateIsoDate(daysFromNow = 30) {
   return current.toISOString().slice(0, 10);
 }
 
-export function VendorBillsConsole() {
-  const searchParams = useSearchParams();
+type VendorBillsConsoleProps = {
+  scopedProjectId?: number | null;
+};
+
+export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null }: VendorBillsConsoleProps) {
   const { token } = useSharedSessionAuth();
   const pageSize = 5;
   const [statusMessage, setStatusMessage] = useState("");
@@ -151,11 +153,7 @@ export function VendorBillsConsole() {
   }, [budgetLineGroups]);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
-  const scopedProjectIdParam = searchParams.get("project");
-  const scopedProjectId =
-    scopedProjectIdParam && /^\d+$/.test(scopedProjectIdParam)
-      ? Number(scopedProjectIdParam)
-      : null;
+  const scopedProjectId = scopedProjectIdProp;
   const isProjectScoped = scopedProjectId !== null;
   const selectedProject =
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;

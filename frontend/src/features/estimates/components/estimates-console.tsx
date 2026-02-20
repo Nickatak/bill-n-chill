@@ -22,6 +22,9 @@ import {
 import { EstimateSheet } from "./estimate-sheet";
 
 type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amount";
+type EstimatesConsoleProps = {
+  scopedProjectId?: number | null;
+};
 
 function emptyLine(localId: number, defaultCostCodeId = ""): EstimateLineInput {
   return {
@@ -35,7 +38,7 @@ function emptyLine(localId: number, defaultCostCodeId = ""): EstimateLineInput {
   };
 }
 
-export function EstimatesConsole() {
+export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }: EstimatesConsoleProps) {
   const searchParams = useSearchParams();
   const [token, setToken] = useState("");
   const [, setStatusMessage] = useState("");
@@ -67,10 +70,11 @@ export function EstimatesConsole() {
   const [hideVoidedFamilies, setHideVoidedFamilies] = useState(true);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
-  const scopedProjectIdParam = searchParams.get("project");
-  const scopedProjectId =
-    scopedProjectIdParam && /^\d+$/.test(scopedProjectIdParam)
-      ? Number(scopedProjectIdParam)
+  const scopedProjectId = scopedProjectIdProp;
+  const scopedEstimateIdParam = searchParams.get("estimate");
+  const scopedEstimateId =
+    scopedEstimateIdParam && /^\d+$/.test(scopedEstimateIdParam)
+      ? Number(scopedEstimateIdParam)
       : null;
   const selectedProject =
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;
@@ -393,13 +397,16 @@ export function EstimatesConsole() {
       const rows = (payload.data as EstimateRecord[]) ?? [];
       setEstimates(rows);
       if (rows[0]) {
-        handleSelectEstimate(rows[0]);
+        const scopedEstimateMatch = scopedEstimateId
+          ? rows.find((estimate) => estimate.id === scopedEstimateId)
+          : null;
+        handleSelectEstimate(scopedEstimateMatch ?? rows[0]);
       }
       setStatusMessage(`Loaded ${rows.length} estimate version(s).`);
     } catch {
       setStatusMessage("Could not reach estimate endpoint.");
     }
-  }, [normalizedBaseUrl, selectedProjectId, token]);
+  }, [normalizedBaseUrl, scopedEstimateId, selectedProjectId, token]);
 
   useEffect(() => {
     if (!token) {

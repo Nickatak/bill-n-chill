@@ -89,6 +89,106 @@ class Command(BaseCommand):
             metadata_json=metadata or {},
         )
 
+    def _sync_estimate_lines(
+        self,
+        *,
+        estimate,
+        primary_cost_code,
+        secondary_cost_code,
+        subtotal: Decimal,
+        primary_description: str,
+        secondary_description: str,
+    ):
+        """Ensure deterministic seeded estimate lines that reconcile exactly to subtotal."""
+        subtotal = Decimal(subtotal).quantize(Decimal("0.01"))
+        primary_total = (subtotal * Decimal("0.40")).quantize(Decimal("0.01"))
+        secondary_total = subtotal - primary_total
+        line_specs = [
+            (primary_cost_code, primary_description, primary_total),
+            (secondary_cost_code, secondary_description, secondary_total),
+        ]
+        keep_ids = []
+
+        for cost_code, description, line_total in line_specs:
+            line, _ = EstimateLineItem.objects.get_or_create(
+                estimate=estimate,
+                cost_code=cost_code,
+                description=description,
+                defaults={
+                    "quantity": Decimal("1.00"),
+                    "unit": "ea",
+                    "unit_cost": line_total,
+                    "markup_percent": Decimal("0.00"),
+                    "line_total": line_total,
+                },
+            )
+            line.quantity = Decimal("1.00")
+            line.unit = "ea"
+            line.unit_cost = line_total
+            line.markup_percent = Decimal("0.00")
+            line.line_total = line_total
+            line.save(
+                update_fields=["quantity", "unit", "unit_cost", "markup_percent", "line_total", "updated_at"]
+            )
+            keep_ids.append(line.id)
+
+        EstimateLineItem.objects.filter(estimate=estimate).exclude(id__in=keep_ids).delete()
+
+    def _sync_estimate_status_history(
+        self,
+        *,
+        estimate,
+        target_status: str,
+        changed_by,
+        include_rework_cycle: bool = False,
+    ):
+        """Rebuild deterministic estimate status history ending at target status."""
+        history_by_target = {
+            Estimate.Status.DRAFT: [
+                (None, Estimate.Status.DRAFT, "Estimate created."),
+            ],
+            Estimate.Status.SENT: [
+                (None, Estimate.Status.DRAFT, "Estimate created."),
+                (Estimate.Status.DRAFT, Estimate.Status.SENT, "Estimate sent to client."),
+            ],
+            Estimate.Status.APPROVED: [
+                (None, Estimate.Status.DRAFT, "Estimate created."),
+                (Estimate.Status.DRAFT, Estimate.Status.SENT, "Estimate sent to client."),
+                (Estimate.Status.SENT, Estimate.Status.APPROVED, "Estimate approved by client."),
+            ],
+            Estimate.Status.REJECTED: [
+                (None, Estimate.Status.DRAFT, "Estimate created."),
+                (Estimate.Status.DRAFT, Estimate.Status.SENT, "Estimate sent to client."),
+                (Estimate.Status.SENT, Estimate.Status.REJECTED, "Estimate rejected by client."),
+            ],
+            Estimate.Status.ARCHIVED: [
+                (None, Estimate.Status.DRAFT, "Estimate created."),
+                (Estimate.Status.DRAFT, Estimate.Status.SENT, "Estimate sent to client."),
+                (Estimate.Status.SENT, Estimate.Status.REJECTED, "Estimate rejected by client."),
+                (Estimate.Status.REJECTED, Estimate.Status.ARCHIVED, "Rejected version voided."),
+            ],
+        }
+
+        events = history_by_target.get(target_status, history_by_target[Estimate.Status.DRAFT])
+        if include_rework_cycle and target_status == Estimate.Status.APPROVED:
+            events = [
+                (None, Estimate.Status.DRAFT, "Estimate created."),
+                (Estimate.Status.DRAFT, Estimate.Status.SENT, "Estimate sent to client."),
+                (Estimate.Status.SENT, Estimate.Status.REJECTED, "Client rejected first submitted scope."),
+                (Estimate.Status.REJECTED, Estimate.Status.ARCHIVED, "Rejected version voided after revision request."),
+                (Estimate.Status.ARCHIVED, Estimate.Status.APPROVED, "Revised scope approved after rejection/void cycle."),
+            ]
+
+        EstimateStatusEvent.objects.filter(estimate=estimate).delete()
+        for from_status, to_status, note in events:
+            EstimateStatusEvent.objects.create(
+                estimate=estimate,
+                from_status=from_status,
+                to_status=to_status,
+                note=note,
+                changed_by=changed_by,
+            )
+
     @transaction.atomic
     def handle(self, *args, **options):
         email = options["email"].strip().lower()
@@ -199,10 +299,10 @@ class Command(BaseCommand):
         estimate, _ = Estimate.objects.get_or_create(
             created_by=user,
             project=project,
+            title="Bathroom Remodel Estimate v1",
             version=1,
             defaults={
                 "status": Estimate.Status.APPROVED,
-                "title": "Bathroom Remodel Estimate v1",
                 "subtotal": Decimal("1000.00"),
                 "markup_total": Decimal("0.00"),
                 "tax_percent": Decimal("0.00"),
@@ -230,60 +330,18 @@ class Command(BaseCommand):
             ]
         )
 
-        line_demo, _ = EstimateLineItem.objects.get_or_create(
+        self._sync_estimate_lines(
             estimate=estimate,
-            cost_code=code_demo,
-            description="Demo",
-            defaults={
-                "quantity": Decimal("1.00"),
-                "unit": "ea",
-                "unit_cost": Decimal("200.00"),
-                "markup_percent": Decimal("0.00"),
-                "line_total": Decimal("200.00"),
-            },
-        )
-        line_demo.quantity = Decimal("1.00")
-        line_demo.unit = "ea"
-        line_demo.unit_cost = Decimal("200.00")
-        line_demo.markup_percent = Decimal("0.00")
-        line_demo.line_total = Decimal("200.00")
-        line_demo.save(
-            update_fields=["quantity", "unit", "unit_cost", "markup_percent", "line_total", "updated_at"]
+            primary_cost_code=code_demo,
+            secondary_cost_code=code_tile,
+            subtotal=estimate.subtotal,
+            primary_description="Demo",
+            secondary_description="Tile",
         )
 
-        line_tile, _ = EstimateLineItem.objects.get_or_create(
+        self._sync_estimate_status_history(
             estimate=estimate,
-            cost_code=code_tile,
-            description="Tile",
-            defaults={
-                "quantity": Decimal("1.00"),
-                "unit": "ea",
-                "unit_cost": Decimal("800.00"),
-                "markup_percent": Decimal("0.00"),
-                "line_total": Decimal("800.00"),
-            },
-        )
-        line_tile.quantity = Decimal("1.00")
-        line_tile.unit = "ea"
-        line_tile.unit_cost = Decimal("800.00")
-        line_tile.markup_percent = Decimal("0.00")
-        line_tile.line_total = Decimal("800.00")
-        line_tile.save(
-            update_fields=["quantity", "unit", "unit_cost", "markup_percent", "line_total", "updated_at"]
-        )
-
-        EstimateStatusEvent.objects.get_or_create(
-            estimate=estimate,
-            from_status=None,
-            to_status=Estimate.Status.DRAFT,
-            note="Estimate created.",
-            changed_by=user,
-        )
-        EstimateStatusEvent.objects.get_or_create(
-            estimate=estimate,
-            from_status=Estimate.Status.DRAFT,
-            to_status=Estimate.Status.APPROVED,
-            note="Approved by homeowner.",
+            target_status=Estimate.Status.APPROVED,
             changed_by=user,
         )
 
@@ -610,10 +668,11 @@ class Command(BaseCommand):
 
         estimate_rows_by_status = {}
         for idx, (status, _) in enumerate(Estimate.Status.choices, start=1):
+            coverage_title = f"Status Coverage Estimate ({status})"
             scoped_estimate, _ = Estimate.objects.get_or_create(
                 created_by=user,
                 project=project,
-                title=f"Status Coverage Estimate ({status})",
+                title=coverage_title,
                 version=1,
                 defaults={
                     "status": status,
@@ -624,6 +683,12 @@ class Command(BaseCommand):
                     "grand_total": Decimal("500.00") + Decimal(str(idx * 50)),
                 },
             )
+            # Keep exactly one deterministic status-coverage estimate per status.
+            Estimate.objects.filter(
+                created_by=user,
+                project=project,
+                title=coverage_title,
+            ).exclude(id=scoped_estimate.id).delete()
             scoped_estimate.status = status
             scoped_estimate.subtotal = Decimal("500.00") + Decimal(str(idx * 50))
             scoped_estimate.markup_total = Decimal("0.00")
@@ -641,26 +706,44 @@ class Command(BaseCommand):
                     "updated_at",
                 ]
             )
+            self._sync_estimate_lines(
+                estimate=scoped_estimate,
+                primary_cost_code=code_demo,
+                secondary_cost_code=code_tile,
+                subtotal=scoped_estimate.subtotal,
+                primary_description=f"Status {status} Demo",
+                secondary_description=f"Status {status} Tile",
+            )
             estimate_rows_by_status[status] = scoped_estimate
 
+        approved_history_estimate = estimate_rows_by_status.get(Estimate.Status.APPROVED, estimate)
+        for status, scoped_estimate in estimate_rows_by_status.items():
+            self._sync_estimate_status_history(
+                estimate=scoped_estimate,
+                target_status=status,
+                changed_by=user,
+                include_rework_cycle=scoped_estimate.id == approved_history_estimate.id,
+            )
+
         budget_source_estimate = estimate_rows_by_status.get(Estimate.Status.APPROVED, estimate)
-        for idx, (status, _) in enumerate(Budget.Status.choices, start=1):
-            scoped_budget, _ = Budget.objects.get_or_create(
-                created_by=user,
-                project=project,
-                source_estimate=budget_source_estimate,
-                status=status,
-                defaults={
-                    "baseline_snapshot_json": _build_budget_baseline_snapshot(budget_source_estimate),
-                    "approved_change_order_total": Decimal(str(idx * 25)),
-                },
-            )
-            scoped_budget.status = status
-            scoped_budget.baseline_snapshot_json = _build_budget_baseline_snapshot(budget_source_estimate)
-            scoped_budget.approved_change_order_total = Decimal(str(idx * 25))
-            scoped_budget.save(
-                update_fields=["status", "baseline_snapshot_json", "approved_change_order_total", "updated_at"]
-            )
+        # Budget status is currently internal system state, not user-facing lifecycle.
+        # Seed only one deterministic active baseline record for analytics previews.
+        scoped_budget, _ = Budget.objects.get_or_create(
+            created_by=user,
+            project=project,
+            source_estimate=budget_source_estimate,
+            defaults={
+                "status": Budget.Status.ACTIVE,
+                "baseline_snapshot_json": _build_budget_baseline_snapshot(budget_source_estimate),
+                "approved_change_order_total": Decimal("25.00"),
+            },
+        )
+        scoped_budget.status = Budget.Status.ACTIVE
+        scoped_budget.baseline_snapshot_json = _build_budget_baseline_snapshot(budget_source_estimate)
+        scoped_budget.approved_change_order_total = Decimal("25.00")
+        scoped_budget.save(
+            update_fields=["status", "baseline_snapshot_json", "approved_change_order_total", "updated_at"]
+        )
 
         for idx, (status, _) in enumerate(ChangeOrder.Status.choices, start=1):
             scoped_change_order, _ = ChangeOrder.objects.get_or_create(
@@ -979,10 +1062,11 @@ class Command(BaseCommand):
         self.stdout.write("Manual flow entry points:")
         self.stdout.write("- /intake/quick-add")
         self.stdout.write("- /projects")
-        self.stdout.write("- /estimates")
-        self.stdout.write("- /budgets")
+        self.stdout.write(f"- /projects/{project.id}/estimates")
+        self.stdout.write(f"- /projects/{project.id}/budgets/analytics")
         self.stdout.write("- /change-orders")
         self.stdout.write("- /invoices")
-        self.stdout.write("- /vendor-bills")
+        self.stdout.write(f"- /projects/{project.id}/vendor-bills")
+        self.stdout.write(f"- /projects/{project.id}/expenses")
         self.stdout.write("- /payments")
         self.stdout.write("Status coverage rows seeded for lifecycle previews.")

@@ -1,0 +1,221 @@
+.console {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #0f172a;
+}
+
+.subtitle {
+  margin: 0.35rem 0 0;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.authMessage {
+  margin: 0;
+  color: #475569;
+  font-size: 0.86rem;
+}
+
+.scope {
+  margin: 0;
+  color: #334155;
+}
+
+.summaryGrid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
+}
+
+.metricCard {
+  border: 1px solid #dbe5f1;
+  border-radius: 10px;
+  background: #f8fbff;
+  padding: 0.75rem 0.85rem;
+  display: grid;
+  gap: 0.32rem;
+}
+
+.metricLabel {
+  font-size: 0.73rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+
+.metricValue {
+  font-size: 1rem;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.metricHint {
+  font-size: 0.76rem;
+  color: #64748b;
+}
+
+.sectionTitle {
+  margin: 0.2rem 0 0;
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #dbe5f1;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.table th,
+.table td {
+  padding: 0.58rem 0.68rem;
+  border-bottom: 1px solid #e5edf7;
+  text-align: left;
+  vertical-align: top;
+}
+
+.table th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #1e3a8a;
+  background: #eff6ff;
+}
+
+.sourceEstimateLink {
+  color: #1d4ed8;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.sourceEstimateLink:hover {
+  text-decoration: underline;
+}
+
+.inlineButton {
+  border: 1px solid #93c5fd;
+  border-radius: 7px;
+  background: #dbeafe;
+  color: #1e3a8a;
+  font-weight: 600;
+  font-size: 0.75rem;
+  padding: 4px 9px;
+  cursor: pointer;
+}
+
+.inlineButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.positive {
+  color: #166534;
+  font-weight: 700;
+}
+
+.negative {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.emptyState {
+  margin: 0;
+  border: 1px dashed #93c5fd;
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+  color: #1e3a8a;
+  background: #eff6ff;
+}
+
+.statusMessage {
+  margin: 0;
+  color: #475569;
+  font-size: 0.84rem;
+}
+
+@media (max-width: 760px) {
+  .table {
+    font-size: 0.86rem;
+  }
+}
+
+:global(html[data-theme="dark"]) .title {
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .subtitle,
+:global(html[data-theme="dark"]) .authMessage,
+:global(html[data-theme="dark"]) .metricHint,
+:global(html[data-theme="dark"]) .statusMessage {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .scope,
+:global(html[data-theme="dark"]) .metricValue,
+:global(html[data-theme="dark"]) .sectionTitle {
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .metricCard {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .metricLabel {
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .table {
+  background: #0b1220;
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .table th,
+:global(html[data-theme="dark"]) .table td {
+  border-bottom-color: #334155;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .table th {
+  background: #111827;
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .sourceEstimateLink {
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .inlineButton {
+  background: #1e3a8a;
+  border-color: #3b82f6;
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .positive {
+  color: #4ade80;
+}
+
+:global(html[data-theme="dark"]) .negative {
+  color: #f87171;
+}
+
+:global(html[data-theme="dark"]) .emptyState {
+  border-color: #1d4ed8;
+  background: #0f172a;
+  color: #bfdbfe;
+}

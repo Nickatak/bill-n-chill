@@ -24,9 +24,8 @@ type HierarchyRule = {
 const ROOT_CRUMB: CrumbDef = { href: "/", label: "Intake" };
 const PROJECTS_HUB_CRUMB: CrumbDef = { href: "/projects", label: "Projects" };
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
-const projectScopedPrefixes = [
+const legacyProjectScopedPrefixes = [
   "/estimates",
-  "/budgets",
   "/change-orders",
   "/invoices",
   "/vendor-bills",
@@ -55,12 +54,17 @@ const hierarchyRules: HierarchyRule[] = [
     when: (pathname) =>
       pathname === "/estimates" ||
       pathname === "/estimates-placeholder" ||
+      /^\/projects\/\d+\/estimates$/.test(pathname) ||
       pathname.startsWith("/estimates/"),
     crumbs: [PROJECTS_HUB_CRUMB, { href: "/estimates", label: "Estimates" }],
   },
   {
-    when: (pathname) => pathname === "/budgets" || pathname === "/budgets-placeholder",
-    crumbs: [PROJECTS_HUB_CRUMB, { href: "/budgets", label: "Budgets" }],
+    when: (pathname) => /^\/projects\/\d+\/budgets\/analytics$/.test(pathname),
+    crumbs: [
+      PROJECTS_HUB_CRUMB,
+      { href: "/budgets/analytics", label: "Budgets" },
+      { href: "/budgets/analytics", label: "Analytics" },
+    ],
   },
   {
     when: (pathname) => pathname === "/change-orders",
@@ -71,11 +75,17 @@ const hierarchyRules: HierarchyRule[] = [
     crumbs: [PROJECTS_HUB_CRUMB, { href: "/invoices", label: "Invoices" }],
   },
   {
-    when: (pathname) => pathname === "/vendor-bills" || pathname === "/vendor-bills-placeholder",
+    when: (pathname) =>
+      pathname === "/vendor-bills" ||
+      pathname === "/vendor-bills-placeholder" ||
+      /^\/projects\/\d+\/vendor-bills$/.test(pathname),
     crumbs: [PROJECTS_HUB_CRUMB, { href: "/vendor-bills", label: "Vendor Bills" }],
   },
   {
-    when: (pathname) => pathname === "/expenses" || pathname === "/expenses-placeholder",
+    when: (pathname) =>
+      pathname === "/expenses" ||
+      pathname === "/expenses-placeholder" ||
+      /^\/projects\/\d+\/expenses$/.test(pathname),
     crumbs: [PROJECTS_HUB_CRUMB, { href: "/expenses", label: "Expenses" }],
   },
   {
@@ -139,29 +149,48 @@ function buildCrumbs(pathname: string): Crumb[] {
   }));
 }
 
-function isProjectScopedRoute(pathname: string): boolean {
-  return projectScopedPrefixes.some(
+function isLegacyProjectScopedRoute(pathname: string): boolean {
+  return legacyProjectScopedPrefixes.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`) || pathname === `${prefix}-placeholder`,
   );
 }
 
-function withProjectParam(href: string, projectId: string): string {
-  const [path, queryString = ""] = href.split("?");
-  const query = new URLSearchParams(queryString);
-  query.set("project", projectId);
-  const nextQuery = query.toString();
-  return nextQuery ? `${path}?${nextQuery}` : path;
+function projectScopedHref(href: string, projectId: string): string {
+  if (href === "/projects") {
+    return `/projects/${encodeURIComponent(projectId)}`;
+  }
+  if (href === "/estimates") {
+    return `/projects/${encodeURIComponent(projectId)}/estimates`;
+  }
+  if (href === "/budgets/analytics") {
+    return `/projects/${encodeURIComponent(projectId)}/budgets/analytics`;
+  }
+  if (href === "/vendor-bills") {
+    return `/projects/${encodeURIComponent(projectId)}/vendor-bills`;
+  }
+  if (href === "/expenses") {
+    return `/projects/${encodeURIComponent(projectId)}/expenses`;
+  }
+  return href;
 }
 
 export function WorkflowBreadcrumbs() {
   const { token } = useSharedSessionAuth();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const projectId = searchParams.get("project");
+  const pathnameValue = pathname || "/";
+  const pathProjectMatch = pathnameValue.match(/^\/projects\/(\d+)(?:\/|$)/);
+  const pathProjectId = pathProjectMatch?.[1] ?? null;
+  const queryProjectId = searchParams.get("project");
+  const projectId =
+    pathProjectId ??
+    (queryProjectId && /^\d+$/.test(queryProjectId) ? queryProjectId : null);
   const [projectTitle, setProjectTitle] = useState("");
-  const baseCrumbs = buildCrumbs(pathname || "/");
+  const baseCrumbs = buildCrumbs(pathnameValue);
   const shouldShowProjectCrumb = Boolean(
-    projectId && /^\d+$/.test(projectId) && isProjectScopedRoute(pathname || "/"),
+    projectId &&
+      /^\d+$/.test(projectId) &&
+      (Boolean(pathProjectId) || isLegacyProjectScopedRoute(pathnameValue)),
   );
 
   useEffect(() => {
@@ -204,7 +233,7 @@ export function WorkflowBreadcrumbs() {
   const crumbs = shouldShowProjectCrumb
     ? (() => {
         const projectHubCrumb: Crumb = {
-          href: `/projects?project=${encodeURIComponent(projectId!)}`,
+          href: `/projects/${encodeURIComponent(projectId!)}`,
           label: `Project: ${projectTitle || `Project #${projectId}`}`,
           isCurrent: false,
         };
@@ -230,8 +259,7 @@ export function WorkflowBreadcrumbs() {
     <nav className="workflowBreadcrumbs" aria-label="Breadcrumb">
       <div className="workflowBreadcrumbsInner">
         {crumbs.map((crumb, index) => {
-          const href =
-            projectId && crumb.href !== "/" ? withProjectParam(crumb.href, projectId) : crumb.href;
+          const href = projectId ? projectScopedHref(crumb.href, projectId) : crumb.href;
           const key = `${crumb.href}-${crumb.label}`;
           return (
             <span key={key} className="workflowBreadcrumbItem">

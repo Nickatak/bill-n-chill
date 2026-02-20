@@ -12,6 +12,9 @@ export type BudgetLineRecord = {
   cost_code_name: string;
   description: string;
   budget_amount: string;
+  planned_amount: string;
+  actual_spend: string;
+  remaining_amount: string;
   committed_amount: string;
   actual_amount: string;
   created_at: string;
@@ -25,6 +28,9 @@ export type BudgetRecord = {
   source_estimate: number;
   source_estimate_version: number;
   baseline_snapshot_json: Record<string, unknown>;
+  approved_change_order_total: string;
+  base_working_total: string;
+  current_working_total: string;
   line_items: BudgetLineRecord[];
   created_at: string;
   updated_at: string;

@@ -38,7 +38,6 @@ export function ProjectsConsole() {
     sent: number;
     approved: number;
   } | null>(null);
-  const [budgetCoverageMissingCount, setBudgetCoverageMissingCount] = useState<number | null>(null);
   const [isProjectProfileOpen, setIsProjectProfileOpen] = useState(false);
 
   const [projectName, setProjectName] = useState("");
@@ -238,38 +237,6 @@ export function ProjectsConsole() {
     }
   }
 
-  async function loadBudgetCoverage(projectId: number) {
-    try {
-      const [estimatesResponse, budgetsResponse] = await Promise.all([
-        fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
-          headers: { Authorization: `Token ${token}` },
-        }),
-        fetch(`${normalizedBaseUrl}/projects/${projectId}/budgets/`, {
-          headers: { Authorization: `Token ${token}` },
-        }),
-      ]);
-
-      const estimatesPayload: ApiResponse = await estimatesResponse.json();
-      const budgetsPayload: ApiResponse = await budgetsResponse.json();
-      if (!estimatesResponse.ok || !budgetsResponse.ok) {
-        setBudgetCoverageMissingCount(null);
-        return;
-      }
-
-      const estimates = (estimatesPayload.data as Array<{ id: number }>) ?? [];
-      const budgets = (budgetsPayload.data as Array<{ source_estimate: number }>) ?? [];
-      const coveredEstimateIds = new Set(
-        budgets
-          .map((budget) => Number(budget.source_estimate))
-          .filter((estimateId) => Number.isFinite(estimateId)),
-      );
-      const missingCount = estimates.filter((estimate) => !coveredEstimateIds.has(estimate.id)).length;
-      setBudgetCoverageMissingCount(missingCount);
-    } catch {
-      setBudgetCoverageMissingCount(null);
-    }
-  }
-
   useEffect(() => {
     const session = loadClientSession();
     if (!session?.token) {
@@ -299,7 +266,6 @@ export function ProjectsConsole() {
     }
     void loadFinancialSummary();
     void loadEstimateStatusCounts(projectId);
-    void loadBudgetCoverage(projectId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProjectId, token]);
 
@@ -322,7 +288,6 @@ export function ProjectsConsole() {
     hydrateForm(fallbackProject);
     setSummary(null);
     setEstimateStatusCounts(null);
-    setBudgetCoverageMissingCount(null);
   }, [selectedProjectId, statusFilteredProjects]);
 
   function handleSelectProject(project: ProjectRecord) {
@@ -519,7 +484,7 @@ export function ProjectsConsole() {
                       </td>
                       <td>
                         <Link
-                          href={`/estimates?project=${project.id}`}
+                          href={`/projects/${project.id}/estimates`}
                           className={styles.projectActionLink}
                         >
                           Open Estimates
@@ -606,7 +571,7 @@ export function ProjectsConsole() {
                 <div className={styles.branch}>
                   <span className={styles.branchLabel}>Scope</span>
                   <div className={styles.node}>
-                    <Link href={`/estimates?project=${selectedProject.id}`}>Estimates</Link>
+                    <Link href={`/projects/${selectedProject.id}/estimates`}>Estimates</Link>
                     <span className={styles.nodeEstimateMeta}>
                       <span className={`${styles.estimateCountPill} ${styles.estimateCountDraft}`}>
                         D {estimateStatusCounts ? estimateStatusCounts.draft : "--"}
@@ -620,22 +585,13 @@ export function ProjectsConsole() {
                     </span>
                   </div>
                   <div className={styles.node}>
-                    <Link href={`/budgets?project=${selectedProject.id}`}>Budgets</Link>
-                    <span
-                      className={`${styles.nodeCount} ${
-                        budgetCoverageMissingCount === null
-                          ? ""
-                          : budgetCoverageMissingCount === 0
-                            ? styles.nodeCountOk
-                            : styles.nodeCountReadyForBudget
-                      }`}
+                    <Link
+                      href={`/projects/${selectedProject.id}/budgets/analytics`}
+                      prefetch={false}
                     >
-                      {budgetCoverageMissingCount === null
-                        ? "--"
-                        : budgetCoverageMissingCount === 0
-                          ? "OK"
-                          : `${budgetCoverageMissingCount} Ready for Budget`}
-                    </span>
+                      Budget Analytics
+                    </Link>
+                    <span className={styles.nodeCount}>Auto</span>
                   </div>
                   <div className={styles.node}>
                     <Link href="/change-orders">Change Orders</Link>
@@ -662,13 +618,13 @@ export function ProjectsConsole() {
                 <div className={styles.branch}>
                   <span className={styles.branchLabel}>Payables</span>
                   <div className={styles.node}>
-                    <Link href={`/vendor-bills?project=${selectedProject.id}`}>Vendor Bills</Link>
+                    <Link href={`/projects/${selectedProject.id}/vendor-bills`}>Vendor Bills</Link>
                     <span className={styles.nodeCount}>
                       {summaryCounts ? summaryCounts.vendorBills : "--"}
                     </span>
                   </div>
                   <div className={styles.node}>
-                    <Link href={`/expenses?project=${selectedProject.id}`}>Expenses</Link>
+                    <Link href={`/projects/${selectedProject.id}/expenses`}>Expenses</Link>
                   </div>
                   <div className={styles.node}>
                     <Link href="/payments">Payments (AP)</Link>
