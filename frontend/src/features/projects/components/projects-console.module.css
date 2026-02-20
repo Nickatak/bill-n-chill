@@ -27,6 +27,73 @@
   font-size: 0.85rem;
 }
 
+.projectFilters {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.projectFiltersLabel {
+  color: #374151;
+  font-size: 0.85rem;
+}
+
+.projectFilterButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.projectFilterButton {
+  border: 1px solid #cbd5f5;
+  border-radius: 999px;
+  padding: 6px 12px;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.projectFilterButtonInactive {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.projectFilterButtonActive {
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+}
+
+.projectFilterActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.projectFilterActionButton {
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 0.64rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  line-height: 1.1;
+  min-height: 0;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.projectFilterActionButton:hover {
+  border-color: #64748b;
+  background: #e2e8f0;
+  color: #1f2937;
+}
+
 .projectTable {
   width: 100%;
   border-collapse: collapse;
@@ -48,6 +115,21 @@
   padding: 10px 12px;
   border-top: 1px solid #e2e8f0;
   color: var(--text-primary);
+}
+
+.projectPagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.projectPagination span {
+  color: #374151;
+  font-size: 0.85rem;
 }
 
 .projectRow {
@@ -129,6 +211,35 @@
   color: #e2e8f0;
 }
 
+:global(html[data-theme="dark"]) .projectFiltersLabel {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .projectFilterButton {
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .projectFilterButtonInactive {
+  background: #0b1220;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .projectFilterButtonActive {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+:global(html[data-theme="dark"]) .projectFilterActionButton {
+  border-color: #64748b;
+  background: #1e293b;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .projectFilterActionButton:hover {
+  border-color: #93c5fd;
+  background: #243244;
+  color: #f8fafc;
+}
+
 :global(html[data-theme="dark"]) .projectTable thead th {
   background: #1e293b;
   color: #bfdbfe;
@@ -137,6 +248,15 @@
 :global(html[data-theme="dark"]) .projectTable tbody td {
   border-color: #1f2937;
   color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .projectPagination {
+  border-top-color: #334155;
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .projectPagination span {
+  color: #cbd5e1;
 }
 
 :global(html[data-theme="dark"]) .projectRow:nth-child(even) {
@@ -251,9 +371,101 @@
   color: var(--text-primary);
 }
 
+.rootTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.projectSettingsToggle {
+  border: 1px solid #cbd5f5;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #1e3a8a;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
 .rootMeta {
   font-size: 0.85rem;
   color: var(--text-secondary);
+}
+
+.quickStatusRow {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.quickStatusLabel {
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #1e3a8a;
+  font-weight: 600;
+}
+
+.quickStatusControl {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.quickStatusBadge {
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  padding: 5px 12px;
+}
+
+.quickStatusChangeLabel {
+  display: grid;
+  gap: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.64rem;
+  font-weight: 600;
+  color: #475569;
+  min-width: 190px;
+}
+
+.quickStatusSelect {
+  min-width: 190px;
+  border: 1px solid #cbd5f5;
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: #ffffff;
+  color: #1f2937;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.quickStatusSelectProspect {
+  border-color: #60a5fa;
+}
+
+.quickStatusSelectActive {
+  border-color: #34d399;
+}
+
+.quickStatusSelectOnHold {
+  border-color: #fb923c;
+}
+
+.quickStatusSelectCompleted {
+  border-color: #38bdf8;
+}
+
+.quickStatusSelectCancelled {
+  border-color: #94a3b8;
 }
 
 .treeBranches {
@@ -365,6 +577,15 @@
   color: var(--text-secondary);
 }
 
+.projectProfileForm {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
 @media (max-width: 980px) {
   .overviewGrid {
     grid-template-columns: 1fr;
@@ -390,6 +611,40 @@
   color: #93c5fd;
 }
 
+:global(html[data-theme="dark"]) .quickStatusLabel {
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .quickStatusChangeLabel {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .quickStatusSelect {
+  border-color: #334155;
+  background: #0b1220;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .quickStatusSelectProspect {
+  border-color: #3b82f6;
+}
+
+:global(html[data-theme="dark"]) .quickStatusSelectActive {
+  border-color: #10b981;
+}
+
+:global(html[data-theme="dark"]) .quickStatusSelectOnHold {
+  border-color: #f97316;
+}
+
+:global(html[data-theme="dark"]) .quickStatusSelectCompleted {
+  border-color: #0ea5e9;
+}
+
+:global(html[data-theme="dark"]) .quickStatusSelectCancelled {
+  border-color: #64748b;
+}
+
 :global(html[data-theme="dark"]) .branch {
   border-left-color: #334155;
 }
@@ -401,6 +656,17 @@
 
 :global(html[data-theme="dark"]) .node a {
   color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .projectSettingsToggle {
+  border-color: #334155;
+  background: #0f172a;
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .projectProfileForm {
+  border-color: #334155;
+  background: #0f172a;
 }
 
 :global(html[data-theme="dark"]) .nodeCount {

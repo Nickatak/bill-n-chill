@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { loadClientSession } from "../../session/client-session";
 import styles from "./projects-console.module.css";
@@ -13,13 +13,28 @@ import {
   ProjectRecord,
 } from "../types";
 
+type ProjectStatusValue = "prospect" | "active" | "on_hold" | "completed" | "cancelled";
+
 export function ProjectsConsole() {
+  const projectPageSize = 5;
+  const projectStatusTransitions: Record<ProjectStatusValue, ProjectStatusValue[]> = {
+    prospect: ["active", "cancelled"],
+    active: ["on_hold", "completed", "cancelled"],
+    on_hold: ["active", "completed", "cancelled"],
+    completed: [],
+    cancelled: [],
+  };
+  const defaultProjectStatusFilters: ProjectStatusValue[] = ["active", "prospect"];
   const [token, setToken] = useState("");
   const [authMessage, setAuthMessage] = useState("Checking session...");
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [statusMessage, setStatusMessage] = useState("");
   const [projectSearch, setProjectSearch] = useState("");
+  const [projectStatusFilters, setProjectStatusFilters] = useState<ProjectStatusValue[]>(
+    defaultProjectStatusFilters,
+  );
+  const [currentProjectPage, setCurrentProjectPage] = useState(1);
   const [summary, setSummary] = useState<ProjectFinancialSummary | null>(null);
   const [estimateStatusCounts, setEstimateStatusCounts] = useState<{
     draft: number;
@@ -35,10 +50,10 @@ export function ProjectsConsole() {
   const [syncStatus, setSyncStatus] = useState<"queued" | "success" | "failed">("queued");
   const [syncErrorMessage, setSyncErrorMessage] = useState("");
   const [retryTargetId, setRetryTargetId] = useState("");
+  const [isProjectProfileOpen, setIsProjectProfileOpen] = useState(false);
 
   const [projectName, setProjectName] = useState("");
-  const [projectStatus, setProjectStatus] = useState("prospect");
-  const [contractOriginal, setContractOriginal] = useState("0.00");
+  const [projectStatus, setProjectStatus] = useState<ProjectStatusValue>("prospect");
   const [contractCurrent, setContractCurrent] = useState("0.00");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -47,6 +62,11 @@ export function ProjectsConsole() {
   const hasSelectedProject = Boolean(selectedProjectId);
   const selectedProject =
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;
+  const isSelectedProjectTerminal =
+    selectedProject?.status === "completed" || selectedProject?.status === "cancelled";
+  const allowedNextProjectStatuses = selectedProject
+    ? projectStatusTransitions[selectedProject.status as ProjectStatusValue] ?? []
+    : [];
   const needle = projectSearch.trim().toLowerCase();
   const filteredProjects = !needle
     ? projects
@@ -61,6 +81,16 @@ export function ProjectsConsole() {
           .toLowerCase();
         return haystack.includes(needle);
       });
+  const statusFilteredProjects = filteredProjects.filter((project) =>
+    projectStatusFilters.includes(project.status as ProjectStatusValue),
+  );
+  const totalProjectPages = Math.max(1, Math.ceil(statusFilteredProjects.length / projectPageSize));
+  const currentProjectPageSafe = Math.min(currentProjectPage, totalProjectPages);
+  const projectPageStartIndex = (currentProjectPageSafe - 1) * projectPageSize;
+  const pagedProjects = statusFilteredProjects.slice(
+    projectPageStartIndex,
+    projectPageStartIndex + projectPageSize,
+  );
   const summaryCounts = summary
     ? {
         changeOrders: summary.traceability.approved_change_orders.records.length,
@@ -93,16 +123,27 @@ export function ProjectsConsole() {
     return styles[key] ?? "";
   }
 
+  function projectStatusLabel(statusValue: string): string {
+    return statusValue.replace("_", " ");
+  }
+
+  function toggleProjectStatusFilter(nextStatus: ProjectStatusValue) {
+    setProjectStatusFilters((current) =>
+      current.includes(nextStatus)
+        ? current.filter((statusValue) => statusValue !== nextStatus)
+        : [...current, nextStatus],
+    );
+  }
+
   function hydrateForm(project: ProjectRecord) {
     setProjectName(project.name);
-    setProjectStatus(project.status);
-    setContractOriginal(project.contract_value_original);
+    setProjectStatus(project.status as ProjectStatusValue);
     setContractCurrent(project.contract_value_current);
     setStartDate(project.start_date_planned ?? "");
     setEndDate(project.end_date_planned ?? "");
   }
 
-  const loadProjects = useCallback(async () => {
+  async function loadProjects() {
     setStatusMessage("Loading projects...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/`, {
@@ -116,8 +157,12 @@ export function ProjectsConsole() {
       const items = (payload.data as ProjectRecord[]) ?? [];
       setProjects(items);
       if (items[0]) {
-        setSelectedProjectId(String(items[0].id));
-        hydrateForm(items[0]);
+        const preferredProject =
+          items.find((project) => project.status === "active")
+          ?? items.find((project) => project.status === "prospect")
+          ?? items[0];
+        setSelectedProjectId(String(preferredProject.id));
+        hydrateForm(preferredProject);
         setSummary(null);
         setAuditEvents([]);
         setStatusMessage(`Loaded ${items.length} project(s).`);
@@ -132,9 +177,9 @@ export function ProjectsConsole() {
     } catch {
       setStatusMessage("Could not reach projects endpoint.");
     }
-  }, [normalizedBaseUrl, token]);
+  }
 
-  const loadFinancialSummary = useCallback(async () => {
+  async function loadFinancialSummary() {
     const projectId = Number(selectedProjectId);
     if (!projectId) {
       setStatusMessage("Select a project first.");
@@ -188,7 +233,7 @@ export function ProjectsConsole() {
       setStatusMessage("Could not reach financial summary endpoint.");
       setEstimateStatusCounts(null);
     }
-  }, [normalizedBaseUrl, selectedProjectId, token]);
+  }
 
   useEffect(() => {
     const session = loadClientSession();
@@ -206,25 +251,47 @@ export function ProjectsConsole() {
       return;
     }
     void loadProjects();
-  }, [loadProjects, token]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   useEffect(() => {
     if (!token || !selectedProjectId) {
       return;
     }
     void loadFinancialSummary();
-  }, [loadFinancialSummary, selectedProjectId, token]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProjectId, token]);
 
-  const handleSelectProject = useCallback(
-    (project: ProjectRecord) => {
-      setSelectedProjectId(String(project.id));
-      setSummary(null);
-      setEstimateStatusCounts(null);
-      setAuditEvents([]);
-      hydrateForm(project);
-    },
-    [],
-  );
+  useEffect(() => {
+    setCurrentProjectPage(1);
+  }, [projectSearch, projectStatusFilters]);
+
+  useEffect(() => {
+    if (statusFilteredProjects.length === 0) {
+      return;
+    }
+    const selectedStillVisible = statusFilteredProjects.some(
+      (project) => String(project.id) === selectedProjectId,
+    );
+    if (selectedStillVisible) {
+      return;
+    }
+    const fallbackProject = statusFilteredProjects[0];
+    setSelectedProjectId(String(fallbackProject.id));
+    hydrateForm(fallbackProject);
+    setSummary(null);
+    setEstimateStatusCounts(null);
+    setAuditEvents([]);
+  }, [selectedProjectId, statusFilteredProjects]);
+
+  function handleSelectProject(project: ProjectRecord) {
+    setSelectedProjectId(String(project.id));
+    setIsProjectProfileOpen(false);
+    setSummary(null);
+    setEstimateStatusCounts(null);
+    setAuditEvents([]);
+    hydrateForm(project);
+  }
 
   async function handleSaveProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -247,7 +314,6 @@ export function ProjectsConsole() {
         body: JSON.stringify({
           name: projectName,
           status: projectStatus,
-          contract_value_original: contractOriginal,
           contract_value_current: contractCurrent,
           start_date_planned: startDate || null,
           end_date_planned: endDate || null,
@@ -268,7 +334,6 @@ export function ProjectsConsole() {
       setStatusMessage("Could not reach project detail endpoint.");
     }
   }
-
 
   async function downloadAccountingExport() {
     const projectId = Number(selectedProjectId);
@@ -462,6 +527,47 @@ export function ProjectsConsole() {
               placeholder="ID, name, customer, or status"
             />
           </label>
+          <div className={styles.projectFilters}>
+            <span className={styles.projectFiltersLabel}>Project status filter</span>
+            <div className={styles.projectFilterButtons}>
+              {(["prospect", "active", "on_hold", "cancelled", "completed"] as ProjectStatusValue[]).map(
+                (statusValue) => {
+                  const active = projectStatusFilters.includes(statusValue);
+                  return (
+                    <button
+                      key={statusValue}
+                      type="button"
+                      className={`${styles.projectFilterButton} ${
+                        active ? projectStatusClass(statusValue) : styles.projectFilterButtonInactive
+                      } ${active ? styles.projectFilterButtonActive : ""}`}
+                      aria-pressed={active}
+                      onClick={() => toggleProjectStatusFilter(statusValue)}
+                    >
+                      {projectStatusLabel(statusValue)}
+                    </button>
+                  );
+                },
+              )}
+            </div>
+            <div className={styles.projectFilterActions}>
+              <button
+                type="button"
+                className={styles.projectFilterActionButton}
+                onClick={() =>
+                  setProjectStatusFilters(["active", "on_hold", "prospect", "completed", "cancelled"])
+                }
+              >
+                Show All Projects
+              </button>
+              <button
+                type="button"
+                className={styles.projectFilterActionButton}
+                onClick={() => setProjectStatusFilters(defaultProjectStatusFilters)}
+              >
+                Reset Filters
+              </button>
+            </div>
+          </div>
           <div className={styles.projectTableWrap}>
             <table className={styles.projectTable}>
               <thead>
@@ -476,7 +582,7 @@ export function ProjectsConsole() {
                 </tr>
               </thead>
               <tbody>
-                {filteredProjects.map((project) => {
+                {pagedProjects.map((project) => {
                   const isActive = String(project.id) === selectedProjectId;
                   const startLabel = project.start_date_planned ?? "TBD";
                   const endLabel = project.end_date_planned ?? "TBD";
@@ -515,9 +621,28 @@ export function ProjectsConsole() {
                 })}
               </tbody>
             </table>
+            <div className={styles.projectPagination}>
+              <button
+                type="button"
+                onClick={() => setCurrentProjectPage((page) => Math.max(1, page - 1))}
+                disabled={currentProjectPageSafe <= 1}
+              >
+                Prev
+              </button>
+              <span>
+                Page {currentProjectPageSafe} of {totalProjectPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCurrentProjectPage((page) => Math.min(totalProjectPages, page + 1))}
+                disabled={currentProjectPageSafe >= totalProjectPages}
+              >
+                Next
+              </button>
+            </div>
           </div>
-          {filteredProjects.length === 0 ? (
-            <p className={styles.searchEmpty}>No projects match your search.</p>
+          {statusFilteredProjects.length === 0 ? (
+            <p className={styles.searchEmpty}>No projects match your search/filter.</p>
           ) : null}
         </section>
       ) : null}
@@ -548,9 +673,21 @@ export function ProjectsConsole() {
             <div className={styles.treePanel}>
               <div className={styles.treeRoot}>
                 <span className={styles.rootLabel}>Project</span>
-                <span className={styles.rootTitle}>{selectedProject.name}</span>
+                <div className={styles.rootTitleRow}>
+                  <span className={styles.rootTitle}>{selectedProject.name}</span>
+                  {!isSelectedProjectTerminal ? (
+                    <button
+                      type="button"
+                      className={styles.projectSettingsToggle}
+                      aria-expanded={isProjectProfileOpen}
+                      onClick={() => setIsProjectProfileOpen((current) => !current)}
+                    >
+                      {isProjectProfileOpen ? "Close Settings" : "Edit Project"}
+                    </button>
+                  ) : null}
+                </div>
                 <span className={styles.rootMeta}>
-                  {formatCustomerName(selectedProject)} • {selectedProject.status}
+                  {formatCustomerName(selectedProject)} • {projectStatusLabel(selectedProject.status)}
                 </span>
               </div>
               <div className={styles.treeBranches}>
@@ -658,50 +795,46 @@ export function ProjectsConsole() {
         </section>
       ) : null}
 
-      <form onSubmit={handleSaveProject}>
-        <h3>Project Profile</h3>
-        <label>
-          Project name
-          <input value={projectName} onChange={(event) => setProjectName(event.target.value)} required />
-        </label>
-        <label>
-          Status
-          <select value={projectStatus} onChange={(event) => setProjectStatus(event.target.value)}>
-            <option value="prospect">prospect</option>
-            <option value="active">active</option>
-            <option value="on_hold">on_hold</option>
-            <option value="completed">completed</option>
-            <option value="cancelled">cancelled</option>
-          </select>
-        </label>
-        <label>
-          Contract value (original)
-          <input
-            value={contractOriginal}
-            onChange={(event) => setContractOriginal(event.target.value)}
-            inputMode="decimal"
-          />
-        </label>
-        <label>
-          Contract value (current)
-          <input
-            value={contractCurrent}
-            onChange={(event) => setContractCurrent(event.target.value)}
-            inputMode="decimal"
-          />
-        </label>
-        <label>
-          Planned start date
-          <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-        </label>
-        <label>
-          Planned end date
-          <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
-        </label>
-        <button type="submit" disabled={!hasSelectedProject}>
-          Save Project Profile
-        </button>
-      </form>
+      {selectedProject && isProjectProfileOpen && !isSelectedProjectTerminal ? (
+        <form className={styles.projectProfileForm} onSubmit={handleSaveProject}>
+          <h3>Project Details</h3>
+          <label>
+            Project name
+            <input value={projectName} onChange={(event) => setProjectName(event.target.value)} required />
+          </label>
+          <label>
+            Status
+            <select value={projectStatus} onChange={(event) => setProjectStatus(event.target.value as ProjectStatusValue)}>
+              {[selectedProject.status as ProjectStatusValue, ...allowedNextProjectStatuses]
+                .filter((value, index, source) => source.indexOf(value) === index)
+                .map((statusOption) => (
+                  <option key={statusOption} value={statusOption}>
+                    {projectStatusLabel(statusOption)}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label>
+            Contract value (current)
+            <input
+              value={contractCurrent}
+              onChange={(event) => setContractCurrent(event.target.value)}
+              inputMode="decimal"
+            />
+          </label>
+          <label>
+            Planned start date
+            <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+          </label>
+          <label>
+            Planned end date
+            <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+          </label>
+          <button type="submit" disabled={!hasSelectedProject}>
+            Save Project Profile
+          </button>
+        </form>
+      ) : null}
 
       <section>
         <h3>Financial Summary (FIN-01)</h3>

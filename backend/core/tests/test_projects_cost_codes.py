@@ -61,7 +61,6 @@ class ProjectProfileTests(TestCase):
             f"/api/v1/projects/{self.project.id}/",
             data={
                 "status": "active",
-                "contract_value_original": "125000.00",
                 "contract_value_current": "130000.00",
                 "start_date_planned": "2026-03-01",
                 "end_date_planned": "2026-07-31",
@@ -73,10 +72,68 @@ class ProjectProfileTests(TestCase):
 
         self.project.refresh_from_db()
         self.assertEqual(self.project.status, Project.Status.ACTIVE)
-        self.assertEqual(str(self.project.contract_value_original), "125000.00")
+        self.assertEqual(str(self.project.contract_value_original), "0.00")
         self.assertEqual(str(self.project.contract_value_current), "130000.00")
         self.assertEqual(str(self.project.start_date_planned), "2026-03-01")
         self.assertEqual(str(self.project.end_date_planned), "2026-07-31")
+
+    def test_project_patch_rejects_contract_value_original_change(self):
+        response = self.client.patch(
+            f"/api/v1/projects/{self.project.id}/",
+            data={"contract_value_original": "125000.00"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "validation_error")
+        self.assertIn("contract_value_original", response.json()["error"]["fields"])
+
+    def test_project_patch_rejects_invalid_status_transitions(self):
+        invalid_from_prospect = self.client.patch(
+            f"/api/v1/projects/{self.project.id}/",
+            data={"status": "completed"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(invalid_from_prospect.status_code, 400)
+        self.assertEqual(invalid_from_prospect.json()["error"]["code"], "validation_error")
+        self.assertIn("status", invalid_from_prospect.json()["error"]["fields"])
+
+        to_active = self.client.patch(
+            f"/api/v1/projects/{self.project.id}/",
+            data={"status": "active"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_active.status_code, 200)
+
+        to_completed = self.client.patch(
+            f"/api/v1/projects/{self.project.id}/",
+            data={"status": "completed"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_completed.status_code, 200)
+
+        invalid_from_completed = self.client.patch(
+            f"/api/v1/projects/{self.project.id}/",
+            data={"status": "active"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(invalid_from_completed.status_code, 400)
+        self.assertEqual(invalid_from_completed.json()["error"]["code"], "validation_error")
+        self.assertIn("status", invalid_from_completed.json()["error"]["fields"])
+
+        immutable_terminal = self.client.patch(
+            f"/api/v1/projects/{self.project.id}/",
+            data={"name": "Renamed After Complete"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(immutable_terminal.status_code, 400)
+        self.assertEqual(immutable_terminal.json()["error"]["code"], "validation_error")
+        self.assertIn("status", immutable_terminal.json()["error"]["fields"])
 
 
 class CostCodeTests(TestCase):

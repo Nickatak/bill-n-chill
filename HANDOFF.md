@@ -92,3 +92,39 @@
 ### Notes / Constraints
 - This repo currently has many unrelated local modifications; do not revert unrelated files.
 - New migrations exist and may need to be applied locally (`make local-migrate`) before runtime verification.
+
+## Deferred Idea: Project Timeline (V1 Spec Stub)
+- Status: intentionally deferred (documented only; no implementation now).
+- Goal: chronological visual map of project events on the project page.
+
+### V1 In Scope
+- Read-only timeline view.
+- Reverse-chronological event stream grouped by day.
+- Event rows include:
+  - `occurred_at`
+  - `event_type`
+  - `object_type` + `object_id`
+  - short `summary`
+  - actor/source metadata when available
+- Deep links from timeline rows to source records (estimate, budget, invoice, vendor bill, payment, etc.).
+- Filter chips + optional date-range:
+  - financial
+  - status
+  - docs
+  - system
+
+### V1 Data Sources (initial)
+- Existing financial audit events.
+- Estimate status events.
+- Accounting sync events.
+- Key create/update lifecycle milestones already emitted by current modules.
+
+### V1 Non-Goals
+- No timeline-based edits or status transitions.
+- No cross-object write actions from timeline rows.
+- No advanced analytics/insights layer (timeline is narrative context only).
+
+### Implementation Guardrails
+- Stable sort for same-timestamp events.
+- Paginated/infinite loading for large histories.
+- Keep event contract normalized so new modules can append events without UI rewrites.

@@ -16,6 +16,25 @@ from core.serializers import (
     ProjectSerializer,
 )
 
+ALLOWED_PROJECT_STATUS_TRANSITIONS = {
+    Project.Status.PROSPECT: {
+        Project.Status.ACTIVE,
+        Project.Status.CANCELLED,
+    },
+    Project.Status.ACTIVE: {
+        Project.Status.ON_HOLD,
+        Project.Status.COMPLETED,
+        Project.Status.CANCELLED,
+    },
+    Project.Status.ON_HOLD: {
+        Project.Status.ACTIVE,
+        Project.Status.COMPLETED,
+        Project.Status.CANCELLED,
+    },
+    Project.Status.COMPLETED: set(),
+    Project.Status.CANCELLED: set(),
+}
+
 
 def _build_project_financial_summary_data(project: Project, user):
     approved_co_rows = list(
@@ -217,6 +236,51 @@ def project_detail_view(request, project_id: int):
 
     if request.method == "GET":
         return Response({"data": ProjectProfileSerializer(project).data})
+
+    if project.status in {Project.Status.COMPLETED, Project.Status.CANCELLED}:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Project is in a terminal state and can no longer be edited.",
+                    "fields": {"status": ["Terminal projects are immutable."]},
+                }
+            },
+            status=400,
+        )
+
+    if "contract_value_original" in request.data:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Original contract value is immutable after project creation.",
+                    "fields": {
+                        "contract_value_original": [
+                            "This field cannot be changed after project creation."
+                        ]
+                    },
+                }
+            },
+            status=400,
+        )
+
+    if "status" in request.data:
+        next_status = request.data.get("status")
+        current_status = project.status
+        if next_status != current_status:
+            allowed_statuses = ALLOWED_PROJECT_STATUS_TRANSITIONS.get(current_status, set())
+            if next_status not in allowed_statuses:
+                return Response(
+                    {
+                        "error": {
+                            "code": "validation_error",
+                            "message": f"Invalid project status transition: {current_status} -> {next_status}.",
+                            "fields": {"status": ["This transition is not allowed."]},
+                        }
+                    },
+                    status=400,
+                )
 
     serializer = ProjectProfileSerializer(project, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
