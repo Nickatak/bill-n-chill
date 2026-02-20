@@ -22,14 +22,11 @@ export function WorkflowNavbar() {
     <nav className="workflowNav" aria-label="MVP workflow order">
       <div className="workflowNavInner">
         <div className="workflowNavScroll">
-          <Link
-            href="/"
-            className={`workflowLink ${pathname === "/" ? "isActive" : ""}`}
-          >
-            Home
-          </Link>
           {workflowRoutes.map((route) => {
             const isActive =
+              route.href === "/intake/quick-add"
+                ? pathname === "/" || pathname === "/intake/quick-add"
+                :
               route.href === "/estimates-placeholder"
                 ? pathname === "/estimates-placeholder" ||
                   pathname === "/estimates" ||

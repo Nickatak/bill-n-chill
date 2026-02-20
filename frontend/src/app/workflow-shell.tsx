@@ -4,13 +4,16 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
-import { clearClientSession, loadClientSession } from "@/features/session/client-session";
+import { clearClientSession } from "@/features/session/client-session";
+import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import { WorkflowNavbar } from "./workflow-navbar";
+import { WorkflowBreadcrumbs } from "./workflow-breadcrumbs";
 
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
 export function WorkflowShell() {
   const pathname = usePathname();
+  const { token } = useSharedSessionAuth();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
   const hideShell = Boolean(pathname && /^\/estimate\/[^/]+\/?$/.test(pathname));
@@ -23,8 +26,7 @@ export function WorkflowShell() {
         return;
       }
 
-      const session = loadClientSession();
-      if (!session?.token) {
+      if (!token) {
         setIsAuthorized(false);
         setIsChecking(false);
         return;
@@ -32,7 +34,7 @@ export function WorkflowShell() {
 
       try {
         const response = await fetch(`${defaultApiBaseUrl}/auth/me/`, {
-          headers: { Authorization: `Token ${session.token}` },
+          headers: { Authorization: `Token ${token}` },
         });
         await response.json();
         if (!response.ok) {
@@ -50,7 +52,7 @@ export function WorkflowShell() {
     }
 
     void verify();
-  }, [hideShell, pathname]);
+  }, [hideShell, pathname, token]);
 
   if (hideShell) {
     return null;
@@ -84,6 +86,7 @@ export function WorkflowShell() {
     <>
       <div className="workflowShellSpacer" />
       <WorkflowNavbar />
+      <WorkflowBreadcrumbs />
     </>
   );
 }

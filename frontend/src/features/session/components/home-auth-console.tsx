@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import {
   clearClientSession,
@@ -38,7 +37,6 @@ type HomeAuthConsoleProps = {
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
 export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState("");
@@ -103,12 +101,6 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
     // Intentionally runs once on initial load.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.replace("/intake/quick-add");
-    }
-  }, [isAuthenticated, router]);
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

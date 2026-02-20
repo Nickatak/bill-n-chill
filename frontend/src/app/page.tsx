@@ -1,5 +1,4 @@
-import { HomeAuthConsole } from "@/features/session/components/home-auth-console";
-import styles from "./page.module.css";
+import { HomeRouteContent } from "./home-route-content";
 
 type HealthResponse = {
   data?: {
@@ -31,15 +30,6 @@ export default async function Home() {
   const health = await fetchHealth();
 
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <h1 className={styles.title}>bill-n-chill</h1>
-        <p className={styles.subtitle}>
-          Auth-gated home: unauthenticated users see a clean sign-in screen,
-          authenticated users are routed straight into Intake.
-        </p>
-        <HomeAuthConsole health={health} />
-      </main>
-    </div>
+    <HomeRouteContent health={health} />
   );
 }

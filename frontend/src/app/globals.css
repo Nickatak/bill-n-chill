@@ -221,6 +221,64 @@ html[data-theme="dark"] .authHintInner {
   color: #e5e7eb;
 }
 
+.workflowBreadcrumbs {
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+.workflowBreadcrumbsInner {
+  min-height: 34px;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.workflowBreadcrumbItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.workflowBreadcrumbLink {
+  color: #334155;
+  font-size: 0.82rem;
+}
+
+.workflowBreadcrumbLink:hover {
+  text-decoration: underline;
+}
+
+.workflowBreadcrumbCurrent {
+  color: #0f172a;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.workflowBreadcrumbSeparator {
+  color: #94a3b8;
+  font-size: 0.78rem;
+}
+
+html[data-theme="dark"] .workflowBreadcrumbs {
+  border-bottom-color: #1f2937;
+  background: #0b1220;
+}
+
+html[data-theme="dark"] .workflowBreadcrumbLink {
+  color: #cbd5e1;
+}
+
+html[data-theme="dark"] .workflowBreadcrumbCurrent {
+  color: #f1f5f9;
+}
+
+html[data-theme="dark"] .workflowBreadcrumbSeparator {
+  color: #64748b;
+}
+
 
 .nonWorkflowMenu {
   position: relative;
