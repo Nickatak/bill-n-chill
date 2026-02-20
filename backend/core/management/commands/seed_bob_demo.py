@@ -559,6 +559,351 @@ class Command(BaseCommand):
             },
         )
 
+        # Status coverage dataset: ensure one deterministic row per lifecycle state so
+        # each UI page can be previewed with realistic mixed populations.
+        project_rows_by_status = {}
+        for idx, (status, _) in enumerate(Project.Status.choices, start=1):
+            scoped_name = f"{project_name} [{status}]"
+            scoped_project, _ = Project.objects.get_or_create(
+                created_by=user,
+                customer=customer,
+                name=scoped_name,
+                defaults={
+                    "status": status,
+                    "contract_value_original": Decimal("1000.00") + Decimal(str(idx * 100)),
+                    "contract_value_current": Decimal("1100.00") + Decimal(str(idx * 100)),
+                    "start_date_planned": today + timedelta(days=idx),
+                    "end_date_planned": today + timedelta(days=idx + 21),
+                },
+            )
+            scoped_project.status = status
+            scoped_project.contract_value_original = Decimal("1000.00") + Decimal(str(idx * 100))
+            scoped_project.contract_value_current = Decimal("1100.00") + Decimal(str(idx * 100))
+            if not scoped_project.start_date_planned:
+                scoped_project.start_date_planned = today + timedelta(days=idx)
+            if not scoped_project.end_date_planned:
+                scoped_project.end_date_planned = today + timedelta(days=idx + 21)
+            scoped_project.save(
+                update_fields=[
+                    "status",
+                    "contract_value_original",
+                    "contract_value_current",
+                    "start_date_planned",
+                    "end_date_planned",
+                    "updated_at",
+                ]
+            )
+            project_rows_by_status[status] = scoped_project
+
+        for idx, (status, _) in enumerate(LeadContact.Status.choices, start=1):
+            lead_phone = f"555-22{idx:02d}"
+            scoped_lead, _ = LeadContact.objects.get_or_create(
+                created_by=user,
+                phone=lead_phone,
+                project_address=f"{100 + idx} Seed Status Ave",
+                defaults={
+                    "full_name": f"Seed Lead {status.title().replace('_', ' ')}",
+                    "email": f"lead-{status}@example.com",
+                    "status": status,
+                    "source": LeadContact.Source.FIELD_MANUAL,
+                    "notes": f"Seeded lead in status {status}.",
+                },
+            )
+            scoped_lead.full_name = f"Seed Lead {status.title().replace('_', ' ')}"
+            scoped_lead.email = f"lead-{status}@example.com"
+            scoped_lead.status = status
+            scoped_lead.source = LeadContact.Source.FIELD_MANUAL
+            scoped_lead.notes = f"Seeded lead in status {status}."
+            if status == LeadContact.Status.PROJECT_CREATED:
+                scoped_lead.converted_customer = customer
+                scoped_lead.converted_project = project
+                scoped_lead.converted_at = timezone.now()
+            else:
+                scoped_lead.converted_customer = None
+                scoped_lead.converted_project = None
+                scoped_lead.converted_at = None
+            scoped_lead.save(
+                update_fields=[
+                    "full_name",
+                    "email",
+                    "status",
+                    "source",
+                    "notes",
+                    "converted_customer",
+                    "converted_project",
+                    "converted_at",
+                    "updated_at",
+                ]
+            )
+
+        estimate_rows_by_status = {}
+        for idx, (status, _) in enumerate(Estimate.Status.choices, start=1):
+            scoped_estimate, _ = Estimate.objects.get_or_create(
+                created_by=user,
+                project=project,
+                title=f"Status Coverage Estimate ({status})",
+                version=1,
+                defaults={
+                    "status": status,
+                    "subtotal": Decimal("500.00") + Decimal(str(idx * 50)),
+                    "markup_total": Decimal("0.00"),
+                    "tax_percent": Decimal("0.00"),
+                    "tax_total": Decimal("0.00"),
+                    "grand_total": Decimal("500.00") + Decimal(str(idx * 50)),
+                },
+            )
+            scoped_estimate.status = status
+            scoped_estimate.subtotal = Decimal("500.00") + Decimal(str(idx * 50))
+            scoped_estimate.markup_total = Decimal("0.00")
+            scoped_estimate.tax_percent = Decimal("0.00")
+            scoped_estimate.tax_total = Decimal("0.00")
+            scoped_estimate.grand_total = Decimal("500.00") + Decimal(str(idx * 50))
+            scoped_estimate.save(
+                update_fields=[
+                    "status",
+                    "subtotal",
+                    "markup_total",
+                    "tax_percent",
+                    "tax_total",
+                    "grand_total",
+                    "updated_at",
+                ]
+            )
+            estimate_rows_by_status[status] = scoped_estimate
+
+        budget_source_estimate = estimate_rows_by_status.get(Estimate.Status.APPROVED, estimate)
+        for idx, (status, _) in enumerate(Budget.Status.choices, start=1):
+            scoped_budget, _ = Budget.objects.get_or_create(
+                created_by=user,
+                project=project,
+                source_estimate=budget_source_estimate,
+                status=status,
+                defaults={
+                    "baseline_snapshot_json": _build_budget_baseline_snapshot(budget_source_estimate),
+                    "approved_change_order_total": Decimal(str(idx * 25)),
+                },
+            )
+            scoped_budget.status = status
+            scoped_budget.baseline_snapshot_json = _build_budget_baseline_snapshot(budget_source_estimate)
+            scoped_budget.approved_change_order_total = Decimal(str(idx * 25))
+            scoped_budget.save(
+                update_fields=["status", "baseline_snapshot_json", "approved_change_order_total", "updated_at"]
+            )
+
+        for idx, (status, _) in enumerate(ChangeOrder.Status.choices, start=1):
+            scoped_change_order, _ = ChangeOrder.objects.get_or_create(
+                project=project,
+                number=100 + idx,
+                defaults={
+                    "title": f"Status Coverage CO ({status})",
+                    "status": status,
+                    "amount_delta": Decimal(str(idx * 10)),
+                    "days_delta": idx,
+                    "reason": f"Seeded change order in status {status}.",
+                    "requested_by": user,
+                },
+            )
+            scoped_change_order.title = f"Status Coverage CO ({status})"
+            scoped_change_order.status = status
+            scoped_change_order.amount_delta = Decimal(str(idx * 10))
+            scoped_change_order.days_delta = idx
+            scoped_change_order.reason = f"Seeded change order in status {status}."
+            scoped_change_order.requested_by = user
+            if status == ChangeOrder.Status.APPROVED:
+                scoped_change_order.approved_by = user
+                scoped_change_order.approved_at = timezone.now()
+            else:
+                scoped_change_order.approved_by = None
+                scoped_change_order.approved_at = None
+            scoped_change_order.save(
+                update_fields=[
+                    "title",
+                    "status",
+                    "amount_delta",
+                    "days_delta",
+                    "reason",
+                    "requested_by",
+                    "approved_by",
+                    "approved_at",
+                    "updated_at",
+                ]
+            )
+
+        for idx, (status, _) in enumerate(Invoice.Status.choices, start=1):
+            invoice_number = f"INV-STATUS-{idx:02d}"
+            scoped_invoice, _ = Invoice.objects.get_or_create(
+                project=project,
+                invoice_number=invoice_number,
+                defaults={
+                    "customer": customer,
+                    "status": status,
+                    "issue_date": today + timedelta(days=idx),
+                    "due_date": today + timedelta(days=idx + 30),
+                    "subtotal": Decimal("300.00"),
+                    "tax_percent": Decimal("0.00"),
+                    "tax_total": Decimal("0.00"),
+                    "total": Decimal("300.00"),
+                    "balance_due": Decimal("300.00"),
+                    "created_by": user,
+                },
+            )
+            scoped_invoice.customer = customer
+            scoped_invoice.status = status
+            scoped_invoice.issue_date = today + timedelta(days=idx)
+            scoped_invoice.due_date = today + timedelta(days=idx + 30)
+            scoped_invoice.subtotal = Decimal("300.00")
+            scoped_invoice.tax_percent = Decimal("0.00")
+            scoped_invoice.tax_total = Decimal("0.00")
+            scoped_invoice.total = Decimal("300.00")
+            if status in {Invoice.Status.PAID, Invoice.Status.VOID}:
+                scoped_invoice.balance_due = Decimal("0.00")
+            elif status == Invoice.Status.PARTIALLY_PAID:
+                scoped_invoice.balance_due = Decimal("120.00")
+            else:
+                scoped_invoice.balance_due = Decimal("300.00")
+            scoped_invoice.created_by = user
+            scoped_invoice.save(
+                update_fields=[
+                    "customer",
+                    "status",
+                    "issue_date",
+                    "due_date",
+                    "subtotal",
+                    "tax_percent",
+                    "tax_total",
+                    "total",
+                    "balance_due",
+                    "created_by",
+                    "updated_at",
+                ]
+            )
+
+        for idx, (status, _) in enumerate(VendorBill.Status.choices, start=1):
+            bill_number = f"VB-STATUS-{idx:02d}"
+            scoped_vendor_bill, _ = VendorBill.objects.get_or_create(
+                project=project,
+                vendor=vendor,
+                bill_number=bill_number,
+                defaults={
+                    "status": status,
+                    "issue_date": today + timedelta(days=idx),
+                    "due_date": today + timedelta(days=idx + 21),
+                    "scheduled_for": today + timedelta(days=idx + 10),
+                    "total": Decimal("180.00"),
+                    "balance_due": Decimal("180.00"),
+                    "notes": f"Seeded vendor bill in status {status}.",
+                    "created_by": user,
+                },
+            )
+            scoped_vendor_bill.status = status
+            scoped_vendor_bill.issue_date = today + timedelta(days=idx)
+            scoped_vendor_bill.due_date = today + timedelta(days=idx + 21)
+            scoped_vendor_bill.scheduled_for = (
+                today + timedelta(days=idx + 10)
+                if status in {VendorBill.Status.SCHEDULED, VendorBill.Status.PAID}
+                else None
+            )
+            scoped_vendor_bill.total = Decimal("180.00")
+            scoped_vendor_bill.balance_due = (
+                Decimal("0.00") if status in {VendorBill.Status.PAID, VendorBill.Status.VOID} else Decimal("180.00")
+            )
+            scoped_vendor_bill.notes = f"Seeded vendor bill in status {status}."
+            scoped_vendor_bill.created_by = user
+            scoped_vendor_bill.save(
+                update_fields=[
+                    "status",
+                    "issue_date",
+                    "due_date",
+                    "scheduled_for",
+                    "total",
+                    "balance_due",
+                    "notes",
+                    "created_by",
+                    "updated_at",
+                ]
+            )
+
+        payment_methods = [method for method, _ in Payment.Method.choices]
+        for direction, _ in Payment.Direction.choices:
+            direction_prefix = "AR" if direction == Payment.Direction.INBOUND else "AP"
+            for idx, (status, _) in enumerate(Payment.Status.choices, start=1):
+                reference_number = f"{direction_prefix}-STATUS-{idx:02d}"
+                scoped_payment, _ = Payment.objects.get_or_create(
+                    project=project,
+                    direction=direction,
+                    reference_number=reference_number,
+                    defaults={
+                        "method": payment_methods[(idx - 1) % len(payment_methods)],
+                        "status": status,
+                        "amount": Decimal("150.00"),
+                        "payment_date": today + timedelta(days=idx),
+                        "notes": f"Seeded payment in status {status}.",
+                        "created_by": user,
+                    },
+                )
+                scoped_payment.method = payment_methods[(idx - 1) % len(payment_methods)]
+                scoped_payment.status = status
+                scoped_payment.amount = Decimal("150.00")
+                scoped_payment.payment_date = today + timedelta(days=idx)
+                scoped_payment.notes = f"Seeded payment in status {status}."
+                scoped_payment.created_by = user
+                scoped_payment.save(
+                    update_fields=[
+                        "method",
+                        "status",
+                        "amount",
+                        "payment_date",
+                        "notes",
+                        "created_by",
+                        "updated_at",
+                    ]
+                )
+
+        sync_directions = [direction for direction, _ in AccountingSyncEvent.Direction.choices]
+        for idx, (status, _) in enumerate(AccountingSyncEvent.Status.choices, start=1):
+            scoped_sync_event, _ = AccountingSyncEvent.objects.get_or_create(
+                project=project,
+                created_by=user,
+                provider=AccountingSyncEvent.Provider.QUICKBOOKS_ONLINE,
+                object_type=f"status_coverage_{status}",
+                object_id=idx,
+                direction=sync_directions[(idx - 1) % len(sync_directions)],
+                defaults={
+                    "status": status,
+                    "external_id": f"SYNC-{idx:02d}" if status == AccountingSyncEvent.Status.SUCCESS else "",
+                    "error_message": (
+                        "Seeded failed sync status coverage."
+                        if status == AccountingSyncEvent.Status.FAILED
+                        else ""
+                    ),
+                    "retry_count": 1 if status == AccountingSyncEvent.Status.FAILED else 0,
+                    "last_attempt_at": timezone.now(),
+                },
+            )
+            scoped_sync_event.status = status
+            scoped_sync_event.direction = sync_directions[(idx - 1) % len(sync_directions)]
+            scoped_sync_event.external_id = (
+                f"SYNC-{idx:02d}" if status == AccountingSyncEvent.Status.SUCCESS else ""
+            )
+            scoped_sync_event.error_message = (
+                "Seeded failed sync status coverage."
+                if status == AccountingSyncEvent.Status.FAILED
+                else ""
+            )
+            scoped_sync_event.retry_count = 1 if status == AccountingSyncEvent.Status.FAILED else 0
+            scoped_sync_event.last_attempt_at = timezone.now()
+            scoped_sync_event.save(
+                update_fields=[
+                    "status",
+                    "direction",
+                    "external_id",
+                    "error_message",
+                    "retry_count",
+                    "last_attempt_at",
+                    "updated_at",
+                ]
+            )
+
         self._audit_once(
             project=project,
             user=user,
@@ -668,3 +1013,4 @@ class Command(BaseCommand):
         self.stdout.write("- /invoices")
         self.stdout.write("- /vendor-bills")
         self.stdout.write("- /payments")
+        self.stdout.write("Status coverage rows seeded for lifecycle previews.")

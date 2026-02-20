@@ -56,7 +56,6 @@ export function ProjectsConsole() {
 
   const [projectName, setProjectName] = useState("");
   const [projectStatus, setProjectStatus] = useState<ProjectStatusValue>("prospect");
-  const [contractCurrent, setContractCurrent] = useState("0.00");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
@@ -74,6 +73,11 @@ export function ProjectsConsole() {
   const allowedNextProjectStatuses = selectedProject
     ? projectStatusTransitions[selectedProject.status as ProjectStatusValue] ?? []
     : [];
+  const allowedProfileStatuses = selectedProject
+    ? [selectedProject.status as ProjectStatusValue, ...allowedNextProjectStatuses]
+        .filter((value, index, source) => source.indexOf(value) === index)
+    : [];
+  const hasInvalidDateRange = Boolean(startDate && endDate && endDate < startDate);
   const needle = projectSearch.trim().toLowerCase();
   const filteredProjects = !needle
     ? projects
@@ -145,7 +149,6 @@ export function ProjectsConsole() {
   function hydrateForm(project: ProjectRecord) {
     setProjectName(project.name);
     setProjectStatus(project.status as ProjectStatusValue);
-    setContractCurrent(project.contract_value_current);
     setStartDate(project.start_date_planned ?? "");
     setEndDate(project.end_date_planned ?? "");
   }
@@ -319,6 +322,10 @@ export function ProjectsConsole() {
       );
       return;
     }
+    if (hasInvalidDateRange) {
+      setStatusMessage("Planned end date cannot be before planned start date.");
+      return;
+    }
 
     setStatusMessage("Saving project profile...");
     try {
@@ -331,7 +338,6 @@ export function ProjectsConsole() {
         body: JSON.stringify({
           name: projectName,
           status: projectStatus,
-          contract_value_current: contractCurrent,
           start_date_planned: startDate || null,
           end_date_planned: endDate || null,
         }),
@@ -821,23 +827,24 @@ export function ProjectsConsole() {
           </label>
           <label>
             Status
-            <select value={projectStatus} onChange={(event) => setProjectStatus(event.target.value as ProjectStatusValue)}>
-              {[selectedProject.status as ProjectStatusValue, ...allowedNextProjectStatuses]
-                .filter((value, index, source) => source.indexOf(value) === index)
-                .map((statusOption) => (
-                  <option key={statusOption} value={statusOption}>
+            <div className={styles.projectStatusPills}>
+              {allowedProfileStatuses.map((statusOption) => {
+                const active = projectStatus === statusOption;
+                return (
+                  <button
+                    key={statusOption}
+                    type="button"
+                    className={`${styles.projectStatusPill} ${
+                      active ? projectStatusClass(statusOption) : styles.projectStatusPillInactive
+                    } ${active ? styles.projectStatusPillActive : ""}`}
+                    aria-pressed={active}
+                    onClick={() => setProjectStatus(statusOption)}
+                  >
                     {projectStatusLabel(statusOption)}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label>
-            Contract value (current)
-            <input
-              value={contractCurrent}
-              onChange={(event) => setContractCurrent(event.target.value)}
-              inputMode="decimal"
-            />
+                  </button>
+                );
+              })}
+            </div>
           </label>
           <label>
             Planned start date
@@ -847,7 +854,12 @@ export function ProjectsConsole() {
             Planned end date
             <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
           </label>
-          <button type="submit" disabled={!hasSelectedProject}>
+          {hasInvalidDateRange ? (
+            <p className={styles.projectProfileError}>
+              Planned end date cannot be before planned start date.
+            </p>
+          ) : null}
+          <button type="submit" disabled={!hasSelectedProject || hasInvalidDateRange}>
             Save Project Profile
           </button>
         </form>

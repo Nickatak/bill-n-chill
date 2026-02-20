@@ -706,6 +706,36 @@
   transform: translateY(-1px);
 }
 
+.statusPillActive.statusDraft {
+  background: #2563eb;
+  border-color: #1d4ed8;
+  color: #eff6ff;
+}
+
+.statusPillActive.statusSent {
+  background: #d97706;
+  border-color: #b45309;
+  color: #fffbeb;
+}
+
+.statusPillActive.statusApproved {
+  background: #16a34a;
+  border-color: #15803d;
+  color: #f0fdf4;
+}
+
+.statusPillActive.statusRejected {
+  background: #dc2626;
+  border-color: #b91c1c;
+  color: #fee2e2;
+}
+
+.statusPillActive.statusArchived {
+  background: #6b7280;
+  border-color: #4b5563;
+  color: #f9fafb;
+}
+
 .statusNote {
   min-height: 96px;
   resize: vertical;
@@ -1471,6 +1501,36 @@
 :global(html[data-theme="dark"]) .statusPillInactive {
   background: #0b1220;
   color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .statusPillActive.statusDraft {
+  background: #1d4ed8;
+  border-color: #3b82f6;
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .statusPillActive.statusSent {
+  background: #b45309;
+  border-color: #f59e0b;
+  color: #fef3c7;
+}
+
+:global(html[data-theme="dark"]) .statusPillActive.statusApproved {
+  background: #15803d;
+  border-color: #22c55e;
+  color: #dcfce7;
+}
+
+:global(html[data-theme="dark"]) .statusPillActive.statusRejected {
+  background: #991b1b;
+  border-color: #ef4444;
+  color: #fee2e2;
+}
+
+:global(html[data-theme="dark"]) .statusPillActive.statusArchived {
+  background: #4b5563;
+  border-color: #9ca3af;
+  color: #f3f4f6;
 }
 
 :global(html[data-theme="dark"]) .statusDraft {

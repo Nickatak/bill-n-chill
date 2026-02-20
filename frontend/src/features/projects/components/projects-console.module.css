@@ -66,6 +66,36 @@
   transform: translateY(-1px);
 }
 
+.projectFilterButtonActive.projectStatusProspect {
+  background: #2563eb;
+  border-color: #1d4ed8;
+  color: #eff6ff;
+}
+
+.projectFilterButtonActive.projectStatusActive {
+  background: #16a34a;
+  border-color: #15803d;
+  color: #f0fdf4;
+}
+
+.projectFilterButtonActive.projectStatusOnHold {
+  background: #eab308;
+  border-color: #ca8a04;
+  color: #422006;
+}
+
+.projectFilterButtonActive.projectStatusCompleted {
+  background: #6b7280;
+  border-color: #4b5563;
+  color: #f9fafb;
+}
+
+.projectFilterButtonActive.projectStatusCancelled {
+  background: #dc2626;
+  border-color: #b91c1c;
+  color: #fee2e2;
+}
+
 .projectFilterActions {
   display: flex;
   gap: 8px;
@@ -171,23 +201,23 @@
 }
 
 .projectStatusActive {
-  background: #bbf7d0;
-  color: #166534;
+  background: #22c55e;
+  color: #052e16;
 }
 
 .projectStatusOnHold {
-  background: #ffedd5;
-  color: #9a3412;
+  background: #fef08a;
+  color: #713f12;
 }
 
 .projectStatusCompleted {
-  background: #ccfbf1;
-  color: #0f766e;
+  background: #e5e7eb;
+  color: #4b5563;
 }
 
 .projectStatusCancelled {
-  background: #e5e7eb;
-  color: #6b7280;
+  background: #fecaca;
+  color: #991b1b;
 }
 
 .projectActionLink {
@@ -226,6 +256,36 @@
 
 :global(html[data-theme="dark"]) .projectFilterButtonActive {
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+:global(html[data-theme="dark"]) .projectFilterButtonActive.projectStatusProspect {
+  background: #1d4ed8;
+  border-color: #3b82f6;
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .projectFilterButtonActive.projectStatusActive {
+  background: #15803d;
+  border-color: #22c55e;
+  color: #dcfce7;
+}
+
+:global(html[data-theme="dark"]) .projectFilterButtonActive.projectStatusOnHold {
+  background: #a16207;
+  border-color: #facc15;
+  color: #fef9c3;
+}
+
+:global(html[data-theme="dark"]) .projectFilterButtonActive.projectStatusCompleted {
+  background: #4b5563;
+  border-color: #9ca3af;
+  color: #f3f4f6;
+}
+
+:global(html[data-theme="dark"]) .projectFilterButtonActive.projectStatusCancelled {
+  background: #991b1b;
+  border-color: #ef4444;
+  color: #fee2e2;
 }
 
 :global(html[data-theme="dark"]) .projectFilterActionButton {
@@ -282,23 +342,23 @@
 }
 
 :global(html[data-theme="dark"]) .projectStatusActive {
-  background: #0f3d22;
-  color: #86efac;
+  background: #166534;
+  color: #bbf7d0;
 }
 
 :global(html[data-theme="dark"]) .projectStatusOnHold {
-  background: #431407;
-  color: #fdba74;
+  background: #854d0e;
+  color: #fef9c3;
 }
 
 :global(html[data-theme="dark"]) .projectStatusCompleted {
-  background: #042f2e;
-  color: #99f6e4;
+  background: #374151;
+  color: #d1d5db;
 }
 
 :global(html[data-theme="dark"]) .projectStatusCancelled {
-  background: #334155;
-  color: #94a3b8;
+  background: #7f1d1d;
+  color: #fecaca;
 }
 
 :global(html[data-theme="dark"]) .projectActionLink {
@@ -586,6 +646,70 @@
   gap: 10px;
 }
 
+.projectStatusPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.projectStatusPill {
+  border: 1px solid #cbd5f5;
+  border-radius: 999px;
+  padding: 6px 12px;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.projectStatusPillInactive {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.projectStatusPillActive {
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+}
+
+.projectStatusPillActive.projectStatusProspect {
+  background: #2563eb;
+  border-color: #1d4ed8;
+  color: #eff6ff;
+}
+
+.projectStatusPillActive.projectStatusActive {
+  background: #16a34a;
+  border-color: #15803d;
+  color: #f0fdf4;
+}
+
+.projectStatusPillActive.projectStatusOnHold {
+  background: #eab308;
+  border-color: #ca8a04;
+  color: #422006;
+}
+
+.projectStatusPillActive.projectStatusCompleted {
+  background: #6b7280;
+  border-color: #4b5563;
+  color: #f9fafb;
+}
+
+.projectStatusPillActive.projectStatusCancelled {
+  background: #dc2626;
+  border-color: #b91c1c;
+  color: #fee2e2;
+}
+
+.projectProfileError {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.85rem;
+}
+
 @media (max-width: 980px) {
   .overviewGrid {
     grid-template-columns: 1fr;
@@ -667,6 +791,53 @@
 :global(html[data-theme="dark"]) .projectProfileForm {
   border-color: #334155;
   background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .projectStatusPill {
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .projectStatusPillInactive {
+  background: #0b1220;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .projectStatusPillActive {
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.25);
+}
+
+:global(html[data-theme="dark"]) .projectStatusPillActive.projectStatusProspect {
+  background: #1d4ed8;
+  border-color: #3b82f6;
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .projectStatusPillActive.projectStatusActive {
+  background: #15803d;
+  border-color: #22c55e;
+  color: #dcfce7;
+}
+
+:global(html[data-theme="dark"]) .projectStatusPillActive.projectStatusOnHold {
+  background: #a16207;
+  border-color: #facc15;
+  color: #fef9c3;
+}
+
+:global(html[data-theme="dark"]) .projectStatusPillActive.projectStatusCompleted {
+  background: #4b5563;
+  border-color: #9ca3af;
+  color: #f3f4f6;
+}
+
+:global(html[data-theme="dark"]) .projectStatusPillActive.projectStatusCancelled {
+  background: #991b1b;
+  border-color: #ef4444;
+  color: #fee2e2;
+}
+
+:global(html[data-theme="dark"]) .projectProfileError {
+  color: #fca5a5;
 }
 
 :global(html[data-theme="dark"]) .nodeCount {

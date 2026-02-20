@@ -249,14 +249,19 @@ def project_detail_view(request, project_id: int):
             status=400,
         )
 
-    if "contract_value_original" in request.data:
+    immutable_contract_fields = {
+        "contract_value_original": "Original contract value is immutable after project creation.",
+        "contract_value_current": "Current contract value is system-derived and cannot be edited directly.",
+    }
+    blocked_field = next((field for field in immutable_contract_fields if field in request.data), None)
+    if blocked_field:
         return Response(
             {
                 "error": {
                     "code": "validation_error",
-                    "message": "Original contract value is immutable after project creation.",
+                    "message": immutable_contract_fields[blocked_field],
                     "fields": {
-                        "contract_value_original": [
+                        blocked_field: [
                             "This field cannot be changed after project creation."
                         ]
                     },
@@ -284,6 +289,19 @@ def project_detail_view(request, project_id: int):
 
     serializer = ProjectProfileSerializer(project, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
+    next_start_date = serializer.validated_data.get("start_date_planned", project.start_date_planned)
+    next_end_date = serializer.validated_data.get("end_date_planned", project.end_date_planned)
+    if next_start_date and next_end_date and next_end_date < next_start_date:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "end_date_planned cannot be before start_date_planned.",
+                    "fields": {"end_date_planned": ["Planned end date must be on or after planned start date."]},
+                }
+            },
+            status=400,
+        )
     serializer.save()
     return Response({"data": ProjectProfileSerializer(project).data})
 

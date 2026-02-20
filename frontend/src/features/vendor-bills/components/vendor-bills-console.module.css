@@ -152,6 +152,42 @@
   transform: translateY(-1px);
 }
 
+.statusFilterButtonActive.statusFilterPlanned {
+  background: #2563eb;
+  border-color: #1d4ed8;
+  color: #eff6ff;
+}
+
+.statusFilterButtonActive.statusFilterReceived {
+  background: #d97706;
+  border-color: #b45309;
+  color: #fffbeb;
+}
+
+.statusFilterButtonActive.statusFilterApproved {
+  background: #16a34a;
+  border-color: #15803d;
+  color: #f0fdf4;
+}
+
+.statusFilterButtonActive.statusFilterScheduled {
+  background: #ca8a04;
+  border-color: #a16207;
+  color: #fffbeb;
+}
+
+.statusFilterButtonActive.statusFilterPaid {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #ecfeff;
+}
+
+.statusFilterButtonActive.statusFilterVoid {
+  background: #6b7280;
+  border-color: #4b5563;
+  color: #f9fafb;
+}
+
 .statusFilterPlanned {
   background: #dbeafe;
   color: #1d4ed8;
@@ -220,6 +256,42 @@
 .statusPillActive {
   box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.12);
   transform: translateY(-1px);
+}
+
+.statusPillActive.statusPillPlanned {
+  background: #2563eb;
+  border-color: #1d4ed8;
+  color: #eff6ff;
+}
+
+.statusPillActive.statusPillReceived {
+  background: #d97706;
+  border-color: #b45309;
+  color: #fffbeb;
+}
+
+.statusPillActive.statusPillApproved {
+  background: #16a34a;
+  border-color: #15803d;
+  color: #f0fdf4;
+}
+
+.statusPillActive.statusPillScheduled {
+  background: #ca8a04;
+  border-color: #a16207;
+  color: #fffbeb;
+}
+
+.statusPillActive.statusPillPaid {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #ecfeff;
+}
+
+.statusPillActive.statusPillVoid {
+  background: #6b7280;
+  border-color: #4b5563;
+  color: #f9fafb;
 }
 
 .statusPillPlanned {
@@ -422,6 +494,42 @@
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
 }
 
+:global(html[data-theme="dark"]) .statusFilterButtonActive.statusFilterPlanned {
+  background: #1d4ed8;
+  border-color: #3b82f6;
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .statusFilterButtonActive.statusFilterReceived {
+  background: #b45309;
+  border-color: #f59e0b;
+  color: #fef3c7;
+}
+
+:global(html[data-theme="dark"]) .statusFilterButtonActive.statusFilterApproved {
+  background: #15803d;
+  border-color: #22c55e;
+  color: #dcfce7;
+}
+
+:global(html[data-theme="dark"]) .statusFilterButtonActive.statusFilterScheduled {
+  background: #92400e;
+  border-color: #f59e0b;
+  color: #fef3c7;
+}
+
+:global(html[data-theme="dark"]) .statusFilterButtonActive.statusFilterPaid {
+  background: #0f766e;
+  border-color: #14b8a6;
+  color: #ccfbf1;
+}
+
+:global(html[data-theme="dark"]) .statusFilterButtonActive.statusFilterVoid {
+  background: #4b5563;
+  border-color: #9ca3af;
+  color: #f3f4f6;
+}
+
 :global(html[data-theme="dark"]) .statusFilterPlanned {
   background: #1e3a8a;
   color: #bfdbfe;
@@ -467,6 +575,42 @@
 
 :global(html[data-theme="dark"]) .statusPillActive {
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+:global(html[data-theme="dark"]) .statusPillActive.statusPillPlanned {
+  background: #1d4ed8;
+  border-color: #3b82f6;
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .statusPillActive.statusPillReceived {
+  background: #b45309;
+  border-color: #f59e0b;
+  color: #fef3c7;
+}
+
+:global(html[data-theme="dark"]) .statusPillActive.statusPillApproved {
+  background: #15803d;
+  border-color: #22c55e;
+  color: #dcfce7;
+}
+
+:global(html[data-theme="dark"]) .statusPillActive.statusPillScheduled {
+  background: #92400e;
+  border-color: #f59e0b;
+  color: #fef3c7;
+}
+
+:global(html[data-theme="dark"]) .statusPillActive.statusPillPaid {
+  background: #0f766e;
+  border-color: #14b8a6;
+  color: #ccfbf1;
+}
+
+:global(html[data-theme="dark"]) .statusPillActive.statusPillVoid {
+  background: #4b5563;
+  border-color: #9ca3af;
+  color: #f3f4f6;
 }
 
 :global(html[data-theme="dark"]) .statusPillPlanned {

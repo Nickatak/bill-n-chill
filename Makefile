@@ -5,7 +5,7 @@
 	local-up local-run local-run-frontend local-run-backend local-check-db \
 	local-migrate local-makemigrations local-superuser \
 	local-test local-test-backend local-test-frontend local-build local-lint local-clean \
-	dev-build dev-up dev-down dev-logs dev-ps dev-config dev-seed \
+	dev-build dev-up dev-down dev-logs dev-ps dev-config dev-seed dev-migrate \
 	dev-db-up dev-db-down dev-db-logs dev-db-reset \
 	prod-build prod-up prod-down prod-logs prod-ps prod-config prod-seed \
 	prod-db-up prod-db-down prod-db-logs prod-db-reset \
@@ -47,6 +47,7 @@ help:
 	@echo "  make dev-up                - Start full dev stack (frontend + backend + mysql)"
 	@echo "  make dev-down              - Stop dev stack"
 	@echo "  make dev-logs              - Stream dev stack logs"
+	@echo "  make dev-migrate           - Apply Django migrations against dev DB"
 	@echo "  make dev-db-up             - Start only MySQL container (for local host workflow)"
 	@echo "  make dev-db-down           - Stop only MySQL container"
 	@echo "  make dev-db-reset          - Drop dev DB volume and recreate MySQL container"
@@ -183,6 +184,9 @@ dev-config: local-env-local
 
 dev-seed: local-env-local local-check-db
 	$(BACKEND_MANAGE) seed_bob_demo
+
+dev-migrate: local-env-local local-check-db
+	$(BACKEND_MANAGE) migrate
 
 dev-db-up: local-env-local
 	$(DEV_COMPOSE) up -d $(DB_SERVICE)
