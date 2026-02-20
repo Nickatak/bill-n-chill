@@ -34,6 +34,17 @@ export default async function VendorBillsPage({ searchParams }: VendorBillsPageP
         <section className={styles.card}>
           <VendorBillsConsole />
         </section>
+        <section className={styles.card}>
+          <h2>Workflow Context</h2>
+          <p>
+            Vendor Bills are project-scoped AP records that track payables, budget allocation, and
+            cost realization states from planned through paid.
+          </p>
+          <p>
+            Use this route for contract/vendor obligations; use Expenses for quick field purchase
+            intake.
+          </p>
+        </section>
       </main>
     </div>
   );

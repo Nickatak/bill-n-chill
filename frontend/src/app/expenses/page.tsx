@@ -33,6 +33,17 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
             same-day field purchases, with room to layer in receipt scanning later.
           </p>
         </section>
+        <section className={styles.card}>
+          <h2>Workflow Context</h2>
+          <p>
+            Expenses are project-scoped quick-capture spend records for field/retail purchases
+            that still require budget attribution and downstream AP traceability.
+          </p>
+          <p>
+            This route complements Vendor Bills by covering ad hoc spend rather than formal vendor
+            contract billing.
+          </p>
+        </section>
       </main>
     </div>
   );

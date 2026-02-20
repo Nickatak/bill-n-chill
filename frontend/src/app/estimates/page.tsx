@@ -29,6 +29,16 @@ export default async function EstimatesPage({ searchParams }: EstimatesPageProps
         <section className={styles.card}>
           <EstimatesConsole />
         </section>
+        <section className={styles.card}>
+          <h2>Workflow Context</h2>
+          <p>
+            Estimates are client-facing scope and pricing records. Each estimate stays project-scoped
+            so revisions, approvals, and downstream conversion stay tied to one job.
+          </p>
+          <p>
+            Approved estimates become the baseline input for internal budget truth.
+          </p>
+        </section>
       </main>
     </div>
   );

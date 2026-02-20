@@ -2,42 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-const workflowRoutes = [
-  { href: "/intake/quick-add", label: "1 Intake" },
-  { href: "/projects", label: "2 Projects" },
-  { href: "/estimates-placeholder", label: "3 Estimates" },
-  { href: "/budgets-placeholder", label: "4 Budgets" },
-  { href: "/change-orders", label: "5 Change Orders" },
-  { href: "/invoices", label: "6 Invoices" },
-  { href: "/vendor-bills-placeholder", label: "7 Vendor Bills" },
-  { href: "/expenses-placeholder", label: "8 Expenses" },
-  { href: "/payments", label: "9 Payments" },
-];
+import { isRouteActive, workflowRoutes } from "./nav-routes";
 
 export function WorkflowNavbar() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
 
   return (
     <nav className="workflowNav" aria-label="MVP workflow order">
       <div className="workflowNavInner">
         <div className="workflowNavScroll">
           {workflowRoutes.map((route) => {
-            const isActive =
-              route.href === "/intake/quick-add"
-                ? pathname === "/" || pathname === "/intake/quick-add"
-                :
-              route.href === "/estimates-placeholder"
-                ? pathname === "/estimates-placeholder" ||
-                  pathname === "/estimates" ||
-                  pathname.startsWith("/estimates/")
-                : route.href === "/budgets-placeholder"
-                  ? pathname === "/budgets-placeholder" || pathname === "/budgets"
-                : route.href === "/vendor-bills-placeholder"
-                  ? pathname === "/vendor-bills-placeholder" || pathname === "/vendor-bills"
-                : route.href === "/expenses-placeholder"
-                  ? pathname === "/expenses-placeholder" || pathname === "/expenses"
-                : pathname === route.href;
+            const isActive = isRouteActive(pathname, route);
             return (
               <Link
                 key={route.href}

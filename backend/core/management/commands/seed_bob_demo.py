@@ -118,35 +118,43 @@ class Command(BaseCommand):
             },
         )
 
-        project, _ = Project.objects.get_or_create(
-            created_by=user,
-            customer=customer,
-            name=project_name,
-            defaults={
-                "status": Project.Status.ACTIVE,
-                "contract_value_original": Decimal("1000.00"),
-                "contract_value_current": Decimal("1200.00"),
-                "start_date_planned": today,
-                "end_date_planned": today + timedelta(days=21),
-            },
-        )
-        project.status = Project.Status.ACTIVE
-        project.contract_value_original = Decimal("1000.00")
-        project.contract_value_current = Decimal("1200.00")
-        if not project.start_date_planned:
-            project.start_date_planned = today
-        if not project.end_date_planned:
-            project.end_date_planned = today + timedelta(days=21)
-        project.save(
-            update_fields=[
-                "status",
-                "contract_value_original",
-                "contract_value_current",
-                "start_date_planned",
-                "end_date_planned",
-                "updated_at",
-            ]
-        )
+        # Status coverage dataset: ensure one deterministic project row per lifecycle
+        # state so each UI page can be previewed with realistic mixed populations.
+        project_rows_by_status = {}
+        for idx, (status, _) in enumerate(Project.Status.choices, start=1):
+            scoped_name = f"{project_name} [{status}]"
+            scoped_project, _ = Project.objects.get_or_create(
+                created_by=user,
+                customer=customer,
+                name=scoped_name,
+                defaults={
+                    "status": status,
+                    "contract_value_original": Decimal("1000.00") + Decimal(str(idx * 100)),
+                    "contract_value_current": Decimal("1100.00") + Decimal(str(idx * 100)),
+                    "start_date_planned": today + timedelta(days=idx),
+                    "end_date_planned": today + timedelta(days=idx + 21),
+                },
+            )
+            scoped_project.status = status
+            scoped_project.contract_value_original = Decimal("1000.00") + Decimal(str(idx * 100))
+            scoped_project.contract_value_current = Decimal("1100.00") + Decimal(str(idx * 100))
+            if not scoped_project.start_date_planned:
+                scoped_project.start_date_planned = today + timedelta(days=idx)
+            if not scoped_project.end_date_planned:
+                scoped_project.end_date_planned = today + timedelta(days=idx + 21)
+            scoped_project.save(
+                update_fields=[
+                    "status",
+                    "contract_value_original",
+                    "contract_value_current",
+                    "start_date_planned",
+                    "end_date_planned",
+                    "updated_at",
+                ]
+            )
+            project_rows_by_status[status] = scoped_project
+
+        project = project_rows_by_status[Project.Status.ACTIVE]
 
         lead, _ = LeadContact.objects.get_or_create(
             created_by=user,
@@ -558,42 +566,6 @@ class Command(BaseCommand):
                 "last_attempt_at": timezone.now(),
             },
         )
-
-        # Status coverage dataset: ensure one deterministic row per lifecycle state so
-        # each UI page can be previewed with realistic mixed populations.
-        project_rows_by_status = {}
-        for idx, (status, _) in enumerate(Project.Status.choices, start=1):
-            scoped_name = f"{project_name} [{status}]"
-            scoped_project, _ = Project.objects.get_or_create(
-                created_by=user,
-                customer=customer,
-                name=scoped_name,
-                defaults={
-                    "status": status,
-                    "contract_value_original": Decimal("1000.00") + Decimal(str(idx * 100)),
-                    "contract_value_current": Decimal("1100.00") + Decimal(str(idx * 100)),
-                    "start_date_planned": today + timedelta(days=idx),
-                    "end_date_planned": today + timedelta(days=idx + 21),
-                },
-            )
-            scoped_project.status = status
-            scoped_project.contract_value_original = Decimal("1000.00") + Decimal(str(idx * 100))
-            scoped_project.contract_value_current = Decimal("1100.00") + Decimal(str(idx * 100))
-            if not scoped_project.start_date_planned:
-                scoped_project.start_date_planned = today + timedelta(days=idx)
-            if not scoped_project.end_date_planned:
-                scoped_project.end_date_planned = today + timedelta(days=idx + 21)
-            scoped_project.save(
-                update_fields=[
-                    "status",
-                    "contract_value_original",
-                    "contract_value_current",
-                    "start_date_planned",
-                    "end_date_planned",
-                    "updated_at",
-                ]
-            )
-            project_rows_by_status[status] = scoped_project
 
         for idx, (status, _) in enumerate(LeadContact.Status.choices, start=1):
             lead_phone = f"555-22{idx:02d}"

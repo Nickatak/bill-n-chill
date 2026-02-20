@@ -35,10 +35,16 @@ if [[ ! -f "${src}" ]]; then
   exit 1
 fi
 
-if [[ -f "${dst}" && "${force}" != "--force" ]]; then
-  backup=".env.backup.$(date +%Y%m%d%H%M%S)"
-  cp "${dst}" "${backup}"
-  echo "Backed up existing ${dst} to ${backup}"
+if [[ -f "${dst}" ]]; then
+  if cmp -s "${src}" "${dst}"; then
+    echo "Active environment already set: ${target} (${src} == ${dst})"
+    exit 0
+  fi
+  if [[ "${force}" != "--force" ]]; then
+    backup=".env.backup.$(date +%Y%m%d%H%M%S)"
+    cp "${dst}" "${backup}"
+    echo "Backed up existing ${dst} to ${backup}"
+  fi
 fi
 
 cp "${src}" "${dst}"

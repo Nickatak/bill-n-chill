@@ -113,8 +113,8 @@ class BudgetTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
 
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()["meta"]["conversion_status"], "converted")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["meta"]["conversion_status"], "already_converted")
         self.assertEqual(response.json()["data"]["approved_change_order_total"], "0.00")
         self.assertEqual(response.json()["data"]["base_working_total"], "500.00")
         self.assertEqual(response.json()["data"]["current_working_total"], "500.00")
@@ -149,7 +149,8 @@ class BudgetTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
 
-        self.assertEqual(first.status_code, 201)
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.json()["meta"]["conversion_status"], "already_converted")
         self.assertEqual(second.status_code, 200)
         self.assertEqual(second.json()["meta"]["conversion_status"], "already_converted")
         self.assertEqual(Budget.objects.count(), 1)
@@ -163,7 +164,7 @@ class BudgetTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(first_conversion.status_code, 201)
+        self.assertEqual(first_conversion.status_code, 200)
         first_budget_id = first_conversion.json()["data"]["id"]
 
         second_estimate_id = self._create_estimate(title="Approved Estimate B", unit_cost="700")
@@ -174,7 +175,7 @@ class BudgetTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(second_conversion.status_code, 201)
+        self.assertEqual(second_conversion.status_code, 200)
 
         first_budget = Budget.objects.get(id=first_budget_id)
         second_budget = Budget.objects.get(id=second_conversion.json()["data"]["id"])
@@ -191,7 +192,7 @@ class BudgetTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(conversion.status_code, 201)
+        self.assertEqual(conversion.status_code, 200)
         budget_id = conversion.json()["data"]["id"]
         line_id = conversion.json()["data"]["line_items"][0]["id"]
 
@@ -247,7 +248,7 @@ class BudgetTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(conversion.status_code, 201)
+        self.assertEqual(conversion.status_code, 200)
         budget_line_id = conversion.json()["data"]["line_items"][0]["id"]
 
         vendor = Vendor.objects.create(
@@ -282,4 +283,3 @@ class BudgetTests(TestCase):
         self.assertEqual(line["planned_amount"], "500.00")
         self.assertEqual(line["actual_spend"], "125.00")
         self.assertEqual(line["remaining_amount"], "375.00")
-

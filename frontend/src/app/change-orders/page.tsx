@@ -12,7 +12,7 @@ export default function ChangeOrdersPage() {
             from draft through approval/rejection/void.
           </p>
           <p>
-            Approved deltas update project contract current and budget aggregates, which directly
+            Approved deltas update the accepted contract total and budget aggregates, which directly
             affects invoice eligibility and overall project financial summary accuracy.
           </p>
         </header>

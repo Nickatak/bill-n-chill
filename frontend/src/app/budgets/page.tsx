@@ -30,6 +30,16 @@ export default async function BudgetsPage({ searchParams }: BudgetsPageProps) {
         <section className={styles.card}>
           <BudgetsConsole scopedProjectId={project} />
         </section>
+        <section className={styles.card}>
+          <h2>Workflow Context</h2>
+          <p>
+            Budgets are internal execution baselines derived from approved estimates. They are
+            scoped per project to keep planned, committed, and actual cost tracking isolated by job.
+          </p>
+          <p>
+            This is the internal cost-control layer, not the client-facing estimate surface.
+          </p>
+        </section>
       </main>
     </div>
   );

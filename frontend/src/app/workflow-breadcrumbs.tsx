@@ -107,6 +107,14 @@ const hierarchyRules: HierarchyRule[] = [
     ],
   },
   {
+    when: (pathname) => pathname === "/financials-auditing",
+    crumbs: [
+      PROJECTS_HUB_CRUMB,
+      { href: "/financials-auditing", label: "Meta" },
+      { href: "/financials-auditing", label: "Financials & Auditing" },
+    ],
+  },
+  {
     when: (pathname) => pathname === "/settings/intake",
     crumbs: [
       PROJECTS_HUB_CRUMB,

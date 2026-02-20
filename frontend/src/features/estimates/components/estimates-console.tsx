@@ -7,6 +7,10 @@ import styles from "./estimates-console.module.css";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
+  formatDateInputFromIso,
+  formatDateTimeDisplay,
+} from "../../../shared/date-format";
+import {
   ApiResponse,
   CostCode,
   EstimateLineInput,
@@ -139,17 +143,7 @@ export function EstimatesConsole() {
   }
 
   function formatEventDate(dateValue: string): string {
-    const parsed = new Date(dateValue);
-    if (Number.isNaN(parsed.getTime())) {
-      return dateValue;
-    }
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    }).format(parsed);
+    return formatDateTimeDisplay(dateValue, dateValue);
   }
 
   function formatEstimateLastActionDate(estimate: EstimateRecord): string {
@@ -235,14 +229,7 @@ export function EstimatesConsole() {
   }
 
   function formatDateFromIso(dateValue?: string): string {
-    if (!dateValue) {
-      return "";
-    }
-    const parsed = new Date(dateValue);
-    if (Number.isNaN(parsed.getTime())) {
-      return "";
-    }
-    return formatDateInput(parsed);
+    return formatDateInputFromIso(dateValue);
   }
 
   function mapLineItemsToInputs(items: EstimateLineItemRecord[] = []): EstimateLineInput[] {

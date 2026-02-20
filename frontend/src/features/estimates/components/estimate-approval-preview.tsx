@@ -6,6 +6,7 @@ import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { EstimateSheet } from "./estimate-sheet";
 import styles from "./estimates-console.module.css";
 import { ApiResponse, CostCode, EstimateLineInput, EstimateRecord, ProjectRecord } from "../types";
+import { formatDateInputFromIso } from "../../../shared/date-format";
 
 type EstimateApprovalPreviewProps = {
   publicToken: string;
@@ -13,17 +14,6 @@ type EstimateApprovalPreviewProps = {
 
 function formatDateInput(date: Date): string {
   return date.toISOString().slice(0, 10);
-}
-
-function formatDateFromIso(dateValue?: string): string {
-  if (!dateValue) {
-    return "";
-  }
-  const parsed = new Date(dateValue);
-  if (Number.isNaN(parsed.getTime())) {
-    return "";
-  }
-  return formatDateInput(parsed);
 }
 
 function mapLineItemsToInputs(estimate: EstimateRecord | null): EstimateLineInput[] {
@@ -68,7 +58,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const lineItems = useMemo(() => mapLineItemsToInputs(estimate), [estimate]);
   const costCodes = useMemo(() => mapLineCostCodes(estimate), [estimate]);
-  const estimateDate = formatDateFromIso(estimate?.created_at);
+  const estimateDate = formatDateInputFromIso(estimate?.created_at);
   const dueDate = useMemo(() => {
     if (!estimateDate) {
       return "";

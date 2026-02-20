@@ -4,6 +4,7 @@ import { clearClientSession } from "@/features/session/client-session";
 import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { isRouteActive, opsMetaRoutes } from "./nav-routes";
 
 const THEME_KEY = "bnc-theme";
 type ThemeMode = "light" | "dark";
@@ -18,15 +19,12 @@ function applyTheme(theme: ThemeMode) {
 }
 
 export function ThemeToggle() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const router = useRouter();
   const { token } = useSharedSessionAuth();
   const hasSession = Boolean(token);
   const isPublicEstimateRoute = Boolean(pathname && /^\/estimate\/[^/]+\/?$/.test(pathname));
-  const hasActiveContacts = pathname === "/contacts";
-  const hasActiveVendors = pathname === "/vendors";
-  const hasActiveCostCodes = pathname === "/cost-codes";
-  const hasActiveSettings = pathname === "/settings/intake";
+  const hasActiveOpsMeta = opsMetaRoutes.some((route) => isRouteActive(pathname, route));
 
   function toggleTheme() {
     const current =
@@ -50,51 +48,20 @@ export function ThemeToggle() {
       ) : null}
       {hasSession && !isPublicEstimateRoute ? (
         <details className="nonWorkflowMenu">
-          <summary
-            className={`themeControlButton ${
-              hasActiveContacts || hasActiveVendors || hasActiveCostCodes ? "isActive" : ""
-            }`}
-          >
-            Non-Workflow
+          <summary className={`themeControlButton ${hasActiveOpsMeta ? "isActive" : ""}`}>
+            Ops / Meta
           </summary>
-          <div className="nonWorkflowList" role="menu" aria-label="Non-workflow tools">
-            <Link
-              href="/contacts"
-              className={`nonWorkflowItem ${hasActiveContacts ? "isActive" : ""}`}
-              role="menuitem"
-            >
-              Contacts
-            </Link>
-            <Link
-              href="/vendors"
-              className={`nonWorkflowItem ${hasActiveVendors ? "isActive" : ""}`}
-              role="menuitem"
-            >
-              Vendors
-            </Link>
-            <Link
-              href="/cost-codes"
-              className={`nonWorkflowItem ${hasActiveCostCodes ? "isActive" : ""}`}
-              role="menuitem"
-            >
-              Cost Codes
-            </Link>
-          </div>
-        </details>
-      ) : null}
-      {hasSession && !isPublicEstimateRoute ? (
-        <details className="nonWorkflowMenu">
-          <summary className={`themeControlButton ${hasActiveSettings ? "isActive" : ""}`}>
-            Settings
-          </summary>
-          <div className="nonWorkflowList" role="menu" aria-label="Settings">
-            <Link
-              href="/settings/intake"
-              className={`nonWorkflowItem ${hasActiveSettings ? "isActive" : ""}`}
-              role="menuitem"
-            >
-              Intake Form
-            </Link>
+          <div className="nonWorkflowList" role="menu" aria-label="Ops and metadata tools">
+            {opsMetaRoutes.map((route) => (
+              <Link
+                key={route.href}
+                href={route.href}
+                className={`nonWorkflowItem ${isRouteActive(pathname, route) ? "isActive" : ""}`}
+                role="menuitem"
+              >
+                {route.label}
+              </Link>
+            ))}
           </div>
         </details>
       ) : null}

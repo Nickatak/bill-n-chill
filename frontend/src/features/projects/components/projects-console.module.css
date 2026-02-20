@@ -610,6 +610,16 @@
   color: #1e3a8a;
 }
 
+.nodeCountOk {
+  background: #bbf7d0;
+  color: #166534;
+}
+
+.nodeCountReadyForBudget {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
 .metricsPanel {
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -843,6 +853,16 @@
 :global(html[data-theme="dark"]) .nodeCount {
   background: #1e293b;
   color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .nodeCountOk {
+  background: #14532d;
+  color: #bbf7d0;
+}
+
+:global(html[data-theme="dark"]) .nodeCountReadyForBudget {
+  background: #1e3a8a;
+  color: #dbeafe;
 }
 
 :global(html[data-theme="dark"]) .estimateCountPill {

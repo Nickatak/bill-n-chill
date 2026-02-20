@@ -62,6 +62,14 @@ class FinancialAuditTrailTests(TestCase):
         self.assertEqual(estimate_create.status_code, 201)
         estimate_id = estimate_create.json()["data"]["id"]
 
+        to_sent = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"status": "sent", "status_note": "Sent to owner."},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_sent.status_code, 200)
+
         to_approved = self.client.patch(
             f"/api/v1/estimates/{estimate_id}/",
             data={"status": "approved", "status_note": "Owner approved."},
@@ -76,7 +84,7 @@ class FinancialAuditTrailTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(budget_convert.status_code, 201)
+        self.assertEqual(budget_convert.status_code, 200)
 
         change_order_create = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",

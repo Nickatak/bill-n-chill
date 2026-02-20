@@ -509,6 +509,56 @@ class EstimateTests(TestCase):
         )
         self.assertEqual(to_approved.status_code, 200)
         self.assertEqual(to_approved.json()["data"]["status"], "approved")
+        self.assertEqual(Budget.objects.filter(source_estimate_id=estimate_id).count(), 1)
+
+    def test_estimate_approval_auto_converts_to_budget_and_manual_convert_is_idempotent(self):
+        create = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Auto Budget Estimate",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo and prep",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(create.status_code, 201)
+        estimate_id = create.json()["data"]["id"]
+
+        to_sent = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_sent.status_code, 200)
+
+        to_approved = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"status": "approved"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_approved.status_code, 200)
+        self.assertEqual(Budget.objects.filter(source_estimate_id=estimate_id).count(), 1)
+
+        convert = self.client.post(
+            f"/api/v1/estimates/{estimate_id}/convert-to-budget/",
+            data={},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(convert.status_code, 200)
+        self.assertEqual(convert.json()["meta"]["conversion_status"], "already_converted")
+        self.assertEqual(Budget.objects.filter(source_estimate_id=estimate_id).count(), 1)
 
     def test_estimate_status_transition_rejects_user_archived_status(self):
         create = self.client.post(

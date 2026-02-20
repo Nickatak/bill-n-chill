@@ -88,6 +88,40 @@ def _next_estimate_family_version(*, project, user, title):
     return (latest.version + 1) if latest else 1
 
 
+def _ensure_budget_from_approved_estimate(*, estimate, user, note: str):
+    existing = (
+        Budget.objects.filter(source_estimate=estimate, created_by=user)
+        .select_related("source_estimate")
+        .prefetch_related("line_items", "line_items__cost_code")
+        .first()
+    )
+    if existing:
+        return existing, "already_converted"
+
+    budget = _create_budget_from_estimate(estimate=estimate, user=user)
+    budget = (
+        Budget.objects.filter(id=budget.id)
+        .select_related("source_estimate")
+        .prefetch_related("line_items", "line_items__cost_code")
+        .get()
+    )
+    _record_financial_audit_event(
+        project=estimate.project,
+        event_type=FinancialAuditEvent.EventType.BUDGET_CONVERTED,
+        object_type="budget",
+        object_id=budget.id,
+        to_status=budget.status,
+        amount=estimate.grand_total,
+        note=note,
+        created_by=user,
+        metadata={
+            "estimate_id": estimate.id,
+            "estimate_version": estimate.version,
+        },
+    )
+    return budget, "converted"
+
+
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_estimates_view(request, project_id: int):
@@ -375,8 +409,12 @@ def estimate_detail_view(request, estimate_id: int):
             note=status_note,
             changed_by=request.user,
         )
-        # TODO: Consider optional auto-convert on approval (sent -> approved) once workflow policy is finalized.
-        # Current intentional behavior is manual budget conversion from the Budgets console.
+        if estimate.status == Estimate.Status.APPROVED:
+            _ensure_budget_from_approved_estimate(
+                estimate=estimate,
+                user=request.user,
+                note=f"Budget auto-converted from approved estimate #{estimate.id}.",
+            )
 
     estimate.refresh_from_db()
     return Response({"data": EstimateSerializer(estimate).data})
@@ -620,42 +658,12 @@ def estimate_convert_to_budget_view(request, estimate_id: int):
             status=400,
         )
 
-    existing = (
-        Budget.objects.filter(source_estimate=estimate, created_by=request.user)
-        .select_related("source_estimate")
-        .prefetch_related("line_items", "line_items__cost_code")
-        .first()
-    )
-    if existing:
-        return Response(
-            {
-                "data": BudgetSerializer(existing).data,
-                "meta": {"conversion_status": "already_converted"},
-            }
-        )
-
-    budget = _create_budget_from_estimate(estimate=estimate, user=request.user)
-    budget = (
-        Budget.objects.filter(id=budget.id)
-        .select_related("source_estimate")
-        .prefetch_related("line_items", "line_items__cost_code")
-        .get()
-    )
-    _record_financial_audit_event(
-        project=estimate.project,
-        event_type=FinancialAuditEvent.EventType.BUDGET_CONVERTED,
-        object_type="budget",
-        object_id=budget.id,
-        to_status=budget.status,
-        amount=estimate.grand_total,
+    budget, conversion_status = _ensure_budget_from_approved_estimate(
+        estimate=estimate,
+        user=request.user,
         note=f"Budget converted from estimate #{estimate.id}.",
-        created_by=request.user,
-        metadata={
-            "estimate_id": estimate.id,
-            "estimate_version": estimate.version,
-        },
     )
     return Response(
-        {"data": BudgetSerializer(budget).data, "meta": {"conversion_status": "converted"}},
-        status=201,
+        {"data": BudgetSerializer(budget).data, "meta": {"conversion_status": conversion_status}},
+        status=201 if conversion_status == "converted" else 200,
     )
