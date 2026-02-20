@@ -8,6 +8,9 @@ from core.models import Budget, BudgetLine
 class BudgetLineSerializer(serializers.ModelSerializer):
     cost_code_code = serializers.CharField(source="cost_code.code", read_only=True)
     cost_code_name = serializers.CharField(source="cost_code.name", read_only=True)
+    planned_amount = serializers.SerializerMethodField()
+    actual_spend = serializers.SerializerMethodField()
+    remaining_amount = serializers.SerializerMethodField()
 
     class Meta:
         model = BudgetLine
@@ -19,6 +22,9 @@ class BudgetLineSerializer(serializers.ModelSerializer):
             "cost_code_name",
             "description",
             "budget_amount",
+            "planned_amount",
+            "actual_spend",
+            "remaining_amount",
             "committed_amount",
             "actual_amount",
             "created_at",
@@ -32,6 +38,19 @@ class BudgetLineSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def get_planned_amount(self, obj):
+        return str(obj.budget_amount or Decimal("0"))
+
+    def get_actual_spend(self, obj):
+        spend_map = self.context.get("line_actual_spend_map", {})
+        return str(spend_map.get(obj.id, Decimal("0")))
+
+    def get_remaining_amount(self, obj):
+        spend_map = self.context.get("line_actual_spend_map", {})
+        actual_spend = spend_map.get(obj.id, Decimal("0"))
+        planned_amount = obj.budget_amount or Decimal("0")
+        return str(planned_amount - actual_spend)
 
 
 class BudgetSerializer(serializers.ModelSerializer):

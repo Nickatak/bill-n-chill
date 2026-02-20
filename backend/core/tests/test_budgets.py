@@ -238,4 +238,48 @@ class BudgetTests(TestCase):
         )
         self.assertEqual(other_project_response.status_code, 404)
 
+    def test_project_budgets_list_includes_line_planned_actual_and_remaining_amounts(self):
+        estimate_id = self._create_estimate(title="Approved Estimate", unit_cost="500")
+        self._approve_estimate(estimate_id)
+        conversion = self.client.post(
+            f"/api/v1/estimates/{estimate_id}/convert-to-budget/",
+            data={},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(conversion.status_code, 201)
+        budget_line_id = conversion.json()["data"]["line_items"][0]["id"]
+
+        vendor = Vendor.objects.create(
+            name="Spend Vendor",
+            email="ap@spend-vendor.example.com",
+            created_by=self.user,
+        )
+        paid_bill = VendorBill.objects.create(
+            project=self.project,
+            vendor=vendor,
+            bill_number="B-PLANNED-1",
+            status=VendorBill.Status.PAID,
+            issue_date="2026-02-20",
+            due_date="2026-03-20",
+            total="125.00",
+            balance_due="0.00",
+            created_by=self.user,
+        )
+        VendorBillAllocation.objects.create(
+            vendor_bill=paid_bill,
+            budget_line_id=budget_line_id,
+            amount="125.00",
+            note="Paid allocation",
+        )
+
+        response = self.client.get(
+            f"/api/v1/projects/{self.project.id}/budgets/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        line = response.json()["data"][0]["line_items"][0]
+        self.assertEqual(line["planned_amount"], "500.00")
+        self.assertEqual(line["actual_spend"], "125.00")
+        self.assertEqual(line["remaining_amount"], "375.00")
 

@@ -1,16 +1,52 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import {
   ApiResponse,
   ProjectRecord,
+  VendorBillAllocationInput,
   VendorBillPayload,
   VendorBillRecord,
   VendorRecord,
 } from "../types";
+import styles from "./vendor-bills-console.module.css";
+
+type VendorBillStatus = "planned" | "received" | "approved" | "scheduled" | "paid" | "void";
+
+const billStatuses: VendorBillStatus[] = [
+  "planned",
+  "received",
+  "approved",
+  "scheduled",
+  "paid",
+  "void",
+];
+const defaultBillStatusFilters: VendorBillStatus[] = billStatuses.filter(
+  (status) => status !== "void",
+);
+
+const allowedStatusTransitions: Record<VendorBillStatus, VendorBillStatus[]> = {
+  planned: ["received", "void"],
+  received: ["approved", "void"],
+  approved: ["scheduled", "paid", "void"],
+  scheduled: ["paid", "void"],
+  paid: ["void"],
+  void: [],
+};
+const createStatusOptions: VendorBillStatus[] = ["planned", "received"];
+
+const statusLabelByValue: Record<VendorBillStatus, string> = {
+  planned: "planned",
+  received: "received",
+  approved: "approved",
+  scheduled: "scheduled",
+  paid: "paid",
+  void: "void",
+};
 
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
@@ -23,46 +59,324 @@ function dueDateIsoDate(daysFromNow = 30) {
 }
 
 export function VendorBillsConsole() {
+  const searchParams = useSearchParams();
   const { token } = useSharedSessionAuth();
+  const pageSize = 5;
   const [statusMessage, setStatusMessage] = useState("");
+  const [createErrorMessage, setCreateErrorMessage] = useState("");
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [vendors, setVendors] = useState<VendorRecord[]>([]);
   const [vendorBills, setVendorBills] = useState<VendorBillRecord[]>([]);
+  const [budgetLineGroups, setBudgetLineGroups] = useState<
+    Array<{
+      budgetId: number;
+      budgetLabel: string;
+      lines: Array<{
+        id: number;
+        label: string;
+        planned_amount: string;
+        actual_spend: string;
+        remaining_amount: string;
+      }>;
+    }>
+  >([]);
 
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [selectedVendorBillId, setSelectedVendorBillId] = useState("");
+  const [billStatusFilters, setBillStatusFilters] = useState<VendorBillStatus[]>(
+    defaultBillStatusFilters,
+  );
+  const [currentBillPage, setCurrentBillPage] = useState(1);
 
   const [newVendorId, setNewVendorId] = useState("");
   const [newBillNumber, setNewBillNumber] = useState("");
   const [newIssueDate, setNewIssueDate] = useState("");
   const [newDueDate, setNewDueDate] = useState("");
+  const [newScheduledFor, setNewScheduledFor] = useState("");
+  const [newStatus, setNewStatus] = useState<VendorBillStatus>("received");
   const [newTotal, setNewTotal] = useState("0.00");
   const [newNotes, setNewNotes] = useState("");
+  const [newAllocations, setNewAllocations] = useState<VendorBillAllocationInput[]>([
+    { budget_line: 0, amount: "", note: "" },
+  ]);
 
   const [vendorId, setVendorId] = useState("");
   const [billNumber, setBillNumber] = useState("");
   const [issueDate, setIssueDate] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [scheduledFor, setScheduledFor] = useState("");
   const [total, setTotal] = useState("0.00");
   const [notes, setNotes] = useState("");
-  const [status, setStatus] = useState<
-    "draft" | "received" | "approved" | "scheduled" | "paid" | "void"
-  >("draft");
+  const [allocations, setAllocations] = useState<VendorBillAllocationInput[]>([
+    { budget_line: 0, amount: "", note: "" },
+  ]);
+  const [status, setStatus] = useState<VendorBillStatus>("planned");
   const [duplicateOverrideOnSave, setDuplicateOverrideOnSave] = useState(false);
 
   const [duplicateCandidates, setDuplicateCandidates] = useState<VendorBillRecord[]>([]);
   const [pendingCreatePayload, setPendingCreatePayload] = useState<VendorBillPayload | null>(null);
+  const activeVendors = vendors.filter((vendor) => vendor.is_active);
+  const filteredVendorBills = vendorBills.filter((bill) =>
+    billStatusFilters.length === 0 ? false : billStatusFilters.includes(bill.status),
+  );
+  const totalBillPages = Math.max(1, Math.ceil(filteredVendorBills.length / pageSize));
+  const currentBillPageSafe = Math.min(currentBillPage, totalBillPages);
+  const billPageStartIndex = (currentBillPageSafe - 1) * pageSize;
+  const pagedVendorBills = filteredVendorBills.slice(
+    billPageStartIndex,
+    billPageStartIndex + pageSize,
+  );
+  const createAllocationTotal = newAllocations.reduce((sum, row) => {
+    const amount = Number(row.amount || 0);
+    return sum + (Number.isFinite(amount) ? amount : 0);
+  }, 0);
+  const createBillTotal = Number(newTotal || 0);
+  const createUnallocated = createBillTotal - createAllocationTotal;
+  const editAllocationTotal = allocations.reduce((sum, row) => {
+    const amount = Number(row.amount || 0);
+    return sum + (Number.isFinite(amount) ? amount : 0);
+  }, 0);
+  const editBillTotal = Number(total || 0);
+  const editUnallocated = editBillTotal - editAllocationTotal;
+  const allocationEpsilon = 0.000001;
+  const createIsOverAllocated = createUnallocated < -allocationEpsilon;
+  const editIsOverAllocated = editUnallocated < -allocationEpsilon;
+  const hasBudgetLineOptions = budgetLineGroups.length > 0;
+  const createSuggestedTotal = createAllocationTotal.toFixed(2);
+  const editSuggestedTotal = editAllocationTotal.toFixed(2);
+  const budgetLineMetaById = useMemo(() => {
+    const entries = budgetLineGroups.flatMap((group) =>
+      group.lines.map((line) => [line.id, line] as const),
+    );
+    return new Map(entries);
+  }, [budgetLineGroups]);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+  const scopedProjectIdParam = searchParams.get("project");
+  const scopedProjectId =
+    scopedProjectIdParam && /^\d+$/.test(scopedProjectIdParam)
+      ? Number(scopedProjectIdParam)
+      : null;
+  const isProjectScoped = scopedProjectId !== null;
+  const selectedProject =
+    projects.find((project) => String(project.id) === selectedProjectId) ?? null;
+  const selectedVendorBill =
+    vendorBills.find((vendorBill) => String(vendorBill.id) === selectedVendorBillId) ?? null;
+  const isEditingMode = Boolean(selectedVendorBillId);
+  const formVendorId = isEditingMode ? vendorId : newVendorId;
+  const formBillNumber = isEditingMode ? billNumber : newBillNumber;
+  const formIssueDate = isEditingMode ? issueDate : newIssueDate;
+  const formDueDate = isEditingMode ? dueDate : newDueDate;
+  const formScheduledFor = isEditingMode ? scheduledFor : newScheduledFor;
+  const formTotal = isEditingMode ? total : newTotal;
+  const formNotes = isEditingMode ? notes : newNotes;
+  const formAllocations = isEditingMode ? allocations : newAllocations;
+  const formAllocationTotal = isEditingMode ? editAllocationTotal : createAllocationTotal;
+  const formUnallocated = isEditingMode ? editUnallocated : createUnallocated;
+  const formIsOverAllocated = isEditingMode ? editIsOverAllocated : createIsOverAllocated;
+  const formSuggestedTotal = isEditingMode ? editSuggestedTotal : createSuggestedTotal;
+  const formStatus: VendorBillStatus = isEditingMode ? status : newStatus;
+  const canEditScheduledFor = formStatus === "approved" || formStatus === "scheduled";
+  const persistedStatus = selectedVendorBill?.status ?? status;
+  const hasPendingStatusChange = isEditingMode && status !== persistedStatus;
+  const formRequiresFullAllocation =
+    isEditingMode && hasPendingStatusChange && (status === "approved" || status === "paid");
+  const formRequiresScheduledFor = isEditingMode && status === "scheduled";
+  const hasAllocationMismatch = Math.abs(formUnallocated) > allocationEpsilon;
+  const allowedEditStatuses = isEditingMode
+    ? [persistedStatus, ...(allowedStatusTransitions[persistedStatus] ?? [])]
+        .filter((value, index, source) => source.indexOf(value) === index)
+        .filter((value) => value !== "planned")
+    : [];
+  const hasUnsavedChanges = useMemo(() => {
+    if (!isEditingMode || !selectedVendorBill) {
+      return false;
+    }
+
+    const persistedAllocations = (selectedVendorBill.allocations ?? []).map((row) => ({
+      budget_line: Number(row.budget_line || 0),
+      amount: row.amount ?? "",
+      note: row.note ?? "",
+    }));
+    const formAllocationsNormalized = allocations.map((row) => ({
+      budget_line: Number(row.budget_line || 0),
+      amount: row.amount ?? "",
+      note: row.note ?? "",
+    }));
+
+    return (
+      String(vendorId || "") !== String(selectedVendorBill.vendor || "") ||
+      billNumber !== (selectedVendorBill.bill_number ?? "") ||
+      issueDate !== (selectedVendorBill.issue_date ?? "") ||
+      dueDate !== (selectedVendorBill.due_date ?? "") ||
+      (scheduledFor || "") !== (selectedVendorBill.scheduled_for ?? "") ||
+      total !== (selectedVendorBill.total ?? "") ||
+      notes !== (selectedVendorBill.notes ?? "") ||
+      status !== selectedVendorBill.status ||
+      JSON.stringify(formAllocationsNormalized) !== JSON.stringify(persistedAllocations)
+    );
+  }, [
+    allocations,
+    billNumber,
+    dueDate,
+    isEditingMode,
+    issueDate,
+    notes,
+    scheduledFor,
+    selectedVendorBill,
+    status,
+    total,
+    vendorId,
+  ]);
+
+  function setFormVendorId(value: string) {
+    if (isEditingMode) {
+      setVendorId(value);
+    } else {
+      setNewVendorId(value);
+    }
+  }
+
+  function setFormBillNumber(value: string) {
+    if (isEditingMode) {
+      setBillNumber(value);
+    } else {
+      setNewBillNumber(value);
+    }
+  }
+
+  function setFormIssueDate(value: string) {
+    if (isEditingMode) {
+      setIssueDate(value);
+    } else {
+      setNewIssueDate(value);
+    }
+  }
+
+  function setFormDueDate(value: string) {
+    if (isEditingMode) {
+      setDueDate(value);
+    } else {
+      setNewDueDate(value);
+    }
+  }
+
+  function setFormScheduledFor(value: string) {
+    if (isEditingMode) {
+      if (value && value < todayIsoDate()) {
+        setStatusMessage("Scheduled for date cannot be in the past.");
+        return;
+      }
+      setScheduledFor(value);
+      if (value && status !== "scheduled") {
+        setStatus("scheduled");
+      }
+    } else {
+      setNewScheduledFor(value);
+    }
+  }
+
+  function setFormTotal(value: string) {
+    if (isEditingMode) {
+      setTotal(value);
+    } else {
+      setNewTotal(value);
+    }
+  }
+
+  function setFormNotes(value: string) {
+    if (isEditingMode) {
+      setNotes(value);
+    } else {
+      setNewNotes(value);
+    }
+  }
+
+  function setFormAllocations(next: VendorBillAllocationInput[]) {
+    if (isEditingMode) {
+      setAllocations(next);
+    } else {
+      setNewAllocations(next);
+    }
+  }
+
+  function updateFormAllocation(index: number, patch: Partial<VendorBillAllocationInput>) {
+    const next = [...formAllocations];
+    next[index] = { ...next[index], ...patch };
+    setFormAllocations(next);
+  }
+
+  function removeFormAllocation(index: number) {
+    const current = formAllocations;
+    setFormAllocations(
+      current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : current,
+    );
+  }
+
+  function addFormAllocation() {
+    setFormAllocations([...formAllocations, { budget_line: 0, amount: "", note: "" }]);
+  }
+
+  function formatMoney(value?: string): string {
+    const parsed = Number(value ?? "0");
+    return Number.isFinite(parsed) ? parsed.toFixed(2) : "0.00";
+  }
+
+  function handleSubmitVendorBillForm(event: FormEvent<HTMLFormElement>) {
+    if (isEditingMode) {
+      void handleSaveVendorBill(event);
+      return;
+    }
+    void handleCreateVendorBill(event);
+  }
+
   function hydrate(item: VendorBillRecord) {
     setVendorId(String(item.vendor));
     setBillNumber(item.bill_number);
     setIssueDate(item.issue_date);
     setDueDate(item.due_date);
+    setScheduledFor(item.scheduled_for ?? "");
     setTotal(item.total);
     setNotes(item.notes);
     setStatus(item.status);
+    const mapped =
+      item.allocations?.map((row) => ({
+        budget_line: row.budget_line,
+        amount: row.amount,
+        note: row.note || "",
+      })) ?? [];
+    setAllocations(mapped.length > 0 ? mapped : [{ budget_line: 0, amount: "", note: "" }]);
+  }
+
+  function statusImpactLabel(value: VendorBillRecord["status"]): string {
+    if (value === "paid") {
+      return "actual";
+    }
+    if (value === "void") {
+      return "excluded";
+    }
+    return "committed";
+  }
+
+  function statusDisplayLabel(value: VendorBillStatus): string {
+    return statusLabelByValue[value] ?? value;
+  }
+
+  function statusBadgeClass(value: VendorBillStatus): string {
+    return styles[`tableStatus${value[0].toUpperCase()}${value.slice(1)}`] ?? "";
+  }
+
+  function statusPillClass(value: VendorBillStatus): string {
+    return styles[`statusPill${value[0].toUpperCase()}${value.slice(1)}`] ?? "";
+  }
+
+  function toggleBillStatusFilter(nextStatus: VendorBillStatus) {
+    setBillStatusFilters((current) =>
+      current.includes(nextStatus)
+        ? current.filter((status) => status !== nextStatus)
+        : [...current, nextStatus],
+    );
   }
 
   async function loadDependencies() {
@@ -91,8 +405,21 @@ export function VendorBillsConsole() {
       setProjects(projectRows);
       setVendors(vendorRows);
 
-      if (projectRows[0]) {
-        setSelectedProjectId(String(projectRows[0].id));
+      if (projectRows.length > 0) {
+        const scopedProject = scopedProjectId
+          ? projectRows.find((row) => row.id === scopedProjectId)
+          : null;
+        if (scopedProject) {
+          setSelectedProjectId(String(scopedProject.id));
+        } else if (scopedProjectId) {
+          setSelectedProjectId("");
+          setStatusMessage(
+            `Project #${scopedProjectId} is not available in your scope. Select a valid project.`,
+          );
+          return;
+        } else {
+          setSelectedProjectId(String(projectRows[0].id));
+        }
       }
       if (activeVendors[0]) {
         setNewVendorId(String(activeVendors[0].id));
@@ -125,20 +452,78 @@ export function VendorBillsConsole() {
       }
 
       const rows = (payload.data as VendorBillRecord[]) ?? [];
-      setVendorBills(rows);
-      if (rows[0]) {
-        setSelectedVendorBillId(String(rows[0].id));
-        hydrate(rows[0]);
+      const sortedRows = [...rows].sort((a, b) => {
+        const updatedA = new Date(a.updated_at || a.created_at).getTime();
+        const updatedB = new Date(b.updated_at || b.created_at).getTime();
+        return updatedB - updatedA;
+      });
+      setVendorBills(sortedRows);
+      setCurrentBillPage(1);
+      const preferred = sortedRows.find((row) => row.status !== "void") ?? sortedRows[0];
+      if (preferred) {
+        setSelectedVendorBillId(String(preferred.id));
+        hydrate(preferred);
       } else {
         setSelectedVendorBillId("");
       }
-      setStatusMessage(`Loaded ${rows.length} vendor bill(s).`);
+      setStatusMessage("");
     } catch {
       setStatusMessage("Could not reach vendor-bills endpoint.");
     }
   }
 
-  async function createVendorBill(
+  async function loadBudgetLineOptions(projectId: number) {
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/budgets/`, {
+        headers: { Authorization: `Token ${token}` },
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setBudgetLineGroups([]);
+        return;
+      }
+      const rows =
+        ((payload.data as Array<{
+          id: number;
+          source_estimate?: number;
+          source_estimate_version?: number;
+          line_items: Array<{
+            id: number;
+            cost_code_code?: string;
+            description?: string;
+            planned_amount?: string;
+            actual_spend?: string;
+            remaining_amount?: string;
+          }>;
+        }>) ?? []) || [];
+      const groups = rows
+        .map((budget) => {
+          const estimateLabel =
+            budget.source_estimate_version != null
+              ? `Estimate v${budget.source_estimate_version}`
+              : budget.source_estimate
+                ? `Estimate #${budget.source_estimate}`
+                : "No estimate ref";
+          return {
+            budgetId: budget.id,
+            budgetLabel: `Budget #${budget.id} (${estimateLabel})`,
+            lines: (budget.line_items ?? []).map((line) => ({
+              id: line.id,
+              label: `${line.cost_code_code ?? "CC"} - ${line.description ?? "Line"} (#${line.id})`,
+              planned_amount: line.planned_amount ?? "0.00",
+              actual_spend: line.actual_spend ?? "0.00",
+              remaining_amount: line.remaining_amount ?? "0.00",
+            })),
+          };
+        })
+        .filter((group) => group.lines.length > 0);
+      setBudgetLineGroups(groups);
+    } catch {
+      setBudgetLineGroups([]);
+    }
+  }
+
+async function createVendorBill(
     payloadBody: VendorBillPayload,
     options?: { duplicate_override?: boolean },
   ) {
@@ -153,10 +538,13 @@ export function VendorBillsConsole() {
         body: JSON.stringify({
           vendor: payloadBody.vendor,
           bill_number: payloadBody.bill_number,
+          status: payloadBody.status,
           issue_date: payloadBody.issue_date,
           due_date: payloadBody.due_date,
+          scheduled_for: payloadBody.scheduled_for ?? null,
           total: payloadBody.total,
           notes: payloadBody.notes,
+          allocations: payloadBody.allocations ?? [],
           ...options,
         }),
       },
@@ -178,11 +566,17 @@ export function VendorBillsConsole() {
 
     const created = payload.data as VendorBillRecord;
     setVendorBills((current) => [created, ...current]);
+    setCurrentBillPage(1);
+    setBillStatusFilters((current) =>
+      current.includes(created.status) ? current : [...current, created.status],
+    );
     setSelectedVendorBillId(String(created.id));
     hydrate(created);
+    setCreateErrorMessage("");
     setNewBillNumber("");
     setNewTotal("0.00");
     setNewNotes("");
+    setNewAllocations([{ budget_line: 0, amount: "", note: "" }]);
     setDuplicateCandidates([]);
     setPendingCreatePayload(null);
     setStatusMessage(`Created vendor bill #${created.id}.`);
@@ -190,26 +584,45 @@ export function VendorBillsConsole() {
 
   async function handleCreateVendorBill(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setCreateErrorMessage("");
     const projectId = Number(selectedProjectId);
     const vendor = Number(newVendorId);
     if (!projectId) {
-      setStatusMessage("Select a project first.");
+      setCreateErrorMessage("Select a project first.");
       return;
     }
     if (!vendor) {
-      setStatusMessage("Select a vendor first.");
+      setCreateErrorMessage("Select an active vendor first.");
+      return;
+    }
+    if (!activeVendors.find((row) => row.id === vendor)) {
+      setCreateErrorMessage("Selected vendor is inactive. Pick an active vendor.");
+      return;
+    }
+    if (createIsOverAllocated) {
+      setCreateErrorMessage("Allocated amount cannot exceed bill total.");
       return;
     }
 
     setStatusMessage("Creating vendor bill...");
+    const normalizedAllocations = newAllocations
+      .filter((row) => row.budget_line && row.amount)
+      .map((row) => ({
+        budget_line: Number(row.budget_line),
+        amount: row.amount,
+        note: row.note,
+      }));
     await createVendorBill({
       projectId,
       vendor,
       bill_number: newBillNumber,
+      status: newStatus,
       issue_date: newIssueDate,
       due_date: newDueDate,
+      scheduled_for: newScheduledFor || null,
       total: newTotal,
       notes: newNotes,
+      allocations: normalizedAllocations,
     });
   }
 
@@ -232,6 +645,28 @@ export function VendorBillsConsole() {
     setDuplicateOverrideOnSave(false);
   }
 
+  function handleStartNewVendorBill() {
+    const today = todayIsoDate();
+    const due = dueDateIsoDate();
+    setSelectedVendorBillId("");
+    setCreateErrorMessage("");
+    setDuplicateCandidates([]);
+    setPendingCreatePayload(null);
+    setDuplicateOverrideOnSave(false);
+    setNewBillNumber("");
+    setNewIssueDate(today);
+    setNewDueDate(due);
+    setNewScheduledFor("");
+    setNewStatus("received");
+    setNewTotal("0.00");
+    setNewNotes("");
+    setNewAllocations([{ budget_line: 0, amount: "", note: "" }]);
+    if (activeVendors[0]) {
+      setNewVendorId(String(activeVendors[0].id));
+    }
+    setStatusMessage("New vendor bill create mode.");
+  }
+
   async function handleSaveVendorBill(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const vendorBillId = Number(selectedVendorBillId);
@@ -242,6 +677,10 @@ export function VendorBillsConsole() {
     }
     if (!vendor) {
       setStatusMessage("Select a vendor first.");
+      return;
+    }
+    if (scheduledFor && scheduledFor < todayIsoDate()) {
+      setStatusMessage("Scheduled for date cannot be in the past.");
       return;
     }
 
@@ -258,8 +697,16 @@ export function VendorBillsConsole() {
           bill_number: billNumber,
           issue_date: issueDate,
           due_date: dueDate,
+          scheduled_for: scheduledFor || null,
           total,
           notes,
+          allocations: allocations
+            .filter((row) => row.budget_line && row.amount)
+            .map((row) => ({
+              budget_line: Number(row.budget_line),
+              amount: row.amount,
+              note: row.note,
+            })),
           status,
           duplicate_override: duplicateOverrideOnSave,
         }),
@@ -289,6 +736,39 @@ export function VendorBillsConsole() {
     }
   }
 
+  function handleRecreateAsNewDraftTemplate() {
+    if (!selectedVendorBillId) {
+      setStatusMessage("Select a vendor bill first.");
+      return;
+    }
+    const selected = vendorBills.find((row) => String(row.id) === selectedVendorBillId);
+    if (!selected) {
+      setStatusMessage("Selected vendor bill could not be found.");
+      return;
+    }
+    setNewVendorId(String(selected.vendor));
+    setNewBillNumber("");
+    setNewIssueDate(selected.issue_date);
+    setNewDueDate(selected.due_date);
+    setNewScheduledFor(selected.scheduled_for ?? "");
+    setNewTotal(selected.total);
+    setNewNotes(selected.notes || "");
+    const copiedAllocations =
+      selected.allocations?.map((row) => ({
+        budget_line: row.budget_line,
+        amount: row.amount,
+        note: row.note || "",
+      })) ?? [];
+    setNewAllocations(
+      copiedAllocations.length > 0 ? copiedAllocations : [{ budget_line: 0, amount: "", note: "" }],
+    );
+    setSelectedVendorBillId("");
+    setDuplicateCandidates([]);
+    setPendingCreatePayload(null);
+    setCreateErrorMessage("Enter a new bill number, then create the recreated planned bill.");
+    setStatusMessage(`Copied bill #${selected.id} into create form.`);
+  }
+
   useEffect(() => {
     if (!token) {
       return;
@@ -313,6 +793,7 @@ export function VendorBillsConsole() {
     if (!token || !selectedProjectId) {
       return;
     }
+    void loadBudgetLineOptions(Number(selectedProjectId));
     const timer = window.setTimeout(() => {
       void loadVendorBills();
     }, 0);
@@ -320,12 +801,22 @@ export function VendorBillsConsole() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, selectedProjectId]);
 
-  return (
-    <section>
-      <h2>Vendor Bill Intake and Lifecycle</h2>
-      <p>Record AP bills from vendors, detect duplicates, and progress payment workflow status.</p>
+  useEffect(() => {
+    setCurrentBillPage(1);
+  }, [billStatusFilters, selectedProjectId]);
 
-      {projects.length > 0 ? (
+  return (
+    <section className={styles.console}>
+      {projects.length > 0 && isProjectScoped ? (
+        <p>
+          Project context:{" "}
+          {selectedProject
+            ? `#${selectedProject.id} - ${selectedProject.name} (${selectedProject.customer_display_name})`
+            : `#${scopedProjectId}`}
+        </p>
+      ) : null}
+
+      {projects.length > 0 && !isProjectScoped ? (
         <label>
           Project
           <select value={selectedProjectId} onChange={(event) => setSelectedProjectId(event.target.value)}>
@@ -337,63 +828,398 @@ export function VendorBillsConsole() {
           </select>
         </label>
       ) : null}
+      {projects.length === 0 ? <p>Create or load a project before entering vendor bills.</p> : null}
 
-      <form onSubmit={handleCreateVendorBill}>
-        <h3>Create Vendor Bill</h3>
+      {vendorBills.length > 0 ? (
+        <>
+          <div className={styles.statusFilters}>
+            <span className={styles.statusFiltersLabel}>Bill status filter</span>
+            <div className={styles.statusFilterButtons}>
+              {billStatuses.map((statusValue) => {
+                const active = billStatusFilters.includes(statusValue);
+                const statusClass = `statusFilter${statusValue[0].toUpperCase()}${statusValue.slice(1)}`;
+                return (
+                  <button
+                    key={statusValue}
+                    type="button"
+                    className={`${styles.statusFilterButton} ${active ? styles[statusClass] ?? "" : styles.statusFilterButtonInactive} ${active ? styles.statusFilterButtonActive : ""}`}
+                    aria-pressed={active}
+                    onClick={() => toggleBillStatusFilter(statusValue)}
+                  >
+                    {statusDisplayLabel(statusValue)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {filteredVendorBills.length > 0 ? (
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Bill</th>
+                    <th>Vendor</th>
+                    <th>Status</th>
+                    <th>Budget impact</th>
+                    <th>Total</th>
+                    <th>Balance due</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagedVendorBills.map((vendorBill) => {
+                    const isSelected = selectedVendorBillId === String(vendorBill.id);
+                    return (
+                      <tr
+                        key={vendorBill.id}
+                        className={isSelected ? styles.rowSelected : undefined}
+                        onClick={() => handleSelectVendorBill(String(vendorBill.id))}
+                      >
+                        <td>
+                          #{vendorBill.id} {vendorBill.bill_number}
+                        </td>
+                        <td>{vendorBill.vendor_name}</td>
+                        <td>
+                          <span className={`${styles.tableStatusBadge} ${statusBadgeClass(vendorBill.status)}`}>
+                            {statusDisplayLabel(vendorBill.status)}
+                          </span>
+                        </td>
+                        <td>{statusImpactLabel(vendorBill.status)}</td>
+                        <td>{vendorBill.total}</td>
+                        <td>{vendorBill.balance_due}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <div className={styles.pagination}>
+                <button
+                  type="button"
+                  onClick={() => setCurrentBillPage((page) => Math.max(1, page - 1))}
+                  disabled={currentBillPageSafe <= 1}
+                >
+                  Prev
+                </button>
+                <span>
+                  Page {currentBillPageSafe} of {totalBillPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentBillPage((page) => Math.min(totalBillPages, page + 1))}
+                  disabled={currentBillPageSafe >= totalBillPages}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p>No vendor bills match the selected status filters.</p>
+          )}
+        </>
+      ) : null}
+
+      <div>
+        <button type="button" onClick={handleStartNewVendorBill}>
+          New Bill
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmitVendorBillForm}>
+        <h3>Bill Details</h3>
         <label>
           Vendor
-          <select value={newVendorId} onChange={(event) => setNewVendorId(event.target.value)} required>
-            <option value="">Select vendor</option>
-            {vendors.map((vendor) => (
-              <option key={vendor.id} value={vendor.id}>
-                #{vendor.id} - {vendor.name} [{vendor.vendor_type}]
-                {vendor.is_canonical ? " [canonical]" : ""}
-              </option>
-            ))}
-          </select>
+          {isEditingMode ? (
+            <input
+              className={styles.readOnlyField}
+              value={
+                formVendorId
+                  ? (() => {
+                      const vendorRow = vendors.find((row) => String(row.id) === formVendorId);
+                      if (!vendorRow) {
+                        return `#${formVendorId}`;
+                      }
+                      return `#${vendorRow.id} - ${vendorRow.name} [${vendorRow.vendor_type}]${
+                        vendorRow.is_canonical ? " [canonical]" : ""
+                      }`;
+                    })()
+                  : ""
+              }
+              disabled
+              readOnly
+            />
+          ) : (
+            <select
+              value={formVendorId}
+              onChange={(event) => setFormVendorId(event.target.value)}
+              required
+              disabled={!selectedProjectId || activeVendors.length === 0}
+            >
+              <option value="">Select vendor</option>
+              {activeVendors.map((vendor) => (
+                <option key={vendor.id} value={vendor.id}>
+                  #{vendor.id} - {vendor.name} [{vendor.vendor_type}]
+                  {vendor.is_canonical ? " [canonical]" : ""}
+                </option>
+              ))}
+            </select>
+          )}
         </label>
+        {!isEditingMode && activeVendors.length === 0 ? (
+          <p>No active vendors available. Add or reactivate a vendor first.</p>
+        ) : null}
         <label>
           Bill number
-          <input
-            value={newBillNumber}
-            onChange={(event) => setNewBillNumber(event.target.value)}
-            required
-          />
+          {isEditingMode ? (
+            <input className={styles.readOnlyField} value={formBillNumber} disabled readOnly required />
+          ) : (
+            <input
+              value={formBillNumber}
+              onChange={(event) => setFormBillNumber(event.target.value)}
+              required
+              disabled={!selectedProjectId || !formVendorId}
+            />
+          )}
         </label>
         <label>
           Issue date
           <input
             type="date"
-            value={newIssueDate}
-            onChange={(event) => setNewIssueDate(event.target.value)}
+            value={formIssueDate}
+            onChange={(event) => setFormIssueDate(event.target.value)}
             required
+            disabled={!selectedProjectId || !formVendorId}
           />
         </label>
         <label>
           Due date
           <input
             type="date"
-            value={newDueDate}
-            onChange={(event) => setNewDueDate(event.target.value)}
+            value={formDueDate}
+            onChange={(event) => setFormDueDate(event.target.value)}
             required
+            disabled={!selectedProjectId || !formVendorId}
           />
         </label>
+        {!isEditingMode || canEditScheduledFor ? (
+          <label>
+            Scheduled for
+            <input
+              type="date"
+              value={formScheduledFor}
+              onChange={(event) => setFormScheduledFor(event.target.value)}
+              disabled={!selectedProjectId || !formVendorId || !canEditScheduledFor}
+            />
+          </label>
+        ) : null}
         <label>
           Total
           <input
-            value={newTotal}
-            onChange={(event) => setNewTotal(event.target.value)}
+            value={formTotal}
+            onChange={(event) => setFormTotal(event.target.value)}
             inputMode="decimal"
             required
+            disabled={!selectedProjectId || !formVendorId}
           />
         </label>
+        <fieldset className={styles.allocationFieldset}>
+          <legend>{isEditingMode ? "Allocations" : "Allocations (optional in planned)"}</legend>
+          <div className={styles.allocationHeader}>
+            <span>Budget line</span>
+            <span>Amount</span>
+            <span>Note</span>
+            <span />
+          </div>
+          {!hasBudgetLineOptions ? (
+            <p className={styles.hintText}>
+              No budget lines available for this project yet. Create a budget first.
+            </p>
+          ) : null}
+          {formAllocations.map((row, index) => {
+            const selectedLineMeta = budgetLineMetaById.get(Number(row.budget_line));
+            return (
+              <div key={`form-allocation-${index}`} className={styles.allocationRowWrap}>
+                <div className={styles.allocationRow}>
+                  <select
+                    value={row.budget_line || ""}
+                    onChange={(event) => {
+                      updateFormAllocation(index, {
+                        budget_line: Number(event.target.value || 0),
+                      });
+                    }}
+                    disabled={!hasBudgetLineOptions}
+                  >
+                    <option value="">Select budget line</option>
+                    {budgetLineGroups.map((group) => (
+                      <optgroup key={group.budgetId} label={group.budgetLabel}>
+                        {group.lines.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <input
+                    value={row.amount}
+                    onChange={(event) => {
+                      updateFormAllocation(index, { amount: event.target.value });
+                    }}
+                    placeholder="Amount"
+                    inputMode="decimal"
+                    disabled={!hasBudgetLineOptions}
+                  />
+                  <input
+                    value={row.note}
+                    onChange={(event) => {
+                      updateFormAllocation(index, { note: event.target.value });
+                    }}
+                    placeholder="Note (optional)"
+                    disabled={!hasBudgetLineOptions}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeFormAllocation(index)}
+                    disabled={formAllocations.length <= 1}
+                  >
+                    Remove
+                  </button>
+                </div>
+                {selectedLineMeta ? (
+                  <p className={styles.allocationMeta}>
+                    Approved: {formatMoney(selectedLineMeta.planned_amount)} | Spent:{" "}
+                    {formatMoney(selectedLineMeta.actual_spend)} | Remaining:{" "}
+                    {formatMoney(selectedLineMeta.remaining_amount)}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })}
+          <button
+            type="button"
+            onClick={addFormAllocation}
+            disabled={!hasBudgetLineOptions}
+          >
+            Add Allocation Row
+          </button>
+          <p className={styles.allocationTotals}>
+            Bill total: {formTotal} | Allocated: {formAllocationTotal.toFixed(2)} | Unallocated:{" "}
+            <span className={hasAllocationMismatch ? styles.unallocatedMismatch : undefined}>
+              {formUnallocated.toFixed(2)}
+            </span>
+          </p>
+          <div className={styles.suggestedTotalRow}>
+            <span>Suggested total from allocations: {formSuggestedTotal}</span>
+            <button
+              type="button"
+              onClick={() => setFormTotal(formSuggestedTotal)}
+              disabled={!isEditingMode && !hasBudgetLineOptions}
+            >
+              Use allocated total
+            </button>
+          </div>
+          {formIsOverAllocated ? (
+            <p className={styles.errorText}>Allocated amount cannot exceed bill total.</p>
+          ) : null}
+          {formRequiresFullAllocation ? (
+            <p className={styles.errorText}>
+              Status <strong>{status}</strong> requires full allocation (unallocated must be 0.00).
+            </p>
+          ) : null}
+          {formRequiresScheduledFor && !formScheduledFor ? (
+            <p className={styles.errorText}>
+              Status <strong>scheduled</strong> requires a <strong>scheduled for</strong> date.
+            </p>
+          ) : null}
+        </fieldset>
         <label>
           Notes
-          <textarea value={newNotes} onChange={(event) => setNewNotes(event.target.value)} />
+          <textarea
+            value={formNotes}
+            onChange={(event) => setFormNotes(event.target.value)}
+            disabled={!selectedProjectId || !formVendorId}
+          />
         </label>
-        <button type="submit" disabled={!selectedProjectId || !newVendorId}>
-          Create Vendor Bill
+        {!isEditingMode ? (
+          <div className={styles.statusPicker}>
+            <span className={styles.statusPickerLabel}>Initial status</span>
+            <div className={styles.statusPills}>
+              {createStatusOptions.map((statusOption) => {
+                const active = statusOption === newStatus;
+                return (
+                  <button
+                    key={statusOption}
+                    type="button"
+                    className={`${styles.statusPill} ${
+                      active ? statusPillClass(statusOption) : styles.statusPillInactive
+                    } ${active ? styles.statusPillActive : ""}`}
+                    aria-pressed={active}
+                    onClick={() => setNewStatus(statusOption)}
+                  >
+                    {statusDisplayLabel(statusOption)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+        {!isEditingMode && createErrorMessage ? <p className={styles.errorText}>{createErrorMessage}</p> : null}
+        {isEditingMode ? (
+          <div className={styles.statusPicker}>
+            <span className={styles.statusPickerLabel}>Status</span>
+            <div className={styles.statusPills}>
+              {allowedEditStatuses.map((statusOption) => {
+                const active = statusOption === status;
+                return (
+                  <button
+                    key={statusOption}
+                    type="button"
+                    className={`${styles.statusPill} ${
+                      active ? statusPillClass(statusOption) : styles.statusPillInactive
+                    } ${active ? styles.statusPillActive : ""}`}
+                    aria-pressed={active}
+                    onClick={() => setStatus(statusOption)}
+                  >
+                    {statusDisplayLabel(statusOption)}
+                  </button>
+                );
+              })}
+            </div>
+            {hasPendingStatusChange ? (
+              <p className={styles.hintText}>
+                Save this bill to confirm the status change before the next transition.
+              </p>
+            ) : null}
+            {hasUnsavedChanges ? (
+              <p className={styles.unsavedNotice}>You have unsaved changes.</p>
+            ) : null}
+          </div>
+        ) : null}
+        {isEditingMode ? (
+          <label>
+            Allow duplicate vendor + bill number on save
+            <input
+              type="checkbox"
+              checked={duplicateOverrideOnSave}
+              onChange={(event) => setDuplicateOverrideOnSave(event.target.checked)}
+            />
+          </label>
+        ) : null}
+        <button
+          type="submit"
+          disabled={
+            !selectedProjectId ||
+            !formVendorId ||
+            formIsOverAllocated ||
+            (formRequiresFullAllocation && Math.abs(formUnallocated) > allocationEpsilon) ||
+            (formRequiresScheduledFor && !formScheduledFor)
+          }
+        >
+          {isEditingMode ? "Save Vendor Bill" : "Create Vendor Bill"}
         </button>
+        {isEditingMode ? (
+          <button type="button" onClick={handleRecreateAsNewDraftTemplate}>
+            Recreate as New Planned
+          </button>
+        ) : null}
       </form>
 
       {duplicateCandidates.length > 0 ? (
@@ -402,7 +1228,8 @@ export function VendorBillsConsole() {
           <ul>
             {duplicateCandidates.map((candidate) => (
               <li key={candidate.id}>
-                #{candidate.id} {candidate.vendor_name} / {candidate.bill_number} ({candidate.status})
+                #{candidate.id} {candidate.vendor_name} / {candidate.bill_number} (
+                {statusDisplayLabel(candidate.status)})
               </li>
             ))}
           </ul>
@@ -413,98 +1240,6 @@ export function VendorBillsConsole() {
           ) : null}
         </>
       ) : null}
-
-      {vendorBills.length > 0 ? (
-        <label>
-          Vendor bill
-          <select
-            value={selectedVendorBillId}
-            onChange={(event) => handleSelectVendorBill(event.target.value)}
-          >
-            {vendorBills.map((vendorBill) => (
-              <option key={vendorBill.id} value={vendorBill.id}>
-                #{vendorBill.id} {vendorBill.vendor_name} / {vendorBill.bill_number} ({vendorBill.status})
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
-
-      <form onSubmit={handleSaveVendorBill}>
-        <h3>Edit Vendor Bill</h3>
-        <label>
-          Vendor
-          <select value={vendorId} onChange={(event) => setVendorId(event.target.value)} required>
-            <option value="">Select vendor</option>
-            {vendors.map((vendorRow) => (
-              <option key={vendorRow.id} value={vendorRow.id}>
-                #{vendorRow.id} - {vendorRow.name} [{vendorRow.vendor_type}]
-                {vendorRow.is_canonical ? " [canonical]" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Bill number
-          <input value={billNumber} onChange={(event) => setBillNumber(event.target.value)} required />
-        </label>
-        <label>
-          Issue date
-          <input
-            type="date"
-            value={issueDate}
-            onChange={(event) => setIssueDate(event.target.value)}
-            required
-          />
-        </label>
-        <label>
-          Due date
-          <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} required />
-        </label>
-        <label>
-          Total
-          <input value={total} onChange={(event) => setTotal(event.target.value)} inputMode="decimal" required />
-        </label>
-        <label>
-          Notes
-          <textarea value={notes} onChange={(event) => setNotes(event.target.value)} />
-        </label>
-        <label>
-          Status
-          <select
-            value={status}
-            onChange={(event) =>
-              setStatus(
-                event.target.value as
-                  | "draft"
-                  | "received"
-                  | "approved"
-                  | "scheduled"
-                  | "paid"
-                  | "void",
-              )
-            }
-          >
-            <option value="draft">draft</option>
-            <option value="received">received</option>
-            <option value="approved">approved</option>
-            <option value="scheduled">scheduled</option>
-            <option value="paid">paid</option>
-            <option value="void">void</option>
-          </select>
-        </label>
-        <label>
-          Allow duplicate vendor + bill number on save
-          <input
-            type="checkbox"
-            checked={duplicateOverrideOnSave}
-            onChange={(event) => setDuplicateOverrideOnSave(event.target.checked)}
-          />
-        </label>
-        <button type="submit" disabled={!selectedVendorBillId}>
-          Save Vendor Bill
-        </button>
-      </form>
 
       <p>{statusMessage}</p>
     </section>

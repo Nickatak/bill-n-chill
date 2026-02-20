@@ -85,6 +85,14 @@ export function ProjectsConsole() {
     return project.customer_display_name || `Customer #${project.customer}`;
   }
 
+  function projectStatusClass(statusValue: string): string {
+    const key = `projectStatus${statusValue
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join("")}`;
+    return styles[key] ?? "";
+  }
+
   function hydrateForm(project: ProjectRecord) {
     setProjectName(project.name);
     setProjectStatus(project.status);
@@ -487,7 +495,9 @@ export function ProjectsConsole() {
                       </td>
                       <td>{formatCustomerName(project)}</td>
                       <td>
-                        <span className={styles.projectStatus}>{project.status}</span>
+                        <span className={`${styles.projectStatus} ${projectStatusClass(project.status)}`}>
+                          {project.status}
+                        </span>
                       </td>
                       <td>
                         <Link
@@ -588,10 +598,13 @@ export function ProjectsConsole() {
                 <div className={styles.branch}>
                   <span className={styles.branchLabel}>Payables</span>
                   <div className={styles.node}>
-                    <Link href="/vendor-bills">Vendor Bills</Link>
+                    <Link href={`/vendor-bills?project=${selectedProject.id}`}>Vendor Bills</Link>
                     <span className={styles.nodeCount}>
                       {summaryCounts ? summaryCounts.vendorBills : "--"}
                     </span>
+                  </div>
+                  <div className={styles.node}>
+                    <Link href={`/expenses?project=${selectedProject.id}`}>Expenses</Link>
                   </div>
                   <div className={styles.node}>
                     <Link href="/payments">Payments (AP)</Link>

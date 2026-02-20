@@ -1,12 +1,14 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import FinancialAuditEvent, Vendor, VendorBill
+from core.models import BudgetLine, FinancialAuditEvent, Vendor, VendorBill, VendorBillAllocation
 from core.serializers import VendorBillSerializer, VendorBillWriteSerializer
 from core.views.helpers import (
     _record_financial_audit_event,
@@ -37,6 +39,43 @@ def _find_duplicate_vendor_bills(
     return list(rows.select_related("vendor", "project").order_by("-created_at", "-id"))
 
 
+def _allocation_total(*, vendor_bill):
+    total = (
+        VendorBillAllocation.objects.filter(vendor_bill=vendor_bill).aggregate(sum=Sum("amount"))["sum"]
+        or Decimal("0")
+    )
+    return Decimal(str(total))
+
+
+def _validate_allocation_budget_lines(*, project, user, allocations):
+    budget_line_ids = [entry["budget_line"] for entry in allocations]
+    if not budget_line_ids:
+        return {}
+    rows = BudgetLine.objects.filter(
+        id__in=budget_line_ids,
+        budget__project=project,
+        budget__created_by=user,
+    ).select_related("budget")
+    return {row.id: row for row in rows}
+
+
+def _sync_vendor_bill_allocations(*, vendor_bill, allocations):
+    VendorBillAllocation.objects.filter(vendor_bill=vendor_bill).delete()
+    if not allocations:
+        return
+    VendorBillAllocation.objects.bulk_create(
+        [
+            VendorBillAllocation(
+                vendor_bill=vendor_bill,
+                budget_line_id=entry["budget_line"],
+                amount=entry["amount"],
+                note=entry.get("note", ""),
+            )
+            for entry in allocations
+        ]
+    )
+
+
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_vendor_bills_view(request, project_id: int):
@@ -51,6 +90,7 @@ def project_vendor_bills_view(request, project_id: int):
         rows = (
             VendorBill.objects.filter(project=project, created_by=request.user)
             .select_related("project", "vendor")
+            .prefetch_related("allocations", "allocations__budget_line", "allocations__budget_line__cost_code")
             .order_by("-created_at")
         )
         return Response({"data": VendorBillSerializer(rows, many=True).data})
@@ -128,25 +168,60 @@ def project_vendor_bills_view(request, project_id: int):
         )
 
     total = Decimal(str(data["total"]))
-    vendor_bill = VendorBill.objects.create(
-        project=project,
-        vendor=vendor,
-        bill_number=data["bill_number"],
-        status=VendorBill.Status.DRAFT,
-        issue_date=issue_date,
-        due_date=due_date,
-        total=total,
-        balance_due=total,
-        notes=data.get("notes", ""),
-        created_by=request.user,
-    )
+    scheduled_for = data.get("scheduled_for")
+    allocations = data.get("allocations", [])
+    if allocations:
+        line_map = _validate_allocation_budget_lines(
+            project=project,
+            user=request.user,
+            allocations=allocations,
+        )
+        if len(line_map) != len({entry["budget_line"] for entry in allocations}):
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "One or more allocation budget lines are invalid for this project.",
+                        "fields": {"allocations": ["Use budget lines from this project."]},
+                    }
+                },
+                status=400,
+            )
+        allocation_total = sum((entry["amount"] for entry in allocations), Decimal("0"))
+        if allocation_total > total:
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "Allocation total cannot exceed bill total.",
+                        "fields": {"allocations": ["Allocated amount exceeds bill total."]},
+                    }
+                },
+                status=400,
+            )
+    with transaction.atomic():
+        vendor_bill = VendorBill.objects.create(
+            project=project,
+            vendor=vendor,
+            bill_number=data["bill_number"],
+            status=VendorBill.Status.PLANNED,
+            issue_date=issue_date,
+            due_date=due_date,
+            scheduled_for=scheduled_for,
+            total=total,
+            balance_due=total,
+            notes=data.get("notes", ""),
+            created_by=request.user,
+        )
+        if allocations:
+            _sync_vendor_bill_allocations(vendor_bill=vendor_bill, allocations=allocations)
     _record_financial_audit_event(
         project=project,
         event_type=FinancialAuditEvent.EventType.VENDOR_BILL_UPDATED,
         object_type="vendor_bill",
         object_id=vendor_bill.id,
         from_status="",
-        to_status=VendorBill.Status.DRAFT,
+        to_status=VendorBill.Status.PLANNED,
         amount=vendor_bill.total,
         note="Vendor bill created.",
         created_by=request.user,
@@ -154,7 +229,11 @@ def project_vendor_bills_view(request, project_id: int):
     )
     return Response(
         {
-            "data": VendorBillSerializer(vendor_bill).data,
+            "data": VendorBillSerializer(
+                VendorBill.objects.select_related("project", "vendor")
+                .prefetch_related("allocations", "allocations__budget_line", "allocations__budget_line__cost_code")
+                .get(id=vendor_bill.id)
+            ).data,
             "meta": {"duplicate_override_used": bool(duplicates and duplicate_override)},
         },
         status=201,
@@ -176,6 +255,11 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
         )
 
     if request.method == "GET":
+        vendor_bill = (
+            VendorBill.objects.select_related("project", "vendor")
+            .prefetch_related("allocations", "allocations__budget_line", "allocations__budget_line__cost_code")
+            .get(id=vendor_bill.id)
+        )
         return Response({"data": VendorBillSerializer(vendor_bill).data})
 
     serializer = VendorBillWriteSerializer(data=request.data, partial=True)
@@ -184,6 +268,19 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
 
     next_vendor_id = data.get("vendor", vendor_bill.vendor_id)
     next_bill_number = data.get("bill_number", vendor_bill.bill_number)
+
+    if "bill_number" in data and data["bill_number"] != vendor_bill.bill_number:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "bill_number is immutable after creation. Recreate a new bill instead.",
+                    "fields": {"bill_number": ["Bill number cannot be edited after creation."]},
+                }
+            },
+            status=400,
+        )
+
     next_vendor = Vendor.objects.filter(id=next_vendor_id, created_by=request.user).first()
     if not next_vendor:
         return Response(
@@ -240,6 +337,7 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
 
     next_issue_date = data.get("issue_date", vendor_bill.issue_date)
     next_due_date = data.get("due_date", vendor_bill.due_date)
+    next_scheduled_for = data.get("scheduled_for", vendor_bill.scheduled_for)
     if next_due_date < next_issue_date:
         return Response(
             {
@@ -251,11 +349,67 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
             },
             status=400,
         )
+    if next_status == VendorBill.Status.SCHEDULED and not next_scheduled_for:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "scheduled_for is required when status is scheduled.",
+                    "fields": {"scheduled_for": ["Provide a scheduled payment date."]},
+                }
+            },
+            status=400,
+        )
 
     candidate_total = Decimal(str(data.get("total", vendor_bill.total)))
     candidate_balance_due = (
         Decimal("0") if next_status == VendorBill.Status.PAID else candidate_total
     )
+    allocations = data.get("allocations")
+    if allocations is not None:
+        line_map = _validate_allocation_budget_lines(
+            project=vendor_bill.project,
+            user=request.user,
+            allocations=allocations,
+        )
+        if len(line_map) != len({entry["budget_line"] for entry in allocations}):
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "One or more allocation budget lines are invalid for this project.",
+                        "fields": {"allocations": ["Use budget lines from this project."]},
+                    }
+                },
+                status=400,
+            )
+        allocation_total = sum((entry["amount"] for entry in allocations), Decimal("0"))
+    else:
+        allocation_total = _allocation_total(vendor_bill=vendor_bill)
+
+    if allocation_total > candidate_total:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Allocation total cannot exceed bill total.",
+                    "fields": {"allocations": ["Allocated amount exceeds bill total."]},
+                }
+            },
+            status=400,
+        )
+
+    if next_status in {VendorBill.Status.APPROVED, VendorBill.Status.PAID} and allocation_total != candidate_total:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Approved and paid bills must be fully allocated.",
+                    "fields": {"allocations": ["Allocation total must equal bill total."]},
+                }
+            },
+            status=400,
+        )
 
     update_fields = ["updated_at"]
     if "vendor" in data:
@@ -270,6 +424,9 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
     if "due_date" in data:
         vendor_bill.due_date = data["due_date"]
         update_fields.append("due_date")
+    if "scheduled_for" in data:
+        vendor_bill.scheduled_for = data["scheduled_for"]
+        update_fields.append("scheduled_for")
     if "total" in data:
         vendor_bill.total = data["total"]
         update_fields.append("total")
@@ -284,24 +441,33 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
         vendor_bill.balance_due = candidate_balance_due
         update_fields.append("balance_due")
 
-    if len(update_fields) > 1:
-        vendor_bill.save(update_fields=update_fields)
-        if previous_status != next_status or "total" in data:
-            _record_financial_audit_event(
-                project=vendor_bill.project,
-                event_type=FinancialAuditEvent.EventType.VENDOR_BILL_UPDATED,
-                object_type="vendor_bill",
-                object_id=vendor_bill.id,
-                from_status=previous_status,
-                to_status=next_status,
-                amount=candidate_total,
-                note="Vendor bill updated.",
-                created_by=request.user,
-                metadata={
-                    "bill_number": vendor_bill.bill_number,
-                    "status_changed": previous_status != next_status,
-                },
-            )
+    with transaction.atomic():
+        if len(update_fields) > 1:
+            vendor_bill.save(update_fields=update_fields)
+            if previous_status != next_status or "total" in data:
+                _record_financial_audit_event(
+                    project=vendor_bill.project,
+                    event_type=FinancialAuditEvent.EventType.VENDOR_BILL_UPDATED,
+                    object_type="vendor_bill",
+                    object_id=vendor_bill.id,
+                    from_status=previous_status,
+                    to_status=next_status,
+                    amount=candidate_total,
+                    note="Vendor bill updated.",
+                    created_by=request.user,
+                    metadata={
+                        "bill_number": vendor_bill.bill_number,
+                        "status_changed": previous_status != next_status,
+                    },
+                )
+        if allocations is not None:
+            _sync_vendor_bill_allocations(vendor_bill=vendor_bill, allocations=allocations)
+
+    vendor_bill = (
+        VendorBill.objects.select_related("project", "vendor")
+        .prefetch_related("allocations", "allocations__budget_line", "allocations__budget_line__cost_code")
+        .get(id=vendor_bill.id)
+    )
 
     return Response(
         {

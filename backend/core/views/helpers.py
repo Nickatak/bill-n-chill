@@ -77,21 +77,20 @@ ALLOWED_INVOICE_STATUS_TRANSITIONS = {
 }
 
 ALLOWED_VENDOR_BILL_STATUS_TRANSITIONS = {
-    VendorBill.Status.DRAFT: {
+    VendorBill.Status.PLANNED: {
         VendorBill.Status.RECEIVED,
         VendorBill.Status.VOID,
     },
     VendorBill.Status.RECEIVED: {
-        VendorBill.Status.DRAFT,
         VendorBill.Status.APPROVED,
         VendorBill.Status.VOID,
     },
     VendorBill.Status.APPROVED: {
         VendorBill.Status.SCHEDULED,
+        VendorBill.Status.PAID,
         VendorBill.Status.VOID,
     },
     VendorBill.Status.SCHEDULED: {
-        VendorBill.Status.APPROVED,
         VendorBill.Status.PAID,
         VendorBill.Status.VOID,
     },

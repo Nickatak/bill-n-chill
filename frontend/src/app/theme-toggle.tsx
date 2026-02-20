@@ -1,6 +1,7 @@
 "use client";
 
-import { clearClientSession, loadClientSession } from "@/features/session/client-session";
+import { clearClientSession } from "@/features/session/client-session";
+import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -19,7 +20,8 @@ function applyTheme(theme: ThemeMode) {
 export function ThemeToggle() {
   const pathname = usePathname();
   const router = useRouter();
-  const hasSession = Boolean(loadClientSession()?.token);
+  const { token } = useSharedSessionAuth();
+  const hasSession = Boolean(token);
   const isPublicEstimateRoute = Boolean(pathname && /^\/estimate\/[^/]+\/?$/.test(pathname));
   const hasActiveContacts = pathname === "/contacts";
   const hasActiveVendors = pathname === "/vendors";

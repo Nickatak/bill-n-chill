@@ -136,7 +136,7 @@ class VendorBill(models.Model):
     """
 
     class Status(models.TextChoices):
-        DRAFT = "draft", "Draft"
+        PLANNED = "planned", "Planned"
         RECEIVED = "received", "Received"
         APPROVED = "approved", "Approved"
         SCHEDULED = "scheduled", "Scheduled"
@@ -157,10 +157,11 @@ class VendorBill(models.Model):
     status = models.CharField(
         max_length=32,
         choices=Status.choices,
-        default=Status.DRAFT,
+        default=Status.PLANNED,
     )
     issue_date = models.DateField()
     due_date = models.DateField()
+    scheduled_for = models.DateField(null=True, blank=True)
     total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     balance_due = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     notes = models.TextField(blank=True)
@@ -177,3 +178,32 @@ class VendorBill(models.Model):
 
     def __str__(self) -> str:
         return f"{self.vendor.name} {self.bill_number}"
+
+
+class VendorBillAllocation(models.Model):
+    """Allocation row that maps a vendor bill amount to a budget line.
+
+    Business workflow:
+    - A single vendor bill can be split across multiple budget lines.
+    - Enables accurate committed/actual attribution and line-level history.
+    """
+
+    vendor_bill = models.ForeignKey(
+        "VendorBill",
+        on_delete=models.CASCADE,
+        related_name="allocations",
+    )
+    budget_line = models.ForeignKey(
+        "BudgetLine",
+        on_delete=models.PROTECT,
+        related_name="vendor_bill_allocations",
+    )
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    note = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self) -> str:
+        return f"Bill {self.vendor_bill_id} -> budget line {self.budget_line_id}: {self.amount}"

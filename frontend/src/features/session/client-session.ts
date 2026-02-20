@@ -1,4 +1,5 @@
 export const SESSION_STORAGE_KEY = "bnc-session-v1";
+export const SESSION_CHANGE_EVENT = "bnc-session-change";
 
 export type ClientSession = {
   token: string;
@@ -34,6 +35,7 @@ export function saveClientSession(session: ClientSession): void {
     return;
   }
   window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
 }
 
 export function clearClientSession(): void {
@@ -41,4 +43,5 @@ export function clearClientSession(): void {
     return;
   }
   window.localStorage.removeItem(SESSION_STORAGE_KEY);
+  window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
 }

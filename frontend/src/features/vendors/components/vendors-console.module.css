@@ -1,0 +1,89 @@
+.tableWrap {
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  overflow-x: auto;
+  margin: 10px 0;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #111827;
+}
+
+.table tbody tr {
+  background: #ffffff;
+}
+
+.table tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.table th {
+  background: #f3f4f6;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.rowSelected {
+  background: #e0e7ff;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.pagination span {
+  color: #374151;
+  font-size: 0.85rem;
+}
+
+:global(html[data-theme="dark"]) .tableWrap {
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .table th,
+:global(html[data-theme="dark"]) .table td {
+  border-bottom-color: #334155;
+  color: #f3f4f6;
+}
+
+:global(html[data-theme="dark"]) .table th {
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .table tbody tr {
+  background: #0b1220;
+}
+
+:global(html[data-theme="dark"]) .table tbody tr:nth-child(even) {
+  background: #111827;
+}
+
+:global(html[data-theme="dark"]) .rowSelected {
+  background: #1e293b;
+}
+
+:global(html[data-theme="dark"]) .pagination {
+  border-top-color: #334155;
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .pagination span {
+  color: #cbd5e1;
+}

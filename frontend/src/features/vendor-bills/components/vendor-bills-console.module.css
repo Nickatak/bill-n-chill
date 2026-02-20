@@ -1,0 +1,544 @@
+.console {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.impactCard {
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 10px 12px;
+}
+
+.impactCard p {
+  margin: 0;
+}
+
+.impactCard p + p {
+  margin-top: 6px;
+}
+
+.tableWrap {
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.table {
+  width: 100%;
+  min-width: 780px;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #111827;
+}
+
+.table th {
+  background: #f3f4f6;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.tableStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tableStatusPlanned {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.tableStatusReceived {
+  background: #fde68a;
+  color: #92400e;
+}
+
+.tableStatusApproved {
+  background: #bbf7d0;
+  color: #166534;
+}
+
+.tableStatusScheduled {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.tableStatusPaid {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.tableStatusVoid {
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
+.table tbody tr {
+  background: #ffffff;
+}
+
+.table tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.rowSelected {
+  background: #e0e7ff !important;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.pagination span {
+  color: #374151;
+  font-size: 0.85rem;
+}
+
+.statusFilters {
+  display: grid;
+  gap: 6px;
+}
+
+.statusFiltersLabel {
+  color: #374151;
+  font-size: 0.85rem;
+}
+
+.statusFilterButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.statusFilterButton {
+  border: 1px solid #cbd5f5;
+  border-radius: 999px;
+  padding: 6px 12px;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.statusFilterButtonInactive {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.statusFilterButtonActive {
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+}
+
+.statusFilterPlanned {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.statusFilterReceived {
+  background: #fde68a;
+  color: #92400e;
+}
+
+.statusFilterApproved {
+  background: #bbf7d0;
+  color: #166534;
+}
+
+.statusFilterScheduled {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.statusFilterPaid {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.statusFilterVoid {
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
+.statusPicker {
+  display: grid;
+  gap: 6px;
+}
+
+.statusPickerLabel {
+  color: #374151;
+  font-size: 0.85rem;
+}
+
+.statusPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.statusPill {
+  border: 1px solid #cbd5f5;
+  border-radius: 12px;
+  padding: 10px 16px;
+  min-height: 44px;
+  min-width: 112px;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.statusPillInactive {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.statusPillActive {
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+}
+
+.statusPillPlanned {
+  border-color: #93c5fd;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.statusPillReceived {
+  border-color: #fcd34d;
+  background: #fde68a;
+  color: #92400e;
+}
+
+.statusPillApproved {
+  border-color: #86efac;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.statusPillScheduled {
+  border-color: #fcd34d;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.statusPillPaid {
+  border-color: #5eead4;
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.statusPillVoid {
+  border-color: #d1d5db;
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
+.allocationFieldset {
+  display: grid;
+  gap: 8px;
+}
+
+.allocationHeader {
+  display: grid;
+  grid-template-columns: 2fr 1fr 2fr auto;
+  gap: 8px;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.allocationRowWrap {
+  display: grid;
+  gap: 4px;
+}
+
+.allocationRow {
+  display: grid;
+  grid-template-columns: 2fr 1fr 2fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.allocationMeta {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.allocationTotals {
+  margin: 0;
+  color: #374151;
+}
+
+.unallocatedMismatch {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.suggestedTotalRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.suggestedTotalRow span {
+  color: #1f2937;
+  font-size: 0.85rem;
+}
+
+.readOnlyField {
+  background: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #d1d5db;
+}
+
+.errorText {
+  color: #b91c1c;
+  margin: 0;
+}
+
+.hintText {
+  color: #1f2937;
+  margin: 0;
+}
+
+.unsavedNotice {
+  margin: 0;
+  color: #b45309;
+  font-weight: 600;
+}
+
+:global(html[data-theme="dark"]) .impactCard {
+  border-color: #334155;
+  background: #111827;
+}
+
+:global(html[data-theme="dark"]) .tableWrap {
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .table th,
+:global(html[data-theme="dark"]) .table td {
+  border-bottom-color: #334155;
+  color: #f3f4f6;
+}
+
+:global(html[data-theme="dark"]) .table th {
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .tableStatusPlanned {
+  background: #1e3a8a;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .tableStatusReceived {
+  background: #3f2f0b;
+  color: #fcd34d;
+}
+
+:global(html[data-theme="dark"]) .tableStatusApproved {
+  background: #0f3d22;
+  color: #86efac;
+}
+
+:global(html[data-theme="dark"]) .tableStatusScheduled {
+  background: #431407;
+  color: #fdba74;
+}
+
+:global(html[data-theme="dark"]) .tableStatusPaid {
+  background: #042f2e;
+  color: #99f6e4;
+}
+
+:global(html[data-theme="dark"]) .tableStatusVoid {
+  background: #334155;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .table tbody tr {
+  background: #0b1220;
+}
+
+:global(html[data-theme="dark"]) .table tbody tr:nth-child(even) {
+  background: #111827;
+}
+
+:global(html[data-theme="dark"]) .rowSelected {
+  background: #1e293b !important;
+}
+
+:global(html[data-theme="dark"]) .pagination {
+  border-top-color: #334155;
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .pagination span {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .statusFiltersLabel {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .statusFilterButton {
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .statusFilterButtonInactive {
+  background: #0b1220;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .statusFilterButtonActive {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+:global(html[data-theme="dark"]) .statusFilterPlanned {
+  background: #1e3a8a;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .statusFilterReceived {
+  background: #3f2f0b;
+  color: #fcd34d;
+}
+
+:global(html[data-theme="dark"]) .statusFilterApproved {
+  background: #0f3d22;
+  color: #86efac;
+}
+
+:global(html[data-theme="dark"]) .statusFilterScheduled {
+  background: #431407;
+  color: #fdba74;
+}
+
+:global(html[data-theme="dark"]) .statusFilterPaid {
+  background: #042f2e;
+  color: #99f6e4;
+}
+
+:global(html[data-theme="dark"]) .statusFilterVoid {
+  background: #334155;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .statusPickerLabel {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .statusPill {
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .statusPillInactive {
+  background: #0b1220;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .statusPillActive {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+:global(html[data-theme="dark"]) .statusPillPlanned {
+  border-color: #1d4ed8;
+  background: #1e3a8a;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .statusPillReceived {
+  border-color: #92400e;
+  background: #3f2f0b;
+  color: #fcd34d;
+}
+
+:global(html[data-theme="dark"]) .statusPillApproved {
+  border-color: #166534;
+  background: #052e16;
+  color: #bbf7d0;
+}
+
+:global(html[data-theme="dark"]) .statusPillScheduled {
+  border-color: #92400e;
+  background: #451a03;
+  color: #fde68a;
+}
+
+:global(html[data-theme="dark"]) .statusPillPaid {
+  border-color: #0f766e;
+  background: #042f2e;
+  color: #99f6e4;
+}
+
+:global(html[data-theme="dark"]) .statusPillVoid {
+  border-color: #475569;
+  background: #334155;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .allocationHeader {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .allocationTotals {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .unallocatedMismatch {
+  color: #fca5a5;
+}
+
+:global(html[data-theme="dark"]) .suggestedTotalRow span {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .readOnlyField {
+  background: #0f172a;
+  color: #94a3b8;
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .allocationMeta {
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .hintText {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .errorText {
+  color: #fca5a5;
+}
+
+:global(html[data-theme="dark"]) .unsavedNotice {
+  color: #fbbf24;
+}

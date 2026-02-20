@@ -39,15 +39,12 @@ const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localh
 
 export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
   const router = useRouter();
-  const initialSession = typeof window !== "undefined" ? loadClientSession() : null;
-  const [email, setEmail] = useState(initialSession?.email ?? "");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [token, setToken] = useState(initialSession?.token ?? "");
+  const [token, setToken] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isChecking, setIsChecking] = useState(Boolean(initialSession?.token));
-  const [message, setMessage] = useState(
-    initialSession ? "Checking saved session..." : "Sign in to open your dashboard.",
-  );
+  const [isChecking, setIsChecking] = useState(false);
+  const [message, setMessage] = useState("Sign in to open your dashboard.");
 
   function normalizeLoginError(message?: string): string {
     const normalized = (message ?? "").trim().toLowerCase();
@@ -85,6 +82,14 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
 
   useEffect(() => {
     async function init() {
+      const session = loadClientSession();
+      if (session?.email) {
+        setEmail(session.email);
+      }
+      if (session?.token) {
+        setToken(session.token);
+        setMessage("Checking saved session...");
+      }
       if (!token) {
         setIsChecking(false);
         return;
@@ -97,7 +102,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
     void init();
     // Intentionally runs once on initial load.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     if (isAuthenticated) {

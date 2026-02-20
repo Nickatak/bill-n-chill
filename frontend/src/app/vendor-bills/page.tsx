@@ -1,36 +1,37 @@
 import { VendorBillsConsole } from "@/features/vendor-bills";
-import { VendorsConsole } from "@/features/vendors";
+import { redirect } from "next/navigation";
 import styles from "./page.module.css";
 
-export default function VendorBillsPage() {
+type VendorBillsPageProps = {
+  searchParams: Promise<{ project?: string }>;
+};
+
+export default async function VendorBillsPage({ searchParams }: VendorBillsPageProps) {
+  const { project } = await searchParams;
+  if (!project || !/^\d+$/.test(project)) {
+    redirect("/vendor-bills-placeholder");
+  }
+
   return (
     <div className={styles.page}>
       <main className={styles.main}>
         <header className={styles.header}>
           <h1>Vendor Bills</h1>
           <p>
-            This route gives users AP liability capture tied to project + vendor with lifecycle
-            controls from draft through paid.
+            Budget impact rule of thumb: <strong>planned/received/approved/scheduled</strong> bills
+            represent <strong>committed</strong> cost, while <strong>paid</strong> bills represent{" "}
+            <strong>actual</strong> cost.
           </p>
           <p>
-            It works with Vendors as the source of payee identity and with outbound Payments as
-            the settlement mechanism that clears AP balances in financial summaries.
+            Allocation linkage tracks which budget lines each bill amount is applied to. Approved
+            and paid bills require full allocation.
+          </p>
+          <p>
+            Vendor Bills are intentionally modeled as a B2B contract/AP workflow. For quick field
+            receipt intake, use the project-scoped <strong>Expenses</strong> flow.
           </p>
         </header>
         <section className={styles.card}>
-          <h2>Vendors</h2>
-          <p>
-            Maintain your vendor directory here first so AP entries tie to canonical payees with
-            duplicate safeguards.
-          </p>
-          <VendorsConsole />
-        </section>
-        <section className={styles.card}>
-          <h2>Vendor Bills</h2>
-          <p>
-            Capture expense transactions and lifecycle status so AP liabilities can be settled and
-            reported accurately.
-          </p>
           <VendorBillsConsole />
         </section>
       </main>

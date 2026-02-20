@@ -2,7 +2,7 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 
-import { SESSION_STORAGE_KEY, type ClientSession } from "./client-session";
+import { SESSION_CHANGE_EVENT, SESSION_STORAGE_KEY, type ClientSession } from "./client-session";
 
 const NO_SHARED_SESSION_MESSAGE = "No shared session found. Go to / and login first.";
 
@@ -14,10 +14,12 @@ function subscribe(onStoreChange: () => void) {
   const handler = () => onStoreChange();
   window.addEventListener("storage", handler);
   window.addEventListener("focus", handler);
+  window.addEventListener(SESSION_CHANGE_EVENT, handler);
 
   return () => {
     window.removeEventListener("storage", handler);
     window.removeEventListener("focus", handler);
+    window.removeEventListener(SESSION_CHANGE_EVENT, handler);
   };
 }
 

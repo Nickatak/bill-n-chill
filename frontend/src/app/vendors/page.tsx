@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { VendorsConsole } from "@/features/vendors";
 import styles from "./page.module.css";
 
 export default function VendorsPage() {
@@ -8,18 +8,16 @@ export default function VendorsPage() {
         <header className={styles.header}>
           <h1>Vendors</h1>
           <p>
-            Vendors now run within the Vendor Bills workflow so payee setup and expense capture
-            stay in one place.
+            This route gives users a canonical vendor directory with duplicate safeguards so AP
+            records are attached to stable payee entities.
+          </p>
+          <p>
+            Vendors are a non-workflow reference list used by Vendor Bills and outbound AP payment
+            flows.
           </p>
         </header>
         <section className={styles.card}>
-          <h2>Where to manage vendors</h2>
-          <p>
-            Open <strong>Vendor Bills</strong> to manage vendors and record vendor bills together.
-          </p>
-          <Link className={styles.linkButton} href="/vendor-bills">
-            Go to Vendor Bills
-          </Link>
+          <VendorsConsole />
         </section>
       </main>
     </div>

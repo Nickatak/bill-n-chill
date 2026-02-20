@@ -5,14 +5,18 @@ import { FormEvent, useEffect, useState } from "react";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { ApiResponse, VendorPayload, VendorRecord } from "../types";
+import styles from "./vendors-console.module.css";
 
 export function VendorsConsole() {
   const { token } = useSharedSessionAuth();
+  const pageSize = 5;
 
   const [rows, setRows] = useState<VendorRecord[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [activityFilter, setActivityFilter] = useState<"all" | "active" | "inactive">("all");
 
   const [name, setName] = useState("");
   const [vendorEmail, setVendorEmail] = useState("");
@@ -32,6 +36,19 @@ export function VendorsConsole() {
 
   const [duplicateCandidates, setDuplicateCandidates] = useState<VendorRecord[]>([]);
   const [pendingCreatePayload, setPendingCreatePayload] = useState<VendorPayload | null>(null);
+  const filteredRows = rows.filter((row) => {
+    if (activityFilter === "active") {
+      return row.is_active;
+    }
+    if (activityFilter === "inactive") {
+      return !row.is_active;
+    }
+    return true;
+  });
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  const currentPageSafe = Math.min(currentPage, totalPages);
+  const pageStartIndex = (currentPageSafe - 1) * pageSize;
+  const pagedRows = filteredRows.slice(pageStartIndex, pageStartIndex + pageSize);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   function hydrate(item: VendorRecord) {
@@ -45,6 +62,10 @@ export function VendorsConsole() {
   }
 
   async function loadVendors() {
+    if (!token) {
+      setStatusMessage("No shared session found. Go to / and login first.");
+      return;
+    }
     setStatusMessage("Loading vendors...");
 
     try {
@@ -61,6 +82,7 @@ export function VendorsConsole() {
       }
       const items = (payload.data as VendorRecord[]) ?? [];
       setRows(items);
+      setCurrentPage(1);
       if (items[0]) {
         setSelectedId(String(items[0].id));
         hydrate(items[0]);
@@ -111,7 +133,11 @@ export function VendorsConsole() {
     }
 
     const created = payload.data as VendorRecord;
-    setRows((current) => [...current, created]);
+    setRows((current) => {
+      const next = [...current, created];
+      setCurrentPage(Math.ceil(next.length / pageSize));
+      return next;
+    });
     setSelectedId(String(created.id));
     hydrate(created);
     setNewName("");
@@ -200,12 +226,13 @@ export function VendorsConsole() {
     if (!token) {
       return;
     }
-    const timer = window.setTimeout(() => {
-      void loadVendors();
-    }, 0);
-    return () => window.clearTimeout(timer);
+    void loadVendors();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activityFilter]);
 
   return (
     <section>
@@ -220,24 +247,91 @@ export function VendorsConsole() {
           placeholder="name, email, phone, or tax id"
         />
       </label>
-      <button type="button" onClick={loadVendors} disabled={!token}>
-        Load Vendors
-      </button>
+      <label>
+        Activity
+        <select
+          value={activityFilter}
+          onChange={(event) =>
+            setActivityFilter(event.target.value as "all" | "active" | "inactive")
+          }
+        >
+          <option value="all">all</option>
+          <option value="active">active</option>
+          <option value="inactive">inactive</option>
+        </select>
+      </label>
 
-      {rows.length > 0 ? (
-        <label>
-          Vendor
-          <select value={selectedId} onChange={(event) => handleSelect(event.target.value)}>
-            {rows.map((row) => (
-              <option key={row.id} value={row.id}>
-                #{row.id} - {row.name} [{row.vendor_type}]
-                {row.is_canonical ? " [canonical]" : ""} ({row.email || "no-email"}){" "}
-                {row.is_active ? "active" : "inactive"}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
+      {filteredRows.length > 0 ? (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Vendor</th>
+                <th>Type</th>
+                <th>Canonical</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Status</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {pagedRows.map((row) => {
+                const isSelected = selectedId === String(row.id);
+                return (
+                  <tr
+                    key={row.id}
+                    className={isSelected ? styles.rowSelected : undefined}
+                    onClick={() => handleSelect(String(row.id))}
+                  >
+                    <td>#{row.id} - {row.name}</td>
+                    <td>{row.vendor_type}</td>
+                    <td>{row.is_canonical ? "yes" : "no"}</td>
+                    <td>{row.email || "no-email"}</td>
+                    <td>{row.phone || "—"}</td>
+                    <td>{row.is_active ? "active" : "inactive"}</td>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleSelect(String(row.id));
+                        }}
+                        disabled={isSelected}
+                      >
+                        {isSelected ? "Selected" : "Select"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <div className={styles.pagination}>
+            <button
+              type="button"
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              disabled={currentPageSafe <= 1}
+            >
+              Prev
+            </button>
+            <span>
+              Page {currentPageSafe} of {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              disabled={currentPageSafe >= totalPages}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      ) : rows.length > 0 ? (
+        <p>No vendors match the selected activity filter.</p>
+      ) : (
+        <p>No vendors loaded yet.</p>
+      )}
 
       {duplicateCandidates.length > 0 ? (
         <>

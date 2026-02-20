@@ -12,6 +12,7 @@ export function ContactsConsole() {
   const [rows, setRows] = useState<ContactRecord[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const [activityFilter, setActivityFilter] = useState<"all" | "active" | "inactive">("all");
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -22,6 +23,18 @@ export function ContactsConsole() {
   const [leadStatus, setLeadStatus] = useState("new_contact");
 
   const normalizedBaseUrl = useMemo(() => normalizeApiBaseUrl(defaultApiBaseUrl), []);
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      const isInactive = row.status === "archived";
+      if (activityFilter === "active") {
+        return !isInactive;
+      }
+      if (activityFilter === "inactive") {
+        return isInactive;
+      }
+      return true;
+    });
+  }, [activityFilter, rows]);
 
   function hydrate(contact: ContactRecord) {
     setFullName(contact.full_name ?? "");
@@ -207,13 +220,27 @@ export function ContactsConsole() {
           placeholder="Name, phone, email, or address"
         />
       </label>
+      <label>
+        Activity
+        <select
+          value={activityFilter}
+          onChange={(event) =>
+            setActivityFilter(event.target.value as "all" | "active" | "inactive")
+          }
+        >
+          <option value="all">all</option>
+          <option value="active">active</option>
+          <option value="inactive">inactive</option>
+        </select>
+      </label>
 
-      {rows.length > 0 ? (
+      {filteredRows.length > 0 ? (
         <>
           <p>Contacts</p>
           <ul style={{ display: "grid", gap: 6, listStyle: "none", padding: 0, margin: 0 }}>
-            {rows.map((row) => {
+            {filteredRows.map((row) => {
               const isActive = selectedId === String(row.id);
+              const isInactive = row.status === "archived";
               return (
                 <li key={row.id}>
                   <button
@@ -233,13 +260,16 @@ export function ContactsConsole() {
                       cursor: "pointer",
                     }}
                   >
-                    #{row.id} - {row.full_name} ({row.phone || row.email || "no contact"})
+                    #{row.id} - {row.full_name} ({row.phone || row.email || "no contact"}){" "}
+                    [{isInactive ? "inactive" : "active"}]
                   </button>
                 </li>
               );
             })}
           </ul>
         </>
+      ) : rows.length > 0 ? (
+        <p>No contacts match the selected activity filter.</p>
       ) : query ? (
         <p>No contacts matched your search.</p>
       ) : (

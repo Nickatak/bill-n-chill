@@ -1,8 +1,11 @@
+from decimal import Decimal
+
+from django.db.models import Sum
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import Budget, BudgetLine
+from core.models import Budget, BudgetLine, VendorBill, VendorBillAllocation
 from core.serializers import BudgetLineSerializer, BudgetLineUpdateSerializer, BudgetSerializer
 from core.views.helpers import _validate_project_for_user
 
@@ -23,7 +26,32 @@ def project_budgets_view(request, project_id: int):
         .prefetch_related("line_items", "line_items__cost_code")
         .order_by("-created_at")
     )
-    return Response({"data": BudgetSerializer(budgets, many=True).data})
+    line_ids = []
+    for budget in budgets:
+        line_ids.extend([line.id for line in budget.line_items.all()])
+
+    line_actual_spend_map = {}
+    if line_ids:
+        spend_rows = (
+            VendorBillAllocation.objects.filter(
+                budget_line_id__in=line_ids,
+                vendor_bill__project=project,
+                vendor_bill__created_by=request.user,
+                vendor_bill__status=VendorBill.Status.PAID,
+            )
+            .values("budget_line_id")
+            .annotate(total=Sum("amount"))
+        )
+        line_actual_spend_map = {
+            row["budget_line_id"]: row["total"] or Decimal("0") for row in spend_rows
+        }
+
+    serializer = BudgetSerializer(
+        budgets,
+        many=True,
+        context={"line_actual_spend_map": line_actual_spend_map},
+    )
+    return Response({"data": serializer.data})
 
 
 @api_view(["PATCH"])
@@ -71,4 +99,17 @@ def budget_line_detail_view(request, budget_id: int, line_id: int):
     if len(update_fields) > 1:
         line.save(update_fields=update_fields)
 
-    return Response({"data": BudgetLineSerializer(line).data})
+    spend_total = (
+        VendorBillAllocation.objects.filter(
+            budget_line_id=line.id,
+            vendor_bill__project=budget.project,
+            vendor_bill__created_by=request.user,
+            vendor_bill__status=VendorBill.Status.PAID,
+        ).aggregate(total=Sum("amount"))["total"]
+        or Decimal("0")
+    )
+    serializer = BudgetLineSerializer(
+        line,
+        context={"line_actual_spend_map": {line.id: spend_total}},
+    )
+    return Response({"data": serializer.data})

@@ -83,6 +83,31 @@
   font-weight: 600;
 }
 
+.projectStatusProspect {
+  background: #e0e7ff;
+  color: #1e3a8a;
+}
+
+.projectStatusActive {
+  background: #bbf7d0;
+  color: #166534;
+}
+
+.projectStatusOnHold {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.projectStatusCompleted {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.projectStatusCancelled {
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
 .projectActionLink {
   color: #1d4ed8;
   font-weight: 600;
@@ -129,6 +154,31 @@
 :global(html[data-theme="dark"]) .projectStatus {
   background: #1e293b;
   color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .projectStatusProspect {
+  background: #1e3a8a;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .projectStatusActive {
+  background: #0f3d22;
+  color: #86efac;
+}
+
+:global(html[data-theme="dark"]) .projectStatusOnHold {
+  background: #431407;
+  color: #fdba74;
+}
+
+:global(html[data-theme="dark"]) .projectStatusCompleted {
+  background: #042f2e;
+  color: #99f6e4;
+}
+
+:global(html[data-theme="dark"]) .projectStatusCancelled {
+  background: #334155;
+  color: #94a3b8;
 }
 
 :global(html[data-theme="dark"]) .projectActionLink {
