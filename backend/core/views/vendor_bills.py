@@ -150,18 +150,18 @@ def project_vendor_bills_view(request, project_id: int):
         vendor_id=vendor.id,
         bill_number=data["bill_number"],
     )
-    duplicate_override = data.get("duplicate_override", False)
-    if duplicates and not duplicate_override:
+    blocking_duplicates = [row for row in duplicates if row.status != VendorBill.Status.VOID]
+    if blocking_duplicates:
         return Response(
             {
                 "error": {
                     "code": "duplicate_detected",
-                    "message": "Possible duplicate vendor bills found by vendor + bill number.",
+                    "message": "A non-void vendor bill already exists for this vendor + bill number.",
                     "fields": {},
                 },
                 "data": {
-                    "duplicate_candidates": VendorBillSerializer(duplicates, many=True).data,
-                    "allowed_resolutions": ["create_anyway"],
+                    "duplicate_candidates": VendorBillSerializer(blocking_duplicates, many=True).data,
+                    "allowed_resolutions": ["void_existing_bill"],
                 },
             },
             status=409,
@@ -234,7 +234,7 @@ def project_vendor_bills_view(request, project_id: int):
                 .prefetch_related("allocations", "allocations__budget_line", "allocations__budget_line__cost_code")
                 .get(id=vendor_bill.id)
             ).data,
-            "meta": {"duplicate_override_used": bool(duplicates and duplicate_override)},
+            "meta": {"duplicate_override_used": False},
         },
         status=201,
     )
@@ -294,28 +294,30 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
             status=400,
         )
 
-    duplicates = _find_duplicate_vendor_bills(
-        request.user,
-        vendor_id=next_vendor.id,
-        bill_number=next_bill_number,
-        exclude_vendor_bill_id=vendor_bill.id,
-    )
-    duplicate_override = data.get("duplicate_override", False)
-    if duplicates and not duplicate_override:
-        return Response(
-            {
-                "error": {
-                    "code": "duplicate_detected",
-                    "message": "Possible duplicate vendor bills found by vendor + bill number.",
-                    "fields": {},
-                },
-                "data": {
-                    "duplicate_candidates": VendorBillSerializer(duplicates, many=True).data,
-                    "allowed_resolutions": ["create_anyway"],
-                },
-            },
-            status=409,
+    identity_changed = next_vendor.id != vendor_bill.vendor_id
+    if identity_changed:
+        duplicates = _find_duplicate_vendor_bills(
+            request.user,
+            vendor_id=next_vendor.id,
+            bill_number=next_bill_number,
+            exclude_vendor_bill_id=vendor_bill.id,
         )
+        blocking_duplicates = [row for row in duplicates if row.status != VendorBill.Status.VOID]
+        if blocking_duplicates:
+            return Response(
+                {
+                    "error": {
+                        "code": "duplicate_detected",
+                        "message": "A non-void vendor bill already exists for this vendor + bill number.",
+                        "fields": {},
+                    },
+                    "data": {
+                        "duplicate_candidates": VendorBillSerializer(blocking_duplicates, many=True).data,
+                        "allowed_resolutions": ["void_existing_bill"],
+                    },
+                },
+                status=409,
+            )
 
     previous_status = vendor_bill.status
     next_status = data.get("status", previous_status)
@@ -472,6 +474,6 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
     return Response(
         {
             "data": VendorBillSerializer(vendor_bill).data,
-            "meta": {"duplicate_override_used": bool(duplicates and duplicate_override)},
+            "meta": {"duplicate_override_used": False},
         }
     )

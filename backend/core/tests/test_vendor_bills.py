@@ -157,7 +157,7 @@ class VendorBillTests(TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["bill_number"], "B-1001")
 
-    def test_vendor_bill_duplicate_warning_and_override_on_create(self):
+    def test_vendor_bill_duplicate_requires_existing_match_to_be_void(self):
         VendorBill.objects.create(
             project=self.project,
             vendor=self.vendor,
@@ -186,6 +186,18 @@ class VendorBillTests(TestCase):
             VendorBill.objects.filter(created_by=self.user, vendor=self.vendor).count(),
             1,
         )
+        self.assertEqual(
+            blocked.json()["data"]["allowed_resolutions"],
+            ["void_existing_bill"],
+        )
+
+        existing = VendorBill.objects.get(
+            created_by=self.user,
+            vendor=self.vendor,
+            bill_number="B-3100",
+        )
+        existing.status = VendorBill.Status.VOID
+        existing.save(update_fields=["status"])
 
         allowed = self.client.post(
             f"/api/v1/projects/{self.project.id}/vendor-bills/",
@@ -193,13 +205,12 @@ class VendorBillTests(TestCase):
                 "vendor": self.vendor.id,
                 "bill_number": "B-3100",
                 "total": "500.00",
-                "duplicate_override": True,
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(allowed.status_code, 201)
-        self.assertTrue(allowed.json()["meta"]["duplicate_override_used"])
+        self.assertFalse(allowed.json()["meta"]["duplicate_override_used"])
 
     def test_vendor_bill_status_transition_and_balance_due(self):
         vendor_bill_id = self._create_vendor_bill(total="900.00")

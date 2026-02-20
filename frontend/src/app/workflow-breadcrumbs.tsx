@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 
 type Crumb = {
   href: string;
@@ -21,6 +23,7 @@ type HierarchyRule = {
 
 const ROOT_CRUMB: CrumbDef = { href: "/", label: "Intake" };
 const PROJECTS_HUB_CRUMB: CrumbDef = { href: "/projects", label: "Projects" };
+const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 const projectScopedPrefixes = [
   "/estimates",
   "/budgets",
@@ -134,33 +137,81 @@ function isProjectScopedRoute(pathname: string): boolean {
   );
 }
 
+function withProjectParam(href: string, projectId: string): string {
+  const [path, queryString = ""] = href.split("?");
+  const query = new URLSearchParams(queryString);
+  query.set("project", projectId);
+  const nextQuery = query.toString();
+  return nextQuery ? `${path}?${nextQuery}` : path;
+}
+
 export function WorkflowBreadcrumbs() {
+  const { token } = useSharedSessionAuth();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const projectId = searchParams.get("project");
+  const [projectTitle, setProjectTitle] = useState("");
   const baseCrumbs = buildCrumbs(pathname || "/");
   const shouldShowProjectCrumb = Boolean(
     projectId && /^\d+$/.test(projectId) && isProjectScopedRoute(pathname || "/"),
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProjectTitle() {
+      if (!shouldShowProjectCrumb || !projectId || !token) {
+        setProjectTitle("");
+        return;
+      }
+
+      try {
+        const response = await fetch(`${defaultApiBaseUrl}/projects/${projectId}/`, {
+          headers: { Authorization: `Token ${token}` },
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          if (!cancelled) {
+            setProjectTitle("");
+          }
+          return;
+        }
+        if (!cancelled) {
+          setProjectTitle(String(payload?.data?.name ?? ""));
+        }
+      } catch {
+        if (!cancelled) {
+          setProjectTitle("");
+        }
+      }
+    }
+
+    void loadProjectTitle();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, shouldShowProjectCrumb, token]);
+
   const crumbs = shouldShowProjectCrumb
     ? (() => {
-        const projectCrumb: Crumb = {
+        const projectHubCrumb: Crumb = {
           href: `/projects?project=${encodeURIComponent(projectId!)}`,
-          label: `Project #${projectId}`,
+          label: `Project: ${projectTitle || `Project #${projectId}`}`,
           isCurrent: false,
         };
         const projectsIndex = baseCrumbs.findIndex((crumb) => crumb.href === "/projects");
         if (projectsIndex >= 0) {
           return [
-            ...baseCrumbs.slice(0, projectsIndex + 1),
-            projectCrumb,
+            ...baseCrumbs.slice(0, projectsIndex),
+            projectHubCrumb,
             ...baseCrumbs.slice(projectsIndex + 1),
           ].map((crumb, index, source) => ({
             ...crumb,
             isCurrent: index === source.length - 1,
           }));
         }
-        return [...baseCrumbs, projectCrumb].map((crumb, index, source) => ({
+        return [projectHubCrumb, ...baseCrumbs].map((crumb, index, source) => ({
           ...crumb,
           isCurrent: index === source.length - 1,
         }));
@@ -172,7 +223,7 @@ export function WorkflowBreadcrumbs() {
       <div className="workflowBreadcrumbsInner">
         {crumbs.map((crumb, index) => {
           const href =
-            projectId && crumb.href !== "/" ? `${crumb.href}?project=${encodeURIComponent(projectId)}` : crumb.href;
+            projectId && crumb.href !== "/" ? withProjectParam(crumb.href, projectId) : crumb.href;
           const key = `${crumb.href}-${crumb.label}`;
           return (
             <span key={key} className="workflowBreadcrumbItem">

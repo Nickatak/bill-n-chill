@@ -1062,7 +1062,7 @@ export function EstimatesConsole() {
           ) : hiddenVoidedFamilyCount > 0 && hideVoidedFamilies ? (
             <p className={styles.inlineHint}>All estimate families are currently voided and hidden.</p>
           ) : (
-            <p className={styles.inlineHint}>No estimate versions loaded yet.</p>
+            <p className={styles.inlineHint}>No estimates to display yet.</p>
           )}
         </div>
 

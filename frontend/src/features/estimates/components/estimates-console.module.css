@@ -571,8 +571,15 @@
   font-variant-numeric: tabular-nums;
 }
 
+.summaryTaxRate {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+
 .summaryTaxInput {
-  width: 64px;
+  width: 52px;
   border: 1px solid #cbd5f5;
   border-radius: 6px;
   padding: 4px 6px;
@@ -588,7 +595,7 @@
 }
 
 .summaryTaxAmount {
-  min-width: 84px;
+  margin-left: 6px;
   text-align: right;
 }
 

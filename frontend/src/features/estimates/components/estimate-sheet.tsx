@@ -457,7 +457,7 @@ export function EstimateSheet({
           <span>{showReadOnlyText ? `Sales Tax (${taxPercent}%)` : "Sales Tax"}</span>
           <div className={styles.summaryTaxLine}>
             {showReadOnlyText ? null : (
-              <>
+              <span className={styles.summaryTaxRate}>
                 <input
                   className={styles.summaryTaxInput}
                   value={taxPercent}
@@ -468,7 +468,7 @@ export function EstimateSheet({
                   aria-disabled={readOnly}
                 />
                 <span className={styles.summaryTaxSuffix}>%</span>
-              </>
+              </span>
             )}
             <span className={styles.summaryTaxAmount}>${formatMoney(taxAmount)}</span>
           </div>

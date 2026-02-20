@@ -132,7 +132,7 @@ class VendorBill(models.Model):
     Business workflow:
     - Internal payable document (vendor-facing), not client-facing billing.
     - Tracks AP lifecycle from intake through approval/scheduling/payment.
-    - Duplicate warnings are handled by vendor + bill number at application level.
+    - Vendor + bill number must be unique for non-void bills (reuse allowed after void).
     """
 
     class Status(models.TextChoices):
@@ -175,6 +175,15 @@ class VendorBill(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                "created_by",
+                "vendor",
+                models.functions.Lower("bill_number"),
+                condition=~models.Q(status="void"),
+                name="uniq_active_vendor_bill_number_per_user_vendor_ci",
+            )
+        ]
 
     def __str__(self) -> str:
         return f"{self.vendor.name} {self.bill_number}"

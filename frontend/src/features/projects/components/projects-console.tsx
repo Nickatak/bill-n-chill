@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { loadClientSession } from "../../session/client-session";
 import styles from "./projects-console.module.css";
@@ -16,6 +17,7 @@ import {
 type ProjectStatusValue = "prospect" | "active" | "on_hold" | "completed" | "cancelled";
 
 export function ProjectsConsole() {
+  const searchParams = useSearchParams();
   const projectPageSize = 5;
   const projectStatusTransitions: Record<ProjectStatusValue, ProjectStatusValue[]> = {
     prospect: ["active", "cancelled"],
@@ -59,6 +61,11 @@ export function ProjectsConsole() {
   const [endDate, setEndDate] = useState("");
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+  const scopedProjectIdParam = searchParams.get("project");
+  const scopedProjectId =
+    scopedProjectIdParam && /^\d+$/.test(scopedProjectIdParam)
+      ? Number(scopedProjectIdParam)
+      : null;
   const hasSelectedProject = Boolean(selectedProjectId);
   const selectedProject =
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;
@@ -157,14 +164,24 @@ export function ProjectsConsole() {
       const items = (payload.data as ProjectRecord[]) ?? [];
       setProjects(items);
       if (items[0]) {
+        const scopedMatch = scopedProjectId
+          ? items.find((project) => project.id === scopedProjectId)
+          : null;
         const preferredProject =
-          items.find((project) => project.status === "active")
-          ?? items.find((project) => project.status === "prospect")
-          ?? items[0];
+          scopedMatch ??
+          items.find((project) =>
+            defaultProjectStatusFilters.includes(project.status as ProjectStatusValue),
+          ) ?? items[0];
         setSelectedProjectId(String(preferredProject.id));
         hydrateForm(preferredProject);
         setSummary(null);
         setAuditEvents([]);
+        if (scopedProjectId && !scopedMatch) {
+          setStatusMessage(
+            `Project #${scopedProjectId} is not available in your scope. Loaded default project.`,
+          );
+          return;
+        }
         setStatusMessage(`Loaded ${items.length} project(s).`);
       } else {
         setSelectedProjectId("");

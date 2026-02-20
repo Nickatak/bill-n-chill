@@ -112,10 +112,8 @@ export function VendorBillsConsole() {
     { budget_line: 0, amount: "", note: "" },
   ]);
   const [status, setStatus] = useState<VendorBillStatus>("planned");
-  const [duplicateOverrideOnSave, setDuplicateOverrideOnSave] = useState(false);
 
   const [duplicateCandidates, setDuplicateCandidates] = useState<VendorBillRecord[]>([]);
-  const [pendingCreatePayload, setPendingCreatePayload] = useState<VendorBillPayload | null>(null);
   const activeVendors = vendors.filter((vendor) => vendor.is_active);
   const filteredVendorBills = vendorBills.filter((bill) =>
     billStatusFilters.length === 0 ? false : billStatusFilters.includes(bill.status),
@@ -523,10 +521,7 @@ export function VendorBillsConsole() {
     }
   }
 
-async function createVendorBill(
-    payloadBody: VendorBillPayload,
-    options?: { duplicate_override?: boolean },
-  ) {
+  async function createVendorBill(payloadBody: VendorBillPayload) {
     const response = await fetch(
       `${normalizedBaseUrl}/projects/${payloadBody.projectId}/vendor-bills/`,
       {
@@ -545,7 +540,6 @@ async function createVendorBill(
           total: payloadBody.total,
           notes: payloadBody.notes,
           allocations: payloadBody.allocations ?? [],
-          ...options,
         }),
       },
     );
@@ -554,8 +548,7 @@ async function createVendorBill(
     if (response.status === 409 && payload.error?.code === "duplicate_detected") {
       const duplicateData = payload.data as { duplicate_candidates?: VendorBillRecord[] };
       setDuplicateCandidates(duplicateData.duplicate_candidates ?? []);
-      setPendingCreatePayload(payloadBody);
-      setStatusMessage("Possible duplicate vendor bill found by vendor + bill number.");
+      setStatusMessage("Duplicate blocked: void existing matching bill(s) before reusing this bill number.");
       return;
     }
 
@@ -578,7 +571,6 @@ async function createVendorBill(
     setNewNotes("");
     setNewAllocations([{ budget_line: 0, amount: "", note: "" }]);
     setDuplicateCandidates([]);
-    setPendingCreatePayload(null);
     setStatusMessage(`Created vendor bill #${created.id}.`);
   }
 
@@ -626,23 +618,12 @@ async function createVendorBill(
     });
   }
 
-  async function handleCreateAnyway() {
-    if (!pendingCreatePayload) {
-      setStatusMessage("No duplicate candidate payload to resolve.");
-      return;
-    }
-
-    setStatusMessage("Creating duplicate vendor bill by override...");
-    await createVendorBill(pendingCreatePayload, { duplicate_override: true });
-  }
-
   function handleSelectVendorBill(id: string) {
     setSelectedVendorBillId(id);
     const selected = vendorBills.find((row) => String(row.id) === id);
     if (!selected) return;
 
     hydrate(selected);
-    setDuplicateOverrideOnSave(false);
   }
 
   function handleStartNewVendorBill() {
@@ -651,8 +632,6 @@ async function createVendorBill(
     setSelectedVendorBillId("");
     setCreateErrorMessage("");
     setDuplicateCandidates([]);
-    setPendingCreatePayload(null);
-    setDuplicateOverrideOnSave(false);
     setNewBillNumber("");
     setNewIssueDate(today);
     setNewDueDate(due);
@@ -708,16 +687,13 @@ async function createVendorBill(
               note: row.note,
             })),
           status,
-          duplicate_override: duplicateOverrideOnSave,
         }),
       });
       const payload: ApiResponse = await response.json();
       if (response.status === 409 && payload.error?.code === "duplicate_detected") {
         const duplicateData = payload.data as { duplicate_candidates?: VendorBillRecord[] };
         setDuplicateCandidates(duplicateData.duplicate_candidates ?? []);
-        setStatusMessage(
-          "Possible duplicate vendor bill found. Enable override and save again if intentional.",
-        );
+        setStatusMessage("Duplicate blocked: void existing matching bill(s) before reusing this bill number.");
         return;
       }
       if (!response.ok) {
@@ -764,7 +740,6 @@ async function createVendorBill(
     );
     setSelectedVendorBillId("");
     setDuplicateCandidates([]);
-    setPendingCreatePayload(null);
     setCreateErrorMessage("Enter a new bill number, then create the recreated planned bill.");
     setStatusMessage(`Copied bill #${selected.id} into create form.`);
   }
@@ -1193,16 +1168,6 @@ async function createVendorBill(
             ) : null}
           </div>
         ) : null}
-        {isEditingMode ? (
-          <label>
-            Allow duplicate vendor + bill number on save
-            <input
-              type="checkbox"
-              checked={duplicateOverrideOnSave}
-              onChange={(event) => setDuplicateOverrideOnSave(event.target.checked)}
-            />
-          </label>
-        ) : null}
         <button
           type="submit"
           disabled={
@@ -1233,11 +1198,7 @@ async function createVendorBill(
               </li>
             ))}
           </ul>
-          {pendingCreatePayload ? (
-            <button type="button" onClick={handleCreateAnyway}>
-              Create Anyway
-            </button>
-          ) : null}
+          <p>Void matching bill(s) first if you need to reuse this bill number.</p>
         </>
       ) : null}
 
