@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import Budget, BudgetLine, VendorBill, VendorBillAllocation
+from core.models import Budget, BudgetLine, ChangeOrder, ChangeOrderLine, VendorBill, VendorBillAllocation
 from core.serializers import BudgetLineSerializer, BudgetLineUpdateSerializer, BudgetSerializer
 from core.views.helpers import _validate_project_for_user
 
@@ -31,6 +31,7 @@ def project_budgets_view(request, project_id: int):
         line_ids.extend([line.id for line in budget.line_items.all()])
 
     line_actual_spend_map = {}
+    line_approved_co_delta_map = {}
     if line_ids:
         spend_rows = (
             VendorBillAllocation.objects.filter(
@@ -45,11 +46,27 @@ def project_budgets_view(request, project_id: int):
         line_actual_spend_map = {
             row["budget_line_id"]: row["total"] or Decimal("0") for row in spend_rows
         }
+        approved_co_rows = (
+            ChangeOrderLine.objects.filter(
+                budget_line_id__in=line_ids,
+                change_order__project=project,
+                change_order__requested_by=request.user,
+                change_order__status=ChangeOrder.Status.APPROVED,
+            )
+            .values("budget_line_id")
+            .annotate(total=Sum("amount_delta"))
+        )
+        line_approved_co_delta_map = {
+            row["budget_line_id"]: row["total"] or Decimal("0") for row in approved_co_rows
+        }
 
     serializer = BudgetSerializer(
         budgets,
         many=True,
-        context={"line_actual_spend_map": line_actual_spend_map},
+        context={
+            "line_actual_spend_map": line_actual_spend_map,
+            "line_approved_co_delta_map": line_approved_co_delta_map,
+        },
     )
     return Response({"data": serializer.data})
 
@@ -110,6 +127,19 @@ def budget_line_detail_view(request, budget_id: int, line_id: int):
     )
     serializer = BudgetLineSerializer(
         line,
-        context={"line_actual_spend_map": {line.id: spend_total}},
+        context={
+            "line_actual_spend_map": {line.id: spend_total},
+            "line_approved_co_delta_map": {
+                line.id: (
+                    ChangeOrderLine.objects.filter(
+                        budget_line_id=line.id,
+                        change_order__project=budget.project,
+                        change_order__requested_by=request.user,
+                        change_order__status=ChangeOrder.Status.APPROVED,
+                    ).aggregate(total=Sum("amount_delta"))["total"]
+                    or Decimal("0")
+                )
+            },
+        },
     )
     return Response({"data": serializer.data})

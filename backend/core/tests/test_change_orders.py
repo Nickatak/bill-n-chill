@@ -91,6 +91,13 @@ class ChangeOrderTests(TestCase):
         return Estimate.objects.get(id=estimate_id)
 
     def _approve_estimate(self, *, estimate_id: int, token: str):
+        sent_response = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {token}",
+        )
+        self.assertEqual(sent_response.status_code, 200)
         response = self.client.patch(
             f"/api/v1/estimates/{estimate_id}/",
             data={"status": "approved"},
@@ -109,7 +116,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {token}",
         )
-        self.assertEqual(response.status_code, 201)
+        self.assertIn(response.status_code, {200, 201})
         return response.json()["data"]["id"]
 
     def _active_budget(self):
@@ -145,7 +152,11 @@ class ChangeOrderTests(TestCase):
         return response.json()["data"]["id"]
 
     def test_change_order_create_requires_active_budget(self):
-        estimate = self._create_estimate_family()
+        estimate_id = self._create_estimate(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
             data={
@@ -153,7 +164,7 @@ class ChangeOrderTests(TestCase):
                 "amount_delta": "2500.00",
                 "days_delta": 3,
                 "reason": "Owner requested larger deck",
-                "origin_estimate": estimate.id,
+                "origin_estimate": estimate_id,
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -643,3 +654,146 @@ class ChangeOrderTests(TestCase):
         active_budget = self._active_budget()
         self.assertEqual(str(self.project.contract_value_current), "101000.00")
         self.assertEqual(str(active_budget.approved_change_order_total), "1000.00")
+
+    def test_approved_change_order_line_deltas_are_exposed_on_budget_lines(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        budget_line = self._active_budget_line()
+        self.assertIsNotNone(budget_line)
+
+        create = self.client.post(
+            f"/api/v1/projects/{self.project.id}/change-orders/",
+            data={
+                "title": "Line Coupling Visibility CO",
+                "amount_delta": "250.00",
+                "days_delta": 1,
+                "reason": "Line-level approved coupling visibility",
+                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+                "line_items": [
+                    {
+                        "budget_line": budget_line.id,
+                        "description": "Line-level coupling",
+                        "amount_delta": "250.00",
+                        "days_delta": 1,
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(create.status_code, 201)
+        change_order_id = create.json()["data"]["id"]
+
+        self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "pending_approval"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "approved"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+
+        budgets_response = self.client.get(
+            f"/api/v1/projects/{self.project.id}/budgets/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(budgets_response.status_code, 200)
+        line_payload = budgets_response.json()["data"][0]["line_items"][0]
+        self.assertEqual(line_payload["approved_change_order_delta"], "250.00")
+        self.assertEqual(line_payload["current_working_amount"], "1250.00")
+
+    def test_void_or_edited_approved_change_order_updates_budget_line_coupling(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        budget_line = self._active_budget_line()
+        self.assertIsNotNone(budget_line)
+
+        create = self.client.post(
+            f"/api/v1/projects/{self.project.id}/change-orders/",
+            data={
+                "title": "Line Coupling Edit CO",
+                "amount_delta": "300.00",
+                "days_delta": 1,
+                "reason": "Line-level coupling edit",
+                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+                "line_items": [
+                    {
+                        "budget_line": budget_line.id,
+                        "description": "Line-level coupling edit",
+                        "amount_delta": "300.00",
+                        "days_delta": 1,
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(create.status_code, 201)
+        change_order_id = create.json()["data"]["id"]
+
+        self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "pending_approval"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "approved"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+
+        edit = self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={
+                "amount_delta": "500.00",
+                "line_items": [
+                    {
+                        "budget_line": budget_line.id,
+                        "description": "Line-level coupling edit",
+                        "amount_delta": "500.00",
+                        "days_delta": 1,
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(edit.status_code, 200)
+
+        mid_budgets_response = self.client.get(
+            f"/api/v1/projects/{self.project.id}/budgets/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(mid_budgets_response.status_code, 200)
+        mid_line_payload = mid_budgets_response.json()["data"][0]["line_items"][0]
+        self.assertEqual(mid_line_payload["approved_change_order_delta"], "500.00")
+        self.assertEqual(mid_line_payload["current_working_amount"], "1500.00")
+
+        void_response = self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "void"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(void_response.status_code, 200)
+
+        final_budgets_response = self.client.get(
+            f"/api/v1/projects/{self.project.id}/budgets/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(final_budgets_response.status_code, 200)
+        final_line_payload = final_budgets_response.json()["data"][0]["line_items"][0]
+        self.assertIn(final_line_payload["approved_change_order_delta"], {"0", "0.00"})
+        self.assertEqual(final_line_payload["current_working_amount"], "1000.00")

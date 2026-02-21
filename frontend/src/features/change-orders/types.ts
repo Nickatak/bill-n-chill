@@ -8,6 +8,8 @@ export type BudgetLineRecord = {
   cost_code_code: string;
   description: string;
   budget_amount: string;
+  approved_change_order_delta?: string;
+  current_working_amount?: string;
 };
 
 export type ChangeOrderLineRecord = {

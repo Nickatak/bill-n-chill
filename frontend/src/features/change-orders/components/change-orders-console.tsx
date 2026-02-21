@@ -159,6 +159,22 @@ export function ChangeOrdersConsole({
     return line.budget_amount;
   }
 
+  function approvedChangeOrderDeltaForLine(budgetLineId: string): string {
+    const line = budgetLineById.get(budgetLineId);
+    if (!line) {
+      return "0.00";
+    }
+    return line.approved_change_order_delta ?? "0.00";
+  }
+
+  function currentWorkingAmountForLine(budgetLineId: string): string {
+    const line = budgetLineById.get(budgetLineId);
+    if (!line) {
+      return "0.00";
+    }
+    return line.current_working_amount ?? line.budget_amount;
+  }
+
   function statusBadgeClass(status: string): string {
     const key = `status${status
       .split("_")
@@ -820,7 +836,10 @@ export function ChangeOrdersConsole({
                                 <tr>
                                   <th>Budget line</th>
                                   <th>Description</th>
-                                  <th>Amount</th>
+                                  <th>Line delta</th>
+                                  <th>Base line amount</th>
+                                  <th>Approved CO delta</th>
+                                  <th>Current working</th>
                                   <th>Days</th>
                                 </tr>
                               </thead>
@@ -832,6 +851,9 @@ export function ChangeOrdersConsole({
                                     </td>
                                     <td>{line.description || line.budget_line_description}</td>
                                     <td>{line.amount_delta}</td>
+                                    <td>{originalApprovedAmountForLine(String(line.budget_line))}</td>
+                                    <td>{approvedChangeOrderDeltaForLine(String(line.budget_line))}</td>
+                                    <td>{currentWorkingAmountForLine(String(line.budget_line))}</td>
                                     <td>{line.days_delta}</td>
                                   </tr>
                                 ))}
