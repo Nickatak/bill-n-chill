@@ -9,7 +9,7 @@ type ProjectVendorBillsPageProps = {
 export default async function ProjectVendorBillsPage({ params }: ProjectVendorBillsPageProps) {
   const { projectId } = await params;
   if (!/^\d+$/.test(projectId)) {
-    redirect("/vendor-bills-placeholder");
+    redirect("/projects");
   }
 
   return (

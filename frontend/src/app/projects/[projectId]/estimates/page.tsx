@@ -15,7 +15,7 @@ export default async function ProjectEstimatesPage({
   const { projectId } = await params;
   const { estimate } = await searchParams;
   if (!/^\d+$/.test(projectId)) {
-    redirect("/estimates-placeholder");
+    redirect("/projects");
   }
 
   const estimateQuery = estimate && /^\d+$/.test(estimate) ? `?estimate=${estimate}` : "";

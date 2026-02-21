@@ -24,12 +24,12 @@ export const workflowRoutes: NavRoute[] = [
   {
     href: "/vendor-bills",
     label: "4 Vendor Bills",
-    exact: ["/vendor-bills", "/vendor-bills-placeholder"],
+    exact: ["/vendor-bills"],
   },
   {
     href: "/expenses",
     label: "5 Expenses",
-    exact: ["/expenses", "/expenses-placeholder"],
+    exact: ["/expenses"],
   },
   {
     href: "/payments",
@@ -54,13 +54,13 @@ export const opsMetaRoutes: NavRoute[] = [
 export function isRouteActive(pathname: string, route: NavRoute): boolean {
   if (
     route.href === "/vendor-bills" &&
-    (pathname === "/vendor-bills" || pathname === "/vendor-bills-placeholder" || /^\/projects\/\d+\/vendor-bills$/.test(pathname))
+    (pathname === "/vendor-bills" || /^\/projects\/\d+\/vendor-bills$/.test(pathname))
   ) {
     return true;
   }
   if (
     route.href === "/expenses" &&
-    (pathname === "/expenses" || pathname === "/expenses-placeholder" || /^\/projects\/\d+\/expenses$/.test(pathname))
+    (pathname === "/expenses" || /^\/projects\/\d+\/expenses$/.test(pathname))
   ) {
     return true;
   }

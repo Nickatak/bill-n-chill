@@ -8,7 +8,7 @@ type ProjectExpensesPageProps = {
 export default async function ProjectExpensesPage({ params }: ProjectExpensesPageProps) {
   const { projectId } = await params;
   if (!/^\d+$/.test(projectId)) {
-    redirect("/expenses-placeholder");
+    redirect("/projects");
   }
 
   return (
