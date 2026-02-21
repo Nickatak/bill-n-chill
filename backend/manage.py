@@ -8,9 +8,9 @@ def _print_mysql_connection_help() -> None:
     print(
         "\n[DB Connection Error] Could not connect to MySQL at 127.0.0.1.\n"
         "Start the Dockerized database first:\n"
-        "  make dev-db-up\n\n"
+        "  make db-up\n\n"
         "Then retry your command (for example):\n"
-        "  make run-backend\n",
+        "  make local-run-backend\n",
         file=sys.stderr,
     )
 

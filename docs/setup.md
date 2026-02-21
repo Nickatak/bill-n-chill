@@ -82,7 +82,7 @@ npx create-next-app@latest frontend
 ### 1) Start MySQL only (recommended for local host workflows)
 
 ```bash
-make dev-db-up
+make db-up
 ```
 
 This starts only the Dockerized MySQL container while you continue to run backend/frontend directly on your host.
@@ -107,7 +107,7 @@ npm run dev
 ### 3) Optional full Docker stack
 
 ```bash
-make dev-up
+make docker-up
 ```
 
 Expected URLs:
@@ -142,7 +142,7 @@ To fully reset local data (delete everything) and reseed the Bob demo:
 ```bash
 backend/.venv/bin/python backend/manage.py reset_fresh_demo
 # or (with dev env selection)
-make dev-reset-fresh
+make docker-reset-fresh
 ```
 
 Options:
@@ -158,17 +158,18 @@ Run `make help` from repo root to see all commands.
 
 ### Command Prefix Pattern
 
-The Makefile now uses three command prefixes:
+The Makefile now uses five primary command prefixes:
 
 - `local-*`: direct local host workflows (frontend/backend run on host).
-- `dev-*`: Dockerized development stack using `.env.local`.
-- `prod-*`: Dockerized prod-like stack using `.env.prod`.
+- `docker-*`: Dockerized development stack using `.env.local`.
+- `db-*`: Dockerized MySQL-only commands for `.env.local`.
+- `docker-prod-*`: Dockerized prod-like stack using `.env.prod`.
+- `db-prod-*`: Dockerized MySQL-only commands for `.env.prod`.
 
 Examples:
 
 - `make local-up`
-- `make dev-up`
-- `make docker-up` (alias of `make dev-up`)
-- `make prod-up`
-- `make dev-db-up` (MySQL only)
-- `make db-up` (alias of `make dev-db-up`)
+- `make docker-up`
+- `make db-up` (MySQL only)
+- `make docker-prod-up`
+- `make db-prod-up` (MySQL only)

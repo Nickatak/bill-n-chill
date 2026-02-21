@@ -5,12 +5,10 @@
 	local-up local-run local-run-frontend local-run-backend local-check-db \
 	local-migrate local-makemigrations local-superuser \
 	local-test local-test-backend local-test-frontend local-build local-lint local-clean \
-	dev-build dev-up dev-down dev-logs dev-ps dev-config dev-seed dev-migrate dev-reset-fresh \
-	dev-db-up dev-db-down dev-db-logs dev-db-reset \
-	prod-build prod-up prod-down prod-logs prod-ps prod-config prod-seed \
-	prod-db-up prod-db-down prod-db-logs prod-db-reset \
-	docker-build docker-up docker-down docker-logs docker-ps docker-config \
-	db-up db-down db-logs db-reset
+	docker-build docker-up docker-down docker-logs docker-ps docker-config docker-seed docker-migrate docker-reset-fresh \
+	db-up db-down db-logs db-reset \
+	docker-prod-build docker-prod-up docker-prod-down docker-prod-logs docker-prod-ps docker-prod-config docker-prod-seed \
+	db-prod-up db-prod-down db-prod-logs db-prod-reset
 
 BACKEND_PYTHON := backend/.venv/bin/python
 BACKEND_MANAGE := $(BACKEND_PYTHON) backend/manage.py
@@ -31,8 +29,10 @@ help:
 	@echo ""
 	@echo "Command Prefix Pattern:"
 	@echo "  local-*   direct local workflow commands (frontend/backend on host)"
-	@echo "  dev-*     Dockerized dev stack (.env.local)"
-	@echo "  prod-*    Dockerized prod-like stack (.env.prod)"
+	@echo "  docker-*  Dockerized dev stack (.env.local)"
+	@echo "  db-*      MySQL-only Docker commands for dev (.env.local)"
+	@echo "  docker-prod-*  Dockerized prod-like stack (.env.prod)"
+	@echo "  db-prod-*      MySQL-only Docker commands for prod-like (.env.prod)"
 	@echo ""
 	@echo "Local Commands:"
 	@echo "  make local-install         - Install all dependencies (frontend + backend)"
@@ -43,25 +43,23 @@ help:
 	@echo "  make local-test            - Run backend tests + frontend lint"
 	@echo "  make local-kill-ports      - Kill processes listening on ports 3000-3005/8000"
 	@echo ""
-	@echo "Dev Docker Commands:"
-	@echo "  make dev-up                - Start full dev stack (frontend + backend + mysql)"
-	@echo "  make dev-down              - Stop dev stack"
-	@echo "  make dev-logs              - Stream dev stack logs"
-	@echo "  make dev-migrate           - Apply Django migrations against dev DB"
-	@echo "  make dev-reset-fresh       - Destructive DB flush + Bob demo reseed (dev DB)"
-	@echo "  make dev-db-up             - Start only MySQL container (for local host workflow)"
-	@echo "  make dev-db-down           - Stop only MySQL container"
-	@echo "  make dev-db-reset          - Drop dev DB volume and recreate MySQL container"
-	@echo "  make dev-seed              - Seed Bob demo data into dev MySQL database"
-	@echo "  make docker-up             - Alias for make dev-up"
-	@echo "  make db-up                 - Alias for make dev-db-up"
+	@echo "Dev Docker Commands (.env.local):"
+	@echo "  make docker-up             - Start full dev stack (frontend + backend + mysql)"
+	@echo "  make docker-down           - Stop dev stack"
+	@echo "  make docker-logs           - Stream dev stack logs"
+	@echo "  make docker-migrate        - Apply Django migrations against dev DB"
+	@echo "  make docker-reset-fresh    - Destructive DB flush + Bob demo reseed (dev DB)"
+	@echo "  make db-up                 - Start only MySQL container (for local host workflow)"
+	@echo "  make db-down               - Stop only MySQL container"
+	@echo "  make db-reset              - Drop dev DB volume and recreate MySQL container"
+	@echo "  make docker-seed           - Seed Bob demo data into dev MySQL database"
 	@echo ""
-	@echo "Prod-like Docker Commands:"
-	@echo "  make prod-up               - Start prod-like stack in detached mode"
-	@echo "  make prod-down             - Stop prod-like stack"
-	@echo "  make prod-logs             - Stream prod-like stack logs"
-	@echo "  make prod-db-up            - Start only prod-like MySQL container"
-	@echo "  make prod-seed             - Seed Bob demo data into prod-like MySQL database"
+	@echo "Prod-like Docker Commands (.env.prod):"
+	@echo "  make docker-prod-up        - Start prod-like stack in detached mode"
+	@echo "  make docker-prod-down      - Stop prod-like stack"
+	@echo "  make docker-prod-logs      - Stream prod-like stack logs"
+	@echo "  make db-prod-up            - Start only prod-like MySQL container"
+	@echo "  make docker-prod-seed      - Seed Bob demo data into prod-like MySQL database"
 
 # ============================================================================
 # LOCAL (HOST PROCESSES)
@@ -162,98 +160,85 @@ local-kill-ports:
 	done
 
 # ============================================================================
-# DEV DOCKER (.env.local)
+# DOCKER DEV (.env.local)
 # ============================================================================
 
-dev-build: local-env-local
+docker-build: local-env-local
 	$(DEV_COMPOSE) build
 
-dev-up: local-env-local
+docker-up: local-env-local
 	$(DEV_COMPOSE) up --build
 
-dev-down: local-env-local
+docker-down: local-env-local
 	$(DEV_COMPOSE) down --remove-orphans
 
-dev-logs: local-env-local
+docker-logs: local-env-local
 	$(DEV_COMPOSE) logs -f --tail=200
 
-dev-ps: local-env-local
+docker-ps: local-env-local
 	$(DEV_COMPOSE) ps
 
-dev-config: local-env-local
+docker-config: local-env-local
 	$(DEV_COMPOSE) config
 
-dev-seed: local-env-local local-check-db
+docker-seed: local-env-local local-check-db
 	$(BACKEND_MANAGE) seed_bob_demo
 
-dev-migrate: local-env-local local-check-db
+docker-migrate: local-env-local local-check-db
 	$(BACKEND_MANAGE) migrate
 
-dev-reset-fresh: local-env-local local-check-db
+docker-reset-fresh: local-env-local local-check-db
 	$(BACKEND_MANAGE) reset_fresh_demo
 
-dev-db-up: local-env-local
+db-up: local-env-local
 	$(DEV_COMPOSE) up -d $(DB_SERVICE)
 
-dev-db-down: local-env-local
+db-down: local-env-local
 	$(DEV_COMPOSE) stop $(DB_SERVICE)
 
-dev-db-logs: local-env-local
+db-logs: local-env-local
 	$(DEV_COMPOSE) logs -f --tail=200 $(DB_SERVICE)
 
-dev-db-reset: local-env-local
+db-reset: local-env-local
 	$(DEV_COMPOSE) down -v --remove-orphans
 	$(DEV_COMPOSE) up -d $(DB_SERVICE)
 
 # ============================================================================
-# PROD-LIKE DOCKER (.env.prod)
+# DOCKER PROD-LIKE (.env.prod)
 # ============================================================================
 
-prod-build: local-env-prod
+docker-prod-build: local-env-prod
 	$(PROD_COMPOSE) build
 
-prod-up: local-env-prod
+docker-prod-up: local-env-prod
 	$(PROD_COMPOSE) up -d --build
 
-prod-down: local-env-prod
+docker-prod-down: local-env-prod
 	$(PROD_COMPOSE) down --remove-orphans
 
-prod-logs: local-env-prod
+docker-prod-logs: local-env-prod
 	$(PROD_COMPOSE) logs -f --tail=200
 
-prod-ps: local-env-prod
+docker-prod-ps: local-env-prod
 	$(PROD_COMPOSE) ps
 
-prod-config: local-env-prod
+docker-prod-config: local-env-prod
 	$(PROD_COMPOSE) config
 
-prod-seed: local-env-prod local-check-db
+docker-prod-seed: local-env-prod local-check-db
 	$(BACKEND_MANAGE) seed_bob_demo
 
-prod-db-up: local-env-prod
+db-prod-up: local-env-prod
 	$(PROD_COMPOSE) up -d $(DB_SERVICE)
 
-prod-db-down: local-env-prod
+db-prod-down: local-env-prod
 	$(PROD_COMPOSE) stop $(DB_SERVICE)
 
-prod-db-logs: local-env-prod
+db-prod-logs: local-env-prod
 	$(PROD_COMPOSE) logs -f --tail=200 $(DB_SERVICE)
 
-prod-db-reset: local-env-prod
+db-prod-reset: local-env-prod
 	$(PROD_COMPOSE) down -v --remove-orphans
 	$(PROD_COMPOSE) up -d $(DB_SERVICE)
-
-# Cross-repo compatibility aliases (other orchestrated repos commonly use docker-* and db-* naming)
-docker-build: dev-build
-docker-up: dev-up
-docker-down: dev-down
-docker-logs: dev-logs
-docker-ps: dev-ps
-docker-config: dev-config
-
-db-up: dev-db-up
-db-down: dev-db-down
-db-logs: dev-db-logs
-db-reset: dev-db-reset
 
 .DEFAULT_GOAL := help

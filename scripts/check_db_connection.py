@@ -43,11 +43,11 @@ def main() -> int:
                 f"\n[DB Connection Error] Could not connect to MySQL on {host}:{port} after {max_attempts}s.\n"
                 "MySQL container may still be starting, or host/port may be mismatched.\n\n"
                 "Checks:\n"
-                "  make dev-db-up\n"
-                "  make dev-db-logs\n"
+                "  make db-up\n"
+                "  make db-logs\n"
                 "  grep DATABASE_URL .env\n\n"
                 "Then retry:\n"
-                "  make run-backend\n",
+                "  make local-run-backend\n",
                 file=sys.stderr,
             )
             return 1
