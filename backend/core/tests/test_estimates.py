@@ -91,6 +91,66 @@ class EstimateTests(TestCase):
         response = self.client.get("/api/v1/public/estimates/notarealtoken/")
         self.assertEqual(response.status_code, 404)
 
+    def test_public_project_snapshot_view_allows_unauthenticated_access(self):
+        estimate = Estimate.objects.create(
+            project=self.project,
+            version=1,
+            title="Snapshot Estimate",
+            created_by=self.user,
+            status=Estimate.Status.APPROVED,
+        )
+        ChangeOrder.objects.create(
+            project=self.project,
+            number=1,
+            title="Approved CO",
+            status=ChangeOrder.Status.APPROVED,
+            amount_delta="250.00",
+            days_delta=1,
+            requested_by=self.user,
+            approved_by=self.user,
+        )
+        invoice = Invoice.objects.create(
+            project=self.project,
+            customer=self.customer,
+            invoice_number="INV-SNAPSHOT-1",
+            status=Invoice.Status.SENT,
+            issue_date="2026-02-01",
+            due_date="2026-03-01",
+            subtotal="500.00",
+            total="500.00",
+            balance_due="500.00",
+            created_by=self.user,
+        )
+        payment = Payment.objects.create(
+            project=self.project,
+            direction=Payment.Direction.INBOUND,
+            method=Payment.Method.ACH,
+            status=Payment.Status.SETTLED,
+            amount="300.00",
+            payment_date="2026-02-05",
+            created_by=self.user,
+        )
+        PaymentAllocation.objects.create(
+            payment=payment,
+            target_type=PaymentAllocation.TargetType.INVOICE,
+            invoice=invoice,
+            applied_amount="300.00",
+            created_by=self.user,
+        )
+
+        response = self.client.get(f"/api/v1/public/projects/{estimate.public_token}/snapshot/")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        self.assertEqual(payload["project"]["id"], self.project.id)
+        self.assertEqual(payload["shared_from_estimate"]["estimate_id"], estimate.id)
+        self.assertEqual(payload["contract"]["approved_change_orders_total"], "250.00")
+        self.assertEqual(payload["invoices"]["total_count"], 1)
+        self.assertEqual(payload["payments"]["settled_amount"], "300.00")
+
+    def test_public_project_snapshot_view_not_found(self):
+        response = self.client.get("/api/v1/public/projects/notarealtoken/snapshot/")
+        self.assertEqual(response.status_code, 404)
+
     def test_project_estimates_create(self):
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/estimates/",

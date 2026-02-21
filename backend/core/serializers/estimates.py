@@ -83,6 +83,34 @@ class EstimateStatusEventSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class PublicProjectSnapshotContractSerializer(serializers.Serializer):
+    original = serializers.DecimalField(max_digits=12, decimal_places=2)
+    current = serializers.DecimalField(max_digits=12, decimal_places=2)
+    approved_change_orders_total = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+
+class PublicProjectSnapshotInvoicesSerializer(serializers.Serializer):
+    total_count = serializers.IntegerField()
+    total_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    outstanding_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    status_counts = serializers.JSONField()
+
+
+class PublicProjectSnapshotPaymentsSerializer(serializers.Serializer):
+    total_count = serializers.IntegerField()
+    settled_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    status_counts = serializers.JSONField()
+
+
+class PublicProjectSnapshotSerializer(serializers.Serializer):
+    generated_at = serializers.DateTimeField()
+    project = serializers.JSONField()
+    shared_from_estimate = serializers.JSONField()
+    contract = PublicProjectSnapshotContractSerializer()
+    invoices = PublicProjectSnapshotInvoicesSerializer()
+    payments = PublicProjectSnapshotPaymentsSerializer()
+
+
 class EstimateLineItemInputSerializer(serializers.Serializer):
     cost_code = serializers.IntegerField()
     description = serializers.CharField(max_length=255)

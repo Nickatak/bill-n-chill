@@ -6,12 +6,22 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import Budget, Estimate, EstimateStatusEvent, FinancialAuditEvent
+from core.models import (
+    Budget,
+    ChangeOrder,
+    Estimate,
+    EstimateStatusEvent,
+    FinancialAuditEvent,
+    Invoice,
+    Payment,
+    PaymentAllocation,
+)
 from core.serializers import (
     BudgetSerializer,
     EstimateDuplicateSerializer,
     EstimateSerializer,
     EstimateStatusEventSerializer,
+    PublicProjectSnapshotSerializer,
     EstimateWriteSerializer,
 )
 from core.views.helpers import (
@@ -49,6 +59,91 @@ def public_estimate_detail_view(request, public_token: str):
         "customer_billing_address": estimate.project.customer.billing_address,
     }
     return Response({"data": serialized})
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def public_project_snapshot_view(request, public_token: str):
+    try:
+        estimate = (
+            Estimate.objects.select_related("project", "project__customer")
+            .get(public_token=public_token)
+        )
+    except Estimate.DoesNotExist:
+        return Response(
+            {"error": {"code": "not_found", "message": "Shared project snapshot not found.", "fields": {}}},
+            status=404,
+        )
+
+    project = estimate.project
+    owner = estimate.created_by
+    approved_change_orders = list(
+        ChangeOrder.objects.filter(
+            project=project,
+            requested_by=owner,
+            status=ChangeOrder.Status.APPROVED,
+        )
+    )
+    approved_change_orders_total = sum((row.amount_delta for row in approved_change_orders), Decimal("0"))
+
+    invoices = list(Invoice.objects.filter(project=project, created_by=owner))
+    invoice_total = sum((row.total for row in invoices if row.status != Invoice.Status.VOID), Decimal("0"))
+    invoice_outstanding = sum(
+        (
+            row.balance_due
+            for row in invoices
+            if row.status not in {Invoice.Status.VOID, Invoice.Status.PAID}
+        ),
+        Decimal("0"),
+    )
+    invoice_status_counts = {status: 0 for status, _ in Invoice.Status.choices}
+    for row in invoices:
+        invoice_status_counts[row.status] = invoice_status_counts.get(row.status, 0) + 1
+
+    payments = list(Payment.objects.filter(project=project, created_by=owner))
+    settled_allocations = PaymentAllocation.objects.filter(
+        payment__project=project,
+        payment__created_by=owner,
+        payment__direction=Payment.Direction.INBOUND,
+        payment__status=Payment.Status.SETTLED,
+    )
+    settled_amount = sum((row.applied_amount for row in settled_allocations), Decimal("0"))
+    payment_status_counts = {status: 0 for status, _ in Payment.Status.choices}
+    for row in payments:
+        payment_status_counts[row.status] = payment_status_counts.get(row.status, 0) + 1
+
+    payload = {
+        "generated_at": timezone.now(),
+        "project": {
+            "id": project.id,
+            "name": project.name,
+            "status": project.status,
+            "customer_display_name": project.customer.display_name,
+        },
+        "shared_from_estimate": {
+            "estimate_id": estimate.id,
+            "estimate_title": estimate.title,
+            "estimate_version": estimate.version,
+            "public_ref": estimate.public_ref,
+        },
+        "contract": {
+            "original": project.contract_value_original,
+            "current": project.contract_value_current,
+            "approved_change_orders_total": approved_change_orders_total,
+        },
+        "invoices": {
+            "total_count": len(invoices),
+            "total_amount": invoice_total,
+            "outstanding_amount": invoice_outstanding,
+            "status_counts": invoice_status_counts,
+        },
+        "payments": {
+            "total_count": len(payments),
+            "settled_amount": settled_amount,
+            "status_counts": payment_status_counts,
+        },
+    }
+    return Response({"data": PublicProjectSnapshotSerializer(payload).data})
 
 
 def _archive_estimate_family(*, project, user, title, exclude_ids, note):

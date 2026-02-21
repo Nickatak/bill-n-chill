@@ -198,6 +198,10 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
   - Auth required
   - Returns one estimate with line items.
 
+- `GET /api/v1/public/estimates/{public_token}/`
+  - No auth required
+  - Returns public estimate view payload for controlled external sharing.
+
 - `PATCH /api/v1/estimates/{estimate_id}/`
   - Auth required
   - Supports updating estimate status/title/tax and replacing line items.
@@ -205,6 +209,15 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
 - `POST /api/v1/estimates/{estimate_id}/clone-version/`
   - Auth required
   - Creates a new draft version cloned from the selected estimate.
+
+- `GET /api/v1/public/projects/{public_token}/snapshot/`
+  - No auth required
+  - Read-only client snapshot linked to the shared estimate token.
+  - Returns:
+    - project summary (name/status/customer display)
+    - contract original/current + approved CO total
+    - invoice count/amount/outstanding + status counts
+    - payment count/settled allocated amount + status counts
 
 ## Estimate Approval Lifecycle (EST-03)
 
