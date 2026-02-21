@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 
 import {
   clearClientSession,
@@ -145,6 +146,13 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
         <div className={styles.card}>
           <h2 className={styles.title}>Sign in</h2>
           <p className={styles.text}>Home doubles as your dashboard once authenticated.</p>
+          <div className={styles.warning} role="note" aria-label="Environment warning">
+            <p className={styles.warningTitle}>Under Construction</p>
+            <p className={styles.warningText}>
+              This environment is still in active development. Data may be reset, changed, or removed at any
+              time.
+            </p>
+          </div>
           <form className={styles.form} onSubmit={handleLogin}>
             <label>
               Email
@@ -171,6 +179,9 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
                 {isChecking ? "Checking..." : "Sign in"}
               </button>
             </div>
+            <p className={styles.formHint}>
+              Need an account? <Link href="/register">Create one</Link>.
+            </p>
           </form>
           <p className={styles.message}>{message}</p>
           <p className={health.ok ? styles.healthOk : styles.healthBad}>API Health: {health.message}</p>

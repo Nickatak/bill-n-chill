@@ -20,6 +20,7 @@ from core.views import (
     invoice_send_view,
     login_view,
     me_view,
+    register_view,
     accounting_sync_event_retry_view,
     payment_detail_view,
     payment_allocate_view,
@@ -44,6 +45,7 @@ from core.views import (
 urlpatterns = [
     path("health/", health_view, name="health"),
     path("auth/login/", login_view, name="auth-login"),
+    path("auth/register/", register_view, name="auth-register"),
     path("auth/me/", me_view, name="auth-me"),
     path("lead-contacts/quick-add/", quick_add_lead_contact_view, name="lead-contact-quick-add"),
     path("contacts/", contacts_list_view, name="contacts-list"),

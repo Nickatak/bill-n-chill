@@ -23,6 +23,30 @@
   color: #4b5563;
 }
 
+.warning {
+  border: 1px solid #f59e0b;
+  border-radius: 10px;
+  background: #fffbeb;
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.warningTitle {
+  margin: 0;
+  color: #92400e;
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.warningText {
+  margin: 0;
+  color: #78350f;
+  font-size: 0.9rem;
+}
+
 .form {
   display: grid;
   gap: 10px;
@@ -48,6 +72,17 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.formHint {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.9rem;
+}
+
+.formHint a {
+  color: #111827;
+  font-weight: 700;
 }
 
 .button {
@@ -142,8 +177,26 @@
 
 :global(html[data-theme="dark"]) .text,
 :global(html[data-theme="dark"]) .message,
-:global(html[data-theme="dark"]) .quickHint {
+:global(html[data-theme="dark"]) .quickHint,
+:global(html[data-theme="dark"]) .formHint {
   color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .formHint a {
+  color: #e5e7eb;
+}
+
+:global(html[data-theme="dark"]) .warning {
+  border-color: #f59e0b;
+  background: #1f2937;
+}
+
+:global(html[data-theme="dark"]) .warningTitle {
+  color: #fcd34d;
+}
+
+:global(html[data-theme="dark"]) .warningText {
+  color: #fde68a;
 }
 
 :global(html[data-theme="dark"]) .form input,

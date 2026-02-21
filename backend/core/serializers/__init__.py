@@ -1,6 +1,6 @@
 from core.serializers.accounting import AccountingSyncEventSerializer, AccountingSyncEventWriteSerializer
 from core.serializers.audit import FinancialAuditEventSerializer
-from core.serializers.auth import LoginSerializer
+from core.serializers.auth import LoginSerializer, RegisterSerializer
 from core.serializers.budgets import BudgetLineSerializer, BudgetLineUpdateSerializer, BudgetSerializer
 from core.serializers.change_orders import (
     ChangeOrderLineInputSerializer,
@@ -46,6 +46,7 @@ from core.serializers.vendors import VendorSerializer, VendorWriteSerializer
 
 __all__ = [
     "LoginSerializer",
+    "RegisterSerializer",
     "AccountingSyncEventSerializer",
     "AccountingSyncEventWriteSerializer",
     "FinancialAuditEventSerializer",

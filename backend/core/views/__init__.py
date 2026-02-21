@@ -1,5 +1,5 @@
 from core.views.accounting import accounting_sync_event_retry_view, project_accounting_sync_events_view
-from core.views.auth import health_view, login_view, me_view
+from core.views.auth import health_view, login_view, me_view, register_view
 from core.views.budgets import budget_line_detail_view, project_budgets_view
 from core.views.change_orders import (
     change_order_clone_revision_view,
@@ -37,6 +37,7 @@ from core.views.vendors import vendor_detail_view, vendors_list_create_view
 __all__ = [
     "health_view",
     "login_view",
+    "register_view",
     "me_view",
     "project_accounting_sync_events_view",
     "accounting_sync_event_retry_view",

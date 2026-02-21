@@ -18,7 +18,9 @@ export function AuthGate({ children }: AuthGateProps) {
   const [isAuthorized, setIsAuthorized] = useState(false);
 
   const isPublicRoute =
-    pathname === "/" || Boolean(pathname && /^\/estimate\/[^/]+\/?$/.test(pathname));
+    pathname === "/" ||
+    pathname === "/register" ||
+    Boolean(pathname && /^\/estimate\/[^/]+\/?$/.test(pathname));
 
   useEffect(() => {
     let cancelled = false;

@@ -5,6 +5,7 @@
 	local-up local-run local-run-frontend local-run-backend local-check-db \
 	local-migrate local-makemigrations local-superuser \
 	local-test local-test-backend local-test-frontend local-build local-lint local-clean \
+	replace-backend replace-frontend replace-app \
 	docker-build docker-up docker-down docker-logs docker-ps docker-config docker-seed docker-migrate docker-reset-fresh \
 	db-up db-down db-logs db-reset \
 	docker-prod-build docker-prod-up docker-prod-down docker-prod-logs docker-prod-ps docker-prod-config docker-prod-seed \
@@ -42,6 +43,9 @@ help:
 	@echo "  make local-migrate         - Apply Django migrations"
 	@echo "  make local-test            - Run backend tests + frontend lint"
 	@echo "  make local-kill-ports      - Kill processes listening on ports 3000-3005/8000"
+	@echo "  make replace-backend       - Stop docker backend, run local backend"
+	@echo "  make replace-frontend      - Stop docker frontend, run local frontend"
+	@echo "  make replace-app           - Stop docker frontend+backend, run local frontend+backend"
 	@echo ""
 	@echo "Dev Docker Commands (.env.local):"
 	@echo "  make docker-up             - Start full dev stack (frontend + backend + mysql)"
@@ -158,6 +162,22 @@ local-kill-ports:
 			echo "Port $$port: skipped (install fuser or lsof)"; \
 		fi; \
 	done
+
+# ============================================================================
+# BRIDGE (DOCKER -> LOCAL)
+# ============================================================================
+
+replace-backend: local-env-local
+	$(DEV_COMPOSE) stop backend
+	$(MAKE) local-run-backend
+
+replace-frontend: local-env-local
+	$(DEV_COMPOSE) stop frontend
+	$(MAKE) local-run-frontend
+
+replace-app: local-env-local
+	$(DEV_COMPOSE) stop backend frontend
+	$(MAKE) local-up
 
 # ============================================================================
 # DOCKER DEV (.env.local)
