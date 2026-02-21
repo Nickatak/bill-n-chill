@@ -121,7 +121,7 @@ Expected URLs:
 
 ## One-Command Demo Seed (Bob Bathroom Remodel)
 
-To load a full MVP walkthrough dataset (lead, project, estimate, budget, change order, invoice, vendor bill, payments, allocations, audit events):
+To load a full MVP walkthrough dataset (lead, project, estimate family revisions, budget, approved + voided change orders, mixed invoice/vendor-bill/payment statuses, allocations, and audit events):
 
 ```bash
 backend/.venv/bin/python backend/manage.py seed_bob_demo
