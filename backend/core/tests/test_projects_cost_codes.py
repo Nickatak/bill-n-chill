@@ -228,6 +228,40 @@ class CostCodeTests(TestCase):
         self.assertEqual(self.code.name, "General Conditions Updated")
         self.assertFalse(self.code.is_active)
 
+    def test_cost_code_csv_import_preview_and_apply(self):
+        preview = self.client.post(
+            "/api/v1/cost-codes/import-csv/",
+            data={
+                "dry_run": True,
+                "csv_text": "code,name,is_active\n01-100,General Conditions Updated,false\n03-300,Site Work,true\n",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(preview.status_code, 200)
+        preview_data = preview.json()["data"]
+        self.assertEqual(preview_data["mode"], "preview")
+        self.assertEqual(preview_data["total_rows"], 2)
+        self.assertEqual(CostCode.objects.filter(created_by=self.user).count(), 1)
+
+        apply_response = self.client.post(
+            "/api/v1/cost-codes/import-csv/",
+            data={
+                "dry_run": False,
+                "csv_text": "code,name,is_active\n01-100,General Conditions Updated,false\n03-300,Site Work,true\n",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(apply_response.status_code, 200)
+        data = apply_response.json()["data"]
+        self.assertEqual(data["updated_count"], 1)
+        self.assertEqual(data["created_count"], 1)
+        self.assertEqual(CostCode.objects.filter(created_by=self.user).count(), 2)
+        self.code.refresh_from_db()
+        self.assertEqual(self.code.name, "General Conditions Updated")
+        self.assertFalse(self.code.is_active)
+
 
 class ProjectFinancialSummaryTests(TestCase):
     def setUp(self):

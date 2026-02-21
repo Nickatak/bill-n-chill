@@ -27,11 +27,27 @@ export type VendorPayload = {
   is_active: boolean;
 };
 
+export type VendorCsvImportResult = {
+  entity: "vendors";
+  mode: "preview" | "apply";
+  total_rows: number;
+  created_count: number;
+  updated_count: number;
+  error_count: number;
+  rows: Array<{
+    row_number: number;
+    name?: string;
+    status: string;
+    message: string;
+  }>;
+};
+
 export type ApiResponse = {
   data?:
     | UserData
     | VendorRecord[]
     | VendorRecord
+    | VendorCsvImportResult
     | {
         duplicate_candidates?: VendorRecord[];
         allowed_resolutions?: string[];

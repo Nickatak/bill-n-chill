@@ -166,6 +166,20 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
   - Auth required
   - Updates `code`, `name`, and/or `is_active`.
 
+- `POST /api/v1/cost-codes/import-csv/`
+  - Auth required
+  - Role guard: `owner`, `pm`
+  - Body:
+    - `csv_text` (required)
+    - `dry_run` (optional; default `true`)
+  - Expected headers:
+    - required: `code`, `name`
+    - optional: `is_active`
+  - Behavior:
+    - existing rows matched by `code` (case-insensitive)
+    - preview mode returns row-level `would_create` / `would_update`
+    - apply mode creates/updates rows and returns row-level results.
+
 ## Estimate Authoring and Versioning (EST-02)
 
 - `GET /api/v1/projects/{project_id}/estimates/`
@@ -518,6 +532,20 @@ INV-02 extends invoice billing actions with a scope guard based on approved proj
   - Duplicate warning behavior:
     - same name/email duplicate check as create (excluding current vendor)
     - accepts `duplicate_override = true` to persist intentional duplicates
+
+- `POST /api/v1/vendors/import-csv/`
+  - Auth required
+  - Role guard: `owner`, `pm`, `bookkeeping`
+  - Body:
+    - `csv_text` (required)
+    - `dry_run` (optional; default `true`)
+  - Expected headers:
+    - required: `name`
+    - optional: `vendor_type`, `email`, `phone`, `tax_id_last4`, `notes`, `is_active`
+  - Behavior:
+    - existing rows matched by `name` (case-insensitive)
+    - preview mode returns row-level `would_create` / `would_update`
+    - apply mode creates/updates rows and returns row-level results.
 
 ## Vendor Bill Intake and Lifecycle (AP-01)
 

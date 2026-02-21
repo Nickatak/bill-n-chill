@@ -5,6 +5,7 @@ from core.views import (
     change_order_clone_revision_view,
     change_order_detail_view,
     cost_code_detail_view,
+    cost_codes_import_csv_view,
     cost_codes_list_create_view,
     contact_detail_view,
     contacts_list_view,
@@ -44,6 +45,7 @@ from core.views import (
     quick_add_lead_contact_view,
     vendor_bill_detail_view,
     vendor_detail_view,
+    vendors_import_csv_view,
     vendors_list_create_view,
 )
 
@@ -177,7 +179,9 @@ urlpatterns = [
         name="accounting-sync-event-retry",
     ),
     path("vendors/", vendors_list_create_view, name="vendors-list-create"),
+    path("vendors/import-csv/", vendors_import_csv_view, name="vendors-import-csv"),
     path("vendors/<int:vendor_id>/", vendor_detail_view, name="vendors-detail"),
     path("cost-codes/", cost_codes_list_create_view, name="cost-codes-list-create"),
+    path("cost-codes/import-csv/", cost_codes_import_csv_view, name="cost-codes-import-csv"),
     path("cost-codes/<int:cost_code_id>/", cost_code_detail_view, name="cost-codes-detail"),
 ]

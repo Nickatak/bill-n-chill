@@ -1,9 +1,13 @@
+import csv
+from io import StringIO
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.models import CostCode
 from core.serializers import CostCodeSerializer
+from core.views.helpers import _role_gate_error_payload
 
 
 @api_view(["GET", "POST"])
@@ -34,3 +38,162 @@ def cost_code_detail_view(request, cost_code_id: int):
     serializer.is_valid(raise_exception=True)
     serializer.save()
     return Response({"data": CostCodeSerializer(row).data})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def cost_codes_import_csv_view(request):
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    if permission_error:
+        return Response(permission_error, status=403)
+
+    csv_text = request.data.get("csv_text", "")
+    dry_run = bool(request.data.get("dry_run", True))
+    if not csv_text or not str(csv_text).strip():
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "csv_text is required.",
+                    "fields": {"csv_text": ["Provide CSV content with headers."]},
+                }
+            },
+            status=400,
+        )
+
+    reader = csv.DictReader(StringIO(str(csv_text)))
+    expected_headers = {"code", "name", "is_active"}
+    incoming_headers = set(reader.fieldnames or [])
+    if not {"code", "name"}.issubset(incoming_headers):
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "CSV headers are invalid for cost code import.",
+                    "fields": {"headers": [f"Expected at least: code,name. Optional: is_active. Found: {', '.join(sorted(incoming_headers))}"]},
+                }
+            },
+            status=400,
+        )
+    unknown_headers = incoming_headers - expected_headers
+    if unknown_headers:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "CSV contains unsupported headers.",
+                    "fields": {"headers": [f"Unsupported: {', '.join(sorted(unknown_headers))}."]},
+                }
+            },
+            status=400,
+        )
+
+    rows_out = []
+    created_count = 0
+    updated_count = 0
+    error_count = 0
+
+    for index, row in enumerate(reader, start=2):
+        code = (row.get("code") or "").strip()
+        name = (row.get("name") or "").strip()
+        is_active_raw = (row.get("is_active") or "true").strip().lower()
+        if not code or not name:
+            error_count += 1
+            rows_out.append(
+                {
+                    "row_number": index,
+                    "code": code,
+                    "name": name,
+                    "is_active": None,
+                    "status": "error",
+                    "message": "code and name are required.",
+                }
+            )
+            continue
+        if is_active_raw not in {"true", "false", "1", "0", "yes", "no"}:
+            error_count += 1
+            rows_out.append(
+                {
+                    "row_number": index,
+                    "code": code,
+                    "name": name,
+                    "is_active": None,
+                    "status": "error",
+                    "message": "is_active must be true/false.",
+                }
+            )
+            continue
+        is_active = is_active_raw in {"true", "1", "yes"}
+        existing = CostCode.objects.filter(created_by=request.user, code__iexact=code).first()
+        if existing:
+            if dry_run:
+                rows_out.append(
+                    {
+                        "row_number": index,
+                        "code": code,
+                        "name": name,
+                        "is_active": is_active,
+                        "status": "would_update",
+                        "message": f"Would update cost code #{existing.id}.",
+                    }
+                )
+            else:
+                existing.name = name
+                existing.is_active = is_active
+                existing.save(update_fields=["name", "is_active", "updated_at"])
+                updated_count += 1
+                rows_out.append(
+                    {
+                        "row_number": index,
+                        "code": code,
+                        "name": name,
+                        "is_active": is_active,
+                        "status": "updated",
+                        "message": f"Updated cost code #{existing.id}.",
+                    }
+                )
+            continue
+
+        if dry_run:
+            rows_out.append(
+                {
+                    "row_number": index,
+                    "code": code,
+                    "name": name,
+                    "is_active": is_active,
+                    "status": "would_create",
+                    "message": "Would create new cost code.",
+                }
+            )
+        else:
+            CostCode.objects.create(
+                created_by=request.user,
+                code=code,
+                name=name,
+                is_active=is_active,
+            )
+            created_count += 1
+            rows_out.append(
+                {
+                    "row_number": index,
+                    "code": code,
+                    "name": name,
+                    "is_active": is_active,
+                    "status": "created",
+                    "message": "Created cost code.",
+                }
+            )
+
+    return Response(
+        {
+            "data": {
+                "entity": "cost_codes",
+                "mode": "preview" if dry_run else "apply",
+                "total_rows": len(rows_out),
+                "created_count": created_count,
+                "updated_count": updated_count,
+                "error_count": error_count,
+                "rows": rows_out,
+            }
+        }
+    )

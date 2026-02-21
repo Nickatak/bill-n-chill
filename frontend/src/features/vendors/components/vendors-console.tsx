@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
-import { ApiResponse, VendorPayload, VendorRecord } from "../types";
+import { ApiResponse, VendorCsvImportResult, VendorPayload, VendorRecord } from "../types";
 import styles from "./vendors-console.module.css";
 
 export function VendorsConsole() {
@@ -36,6 +36,8 @@ export function VendorsConsole() {
 
   const [duplicateCandidates, setDuplicateCandidates] = useState<VendorRecord[]>([]);
   const [pendingCreatePayload, setPendingCreatePayload] = useState<VendorPayload | null>(null);
+  const [importCsvText, setImportCsvText] = useState("name,vendor_type,email,phone,is_active\n");
+  const [importResult, setImportResult] = useState<VendorCsvImportResult | null>(null);
   const filteredRows = rows.filter((row) => {
     if (activityFilter === "active") {
       return row.is_active;
@@ -219,6 +221,35 @@ export function VendorsConsole() {
       setStatusMessage(`Saved vendor #${updated.id}.`);
     } catch {
       setStatusMessage("Could not reach vendor detail endpoint.");
+    }
+  }
+
+  async function runCsvImport(dryRun: boolean) {
+    setStatusMessage(dryRun ? "Previewing vendor CSV import..." : "Applying vendor CSV import...");
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/vendors/import-csv/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Token ${token}`,
+        },
+        body: JSON.stringify({ csv_text: importCsvText, dry_run: dryRun }),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setStatusMessage(payload.error?.message ?? "Vendor CSV import failed.");
+        return;
+      }
+      const result = payload.data as VendorCsvImportResult;
+      setImportResult(result);
+      setStatusMessage(
+        `${dryRun ? "Previewed" : "Applied"} ${result.total_rows} row(s): create ${result.created_count}, update ${result.updated_count}, errors ${result.error_count}.`,
+      );
+      if (!dryRun) {
+        await loadVendors();
+      }
+    } catch {
+      setStatusMessage("Could not reach vendor CSV import endpoint.");
     }
   }
 
@@ -450,6 +481,39 @@ export function VendorsConsole() {
           Save Vendor
         </button>
       </form>
+
+      <section>
+        <h3>CSV Import</h3>
+        <p>Headers: name,vendor_type,email,phone,tax_id_last4,notes,is_active.</p>
+        <label>
+          CSV text
+          <textarea
+            value={importCsvText}
+            onChange={(event) => setImportCsvText(event.target.value)}
+            rows={8}
+          />
+        </label>
+        <p>
+          <button type="button" onClick={() => runCsvImport(true)}>
+            Preview Import
+          </button>
+          <button type="button" onClick={() => runCsvImport(false)}>
+            Apply Import
+          </button>
+        </p>
+        {importResult ? (
+          <label>
+            Import result
+            <textarea
+              readOnly
+              rows={Math.min(10, importResult.rows.length + 2)}
+              value={importResult.rows
+                .map((row) => `row ${row.row_number} | ${row.status} | ${row.name || ""} | ${row.message}`)
+                .join("\n")}
+            />
+          </label>
+        ) : null}
+      </section>
 
       <p>{statusMessage}</p>
     </section>
