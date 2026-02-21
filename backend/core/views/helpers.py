@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.contrib.auth.models import Group
 from django.db.models import Sum
 
 from core.models import (
@@ -123,12 +124,56 @@ BILLABLE_INVOICE_STATUSES = {
     Invoice.Status.OVERDUE,
 }
 
+RBAC_ROLE_OWNER = "owner"
+RBAC_ROLE_PM = "pm"
+RBAC_ROLE_BOOKKEEPING = "bookkeeping"
+RBAC_ROLE_VIEWER = "viewer"
+RBAC_ROLE_PRECEDENCE = [
+    RBAC_ROLE_OWNER,
+    RBAC_ROLE_PM,
+    RBAC_ROLE_BOOKKEEPING,
+    RBAC_ROLE_VIEWER,
+]
+
 
 def _validate_project_for_user(project_id: int, user):
     try:
         return Project.objects.select_related("customer").get(id=project_id, created_by=user)
     except Project.DoesNotExist:
         return None
+
+
+def _resolve_user_role(user) -> str:
+    user_group_names = set(
+        Group.objects.filter(user=user).values_list("name", flat=True)
+    )
+    normalized_names = {name.strip().lower() for name in user_group_names}
+    for role in RBAC_ROLE_PRECEDENCE:
+        if role in normalized_names:
+            return role
+    # Backward compatibility for existing users without explicit role assignment.
+    return RBAC_ROLE_OWNER
+
+
+def _role_gate_error_payload(user, allowed_roles):
+    effective_role = _resolve_user_role(user)
+    allowed_role_set = {role.strip().lower() for role in allowed_roles}
+    if effective_role in allowed_role_set:
+        return None, effective_role
+    return (
+        {
+            "error": {
+                "code": "forbidden",
+                "message": "Your role is not allowed to perform this action.",
+                "fields": {
+                    "role": [
+                        f"Required role in: {', '.join(sorted(allowed_role_set))}. Current role: {effective_role}."
+                    ]
+                },
+            }
+        },
+        effective_role,
+    )
 
 
 def _calculate_line_totals(line_items_data):

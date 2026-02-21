@@ -22,7 +22,7 @@ function todayIsoDate() {
 }
 
 export function PaymentsConsole() {
-  const { token, authMessage } = useSharedSessionAuth();
+  const { token, authMessage, role } = useSharedSessionAuth();
   const [statusMessage, setStatusMessage] = useState("");
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -53,6 +53,7 @@ export function PaymentsConsole() {
   const [allocationAmount, setAllocationAmount] = useState("0.00");
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+  const canMutatePayments = role === "owner" || role === "bookkeeping";
   const selectedPayment = useMemo(
     () => payments.find((payment) => String(payment.id) === selectedPaymentId),
     [payments, selectedPaymentId],
@@ -141,6 +142,10 @@ export function PaymentsConsole() {
 
   async function handleCreatePayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canMutatePayments) {
+      setStatusMessage(`Role ${role} is read-only for payment mutations.`);
+      return;
+    }
 
     const projectId = Number(selectedProjectId);
     if (!projectId) {
@@ -195,6 +200,10 @@ export function PaymentsConsole() {
 
   async function handleSavePayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canMutatePayments) {
+      setStatusMessage(`Role ${role} is read-only for payment mutations.`);
+      return;
+    }
 
     const paymentId = Number(selectedPaymentId);
     if (!paymentId) {
@@ -289,6 +298,10 @@ export function PaymentsConsole() {
 
   async function handleCreateAllocation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canMutatePayments) {
+      setStatusMessage(`Role ${role} is read-only for payment mutations.`);
+      return;
+    }
 
     const paymentId = Number(selectedPaymentId);
     const targetId = Number(allocationTargetId);
@@ -344,6 +357,7 @@ export function PaymentsConsole() {
       <p>Record inbound and outbound money movement with method, status, and reference tracking.</p>
 
       <p>{authMessage}</p>
+      {!canMutatePayments ? <p>Role `{role}` can view payments but cannot create, edit, or allocate.</p> : null}
 
       <button type="button" onClick={loadProjects}>
         Load Projects
@@ -419,7 +433,7 @@ export function PaymentsConsole() {
           <textarea value={newNotes} onChange={(event) => setNewNotes(event.target.value)} rows={3} />
         </label>
 
-        <button type="submit" disabled={!selectedProjectId}>
+        <button type="submit" disabled={!selectedProjectId || !canMutatePayments}>
           Create Payment
         </button>
       </form>
@@ -492,7 +506,7 @@ export function PaymentsConsole() {
           <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} />
         </label>
 
-        <button type="submit" disabled={!selectedPaymentId}>
+        <button type="submit" disabled={!selectedPaymentId || !canMutatePayments}>
           Save Payment
         </button>
       </form>
@@ -558,7 +572,12 @@ export function PaymentsConsole() {
           </label>
           <button
             type="submit"
-            disabled={!selectedPaymentId || !allocationTargetId || allocationAmount === "0.00"}
+            disabled={
+              !canMutatePayments ||
+              !selectedPaymentId ||
+              !allocationTargetId ||
+              allocationAmount === "0.00"
+            }
           >
             Create Allocation
           </button>

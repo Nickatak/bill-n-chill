@@ -19,6 +19,7 @@ from core.views.helpers import (
     _create_budget_from_estimate,
     _record_financial_audit_event,
     _record_estimate_status_event,
+    _role_gate_error_payload,
     _validate_estimate_status_transition,
     _validate_project_for_user,
 )
@@ -139,6 +140,10 @@ def project_estimates_view(request, project_id: int):
             .order_by("-version")
         )
         return Response({"data": EstimateSerializer(estimates, many=True).data})
+
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    if permission_error:
+        return Response(permission_error, status=403)
 
     serializer = EstimateWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -273,6 +278,10 @@ def estimate_detail_view(request, estimate_id: int):
 
     if request.method == "GET":
         return Response({"data": EstimateSerializer(estimate).data})
+
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    if permission_error:
+        return Response(permission_error, status=403)
 
     serializer = EstimateWriteSerializer(
         data=request.data,
@@ -438,6 +447,10 @@ def estimate_clone_version_view(request, estimate_id: int):
             status=404,
         )
 
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    if permission_error:
+        return Response(permission_error, status=403)
+
     if estimate.status not in {
         Estimate.Status.SENT,
         Estimate.Status.REJECTED,
@@ -529,6 +542,10 @@ def estimate_duplicate_view(request, estimate_id: int):
             {"error": {"code": "not_found", "message": "Estimate not found.", "fields": {}}},
             status=404,
         )
+
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    if permission_error:
+        return Response(permission_error, status=403)
 
     serializer = EstimateDuplicateSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -647,6 +664,10 @@ def estimate_convert_to_budget_view(request, estimate_id: int):
             {"error": {"code": "not_found", "message": "Estimate not found.", "fields": {}}},
             status=404,
         )
+
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    if permission_error:
+        return Response(permission_error, status=403)
 
     if estimate.status != Estimate.Status.APPROVED:
         return Response(

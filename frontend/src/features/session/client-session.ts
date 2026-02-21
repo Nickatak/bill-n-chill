@@ -4,6 +4,7 @@ export const SESSION_CHANGE_EVENT = "bnc-session-change";
 export type ClientSession = {
   token: string;
   email: string;
+  role?: "owner" | "pm" | "bookkeeping" | "viewer";
 };
 
 export function loadClientSession(): ClientSession | null {
@@ -24,6 +25,7 @@ export function loadClientSession(): ClientSession | null {
     return {
       token: parsed.token,
       email: parsed.email ?? "",
+      role: parsed.role,
     };
   } catch {
     return null;

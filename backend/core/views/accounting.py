@@ -5,7 +5,7 @@ from rest_framework.response import Response
 
 from core.models import AccountingSyncEvent
 from core.serializers import AccountingSyncEventSerializer, AccountingSyncEventWriteSerializer
-from core.views.helpers import _validate_project_for_user
+from core.views.helpers import _role_gate_error_payload, _validate_project_for_user
 
 
 @api_view(["GET", "POST"])
@@ -23,6 +23,10 @@ def project_accounting_sync_events_view(request, project_id: int):
             "-created_at", "-id"
         )
         return Response({"data": AccountingSyncEventSerializer(rows, many=True).data})
+
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "bookkeeping"})
+    if permission_error:
+        return Response(permission_error, status=403)
 
     serializer = AccountingSyncEventWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -78,6 +82,10 @@ def accounting_sync_event_retry_view(request, sync_event_id: int):
             {"error": {"code": "not_found", "message": "Accounting sync event not found.", "fields": {}}},
             status=404,
         )
+
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "bookkeeping"})
+    if permission_error:
+        return Response(permission_error, status=403)
 
     if sync_event.status == AccountingSyncEvent.Status.QUEUED:
         return Response(

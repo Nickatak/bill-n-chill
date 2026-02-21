@@ -62,7 +62,7 @@ type VendorBillsConsoleProps = {
 };
 
 export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null }: VendorBillsConsoleProps) {
-  const { token } = useSharedSessionAuth();
+  const { token, role } = useSharedSessionAuth();
   const pageSize = 5;
   const [statusMessage, setStatusMessage] = useState("");
   const [createErrorMessage, setCreateErrorMessage] = useState("");
@@ -153,6 +153,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   }, [budgetLineGroups]);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+  const canMutateVendorBills = role === "owner" || role === "pm" || role === "bookkeeping";
   const scopedProjectId = scopedProjectIdProp;
   const isProjectScoped = scopedProjectId !== null;
   const selectedProject =
@@ -320,6 +321,11 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   }
 
   function handleSubmitVendorBillForm(event: FormEvent<HTMLFormElement>) {
+    if (!canMutateVendorBills) {
+      event.preventDefault();
+      setStatusMessage(`Role ${role} is read-only for vendor bill mutations.`);
+      return;
+    }
     if (isEditingMode) {
       void handleSaveVendorBill(event);
       return;
@@ -1169,6 +1175,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
         <button
           type="submit"
           disabled={
+            !canMutateVendorBills ||
             !selectedProjectId ||
             !formVendorId ||
             formIsOverAllocated ||
@@ -1201,6 +1208,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       ) : null}
 
       <p>{statusMessage}</p>
+      {!canMutateVendorBills ? <p>Role `{role}` can view vendor bills but cannot create or update.</p> : null}
     </section>
   );
 }

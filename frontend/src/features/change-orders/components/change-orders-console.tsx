@@ -44,7 +44,7 @@ export function ChangeOrdersConsole({
   scopedProjectId: scopedProjectIdProp = null,
   initialOriginEstimateId: initialOriginEstimateIdProp = null,
 }: ChangeOrdersConsoleProps) {
-  const { token, authMessage } = useSharedSessionAuth();
+  const { token, authMessage, role } = useSharedSessionAuth();
   const [statusMessage, setStatusMessage] = useState("");
 
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -72,6 +72,7 @@ export function ChangeOrdersConsole({
   const [quickStatus, setQuickStatus] = useState("pending_approval");
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+  const canMutateChangeOrders = role === "owner" || role === "pm";
   const scopedProjectId = scopedProjectIdProp;
   const initialOriginEstimateId = initialOriginEstimateIdProp;
   const selectedChangeOrder =
@@ -475,6 +476,10 @@ export function ChangeOrdersConsole({
 
   async function handleCreateChangeOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canMutateChangeOrders) {
+      setStatusMessage(`Role ${role} is read-only for change order mutations.`);
+      return;
+    }
     const projectId = Number(selectedProjectId);
     if (!projectId) {
       setStatusMessage("Select a project first.");
@@ -529,6 +534,10 @@ export function ChangeOrdersConsole({
   }
 
   async function handleCloneRevision() {
+    if (!canMutateChangeOrders) {
+      setStatusMessage(`Role ${role} is read-only for change order mutations.`);
+      return;
+    }
     const changeOrderId = Number(selectedChangeOrderId);
     if (!changeOrderId) {
       setStatusMessage("Select a change order first.");
@@ -566,6 +575,10 @@ export function ChangeOrdersConsole({
 
   async function handleUpdateChangeOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canMutateChangeOrders) {
+      setStatusMessage(`Role ${role} is read-only for change order mutations.`);
+      return;
+    }
     const changeOrderId = Number(selectedChangeOrderId);
     if (!changeOrderId) {
       setStatusMessage("Select a change order first.");
@@ -621,6 +634,10 @@ export function ChangeOrdersConsole({
   }
 
   async function handleQuickUpdateStatus() {
+    if (!canMutateChangeOrders) {
+      setStatusMessage(`Role ${role} is read-only for change order mutations.`);
+      return;
+    }
     const projectId = Number(selectedProjectId);
     if (!selectedViewerChangeOrder || !quickStatus) {
       setStatusMessage("Select a change order and next status first.");
@@ -673,6 +690,7 @@ export function ChangeOrdersConsole({
       <p>Create and route project change orders through approval states.</p>
 
       <p>{authMessage}</p>
+      {!canMutateChangeOrders ? <p>Role `{role}` can view change orders but cannot create or update.</p> : null}
 
       <div className={styles.primaryCreateAction}>
         <button type="button" onClick={handleStartNewChangeOrder}>
@@ -806,7 +824,7 @@ export function ChangeOrdersConsole({
                             type="button"
                             className={styles.quickStatusSubmit}
                             onClick={handleQuickUpdateStatus}
-                            disabled={!quickStatusOptions.length}
+                            disabled={!canMutateChangeOrders || !quickStatusOptions.length}
                           >
                             Update CO Status
                           </button>
@@ -823,7 +841,7 @@ export function ChangeOrdersConsole({
                             : "Line totals reconcile with header amount."}
                         </p>
                         {selectedViewerChangeOrder.is_latest_revision ? (
-                          <button type="button" onClick={handleCloneRevision}>
+                          <button type="button" onClick={handleCloneRevision} disabled={!canMutateChangeOrders}>
                             Clone Revision
                           </button>
                         ) : (
@@ -1015,7 +1033,7 @@ export function ChangeOrdersConsole({
             <button
               type="submit"
               className={`${estimateStyles.primaryButton} ${styles.coFooterPrimaryButton}`}
-              disabled={!selectedProjectId || !newOriginEstimateId}
+              disabled={!canMutateChangeOrders || !selectedProjectId || !newOriginEstimateId}
             >
               Create Change Order
             </button>
@@ -1170,7 +1188,7 @@ export function ChangeOrdersConsole({
             <button
               type="submit"
               className={`${estimateStyles.primaryButton} ${styles.coFooterPrimaryButton}`}
-              disabled={!selectedChangeOrderId}
+              disabled={!canMutateChangeOrders || !selectedChangeOrderId}
             >
               Save Change Order
             </button>

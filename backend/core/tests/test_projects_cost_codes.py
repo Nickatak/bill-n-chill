@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.contrib.auth.models import Group
 from core.tests.common import *
 from django.utils import timezone
 
@@ -842,6 +843,35 @@ class ReportingPackTests(TestCase):
         scoped_data = scoped_response.json()["data"]
         self.assertEqual(scoped_data["item_count"], 0)
 
+
+class ProjectTimelineTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="pm26",
+            email="pm26@example.com",
+            password="secret123",
+        )
+        self.other_user = User.objects.create_user(
+            username="pm27",
+            email="pm27@example.com",
+            password="secret123",
+        )
+        self.token, _ = Token.objects.get_or_create(user=self.user)
+
+        self.customer = Customer.objects.create(
+            display_name="Owner Timeline",
+            email="owner-timeline@example.com",
+            phone="555-8383",
+            billing_address="83 Main St",
+            created_by=self.user,
+        )
+        self.project = Project.objects.create(
+            customer=self.customer,
+            name="Timeline Project",
+            status=Project.Status.ACTIVE,
+            created_by=self.user,
+        )
+
     def test_project_timeline_merges_financial_and_workflow_events(self):
         estimate = Estimate.objects.create(
             project=self.project,
@@ -910,3 +940,128 @@ class ReportingPackTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(hidden.status_code, 404)
+
+
+class RoleHardeningTests(TestCase):
+    def setUp(self):
+        self.owner_user = User.objects.create_user(
+            username="role-owner",
+            email="role-owner@example.com",
+            password="secret123",
+        )
+        self.viewer_user = User.objects.create_user(
+            username="role-viewer",
+            email="role-viewer@example.com",
+            password="secret123",
+        )
+        self.bookkeeping_user = User.objects.create_user(
+            username="role-bookkeeping",
+            email="role-bookkeeping@example.com",
+            password="secret123",
+        )
+        self.owner_token, _ = Token.objects.get_or_create(user=self.owner_user)
+        self.viewer_token, _ = Token.objects.get_or_create(user=self.viewer_user)
+        self.bookkeeping_token, _ = Token.objects.get_or_create(user=self.bookkeeping_user)
+
+        viewer_group, _ = Group.objects.get_or_create(name="viewer")
+        bookkeeping_group, _ = Group.objects.get_or_create(name="bookkeeping")
+        self.viewer_user.groups.add(viewer_group)
+        self.bookkeeping_user.groups.add(bookkeeping_group)
+
+        self.viewer_customer = Customer.objects.create(
+            display_name="Viewer Owner",
+            email="viewer-owner@example.com",
+            phone="555-1111",
+            billing_address="111 Main St",
+            created_by=self.viewer_user,
+        )
+        self.viewer_project = Project.objects.create(
+            customer=self.viewer_customer,
+            name="Viewer Project",
+            status=Project.Status.ACTIVE,
+            created_by=self.viewer_user,
+        )
+        self.viewer_cost_code = CostCode.objects.create(
+            code="01-010",
+            name="General Conditions",
+            created_by=self.viewer_user,
+        )
+        self.viewer_vendor = Vendor.objects.create(
+            name="Viewer Vendor",
+            email="viewer-vendor@example.com",
+            created_by=self.viewer_user,
+        )
+
+        self.bookkeeping_customer = Customer.objects.create(
+            display_name="Bookkeeping Owner",
+            email="bookkeeping-owner@example.com",
+            phone="555-2222",
+            billing_address="222 Main St",
+            created_by=self.bookkeeping_user,
+        )
+        self.bookkeeping_project = Project.objects.create(
+            customer=self.bookkeeping_customer,
+            name="Bookkeeping Project",
+            status=Project.Status.ACTIVE,
+            created_by=self.bookkeeping_user,
+        )
+
+    def test_auth_me_returns_effective_role(self):
+        response = self.client.get(
+            "/api/v1/auth/me/",
+            HTTP_AUTHORIZATION=f"Token {self.viewer_token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["role"], "viewer")
+
+    def test_viewer_cannot_create_invoice_or_payment(self):
+        invoice_response = self.client.post(
+            f"/api/v1/projects/{self.viewer_project.id}/invoices/",
+            data={
+                "issue_date": "2026-02-01",
+                "due_date": "2026-02-28",
+                "line_items": [
+                    {
+                        "cost_code": self.viewer_cost_code.id,
+                        "description": "Scope line",
+                        "quantity": "1.00",
+                        "unit": "ea",
+                        "unit_price": "100.00",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.viewer_token.key}",
+        )
+        self.assertEqual(invoice_response.status_code, 403)
+        self.assertEqual(invoice_response.json()["error"]["code"], "forbidden")
+
+        payment_response = self.client.post(
+            f"/api/v1/projects/{self.viewer_project.id}/payments/",
+            data={
+                "direction": "inbound",
+                "method": "ach",
+                "status": "pending",
+                "amount": "50.00",
+                "payment_date": "2026-02-01",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.viewer_token.key}",
+        )
+        self.assertEqual(payment_response.status_code, 403)
+        self.assertEqual(payment_response.json()["error"]["code"], "forbidden")
+
+    def test_bookkeeping_can_create_payment(self):
+        response = self.client.post(
+            f"/api/v1/projects/{self.bookkeeping_project.id}/payments/",
+            data={
+                "direction": "inbound",
+                "method": "ach",
+                "status": "pending",
+                "amount": "75.00",
+                "payment_date": "2026-02-01",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.bookkeeping_token.key}",
+        )
+        self.assertEqual(response.status_code, 201)

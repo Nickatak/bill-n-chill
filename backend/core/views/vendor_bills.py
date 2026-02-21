@@ -12,6 +12,7 @@ from core.models import BudgetLine, FinancialAuditEvent, Vendor, VendorBill, Ven
 from core.serializers import VendorBillSerializer, VendorBillWriteSerializer
 from core.views.helpers import (
     _record_financial_audit_event,
+    _role_gate_error_payload,
     _validate_project_for_user,
     _validate_vendor_bill_status_transition,
 )
@@ -94,6 +95,10 @@ def project_vendor_bills_view(request, project_id: int):
             .order_by("-created_at")
         )
         return Response({"data": VendorBillSerializer(rows, many=True).data})
+
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm", "bookkeeping"})
+    if permission_error:
+        return Response(permission_error, status=403)
 
     serializer = VendorBillWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -261,6 +266,10 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
             .get(id=vendor_bill.id)
         )
         return Response({"data": VendorBillSerializer(vendor_bill).data})
+
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm", "bookkeeping"})
+    if permission_error:
+        return Response(permission_error, status=403)
 
     serializer = VendorBillWriteSerializer(data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)

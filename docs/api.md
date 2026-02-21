@@ -50,7 +50,8 @@ bill-n-chill currently uses DRF token authentication for API access.
         "token": "TOKEN_VALUE",
         "user": {
           "id": 1,
-          "email": "pm@example.com"
+          "email": "pm@example.com",
+          "role": "owner"
         }
       }
     }
@@ -58,6 +59,24 @@ bill-n-chill currently uses DRF token authentication for API access.
 - `GET /api/v1/auth/me/`
   - Header: `Authorization: Token TOKEN_VALUE`
   - Purpose: confirm token validity and current user identity.
+  - Response includes:
+    - `id`
+    - `email`
+    - `role` (`owner` | `pm` | `bookkeeping` | `viewer`)
+
+## Role Matrix (RBAC Thin Pass)
+
+- Role source:
+  - Django group name match: `owner`, `pm`, `bookkeeping`, `viewer`.
+  - If no recognized group is present, role defaults to `owner` for backward compatibility.
+- Error shape for denied write action:
+  - HTTP `403`
+  - `error.code = "forbidden"`
+- Write access matrix:
+  - `owner`: full write access across money workflow endpoints.
+  - `pm`: estimate/budget/change-order/invoice/vendor-bill writes.
+  - `bookkeeping`: invoice/vendor-bill/payment/accounting-sync writes.
+  - `viewer`: read-only across protected surfaces.
 
 ## Lead Contact Intake (INT-01)
 

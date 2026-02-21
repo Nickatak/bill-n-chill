@@ -7,7 +7,7 @@ from rest_framework.response import Response
 
 from core.models import Budget, BudgetLine, ChangeOrder, ChangeOrderLine, VendorBill, VendorBillAllocation
 from core.serializers import BudgetLineSerializer, BudgetLineUpdateSerializer, BudgetSerializer
-from core.views.helpers import _validate_project_for_user
+from core.views.helpers import _role_gate_error_payload, _validate_project_for_user
 
 
 @api_view(["GET"])
@@ -74,6 +74,10 @@ def project_budgets_view(request, project_id: int):
 @api_view(["PATCH"])
 @permission_classes([IsAuthenticated])
 def budget_line_detail_view(request, budget_id: int, line_id: int):
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    if permission_error:
+        return Response(permission_error, status=403)
+
     try:
         budget = Budget.objects.get(id=budget_id, created_by=request.user)
     except Budget.DoesNotExist:

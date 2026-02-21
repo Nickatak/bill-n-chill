@@ -12,6 +12,7 @@ type RegisterResponse = {
     token?: string;
     user?: {
       email?: string;
+      role?: "owner" | "pm" | "bookkeeping" | "viewer";
     };
   };
   error?: {
@@ -71,6 +72,7 @@ export function HomeRegisterConsole({ health }: HomeRegisterConsoleProps) {
       const payload: RegisterResponse = await response.json();
       const token = payload.data?.token ?? "";
       const nextEmail = payload.data?.user?.email ?? email;
+      const nextRole = payload.data?.user?.role ?? "owner";
 
       if (!response.ok || !token) {
         setMessage(normalizeRegisterError(payload));
@@ -78,7 +80,7 @@ export function HomeRegisterConsole({ health }: HomeRegisterConsoleProps) {
         return;
       }
 
-      saveClientSession({ token, email: nextEmail });
+      saveClientSession({ token, email: nextEmail, role: nextRole });
       setMessage("Account created. Redirecting...");
       router.push("/");
     } catch {

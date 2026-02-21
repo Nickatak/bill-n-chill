@@ -15,6 +15,7 @@ type LoginResponse = {
     token?: string;
     user?: {
       email?: string;
+      role?: "owner" | "pm" | "bookkeeping" | "viewer";
     };
   };
   error?: {
@@ -25,6 +26,7 @@ type LoginResponse = {
 type MeResponse = {
   data?: {
     email?: string;
+    role?: "owner" | "pm" | "bookkeeping" | "viewer";
   };
 };
 
@@ -53,7 +55,11 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
     return message ?? "Invalid username/password combination.";
   }
 
-  async function verifySession(activeToken: string, fallbackEmail: string) {
+  async function verifySession(
+    activeToken: string,
+    fallbackEmail: string,
+    fallbackRole: "owner" | "pm" | "bookkeeping" | "viewer" = "owner",
+  ) {
     try {
       const response = await fetch(`${defaultApiBaseUrl}/auth/me/`, {
         headers: { Authorization: `Token ${activeToken}` },
@@ -67,12 +73,13 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
         return;
       }
       const nextEmail = payload.data?.email ?? fallbackEmail;
+      const nextRole = payload.data?.role ?? fallbackRole;
       if (nextEmail && nextEmail !== email) {
         setEmail(nextEmail);
       }
-      saveClientSession({ token: activeToken, email: nextEmail });
+      saveClientSession({ token: activeToken, email: nextEmail, role: nextRole });
       setIsAuthenticated(true);
-      setMessage(`Using shared session for ${nextEmail || "user"}.`);
+      setMessage(`Using shared session for ${nextEmail || "user"} (${nextRole}).`);
     } catch {
       setIsAuthenticated(false);
       setMessage("Could not reach auth/me endpoint.");
@@ -116,6 +123,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
       const payload: LoginResponse = await response.json();
       const nextToken = payload.data?.token ?? "";
       const nextEmail = payload.data?.user?.email ?? email;
+      const nextRole = payload.data?.user?.role ?? "owner";
       if (!response.ok || !nextToken) {
         setMessage(normalizeLoginError(payload.error?.message));
         setIsChecking(false);
@@ -124,7 +132,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
 
       setToken(nextToken);
       setPassword("");
-      await verifySession(nextToken, nextEmail);
+      await verifySession(nextToken, nextEmail, nextRole);
     } catch {
       setMessage("Could not reach login endpoint.");
     } finally {

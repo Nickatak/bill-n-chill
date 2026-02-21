@@ -27,7 +27,7 @@ function emptyLine(localId: number, defaultCostCodeId = ""): InvoiceLineInput {
 }
 
 export function InvoicesConsole() {
-  const { token, authMessage } = useSharedSessionAuth();
+  const { token, authMessage, role } = useSharedSessionAuth();
   const [statusMessage, setStatusMessage] = useState("");
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -47,6 +47,7 @@ export function InvoicesConsole() {
   const [nextLineId, setNextLineId] = useState(2);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+  const canMutateInvoices = role === "owner" || role === "pm" || role === "bookkeeping";
   async function loadDependencies() {
     setStatusMessage("Loading projects and cost codes...");
     try {
@@ -138,6 +139,10 @@ export function InvoicesConsole() {
 
   async function handleCreateInvoice(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canMutateInvoices) {
+      setStatusMessage(`Role ${role} is read-only for invoice mutations.`);
+      return;
+    }
     const projectId = Number(selectedProjectId);
     if (!projectId) {
       setStatusMessage("Select a project first.");
@@ -181,6 +186,10 @@ export function InvoicesConsole() {
   }
 
   async function handleUpdateInvoiceStatus() {
+    if (!canMutateInvoices) {
+      setStatusMessage(`Role ${role} is read-only for invoice mutations.`);
+      return;
+    }
     const invoiceId = Number(selectedInvoiceId);
     if (!invoiceId) {
       setStatusMessage("Select an invoice first.");
@@ -217,6 +226,10 @@ export function InvoicesConsole() {
   }
 
   async function handleSendInvoice() {
+    if (!canMutateInvoices) {
+      setStatusMessage(`Role ${role} is read-only for invoice mutations.`);
+      return;
+    }
     const invoiceId = Number(selectedInvoiceId);
     if (!invoiceId) {
       setStatusMessage("Select an invoice first.");
@@ -258,6 +271,7 @@ export function InvoicesConsole() {
       <p>Create invoice lines, calculate totals, and move invoices through lifecycle states.</p>
 
       <p>{authMessage}</p>
+      {!canMutateInvoices ? <p>Role `{role}` can view invoices but cannot create, update, or send.</p> : null}
 
       <button type="button" onClick={loadDependencies}>
         Load Projects + Cost Codes
@@ -349,10 +363,10 @@ export function InvoicesConsole() {
           </div>
         ))}
 
-        <button type="button" onClick={addLineItem}>
+        <button type="button" onClick={addLineItem} disabled={!canMutateInvoices}>
           Add Line Item
         </button>
-        <button type="submit" disabled={!selectedProjectId}>
+        <button type="submit" disabled={!selectedProjectId || !canMutateInvoices}>
           Create Invoice
         </button>
       </form>
@@ -410,10 +424,14 @@ export function InvoicesConsole() {
           <option value="void">void</option>
         </select>
       </label>
-      <button type="button" onClick={handleUpdateInvoiceStatus} disabled={!selectedInvoiceId}>
+      <button
+        type="button"
+        onClick={handleUpdateInvoiceStatus}
+        disabled={!selectedInvoiceId || !canMutateInvoices}
+      >
         Update Invoice Status
       </button>
-      <button type="button" onClick={handleSendInvoice} disabled={!selectedInvoiceId}>
+      <button type="button" onClick={handleSendInvoice} disabled={!selectedInvoiceId || !canMutateInvoices}>
         Send Invoice
       </button>
 

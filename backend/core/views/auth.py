@@ -5,6 +5,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from core.serializers import LoginSerializer, RegisterSerializer
+from core.views.helpers import _resolve_user_role
 
 User = get_user_model()
 
@@ -30,6 +31,7 @@ def login_view(request):
                 "user": {
                     "id": user.id,
                     "email": user.email,
+                    "role": _resolve_user_role(user),
                 },
             }
         }
@@ -54,6 +56,7 @@ def register_view(request):
                 "user": {
                     "id": user.id,
                     "email": user.email,
+                    "role": _resolve_user_role(user),
                 },
             }
         },
@@ -65,4 +68,4 @@ def register_view(request):
 @permission_classes([IsAuthenticated])
 def me_view(request):
     user = request.user
-    return Response({"data": {"id": user.id, "email": user.email}})
+    return Response({"data": {"id": user.id, "email": user.email, "role": _resolve_user_role(user)}})
