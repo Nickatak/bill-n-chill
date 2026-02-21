@@ -698,6 +698,42 @@ export function ProjectsConsole() {
         </section>
       ) : null}
 
+      {selectedProject ? (
+        <section className={styles.commandCenterAttention}>
+          <h3>What Needs Attention</h3>
+          <ul>
+            {summary && Number(summary.ar_outstanding) > 0 ? (
+              <li>
+                AR outstanding is {summary.ar_outstanding}. <Link href={`/invoices?project=${selectedProject.id}`}>Open Invoices</Link>
+              </li>
+            ) : null}
+            {summary && Number(summary.ap_outstanding) > 0 ? (
+              <li>
+                AP outstanding is {summary.ap_outstanding}.{" "}
+                <Link href={`/projects/${selectedProject.id}/vendor-bills`}>Open Vendor Bills</Link>
+              </li>
+            ) : null}
+            {estimateStatusCounts && estimateStatusCounts.sent > 0 ? (
+              <li>
+                {estimateStatusCounts.sent} estimate(s) are still sent and pending outcome.{" "}
+                <Link href={`/projects/${selectedProject.id}/estimates`}>Open Estimates</Link>
+              </li>
+            ) : null}
+            {summaryCounts && summaryCounts.changeOrders > 0 ? (
+              <li>
+                {summaryCounts.changeOrders} approved CO source record(s) linked.{" "}
+                <Link href={`/projects/${selectedProject.id}/change-orders`}>Open Change Orders</Link>
+              </li>
+            ) : null}
+            {!summary ? (
+              <li>
+                Load summary first to populate contract/AR/AP attention details.
+              </li>
+            ) : null}
+          </ul>
+        </section>
+      ) : null}
+
       {selectedProject && isProjectProfileOpen && !isSelectedProjectTerminal ? (
         <form className={styles.projectProfileForm} onSubmit={handleSaveProject}>
           <h3>Project Details</h3>
