@@ -52,6 +52,11 @@ bill-n-chill currently uses DRF token authentication for API access.
           "id": 1,
           "email": "pm@example.com",
           "role": "owner"
+        },
+        "organization": {
+          "id": 1,
+          "display_name": "Pm Organization",
+          "slug": "pm"
         }
       }
     }
@@ -62,13 +67,14 @@ bill-n-chill currently uses DRF token authentication for API access.
   - Response includes:
     - `id`
     - `email`
-    - `role` (`owner` | `pm` | `bookkeeping` | `viewer`)
+    - `role` (`owner` | `pm` | `bookkeeping` | `worker` | `viewer`)
+    - `organization` (`id`, `display_name`, `slug`)
 
 ## Role Matrix (RBAC Thin Pass)
 
 - Role source:
-  - Django group name match: `owner`, `pm`, `bookkeeping`, `viewer`.
-  - If no recognized group is present, role defaults to `owner` for backward compatibility.
+  - Primary source: `OrganizationMembership.role` (one active membership per user).
+  - Backward compatibility fallback: Django group name match (`owner`, `pm`, `bookkeeping`, `worker`, `viewer`), then default `owner`.
 - Error shape for denied write action:
   - HTTP `403`
   - `error.code = "forbidden"`
@@ -209,15 +215,6 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
 - `POST /api/v1/estimates/{estimate_id}/clone-version/`
   - Auth required
   - Creates a new draft version cloned from the selected estimate.
-
-- `GET /api/v1/public/projects/{public_token}/snapshot/`
-  - No auth required
-  - Read-only client snapshot linked to the shared estimate token.
-  - Returns:
-    - project summary (name/status/customer display)
-    - contract original/current + approved CO total
-    - invoice count/amount/outstanding + status counts
-    - payment count/settled allocated amount + status counts
 
 ## Estimate Approval Lifecycle (EST-03)
 

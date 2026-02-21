@@ -21,6 +21,8 @@ from core.models import (
     Payment,
     PaymentAllocation,
     Project,
+    Organization,
+    OrganizationMembership,
     VendorBill,
     Vendor,
 )
@@ -49,6 +51,8 @@ __all__ = [
     "PaymentAllocation",
     "LeadContact",
     "Project",
+    "Organization",
+    "OrganizationMembership",
     "VendorBill",
     "Vendor",
 ]

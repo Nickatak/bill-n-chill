@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { EstimateSheet } from "./estimate-sheet";
 import styles from "./estimates-console.module.css";
@@ -153,9 +151,6 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
           />
           <div className={styles.lifecycle}>
             <h3>Decision</h3>
-            <p>
-              <Link href={`/project-snapshot/${publicToken}`}>Open Client Financial Snapshot</Link>
-            </p>
             <p className={styles.inlineHint}>
               Approval/decline is not wired yet. These buttons are preview-only and will remain
               inactive for now.

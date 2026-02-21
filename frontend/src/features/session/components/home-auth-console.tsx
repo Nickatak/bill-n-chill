@@ -15,7 +15,7 @@ type LoginResponse = {
     token?: string;
     user?: {
       email?: string;
-      role?: "owner" | "pm" | "bookkeeping" | "viewer";
+      role?: "owner" | "pm" | "bookkeeping" | "worker" | "viewer";
     };
   };
   error?: {
@@ -26,7 +26,7 @@ type LoginResponse = {
 type MeResponse = {
   data?: {
     email?: string;
-    role?: "owner" | "pm" | "bookkeeping" | "viewer";
+    role?: "owner" | "pm" | "bookkeeping" | "worker" | "viewer";
   };
 };
 
@@ -58,7 +58,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
   async function verifySession(
     activeToken: string,
     fallbackEmail: string,
-    fallbackRole: "owner" | "pm" | "bookkeeping" | "viewer" = "owner",
+    fallbackRole: "owner" | "pm" | "bookkeeping" | "worker" | "viewer" = "owner",
   ) {
     try {
       const response = await fetch(`${defaultApiBaseUrl}/auth/me/`, {

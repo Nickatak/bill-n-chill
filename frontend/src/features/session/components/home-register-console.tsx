@@ -12,7 +12,7 @@ type RegisterResponse = {
     token?: string;
     user?: {
       email?: string;
-      role?: "owner" | "pm" | "bookkeeping" | "viewer";
+      role?: "owner" | "pm" | "bookkeeping" | "worker" | "viewer";
     };
   };
   error?: {
