@@ -1,4 +1,5 @@
 import { ChangeOrdersConsole } from "@/features/change-orders";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import styles from "../../../change-orders/page.module.css";
 
@@ -30,6 +31,10 @@ export default async function ProjectChangeOrdersPage({
           <p>
             Approved deltas update contract current and budget aggregates; revisions preserve family
             history without losing origin context.
+          </p>
+          <p>
+            <Link href={`/projects?project=${projectId}`}>Back to Project Hub</Link> |{" "}
+            <Link href={`/invoices?project=${projectId}`}>Next: Invoice from approved scope</Link>
           </p>
         </header>
         <section className={styles.card}>

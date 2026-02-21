@@ -37,6 +37,8 @@ export default async function ProjectEstimatesPage({
             <Link href={`/projects/${projectId}/budgets/analytics`} prefetch={false}>
               Open Budget Analytics
             </Link>
+            {" "} | <Link href={`/projects?project=${projectId}`}>Back to Project Hub</Link>
+            {" "} | <Link href={`/projects/${projectId}/change-orders`}>Next: Change Orders</Link>
           </p>
         </header>
         <section className={styles.card}>

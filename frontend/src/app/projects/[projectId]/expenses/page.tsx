@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import styles from "../../../expenses/page.module.css";
 
 type ProjectExpensesPageProps = {
@@ -23,6 +24,10 @@ export default async function ProjectExpensesPage({ params }: ProjectExpensesPag
           <p>
             This route is project-scoped by design so expense intake maps directly to one job’s
             budget and reporting context.
+          </p>
+          <p>
+            <Link href={`/projects?project=${projectId}`}>Back to Project Hub</Link> |{" "}
+            <Link href={`/projects/${projectId}/vendor-bills`}>Next: Vendor Bills</Link>
           </p>
         </header>
         <section className={styles.card}>

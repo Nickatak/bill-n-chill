@@ -1,4 +1,5 @@
 import { BudgetAnalyticsConsole } from "@/features/budgets";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import styles from "../../../../budgets/page.module.css";
 
@@ -22,6 +23,10 @@ export default async function ProjectBudgetAnalyticsPage({
           <p>
             Read-only analytics surface for budget truth on this project. Use this view to monitor
             baseline, working totals, and variance without mutating budget records.
+          </p>
+          <p>
+            <Link href={`/projects?project=${projectId}`}>Back to Project Hub</Link> |{" "}
+            <Link href={`/projects/${projectId}/change-orders`}>Next: Review change orders</Link>
           </p>
         </header>
         <section className={styles.card}>

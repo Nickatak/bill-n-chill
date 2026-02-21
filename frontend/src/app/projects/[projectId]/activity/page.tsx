@@ -1,4 +1,5 @@
 import { ProjectActivityConsole } from "@/features/projects/components/project-activity-console";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import styles from "../../../vendors/page.module.css";
 
@@ -24,6 +25,10 @@ export default async function ProjectActivityPage({ params }: ProjectActivityPag
           <p>
             Use category filters to focus on finance-only events or workflow-only events while
             keeping drill-down links available.
+          </p>
+          <p>
+            <Link href={`/projects?project=${projectId}`}>Back to Project Hub</Link> |{" "}
+            <Link href={`/financials-auditing`}>Next: Financials & Auditing</Link>
           </p>
         </header>
         <section className={styles.card}>
