@@ -17,33 +17,29 @@ export const workflowRoutes: NavRoute[] = [
     exact: ["/projects"],
   },
   {
-    href: "/change-orders",
-    label: "3 Change Orders",
-    exact: ["/change-orders"],
-  },
-  {
     href: "/invoices",
-    label: "4 Invoices",
+    label: "3 Invoices",
     exact: ["/invoices"],
   },
   {
     href: "/vendor-bills",
-    label: "5 Vendor Bills",
+    label: "4 Vendor Bills",
     exact: ["/vendor-bills", "/vendor-bills-placeholder"],
   },
   {
     href: "/expenses",
-    label: "6 Expenses",
+    label: "5 Expenses",
     exact: ["/expenses", "/expenses-placeholder"],
   },
   {
     href: "/payments",
-    label: "7 Payments",
+    label: "6 Payments",
     exact: ["/payments"],
   },
 ];
 
 export const opsMetaRoutes: NavRoute[] = [
+  { href: "/ops/meta", label: "Notes", exact: ["/ops/meta"] },
   { href: "/contacts", label: "Contacts", exact: ["/contacts"] },
   { href: "/vendors", label: "Vendors", exact: ["/vendors"] },
   { href: "/cost-codes", label: "Cost Codes", exact: ["/cost-codes"] },

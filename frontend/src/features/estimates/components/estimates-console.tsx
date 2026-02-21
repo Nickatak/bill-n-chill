@@ -15,6 +15,7 @@ import {
   CostCode,
   EstimateLineInput,
   EstimateLineItemRecord,
+  EstimateRelatedChangeOrderRecord,
   EstimateRecord,
   EstimateStatusEventRecord,
   ProjectRecord,
@@ -22,6 +23,7 @@ import {
 import { EstimateSheet } from "./estimate-sheet";
 
 type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amount";
+type EstimateStatusValue = "draft" | "sent" | "approved" | "rejected" | "archived";
 type EstimatesConsoleProps = {
   scopedProjectId?: number | null;
 };
@@ -50,9 +52,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
   const [estimates, setEstimates] = useState<EstimateRecord[]>([]);
   const [selectedEstimateId, setSelectedEstimateId] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState("draft");
+  const [selectedStatus, setSelectedStatus] = useState<EstimateStatusValue>("draft");
   const [statusNote, setStatusNote] = useState("");
   const [statusEvents, setStatusEvents] = useState<EstimateStatusEventRecord[]>([]);
+  const [projectChangeOrders, setProjectChangeOrders] = useState<EstimateRelatedChangeOrderRecord[]>([]);
 
   const [estimateTitle, setEstimateTitle] = useState("Initial Estimate");
   const [taxPercent, setTaxPercent] = useState("0");
@@ -67,7 +70,11 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const [openFamilyHistory, setOpenFamilyHistory] = useState<Set<string>>(() => new Set());
   const [showDuplicatePanel, setShowDuplicatePanel] = useState(false);
   const [duplicateTitle, setDuplicateTitle] = useState("");
-  const [hideVoidedFamilies, setHideVoidedFamilies] = useState(true);
+  const [isViewerExpanded, setIsViewerExpanded] = useState(true);
+  const defaultEstimateStatusFilters: EstimateStatusValue[] = ["draft", "sent", "approved", "rejected"];
+  const [estimateStatusFilters, setEstimateStatusFilters] = useState<EstimateStatusValue[]>(
+    defaultEstimateStatusFilters,
+  );
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const scopedProjectId = scopedProjectIdProp;
@@ -89,19 +96,20 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     rejected: styles.statusRejected,
     archived: styles.statusArchived,
   };
-  const statusOptions = [
+  const statusOptions: Array<{ value: EstimateStatusValue; label: string }> = [
     { value: "draft", label: "Draft" },
     { value: "sent", label: "Sent" },
     { value: "approved", label: "Approved" },
     { value: "rejected", label: "Rejected" },
     { value: "archived", label: "Voided" },
   ];
+  const estimateStatusFilterValues = statusOptions.map((option) => option.value);
   const statusDisplayOptions = statusOptions;
   const statusLabelByValue = statusDisplayOptions.reduce<Record<string, string>>((labels, option) => {
     labels[option.value] = option.label;
     return labels;
   }, {});
-  const allowedStatusTransitions: Record<string, string[]> = {
+  const allowedStatusTransitions: Record<string, EstimateStatusValue[]> = {
     draft: ["sent", "archived"],
     sent: ["sent", "approved", "rejected", "archived"],
     approved: [],
@@ -137,7 +145,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       return "Re-sent";
     }
     const actionByStatus: Record<string, string> = {
-      draft: "Created",
+      draft: "Created as Draft",
       sent: "Sent",
       approved: "Approved",
       rejected: "Rejected",
@@ -199,23 +207,18 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         return lastActionB - lastActionA;
       });
   }, [estimates]);
-  const hiddenVoidedFamilyCount = useMemo(
-    () =>
-      estimateFamilies.filter((family) => {
-        const latest = family.items[family.items.length - 1];
-        return latest?.status === "archived";
-      }).length,
-    [estimateFamilies],
-  );
   const visibleEstimateFamilies = useMemo(() => {
-    if (!hideVoidedFamilies) {
-      return estimateFamilies;
+    if (estimateStatusFilters.length === 0) {
+      return [];
     }
     return estimateFamilies.filter((family) => {
       const latest = family.items[family.items.length - 1];
-      return latest?.status !== "archived";
+      if (!latest?.status) {
+        return false;
+      }
+      return estimateStatusFilters.includes(latest.status as EstimateStatusValue);
     });
-  }, [estimateFamilies, hideVoidedFamilies]);
+  }, [estimateFamilies, estimateStatusFilters]);
 
   function formatMoney(value: number): string {
     return value.toFixed(2);
@@ -304,6 +307,16 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       }
       return new Set<string>([title]);
     });
+  }
+
+  function toggleEstimateStatusFilter(nextStatus: EstimateStatusValue) {
+    setEstimateStatusFilters((current) =>
+      current.includes(nextStatus)
+        ? current.filter((statusValue) => statusValue !== nextStatus)
+        : estimateStatusFilterValues.filter(
+            (statusValue) => statusValue === nextStatus || current.includes(statusValue),
+          ),
+    );
   }
 
   useEffect(() => {
@@ -408,6 +421,27 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     }
   }, [normalizedBaseUrl, scopedEstimateId, selectedProjectId, token]);
 
+  const loadProjectChangeOrders = useCallback(async () => {
+    const projectId = Number(selectedProjectId);
+    if (!projectId) {
+      setProjectChangeOrders([]);
+      return;
+    }
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/change-orders/`, {
+        headers: { Authorization: `Token ${token}` },
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setProjectChangeOrders([]);
+        return;
+      }
+      setProjectChangeOrders((payload.data as EstimateRelatedChangeOrderRecord[]) ?? []);
+    } catch {
+      setProjectChangeOrders([]);
+    }
+  }, [normalizedBaseUrl, selectedProjectId, token]);
+
   useEffect(() => {
     if (!token) {
       return;
@@ -421,6 +455,13 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     }
     void loadEstimates();
   }, [loadEstimates, selectedProjectId, token]);
+
+  useEffect(() => {
+    if (!token || !selectedProjectId) {
+      return;
+    }
+    void loadProjectChangeOrders();
+  }, [loadProjectChangeOrders, selectedProjectId, token]);
 
   useEffect(() => {
     if (!projects.length || !scopedProjectId) {
@@ -856,297 +897,356 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         )}
       </div>
 
+      <div className={styles.primaryCreateAction}>
+        <button type="button" onClick={startNewEstimate}>
+          Add New Estimate
+        </button>
+      </div>
+
       <section className={styles.lifecycle}>
-        <h3>Estimate Versions & Status</h3>
-
-        <div className={styles.lifecycleActions}>
-          <button type="button" onClick={startNewEstimate}>
-            Add New Estimate
-          </button>
+        <div className={styles.lifecycleHeader}>
+          <h3>Estimate Versions & Status</h3>
           <button
             type="button"
-            onClick={() => {
-              if (!selectedEstimate) {
-                setStatusMessage("Select an existing estimate version before duplicating.");
-                setActionMessage("Select an existing estimate version before duplicating.");
-                return;
-              }
-              setDuplicateTitle(`${selectedEstimate.title || "Estimate"} Copy`);
-              setShowDuplicatePanel((current) => !current);
-            }}
+            className={styles.lifecycleToggleButton}
+            onClick={() => setIsViewerExpanded((current) => !current)}
+            aria-expanded={isViewerExpanded}
           >
-            Duplicate as New Estimate
-          </button>
-          <button
-            type="button"
-            onClick={handleCloneEstimate}
-            title={
-              selectedEstimate && !canCreateRevision
-                ? revisionUnavailableMessage
-                : undefined
-            }
-          >
-            Create Revision From Selected
+            {isViewerExpanded ? "Hide Viewer" : "Show Viewer"}
           </button>
         </div>
-        {actionMessage ? <p className={styles.actionError}>{actionMessage}</p> : null}
-        {showDuplicatePanel ? (
-          <div className={styles.duplicatePanel}>
-            <p className={styles.inlineHint}>
-              Duplicating in project{" "}
-              {selectedProject
-                ? `#${selectedProject.id} - ${selectedProject.name} (${selectedProject.customer_display_name})`
-                : "current selection"}.
-            </p>
-            <label className={styles.lifecycleField}>
-              New estimate title
-              <input
-                value={duplicateTitle}
-                onChange={(event) => setDuplicateTitle(event.target.value)}
-                placeholder="Estimate title"
-              />
-            </label>
+
+        {isViewerExpanded ? (
+          <>
             <div className={styles.lifecycleActions}>
-              <button type="button" onClick={handleDuplicateEstimate}>
-                Confirm Duplicate
+              <button
+                type="button"
+                onClick={() => {
+                  if (!selectedEstimate) {
+                    setStatusMessage("Select an existing estimate version before duplicating.");
+                    setActionMessage("Select an existing estimate version before duplicating.");
+                    return;
+                  }
+                  setDuplicateTitle(`${selectedEstimate.title || "Estimate"} Copy`);
+                  setShowDuplicatePanel((current) => !current);
+                }}
+              >
+                Duplicate as New Estimate
               </button>
-              <button type="button" onClick={() => setShowDuplicatePanel(false)}>
-                Cancel
+              <button
+                type="button"
+                onClick={handleCloneEstimate}
+                title={
+                  selectedEstimate && !canCreateRevision
+                    ? revisionUnavailableMessage
+                    : undefined
+                }
+              >
+                Create Revision From Selected
               </button>
             </div>
-          </div>
-        ) : null}
-
-        <div className={styles.versionFilters}>
-          <button
-            type="button"
-            className={`${styles.historyToggle} ${
-              hideVoidedFamilies ? styles.filterToggleOn : styles.filterToggleOff
-            }`}
-            aria-pressed={hideVoidedFamilies}
-            onClick={() => setHideVoidedFamilies((current) => !current)}
-          >
-            Hide Voided: {hideVoidedFamilies ? "ON" : "OFF"} ({hiddenVoidedFamilyCount})
-          </button>
-        </div>
-
-        <div className={styles.versionTree}>
-          {visibleEstimateFamilies.length > 0 ? (
-            visibleEstimateFamilies.map((family) => {
-              const latest = family.items[family.items.length - 1];
-              const history = family.items.slice(0, -1).reverse();
-              const selectedInFamily = family.items.find(
-                (estimate) => String(estimate.id) === selectedEstimateId,
-              );
-              const isFamilyActive = Boolean(selectedInFamily);
-              const isViewingHistory =
-                selectedInFamily && String(selectedInFamily.id) !== String(latest.id);
-              const isLatestSelected = String(latest.id) === selectedEstimateId;
-              const isHistoryOpen = openFamilyHistory.has(family.title);
-              const latestTotal = formatMoney(toNumber(latest.grand_total || "0"));
-              return (
-                <div
-                  key={family.title}
-                  className={`${styles.familyGroup} ${
-                    isFamilyActive ? styles.familyGroupActive : ""
-                  }`}
-                >
-                  <div className={styles.familyRow}>
-                    <div className={styles.versionCardWrap}>
-                      {latest.public_ref ? (
-                        <Link
-                          href={publicEstimateHref(latest.public_ref)}
-                          className={styles.publicEstimateLinkIcon}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label={`Open public view for estimate #${latest.id}`}
-                          title="Open public view"
-                        >
-                          ↗
-                        </Link>
-                      ) : null}
-                      <button
-                        type="button"
-                        className={`${styles.familyMain} ${
-                          isLatestSelected ? styles.familyMainActive : ""
-                        }`}
-                        onClick={() => handleSelectFamilyLatest(family.title, latest)}
-                      >
-                        <div className={styles.familyMainContent}>
-                          <span className={styles.familyTitle}>{family.title}</span>
-                          <span className={styles.familyMeta}>
-                            Estimate #{latest.id} · {history.length} history{" "}
-                            {history.length === 1 ? "entry" : "entries"}
-                          </span>
-                          <span className={styles.familyDate}>
-                            Last action: {formatEstimateLastActionDate(latest)}
-                          </span>
-                        </div>
-                        <div className={styles.versionRight}>
-                          <span
-                            className={`${styles.versionStatus} ${
-                              statusClasses[latest.status] ?? ""
-                            }`}
-                          >
-                            {formatEstimateStatus(latest.status)}
-                          </span>
-                          <span className={styles.versionAmount}>${latestTotal}</span>
-                        </div>
-                      </button>
-                    </div>
-                    {isHistoryOpen && history.length > 0 ? (
-                      <div className={styles.historyRow}>
-                        {history.map((estimate) => {
-                          const total = formatMoney(toNumber(estimate.grand_total || "0"));
-                          const isSelected = String(estimate.id) === selectedEstimateId;
-                          return (
-                            <div key={estimate.id} className={styles.versionCardWrap}>
-                              {estimate.public_ref ? (
-                                <Link
-                                  href={publicEstimateHref(estimate.public_ref)}
-                                  className={styles.publicEstimateLinkIcon}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  aria-label={`Open public view for estimate #${estimate.id}`}
-                                  title="Open public view"
-                                >
-                                  ↗
-                                </Link>
-                              ) : null}
-                              <button
-                                type="button"
-                                className={`${styles.historyCard} ${
-                                  isSelected ? styles.historyCardActive : ""
-                                }`}
-                                onClick={() => handleSelectEstimate(estimate)}
-                              >
-                                <span className={styles.historyMetaRow}>
-                                  <span className={styles.historyVersionMeta}>
-                                    v{estimate.version} <span className={styles.historyMeta}>#{estimate.id}</span>
-                                  </span>
-                                  <span
-                                    className={`${styles.versionStatus} ${
-                                      statusClasses[estimate.status] ?? ""
-                                    } ${styles.historyStatus}`}
-                                  >
-                                    {formatEstimateStatus(estimate.status)}
-                                  </span>
-                                </span>
-                                <span className={styles.historyAmount}>${total}</span>
-                                <span className={styles.historyDate}>
-                                  {formatEstimateLastActionDate(estimate)}
-                                </span>
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className={styles.familyFooter}>
-                    {isViewingHistory ? (
-                      <span className={styles.historyNotice}>
-                        Viewing v{selectedInFamily?.version}
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })
-          ) : hiddenVoidedFamilyCount > 0 && hideVoidedFamilies ? (
-            <p className={styles.inlineHint}>All estimate families are currently voided and hidden.</p>
-          ) : (
-            <p className={styles.inlineHint}>No estimates to display yet.</p>
-          )}
-        </div>
-
-        <div className={styles.lifecycleGrid}>
-          <div className={styles.statusPicker}>
-            <span className={styles.lifecycleFieldLabel}>Next status</span>
-            <div className={styles.statusPills}>
-              {nextStatusOptions.map((option) => {
-                const isSelected = selectedStatus === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={`${styles.statusPill} ${
-                      isSelected ? statusClasses[option.value] ?? "" : styles.statusPillInactive
-                    } ${isSelected ? styles.statusPillActive : ""}`}
-                    onClick={() => setSelectedStatus(option.value)}
-                    aria-pressed={isSelected}
-                    disabled={!selectedEstimateId}
-                  >
-                    {option.label}
+            {actionMessage ? <p className={styles.actionError}>{actionMessage}</p> : null}
+            {showDuplicatePanel ? (
+              <div className={styles.duplicatePanel}>
+                <p className={styles.inlineHint}>
+                  Duplicating in project{" "}
+                  {selectedProject
+                    ? `#${selectedProject.id} - ${selectedProject.name} (${selectedProject.customer_display_name})`
+                    : "current selection"}.
+                </p>
+                <label className={styles.lifecycleField}>
+                  New estimate title
+                  <input
+                    value={duplicateTitle}
+                    onChange={(event) => setDuplicateTitle(event.target.value)}
+                    placeholder="Estimate title"
+                  />
+                </label>
+                <div className={styles.lifecycleActions}>
+                  <button type="button" onClick={handleDuplicateEstimate}>
+                    Confirm Duplicate
                   </button>
-                );
-              })}
-            </div>
-            {selectedEstimateId && nextStatusOptions.length === 0 ? (
-              <p className={styles.inlineHint}>No next statuses available for this estimate.</p>
+                  <button type="button" onClick={() => setShowDuplicatePanel(false)}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
             ) : null}
-          </div>
-          <label className={styles.lifecycleField}>
-            Status note
-            <textarea
-              className={styles.statusNote}
-              value={statusNote}
-              onChange={(event) => setStatusNote(event.target.value)}
-              placeholder="Optional note for this transition"
-              rows={3}
-            />
-          </label>
-        </div>
-        <div className={styles.lifecycleActions}>
-          <button
-            type="button"
-            onClick={handleUpdateEstimateStatus}
-            disabled={!selectedEstimateId || nextStatusOptions.length === 0}
-          >
-            Update Selected Estimate Status
-          </button>
-        </div>
 
-        {statusEvents.length > 0 ? (
-          <div className={styles.statusEvents}>
-            <h4>Status Events</h4>
-            <div className={styles.statusEventsTableWrap}>
-              <table className={styles.statusEventsTable}>
-                <thead>
-                  <tr>
-                    <th>Action</th>
-                    <th>Status</th>
-                    <th>Occurred</th>
-                    <th>Note</th>
-                    <th>Who</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {statusEvents.map((event) => {
-                    const toStatusClass = statusClasses[event.to_status] ?? "";
+            <div className={styles.versionFilters}>
+              <span className={styles.versionFiltersLabel}>Estimate status filter</span>
+              <div className={styles.versionFilterButtons}>
+                {statusOptions.map((option) => {
+                  const active = estimateStatusFilters.includes(option.value);
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`${styles.statusPill} ${
+                        active ? statusClasses[option.value] : styles.statusPillInactive
+                      } ${active ? styles.statusPillActive : ""}`}
+                      aria-pressed={active}
+                      onClick={() => toggleEstimateStatusFilter(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className={styles.versionFilterActions}>
+                <button
+                  type="button"
+                  className={styles.versionFilterActionButton}
+                  onClick={() => setEstimateStatusFilters(estimateStatusFilterValues)}
+                >
+                  Show All Statuses
+                </button>
+                <button
+                  type="button"
+                  className={styles.versionFilterActionButton}
+                  onClick={() => setEstimateStatusFilters(defaultEstimateStatusFilters)}
+                >
+                  Reset Filters
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.versionTree}>
+              {visibleEstimateFamilies.length > 0 ? (
+                visibleEstimateFamilies.map((family) => {
+                  const latest = family.items[family.items.length - 1];
+                  const history = family.items.slice(0, -1).reverse();
+                  const selectedInFamily = family.items.find(
+                    (estimate) => String(estimate.id) === selectedEstimateId,
+                  );
+                  const isFamilyActive = Boolean(selectedInFamily);
+                  const isViewingHistory =
+                    selectedInFamily && String(selectedInFamily.id) !== String(latest.id);
+                  const isLatestSelected = String(latest.id) === selectedEstimateId;
+                  const isHistoryOpen = openFamilyHistory.has(family.title);
+                  const relationEstimateId = selectedInFamily?.id ?? latest.id;
+                  const relatedChangeOrders = projectChangeOrders.filter(
+                    (changeOrder) => changeOrder.origin_estimate === relationEstimateId,
+                  );
+                  const latestTotal = formatMoney(toNumber(latest.grand_total || "0"));
+                  return (
+                    <div
+                      key={family.title}
+                      className={`${styles.familyGroup} ${
+                        isFamilyActive ? styles.familyGroupActive : ""
+                      }`}
+                    >
+                      <div className={styles.familyRow}>
+                        <div className={styles.versionCardWrap}>
+                          {latest.public_ref ? (
+                            <Link
+                              href={publicEstimateHref(latest.public_ref)}
+                              className={styles.publicEstimateLinkIcon}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label={`Open public view for estimate #${latest.id}`}
+                              title="Open public view"
+                            >
+                              ↗
+                            </Link>
+                          ) : null}
+                          <button
+                            type="button"
+                            className={`${styles.familyMain} ${
+                              isLatestSelected ? styles.familyMainActive : ""
+                            }`}
+                            onClick={() => handleSelectFamilyLatest(family.title, latest)}
+                          >
+                            <div className={styles.familyMainContent}>
+                              <span className={styles.familyTitle}>{family.title}</span>
+                              <span className={styles.familyMeta}>
+                                Estimate #{latest.id} · {history.length} history{" "}
+                                {history.length === 1 ? "entry" : "entries"}
+                              </span>
+                              <span className={styles.familyDate}>
+                                Last action: {formatEstimateLastActionDate(latest)}
+                              </span>
+                            </div>
+                            <div className={styles.versionRight}>
+                              <span
+                                className={`${styles.versionStatus} ${
+                                  statusClasses[latest.status] ?? ""
+                                }`}
+                              >
+                                {formatEstimateStatus(latest.status)}
+                              </span>
+                              <span className={styles.versionAmount}>${latestTotal}</span>
+                            </div>
+                          </button>
+                        </div>
+                        {isHistoryOpen && history.length > 0 ? (
+                          <div className={styles.historyRow}>
+                            {history.map((estimate) => {
+                              const total = formatMoney(toNumber(estimate.grand_total || "0"));
+                              const isSelected = String(estimate.id) === selectedEstimateId;
+                              return (
+                                <div key={estimate.id} className={styles.versionCardWrap}>
+                                  {estimate.public_ref ? (
+                                    <Link
+                                      href={publicEstimateHref(estimate.public_ref)}
+                                      className={styles.publicEstimateLinkIcon}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      aria-label={`Open public view for estimate #${estimate.id}`}
+                                      title="Open public view"
+                                    >
+                                      ↗
+                                    </Link>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    className={`${styles.historyCard} ${
+                                      isSelected ? styles.historyCardActive : ""
+                                    }`}
+                                    onClick={() => handleSelectEstimate(estimate)}
+                                  >
+                                    <span className={styles.historyMetaRow}>
+                                      <span className={styles.historyVersionMeta}>
+                                        v{estimate.version} <span className={styles.historyMeta}>#{estimate.id}</span>
+                                      </span>
+                                      <span
+                                        className={`${styles.versionStatus} ${
+                                          statusClasses[estimate.status] ?? ""
+                                        } ${styles.historyStatus}`}
+                                      >
+                                        {formatEstimateStatus(estimate.status)}
+                                      </span>
+                                    </span>
+                                    <span className={styles.historyAmount}>${total}</span>
+                                    <span className={styles.historyDate}>
+                                      {formatEstimateLastActionDate(estimate)}
+                                    </span>
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className={styles.familyFooter}>
+                        {isViewingHistory ? (
+                          <span className={styles.historyNotice}>
+                            Viewing v{selectedInFamily?.version}
+                          </span>
+                        ) : null}
+                        {relatedChangeOrders.length > 0 ? (
+                          <span className={styles.relatedChangeOrders}>
+                            CO refs:{" "}
+                            {relatedChangeOrders.slice(0, 3).map((changeOrder, index) => (
+                              <span key={changeOrder.id}>
+                                {index > 0 ? ", " : ""}
+                                <Link
+                                  href={`/projects/${selectedProjectId}/change-orders`}
+                                  className={styles.relatedChangeOrdersLink}
+                                >
+                                  CO-{changeOrder.number} v{changeOrder.revision_number}
+                                </Link>
+                              </span>
+                            ))}
+                            {relatedChangeOrders.length > 3 ? ` +${relatedChangeOrders.length - 3} more` : ""}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : estimateFamilies.length > 0 ? (
+                <p className={styles.inlineHint}>No estimate families match the selected status filters.</p>
+              ) : (
+                <p className={styles.inlineHint}>No estimates to display yet.</p>
+              )}
+            </div>
+
+            <div className={styles.lifecycleGrid}>
+              <div className={styles.statusPicker}>
+                <span className={styles.lifecycleFieldLabel}>Next status</span>
+                <div className={styles.statusPills}>
+                  {nextStatusOptions.map((option) => {
+                    const isSelected = selectedStatus === option.value;
                     return (
-                      <tr key={event.id}>
-                        <td>
-                          <span className={`${styles.versionStatus} ${toStatusClass}`}>
-                            {formatStatusAction(event)}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={`${styles.versionStatus} ${toStatusClass}`}>
-                            {formatEstimateStatus(event.to_status)}
-                          </span>
-                        </td>
-                        <td>{formatEventDate(event.changed_at)}</td>
-                        <td>{event.note || "—"}</td>
-                        <td>{event.changed_by_email}</td>
-                      </tr>
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={`${styles.statusPill} ${
+                          isSelected ? statusClasses[option.value] ?? "" : styles.statusPillInactive
+                        } ${isSelected ? styles.statusPillActive : ""}`}
+                        onClick={() => setSelectedStatus(option.value)}
+                        aria-pressed={isSelected}
+                        disabled={!selectedEstimateId}
+                      >
+                        {option.label}
+                      </button>
                     );
                   })}
-                </tbody>
-              </table>
+                </div>
+                {selectedEstimateId && nextStatusOptions.length === 0 ? (
+                  <p className={styles.inlineHint}>No next statuses available for this estimate.</p>
+                ) : null}
+              </div>
+              <label className={styles.lifecycleField}>
+                Status note
+                <textarea
+                  className={styles.statusNote}
+                  value={statusNote}
+                  onChange={(event) => setStatusNote(event.target.value)}
+                  placeholder="Optional note for this transition"
+                  rows={3}
+                />
+              </label>
             </div>
-          </div>
-        ) : null}
+            <div className={styles.lifecycleActions}>
+              <button
+                type="button"
+                onClick={handleUpdateEstimateStatus}
+                disabled={!selectedEstimateId || nextStatusOptions.length === 0}
+              >
+                Update Selected Estimate Status
+              </button>
+            </div>
+
+            {statusEvents.length > 0 ? (
+              <div className={styles.statusEvents}>
+                <h4>Status Events</h4>
+                <div className={styles.statusEventsTableWrap}>
+                  <table className={styles.statusEventsTable}>
+                    <thead>
+                      <tr>
+                        <th>Action</th>
+                        <th>Occurred</th>
+                        <th>Note</th>
+                        <th>Who</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {statusEvents.map((event) => {
+                        const toStatusClass = statusClasses[event.to_status] ?? "";
+                        return (
+                          <tr key={event.id}>
+                            <td>
+                              <span className={`${styles.versionStatus} ${toStatusClass}`}>
+                                {formatStatusAction(event)}
+                              </span>
+                            </td>
+                            <td>{formatEventDate(event.changed_at)}</td>
+                            <td>{event.note || "—"}</td>
+                            <td>{event.changed_by_email}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <p className={styles.inlineHint}>Viewer collapsed. Expand to review versions, status transitions, and history.</p>
+        )}
       </section>
 
       <EstimateSheet

@@ -597,7 +597,7 @@ export function ProjectsConsole() {
                     <span className={styles.nodeCount}>Auto</span>
                   </div>
                   <div className={styles.node}>
-                    <Link href="/change-orders">Change Orders</Link>
+                    <Link href={`/projects/${selectedProject.id}/change-orders`}>Change Orders</Link>
                     <span className={styles.nodeCount}>
                       {summaryCounts ? summaryCounts.changeOrders : "--"}
                     </span>

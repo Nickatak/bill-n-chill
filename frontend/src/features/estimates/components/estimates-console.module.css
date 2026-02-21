@@ -646,9 +646,40 @@
   gap: 12px;
 }
 
+.primaryCreateAction {
+  display: flex;
+}
+
+.primaryCreateAction button {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #111827;
+  color: #f9fafb;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
 .lifecycle h3 {
   margin: 0;
   color: var(--text-primary);
+}
+
+.lifecycleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lifecycleToggleButton {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--foreground);
+  color: var(--text-secondary);
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .lifecycleField {
@@ -821,8 +852,45 @@
 }
 
 .versionFilters {
+  display: grid;
+  gap: 8px;
+}
+
+.versionFiltersLabel {
+  margin: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #475569;
+  font-weight: 600;
+}
+
+.versionFilterButtons {
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.versionFilterActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.versionFilterActionButton {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #334155;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.versionFilterActionButton:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #1e3a8a;
 }
 
 .familyGroup {
@@ -917,29 +985,20 @@
   font-weight: 600;
 }
 
-.historyToggle {
-  border: 1px solid #cbd5f5;
-  border-radius: 999px;
-  background: #eef2ff;
-  color: #1e3a8a;
-  padding: 4px 10px;
-  font-size: 0.7rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.filterToggleOn {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
-  color: #ffffff;
-  box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.18);
-}
-
-.filterToggleOff {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
+.relatedChangeOrders {
+  font-size: 0.78rem;
   color: #475569;
+  font-weight: 500;
+}
+
+.relatedChangeOrdersLink {
+  color: #1d4ed8;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.relatedChangeOrdersLink:hover {
+  text-decoration: underline;
 }
 
 .historyRow {
@@ -1439,26 +1498,31 @@
   border-color: #1f2937;
 }
 
-:global(html[data-theme="dark"]) .historyToggle {
-  background: #1e293b;
+:global(html[data-theme="dark"]) .versionFiltersLabel {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .versionFilterActionButton {
+  background: #0b1220;
   border-color: #334155;
   color: #bfdbfe;
 }
 
-:global(html[data-theme="dark"]) .filterToggleOn {
-  background: #2563eb;
+:global(html[data-theme="dark"]) .versionFilterActionButton:hover {
+  background: #172554;
   border-color: #3b82f6;
-  color: #eff6ff;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
-}
-
-:global(html[data-theme="dark"]) .filterToggleOff {
-  background: #0f172a;
-  border-color: #334155;
-  color: #94a3b8;
+  color: #dbeafe;
 }
 
 :global(html[data-theme="dark"]) .historyNotice {
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .relatedChangeOrders {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .relatedChangeOrdersLink {
   color: #93c5fd;
 }
 

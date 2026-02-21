@@ -1,0 +1,742 @@
+.viewer {
+  margin: 16px 0;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.primaryCreateAction {
+  display: flex;
+}
+
+.primaryCreateAction button {
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #1e293b;
+  color: #f8fafc;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.viewerHeader h3 {
+  margin: 0;
+}
+
+.viewerHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.viewerToggleButton {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.viewerHeader p {
+  margin: 6px 0 10px;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.viewerGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.viewerRail {
+  display: grid;
+  gap: 8px;
+}
+
+.viewerRailItem {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 8px 10px;
+  text-align: left;
+  display: grid;
+  gap: 6px;
+}
+
+.viewerRailItemActive {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.25);
+}
+
+.viewerRailTitle {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.viewerDetail {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.viewerMetaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.viewerMetaLabel {
+  color: #475569;
+  font-size: 0.85rem;
+}
+
+.viewerHint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.quickStatusPanel {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px;
+  background: #f8fafc;
+  display: grid;
+  gap: 8px;
+}
+
+.quickStatusPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quickStatusButton {
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #334155;
+  padding: 5px 10px;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.quickStatusButtonActive {
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.28);
+}
+
+.quickStatusButton.statusDraft {
+  background: #dbeafe;
+  color: #1e40af;
+  border-color: #93c5fd;
+}
+
+.quickStatusButton.statusPendingApproval {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fcd34d;
+}
+
+.quickStatusButton.statusApproved {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #86efac;
+}
+
+.quickStatusButton.statusRejected {
+  background: #fecaca;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+
+.quickStatusButton.statusVoid {
+  background: #e5e7eb;
+  color: #374151;
+  border-color: #cbd5e1;
+}
+
+.quickStatusSubmit {
+  width: fit-content;
+  border: 1px solid #1d4ed8;
+  border-radius: 8px;
+  background: #1d4ed8;
+  color: #ffffff;
+  padding: 7px 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.quickStatusSubmit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.statusBadge {
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+.statusDraft {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.statusPendingApproval {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.statusApproved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.statusRejected {
+  background: #fecaca;
+  color: #991b1b;
+}
+
+.statusVoid {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.reconcilePill {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  border-radius: 999px;
+  padding: 4px 8px;
+  width: fit-content;
+}
+
+.reconcileGood {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.reconcileBad {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.lineTableWrap {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: auto;
+}
+
+.lineTable {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 460px;
+}
+
+.lineTable th {
+  text-align: left;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #1e3a8a;
+  background: #eff6ff;
+  padding: 8px;
+}
+
+.lineTable td {
+  padding: 8px;
+  border-top: 1px solid #e2e8f0;
+  color: #0f172a;
+  font-size: 0.9rem;
+}
+
+.coSheet {
+  margin: 16px 0;
+  border: 1px solid #d1d5db;
+  border-radius: 16px;
+  padding: 16px;
+  background: #ffffff;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.07);
+  display: grid;
+  gap: 14px;
+}
+
+.coSheetHeader {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.coFromBlock {
+  display: grid;
+  gap: 4px;
+}
+
+.coBlockLabel {
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.coBlockText {
+  margin: 0;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.coBlockMuted {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.86rem;
+}
+
+.coHeaderRight {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+
+.coSheetTitle {
+  color: #1d4ed8;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.coSheetSubtitle {
+  color: #334155;
+  font-size: 0.85rem;
+}
+
+.coMetaGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.coField {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.coMetaField {
+  min-width: 0;
+}
+
+.coMetaInput {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.coFieldWide {
+  grid-column: 1 / -1;
+}
+
+.coInput {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.92rem;
+}
+
+.coLineTable {
+  border: 1px solid #cbd5f5;
+  border-radius: 12px;
+  overflow-x: auto;
+  background: #f8fafc;
+}
+
+.coLineHeader {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(220px, 1.4fr) 150px 140px 120px 90px;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 10px;
+  background: #eef2ff;
+  color: #1e3a8a;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  min-width: 910px;
+}
+
+.coLineRow {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(220px, 1.4fr) 150px 140px 120px 90px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-top: 1px solid #dbe5f3;
+  background: #ffffff;
+  min-width: 910px;
+}
+
+.coLineRow:nth-child(even) {
+  background: #f4f7fc;
+}
+
+.coReadValue {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.coSmallButton {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #334155;
+  padding: 7px 10px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.coSheetFooter {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.coSheetFooterActions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.coFooterHint {
+  flex-basis: 100%;
+  margin: 0;
+  text-align: right;
+}
+
+.coSheetFooter button.coFooterSecondaryButton,
+.coSheetFooter button.coFooterPrimaryButton {
+  width: fit-content;
+  min-height: 0;
+  padding: 8px 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.coSheetFooter button.coFooterSecondaryButton {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.coSheetFooter button.coFooterPrimaryButton {
+  border: 1px solid #1d4ed8;
+  border-radius: 8px;
+  background: #1d4ed8;
+  color: #ffffff;
+}
+
+.coSheetFooter button.coFooterPrimaryButton:disabled,
+.coSheetFooter button.coFooterSecondaryButton:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.coSecondaryButton {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #334155;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.coPrimaryButton {
+  border: 1px solid #1d4ed8;
+  border-radius: 8px;
+  background: #1d4ed8;
+  color: #ffffff;
+  padding: 9px 14px;
+  cursor: pointer;
+}
+
+.coSummary {
+  border: 1px solid #cbd5f5;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 8px 10px;
+  min-width: 230px;
+}
+
+.coSummaryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.85rem;
+  color: #0f172a;
+}
+
+.coSummaryRow + .coSummaryRow {
+  margin-top: 4px;
+}
+
+@media (min-width: 960px) {
+  .viewerGrid {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .coSheetHeader,
+  .coMetaGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .coHeaderRight {
+    justify-items: start;
+  }
+
+  .coSheetFooter {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .coSheetFooterActions {
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .coSheetFooter button.coFooterPrimaryButton,
+  .coSheetFooter button.coFooterSecondaryButton {
+    width: 100%;
+  }
+
+  .coFooterHint {
+    text-align: left;
+  }
+}
+
+:global(html[data-theme="dark"]) .viewer {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .primaryCreateAction button {
+  background: #0f172a;
+  border-color: #475569;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .viewerHeader p {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .viewerToggleButton {
+  background: #1f2937;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .viewerRailItem,
+:global(html[data-theme="dark"]) .viewerDetail {
+  background: #111827;
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .quickStatusPanel {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .quickStatusButton {
+  background: #111827;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .quickStatusButton.statusDraft {
+  background: #1e3a8a;
+  color: #dbeafe;
+  border-color: #3b82f6;
+}
+
+:global(html[data-theme="dark"]) .quickStatusButton.statusPendingApproval {
+  background: #78350f;
+  color: #fde68a;
+  border-color: #d97706;
+}
+
+:global(html[data-theme="dark"]) .quickStatusButton.statusApproved {
+  background: #14532d;
+  color: #bbf7d0;
+  border-color: #22c55e;
+}
+
+:global(html[data-theme="dark"]) .quickStatusButton.statusRejected {
+  background: #7f1d1d;
+  color: #fecaca;
+  border-color: #ef4444;
+}
+
+:global(html[data-theme="dark"]) .quickStatusButton.statusVoid {
+  background: #374151;
+  color: #e5e7eb;
+  border-color: #6b7280;
+}
+
+:global(html[data-theme="dark"]) .quickStatusButtonActive {
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.32);
+}
+
+:global(html[data-theme="dark"]) .coSheet {
+  background: #111827;
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .coBlockText {
+  color: #f8fafc;
+}
+
+:global(html[data-theme="dark"]) .coBlockMuted,
+:global(html[data-theme="dark"]) .coSheetSubtitle,
+:global(html[data-theme="dark"]) .coField {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .coInput {
+  background: #0b1220;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .coLineTable {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .coLineHeader {
+  background: #1e293b;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .coLineRow {
+  border-top-color: #334155;
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .coLineRow:nth-child(even) {
+  background: #131d31;
+}
+
+:global(html[data-theme="dark"]) .coReadValue {
+  background: #0b1220;
+  border-color: #334155;
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .coSmallButton,
+:global(html[data-theme="dark"]) .coSecondaryButton {
+  background: #0b1220;
+  border-color: #334155;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .coPrimaryButton {
+  background: #1d4ed8;
+  border-color: #3b82f6;
+}
+
+:global(html[data-theme="dark"]) .coSummary {
+  background: #0b1220;
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .coSummaryRow {
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .coSheetFooter button.coFooterSecondaryButton {
+  background: #0b1220;
+  border-color: #334155;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .coSheetFooter button.coFooterPrimaryButton {
+  background: #1d4ed8;
+  border-color: #3b82f6;
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .reconcileGood {
+  background: #14532d;
+  color: #dcfce7;
+}
+
+:global(html[data-theme="dark"]) .reconcileBad {
+  background: #7f1d1d;
+  color: #fee2e2;
+}
+
+:global(html[data-theme="dark"]) .viewerRailTitle {
+  color: #f8fafc;
+}
+
+:global(html[data-theme="dark"]) .viewerMetaLabel {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .viewerHint {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .lineTableWrap {
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .lineTable th {
+  background: #1e293b;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .lineTable td {
+  color: #e2e8f0;
+  border-top-color: #334155;
+}

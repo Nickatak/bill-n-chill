@@ -1,0 +1,210 @@
+.page {
+  --background: #f5f7fa;
+  --foreground: #ffffff;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --border: #d1d5db;
+
+  min-height: 100dvh;
+  padding: 20px;
+  background: var(--background);
+  font-family: var(--font-geist-sans);
+}
+
+.main {
+  width: min(980px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 12px;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  background: var(--foreground);
+}
+
+.card h2,
+.card h3,
+.entry h3 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.card p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+}
+
+.orderedList {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  color: var(--text-primary);
+}
+
+.orderedList li + li {
+  margin-top: 5px;
+}
+
+.accordion {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--foreground);
+}
+
+.accordionSummary {
+  list-style: none;
+  cursor: pointer;
+  padding: 10px 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.accordionSummary::-webkit-details-marker {
+  display: none;
+}
+
+.accordionSummary::after {
+  content: "+";
+  float: right;
+  color: var(--text-secondary);
+}
+
+.accordion[open] .accordionSummary::after {
+  content: "-";
+}
+
+.bulletList {
+  margin: 0;
+  padding: 0 18px 12px 30px;
+  color: var(--text-primary);
+}
+
+.bulletList li + li {
+  margin-top: 5px;
+}
+
+.termLink {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 1px 8px;
+  background: #f8fafc;
+  color: #0f172a;
+  text-decoration: none;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.termLink code {
+  font-size: 0.84em;
+}
+
+.termLink:hover {
+  background: #eef2ff;
+  border-color: #a5b4fc;
+  color: #1e1b4b;
+}
+
+.termLink:focus-visible {
+  outline: 2px solid #64748b;
+  outline-offset: 1px;
+}
+
+.definitionList {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.definitionCard {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--foreground);
+  scroll-margin-top: 90px;
+}
+
+.definitionCard h4 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.definitionCard p {
+  margin: 6px 0 0;
+}
+
+.timeline {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.entry {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--foreground);
+}
+
+.entryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.badge {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.date {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+}
+
+.notes {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: var(--text-primary);
+}
+
+.notes li + li {
+  margin-top: 5px;
+}
+
+:global(html[data-theme="dark"]) .page {
+  --background: #0b1220;
+  --foreground: #111827;
+  --text-primary: #f3f4f6;
+  --text-secondary: #cbd5e1;
+  --border: #334155;
+}
+
+:global(html[data-theme="dark"]) .entry {
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .definitionCard {
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .termLink {
+  border-color: #334155;
+  background: #0b1220;
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .termLink:hover {
+  background: #172554;
+  border-color: #3b82f6;
+  color: #eff6ff;
+}

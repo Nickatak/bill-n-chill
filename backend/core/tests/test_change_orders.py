@@ -56,6 +56,7 @@ class ChangeOrderTests(TestCase):
             is_active=True,
             created_by=self.other_user,
         )
+        self.last_approved_estimate_by_project = {}
 
     def _create_estimate(self, *, project_id: int, cost_code_id: int, token: str):
         response = self.client.post(
@@ -79,6 +80,16 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(response.status_code, 201)
         return response.json()["data"]["id"]
 
+    def _create_estimate_family(self):
+        estimate_id = self._create_estimate(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        self._approve_estimate(estimate_id=estimate_id, token=self.token.key)
+        self.last_approved_estimate_by_project[self.project.id] = estimate_id
+        return Estimate.objects.get(id=estimate_id)
+
     def _approve_estimate(self, *, estimate_id: int, token: str):
         response = self.client.patch(
             f"/api/v1/estimates/{estimate_id}/",
@@ -91,6 +102,7 @@ class ChangeOrderTests(TestCase):
     def _create_active_budget(self, *, project_id: int, cost_code_id: int, token: str):
         estimate_id = self._create_estimate(project_id=project_id, cost_code_id=cost_code_id, token=token)
         self._approve_estimate(estimate_id=estimate_id, token=token)
+        self.last_approved_estimate_by_project[project_id] = estimate_id
         response = self.client.post(
             f"/api/v1/estimates/{estimate_id}/convert-to-budget/",
             data={},
@@ -107,7 +119,16 @@ class ChangeOrderTests(TestCase):
             status=Budget.Status.ACTIVE,
         )
 
+    def _active_budget_line(self):
+        return BudgetLine.objects.filter(
+            budget__project=self.project,
+            budget__status=Budget.Status.ACTIVE,
+        ).order_by("id").first()
+
     def _create_change_order(self, *, title="Owner requested upgraded finish", amount_delta="1500.00"):
+        origin_estimate_id = self.last_approved_estimate_by_project.get(self.project.id)
+        if not origin_estimate_id:
+            origin_estimate_id = self._create_estimate_family().id
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
             data={
@@ -115,6 +136,7 @@ class ChangeOrderTests(TestCase):
                 "amount_delta": amount_delta,
                 "days_delta": 2,
                 "reason": "Scope upgrade",
+                "origin_estimate": origin_estimate_id,
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -123,6 +145,7 @@ class ChangeOrderTests(TestCase):
         return response.json()["data"]["id"]
 
     def test_change_order_create_requires_active_budget(self):
+        estimate = self._create_estimate_family()
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
             data={
@@ -130,6 +153,7 @@ class ChangeOrderTests(TestCase):
                 "amount_delta": "2500.00",
                 "days_delta": 3,
                 "reason": "Owner requested larger deck",
+                "origin_estimate": estimate.id,
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -152,6 +176,7 @@ class ChangeOrderTests(TestCase):
                 "amount_delta": "2500.00",
                 "days_delta": 3,
                 "reason": "Owner requested larger deck",
+                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -163,6 +188,7 @@ class ChangeOrderTests(TestCase):
                 "amount_delta": "800.00",
                 "days_delta": 1,
                 "reason": "Add recessed lighting",
+                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -173,6 +199,215 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(first.json()["data"]["number"], 1)
         self.assertEqual(second.json()["data"]["number"], 2)
         self.assertEqual(ChangeOrder.objects.count(), 2)
+
+    def test_change_order_create_with_line_items_scaffold(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        budget_line = self._active_budget_line()
+        self.assertIsNotNone(budget_line)
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/change-orders/",
+            data={
+                "title": "Line-coupled CO",
+                "amount_delta": "2500.00",
+                "days_delta": 3,
+                "reason": "Line-level coupling scaffold",
+                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+                "line_items": [
+                    {
+                        "budget_line": budget_line.id,
+                        "description": "Cabinet scope delta",
+                        "amount_delta": "2500.00",
+                        "days_delta": 3,
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["data"]
+        self.assertEqual(payload["line_total_delta"], "2500.00")
+        self.assertEqual(len(payload["line_items"]), 1)
+        self.assertEqual(payload["line_items"][0]["budget_line"], budget_line.id)
+
+    def test_change_order_create_with_origin_estimate_link(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        estimate = self._create_estimate_family()
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/change-orders/",
+            data={
+                "title": "Linked CO",
+                "amount_delta": "2500.00",
+                "days_delta": 3,
+                "reason": "Linked to approved estimate",
+                "origin_estimate": estimate.id,
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["data"]
+        self.assertEqual(payload["origin_estimate"], estimate.id)
+        self.assertEqual(payload["origin_estimate_version"], estimate.version)
+        self.assertEqual(payload["revision_number"], 1)
+        self.assertEqual(payload["is_latest_revision"], True)
+
+    def test_change_order_create_requires_origin_estimate(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/change-orders/",
+            data={
+                "title": "Missing Origin CO",
+                "amount_delta": "500.00",
+                "days_delta": 1,
+                "reason": "Missing origin estimate linkage",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "validation_error")
+        self.assertIn("origin_estimate", response.json()["error"]["fields"])
+
+    def test_change_order_create_rejects_non_approved_origin_estimate(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        draft_estimate_id = self._create_estimate(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/change-orders/",
+            data={
+                "title": "Draft origin CO",
+                "amount_delta": "500.00",
+                "days_delta": 1,
+                "reason": "Invalid origin status",
+                "origin_estimate": draft_estimate_id,
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "validation_error")
+        self.assertIn("origin_estimate", response.json()["error"]["fields"])
+
+    def test_change_order_create_rejects_line_total_mismatch(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        budget_line = self._active_budget_line()
+        self.assertIsNotNone(budget_line)
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/change-orders/",
+            data={
+                "title": "Mismatch CO",
+                "amount_delta": "2500.00",
+                "days_delta": 3,
+                "reason": "Line mismatch",
+                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+                "line_items": [
+                    {
+                        "budget_line": budget_line.id,
+                        "description": "Cabinet scope delta",
+                        "amount_delta": "2000.00",
+                        "days_delta": 3,
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "validation_error")
+
+    def test_change_order_patch_updates_line_items_scaffold(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        budget_line = self._active_budget_line()
+        self.assertIsNotNone(budget_line)
+        change_order_id = self._create_change_order(amount_delta="1200.00")
+
+        response = self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={
+                "line_items": [
+                    {
+                        "budget_line": budget_line.id,
+                        "description": "Line-level delta",
+                        "amount_delta": "1200.00",
+                        "days_delta": 2,
+                    }
+                ]
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        self.assertEqual(payload["line_total_delta"], "1200.00")
+        self.assertEqual(len(payload["line_items"]), 1)
+
+    def test_change_order_clone_revision_creates_next_revision_in_same_family(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        estimate = self._create_estimate_family()
+        create = self.client.post(
+            f"/api/v1/projects/{self.project.id}/change-orders/",
+            data={
+                "title": "Revision Family CO",
+                "amount_delta": "1800.00",
+                "days_delta": 2,
+                "reason": "Base revision",
+                "origin_estimate": estimate.id,
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(create.status_code, 201)
+        base = create.json()["data"]
+        base_id = base["id"]
+
+        clone = self.client.post(
+            f"/api/v1/change-orders/{base_id}/clone-revision/",
+            data={},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(clone.status_code, 201)
+        payload = clone.json()["data"]
+        self.assertEqual(payload["number"], base["number"])
+        self.assertEqual(payload["revision_number"], 2)
+        self.assertEqual(payload["status"], "draft")
+        self.assertEqual(payload["supersedes_change_order"], base_id)
+        self.assertEqual(payload["origin_estimate"], estimate.id)
 
     def test_change_order_status_lifecycle_validation(self):
         self._create_active_budget(
@@ -239,6 +474,7 @@ class ChangeOrderTests(TestCase):
                 "amount_delta": "500.00",
                 "days_delta": 1,
                 "reason": "Other change",
+                "origin_estimate": self.last_approved_estimate_by_project[self.other_project.id],
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.other_token.key}",
@@ -407,5 +643,3 @@ class ChangeOrderTests(TestCase):
         active_budget = self._active_budget()
         self.assertEqual(str(self.project.contract_value_current), "101000.00")
         self.assertEqual(str(active_budget.approved_change_order_total), "1000.00")
-
-

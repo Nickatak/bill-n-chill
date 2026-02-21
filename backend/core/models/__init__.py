@@ -1,6 +1,6 @@
 from core.models.accounting import AccountingSyncEvent
 from core.models.audit import FinancialAuditEvent
-from core.models.budgets import Budget, BudgetLine, ChangeOrder
+from core.models.budgets import Budget, BudgetLine, ChangeOrder, ChangeOrderLine
 from core.models.contacts import Customer, LeadContact
 from core.models.estimates import Estimate, EstimateLineItem, EstimateStatusEvent
 from core.models.invoices import (
@@ -26,6 +26,7 @@ __all__ = [
     "Budget",
     "BudgetLine",
     "ChangeOrder",
+    "ChangeOrderLine",
     "AccountingSyncEvent",
     "FinancialAuditEvent",
     "Invoice",

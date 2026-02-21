@@ -47,6 +47,16 @@ export type EstimateStatusEventRecord = {
   changed_at: string;
 };
 
+export type EstimateRelatedChangeOrderRecord = {
+  id: number;
+  number: number;
+  revision_number: number;
+  title: string;
+  status: string;
+  origin_estimate: number | null;
+  is_latest_revision: boolean;
+};
+
 export type EstimateLineInput = {
   localId: number;
   costCodeId: string;
@@ -64,7 +74,8 @@ export type ApiResponse = {
     | CostCode[]
     | EstimateRecord
     | EstimateRecord[]
-    | EstimateStatusEventRecord[];
+    | EstimateStatusEventRecord[]
+    | EstimateRelatedChangeOrderRecord[];
   meta?: { cloned_from?: number; duplicated_from?: number };
   error?: { code?: string; message?: string; fields?: Record<string, string[]> };
 };

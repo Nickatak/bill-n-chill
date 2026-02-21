@@ -108,6 +108,7 @@ class ChangeOrder(models.Model):
         related_name="change_orders",
     )
     number = models.PositiveIntegerField()
+    revision_number = models.PositiveIntegerField(default=1)
     title = models.CharField(max_length=255)
     status = models.CharField(
         max_length=32,
@@ -117,6 +118,21 @@ class ChangeOrder(models.Model):
     amount_delta = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     days_delta = models.IntegerField(default=0)
     reason = models.TextField(blank=True)
+    origin_estimate = models.ForeignKey(
+        "Estimate",
+        on_delete=models.PROTECT,
+        related_name="originated_change_orders",
+        null=True,
+        blank=True,
+    )
+    origin_estimate_version = models.PositiveIntegerField(null=True, blank=True)
+    supersedes_change_order = models.ForeignKey(
+        "ChangeOrder",
+        on_delete=models.PROTECT,
+        related_name="revision_children",
+        null=True,
+        blank=True,
+    )
     requested_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -135,7 +151,39 @@ class ChangeOrder(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
-        unique_together = ("project", "number")
+        unique_together = ("project", "number", "revision_number")
 
     def __str__(self) -> str:
-        return f"{self.project.name} CO-{self.number}"
+        return f"{self.project.name} CO-{self.number} v{self.revision_number}"
+
+
+class ChangeOrderLine(models.Model):
+    """Line-level change-order delta tied to an active budget line.
+
+    Business workflow:
+    - Stores semantic scope deltas within a change-order family/version.
+    - Maps each delta to a budget line for deterministic budget propagation.
+    - Enables iterative rollout from aggregate CO deltas to line-level controls.
+    """
+
+    change_order = models.ForeignKey(
+        "ChangeOrder",
+        on_delete=models.CASCADE,
+        related_name="line_items",
+    )
+    budget_line = models.ForeignKey(
+        "BudgetLine",
+        on_delete=models.PROTECT,
+        related_name="change_order_lines",
+    )
+    description = models.CharField(max_length=255, blank=True)
+    amount_delta = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    days_delta = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self) -> str:
+        return f"CO-{self.change_order.number} line {self.id} ({self.amount_delta})"

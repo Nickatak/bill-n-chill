@@ -88,7 +88,12 @@ class FinancialAuditTrailTests(TestCase):
 
         change_order_create = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
-            data={"title": "Upgrade", "amount_delta": "250.00", "days_delta": 1},
+            data={
+                "title": "Upgrade",
+                "amount_delta": "250.00",
+                "days_delta": 1,
+                "origin_estimate": estimate_id,
+            },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )

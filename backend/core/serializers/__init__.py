@@ -2,7 +2,12 @@ from core.serializers.accounting import AccountingSyncEventSerializer, Accountin
 from core.serializers.audit import FinancialAuditEventSerializer
 from core.serializers.auth import LoginSerializer
 from core.serializers.budgets import BudgetLineSerializer, BudgetLineUpdateSerializer, BudgetSerializer
-from core.serializers.change_orders import ChangeOrderSerializer, ChangeOrderWriteSerializer
+from core.serializers.change_orders import (
+    ChangeOrderLineInputSerializer,
+    ChangeOrderLineSerializer,
+    ChangeOrderSerializer,
+    ChangeOrderWriteSerializer,
+)
 from core.serializers.estimates import (
     EstimateDuplicateSerializer,
     EstimateLineItemInputSerializer,
@@ -66,6 +71,8 @@ __all__ = [
     "BudgetSerializer",
     "BudgetLineUpdateSerializer",
     "ChangeOrderSerializer",
+    "ChangeOrderLineSerializer",
+    "ChangeOrderLineInputSerializer",
     "ChangeOrderWriteSerializer",
     "InvoiceLineSerializer",
     "InvoiceSerializer",

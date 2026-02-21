@@ -2,6 +2,7 @@ from django.urls import path
 
 from core.views import (
     budget_line_detail_view,
+    change_order_clone_revision_view,
     change_order_detail_view,
     cost_code_detail_view,
     cost_codes_list_create_view,
@@ -139,6 +140,11 @@ urlpatterns = [
         "change-orders/<int:change_order_id>/",
         change_order_detail_view,
         name="change-order-detail",
+    ),
+    path(
+        "change-orders/<int:change_order_id>/clone-revision/",
+        change_order_clone_revision_view,
+        name="change-order-clone-revision",
     ),
     path("invoices/<int:invoice_id>/", invoice_detail_view, name="invoice-detail"),
     path("invoices/<int:invoice_id>/send/", invoice_send_view, name="invoice-send"),

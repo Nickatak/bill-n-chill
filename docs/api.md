@@ -225,7 +225,15 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
 
 - `GET /api/v1/projects/{project_id}/change-orders/`
   - Auth required
-  - Returns change orders for the selected project, scoped to current user.
+  - Returns change-order revisions for the selected project, scoped to current user.
+  - Family semantics:
+    - `number` = family number
+    - `revision_number` = revision inside family
+    - `is_latest_revision` marks editable/latest record
+  - Traceability fields:
+    - `origin_estimate` (nullable)
+    - `origin_estimate_version` (nullable snapshot)
+    - `supersedes_change_order` (nullable link to prior revision)
 
 - `POST /api/v1/projects/{project_id}/change-orders/`
   - Auth required
@@ -234,12 +242,27 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
     - `amount_delta` (required)
     - `days_delta` (optional, default `0`)
     - `reason` (optional)
+    - `origin_estimate` (optional; estimate id from same project)
+    - `line_items[]` (optional scaffold):
+      - `budget_line` (required when row present; must belong to active budget for project)
+      - `description` (optional)
+      - `amount_delta` (required)
+      - `days_delta` (optional)
   - Validation:
     - project must have an active budget baseline before change-order creation.
+    - if `line_items` are provided, sum of line `amount_delta` must equal change-order `amount_delta`.
 
 - `GET /api/v1/change-orders/{change_order_id}/`
   - Auth required
-  - Returns one change order record.
+  - Returns one change-order revision record.
+
+- `POST /api/v1/change-orders/{change_order_id}/clone-revision/`
+  - Auth required
+  - Creates next draft revision within same CO family:
+    - keeps `number` (family)
+    - increments `revision_number`
+    - sets `supersedes_change_order` to source revision
+    - copies title/amount/days/reason/origin-estimate and line items
 
 - `PATCH /api/v1/change-orders/{change_order_id}/`
   - Auth required
@@ -249,6 +272,9 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
     - `days_delta`
     - `reason`
     - `status`
+    - `line_items[]` (optional full-replace scaffold)
+  - Revision rule:
+    - only latest revision in family is editable
   - Allowed transitions:
     - `draft -> pending_approval | void`
     - `pending_approval -> draft | approved | rejected | void`
@@ -259,6 +285,9 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
     - direct `draft -> approved` is invalid; CO must move through `pending_approval` first.
   - Approval behavior:
     - transition to `approved` sets `approved_by` and `approved_at`.
+  - Line-item consistency:
+    - if `line_items` are supplied, they fully replace existing rows and must sum to `amount_delta`.
+    - if existing line items are present, changing only `amount_delta` is blocked unless line totals stay equal.
 
 ## Change Order Financial Propagation (CO-02)
 

@@ -1,7 +1,11 @@
 from core.views.accounting import accounting_sync_event_retry_view, project_accounting_sync_events_view
 from core.views.auth import health_view, login_view, me_view
 from core.views.budgets import budget_line_detail_view, project_budgets_view
-from core.views.change_orders import change_order_detail_view, project_change_orders_view
+from core.views.change_orders import (
+    change_order_clone_revision_view,
+    change_order_detail_view,
+    project_change_orders_view,
+)
 from core.views.cost_codes import cost_code_detail_view, cost_codes_list_create_view
 from core.views.estimates import (
     estimate_clone_version_view,
@@ -58,6 +62,7 @@ __all__ = [
     "budget_line_detail_view",
     "project_change_orders_view",
     "change_order_detail_view",
+    "change_order_clone_revision_view",
     "project_invoices_view",
     "invoice_detail_view",
     "invoice_send_view",
