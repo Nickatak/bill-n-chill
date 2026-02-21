@@ -10,6 +10,7 @@ from rest_framework.response import Response
 
 from core.models import Budget, BudgetLine, ChangeOrder, ChangeOrderLine, Estimate, FinancialAuditEvent, Project
 from core.serializers import ChangeOrderSerializer, ChangeOrderWriteSerializer
+from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
     _get_active_budget_for_project,
     _next_change_order_number,
@@ -119,7 +120,7 @@ def project_change_orders_view(request, project_id: int):
         )
 
     line_map = {}
-    line_total_delta = Decimal("0.00")
+    line_total_delta = MONEY_ZERO
     if incoming_line_items:
         line_map, line_total_delta, line_error = _validate_change_order_lines(
             project=project,
@@ -224,8 +225,8 @@ def change_order_detail_view(request, change_order_id: int):
         )
 
     previous_status = change_order.status
-    current_amount_delta = Decimal(str(change_order.amount_delta))
-    next_amount_delta = Decimal(str(data.get("amount_delta", current_amount_delta)))
+    current_amount_delta = quantize_money(change_order.amount_delta)
+    next_amount_delta = quantize_money(data.get("amount_delta", current_amount_delta))
     status_changing = "status" in data
     next_status = data.get("status", previous_status)
     if status_changing and not _validate_change_order_status_transition(
@@ -243,11 +244,11 @@ def change_order_detail_view(request, change_order_id: int):
             status=400,
         )
 
-    financial_delta = Decimal("0")
+    financial_delta = MONEY_ZERO
     if previous_status != ChangeOrder.Status.APPROVED and next_status == ChangeOrder.Status.APPROVED:
         financial_delta = next_amount_delta
     elif previous_status == ChangeOrder.Status.APPROVED and next_status != ChangeOrder.Status.APPROVED:
-        financial_delta = current_amount_delta * Decimal("-1")
+        financial_delta = quantize_money(current_amount_delta * Decimal("-1"))
     elif (
         previous_status == ChangeOrder.Status.APPROVED
         and next_status == ChangeOrder.Status.APPROVED
@@ -256,7 +257,7 @@ def change_order_detail_view(request, change_order_id: int):
         financial_delta = next_amount_delta - current_amount_delta
 
     active_budget = None
-    if financial_delta != Decimal("0"):
+    if financial_delta != MONEY_ZERO:
         active_budget = _get_active_budget_for_project(
             project=change_order.project,
             user=request.user,
@@ -398,7 +399,7 @@ def change_order_detail_view(request, change_order_id: int):
                 line_items=incoming_line_items,
                 line_map=line_map,
             )
-        if financial_delta != Decimal("0"):
+        if financial_delta != MONEY_ZERO:
             Project.objects.filter(
                 id=change_order.project_id,
                 created_by=request.user,
@@ -408,9 +409,9 @@ def change_order_detail_view(request, change_order_id: int):
             Budget.objects.filter(id=active_budget.id).update(
                 approved_change_order_total=F("approved_change_order_total") + financial_delta,
             )
-        if previous_status != next_status or financial_delta != Decimal("0"):
+        if previous_status != next_status or financial_delta != MONEY_ZERO:
             event_note = "Change order status updated."
-            if financial_delta != Decimal("0"):
+            if financial_delta != MONEY_ZERO:
                 event_note = f"{event_note} Financial delta applied: {financial_delta}."
             _record_financial_audit_event(
                 project=change_order.project,
@@ -531,14 +532,14 @@ def change_order_clone_revision_view(request, change_order_id: int):
 
 def _validate_change_order_lines(*, project, line_items):
     if not line_items:
-        return {}, Decimal("0.00"), None
+        return {}, MONEY_ZERO, None
 
     budget_line_ids = [int(row["budget_line"]) for row in line_items]
     unique_budget_line_ids = set(budget_line_ids)
     if len(unique_budget_line_ids) != len(budget_line_ids):
         return (
             {},
-            Decimal("0.00"),
+            MONEY_ZERO,
             Response(
                 {
                     "error": {
@@ -562,7 +563,7 @@ def _validate_change_order_lines(*, project, line_items):
     if len(line_map) != len(unique_budget_line_ids):
         return (
             {},
-            Decimal("0.00"),
+            MONEY_ZERO,
             Response(
                 {
                     "error": {
@@ -575,7 +576,9 @@ def _validate_change_order_lines(*, project, line_items):
             ),
         )
 
-    total = sum((Decimal(str(row["amount_delta"])) for row in line_items), Decimal("0.00"))
+    total = MONEY_ZERO
+    for row in line_items:
+        total = quantize_money(total + Decimal(str(row["amount_delta"])))
     return line_map, total, None
 
 
@@ -587,7 +590,7 @@ def _sync_change_order_lines(*, change_order, line_items, line_map):
                 change_order=change_order,
                 budget_line=line_map[int(row["budget_line"])],
                 description=row.get("description", ""),
-                amount_delta=Decimal(str(row["amount_delta"])),
+                amount_delta=quantize_money(row["amount_delta"]),
                 days_delta=row.get("days_delta", 0),
             )
             for row in line_items

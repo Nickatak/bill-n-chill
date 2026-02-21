@@ -61,6 +61,7 @@ Key fields:
 - `company_id`
 - `customer_id`
 - `name`
+- `site_address` (job/site address; distinct from customer billing address)
 - `status` (`prospect`, `active`, `on_hold`, `completed`, `cancelled`)
 - `contract_value_original`
 - `contract_value_current`

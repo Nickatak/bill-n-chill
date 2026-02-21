@@ -12,7 +12,13 @@ from core.models.invoices import (
 )
 from core.models.payments import Payment, PaymentAllocation
 from core.models.projects import CostCode, Project
-from core.models.organizations import Organization, OrganizationMembership
+from core.models.organizations import (
+    Organization,
+    OrganizationMembership,
+    Permission,
+    RoleTemplate,
+    RoleTemplatePermission,
+)
 from core.models.vendors import Vendor
 
 __all__ = [
@@ -22,6 +28,9 @@ __all__ = [
     "CostCode",
     "Organization",
     "OrganizationMembership",
+    "Permission",
+    "RoleTemplate",
+    "RoleTemplatePermission",
     "Vendor",
     "Estimate",
     "EstimateLineItem",

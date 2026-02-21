@@ -57,7 +57,7 @@ export function ContactsConsole() {
   }
 
   async function loadContacts(searchQuery: string) {
-    setStatusMessage("Loading contacts...");
+    setStatusMessage("Loading customers...");
     try {
       const params = new URLSearchParams();
       if (searchQuery.trim()) {
@@ -69,7 +69,7 @@ export function ContactsConsole() {
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setStatusMessage(payload.error?.message ?? "Could not load contacts.");
+        setStatusMessage(payload.error?.message ?? "Could not load customers.");
         return;
       }
 
@@ -87,9 +87,9 @@ export function ContactsConsole() {
         setSelectedId("");
         clearForm();
       }
-      setStatusMessage(`Loaded ${items.length} contact(s).`);
+      setStatusMessage(`Loaded ${items.length} customer(s).`);
     } catch {
-      setStatusMessage("Could not reach contacts endpoint.");
+      setStatusMessage("Could not reach customers endpoint.");
     }
   }
 
@@ -117,11 +117,11 @@ export function ContactsConsole() {
     event.preventDefault();
     const contactId = Number(selectedId);
     if (!contactId) {
-      setStatusMessage("Select a contact first.");
+      setStatusMessage("Select a customer first.");
       return;
     }
 
-    setStatusMessage("Saving contact...");
+    setStatusMessage("Saving customer...");
 
     try {
       const response = await fetch(`${normalizedBaseUrl}/contacts/${contactId}/`, {
@@ -151,25 +151,25 @@ export function ContactsConsole() {
         current.map((entry) => (entry.id === updated.id ? updated : entry)),
       );
       hydrate(updated);
-      setStatusMessage(`Saved contact #${updated.id}.`);
+      setStatusMessage(`Saved customer #${updated.id}.`);
     } catch {
-      setStatusMessage("Could not reach contact detail endpoint.");
+      setStatusMessage("Could not reach customer detail endpoint.");
     }
   }
 
   async function handleDelete() {
     const contactId = Number(selectedId);
     if (!contactId) {
-      setStatusMessage("Select a contact first.");
+      setStatusMessage("Select a customer first.");
       return;
     }
 
-    const confirmed = window.confirm(`Delete contact #${contactId}? This cannot be undone.`);
+    const confirmed = window.confirm(`Delete customer #${contactId}? This cannot be undone.`);
     if (!confirmed) {
       return;
     }
 
-    setStatusMessage("Deleting contact...");
+    setStatusMessage("Deleting customer...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/contacts/${contactId}/`, {
         method: "DELETE",
@@ -200,16 +200,16 @@ export function ContactsConsole() {
         }
         return nextRows;
       });
-      setStatusMessage(`Deleted contact #${contactId}.`);
+      setStatusMessage(`Deleted customer #${contactId}.`);
     } catch {
-      setStatusMessage("Could not reach contact detail endpoint.");
+      setStatusMessage("Could not reach customer detail endpoint.");
     }
   }
 
   return (
     <section>
-      <h2>Contacts Management</h2>
-      <p>Search, review, and edit captured contacts outside the core money workflow.</p>
+      <h2>Customers Management</h2>
+      <p>Search, review, and edit canonical customer records outside the core money workflow.</p>
       <p>{authMessage}</p>
 
       <label>
@@ -236,7 +236,7 @@ export function ContactsConsole() {
 
       {filteredRows.length > 0 ? (
         <>
-          <p>Contacts</p>
+          <p>Customers</p>
           <ul style={{ display: "grid", gap: 6, listStyle: "none", padding: 0, margin: 0 }}>
             {filteredRows.map((row) => {
               const isActive = selectedId === String(row.id);
@@ -269,15 +269,15 @@ export function ContactsConsole() {
           </ul>
         </>
       ) : rows.length > 0 ? (
-        <p>No contacts match the selected activity filter.</p>
+        <p>No customers match the selected activity filter.</p>
       ) : query ? (
-        <p>No contacts matched your search.</p>
+        <p>No customers matched your search.</p>
       ) : (
-        <p>No contacts yet.</p>
+        <p>No customers yet.</p>
       )}
 
       <form onSubmit={handleSave}>
-        <h3>Edit Contact</h3>
+        <h3>Edit Customer</h3>
         <label>
           Full name
           <input value={fullName} onChange={(event) => setFullName(event.target.value)} required />
@@ -327,9 +327,9 @@ export function ContactsConsole() {
           <textarea rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} />
         </label>
         <div style={{ display: "flex", gap: 8 }}>
-          <button type="submit" disabled={!selectedId}>Save Contact</button>
+          <button type="submit" disabled={!selectedId}>Save Customer</button>
           <button type="button" disabled={!selectedId} onClick={handleDelete}>
-            Delete Contact
+            Delete Customer
           </button>
         </div>
       </form>

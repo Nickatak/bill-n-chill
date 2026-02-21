@@ -14,6 +14,7 @@ from core.serializers import (
     PaymentSerializer,
     PaymentWriteSerializer,
 )
+from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
     _record_financial_audit_event,
     _role_gate_error_payload,
@@ -23,19 +24,19 @@ from core.views.helpers import (
 
 
 def _settled_allocated_total(payment: Payment) -> Decimal:
-    return (
+    return quantize_money(
         PaymentAllocation.objects.filter(
             payment=payment,
             payment__status=Payment.Status.SETTLED,
         ).aggregate(total=Sum("applied_amount")).get("total")
-        or Decimal("0")
+        or MONEY_ZERO
     )
 
 
 def _all_allocated_total(payment: Payment) -> Decimal:
-    return (
+    return quantize_money(
         PaymentAllocation.objects.filter(payment=payment).aggregate(total=Sum("applied_amount")).get("total")
-        or Decimal("0")
+        or MONEY_ZERO
     )
 
 
@@ -48,15 +49,15 @@ def _set_invoice_balance_from_allocations(invoice: Invoice):
         or Decimal("0")
     )
 
-    next_balance = Decimal(str(invoice.total)) - applied_total
-    if next_balance < Decimal("0"):
-        next_balance = Decimal("0")
+    next_balance = quantize_money(Decimal(str(invoice.total)) - applied_total)
+    if next_balance < MONEY_ZERO:
+        next_balance = MONEY_ZERO
 
     update_fields = ["balance_due", "updated_at"]
     invoice.balance_due = next_balance
 
     if invoice.status != Invoice.Status.VOID:
-        if next_balance == Decimal("0"):
+        if next_balance == MONEY_ZERO:
             invoice.status = Invoice.Status.PAID
             update_fields.append("status")
         elif next_balance < Decimal(str(invoice.total)):
@@ -78,15 +79,15 @@ def _set_vendor_bill_balance_from_allocations(vendor_bill: VendorBill):
         or Decimal("0")
     )
 
-    next_balance = Decimal(str(vendor_bill.total)) - applied_total
-    if next_balance < Decimal("0"):
-        next_balance = Decimal("0")
+    next_balance = quantize_money(Decimal(str(vendor_bill.total)) - applied_total)
+    if next_balance < MONEY_ZERO:
+        next_balance = MONEY_ZERO
 
     update_fields = ["balance_due", "updated_at"]
     vendor_bill.balance_due = next_balance
 
     if vendor_bill.status != VendorBill.Status.VOID:
-        if next_balance == Decimal("0"):
+        if next_balance == MONEY_ZERO:
             vendor_bill.status = VendorBill.Status.PAID
             update_fields.append("status")
         elif vendor_bill.status == VendorBill.Status.PAID:
@@ -361,7 +362,7 @@ def payment_allocate_view(request, payment_id: int):
         )
 
     fields = {}
-    new_total = Decimal("0")
+    new_total = MONEY_ZERO
     resolved_targets = []
 
     for index, row in enumerate(allocations_data):
@@ -419,7 +420,7 @@ def payment_allocate_view(request, payment_id: int):
                 continue
             resolved_targets.append((row, None, target))
 
-        new_total += Decimal(str(row["applied_amount"]))
+        new_total = quantize_money(new_total + Decimal(str(row["applied_amount"])))
 
     if fields:
         return Response(
@@ -434,7 +435,7 @@ def payment_allocate_view(request, payment_id: int):
         )
 
     existing_total = _all_allocated_total(payment)
-    max_allocatable = Decimal(str(payment.amount)) - existing_total
+    max_allocatable = quantize_money(Decimal(str(payment.amount)) - existing_total)
     if new_total > max_allocatable:
         return Response(
             {

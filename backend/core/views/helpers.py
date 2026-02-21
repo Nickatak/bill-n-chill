@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth.models import Group
+from django.db.models import Q
 from django.db.models import Sum
 from django.utils.text import slugify
 
@@ -22,6 +23,7 @@ from core.models import (
     OrganizationMembership,
     VendorBill,
 )
+from core.utils.money import MONEY_ZERO, quantize_money
 
 ALLOWED_ESTIMATE_STATUS_TRANSITIONS = {
     Estimate.Status.DRAFT: {
@@ -205,6 +207,15 @@ def _next_org_slug(seed: str) -> str:
     return candidate
 
 
+def _legacy_group_role(user) -> str | None:
+    group_names = set(Group.objects.filter(user=user).values_list("name", flat=True))
+    normalized_names = {_normalize_legacy_role(name.strip().lower()) for name in group_names}
+    for role in RBAC_ROLE_PRECEDENCE:
+        if role in normalized_names:
+            return role
+    return None
+
+
 def _ensure_primary_membership(user):
     membership = (
         OrganizationMembership.objects.select_related("organization")
@@ -222,10 +233,11 @@ def _ensure_primary_membership(user):
         slug=_next_org_slug((user.email or user.username or f"user-{user.id}").split("@")[0]),
         created_by=user,
     )
+    bootstrap_role = _legacy_group_role(user) or OrganizationMembership.Role.OWNER
     return OrganizationMembership.objects.create(
         organization=organization,
         user=user,
-        role=OrganizationMembership.Role.OWNER,
+        role=bootstrap_role,
         status=OrganizationMembership.Status.ACTIVE,
     )
 
@@ -242,13 +254,9 @@ def _resolve_user_role(user) -> str:
     if membership:
         return _normalize_legacy_role(membership.role)
 
-    user_group_names = set(
-        Group.objects.filter(user=user).values_list("name", flat=True)
-    )
-    normalized_names = {_normalize_legacy_role(name.strip().lower()) for name in user_group_names}
-    for role in RBAC_ROLE_PRECEDENCE:
-        if role in normalized_names:
-            return role
+    legacy_role = _legacy_group_role(user)
+    if legacy_role:
+        return legacy_role
     # Backward compatibility for existing users without explicit role assignment.
     return RBAC_ROLE_OWNER
 
@@ -275,8 +283,8 @@ def _role_gate_error_payload(user, allowed_roles):
 
 
 def _calculate_line_totals(line_items_data):
-    subtotal = Decimal("0")
-    markup_total = Decimal("0")
+    subtotal = MONEY_ZERO
+    markup_total = MONEY_ZERO
     normalized_items = []
 
     for item in line_items_data:
@@ -285,11 +293,11 @@ def _calculate_line_totals(line_items_data):
         markup_percent = Decimal(str(item.get("markup_percent", 0)))
         # Markup can be applied before or after quantity multiplication:
         # q * u * (1 + m) == q * (u * (1 + m))
-        base_total = quantity * unit_cost
-        line_markup = base_total * (markup_percent / Decimal("100"))
-        line_total = base_total + line_markup
-        subtotal += base_total
-        markup_total += line_markup
+        base_total = quantize_money(quantity * unit_cost)
+        line_markup = quantize_money(base_total * (markup_percent / Decimal("100")))
+        line_total = quantize_money(base_total + line_markup)
+        subtotal = quantize_money(subtotal + base_total)
+        markup_total = quantize_money(markup_total + line_markup)
         normalized_items.append(
             {
                 **item,
@@ -305,7 +313,15 @@ def _calculate_line_totals(line_items_data):
 
 def _resolve_cost_codes_for_user(user, line_items_data):
     ids = [item["cost_code"] for item in line_items_data]
-    codes = CostCode.objects.filter(created_by=user, id__in=ids)
+    membership = _ensure_primary_membership(user)
+    codes = CostCode.objects.filter(
+        id__in=ids,
+    ).filter(
+        Q(organization_id=membership.organization_id) | Q(
+            organization__isnull=True,
+            created_by=user,
+        )
+    )
     code_map = {code.id: code for code in codes}
     missing = [cost_code_id for cost_code_id in ids if cost_code_id not in code_map]
     return code_map, missing
@@ -318,8 +334,8 @@ def _apply_estimate_lines_and_totals(estimate, line_items_data, tax_percent, use
         return {"missing_cost_codes": missing}
 
     tax_percent = Decimal(str(tax_percent))
-    tax_total = (subtotal + markup_total) * (tax_percent / Decimal("100"))
-    grand_total = subtotal + markup_total + tax_total
+    tax_total = quantize_money((subtotal + markup_total) * (tax_percent / Decimal("100")))
+    grand_total = quantize_money(subtotal + markup_total + tax_total)
 
     estimate.line_items.all().delete()
     new_lines = []
@@ -456,7 +472,7 @@ def _project_billable_invoices_total(*, project, user, exclude_invoice_id=None):
     )
     if exclude_invoice_id:
         query = query.exclude(id=exclude_invoice_id)
-    return query.aggregate(total=Sum("total")).get("total") or Decimal("0")
+    return quantize_money(query.aggregate(total=Sum("total")).get("total") or MONEY_ZERO)
 
 
 def _enforce_invoice_scope_guard(
@@ -478,12 +494,12 @@ def _enforce_invoice_scope_guard(
         user=user,
         exclude_invoice_id=invoice.id,
     )
-    projected_billed_total = already_billed + Decimal(str(candidate_total))
+    projected_billed_total = quantize_money(already_billed + Decimal(str(candidate_total)))
 
     if projected_billed_total <= approved_scope_limit:
         return None
 
-    overage_amount = projected_billed_total - approved_scope_limit
+    overage_amount = quantize_money(projected_billed_total - approved_scope_limit)
     if not scope_override:
         return {
             "error": {
@@ -565,14 +581,14 @@ def _get_active_budget_for_project(*, project, user):
 
 
 def _calculate_invoice_line_totals(line_items_data):
-    subtotal = Decimal("0")
+    subtotal = MONEY_ZERO
     normalized_items = []
 
     for item in line_items_data:
         quantity = Decimal(str(item["quantity"]))
         unit_price = Decimal(str(item["unit_price"]))
-        line_total = quantity * unit_price
-        subtotal += line_total
+        line_total = quantize_money(quantity * unit_price)
+        subtotal = quantize_money(subtotal + line_total)
         normalized_items.append(
             {
                 **item,
@@ -590,7 +606,15 @@ def _resolve_invoice_cost_codes_for_user(user, line_items_data):
     if not ids:
         return {}, []
 
-    codes = CostCode.objects.filter(created_by=user, id__in=ids)
+    membership = _ensure_primary_membership(user)
+    codes = CostCode.objects.filter(
+        id__in=ids,
+    ).filter(
+        Q(organization_id=membership.organization_id) | Q(
+            organization__isnull=True,
+            created_by=user,
+        )
+    )
     code_map = {code.id: code for code in codes}
     missing = [cost_code_id for cost_code_id in ids if cost_code_id not in code_map]
     return code_map, missing
@@ -603,8 +627,8 @@ def _apply_invoice_lines_and_totals(invoice, line_items_data, tax_percent, user)
         return {"missing_cost_codes": missing}
 
     tax_percent = Decimal(str(tax_percent))
-    tax_total = subtotal * (tax_percent / Decimal("100"))
-    total = subtotal + tax_total
+    tax_total = quantize_money(subtotal * (tax_percent / Decimal("100")))
+    total = quantize_money(subtotal + tax_total)
 
     invoice.line_items.all().delete()
     new_lines = []
@@ -628,7 +652,7 @@ def _apply_invoice_lines_and_totals(invoice, line_items_data, tax_percent, user)
     invoice.tax_percent = tax_percent
     invoice.tax_total = tax_total
     invoice.total = total
-    invoice.balance_due = Decimal("0") if invoice.status == Invoice.Status.PAID else total
+    invoice.balance_due = MONEY_ZERO if invoice.status == Invoice.Status.PAID else total
     invoice.save(
         update_fields=[
             "subtotal",

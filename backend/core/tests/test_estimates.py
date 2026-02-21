@@ -118,6 +118,32 @@ class EstimateTests(TestCase):
         self.assertEqual(str(estimate.subtotal), "1000.00")
         self.assertEqual(str(estimate.markup_total), "100.00")
 
+    def test_project_estimates_create_rounds_tax_half_up_to_cents(self):
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Rounding Estimate",
+                "tax_percent": "10.00",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Tiny taxable line",
+                        "quantity": "1",
+                        "unit": "ea",
+                        "unit_cost": "0.05",
+                        "markup_percent": "0.00",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["data"]
+        self.assertEqual(payload["subtotal"], "0.05")
+        self.assertEqual(payload["tax_total"], "0.01")
+        self.assertEqual(payload["grand_total"], "0.06")
+
     def test_project_estimates_create_requires_title(self):
         missing = self.client.post(
             f"/api/v1/projects/{self.project.id}/estimates/",

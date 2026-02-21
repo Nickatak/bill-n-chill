@@ -287,6 +287,7 @@ def convert_lead_to_project_view(request, lead_id: int):
     project = Project.objects.create(
         customer=customer,
         name=project_name,
+        site_address=lead.project_address,
         status=data.get("project_status", Project.Status.PROSPECT),
         contract_value_original=lead.initial_contract_value or 0,
         contract_value_current=lead.initial_contract_value or 0,

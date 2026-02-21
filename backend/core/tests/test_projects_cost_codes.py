@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from django.contrib.auth.models import Group
+from django.core.exceptions import ValidationError
 from core.tests.common import *
 from django.utils import timezone
 
@@ -59,12 +60,14 @@ class ProjectProfileTests(TestCase):
         projects = response.json()["data"]
         self.assertEqual(len(projects), 1)
         self.assertEqual(projects[0]["name"], "Basement Remodel")
+        self.assertIn("site_address", projects[0])
 
     def test_project_patch_updates_profile_fields(self):
         response = self.client.patch(
             f"/api/v1/projects/{self.project.id}/",
             data={
                 "status": "active",
+                "site_address": "7 Job Site Ln",
                 "start_date_planned": "2026-03-01",
                 "end_date_planned": "2026-07-31",
             },
@@ -75,10 +78,35 @@ class ProjectProfileTests(TestCase):
 
         self.project.refresh_from_db()
         self.assertEqual(self.project.status, Project.Status.ACTIVE)
+        self.assertEqual(self.project.site_address, "7 Job Site Ln")
         self.assertEqual(str(self.project.contract_value_original), "0.00")
         self.assertEqual(str(self.project.contract_value_current), "0.00")
         self.assertEqual(str(self.project.start_date_planned), "2026-03-01")
         self.assertEqual(str(self.project.end_date_planned), "2026-07-31")
+
+    def test_project_patch_returns_not_found_for_other_users_project(self):
+        other_project = Project.objects.exclude(created_by=self.user).first()
+        response = self.client.patch(
+            f"/api/v1/projects/{other_project.id}/",
+            data={"name": "Should Not Update"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_project_patch_site_address_does_not_modify_customer_billing_address(self):
+        original_billing_address = self.customer.billing_address
+        response = self.client.patch(
+            f"/api/v1/projects/{self.project.id}/",
+            data={"site_address": "55 Jobsite Way"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.project.refresh_from_db()
+        self.customer.refresh_from_db()
+        self.assertEqual(self.project.site_address, "55 Jobsite Way")
+        self.assertEqual(self.customer.billing_address, original_billing_address)
 
     def test_project_patch_rejects_contract_value_original_change(self):
         response = self.client.patch(
@@ -206,7 +234,75 @@ class CostCodeTests(TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["code"], "01-100")
 
+    def test_cost_codes_list_includes_rows_created_by_other_user_in_same_org(self):
+        shared_org = Organization.objects.create(
+            display_name="Shared Org",
+            slug="shared-org-cost-codes",
+            created_by=self.user,
+        )
+        OrganizationMembership.objects.update_or_create(
+            user=self.user,
+            defaults={
+                "organization": shared_org,
+                "role": OrganizationMembership.Role.OWNER,
+                "status": OrganizationMembership.Status.ACTIVE,
+            },
+        )
+        OrganizationMembership.objects.update_or_create(
+            user=self.other_user,
+            defaults={
+                "organization": shared_org,
+                "role": OrganizationMembership.Role.PM,
+                "status": OrganizationMembership.Status.ACTIVE,
+            },
+        )
+        self.code.organization = shared_org
+        self.code.save(update_fields=["organization"])
+
+        shared_org_code = CostCode.objects.create(
+            code="03-300",
+            name="Shared Org Code",
+            is_active=True,
+            organization=shared_org,
+            created_by=self.other_user,
+        )
+        other_isolated_org = Organization.objects.create(
+            display_name="Isolated Org",
+            slug="isolated-org-cost-codes",
+            created_by=self.other_user,
+        )
+        isolated_org_code = CostCode.objects.create(
+            code="04-400",
+            name="Isolated Org Code",
+            is_active=True,
+            organization=other_isolated_org,
+            created_by=self.other_user,
+        )
+
+        response = self.client.get(
+            "/api/v1/cost-codes/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        rows = response.json()["data"]
+        returned_ids = {row["id"] for row in rows}
+        self.assertIn(self.code.id, returned_ids)
+        self.assertIn(shared_org_code.id, returned_ids)
+        self.assertNotIn(isolated_org_code.id, returned_ids)
+
     def test_cost_code_create(self):
+        membership = OrganizationMembership.objects.update_or_create(
+            user=self.user,
+            defaults={
+                "organization": Organization.objects.create(
+                    display_name="Cost Code Org",
+                    slug="cost-code-org-tests",
+                    created_by=self.user,
+                ),
+                "role": OrganizationMembership.Role.OWNER,
+                "status": OrganizationMembership.Status.ACTIVE,
+            },
+        )[0]
         response = self.client.post(
             "/api/v1/cost-codes/",
             data={"code": "03-300", "name": "Site Work", "is_active": True},
@@ -214,6 +310,8 @@ class CostCodeTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 201)
+        created_code = CostCode.objects.get(id=response.json()["data"]["id"])
+        self.assertEqual(created_code.organization_id, membership.organization_id)
         self.assertEqual(CostCode.objects.filter(created_by=self.user).count(), 2)
 
     def test_cost_code_patch(self):
@@ -227,6 +325,31 @@ class CostCodeTests(TestCase):
         self.code.refresh_from_db()
         self.assertEqual(self.code.name, "General Conditions Updated")
         self.assertFalse(self.code.is_active)
+        self.assertEqual(self.code.code, "01-100")
+
+    def test_cost_code_patch_rejects_code_change(self):
+        response = self.client.patch(
+            f"/api/v1/cost-codes/{self.code.id}/",
+            data={"code": "99-999"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "validation_error")
+        self.assertIn("code", payload["error"]["fields"])
+        self.code.refresh_from_db()
+        self.assertEqual(self.code.code, "01-100")
+
+    def test_cost_code_delete_is_blocked_by_policy(self):
+        with self.assertRaises(ValidationError):
+            self.code.delete()
+        self.assertTrue(CostCode.objects.filter(id=self.code.id).exists())
+
+    def test_cost_code_queryset_delete_is_blocked_by_policy(self):
+        with self.assertRaises(ValidationError):
+            CostCode.objects.filter(id=self.code.id).delete()
+        self.assertTrue(CostCode.objects.filter(id=self.code.id).exists())
 
     def test_cost_code_csv_import_preview_and_apply(self):
         preview = self.client.post(

@@ -105,6 +105,33 @@ class InvoiceTests(TestCase):
         self.assertEqual(Invoice.objects.count(), 1)
         self.assertEqual(InvoiceLine.objects.count(), 1)
 
+    def test_invoice_create_rounds_tax_half_up_to_cents(self):
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/invoices/",
+            data={
+                "issue_date": "2026-02-13",
+                "due_date": "2026-03-15",
+                "tax_percent": "10.00",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Tiny taxable draw",
+                        "quantity": "1",
+                        "unit": "ea",
+                        "unit_price": "0.05",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["data"]
+        self.assertEqual(payload["subtotal"], "0.05")
+        self.assertEqual(payload["tax_total"], "0.01")
+        self.assertEqual(payload["total"], "0.06")
+        self.assertEqual(payload["balance_due"], "0.06")
+
     def test_project_invoices_list_scoped_by_project_and_user(self):
         self._create_invoice()
 

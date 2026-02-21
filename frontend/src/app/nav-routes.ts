@@ -40,7 +40,7 @@ export const workflowRoutes: NavRoute[] = [
 
 export const opsMetaRoutes: NavRoute[] = [
   { href: "/ops/meta", label: "Notes", exact: ["/ops/meta"] },
-  { href: "/contacts", label: "Contacts", exact: ["/contacts"] },
+  { href: "/contacts", label: "Customers", exact: ["/contacts"] },
   { href: "/vendors", label: "Vendors", exact: ["/vendors"] },
   { href: "/cost-codes", label: "Cost Codes", exact: ["/cost-codes"] },
   {

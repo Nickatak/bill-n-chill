@@ -1,38 +1,69 @@
 import csv
 from io import StringIO
 
+from django.db.models import Q
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.models import CostCode
 from core.serializers import CostCodeSerializer
-from core.views.helpers import _role_gate_error_payload
+from core.views.helpers import _ensure_primary_membership, _role_gate_error_payload
+
+
+def _cost_code_scope_filter(user):
+    membership = _ensure_primary_membership(user)
+    return Q(organization_id=membership.organization_id) | Q(
+        organization__isnull=True,
+        created_by=user,
+    )
 
 
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def cost_codes_list_create_view(request):
+    scope_filter = _cost_code_scope_filter(request.user)
     if request.method == "GET":
-        rows = CostCode.objects.filter(created_by=request.user).order_by("code", "name")
+        rows = CostCode.objects.filter(scope_filter).order_by("code", "name")
         return Response({"data": CostCodeSerializer(rows, many=True).data})
 
     serializer = CostCodeSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
-    code = serializer.save(created_by=request.user)
+    membership = _ensure_primary_membership(request.user)
+    code = serializer.save(
+        created_by=request.user,
+        organization_id=membership.organization_id,
+    )
     return Response({"data": CostCodeSerializer(code).data}, status=201)
 
 
 @api_view(["PATCH"])
 @permission_classes([IsAuthenticated])
 def cost_code_detail_view(request, cost_code_id: int):
+    scope_filter = _cost_code_scope_filter(request.user)
     try:
-        row = CostCode.objects.get(id=cost_code_id, created_by=request.user)
+        row = CostCode.objects.get(scope_filter, id=cost_code_id)
     except CostCode.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Cost code not found.", "fields": {}}},
             status=404,
         )
+
+    if "code" in request.data:
+        incoming_code = str(request.data.get("code", "")).strip()
+        if incoming_code and incoming_code != row.code:
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "code is immutable after creation.",
+                        "fields": {
+                            "code": ["Cost code identifier cannot be changed after creation."]
+                        },
+                    }
+                },
+                status=400,
+            )
 
     serializer = CostCodeSerializer(row, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
@@ -46,6 +77,9 @@ def cost_codes_import_csv_view(request):
     permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
     if permission_error:
         return Response(permission_error, status=403)
+
+    scope_filter = _cost_code_scope_filter(request.user)
+    membership = _ensure_primary_membership(request.user)
 
     csv_text = request.data.get("csv_text", "")
     dry_run = bool(request.data.get("dry_run", True))
@@ -124,7 +158,7 @@ def cost_codes_import_csv_view(request):
             )
             continue
         is_active = is_active_raw in {"true", "1", "yes"}
-        existing = CostCode.objects.filter(created_by=request.user, code__iexact=code).first()
+        existing = CostCode.objects.filter(scope_filter, code__iexact=code).first()
         if existing:
             if dry_run:
                 rows_out.append(
@@ -168,6 +202,7 @@ def cost_codes_import_csv_view(request):
         else:
             CostCode.objects.create(
                 created_by=request.user,
+                organization_id=membership.organization_id,
                 code=code,
                 name=name,
                 is_active=is_active,
@@ -197,3 +232,5 @@ def cost_codes_import_csv_view(request):
             }
         }
     )
+    scope_filter = _cost_code_scope_filter(request.user)
+    membership = _ensure_primary_membership(request.user)

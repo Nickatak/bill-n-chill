@@ -7,10 +7,23 @@ User = get_user_model()
 class LeadContact(models.Model):
     """Pre-project intake record captured before a customer/project exists.
 
-    Business workflow:
-    - Created quickly in the field/office as the first sales-contact artifact.
+    Workflow role:
+    - Created quickly in the field/office as the first sales-contact entity.
+    - Captures intake analytics context (who captured it, when, and intake source/channel).
     - May be duplicate-resolved before progressing.
-    - Can be converted into a Customer + Project shell.
+    - Can be converted into a Customer + Project shell when intake is qualified.
+
+    Current policy:
+    - Lead conversion is intended to be idempotent at the API layer.
+    - Converted leads keep references to created/reused customer and project shell.
+
+    Notes:
+    - `initial_contract_value` is optional intake-time context and may be used when
+      creating the project baseline during conversion.
+    - `status` currently has minimal UX usage and is primarily lifecycle scaffolding.
+      Full status-driven lead handling is deferred until intake workflow expansion.
+    - `source` is currently low-impact metadata; richer usage is deferred until
+      importer/integration workflows (for example CRM or form ingestion) are expanded.
     """
 
     class Status(models.TextChoices):
@@ -82,9 +95,17 @@ class LeadContact(models.Model):
 class Customer(models.Model):
     """Client/owner account that owns one or more projects.
 
-    Business workflow:
+    Workflow role:
+    - Canonical contact-representation object used by the Contacts management page.
     - Usually created/reused during lead conversion.
     - Serves as the customer anchor for projects and owner invoices.
+
+    Current policy:
+    - Customer records are user-scoped via `created_by` in current implementation.
+    - `billing_address` is billing-only and intentionally separate from
+      project-level `site_address`/service location data.
+    - Deduplication/reuse behavior is handled by intake conversion logic, not by
+      a hard unique constraint on this model.
     """
 
     display_name = models.CharField(max_length=255)

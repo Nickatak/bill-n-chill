@@ -242,9 +242,11 @@ class LeadConversionTests(TestCase):
         self.assertEqual(Project.objects.count(), 1)
 
         self.lead.refresh_from_db()
+        project = Project.objects.get(id=self.lead.converted_project_id)
         self.assertEqual(self.lead.status, LeadContact.Status.PROJECT_CREATED)
         self.assertIsNotNone(self.lead.converted_customer_id)
         self.assertIsNotNone(self.lead.converted_project_id)
+        self.assertEqual(project.site_address, "321 Build St")
         self.assertEqual(response.json()["meta"]["conversion_status"], "converted")
 
     def test_convert_uses_initial_contract_value_when_present(self):
@@ -281,3 +283,26 @@ class LeadConversionTests(TestCase):
         self.assertEqual(second.json()["meta"]["conversion_status"], "already_converted")
         self.assertEqual(Customer.objects.count(), 1)
         self.assertEqual(Project.objects.count(), 1)
+
+    def test_convert_reused_customer_keeps_billing_address_and_sets_project_site_address(self):
+        existing_customer = Customer.objects.create(
+            display_name="Owner Name",
+            email="owner@example.com",
+            phone="555-9999",
+            billing_address="777 Billing Blvd",
+            created_by=self.user,
+        )
+
+        response = self.client.post(
+            f"/api/v1/lead-contacts/{self.lead.id}/convert-to-project/",
+            data={"project_name": "Property B"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+
+        project = Project.objects.get(id=response.json()["data"]["project"]["id"])
+        existing_customer.refresh_from_db()
+        self.assertEqual(project.customer_id, existing_customer.id)
+        self.assertEqual(project.site_address, "321 Build St")
+        self.assertEqual(existing_customer.billing_address, "777 Billing Blvd")

@@ -6,14 +6,14 @@ export default function ContactsPage() {
     <div className={styles.page}>
       <main className={styles.main}>
         <header className={styles.header}>
-          <h1>Contacts: View + Edit</h1>
+          <h1>Customers: View + Edit</h1>
           <p>
             This non-workflow route gives operations users a dedicated place to inspect and
-            correct captured contact records.
+            correct customer records.
           </p>
           <p>
-            It supports debugging and data hygiene by letting you search and patch lead fields
-            without running through the full intake flow again.
+            It supports debugging and data hygiene by letting you search and patch canonical
+            client data without rerunning the full intake flow.
           </p>
         </header>
         <section className={styles.card}>

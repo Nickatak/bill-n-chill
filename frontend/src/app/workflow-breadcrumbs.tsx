@@ -106,7 +106,7 @@ const hierarchyRules: HierarchyRule[] = [
     crumbs: [
       PROJECTS_HUB_CRUMB,
       { href: "/contacts", label: "Meta" },
-      { href: "/contacts", label: "Contacts" },
+      { href: "/contacts", label: "Customers" },
     ],
   },
   {

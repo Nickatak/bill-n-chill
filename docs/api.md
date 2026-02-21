@@ -26,6 +26,13 @@ Error:
 }
 ```
 
+## Money Precision Policy
+
+- All persisted money values are currency precision (`2` decimal places).
+- All server-side computed money values are quantized with `ROUND_HALF_UP` to `$0.01`.
+- This applies to estimate, invoice, payment allocation, change-order, and vendor-bill calculations.
+- Contract: API money responses must always serialize as fixed two-decimal strings (example: `"1000.00"`).
+
 ## Initial Endpoint Plan
 
 - `GET /api/v1/health/`
@@ -129,7 +136,7 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
       - allowed: `prospect`, `active`, `on_hold`, `completed`, `cancelled`
   - Behavior:
     - creates or reuses a matching `Customer`
-    - creates a `Project` shell
+    - creates a `Project` shell (job `site_address` seeded from lead `project_address`)
     - marks lead as `project_created` and stores conversion links
   - Idempotency:
     - If lead is already converted, returns existing customer/project with `meta.conversion_status = "already_converted"`.
@@ -149,6 +156,7 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
   - Supports profile updates:
     - `name`
     - `status`
+    - `site_address`
     - `contract_value_original`
     - `contract_value_current`
     - `start_date_planned`

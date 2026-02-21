@@ -10,6 +10,7 @@ from rest_framework.response import Response
 
 from core.models import BudgetLine, FinancialAuditEvent, Vendor, VendorBill, VendorBillAllocation
 from core.serializers import VendorBillSerializer, VendorBillWriteSerializer
+from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
     _record_financial_audit_event,
     _role_gate_error_payload,
@@ -43,9 +44,9 @@ def _find_duplicate_vendor_bills(
 def _allocation_total(*, vendor_bill):
     total = (
         VendorBillAllocation.objects.filter(vendor_bill=vendor_bill).aggregate(sum=Sum("amount"))["sum"]
-        or Decimal("0")
+        or MONEY_ZERO
     )
-    return Decimal(str(total))
+    return quantize_money(total)
 
 
 def _validate_allocation_budget_lines(*, project, user, allocations):
@@ -172,7 +173,7 @@ def project_vendor_bills_view(request, project_id: int):
             status=409,
         )
 
-    total = Decimal(str(data["total"]))
+    total = quantize_money(data["total"])
     scheduled_for = data.get("scheduled_for")
     allocations = data.get("allocations", [])
     if allocations:
@@ -192,7 +193,9 @@ def project_vendor_bills_view(request, project_id: int):
                 },
                 status=400,
             )
-        allocation_total = sum((entry["amount"] for entry in allocations), Decimal("0"))
+        allocation_total = MONEY_ZERO
+        for entry in allocations:
+            allocation_total = quantize_money(allocation_total + entry["amount"])
         if allocation_total > total:
             return Response(
                 {
@@ -372,9 +375,9 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
             status=400,
         )
 
-    candidate_total = Decimal(str(data.get("total", vendor_bill.total)))
+    candidate_total = quantize_money(data.get("total", vendor_bill.total))
     candidate_balance_due = (
-        Decimal("0") if next_status == VendorBill.Status.PAID else candidate_total
+        MONEY_ZERO if next_status == VendorBill.Status.PAID else candidate_total
     )
     allocations = data.get("allocations")
     if allocations is not None:
@@ -394,7 +397,9 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
                 },
                 status=400,
             )
-        allocation_total = sum((entry["amount"] for entry in allocations), Decimal("0"))
+        allocation_total = MONEY_ZERO
+        for entry in allocations:
+            allocation_total = quantize_money(allocation_total + entry["amount"])
     else:
         allocation_total = _allocation_total(vendor_bill=vendor_bill)
 

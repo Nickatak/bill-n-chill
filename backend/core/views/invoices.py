@@ -9,6 +9,7 @@ from rest_framework.response import Response
 
 from core.models import FinancialAuditEvent, Invoice
 from core.serializers import InvoiceScopeOverrideSerializer, InvoiceSerializer, InvoiceWriteSerializer
+from core.utils.money import quantize_money
 from core.views.helpers import (
     _apply_invoice_lines_and_totals,
     _calculate_invoice_line_totals,
@@ -224,8 +225,8 @@ def invoice_detail_view(request, invoice_id: int):
     if totals_changing:
         _, candidate_subtotal = _calculate_invoice_line_totals(line_items_for_preview)
         candidate_tax_percent = Decimal(str(data.get("tax_percent", invoice.tax_percent)))
-        candidate_tax_total = candidate_subtotal * (candidate_tax_percent / Decimal("100"))
-        candidate_total = candidate_subtotal + candidate_tax_total
+        candidate_tax_total = quantize_money(candidate_subtotal * (candidate_tax_percent / Decimal("100")))
+        candidate_total = quantize_money(candidate_subtotal + candidate_tax_total)
 
     status_is_entering_billable = _is_billable_invoice_status(next_status) and not _is_billable_invoice_status(
         invoice.status
