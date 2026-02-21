@@ -98,6 +98,8 @@ export type ApiResponse = {
     | ProjectRecord[]
     | ProjectRecord
     | ProjectFinancialSummary
+    | PortfolioSnapshot
+    | ChangeImpactSummary
     | AccountingSyncEventRecord[]
     | AccountingSyncEventRecord
     | FinancialAuditEventRecord[];
@@ -109,4 +111,45 @@ export type ApiResponse = {
     message?: string;
     fields?: Record<string, string[]>;
   };
+};
+
+export type PortfolioProjectSnapshot = {
+  project_id: number;
+  project_name: string;
+  project_status: string;
+  ar_outstanding: string;
+  ap_outstanding: string;
+  approved_change_orders_total: string;
+};
+
+export type PortfolioSnapshot = {
+  generated_at: string;
+  date_filter: {
+    date_from: string;
+    date_to: string;
+  };
+  active_projects_count: number;
+  ar_total_outstanding: string;
+  ap_total_outstanding: string;
+  overdue_invoice_count: number;
+  overdue_vendor_bill_count: number;
+  projects: PortfolioProjectSnapshot[];
+};
+
+export type ChangeImpactProject = {
+  project_id: number;
+  project_name: string;
+  approved_change_order_count: number;
+  approved_change_order_total: string;
+};
+
+export type ChangeImpactSummary = {
+  generated_at: string;
+  date_filter: {
+    date_from: string;
+    date_to: string;
+  };
+  approved_change_order_count: number;
+  approved_change_order_total: string;
+  projects: ChangeImpactProject[];
 };

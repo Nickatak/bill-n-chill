@@ -307,6 +307,35 @@ CO-02 extends existing CO endpoints with propagation behavior.
 - Billable amount basis in current v1:
   - billable basis is derived from project contract current value until invoice composition features are implemented.
 
+## Reporting Pack v1 (RPT-01)
+
+- `GET /api/v1/reports/portfolio/`
+  - Auth required
+  - Returns portfolio-level rollup:
+    - `active_projects_count`
+    - `ar_total_outstanding`
+    - `ap_total_outstanding`
+    - `overdue_invoice_count`
+    - `overdue_vendor_bill_count`
+    - `projects[]` with per-project AR/AP outstanding and approved CO totals
+  - Optional query filters:
+    - `date_from=YYYY-MM-DD`
+    - `date_to=YYYY-MM-DD`
+  - Filter behavior:
+    - affects overdue invoice/vendor-bill counts by issue date range.
+
+- `GET /api/v1/reports/change-impact/`
+  - Auth required
+  - Returns approved change-order impact rollup:
+    - `approved_change_order_count`
+    - `approved_change_order_total`
+    - `projects[]` with approved CO count/total per project
+  - Optional query filters:
+    - `date_from=YYYY-MM-DD`
+    - `date_to=YYYY-MM-DD`
+  - Filter behavior:
+    - filters approved CO rows by `approved_at` date window.
+
 ## Invoice Composition and Send (INV-01)
 
 - `GET /api/v1/projects/{project_id}/invoices/`

@@ -72,3 +72,38 @@ class ProjectFinancialSummarySerializer(serializers.Serializer):
     inbound_unapplied_credit = serializers.DecimalField(max_digits=12, decimal_places=2)
     outbound_unapplied_credit = serializers.DecimalField(max_digits=12, decimal_places=2)
     traceability = serializers.JSONField()
+
+
+class PortfolioProjectSnapshotSerializer(serializers.Serializer):
+    project_id = serializers.IntegerField()
+    project_name = serializers.CharField()
+    project_status = serializers.CharField()
+    ar_outstanding = serializers.DecimalField(max_digits=12, decimal_places=2)
+    ap_outstanding = serializers.DecimalField(max_digits=12, decimal_places=2)
+    approved_change_orders_total = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+
+class PortfolioSnapshotSerializer(serializers.Serializer):
+    generated_at = serializers.DateTimeField()
+    date_filter = serializers.JSONField()
+    active_projects_count = serializers.IntegerField()
+    ar_total_outstanding = serializers.DecimalField(max_digits=12, decimal_places=2)
+    ap_total_outstanding = serializers.DecimalField(max_digits=12, decimal_places=2)
+    overdue_invoice_count = serializers.IntegerField()
+    overdue_vendor_bill_count = serializers.IntegerField()
+    projects = PortfolioProjectSnapshotSerializer(many=True)
+
+
+class ChangeImpactProjectSerializer(serializers.Serializer):
+    project_id = serializers.IntegerField()
+    project_name = serializers.CharField()
+    approved_change_order_count = serializers.IntegerField()
+    approved_change_order_total = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+
+class ChangeImpactSummarySerializer(serializers.Serializer):
+    generated_at = serializers.DateTimeField()
+    date_filter = serializers.JSONField()
+    approved_change_order_count = serializers.IntegerField()
+    approved_change_order_total = serializers.DecimalField(max_digits=12, decimal_places=2)
+    projects = ChangeImpactProjectSerializer(many=True)

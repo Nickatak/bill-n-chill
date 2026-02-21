@@ -459,3 +459,207 @@ class ProjectFinancialSummaryTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(hidden.status_code, 404)
+
+
+class ReportingPackTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="pm24",
+            email="pm24@example.com",
+            password="secret123",
+        )
+        self.other_user = User.objects.create_user(
+            username="pm25",
+            email="pm25@example.com",
+            password="secret123",
+        )
+        self.token, _ = Token.objects.get_or_create(user=self.user)
+
+        self.customer = Customer.objects.create(
+            display_name="Owner Reporting",
+            email="owner-reporting@example.com",
+            phone="555-8181",
+            billing_address="81 Main St",
+            created_by=self.user,
+        )
+        self.project = Project.objects.create(
+            customer=self.customer,
+            name="Reporting Active Project",
+            status=Project.Status.ACTIVE,
+            contract_value_original="10000.00",
+            contract_value_current="10800.00",
+            created_by=self.user,
+        )
+        self.project_prospect = Project.objects.create(
+            customer=self.customer,
+            name="Reporting Prospect Project",
+            status=Project.Status.PROSPECT,
+            contract_value_original="5000.00",
+            contract_value_current="5000.00",
+            created_by=self.user,
+        )
+        self.vendor = Vendor.objects.create(
+            name="Reporting Vendor",
+            email="billing@reporting-vendor.example.com",
+            created_by=self.user,
+        )
+
+    def _seed_reporting_records(self):
+        ChangeOrder.objects.create(
+            project=self.project,
+            number=1,
+            title="Approved CO 1",
+            status=ChangeOrder.Status.APPROVED,
+            amount_delta="300.00",
+            days_delta=1,
+            requested_by=self.user,
+            approved_by=self.user,
+            approved_at="2026-02-10T00:00:00Z",
+        )
+        ChangeOrder.objects.create(
+            project=self.project,
+            number=2,
+            title="Approved CO 2",
+            status=ChangeOrder.Status.APPROVED,
+            amount_delta="500.00",
+            days_delta=1,
+            requested_by=self.user,
+            approved_by=self.user,
+            approved_at="2026-03-10T00:00:00Z",
+        )
+
+        Invoice.objects.create(
+            project=self.project,
+            customer=self.project.customer,
+            invoice_number="INV-RPT-1",
+            status=Invoice.Status.SENT,
+            issue_date="2026-02-01",
+            due_date="2026-02-15",
+            subtotal="400.00",
+            total="400.00",
+            balance_due="400.00",
+            created_by=self.user,
+        )
+        Invoice.objects.create(
+            project=self.project,
+            customer=self.project.customer,
+            invoice_number="INV-RPT-2",
+            status=Invoice.Status.PAID,
+            issue_date="2026-02-01",
+            due_date="2026-03-01",
+            subtotal="600.00",
+            total="600.00",
+            balance_due="0.00",
+            created_by=self.user,
+        )
+
+        VendorBill.objects.create(
+            project=self.project,
+            vendor=self.vendor,
+            bill_number="VB-RPT-1",
+            status=VendorBill.Status.RECEIVED,
+            issue_date="2026-02-01",
+            due_date="2026-02-20",
+            total="250.00",
+            balance_due="250.00",
+            created_by=self.user,
+        )
+        VendorBill.objects.create(
+            project=self.project,
+            vendor=self.vendor,
+            bill_number="VB-RPT-2",
+            status=VendorBill.Status.PAID,
+            issue_date="2026-02-01",
+            due_date="2026-03-20",
+            total="100.00",
+            balance_due="0.00",
+            created_by=self.user,
+        )
+
+    def test_portfolio_snapshot_reports_rollups(self):
+        self._seed_reporting_records()
+
+        response = self.client.get(
+            "/api/v1/reports/portfolio/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data["active_projects_count"], 1)
+        self.assertEqual(data["ar_total_outstanding"], "1000.00")
+        self.assertEqual(data["ap_total_outstanding"], "350.00")
+        self.assertEqual(data["overdue_invoice_count"], 1)
+        self.assertEqual(data["overdue_vendor_bill_count"], 1)
+        self.assertEqual(len(data["projects"]), 2)
+
+    def test_change_impact_summary_supports_date_filters(self):
+        self._seed_reporting_records()
+
+        all_rows = self.client.get(
+            "/api/v1/reports/change-impact/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(all_rows.status_code, 200)
+        all_data = all_rows.json()["data"]
+        self.assertEqual(all_data["approved_change_order_count"], 2)
+        self.assertEqual(all_data["approved_change_order_total"], "800.00")
+        self.assertEqual(len(all_data["projects"]), 1)
+
+        filtered = self.client.get(
+            "/api/v1/reports/change-impact/?date_from=2026-03-01&date_to=2026-03-31",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(filtered.status_code, 200)
+        filtered_data = filtered.json()["data"]
+        self.assertEqual(filtered_data["approved_change_order_count"], 1)
+        self.assertEqual(filtered_data["approved_change_order_total"], "500.00")
+
+    def test_reporting_endpoints_validate_dates_and_scope_to_user(self):
+        invalid = self.client.get(
+            "/api/v1/reports/portfolio/?date_from=2026-03-20&date_to=2026-03-01",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(invalid.json()["error"]["code"], "validation_error")
+
+        invalid_format = self.client.get(
+            "/api/v1/reports/change-impact/?date_from=03-01-2026",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(invalid_format.status_code, 400)
+        self.assertEqual(invalid_format.json()["error"]["code"], "validation_error")
+
+        other_customer = Customer.objects.create(
+            display_name="Other Reporting Owner",
+            email="other-reporting-owner@example.com",
+            phone="555-9191",
+            billing_address="91 Main St",
+            created_by=self.other_user,
+        )
+        other_project = Project.objects.create(
+            customer=other_customer,
+            name="Other User Project",
+            status=Project.Status.ACTIVE,
+            contract_value_original="1000.00",
+            contract_value_current="1200.00",
+            created_by=self.other_user,
+        )
+        ChangeOrder.objects.create(
+            project=other_project,
+            number=1,
+            title="Other User CO",
+            status=ChangeOrder.Status.APPROVED,
+            amount_delta="999.00",
+            days_delta=1,
+            requested_by=self.other_user,
+            approved_by=self.other_user,
+            approved_at="2026-02-10T00:00:00Z",
+        )
+
+        scoped = self.client.get(
+            "/api/v1/reports/change-impact/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(scoped.status_code, 200)
+        scoped_data = scoped.json()["data"]
+        self.assertEqual(scoped_data["approved_change_order_total"], "0.00")

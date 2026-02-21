@@ -1,16 +1,19 @@
 import csv
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from io import StringIO
 
 from django.http import HttpResponse
+from django.utils import timezone as django_timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.models import ChangeOrder, FinancialAuditEvent, Invoice, Payment, PaymentAllocation, Project, VendorBill
 from core.serializers import (
+    ChangeImpactSummarySerializer,
     FinancialAuditEventSerializer,
+    PortfolioSnapshotSerializer,
     ProjectFinancialSummarySerializer,
     ProjectProfileSerializer,
     ProjectSerializer,
@@ -34,6 +37,32 @@ ALLOWED_PROJECT_STATUS_TRANSITIONS = {
     Project.Status.COMPLETED: set(),
     Project.Status.CANCELLED: set(),
 }
+
+
+def _parse_optional_date(value: str):
+    if not value:
+        return None, None
+    try:
+        return date.fromisoformat(value), None
+    except ValueError:
+        return None, ["Use YYYY-MM-DD format."]
+
+
+def _date_filter_from_query(request):
+    date_from_raw = (request.query_params.get("date_from") or "").strip()
+    date_to_raw = (request.query_params.get("date_to") or "").strip()
+    date_from, date_from_error = _parse_optional_date(date_from_raw)
+    date_to, date_to_error = _parse_optional_date(date_to_raw)
+    fields = {}
+    if date_from_error:
+        fields["date_from"] = date_from_error
+    if date_to_error:
+        fields["date_to"] = date_to_error
+    if date_from and date_to and date_to < date_from:
+        fields["date_to"] = ["date_to must be on or after date_from."]
+    if fields:
+        return None, None, fields
+    return date_from, date_to, None
 
 
 def _build_project_financial_summary_data(project: Project, user):
@@ -425,3 +454,135 @@ def project_audit_events_view(request, project_id: int):
         created_by=request.user,
     ).order_by("-created_at", "-id")
     return Response({"data": FinancialAuditEventSerializer(rows, many=True).data})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def portfolio_snapshot_view(request):
+    date_from, date_to, filter_error = _date_filter_from_query(request)
+    if filter_error:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Invalid date filters.",
+                    "fields": filter_error,
+                }
+            },
+            status=400,
+        )
+
+    today = django_timezone.localdate()
+    project_rows = list(
+        Project.objects.filter(created_by=request.user).select_related("customer").order_by("-created_at", "-id")
+    )
+    project_summaries = []
+    ar_total_outstanding = Decimal("0")
+    ap_total_outstanding = Decimal("0")
+    active_projects_count = 0
+
+    for project in project_rows:
+        if project.status == Project.Status.ACTIVE:
+            active_projects_count += 1
+        summary = _build_project_financial_summary_data(project, request.user)
+        ar_total_outstanding += summary["ar_outstanding"]
+        ap_total_outstanding += summary["ap_outstanding"]
+        project_summaries.append(
+            {
+                "project_id": project.id,
+                "project_name": project.name,
+                "project_status": project.status,
+                "ar_outstanding": summary["ar_outstanding"],
+                "ap_outstanding": summary["ap_outstanding"],
+                "approved_change_orders_total": summary["approved_change_orders_total"],
+            }
+        )
+
+    overdue_invoices = Invoice.objects.filter(
+        project__created_by=request.user,
+        created_by=request.user,
+        due_date__lt=today,
+    ).exclude(status__in=[Invoice.Status.PAID, Invoice.Status.VOID])
+    overdue_vendor_bills = VendorBill.objects.filter(
+        project__created_by=request.user,
+        created_by=request.user,
+        due_date__lt=today,
+    ).exclude(status__in=[VendorBill.Status.PAID, VendorBill.Status.VOID])
+
+    if date_from:
+        overdue_invoices = overdue_invoices.filter(issue_date__gte=date_from)
+        overdue_vendor_bills = overdue_vendor_bills.filter(issue_date__gte=date_from)
+    if date_to:
+        overdue_invoices = overdue_invoices.filter(issue_date__lte=date_to)
+        overdue_vendor_bills = overdue_vendor_bills.filter(issue_date__lte=date_to)
+
+    payload = {
+        "generated_at": django_timezone.now(),
+        "date_filter": {
+            "date_from": date_from.isoformat() if date_from else "",
+            "date_to": date_to.isoformat() if date_to else "",
+        },
+        "active_projects_count": active_projects_count,
+        "ar_total_outstanding": ar_total_outstanding,
+        "ap_total_outstanding": ap_total_outstanding,
+        "overdue_invoice_count": overdue_invoices.count(),
+        "overdue_vendor_bill_count": overdue_vendor_bills.count(),
+        "projects": project_summaries,
+    }
+    return Response({"data": PortfolioSnapshotSerializer(payload).data})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def change_impact_summary_view(request):
+    date_from, date_to, filter_error = _date_filter_from_query(request)
+    if filter_error:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Invalid date filters.",
+                    "fields": filter_error,
+                }
+            },
+            status=400,
+        )
+
+    approved_rows = ChangeOrder.objects.filter(
+        requested_by=request.user,
+        status=ChangeOrder.Status.APPROVED,
+    ).select_related("project")
+    if date_from:
+        approved_rows = approved_rows.filter(approved_at__date__gte=date_from)
+    if date_to:
+        approved_rows = approved_rows.filter(approved_at__date__lte=date_to)
+
+    project_map = {}
+    total_amount = Decimal("0")
+    total_count = 0
+    for row in approved_rows.order_by("project_id", "number", "revision_number"):
+        total_amount += row.amount_delta
+        total_count += 1
+        project_bucket = project_map.setdefault(
+            row.project_id,
+            {
+                "project_id": row.project_id,
+                "project_name": row.project.name,
+                "approved_change_order_count": 0,
+                "approved_change_order_total": Decimal("0"),
+            },
+        )
+        project_bucket["approved_change_order_count"] += 1
+        project_bucket["approved_change_order_total"] += row.amount_delta
+
+    payload = {
+        "generated_at": django_timezone.now(),
+        "date_filter": {
+            "date_from": date_from.isoformat() if date_from else "",
+            "date_to": date_to.isoformat() if date_to else "",
+        },
+        "approved_change_order_count": total_count,
+        "approved_change_order_total": total_amount,
+        "projects": sorted(project_map.values(), key=lambda row: row["approved_change_order_total"], reverse=True),
+    }
+    return Response({"data": ChangeImpactSummarySerializer(payload).data})

@@ -25,6 +25,8 @@ from core.views.intake import (
 from core.views.invoices import invoice_detail_view, invoice_send_view, project_invoices_view
 from core.views.payments import payment_allocate_view, payment_detail_view, project_payments_view
 from core.views.projects import (
+    change_impact_summary_view,
+    portfolio_snapshot_view,
     project_accounting_export_view,
     project_audit_events_view,
     project_detail_view,
@@ -50,6 +52,8 @@ __all__ = [
     "project_financial_summary_view",
     "project_audit_events_view",
     "project_accounting_export_view",
+    "portfolio_snapshot_view",
+    "change_impact_summary_view",
     "cost_codes_list_create_view",
     "cost_code_detail_view",
     "project_estimates_view",
