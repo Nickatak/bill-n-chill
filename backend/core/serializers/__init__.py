@@ -37,13 +37,14 @@ from core.serializers.payments import (
 )
 from core.serializers.projects import (
     AttentionFeedSerializer,
-    QuickJumpSearchSerializer,
-    CostCodeSerializer,
     ChangeImpactSummarySerializer,
+    CostCodeSerializer,
     PortfolioSnapshotSerializer,
+    ProjectTimelineSerializer,
     ProjectFinancialSummarySerializer,
     ProjectProfileSerializer,
     ProjectSerializer,
+    QuickJumpSearchSerializer,
 )
 from core.serializers.vendor_bills import VendorBillSerializer, VendorBillWriteSerializer
 from core.serializers.vendors import VendorSerializer, VendorWriteSerializer
@@ -65,6 +66,7 @@ __all__ = [
     "ChangeImpactSummarySerializer",
     "AttentionFeedSerializer",
     "QuickJumpSearchSerializer",
+    "ProjectTimelineSerializer",
     "CostCodeSerializer",
     "VendorSerializer",
     "VendorWriteSerializer",

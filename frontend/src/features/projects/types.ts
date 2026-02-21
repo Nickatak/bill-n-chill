@@ -101,6 +101,7 @@ export type ApiResponse = {
     | PortfolioSnapshot
     | ChangeImpactSummary
     | AttentionFeed
+    | ProjectTimeline
     | AccountingSyncEventRecord[]
     | AccountingSyncEventRecord
     | FinancialAuditEventRecord[];
@@ -172,4 +173,25 @@ export type AttentionFeed = {
   due_soon_window_days: number;
   item_count: number;
   items: AttentionFeedItem[];
+};
+
+export type ProjectTimelineItem = {
+  timeline_id: string;
+  category: "financial" | "workflow";
+  event_type: string;
+  occurred_at: string;
+  label: string;
+  detail: string;
+  object_type: string;
+  object_id: number;
+  ui_route: string;
+  detail_endpoint: string;
+};
+
+export type ProjectTimeline = {
+  project_id: number;
+  project_name: string;
+  category: "all" | "financial" | "workflow";
+  item_count: number;
+  items: ProjectTimelineItem[];
 };

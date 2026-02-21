@@ -770,6 +770,33 @@ Each bucket contains:
   - Immutability:
     - rows are append-only and cannot be updated/deleted through API.
 
+## Project Timeline / Activity Center (QA-02)
+
+- `GET /api/v1/projects/{project_id}/timeline/`
+  - Auth required
+  - Returns a read-only project timeline merged from:
+    - financial audit events (`FinancialAuditEvent`)
+    - workflow estimate status events (`EstimateStatusEvent`)
+  - Query params:
+    - `category` (optional; default `all`)
+      - allowed: `all`, `financial`, `workflow`
+  - Response fields:
+    - `project_id`
+    - `project_name`
+    - `category`
+    - `item_count`
+    - `items[]` with:
+      - `timeline_id`
+      - `category`
+      - `event_type`
+      - `occurred_at`
+      - `label`
+      - `detail`
+      - `object_type`
+      - `object_id`
+      - `ui_route`
+      - `detail_endpoint`
+
 ## Versioning Rules
 
 - Non-breaking changes can stay in `v1`.

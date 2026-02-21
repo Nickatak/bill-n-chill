@@ -602,6 +602,9 @@ export function ProjectsConsole() {
                       {summaryCounts ? summaryCounts.changeOrders : "--"}
                     </span>
                   </div>
+                  <div className={styles.node}>
+                    <Link href={`/projects/${selectedProject.id}/activity`}>Activity Timeline</Link>
+                  </div>
                 </div>
                 <div className={styles.branch}>
                   <span className={styles.branchLabel}>Receivables</span>

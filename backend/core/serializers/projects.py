@@ -143,3 +143,24 @@ class QuickJumpSearchSerializer(serializers.Serializer):
     query = serializers.CharField()
     item_count = serializers.IntegerField()
     items = QuickJumpItemSerializer(many=True)
+
+
+class ProjectTimelineItemSerializer(serializers.Serializer):
+    timeline_id = serializers.CharField()
+    category = serializers.ChoiceField(choices=["financial", "workflow"])
+    event_type = serializers.CharField()
+    occurred_at = serializers.DateTimeField()
+    label = serializers.CharField()
+    detail = serializers.CharField(allow_blank=True)
+    object_type = serializers.CharField()
+    object_id = serializers.IntegerField()
+    ui_route = serializers.CharField()
+    detail_endpoint = serializers.CharField()
+
+
+class ProjectTimelineSerializer(serializers.Serializer):
+    project_id = serializers.IntegerField()
+    project_name = serializers.CharField()
+    category = serializers.ChoiceField(choices=["all", "financial", "workflow"])
+    item_count = serializers.IntegerField()
+    items = ProjectTimelineItemSerializer(many=True)

@@ -841,3 +841,72 @@ class ReportingPackTests(TestCase):
         self.assertEqual(scoped_response.status_code, 200)
         scoped_data = scoped_response.json()["data"]
         self.assertEqual(scoped_data["item_count"], 0)
+
+    def test_project_timeline_merges_financial_and_workflow_events(self):
+        estimate = Estimate.objects.create(
+            project=self.project,
+            version=1,
+            status=Estimate.Status.SENT,
+            title="Timeline Estimate",
+            created_by=self.user,
+        )
+        EstimateStatusEvent.objects.create(
+            estimate=estimate,
+            from_status=Estimate.Status.DRAFT,
+            to_status=Estimate.Status.SENT,
+            note="Sent for review",
+            changed_by=self.user,
+        )
+        FinancialAuditEvent.objects.create(
+            project=self.project,
+            event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
+            object_type="invoice",
+            object_id=123,
+            from_status=Invoice.Status.DRAFT,
+            to_status=Invoice.Status.SENT,
+            amount="125.00",
+            note="Invoice sent",
+            created_by=self.user,
+        )
+
+        response = self.client.get(
+            f"/api/v1/projects/{self.project.id}/timeline/?category=all",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data["project_id"], self.project.id)
+        self.assertEqual(data["category"], "all")
+        self.assertEqual(data["item_count"], 2)
+        categories = {item["category"] for item in data["items"]}
+        self.assertEqual(categories, {"financial", "workflow"})
+        for item in data["items"]:
+            self.assertIn("ui_route", item)
+            self.assertIn("detail_endpoint", item)
+
+    def test_project_timeline_category_filter_validation_and_scope(self):
+        invalid = self.client.get(
+            f"/api/v1/projects/{self.project.id}/timeline/?category=bad",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(invalid.json()["error"]["code"], "validation_error")
+
+        other_customer = Customer.objects.create(
+            display_name="Other Timeline Owner",
+            email="other-timeline-owner@example.com",
+            phone="555-9393",
+            billing_address="93 Main St",
+            created_by=self.other_user,
+        )
+        other_project = Project.objects.create(
+            customer=other_customer,
+            name="Other Timeline Project",
+            status=Project.Status.ACTIVE,
+            created_by=self.other_user,
+        )
+        hidden = self.client.get(
+            f"/api/v1/projects/{other_project.id}/timeline/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(hidden.status_code, 404)

@@ -32,6 +32,7 @@ from core.views.projects import (
     project_audit_events_view,
     project_detail_view,
     project_financial_summary_view,
+    project_timeline_events_view,
     quick_jump_search_view,
     projects_list_view,
 )
@@ -52,6 +53,7 @@ __all__ = [
     "projects_list_view",
     "project_detail_view",
     "project_financial_summary_view",
+    "project_timeline_events_view",
     "quick_jump_search_view",
     "project_audit_events_view",
     "project_accounting_export_view",

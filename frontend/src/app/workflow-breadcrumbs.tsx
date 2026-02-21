@@ -66,6 +66,10 @@ const hierarchyRules: HierarchyRule[] = [
     ],
   },
   {
+    when: (pathname) => /^\/projects\/\d+\/activity$/.test(pathname),
+    crumbs: [PROJECTS_HUB_CRUMB, { href: "/activity", label: "Activity" }],
+  },
+  {
     when: (pathname) => pathname === "/change-orders" || /^\/projects\/\d+\/change-orders$/.test(pathname),
     crumbs: [PROJECTS_HUB_CRUMB, { href: "/change-orders", label: "Change Orders" }],
   },
@@ -178,6 +182,9 @@ function projectScopedHref(href: string, projectId: string): string {
   }
   if (href === "/change-orders") {
     return `/projects/${encodeURIComponent(projectId)}/change-orders`;
+  }
+  if (href === "/activity") {
+    return `/projects/${encodeURIComponent(projectId)}/activity`;
   }
   return href;
 }

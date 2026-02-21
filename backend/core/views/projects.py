@@ -9,7 +9,17 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import ChangeOrder, Estimate, FinancialAuditEvent, Invoice, Payment, PaymentAllocation, Project, VendorBill
+from core.models import (
+    ChangeOrder,
+    Estimate,
+    EstimateStatusEvent,
+    FinancialAuditEvent,
+    Invoice,
+    Payment,
+    PaymentAllocation,
+    Project,
+    VendorBill,
+)
 from core.serializers import (
     AttentionFeedSerializer,
     ChangeImpactSummarySerializer,
@@ -17,6 +27,7 @@ from core.serializers import (
     PortfolioSnapshotSerializer,
     ProjectFinancialSummarySerializer,
     ProjectProfileSerializer,
+    ProjectTimelineSerializer,
     QuickJumpSearchSerializer,
     ProjectSerializer,
 )
@@ -842,3 +853,102 @@ def quick_jump_search_view(request):
         "items": sorted_items,
     }
     return Response({"data": QuickJumpSearchSerializer(payload).data})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def project_timeline_events_view(request, project_id: int):
+    try:
+        project = Project.objects.get(id=project_id, created_by=request.user)
+    except Project.DoesNotExist:
+        return Response(
+            {"error": {"code": "not_found", "message": "Project not found.", "fields": {}}},
+            status=404,
+        )
+
+    category = (request.query_params.get("category") or "all").strip().lower()
+    if category not in {"all", "financial", "workflow"}:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Invalid category filter.",
+                    "fields": {"category": ["Use one of: all, financial, workflow."]},
+                }
+            },
+            status=400,
+        )
+
+    items = []
+    if category in {"all", "financial"}:
+        financial_rows = FinancialAuditEvent.objects.filter(
+            project=project,
+            created_by=request.user,
+        ).order_by("-created_at", "-id")
+        for row in financial_rows:
+            ui_route = "/financials-auditing"
+            detail_endpoint = f"/api/v1/projects/{project.id}/audit-events/"
+            if row.object_type == "estimate":
+                ui_route = f"/projects/{project.id}/estimates?estimate={row.object_id}"
+                detail_endpoint = f"/api/v1/estimates/{row.object_id}/"
+            elif row.object_type == "change_order":
+                ui_route = f"/projects/{project.id}/change-orders"
+                detail_endpoint = f"/api/v1/change-orders/{row.object_id}/"
+            elif row.object_type == "invoice":
+                ui_route = f"/invoices?project={project.id}"
+                detail_endpoint = f"/api/v1/invoices/{row.object_id}/"
+            elif row.object_type == "vendor_bill":
+                ui_route = f"/vendor-bills?project={project.id}"
+                detail_endpoint = f"/api/v1/vendor-bills/{row.object_id}/"
+            elif row.object_type == "payment":
+                ui_route = f"/payments?project={project.id}"
+                detail_endpoint = f"/api/v1/payments/{row.object_id}/"
+            items.append(
+                {
+                    "timeline_id": f"financial-{row.id}",
+                    "category": "financial",
+                    "event_type": row.event_type,
+                    "occurred_at": row.created_at,
+                    "label": row.event_type.replace("_", " "),
+                    "detail": row.note or "",
+                    "object_type": row.object_type,
+                    "object_id": row.object_id,
+                    "ui_route": ui_route,
+                    "detail_endpoint": detail_endpoint,
+                }
+            )
+
+    if category in {"all", "workflow"}:
+        workflow_rows = (
+            EstimateStatusEvent.objects.filter(
+                estimate__project=project,
+                changed_by=request.user,
+            )
+            .select_related("estimate")
+            .order_by("-changed_at", "-id")
+        )
+        for row in workflow_rows:
+            items.append(
+                {
+                    "timeline_id": f"workflow-estimate-{row.id}",
+                    "category": "workflow",
+                    "event_type": "estimate_status_event",
+                    "occurred_at": row.changed_at,
+                    "label": f"estimate {row.from_status or 'new'} -> {row.to_status}",
+                    "detail": row.note or "",
+                    "object_type": "estimate",
+                    "object_id": row.estimate_id,
+                    "ui_route": f"/projects/{project.id}/estimates?estimate={row.estimate_id}",
+                    "detail_endpoint": f"/api/v1/estimates/{row.estimate_id}/status-events/",
+                }
+            )
+
+    sorted_items = sorted(items, key=lambda row: row["occurred_at"], reverse=True)
+    payload = {
+        "project_id": project.id,
+        "project_name": project.name,
+        "category": category,
+        "item_count": len(sorted_items),
+        "items": sorted_items,
+    }
+    return Response({"data": ProjectTimelineSerializer(payload).data})
