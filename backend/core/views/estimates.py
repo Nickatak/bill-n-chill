@@ -274,7 +274,11 @@ def estimate_detail_view(request, estimate_id: int):
     if request.method == "GET":
         return Response({"data": EstimateSerializer(estimate).data})
 
-    serializer = EstimateWriteSerializer(data=request.data, partial=True)
+    serializer = EstimateWriteSerializer(
+        data=request.data,
+        partial=True,
+        context={"allow_archived_status": True},
+    )
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
     if "title" in data and data["title"] != estimate.title:

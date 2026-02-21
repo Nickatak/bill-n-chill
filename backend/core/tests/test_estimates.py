@@ -560,7 +560,7 @@ class EstimateTests(TestCase):
         self.assertEqual(convert.json()["meta"]["conversion_status"], "already_converted")
         self.assertEqual(Budget.objects.filter(source_estimate_id=estimate_id).count(), 1)
 
-    def test_estimate_status_transition_rejects_user_archived_status(self):
+    def test_estimate_status_transition_allows_sent_to_archived(self):
         create = self.client.post(
             f"/api/v1/projects/{self.project.id}/estimates/",
             data={
@@ -595,11 +595,8 @@ class EstimateTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(archived.status_code, 400)
-        self.assertEqual(
-            archived.json()["status"][0],
-            "Archived status is system-controlled and cannot be set directly.",
-        )
+        self.assertEqual(archived.status_code, 200)
+        self.assertEqual(archived.json()["data"]["status"], Estimate.Status.ARCHIVED)
 
     def test_estimate_status_transition_creates_audit_events(self):
         create = self.client.post(

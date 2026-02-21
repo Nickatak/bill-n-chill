@@ -37,9 +37,13 @@ function emptyLine(localId: number): ChangeOrderLineInput {
 
 type ChangeOrdersConsoleProps = {
   scopedProjectId?: number | null;
+  initialOriginEstimateId?: number | null;
 };
 
-export function ChangeOrdersConsole({ scopedProjectId: scopedProjectIdProp = null }: ChangeOrdersConsoleProps) {
+export function ChangeOrdersConsole({
+  scopedProjectId: scopedProjectIdProp = null,
+  initialOriginEstimateId: initialOriginEstimateIdProp = null,
+}: ChangeOrdersConsoleProps) {
   const { token, authMessage } = useSharedSessionAuth();
   const [statusMessage, setStatusMessage] = useState("");
 
@@ -69,6 +73,7 @@ export function ChangeOrdersConsole({ scopedProjectId: scopedProjectIdProp = nul
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const scopedProjectId = scopedProjectIdProp;
+  const initialOriginEstimateId = initialOriginEstimateIdProp;
   const selectedChangeOrder =
     changeOrders.find((row) => String(row.id) === selectedChangeOrderId) ?? null;
   const selectedViewerEstimate =
@@ -334,14 +339,24 @@ export function ChangeOrdersConsole({ scopedProjectId: scopedProjectIdProp = nul
       const rows =
         (payload.data as Array<{ id: number; title: string; version: number; status?: string }>) ?? [];
       const approvedRows = rows.filter((estimate) => estimate.status === "approved");
+      const preferredEstimateId =
+        initialOriginEstimateId && approvedRows.some((estimate) => estimate.id === initialOriginEstimateId)
+          ? String(initialOriginEstimateId)
+          : "";
       setProjectEstimates(approvedRows);
       setNewOriginEstimateId((current) => {
+        if (preferredEstimateId) {
+          return preferredEstimateId;
+        }
         if (current && approvedRows.some((estimate) => String(estimate.id) === current)) {
           return current;
         }
         return approvedRows[0] ? String(approvedRows[0].id) : "";
       });
       setSelectedViewerEstimateId((current) => {
+        if (preferredEstimateId) {
+          return preferredEstimateId;
+        }
         if (current && approvedRows.some((estimate) => String(estimate.id) === current)) {
           return current;
         }
