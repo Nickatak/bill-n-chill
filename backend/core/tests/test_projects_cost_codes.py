@@ -726,3 +726,118 @@ class ReportingPackTests(TestCase):
         self.assertIn("vendor_bill_due_soon", kinds)
         self.assertIn("change_order_pending_approval", kinds)
         self.assertIn("payment_problem", kinds)
+
+    def test_quick_jump_search_returns_cross_entity_results(self):
+        self.project.name = "Kitchen Main Project"
+        self.project.save(update_fields=["name", "updated_at"])
+        estimate = Estimate.objects.create(
+            project=self.project,
+            version=1,
+            status=Estimate.Status.DRAFT,
+            title="Kitchen Scope",
+            created_by=self.user,
+        )
+        change_order = ChangeOrder.objects.create(
+            project=self.project,
+            number=5,
+            title="Kitchen Delta",
+            status=ChangeOrder.Status.PENDING_APPROVAL,
+            amount_delta="250.00",
+            days_delta=1,
+            requested_by=self.user,
+        )
+        invoice = Invoice.objects.create(
+            project=self.project,
+            customer=self.project.customer,
+            invoice_number="INV-KITCHEN-1",
+            status=Invoice.Status.DRAFT,
+            issue_date=timezone.localdate(),
+            due_date=timezone.localdate(),
+            subtotal="100.00",
+            total="100.00",
+            balance_due="100.00",
+            created_by=self.user,
+        )
+        vendor_bill = VendorBill.objects.create(
+            project=self.project,
+            vendor=self.vendor,
+            bill_number="VB-KITCHEN-1",
+            status=VendorBill.Status.PLANNED,
+            issue_date=timezone.localdate(),
+            due_date=timezone.localdate(),
+            total="80.00",
+            balance_due="80.00",
+            created_by=self.user,
+        )
+        payment = Payment.objects.create(
+            project=self.project,
+            direction=Payment.Direction.INBOUND,
+            method=Payment.Method.ACH,
+            status=Payment.Status.PENDING,
+            amount="75.00",
+            payment_date=timezone.localdate(),
+            reference_number="KITCHEN-PAY",
+            created_by=self.user,
+        )
+
+        response = self.client.get(
+            "/api/v1/search/quick-jump/?q=kitchen",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertGreaterEqual(data["item_count"], 6)
+        kinds = {item["kind"] for item in data["items"]}
+        self.assertIn("project", kinds)
+        self.assertIn("estimate", kinds)
+        self.assertIn("change_order", kinds)
+        self.assertIn("invoice", kinds)
+        self.assertIn("vendor_bill", kinds)
+        self.assertIn("payment", kinds)
+        endpoints = {item["detail_endpoint"] for item in data["items"]}
+        self.assertIn(f"/api/v1/estimates/{estimate.id}/", endpoints)
+        self.assertIn(f"/api/v1/change-orders/{change_order.id}/", endpoints)
+        self.assertIn(f"/api/v1/invoices/{invoice.id}/", endpoints)
+        self.assertIn(f"/api/v1/vendor-bills/{vendor_bill.id}/", endpoints)
+        self.assertIn(f"/api/v1/payments/{payment.id}/", endpoints)
+
+    def test_quick_jump_search_minimum_query_and_scope(self):
+        short_response = self.client.get(
+            "/api/v1/search/quick-jump/?q=a",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(short_response.status_code, 200)
+        short_data = short_response.json()["data"]
+        self.assertEqual(short_data["item_count"], 0)
+        self.assertEqual(short_data["items"], [])
+
+        other_customer = Customer.objects.create(
+            display_name="Other Search Owner",
+            email="other-search-owner@example.com",
+            phone="555-9292",
+            billing_address="92 Main St",
+            created_by=self.other_user,
+        )
+        other_project = Project.objects.create(
+            customer=other_customer,
+            name="Other Kitchen Project",
+            status=Project.Status.ACTIVE,
+            contract_value_original="1000.00",
+            contract_value_current="1000.00",
+            created_by=self.other_user,
+        )
+        Estimate.objects.create(
+            project=other_project,
+            version=1,
+            status=Estimate.Status.DRAFT,
+            title="Other Kitchen Scope",
+            created_by=self.other_user,
+        )
+
+        scoped_response = self.client.get(
+            "/api/v1/search/quick-jump/?q=other",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(scoped_response.status_code, 200)
+        scoped_data = scoped_response.json()["data"]
+        self.assertEqual(scoped_data["item_count"], 0)

@@ -9,7 +9,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import ChangeOrder, FinancialAuditEvent, Invoice, Payment, PaymentAllocation, Project, VendorBill
+from core.models import ChangeOrder, Estimate, FinancialAuditEvent, Invoice, Payment, PaymentAllocation, Project, VendorBill
 from core.serializers import (
     AttentionFeedSerializer,
     ChangeImpactSummarySerializer,
@@ -17,6 +17,7 @@ from core.serializers import (
     PortfolioSnapshotSerializer,
     ProjectFinancialSummarySerializer,
     ProjectProfileSerializer,
+    QuickJumpSearchSerializer,
     ProjectSerializer,
 )
 
@@ -712,3 +713,132 @@ def attention_feed_view(request):
         "items": items,
     }
     return Response({"data": AttentionFeedSerializer(payload).data})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def quick_jump_search_view(request):
+    query = (request.query_params.get("q") or "").strip()
+    if len(query) < 2:
+        return Response({"data": QuickJumpSearchSerializer({"query": query, "item_count": 0, "items": []}).data})
+
+    query_lower = query.lower()
+    items = []
+
+    projects = Project.objects.filter(created_by=request.user).select_related("customer")
+    for row in projects:
+        if query_lower in row.name.lower() or query_lower in str(row.id):
+            items.append(
+                {
+                    "kind": "project",
+                    "record_id": row.id,
+                    "label": row.name,
+                    "sub_label": f"Project #{row.id} ({row.status})",
+                    "project_id": row.id,
+                    "project_name": row.name,
+                    "ui_href": f"/projects?project={row.id}",
+                    "detail_endpoint": f"/api/v1/projects/{row.id}/",
+                }
+            )
+
+    estimates = Estimate.objects.filter(created_by=request.user).select_related("project")
+    for row in estimates:
+        if (
+            query_lower in (row.title or "").lower()
+            or query_lower in str(row.id)
+            or query_lower in str(row.version)
+        ):
+            items.append(
+                {
+                    "kind": "estimate",
+                    "record_id": row.id,
+                    "label": row.title or f"Estimate #{row.id}",
+                    "sub_label": f"Estimate #{row.id} v{row.version} ({row.status})",
+                    "project_id": row.project_id,
+                    "project_name": row.project.name,
+                    "ui_href": f"/projects/{row.project_id}/estimates?estimate={row.id}",
+                    "detail_endpoint": f"/api/v1/estimates/{row.id}/",
+                }
+            )
+
+    change_orders = ChangeOrder.objects.filter(requested_by=request.user).select_related("project")
+    for row in change_orders:
+        candidate = f"co-{row.number} v{row.revision_number} {row.title or ''}".lower()
+        if query_lower in candidate or query_lower in str(row.id):
+            items.append(
+                {
+                    "kind": "change_order",
+                    "record_id": row.id,
+                    "label": f"CO-{row.number} v{row.revision_number}",
+                    "sub_label": f"{row.title} ({row.status})",
+                    "project_id": row.project_id,
+                    "project_name": row.project.name,
+                    "ui_href": f"/projects/{row.project_id}/change-orders",
+                    "detail_endpoint": f"/api/v1/change-orders/{row.id}/",
+                }
+            )
+
+    invoices = Invoice.objects.filter(created_by=request.user).select_related("project")
+    for row in invoices:
+        if query_lower in row.invoice_number.lower() or query_lower in str(row.id):
+            items.append(
+                {
+                    "kind": "invoice",
+                    "record_id": row.id,
+                    "label": row.invoice_number,
+                    "sub_label": f"Invoice #{row.id} ({row.status})",
+                    "project_id": row.project_id,
+                    "project_name": row.project.name,
+                    "ui_href": f"/invoices?project={row.project_id}",
+                    "detail_endpoint": f"/api/v1/invoices/{row.id}/",
+                }
+            )
+
+    vendor_bills = VendorBill.objects.filter(created_by=request.user).select_related("project")
+    for row in vendor_bills:
+        if query_lower in row.bill_number.lower() or query_lower in str(row.id):
+            items.append(
+                {
+                    "kind": "vendor_bill",
+                    "record_id": row.id,
+                    "label": row.bill_number,
+                    "sub_label": f"Vendor bill #{row.id} ({row.status})",
+                    "project_id": row.project_id,
+                    "project_name": row.project.name,
+                    "ui_href": f"/vendor-bills?project={row.project_id}",
+                    "detail_endpoint": f"/api/v1/vendor-bills/{row.id}/",
+                }
+            )
+
+    payments = Payment.objects.filter(created_by=request.user).select_related("project")
+    for row in payments:
+        candidate = f"{row.reference_number or ''} {row.id} {row.direction} {row.status}".lower()
+        if query_lower in candidate:
+            items.append(
+                {
+                    "kind": "payment",
+                    "record_id": row.id,
+                    "label": row.reference_number or f"Payment #{row.id}",
+                    "sub_label": f"{row.direction} {row.status} amount {row.amount}",
+                    "project_id": row.project_id,
+                    "project_name": row.project.name,
+                    "ui_href": f"/payments?project={row.project_id}",
+                    "detail_endpoint": f"/api/v1/payments/{row.id}/",
+                }
+            )
+
+    deduped = {}
+    for row in items:
+        key = (row["kind"], row["record_id"])
+        deduped[key] = row
+    sorted_items = sorted(
+        deduped.values(),
+        key=lambda row: (row["kind"], row["label"].lower(), row["record_id"]),
+    )[:40]
+
+    payload = {
+        "query": query,
+        "item_count": len(sorted_items),
+        "items": sorted_items,
+    }
+    return Response({"data": QuickJumpSearchSerializer(payload).data})

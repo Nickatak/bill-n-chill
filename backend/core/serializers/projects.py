@@ -126,3 +126,20 @@ class AttentionFeedSerializer(serializers.Serializer):
     due_soon_window_days = serializers.IntegerField()
     item_count = serializers.IntegerField()
     items = AttentionFeedItemSerializer(many=True)
+
+
+class QuickJumpItemSerializer(serializers.Serializer):
+    kind = serializers.CharField()
+    record_id = serializers.IntegerField()
+    label = serializers.CharField()
+    sub_label = serializers.CharField()
+    project_id = serializers.IntegerField(allow_null=True)
+    project_name = serializers.CharField(allow_blank=True)
+    ui_href = serializers.CharField()
+    detail_endpoint = serializers.CharField()
+
+
+class QuickJumpSearchSerializer(serializers.Serializer):
+    query = serializers.CharField()
+    item_count = serializers.IntegerField()
+    items = QuickJumpItemSerializer(many=True)

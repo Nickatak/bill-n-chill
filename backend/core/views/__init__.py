@@ -32,6 +32,7 @@ from core.views.projects import (
     project_audit_events_view,
     project_detail_view,
     project_financial_summary_view,
+    quick_jump_search_view,
     projects_list_view,
 )
 from core.views.vendor_bills import project_vendor_bills_view, vendor_bill_detail_view
@@ -51,6 +52,7 @@ __all__ = [
     "projects_list_view",
     "project_detail_view",
     "project_financial_summary_view",
+    "quick_jump_search_view",
     "project_audit_events_view",
     "project_accounting_export_view",
     "attention_feed_view",

@@ -351,6 +351,25 @@ CO-02 extends existing CO endpoints with propagation behavior.
     - `item_count`
     - `items[]` with severity, label/detail, project context, and source links.
 
+## Search + Quick Jump (NAV-01)
+
+- `GET /api/v1/search/quick-jump/?q=<query>`
+  - Auth required
+  - Global lightweight search across:
+    - projects
+    - estimates
+    - change orders
+    - invoices
+    - vendor bills
+    - payments
+  - Response includes:
+    - `query`
+    - `item_count`
+    - `items[]` (kind, label, project context, `ui_href`, and API `detail_endpoint`)
+  - Notes:
+    - minimum query length is 2 chars (shorter queries return empty list)
+    - results are scoped to current authenticated user data.
+
 ## Invoice Composition and Send (INV-01)
 
 - `GET /api/v1/projects/{project_id}/invoices/`
