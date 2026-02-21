@@ -64,6 +64,7 @@ type VendorBillsConsoleProps = {
 export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null }: VendorBillsConsoleProps) {
   const { token, role } = useSharedSessionAuth();
   const pageSize = 5;
+  const dueSoonWindowDays = 7;
   const [statusMessage, setStatusMessage] = useState("");
   const [createErrorMessage, setCreateErrorMessage] = useState("");
 
@@ -89,6 +90,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const [billStatusFilters, setBillStatusFilters] = useState<VendorBillStatus[]>(
     defaultBillStatusFilters,
   );
+  const [dueFilter, setDueFilter] = useState<"all" | "due_soon" | "overdue">("all");
   const [currentBillPage, setCurrentBillPage] = useState(1);
 
   const [newVendorId, setNewVendorId] = useState("");
@@ -117,9 +119,23 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   const [duplicateCandidates, setDuplicateCandidates] = useState<VendorBillRecord[]>([]);
   const activeVendors = vendors.filter((vendor) => vendor.is_active);
-  const filteredVendorBills = vendorBills.filter((bill) =>
-    billStatusFilters.length === 0 ? false : billStatusFilters.includes(bill.status),
-  );
+  const filteredVendorBills = vendorBills.filter((bill) => {
+    if (billStatusFilters.length === 0 || !billStatusFilters.includes(bill.status)) {
+      return false;
+    }
+    if (dueFilter === "all") {
+      return true;
+    }
+    if (!bill.due_date || bill.status === "paid" || bill.status === "void") {
+      return false;
+    }
+    const today = todayIsoDate();
+    if (dueFilter === "overdue") {
+      return bill.due_date < today;
+    }
+    const dueSoonDate = dueDateIsoDate(dueSoonWindowDays);
+    return bill.due_date >= today && bill.due_date <= dueSoonDate;
+  });
   const totalBillPages = Math.max(1, Math.ceil(filteredVendorBills.length / pageSize));
   const currentBillPageSafe = Math.min(currentBillPage, totalBillPages);
   const billPageStartIndex = (currentBillPageSafe - 1) * pageSize;
@@ -816,7 +832,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   useEffect(() => {
     setCurrentBillPage(1);
-  }, [billStatusFilters, selectedProjectId]);
+  }, [billStatusFilters, dueFilter, selectedProjectId]);
 
   return (
     <section className={styles.console}>
@@ -864,6 +880,17 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                 );
               })}
             </div>
+            <label>
+              Due filter
+              <select
+                value={dueFilter}
+                onChange={(event) => setDueFilter(event.target.value as "all" | "due_soon" | "overdue")}
+              >
+                <option value="all">all</option>
+                <option value="due_soon">due soon ({dueSoonWindowDays}d)</option>
+                <option value="overdue">overdue</option>
+              </select>
+            </label>
           </div>
           {filteredVendorBills.length > 0 ? (
             <div className={styles.tableWrap}>
@@ -925,7 +952,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
               </div>
             </div>
           ) : (
-            <p>No vendor bills match the selected status filters.</p>
+            <p>No vendor bills match the selected status/due filters.</p>
           )}
         </>
       ) : null}
