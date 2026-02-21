@@ -26,6 +26,7 @@ from core.models import (
     Project,
     Vendor,
     VendorBill,
+    VendorBillAllocation,
 )
 from core.views.helpers import _build_budget_baseline_snapshot
 
@@ -133,6 +134,32 @@ class Command(BaseCommand):
             keep_ids.append(line.id)
 
         EstimateLineItem.objects.filter(estimate=estimate).exclude(id__in=keep_ids).delete()
+
+    def _sync_vendor_bill_allocations(self, *, vendor_bill, allocations):
+        """Ensure deterministic vendor-bill allocations and remove stale rows."""
+        keep_ids = []
+
+        for entry in allocations:
+            existing_rows = VendorBillAllocation.objects.filter(
+                vendor_bill=vendor_bill,
+                budget_line=entry["budget_line"],
+            ).order_by("id")
+            row = existing_rows.first()
+            if row is None:
+                row = VendorBillAllocation.objects.create(
+                    vendor_bill=vendor_bill,
+                    budget_line=entry["budget_line"],
+                    amount=entry["amount"],
+                    note=entry.get("note", ""),
+                )
+            else:
+                existing_rows.exclude(id=row.id).delete()
+            row.amount = entry["amount"]
+            row.note = entry.get("note", "")
+            row.save(update_fields=["amount", "note"])
+            keep_ids.append(row.id)
+
+        VendorBillAllocation.objects.filter(vendor_bill=vendor_bill).exclude(id__in=keep_ids).delete()
 
     def _sync_estimate_status_history(
         self,
@@ -254,7 +281,36 @@ class Command(BaseCommand):
             )
             project_rows_by_status[status] = scoped_project
 
-        project = project_rows_by_status[Project.Status.ACTIVE]
+        child_models_project_name = f"{project_name} - CHILD MODELS (OPEN THIS PROJECT)"
+        project, _ = Project.objects.get_or_create(
+            created_by=user,
+            customer=customer,
+            name=child_models_project_name,
+            defaults={
+                "status": Project.Status.ACTIVE,
+                "contract_value_original": Decimal("1000.00"),
+                "contract_value_current": Decimal("1200.00"),
+                "start_date_planned": today,
+                "end_date_planned": today + timedelta(days=30),
+            },
+        )
+        project.status = Project.Status.ACTIVE
+        project.contract_value_original = Decimal("1000.00")
+        project.contract_value_current = Decimal("1200.00")
+        if not project.start_date_planned:
+            project.start_date_planned = today
+        if not project.end_date_planned:
+            project.end_date_planned = today + timedelta(days=30)
+        project.save(
+            update_fields=[
+                "status",
+                "contract_value_original",
+                "contract_value_current",
+                "start_date_planned",
+                "end_date_planned",
+                "updated_at",
+            ]
+        )
 
         lead, _ = LeadContact.objects.get_or_create(
             created_by=user,
@@ -296,54 +352,67 @@ class Command(BaseCommand):
             defaults={"name": "Tile", "is_active": True},
         )
 
-        estimate, _ = Estimate.objects.get_or_create(
-            created_by=user,
-            project=project,
-            title="Bathroom Remodel Estimate v1",
-            version=1,
-            defaults={
-                "status": Estimate.Status.APPROVED,
-                "subtotal": Decimal("1000.00"),
-                "markup_total": Decimal("0.00"),
-                "tax_percent": Decimal("0.00"),
-                "tax_total": Decimal("0.00"),
-                "grand_total": Decimal("1000.00"),
-            },
-        )
-        estimate.status = Estimate.Status.APPROVED
-        estimate.title = "Bathroom Remodel Estimate v1"
-        estimate.subtotal = Decimal("1000.00")
-        estimate.markup_total = Decimal("0.00")
-        estimate.tax_percent = Decimal("0.00")
-        estimate.tax_total = Decimal("0.00")
-        estimate.grand_total = Decimal("1000.00")
-        estimate.save(
-            update_fields=[
-                "status",
-                "title",
-                "subtotal",
-                "markup_total",
-                "tax_percent",
-                "tax_total",
-                "grand_total",
-                "updated_at",
-            ]
-        )
+        child_models_estimate_title = "CHILD MODELS ESTIMATE (OPEN THIS ESTIMATE)"
+        child_models_family_specs = [
+            {"version": 1, "status": Estimate.Status.ARCHIVED, "subtotal": Decimal("900.00")},
+            {"version": 2, "status": Estimate.Status.REJECTED, "subtotal": Decimal("950.00")},
+            {"version": 3, "status": Estimate.Status.APPROVED, "subtotal": Decimal("1000.00")},
+        ]
+        child_models_family_rows: dict[int, Estimate] = {}
+        for spec in child_models_family_specs:
+            version = spec["version"]
+            status = spec["status"]
+            subtotal = spec["subtotal"]
+            family_estimate, _ = Estimate.objects.get_or_create(
+                created_by=user,
+                project=project,
+                title=child_models_estimate_title,
+                version=version,
+                defaults={
+                    "status": status,
+                    "subtotal": subtotal,
+                    "markup_total": Decimal("0.00"),
+                    "tax_percent": Decimal("0.00"),
+                    "tax_total": Decimal("0.00"),
+                    "grand_total": subtotal,
+                },
+            )
+            family_estimate.status = status
+            family_estimate.title = child_models_estimate_title
+            family_estimate.subtotal = subtotal
+            family_estimate.markup_total = Decimal("0.00")
+            family_estimate.tax_percent = Decimal("0.00")
+            family_estimate.tax_total = Decimal("0.00")
+            family_estimate.grand_total = subtotal
+            family_estimate.save(
+                update_fields=[
+                    "status",
+                    "title",
+                    "subtotal",
+                    "markup_total",
+                    "tax_percent",
+                    "tax_total",
+                    "grand_total",
+                    "updated_at",
+                ]
+            )
+            self._sync_estimate_lines(
+                estimate=family_estimate,
+                primary_cost_code=code_demo,
+                secondary_cost_code=code_tile,
+                subtotal=family_estimate.subtotal,
+                primary_description=f"Family v{version} Demo",
+                secondary_description=f"Family v{version} Tile",
+            )
+            self._sync_estimate_status_history(
+                estimate=family_estimate,
+                target_status=status,
+                changed_by=user,
+                include_rework_cycle=False,
+            )
+            child_models_family_rows[version] = family_estimate
 
-        self._sync_estimate_lines(
-            estimate=estimate,
-            primary_cost_code=code_demo,
-            secondary_cost_code=code_tile,
-            subtotal=estimate.subtotal,
-            primary_description="Demo",
-            secondary_description="Tile",
-        )
-
-        self._sync_estimate_status_history(
-            estimate=estimate,
-            target_status=Estimate.Status.APPROVED,
-            changed_by=user,
-        )
+        estimate = child_models_family_rows[3]
 
         budget, _ = Budget.objects.get_or_create(
             created_by=user,
@@ -547,6 +616,16 @@ class Command(BaseCommand):
         vendor_bill.save(
             update_fields=["status", "issue_date", "due_date", "total", "balance_due", "notes", "created_by", "updated_at"]
         )
+        self._sync_vendor_bill_allocations(
+            vendor_bill=vendor_bill,
+            allocations=[
+                {
+                    "budget_line": budget_line_tile,
+                    "amount": Decimal("500.00"),
+                    "note": "Seed paid bill allocation.",
+                }
+            ],
+        )
 
         inbound_payment, _ = Payment.objects.get_or_create(
             project=project,
@@ -668,7 +747,7 @@ class Command(BaseCommand):
 
         estimate_rows_by_status = {}
         for idx, (status, _) in enumerate(Estimate.Status.choices, start=1):
-            coverage_title = f"Status Coverage Estimate ({status})"
+            coverage_title = f"STATUS VARIATION ESTIMATE ({status.upper()})"
             scoped_estimate, _ = Estimate.objects.get_or_create(
                 created_by=user,
                 project=project,
@@ -716,13 +795,12 @@ class Command(BaseCommand):
             )
             estimate_rows_by_status[status] = scoped_estimate
 
-        approved_history_estimate = estimate_rows_by_status.get(Estimate.Status.APPROVED, estimate)
         for status, scoped_estimate in estimate_rows_by_status.items():
             self._sync_estimate_status_history(
                 estimate=scoped_estimate,
                 target_status=status,
                 changed_by=user,
-                include_rework_cycle=scoped_estimate.id == approved_history_estimate.id,
+                include_rework_cycle=False,
             )
 
         budget_source_estimate = estimate_rows_by_status.get(Estimate.Status.APPROVED, estimate)
@@ -877,6 +955,24 @@ class Command(BaseCommand):
                     "updated_at",
                 ]
             )
+            if status in {VendorBill.Status.APPROVED, VendorBill.Status.SCHEDULED, VendorBill.Status.PAID}:
+                self._sync_vendor_bill_allocations(
+                    vendor_bill=scoped_vendor_bill,
+                    allocations=[
+                        {
+                            "budget_line": budget_line_demo,
+                            "amount": Decimal("90.00"),
+                            "note": "Seed status coverage allocation (demo).",
+                        },
+                        {
+                            "budget_line": budget_line_tile,
+                            "amount": Decimal("90.00"),
+                            "note": "Seed status coverage allocation (tile).",
+                        },
+                    ],
+                )
+            else:
+                self._sync_vendor_bill_allocations(vendor_bill=scoped_vendor_bill, allocations=[])
 
         payment_methods = [method for method, _ in Payment.Method.choices]
         for direction, _ in Payment.Direction.choices:
@@ -1058,6 +1154,14 @@ class Command(BaseCommand):
         self.stdout.write(f"Email: {email}")
         self.stdout.write(f"Password: {password}")
         self.stdout.write(f"Token: {token.key}")
+        self.stdout.write("Status-only projects (for project lifecycle preview):")
+        for status, _ in Project.Status.choices:
+            scoped_name = f"{project_name} [{status}]"
+            scoped_id = project_rows_by_status[status].id
+            self.stdout.write(f"- {scoped_name} (id={scoped_id})")
+        self.stdout.write(f"Child Models Project Name: {child_models_project_name}")
+        self.stdout.write(f"Child Models Estimate Title: {child_models_estimate_title}")
+        self.stdout.write("Child Models Estimate Family Versions: v1 archived, v2 rejected, v3 approved")
         self.stdout.write(f"Project ID: {project.id}")
         self.stdout.write("Manual flow entry points:")
         self.stdout.write("- /intake/quick-add")

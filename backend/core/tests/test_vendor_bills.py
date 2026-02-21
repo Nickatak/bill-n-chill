@@ -383,6 +383,49 @@ class VendorBillTests(TestCase):
         self.assertEqual(scheduled.status_code, 400)
         self.assertEqual(scheduled.json()["error"]["code"], "validation_error")
 
+    def test_vendor_bill_patch_requires_full_allocation_when_status_scheduled(self):
+        vendor_bill_id = self._create_vendor_bill(total="200.00")
+        received = self.client.patch(
+            f"/api/v1/vendor-bills/{vendor_bill_id}/",
+            data={"status": "received"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(received.status_code, 200)
+        approved = self.client.patch(
+            f"/api/v1/vendor-bills/{vendor_bill_id}/",
+            data={
+                "status": "approved",
+                "allocations": [
+                    {"budget_line": self.budget_line.id, "amount": "200.00", "note": "Full alloc"}
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(approved.status_code, 200)
+
+        scheduled = self.client.patch(
+            f"/api/v1/vendor-bills/{vendor_bill_id}/",
+            data={
+                "status": "scheduled",
+                "scheduled_for": "2026-02-25",
+                "allocations": [
+                    {"budget_line": self.budget_line.id, "amount": "150.00", "note": "Partial alloc"}
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(scheduled.status_code, 400)
+        payload = scheduled.json()["error"]
+        self.assertEqual(payload["code"], "validation_error")
+        self.assertEqual(
+            payload["message"],
+            "Approved, scheduled, and paid bills must be fully allocated.",
+        )
+        self.assertEqual(payload["fields"]["allocations"], ["Allocation total must equal bill total."])
+
     def test_vendor_bill_patch_rejects_allocation_with_wrong_project_budget_line(self):
         other_code = CostCode.objects.create(
             code="50-200",

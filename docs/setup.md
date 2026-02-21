@@ -141,6 +141,8 @@ To fully reset local data (delete everything) and reseed the Bob demo:
 
 ```bash
 backend/.venv/bin/python backend/manage.py reset_fresh_demo
+# or (with dev env selection)
+make dev-reset-fresh
 ```
 
 Options:

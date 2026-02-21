@@ -291,6 +291,9 @@ export function ProjectsConsole() {
   }, [selectedProjectId, statusFilteredProjects]);
 
   function handleSelectProject(project: ProjectRecord) {
+    if (String(project.id) === selectedProjectId) {
+      return;
+    }
     setSelectedProjectId(String(project.id));
     setIsProjectProfileOpen(false);
     setSummary(null);
@@ -574,13 +577,13 @@ export function ProjectsConsole() {
                     <Link href={`/projects/${selectedProject.id}/estimates`}>Estimates</Link>
                     <span className={styles.nodeEstimateMeta}>
                       <span className={`${styles.estimateCountPill} ${styles.estimateCountDraft}`}>
-                        D {estimateStatusCounts ? estimateStatusCounts.draft : "--"}
+                        D{estimateStatusCounts ? estimateStatusCounts.draft : "--"}
                       </span>
                       <span className={`${styles.estimateCountPill} ${styles.estimateCountSent}`}>
-                        S {estimateStatusCounts ? estimateStatusCounts.sent : "--"}
+                        S{estimateStatusCounts ? estimateStatusCounts.sent : "--"}
                       </span>
                       <span className={`${styles.estimateCountPill} ${styles.estimateCountApproved}`}>
-                        A {estimateStatusCounts ? estimateStatusCounts.approved : "--"}
+                        A{estimateStatusCounts ? estimateStatusCounts.approved : "--"}
                       </span>
                     </span>
                   </div>

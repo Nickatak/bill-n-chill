@@ -401,12 +401,12 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
             status=400,
         )
 
-    if next_status in {VendorBill.Status.APPROVED, VendorBill.Status.PAID} and allocation_total != candidate_total:
+    if next_status in {VendorBill.Status.APPROVED, VendorBill.Status.SCHEDULED, VendorBill.Status.PAID} and allocation_total != candidate_total:
         return Response(
             {
                 "error": {
                     "code": "validation_error",
-                    "message": "Approved and paid bills must be fully allocated.",
+                    "message": "Approved, scheduled, and paid bills must be fully allocated.",
                     "fields": {"allocations": ["Allocation total must equal bill total."]},
                 }
             },
