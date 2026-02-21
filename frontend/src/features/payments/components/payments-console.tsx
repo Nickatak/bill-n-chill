@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
@@ -53,7 +54,11 @@ export function PaymentsConsole() {
   const [allocationAmount, setAllocationAmount] = useState("0.00");
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+  const searchParams = useSearchParams();
   const canMutatePayments = role === "owner" || role === "bookkeeping";
+  const scopedProjectIdParam = searchParams.get("project");
+  const scopedProjectId =
+    scopedProjectIdParam && /^\d+$/.test(scopedProjectIdParam) ? Number(scopedProjectIdParam) : null;
   const selectedPayment = useMemo(
     () => payments.find((payment) => String(payment.id) === selectedPaymentId),
     [payments, selectedPaymentId],
@@ -96,7 +101,10 @@ export function PaymentsConsole() {
       const rows = (payload.data as ProjectRecord[]) ?? [];
       setProjects(rows);
       if (rows[0]) {
-        setSelectedProjectId(String(rows[0].id));
+        const scopedProject = scopedProjectId
+          ? rows.find((project) => project.id === scopedProjectId)
+          : null;
+        setSelectedProjectId(String((scopedProject ?? rows[0]).id));
       } else {
         setSelectedProjectId("");
       }
@@ -351,6 +359,42 @@ export function PaymentsConsole() {
     }
   }
 
+  async function handleQuickPaymentStatus(nextStatus: PaymentStatus) {
+    if (!canMutatePayments) {
+      setStatusMessage(`Role ${role} is read-only for payment mutations.`);
+      return;
+    }
+    const paymentId = Number(selectedPaymentId);
+    if (!paymentId) {
+      setStatusMessage("Select a payment first.");
+      return;
+    }
+    setStatusMessage(`Updating payment status to ${nextStatus}...`);
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/payments/${paymentId}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Token ${token}`,
+        },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setStatusMessage(payload.error?.message ?? "Quick status update failed.");
+        return;
+      }
+      const updated = payload.data as PaymentRecord;
+      setPayments((current) =>
+        current.map((payment) => (payment.id === updated.id ? updated : payment)),
+      );
+      hydratePayment(updated);
+      setStatusMessage(`Updated payment #${updated.id} to ${updated.status}.`);
+    } catch {
+      setStatusMessage("Could not reach payment quick status endpoint.");
+    }
+  }
+
   return (
     <section>
       <h2>Payment Recording</h2>
@@ -509,6 +553,18 @@ export function PaymentsConsole() {
         <button type="submit" disabled={!selectedPaymentId || !canMutatePayments}>
           Save Payment
         </button>
+        <p>Mobile quick actions:</p>
+        <p>
+          <button type="button" onClick={() => handleQuickPaymentStatus("settled")} disabled={!selectedPaymentId || !canMutatePayments}>
+            Mark Settled
+          </button>
+          <button type="button" onClick={() => handleQuickPaymentStatus("failed")} disabled={!selectedPaymentId || !canMutatePayments}>
+            Mark Failed
+          </button>
+          <button type="button" onClick={() => handleQuickPaymentStatus("void")} disabled={!selectedPaymentId || !canMutatePayments}>
+            Void
+          </button>
+        </p>
       </form>
 
       <section>

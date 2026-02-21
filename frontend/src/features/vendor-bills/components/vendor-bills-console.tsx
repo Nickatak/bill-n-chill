@@ -716,6 +716,40 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
   }
 
+  async function handleQuickVendorBillStatus(nextStatus: VendorBillStatus) {
+    if (!canMutateVendorBills) {
+      setStatusMessage(`Role ${role} is read-only for vendor bill mutations.`);
+      return;
+    }
+    const vendorBillId = Number(selectedVendorBillId);
+    if (!vendorBillId) {
+      setStatusMessage("Select a vendor bill first.");
+      return;
+    }
+    setStatusMessage(`Updating vendor bill status to ${nextStatus}...`);
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/vendor-bills/${vendorBillId}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Token ${token}`,
+        },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setStatusMessage(payload.error?.message ?? "Quick status update failed.");
+        return;
+      }
+      const updated = payload.data as VendorBillRecord;
+      setVendorBills((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      hydrate(updated);
+      setStatusMessage(`Updated vendor bill #${updated.id} to ${updated.status}.`);
+    } catch {
+      setStatusMessage("Could not reach vendor bill quick status endpoint.");
+    }
+  }
+
   function handleRecreateAsNewDraftTemplate() {
     if (!selectedVendorBillId) {
       setStatusMessage("Select a vendor bill first.");
@@ -1185,6 +1219,23 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
         >
           {isEditingMode ? "Save Vendor Bill" : "Create Vendor Bill"}
         </button>
+        {isEditingMode ? (
+          <p>
+            Mobile quick actions:
+            <button type="button" onClick={() => handleQuickVendorBillStatus("received")} disabled={!selectedVendorBillId || !canMutateVendorBills}>
+              Received
+            </button>
+            <button type="button" onClick={() => handleQuickVendorBillStatus("approved")} disabled={!selectedVendorBillId || !canMutateVendorBills}>
+              Approved
+            </button>
+            <button type="button" onClick={() => handleQuickVendorBillStatus("paid")} disabled={!selectedVendorBillId || !canMutateVendorBills}>
+              Paid
+            </button>
+            <button type="button" onClick={() => handleQuickVendorBillStatus("void")} disabled={!selectedVendorBillId || !canMutateVendorBills}>
+              Void
+            </button>
+          </p>
+        ) : null}
         {isEditingMode ? (
           <button type="button" onClick={handleRecreateAsNewDraftTemplate}>
             Recreate as New Planned

@@ -534,6 +534,20 @@ export function ProjectsConsole() {
       ) : null}
 
       {selectedProject ? (
+        <section className={styles.mobileQuickActions}>
+          <h3>Mobile Quick Actions</h3>
+          <p>One-tap shortcuts for in-field updates.</p>
+          <p>
+            <Link href="/intake/quick-add">Quick Add Contact</Link> |{" "}
+            <Link href={`/projects/${selectedProject.id}/change-orders`}>Quick CO</Link> |{" "}
+            <Link href={`/invoices?project=${selectedProject.id}`}>Quick Invoice</Link> |{" "}
+            <Link href={`/vendor-bills?project=${selectedProject.id}`}>Quick Vendor Bill</Link> |{" "}
+            <Link href={`/payments?project=${selectedProject.id}`}>Quick Payment</Link>
+          </p>
+        </section>
+      ) : null}
+
+      {selectedProject ? (
         <section className={styles.overview}>
           <div className={styles.overviewHeader}>
             <div>

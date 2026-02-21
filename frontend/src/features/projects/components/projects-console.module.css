@@ -370,6 +370,21 @@
   gap: 12px;
 }
 
+.mobileQuickActions {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #f8fafc;
+}
+
+.mobileQuickActions h3 {
+  margin: 0 0 4px;
+}
+
+.mobileQuickActions p {
+  margin: 6px 0;
+}
+
 .overviewHeader {
   display: flex;
   align-items: flex-start;
@@ -877,4 +892,9 @@
 :global(html[data-theme="dark"]) .metricsPanel {
   background: #0f172a;
   border-color: #1f2937;
+}
+
+:global(html[data-theme="dark"]) .mobileQuickActions {
+  background: #0f172a;
+  border-color: #334155;
 }
