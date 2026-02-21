@@ -36,6 +36,7 @@ from core.serializers.payments import (
     PaymentWriteSerializer,
 )
 from core.serializers.projects import (
+    AttentionFeedSerializer,
     CostCodeSerializer,
     ChangeImpactSummarySerializer,
     PortfolioSnapshotSerializer,
@@ -61,6 +62,7 @@ __all__ = [
     "ProjectFinancialSummarySerializer",
     "PortfolioSnapshotSerializer",
     "ChangeImpactSummarySerializer",
+    "AttentionFeedSerializer",
     "CostCodeSerializer",
     "VendorSerializer",
     "VendorWriteSerializer",

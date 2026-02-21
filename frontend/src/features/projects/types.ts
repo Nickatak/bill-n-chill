@@ -100,6 +100,7 @@ export type ApiResponse = {
     | ProjectFinancialSummary
     | PortfolioSnapshot
     | ChangeImpactSummary
+    | AttentionFeed
     | AccountingSyncEventRecord[]
     | AccountingSyncEventRecord
     | FinancialAuditEventRecord[];
@@ -152,4 +153,23 @@ export type ChangeImpactSummary = {
   approved_change_order_count: number;
   approved_change_order_total: string;
   projects: ChangeImpactProject[];
+};
+
+export type AttentionFeedItem = {
+  kind: string;
+  severity: "high" | "medium" | "low";
+  label: string;
+  detail: string;
+  project_id: number;
+  project_name: string;
+  ui_route: string;
+  detail_endpoint: string;
+  due_date: string | null;
+};
+
+export type AttentionFeed = {
+  generated_at: string;
+  due_soon_window_days: number;
+  item_count: number;
+  items: AttentionFeedItem[];
 };

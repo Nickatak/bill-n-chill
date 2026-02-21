@@ -7,6 +7,7 @@ import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "@/features/projects/api";
 import {
   AccountingSyncEventRecord,
+  AttentionFeed,
   ApiResponse,
   ChangeImpactSummary,
   FinancialAuditEventRecord,
@@ -35,6 +36,7 @@ export function FinancialsAuditingConsole() {
   const [reportDateTo, setReportDateTo] = useState("");
   const [portfolioSnapshot, setPortfolioSnapshot] = useState<PortfolioSnapshot | null>(null);
   const [changeImpactSummary, setChangeImpactSummary] = useState<ChangeImpactSummary | null>(null);
+  const [attentionFeed, setAttentionFeed] = useState<AttentionFeed | null>(null);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const hasSelectedProject = Boolean(selectedProjectId);
@@ -312,6 +314,24 @@ export function FinancialsAuditingConsole() {
     }
   }
 
+  async function loadAttentionFeed() {
+    setStatusMessage("Loading attention feed...");
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/reports/attention-feed/`, {
+        headers: { Authorization: `Token ${token}` },
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setStatusMessage(payload.error?.message ?? "Could not load attention feed.");
+        return;
+      }
+      setAttentionFeed(payload.data as AttentionFeed);
+      setStatusMessage("Attention feed loaded.");
+    } catch {
+      setStatusMessage("Could not reach attention feed endpoint.");
+    }
+  }
+
   return (
     <section>
       <p>{authMessage}</p>
@@ -433,6 +453,9 @@ export function FinancialsAuditingConsole() {
           <button type="button" onClick={loadChangeImpactSummary}>
             Load Change Impact Summary
           </button>
+          <button type="button" onClick={loadAttentionFeed}>
+            Load Attention Feed
+          </button>
         </p>
 
         {portfolioSnapshot ? (
@@ -468,6 +491,23 @@ export function FinancialsAuditingConsole() {
                   .join("\n")}
               />
             </label>
+          </div>
+        ) : null}
+
+        {attentionFeed ? (
+          <div>
+            <p>
+              Attention items: {attentionFeed.item_count} | due soon window:{" "}
+              {attentionFeed.due_soon_window_days} days
+            </p>
+            <ul>
+              {attentionFeed.items.map((item, index) => (
+                <li key={`${item.kind}-${item.detail_endpoint}-${index}`}>
+                  [{item.severity.toUpperCase()}] {item.label} ({item.project_name}) | {item.detail} |{" "}
+                  <Link href={item.ui_route}>Open</Link>
+                </li>
+              ))}
+            </ul>
           </div>
         ) : null}
       </section>

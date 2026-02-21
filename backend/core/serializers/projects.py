@@ -107,3 +107,22 @@ class ChangeImpactSummarySerializer(serializers.Serializer):
     approved_change_order_count = serializers.IntegerField()
     approved_change_order_total = serializers.DecimalField(max_digits=12, decimal_places=2)
     projects = ChangeImpactProjectSerializer(many=True)
+
+
+class AttentionFeedItemSerializer(serializers.Serializer):
+    kind = serializers.CharField()
+    severity = serializers.CharField()
+    label = serializers.CharField()
+    detail = serializers.CharField()
+    project_id = serializers.IntegerField()
+    project_name = serializers.CharField()
+    ui_route = serializers.CharField()
+    detail_endpoint = serializers.CharField()
+    due_date = serializers.DateField(allow_null=True)
+
+
+class AttentionFeedSerializer(serializers.Serializer):
+    generated_at = serializers.DateTimeField()
+    due_soon_window_days = serializers.IntegerField()
+    item_count = serializers.IntegerField()
+    items = AttentionFeedItemSerializer(many=True)

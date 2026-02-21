@@ -1,5 +1,5 @@
 import csv
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from io import StringIO
 
@@ -11,6 +11,7 @@ from rest_framework.response import Response
 
 from core.models import ChangeOrder, FinancialAuditEvent, Invoice, Payment, PaymentAllocation, Project, VendorBill
 from core.serializers import (
+    AttentionFeedSerializer,
     ChangeImpactSummarySerializer,
     FinancialAuditEventSerializer,
     PortfolioSnapshotSerializer,
@@ -586,3 +587,128 @@ def change_impact_summary_view(request):
         "projects": sorted(project_map.values(), key=lambda row: row["approved_change_order_total"], reverse=True),
     }
     return Response({"data": ChangeImpactSummarySerializer(payload).data})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def attention_feed_view(request):
+    today = django_timezone.localdate()
+    due_soon_window_days = 7
+    due_soon_date = today + timedelta(days=due_soon_window_days)
+    items = []
+
+    overdue_invoices = (
+        Invoice.objects.filter(
+            project__created_by=request.user,
+            created_by=request.user,
+            due_date__lt=today,
+        )
+        .exclude(status__in=[Invoice.Status.PAID, Invoice.Status.VOID])
+        .select_related("project")
+        .order_by("due_date", "id")
+    )
+    for row in overdue_invoices:
+        items.append(
+            {
+                "kind": "overdue_invoice",
+                "severity": "high",
+                "label": f"Invoice {row.invoice_number} overdue",
+                "detail": f"Status {row.status}, balance due {row.balance_due}",
+                "project_id": row.project_id,
+                "project_name": row.project.name,
+                "ui_route": "/invoices",
+                "detail_endpoint": f"/api/v1/invoices/{row.id}/",
+                "due_date": row.due_date,
+            }
+        )
+
+    due_soon_vendor_bills = (
+        VendorBill.objects.filter(
+            project__created_by=request.user,
+            created_by=request.user,
+            due_date__gte=today,
+            due_date__lte=due_soon_date,
+        )
+        .exclude(status__in=[VendorBill.Status.PAID, VendorBill.Status.VOID])
+        .select_related("project")
+        .order_by("due_date", "id")
+    )
+    for row in due_soon_vendor_bills:
+        items.append(
+            {
+                "kind": "vendor_bill_due_soon",
+                "severity": "medium",
+                "label": f"Vendor bill {row.bill_number} due soon",
+                "detail": f"Status {row.status}, balance due {row.balance_due}",
+                "project_id": row.project_id,
+                "project_name": row.project.name,
+                "ui_route": "/vendor-bills",
+                "detail_endpoint": f"/api/v1/vendor-bills/{row.id}/",
+                "due_date": row.due_date,
+            }
+        )
+
+    pending_change_orders = (
+        ChangeOrder.objects.filter(
+            requested_by=request.user,
+            status=ChangeOrder.Status.PENDING_APPROVAL,
+        )
+        .select_related("project")
+        .order_by("-created_at", "-id")
+    )
+    for row in pending_change_orders:
+        items.append(
+            {
+                "kind": "change_order_pending_approval",
+                "severity": "medium",
+                "label": f"CO-{row.number} pending approval",
+                "detail": f"{row.title} | amount delta {row.amount_delta}",
+                "project_id": row.project_id,
+                "project_name": row.project.name,
+                "ui_route": "/change-orders",
+                "detail_endpoint": f"/api/v1/change-orders/{row.id}/",
+                "due_date": None,
+            }
+        )
+
+    problem_payments = (
+        Payment.objects.filter(
+            project__created_by=request.user,
+            created_by=request.user,
+            status__in=[Payment.Status.FAILED, Payment.Status.VOID],
+        )
+        .select_related("project")
+        .order_by("-payment_date", "-id")
+    )
+    for row in problem_payments:
+        severity = "high" if row.status == Payment.Status.FAILED else "low"
+        items.append(
+            {
+                "kind": "payment_problem",
+                "severity": severity,
+                "label": f"Payment #{row.id} {row.status}",
+                "detail": f"{row.direction} {row.amount} via {row.method}",
+                "project_id": row.project_id,
+                "project_name": row.project.name,
+                "ui_route": "/payments",
+                "detail_endpoint": f"/api/v1/payments/{row.id}/",
+                "due_date": None,
+            }
+        )
+
+    severity_rank = {"high": 0, "medium": 1, "low": 2}
+    items = sorted(
+        items,
+        key=lambda row: (
+            severity_rank.get(row["severity"], 9),
+            row["due_date"] or today,
+            row["project_id"],
+        ),
+    )
+    payload = {
+        "generated_at": django_timezone.now(),
+        "due_soon_window_days": due_soon_window_days,
+        "item_count": len(items),
+        "items": items,
+    }
+    return Response({"data": AttentionFeedSerializer(payload).data})

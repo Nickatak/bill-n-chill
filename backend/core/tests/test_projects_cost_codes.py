@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 from core.tests.common import *
+from django.utils import timezone
 
 class ProjectProfileTests(TestCase):
     def setUp(self):
@@ -663,3 +666,63 @@ class ReportingPackTests(TestCase):
         self.assertEqual(scoped.status_code, 200)
         scoped_data = scoped.json()["data"]
         self.assertEqual(scoped_data["approved_change_order_total"], "0.00")
+
+    def test_attention_feed_returns_actionable_items(self):
+        today = timezone.localdate()
+        overdue_due_date = today - timedelta(days=1)
+        due_soon_date = today + timedelta(days=4)
+        Invoice.objects.create(
+            project=self.project,
+            customer=self.project.customer,
+            invoice_number="INV-ATTN-1",
+            status=Invoice.Status.SENT,
+            issue_date=today,
+            due_date=overdue_due_date,
+            subtotal="250.00",
+            total="250.00",
+            balance_due="250.00",
+            created_by=self.user,
+        )
+        VendorBill.objects.create(
+            project=self.project,
+            vendor=self.vendor,
+            bill_number="VB-ATTN-1",
+            status=VendorBill.Status.RECEIVED,
+            issue_date=today,
+            due_date=due_soon_date,
+            total="180.00",
+            balance_due="180.00",
+            created_by=self.user,
+        )
+        ChangeOrder.objects.create(
+            project=self.project,
+            number=21,
+            title="Pending Approval CO",
+            status=ChangeOrder.Status.PENDING_APPROVAL,
+            amount_delta="90.00",
+            days_delta=1,
+            requested_by=self.user,
+        )
+        Payment.objects.create(
+            project=self.project,
+            direction=Payment.Direction.INBOUND,
+            method=Payment.Method.ACH,
+            status=Payment.Status.FAILED,
+            amount="120.00",
+            payment_date=today,
+            created_by=self.user,
+        )
+
+        response = self.client.get(
+            "/api/v1/reports/attention-feed/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data["due_soon_window_days"], 7)
+        self.assertEqual(data["item_count"], 4)
+        kinds = {item["kind"] for item in data["items"]}
+        self.assertIn("overdue_invoice", kinds)
+        self.assertIn("vendor_bill_due_soon", kinds)
+        self.assertIn("change_order_pending_approval", kinds)
+        self.assertIn("payment_problem", kinds)

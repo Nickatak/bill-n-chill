@@ -336,6 +336,21 @@ CO-02 extends existing CO endpoints with propagation behavior.
   - Filter behavior:
     - filters approved CO rows by `approved_at` date window.
 
+## Attention Feed (RPT-02)
+
+- `GET /api/v1/reports/attention-feed/`
+  - Auth required
+  - Returns in-app actionable attention items across projects:
+    - overdue invoices
+    - vendor bills due soon (next 7 days)
+    - change orders pending approval
+    - failed/voided payments
+  - Response includes:
+    - `generated_at`
+    - `due_soon_window_days`
+    - `item_count`
+    - `items[]` with severity, label/detail, project context, and source links.
+
 ## Invoice Composition and Send (INV-01)
 
 - `GET /api/v1/projects/{project_id}/invoices/`
