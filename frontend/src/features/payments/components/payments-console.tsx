@@ -22,6 +22,19 @@ function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function paymentNextActionHint(status: PaymentStatus): string {
+  if (status === "pending") {
+    return "Next: settle or mark failed once bank confirmation is known.";
+  }
+  if (status === "settled") {
+    return "Next: allocate this payment to invoice/vendor-bill targets.";
+  }
+  if (status === "failed") {
+    return "Next: retry collection/disbursement or void if cancelled.";
+  }
+  return "Payment is void and cannot be allocated.";
+}
+
 export function PaymentsConsole() {
   const { token, authMessage, role } = useSharedSessionAuth();
   const [statusMessage, setStatusMessage] = useState("");
@@ -497,6 +510,16 @@ export function PaymentsConsole() {
             ))}
           </select>
         </label>
+      ) : (
+        <p>No payments yet for this project. Create one to start reconciliation.</p>
+      )}
+
+      {selectedPayment ? (
+        <p>
+          Selected payment #{selectedPayment.id}: status {selectedPayment.status} | allocated{" "}
+          {selectedPayment.allocated_total} | unapplied {selectedPayment.unapplied_amount}.{" "}
+          {paymentNextActionHint(selectedPayment.status)}
+        </p>
       ) : null}
 
       <form onSubmit={handleSavePayment}>

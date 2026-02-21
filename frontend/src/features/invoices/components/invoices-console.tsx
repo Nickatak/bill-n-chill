@@ -27,6 +27,28 @@ function emptyLine(localId: number, defaultCostCodeId = ""): InvoiceLineInput {
   };
 }
 
+function invoiceNextActionHint(status: string): string {
+  if (status === "draft") {
+    return "Next: send the invoice to move it into billable AR tracking.";
+  }
+  if (status === "sent") {
+    return "Next: record payments to move invoice to partially paid or paid.";
+  }
+  if (status === "partially_paid") {
+    return "Next: allocate remaining payment and close the outstanding balance.";
+  }
+  if (status === "overdue") {
+    return "Next: follow up with client and record payment once received.";
+  }
+  if (status === "paid") {
+    return "Invoice is fully settled.";
+  }
+  if (status === "void") {
+    return "Invoice is void and no longer billable.";
+  }
+  return "Select a status transition as needed.";
+}
+
 export function InvoicesConsole() {
   const { token, authMessage, role } = useSharedSessionAuth();
   const [statusMessage, setStatusMessage] = useState("");
@@ -440,11 +462,22 @@ export function InvoicesConsole() {
           >
             {invoices.map((invoice) => (
               <option key={invoice.id} value={invoice.id}>
-                {invoice.invoice_number} ({invoice.status}) - total ${invoice.total}
+                {invoice.invoice_number} ({invoice.status}) - total ${invoice.total} - due ${invoice.balance_due}
               </option>
             ))}
           </select>
         </label>
+      ) : (
+        <p>No invoices yet for this project. Create one from line items above.</p>
+      )}
+
+      {selectedInvoiceId ? (
+        <p>
+          Selected invoice hint:{" "}
+          {invoiceNextActionHint(
+            invoices.find((invoice) => String(invoice.id) === selectedInvoiceId)?.status || selectedStatus,
+          )}
+        </p>
       ) : null}
 
       <h3>Invoice Status</h3>
