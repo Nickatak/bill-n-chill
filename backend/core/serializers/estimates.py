@@ -108,7 +108,8 @@ class EstimateWriteSerializer(serializers.Serializer):
         return trimmed
 
     def validate_status(self, value: str) -> str:
-        if value == Estimate.Status.ARCHIVED:
+        allow_archived_status = bool(self.context.get("allow_archived_status", False))
+        if value == Estimate.Status.ARCHIVED and not allow_archived_status:
             raise serializers.ValidationError(
                 "Archived status is system-controlled and cannot be set directly."
             )

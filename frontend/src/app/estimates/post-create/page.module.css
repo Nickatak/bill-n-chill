@@ -12,7 +12,7 @@
 }
 
 .main {
-  width: min(820px, 100%);
+  width: min(1080px, 100%);
   margin: 0 auto;
   display: grid;
   gap: 14px;
@@ -52,7 +52,13 @@
   color: var(--text-secondary);
 }
 
-.actions {
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.footerActions {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
@@ -60,6 +66,9 @@
 
 .linkButton,
 .ghostButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 8px;
   padding: 8px 14px;
   text-decoration: none;
@@ -81,6 +90,10 @@
 @media (max-width: 640px) {
   .page {
     padding: 12px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
   }
 
   .header,

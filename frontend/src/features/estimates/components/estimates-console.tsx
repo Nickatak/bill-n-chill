@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { loadClientSession } from "../../session/client-session";
 import styles from "./estimates-console.module.css";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   formatDateInputFromIso,
@@ -41,6 +41,7 @@ function emptyLine(localId: number, defaultCostCodeId = ""): EstimateLineInput {
 }
 
 export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }: EstimatesConsoleProps) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [token, setToken] = useState("");
   const [, setStatusMessage] = useState("");
@@ -116,12 +117,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     rejected: [],
     archived: [],
   };
-  const revisableStatuses = new Set(["sent", "rejected", "archived"]);
-  const canCreateRevision = Boolean(
-    selectedEstimate && revisableStatuses.has(selectedEstimate.status),
-  );
-  const revisionUnavailableMessage =
-    "Revisions are only for sent, rejected, or voided estimates. If this estimate is still draft, select it in the viewer and edit it directly.";
   const nextStatusValues = selectedEstimate
     ? allowedStatusTransitions[selectedEstimate.status] ?? []
     : [];
@@ -165,6 +160,89 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   function toNumber(value: string): number {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function postEstimateWorkflowHref(estimateId: number): string {
+    if (!selectedProjectId) {
+      return "/projects";
+    }
+    const params = new URLSearchParams({
+      project: selectedProjectId,
+      estimate: String(estimateId),
+    });
+    return `/estimates/post-create?${params.toString()}`;
+  }
+
+  function quickActionKindForStatus(status: string): "change_order" | "revision" | null {
+    if (status === "approved") {
+      return "change_order";
+    }
+    if (status === "rejected" || status === "archived") {
+      return "revision";
+    }
+    return null;
+  }
+
+  function quickActionTitleForStatus(status: string): string {
+    const kind = quickActionKindForStatus(status);
+    if (kind === "change_order") {
+      return "Start change-order workflow from this estimate";
+    }
+    if (kind === "revision") {
+      return "Create revision from this estimate";
+    }
+    return "";
+  }
+
+  async function cloneEstimateRevision(sourceEstimate: EstimateRecord) {
+    const sourceWasSent = sourceEstimate.status === "sent";
+    setStatusMessage("Cloning estimate version...");
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/estimates/${sourceEstimate.id}/clone-version/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Token ${token}`,
+        },
+        body: JSON.stringify({}),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setStatusMessage("Clone failed.");
+        return;
+      }
+      const cloned = payload.data as EstimateRecord;
+      setEstimates((current) => {
+        const updated = current.map((estimate) =>
+          sourceWasSent && estimate.id === sourceEstimate.id
+            ? { ...estimate, status: "rejected" }
+            : estimate,
+        );
+        return [cloned, ...updated];
+      });
+      handleSelectEstimate(cloned);
+      setStatusEvents([]);
+      setStatusMessage(`Cloned estimate to version ${cloned.version}.`);
+      setActionMessage("");
+    } catch {
+      setStatusMessage("Could not reach clone endpoint.");
+    }
+  }
+
+  async function handleFamilyCardQuickAction(sourceEstimate: EstimateRecord) {
+    const actionKind = quickActionKindForStatus(sourceEstimate.status);
+    if (!actionKind) {
+      return;
+    }
+    if (actionKind === "change_order") {
+      if (!selectedProjectId) {
+        setStatusMessage("Select a project first.");
+        return;
+      }
+      router.push(`/projects/${selectedProjectId}/change-orders?origin_estimate=${sourceEstimate.id}`);
+      return;
+    }
+    await cloneEstimateRevision(sourceEstimate);
   }
 
   const lineTotals = useMemo(
@@ -283,6 +361,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
   function startNewEstimate() {
     const defaultCostCodeId = costCodes[0] ? String(costCodes[0].id) : "";
+    setIsViewerExpanded(false);
     setSelectedEstimateId("");
     setSelectedStatus("draft");
     setStatusNote("");
@@ -682,6 +761,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       }
       const created = payload.data as EstimateRecord;
       setEstimates((current) => [created, ...current]);
+      setIsViewerExpanded(true);
       handleSelectEstimate(created);
       setStatusEvents([]);
       setStatusMessage(`Created estimate #${created.id} v${created.version}.`);
@@ -691,53 +771,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     } finally {
       submitGuard.current = false;
       setIsSubmitting(false);
-    }
-  }
-
-  async function handleCloneEstimate() {
-    const estimateId = Number(selectedEstimateId);
-    if (!estimateId) {
-      setStatusMessage("Select an existing estimate version before creating a revision.");
-      setActionMessage("Select an existing estimate version before creating a revision.");
-      return;
-    }
-    if (!canCreateRevision) {
-      setStatusMessage(revisionUnavailableMessage);
-      setActionMessage(revisionUnavailableMessage);
-      return;
-    }
-    const sourceWasSent = selectedEstimate?.status === "sent";
-
-    setStatusMessage("Cloning estimate version...");
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/estimates/${estimateId}/clone-version/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
-        body: JSON.stringify({}),
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setStatusMessage("Clone failed.");
-        return;
-      }
-      const cloned = payload.data as EstimateRecord;
-      setEstimates((current) => {
-        const updated = current.map((estimate) =>
-          sourceWasSent && estimate.id === estimateId
-            ? { ...estimate, status: "rejected" }
-            : estimate,
-        );
-        return [cloned, ...updated];
-      });
-      handleSelectEstimate(cloned);
-      setStatusEvents([]);
-      setStatusMessage(`Cloned estimate to version ${cloned.version}.`);
-      setActionMessage("");
-    } catch {
-      setStatusMessage("Could not reach clone endpoint.");
     }
   }
 
@@ -933,17 +966,15 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
               >
                 Duplicate as New Estimate
               </button>
-              <button
-                type="button"
-                onClick={handleCloneEstimate}
-                title={
-                  selectedEstimate && !canCreateRevision
-                    ? revisionUnavailableMessage
-                    : undefined
-                }
-              >
-                Create Revision From Selected
-              </button>
+              {selectedEstimate && selectedProjectId ? (
+                <Link
+                  href={postEstimateWorkflowHref(selectedEstimate.id)}
+                  className={styles.lifecycleLinkAction}
+                  prefetch={false}
+                >
+                  Open Post-Estimate Workflow
+                </Link>
+              ) : null}
             </div>
             {actionMessage ? <p className={styles.actionError}>{actionMessage}</p> : null}
             {showDuplicatePanel ? (
@@ -1025,6 +1056,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                   const isLatestSelected = String(latest.id) === selectedEstimateId;
                   const isHistoryOpen = openFamilyHistory.has(family.title);
                   const relationEstimateId = selectedInFamily?.id ?? latest.id;
+                  const quickActionKind = quickActionKindForStatus(latest.status);
+                  const quickActionTitle = quickActionTitleForStatus(latest.status);
                   const relatedChangeOrders = projectChangeOrders.filter(
                     (changeOrder) => changeOrder.origin_estimate === relationEstimateId,
                   );
@@ -1038,6 +1071,17 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                     >
                       <div className={styles.familyRow}>
                         <div className={styles.versionCardWrap}>
+                          {quickActionKind ? (
+                            <button
+                              type="button"
+                              className={styles.coStartIconLink}
+                              aria-label={`${quickActionTitle} (estimate #${latest.id})`}
+                              title={quickActionTitle}
+                              onClick={() => void handleFamilyCardQuickAction(latest)}
+                            >
+                              +
+                            </button>
+                          ) : null}
                           {latest.public_ref ? (
                             <Link
                               href={publicEstimateHref(latest.public_ref)}
@@ -1060,7 +1104,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                             <div className={styles.familyMainContent}>
                               <span className={styles.familyTitle}>{family.title}</span>
                               <span className={styles.familyMeta}>
-                                Estimate #{latest.id} · {history.length} history{" "}
+                                ${latestTotal} · Estimate #{latest.id} · {history.length} history{" "}
                                 {history.length === 1 ? "entry" : "entries"}
                               </span>
                               <span className={styles.familyDate}>
@@ -1075,7 +1119,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                               >
                                 {formatEstimateStatus(latest.status)}
                               </span>
-                              <span className={styles.versionAmount}>${latestTotal}</span>
                             </div>
                           </button>
                         </div>
@@ -1141,7 +1184,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                               <span key={changeOrder.id}>
                                 {index > 0 ? ", " : ""}
                                 <Link
-                                  href={`/projects/${selectedProjectId}/change-orders`}
+                                  href={`/projects/${selectedProjectId}/change-orders?origin_estimate=${relationEstimateId}`}
                                   className={styles.relatedChangeOrdersLink}
                                 >
                                   CO-{changeOrder.number} v{changeOrder.revision_number}
