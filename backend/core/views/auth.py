@@ -5,6 +5,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from core.serializers import LoginSerializer, RegisterSerializer
+from core.views.helpers import _ensure_primary_membership, _resolve_user_role
 
 User = get_user_model()
 
@@ -21,6 +22,7 @@ def login_view(request):
     serializer = LoginSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     user = serializer.validated_data["user"]
+    membership = _ensure_primary_membership(user)
     token, _ = Token.objects.get_or_create(user=user)
 
     return Response(
@@ -30,6 +32,12 @@ def login_view(request):
                 "user": {
                     "id": user.id,
                     "email": user.email,
+                    "role": _resolve_user_role(user),
+                },
+                "organization": {
+                    "id": membership.organization_id,
+                    "display_name": membership.organization.display_name,
+                    "slug": membership.organization.slug,
                 },
             }
         }
@@ -45,6 +53,7 @@ def register_view(request):
     email = serializer.validated_data["email"]
     password = serializer.validated_data["password"]
     user = User.objects.create_user(username=email, email=email, password=password)
+    membership = _ensure_primary_membership(user)
     token, _ = Token.objects.get_or_create(user=user)
 
     return Response(
@@ -54,6 +63,12 @@ def register_view(request):
                 "user": {
                     "id": user.id,
                     "email": user.email,
+                    "role": _resolve_user_role(user),
+                },
+                "organization": {
+                    "id": membership.organization_id,
+                    "display_name": membership.organization.display_name,
+                    "slug": membership.organization.slug,
                 },
             }
         },
@@ -65,4 +80,18 @@ def register_view(request):
 @permission_classes([IsAuthenticated])
 def me_view(request):
     user = request.user
-    return Response({"data": {"id": user.id, "email": user.email}})
+    membership = _ensure_primary_membership(user)
+    return Response(
+        {
+            "data": {
+                "id": user.id,
+                "email": user.email,
+                "role": _resolve_user_role(user),
+                "organization": {
+                    "id": membership.organization_id,
+                    "display_name": membership.organization.display_name,
+                    "slug": membership.organization.slug,
+                },
+            }
+        }
+    )

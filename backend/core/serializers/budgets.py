@@ -10,6 +10,8 @@ class BudgetLineSerializer(serializers.ModelSerializer):
     cost_code_name = serializers.CharField(source="cost_code.name", read_only=True)
     planned_amount = serializers.SerializerMethodField()
     actual_spend = serializers.SerializerMethodField()
+    approved_change_order_delta = serializers.SerializerMethodField()
+    current_working_amount = serializers.SerializerMethodField()
     remaining_amount = serializers.SerializerMethodField()
 
     class Meta:
@@ -24,6 +26,8 @@ class BudgetLineSerializer(serializers.ModelSerializer):
             "budget_amount",
             "planned_amount",
             "actual_spend",
+            "approved_change_order_delta",
+            "current_working_amount",
             "remaining_amount",
             "committed_amount",
             "actual_amount",
@@ -39,18 +43,33 @@ class BudgetLineSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
+    @staticmethod
+    def _money_str(value: Decimal) -> str:
+        amount = value if isinstance(value, Decimal) else Decimal(str(value or 0))
+        return f"{amount:.2f}"
+
     def get_planned_amount(self, obj):
         return str(obj.budget_amount or Decimal("0"))
 
     def get_actual_spend(self, obj):
         spend_map = self.context.get("line_actual_spend_map", {})
-        return str(spend_map.get(obj.id, Decimal("0")))
+        return self._money_str(spend_map.get(obj.id, Decimal("0")))
+
+    def get_approved_change_order_delta(self, obj):
+        co_delta_map = self.context.get("line_approved_co_delta_map", {})
+        return self._money_str(co_delta_map.get(obj.id, Decimal("0")))
+
+    def get_current_working_amount(self, obj):
+        co_delta_map = self.context.get("line_approved_co_delta_map", {})
+        base_amount = obj.budget_amount or Decimal("0")
+        return self._money_str(base_amount + co_delta_map.get(obj.id, Decimal("0")))
 
     def get_remaining_amount(self, obj):
         spend_map = self.context.get("line_actual_spend_map", {})
         actual_spend = spend_map.get(obj.id, Decimal("0"))
-        planned_amount = obj.budget_amount or Decimal("0")
-        return str(planned_amount - actual_spend)
+        co_delta_map = self.context.get("line_approved_co_delta_map", {})
+        planned_amount = (obj.budget_amount or Decimal("0")) + co_delta_map.get(obj.id, Decimal("0"))
+        return self._money_str(planned_amount - actual_spend)
 
 
 class BudgetSerializer(serializers.ModelSerializer):

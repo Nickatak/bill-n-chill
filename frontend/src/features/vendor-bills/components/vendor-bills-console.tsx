@@ -62,8 +62,9 @@ type VendorBillsConsoleProps = {
 };
 
 export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null }: VendorBillsConsoleProps) {
-  const { token } = useSharedSessionAuth();
+  const { token, role } = useSharedSessionAuth();
   const pageSize = 5;
+  const dueSoonWindowDays = 7;
   const [statusMessage, setStatusMessage] = useState("");
   const [createErrorMessage, setCreateErrorMessage] = useState("");
 
@@ -89,6 +90,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const [billStatusFilters, setBillStatusFilters] = useState<VendorBillStatus[]>(
     defaultBillStatusFilters,
   );
+  const [dueFilter, setDueFilter] = useState<"all" | "due_soon" | "overdue">("all");
   const [currentBillPage, setCurrentBillPage] = useState(1);
 
   const [newVendorId, setNewVendorId] = useState("");
@@ -117,9 +119,23 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   const [duplicateCandidates, setDuplicateCandidates] = useState<VendorBillRecord[]>([]);
   const activeVendors = vendors.filter((vendor) => vendor.is_active);
-  const filteredVendorBills = vendorBills.filter((bill) =>
-    billStatusFilters.length === 0 ? false : billStatusFilters.includes(bill.status),
-  );
+  const filteredVendorBills = vendorBills.filter((bill) => {
+    if (billStatusFilters.length === 0 || !billStatusFilters.includes(bill.status)) {
+      return false;
+    }
+    if (dueFilter === "all") {
+      return true;
+    }
+    if (!bill.due_date || bill.status === "paid" || bill.status === "void") {
+      return false;
+    }
+    const today = todayIsoDate();
+    if (dueFilter === "overdue") {
+      return bill.due_date < today;
+    }
+    const dueSoonDate = dueDateIsoDate(dueSoonWindowDays);
+    return bill.due_date >= today && bill.due_date <= dueSoonDate;
+  });
   const totalBillPages = Math.max(1, Math.ceil(filteredVendorBills.length / pageSize));
   const currentBillPageSafe = Math.min(currentBillPage, totalBillPages);
   const billPageStartIndex = (currentBillPageSafe - 1) * pageSize;
@@ -153,6 +169,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   }, [budgetLineGroups]);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+  const canMutateVendorBills = role === "owner" || role === "pm" || role === "bookkeeping";
   const scopedProjectId = scopedProjectIdProp;
   const isProjectScoped = scopedProjectId !== null;
   const selectedProject =
@@ -320,6 +337,11 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   }
 
   function handleSubmitVendorBillForm(event: FormEvent<HTMLFormElement>) {
+    if (!canMutateVendorBills) {
+      event.preventDefault();
+      setStatusMessage(`Role ${role} is read-only for vendor bill mutations.`);
+      return;
+    }
     if (isEditingMode) {
       void handleSaveVendorBill(event);
       return;
@@ -710,6 +732,40 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
   }
 
+  async function handleQuickVendorBillStatus(nextStatus: VendorBillStatus) {
+    if (!canMutateVendorBills) {
+      setStatusMessage(`Role ${role} is read-only for vendor bill mutations.`);
+      return;
+    }
+    const vendorBillId = Number(selectedVendorBillId);
+    if (!vendorBillId) {
+      setStatusMessage("Select a vendor bill first.");
+      return;
+    }
+    setStatusMessage(`Updating vendor bill status to ${nextStatus}...`);
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/vendor-bills/${vendorBillId}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Token ${token}`,
+        },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setStatusMessage(payload.error?.message ?? "Quick status update failed.");
+        return;
+      }
+      const updated = payload.data as VendorBillRecord;
+      setVendorBills((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      hydrate(updated);
+      setStatusMessage(`Updated vendor bill #${updated.id} to ${updated.status}.`);
+    } catch {
+      setStatusMessage("Could not reach vendor bill quick status endpoint.");
+    }
+  }
+
   function handleRecreateAsNewDraftTemplate() {
     if (!selectedVendorBillId) {
       setStatusMessage("Select a vendor bill first.");
@@ -776,7 +832,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   useEffect(() => {
     setCurrentBillPage(1);
-  }, [billStatusFilters, selectedProjectId]);
+  }, [billStatusFilters, dueFilter, selectedProjectId]);
 
   return (
     <section className={styles.console}>
@@ -824,6 +880,17 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                 );
               })}
             </div>
+            <label>
+              Due filter
+              <select
+                value={dueFilter}
+                onChange={(event) => setDueFilter(event.target.value as "all" | "due_soon" | "overdue")}
+              >
+                <option value="all">all</option>
+                <option value="due_soon">due soon ({dueSoonWindowDays}d)</option>
+                <option value="overdue">overdue</option>
+              </select>
+            </label>
           </div>
           {filteredVendorBills.length > 0 ? (
             <div className={styles.tableWrap}>
@@ -885,7 +952,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
               </div>
             </div>
           ) : (
-            <p>No vendor bills match the selected status filters.</p>
+            <p>No vendor bills match the selected status/due filters.</p>
           )}
         </>
       ) : null}
@@ -1169,6 +1236,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
         <button
           type="submit"
           disabled={
+            !canMutateVendorBills ||
             !selectedProjectId ||
             !formVendorId ||
             formIsOverAllocated ||
@@ -1178,6 +1246,23 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
         >
           {isEditingMode ? "Save Vendor Bill" : "Create Vendor Bill"}
         </button>
+        {isEditingMode ? (
+          <p>
+            Mobile quick actions:
+            <button type="button" onClick={() => handleQuickVendorBillStatus("received")} disabled={!selectedVendorBillId || !canMutateVendorBills}>
+              Received
+            </button>
+            <button type="button" onClick={() => handleQuickVendorBillStatus("approved")} disabled={!selectedVendorBillId || !canMutateVendorBills}>
+              Approved
+            </button>
+            <button type="button" onClick={() => handleQuickVendorBillStatus("paid")} disabled={!selectedVendorBillId || !canMutateVendorBills}>
+              Paid
+            </button>
+            <button type="button" onClick={() => handleQuickVendorBillStatus("void")} disabled={!selectedVendorBillId || !canMutateVendorBills}>
+              Void
+            </button>
+          </p>
+        ) : null}
         {isEditingMode ? (
           <button type="button" onClick={handleRecreateAsNewDraftTemplate}>
             Recreate as New Planned
@@ -1201,6 +1286,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       ) : null}
 
       <p>{statusMessage}</p>
+      {!canMutateVendorBills ? <p>Role `{role}` can view vendor bills but cannot create or update.</p> : null}
     </section>
   );
 }

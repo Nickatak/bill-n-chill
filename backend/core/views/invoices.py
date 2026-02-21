@@ -17,6 +17,7 @@ from core.views.helpers import (
     _next_invoice_number,
     _resolve_invoice_cost_codes_for_user,
     _record_financial_audit_event,
+    _role_gate_error_payload,
     _validate_invoice_status_transition,
     _validate_project_for_user,
 )
@@ -40,6 +41,10 @@ def project_invoices_view(request, project_id: int):
             .order_by("-created_at")
         )
         return Response({"data": InvoiceSerializer(rows, many=True).data})
+
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm", "bookkeeping"})
+    if permission_error:
+        return Response(permission_error, status=403)
 
     serializer = InvoiceWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -133,6 +138,10 @@ def invoice_detail_view(request, invoice_id: int):
 
     if request.method == "GET":
         return Response({"data": InvoiceSerializer(invoice).data})
+
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm", "bookkeeping"})
+    if permission_error:
+        return Response(permission_error, status=403)
 
     serializer = InvoiceWriteSerializer(data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
@@ -329,6 +338,10 @@ def invoice_send_view(request, invoice_id: int):
             {"error": {"code": "not_found", "message": "Invoice not found.", "fields": {}}},
             status=404,
         )
+
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm", "bookkeeping"})
+    if permission_error:
+        return Response(permission_error, status=403)
 
     if not _validate_invoice_status_transition(
         current_status=invoice.status,

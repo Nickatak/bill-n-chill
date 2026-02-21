@@ -14,6 +14,7 @@ from core.views.helpers import (
     _get_active_budget_for_project,
     _next_change_order_number,
     _record_financial_audit_event,
+    _role_gate_error_payload,
     _validate_change_order_status_transition,
     _validate_project_for_user,
 )
@@ -36,6 +37,10 @@ def project_change_orders_view(request, project_id: int):
             .order_by("-number", "-revision_number")
         )
         return Response({"data": ChangeOrderSerializer(rows, many=True).data})
+
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    if permission_error:
+        return Response(permission_error, status=403)
 
     serializer = ChangeOrderWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -191,6 +196,10 @@ def change_order_detail_view(request, change_order_id: int):
 
     if request.method == "GET":
         return Response({"data": ChangeOrderSerializer(change_order).data})
+
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    if permission_error:
+        return Response(permission_error, status=403)
 
     serializer = ChangeOrderWriteSerializer(data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
@@ -440,6 +449,10 @@ def change_order_clone_revision_view(request, change_order_id: int):
             {"error": {"code": "not_found", "message": "Change order not found.", "fields": {}}},
             status=404,
         )
+
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    if permission_error:
+        return Response(permission_error, status=403)
 
     latest = (
         ChangeOrder.objects.filter(

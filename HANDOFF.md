@@ -1,46 +1,64 @@
 # Handoff - 2026-02-21
 
 ## What was completed
-- Change Orders now support revision/origin modeling and project-scoped routing.
-- CO creation enforces `origin_estimate` and requires it to be an approved estimate.
-- CO add/edit forms moved toward estimate-like WYSIWYG parity.
-- Add CO header amount/days are derived from line items (not manually editable).
-- CO viewer was reworked to be estimate-centric:
-  - shows approved estimates
-  - shows linked COs for selected estimate
-  - supports quick status updates directly in viewer
-- Viewer UX pattern added:
-  - viewer toggle (`Show/Hide`) on Estimates and Change Orders
-  - `Add New X` action placed outside viewer
-  - viewer defaults open
-- Navbar/breadcrumb/project-scoped route updates for CO flow.
-- Seed/migration/test/docs updates were included with CO feature expansion.
+- Removed obsolete non-project placeholder routes:
+  - `frontend/src/app/expenses-placeholder/page.tsx`
+  - `frontend/src/app/vendor-bills-placeholder/page.tsx`
+  - `frontend/src/app/estimates-placeholder/page.tsx`
+- Built and refined post-estimate workflow hub:
+  - `frontend/src/app/estimates/post-create/page.tsx`
+  - Added project/estimate-scoped handoff path into CO workflow.
+- Change Orders now support project filtering by origin estimate via query param:
+  - `origin_estimate` is accepted in `frontend/src/app/projects/[projectId]/change-orders/page.tsx`
+  - `frontend/src/features/change-orders/components/change-orders-console.tsx` supports initial origin estimate selection.
+- Estimates console UX improvements:
+  - Card-level compact `+` action for next-step workflow/revision pathing based on estimate status.
+  - "Add New Estimate" collapses viewer.
+  - Successful create selects and re-opens viewer on the new estimate.
+  - Removed redundant "Create revision from selected" button.
+  - Price placement adjusted in card metadata for readability.
+- Backend estimate status handling fix for void/archived transition:
+  - `PATCH /api/v1/estimates/{id}/` now allows `status=archived` (void) through transition validation.
+  - Create path still blocks direct archived creation.
+  - Files:
+    - `backend/core/serializers/estimates.py`
+    - `backend/core/views/estimates.py`
+    - `backend/core/tests/test_estimates.py`
+- Tandem experiment cleanup completed:
+  - Removed `sockfile`, `TANDEM_LOG.md`, tandem docs, and socket poller/send scripts.
 
 ## Known issues / follow-ups
-- Backend CO-focused tests currently fail in local sqlite test run because estimate approval is returning 400 during setup in multiple tests.
-  - Key files: `backend/core/tests/test_change_orders.py`, `backend/core/tests/test_mvp_regression.py`
-  - Likely related to newer estimate approval validation constraints vs test fixtures.
-- MySQL test database creation permission issue exists in this environment:
-  - `Access denied for user 'bnc'@'%' to database 'test_bill_n_chill'`
-- Frontend lint is not fully green repo-wide (some pre-existing lint issues outside CO scope).
+- In this shell environment, full backend test execution is still blocked by missing dependency:
+  - `ModuleNotFoundError: No module named 'pymysql'`
+- Prior CO/MVP regression suite follow-up likely still needed (from earlier handoff):
+  - Re-validate estimate approval setup in:
+    - `backend/core/tests/test_change_orders.py`
+    - `backend/core/tests/test_mvp_regression.py`
+- Frontend lint may still include pre-existing repo-wide issues outside the touched estimate/CO files.
 
 ## Suggested next sequence
-1. Fix failing estimate approval path in test setup/helpers so CO + MVP regression tests pass.
-2. Re-run targeted backend suite:
+1. Run backend tests in a fully provisioned env (with `pymysql`) and confirm:
+   - `core.tests.test_estimates`
    - `core.tests.test_change_orders`
-   - `core.tests.test_audit_trail`
    - `core.tests.test_mvp_regression`
-3. Mirror final Add CO decisions to any remaining Edit CO edges (if any drift remains after QA).
-4. Continue UI polish pass (button consistency, spacing, and any viewer readability refinements).
+2. Continue tight UX iteration in estimates/CO handoff flow:
+   - Status-gated `+` action behavior
+   - Card hierarchy/readability
+   - Viewer open/close affordance polish
+3. If CO discoverability remains strong from Estimates, evaluate whether redundant project-scope CO entry points can be reduced.
+4. Start next feature exploration in parallel (new Codex session) while preserving this iterative loop on Estimates/CO UX.
 
 ## Useful commands
 - Frontend build:
   - `npm run build --prefix frontend`
-- Backend targeted tests (sqlite fallback):
-  - `DATABASE_URL=sqlite:///backend/db.sqlite3 backend/.venv/bin/python backend/manage.py test core.tests.test_change_orders core.tests.test_audit_trail core.tests.test_mvp_regression`
+- Backend targeted tests:
+  - `backend/.venv/bin/python backend/manage.py test core.tests.test_estimates`
+  - `backend/.venv/bin/python backend/manage.py test core.tests.test_change_orders core.tests.test_audit_trail core.tests.test_mvp_regression`
 - Migrations status:
   - `backend/.venv/bin/python backend/manage.py showmigrations core`
 
 ## Branch / remote
-- Branch: `main`
+- Branches:
+  - `main` at `cbcb2b9` (`feat: refine post-estimate workflow and estimate status handling`)
+  - `danger` at `fa49391` (same content; mirrored)
 - Remote: `origin`

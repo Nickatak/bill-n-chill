@@ -50,7 +50,13 @@ bill-n-chill currently uses DRF token authentication for API access.
         "token": "TOKEN_VALUE",
         "user": {
           "id": 1,
-          "email": "pm@example.com"
+          "email": "pm@example.com",
+          "role": "owner"
+        },
+        "organization": {
+          "id": 1,
+          "display_name": "Pm Organization",
+          "slug": "pm"
         }
       }
     }
@@ -58,6 +64,25 @@ bill-n-chill currently uses DRF token authentication for API access.
 - `GET /api/v1/auth/me/`
   - Header: `Authorization: Token TOKEN_VALUE`
   - Purpose: confirm token validity and current user identity.
+  - Response includes:
+    - `id`
+    - `email`
+    - `role` (`owner` | `pm` | `bookkeeping` | `worker` | `viewer`)
+    - `organization` (`id`, `display_name`, `slug`)
+
+## Role Matrix (RBAC Thin Pass)
+
+- Role source:
+  - Primary source: `OrganizationMembership.role` (one active membership per user).
+  - Backward compatibility fallback: Django group name match (`owner`, `pm`, `bookkeeping`, `worker`, `viewer`), then default `owner`.
+- Error shape for denied write action:
+  - HTTP `403`
+  - `error.code = "forbidden"`
+- Write access matrix:
+  - `owner`: full write access across money workflow endpoints.
+  - `pm`: estimate/budget/change-order/invoice/vendor-bill writes.
+  - `bookkeeping`: invoice/vendor-bill/payment/accounting-sync writes.
+  - `viewer`: read-only across protected surfaces.
 
 ## Lead Contact Intake (INT-01)
 
@@ -147,6 +172,20 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
   - Auth required
   - Updates `code`, `name`, and/or `is_active`.
 
+- `POST /api/v1/cost-codes/import-csv/`
+  - Auth required
+  - Role guard: `owner`, `pm`
+  - Body:
+    - `csv_text` (required)
+    - `dry_run` (optional; default `true`)
+  - Expected headers:
+    - required: `code`, `name`
+    - optional: `is_active`
+  - Behavior:
+    - existing rows matched by `code` (case-insensitive)
+    - preview mode returns row-level `would_create` / `would_update`
+    - apply mode creates/updates rows and returns row-level results.
+
 ## Estimate Authoring and Versioning (EST-02)
 
 - `GET /api/v1/projects/{project_id}/estimates/`
@@ -164,6 +203,10 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
 - `GET /api/v1/estimates/{estimate_id}/`
   - Auth required
   - Returns one estimate with line items.
+
+- `GET /api/v1/public/estimates/{public_token}/`
+  - No auth required
+  - Returns public estimate view payload for controlled external sharing.
 
 - `PATCH /api/v1/estimates/{estimate_id}/`
   - Auth required
@@ -307,6 +350,69 @@ CO-02 extends existing CO endpoints with propagation behavior.
 - Billable amount basis in current v1:
   - billable basis is derived from project contract current value until invoice composition features are implemented.
 
+## Reporting Pack v1 (RPT-01)
+
+- `GET /api/v1/reports/portfolio/`
+  - Auth required
+  - Returns portfolio-level rollup:
+    - `active_projects_count`
+    - `ar_total_outstanding`
+    - `ap_total_outstanding`
+    - `overdue_invoice_count`
+    - `overdue_vendor_bill_count`
+    - `projects[]` with per-project AR/AP outstanding and approved CO totals
+  - Optional query filters:
+    - `date_from=YYYY-MM-DD`
+    - `date_to=YYYY-MM-DD`
+  - Filter behavior:
+    - affects overdue invoice/vendor-bill counts by issue date range.
+
+- `GET /api/v1/reports/change-impact/`
+  - Auth required
+  - Returns approved change-order impact rollup:
+    - `approved_change_order_count`
+    - `approved_change_order_total`
+    - `projects[]` with approved CO count/total per project
+  - Optional query filters:
+    - `date_from=YYYY-MM-DD`
+    - `date_to=YYYY-MM-DD`
+  - Filter behavior:
+    - filters approved CO rows by `approved_at` date window.
+
+## Attention Feed (RPT-02)
+
+- `GET /api/v1/reports/attention-feed/`
+  - Auth required
+  - Returns in-app actionable attention items across projects:
+    - overdue invoices
+    - vendor bills due soon (next 7 days)
+    - change orders pending approval
+    - failed/voided payments
+  - Response includes:
+    - `generated_at`
+    - `due_soon_window_days`
+    - `item_count`
+    - `items[]` with severity, label/detail, project context, and source links.
+
+## Search + Quick Jump (NAV-01)
+
+- `GET /api/v1/search/quick-jump/?q=<query>`
+  - Auth required
+  - Global lightweight search across:
+    - projects
+    - estimates
+    - change orders
+    - invoices
+    - vendor bills
+    - payments
+  - Response includes:
+    - `query`
+    - `item_count`
+    - `items[]` (kind, label, project context, `ui_href`, and API `detail_endpoint`)
+  - Notes:
+    - minimum query length is 2 chars (shorter queries return empty list)
+    - results are scoped to current authenticated user data.
+
 ## Invoice Composition and Send (INV-01)
 
 - `GET /api/v1/projects/{project_id}/invoices/`
@@ -436,6 +542,20 @@ INV-02 extends invoice billing actions with a scope guard based on approved proj
   - Duplicate warning behavior:
     - same name/email duplicate check as create (excluding current vendor)
     - accepts `duplicate_override = true` to persist intentional duplicates
+
+- `POST /api/v1/vendors/import-csv/`
+  - Auth required
+  - Role guard: `owner`, `pm`, `bookkeeping`
+  - Body:
+    - `csv_text` (required)
+    - `dry_run` (optional; default `true`)
+  - Expected headers:
+    - required: `name`
+    - optional: `vendor_type`, `email`, `phone`, `tax_id_last4`, `notes`, `is_active`
+  - Behavior:
+    - existing rows matched by `name` (case-insensitive)
+    - preview mode returns row-level `would_create` / `would_update`
+    - apply mode creates/updates rows and returns row-level results.
 
 ## Vendor Bill Intake and Lifecycle (AP-01)
 
@@ -706,6 +826,33 @@ Each bucket contains:
     - `created_at`
   - Immutability:
     - rows are append-only and cannot be updated/deleted through API.
+
+## Project Timeline / Activity Center (QA-02)
+
+- `GET /api/v1/projects/{project_id}/timeline/`
+  - Auth required
+  - Returns a read-only project timeline merged from:
+    - financial audit events (`FinancialAuditEvent`)
+    - workflow estimate status events (`EstimateStatusEvent`)
+  - Query params:
+    - `category` (optional; default `all`)
+      - allowed: `all`, `financial`, `workflow`
+  - Response fields:
+    - `project_id`
+    - `project_name`
+    - `category`
+    - `item_count`
+    - `items[]` with:
+      - `timeline_id`
+      - `category`
+      - `event_type`
+      - `occurred_at`
+      - `label`
+      - `detail`
+      - `object_type`
+      - `object_id`
+      - `ui_route`
+      - `detail_endpoint`
 
 ## Versioning Rules
 

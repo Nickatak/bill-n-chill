@@ -53,7 +53,6 @@ const hierarchyRules: HierarchyRule[] = [
   {
     when: (pathname) =>
       pathname === "/estimates" ||
-      pathname === "/estimates-placeholder" ||
       /^\/projects\/\d+\/estimates$/.test(pathname) ||
       pathname.startsWith("/estimates/"),
     crumbs: [PROJECTS_HUB_CRUMB, { href: "/estimates", label: "Estimates" }],
@@ -67,6 +66,10 @@ const hierarchyRules: HierarchyRule[] = [
     ],
   },
   {
+    when: (pathname) => /^\/projects\/\d+\/activity$/.test(pathname),
+    crumbs: [PROJECTS_HUB_CRUMB, { href: "/activity", label: "Activity" }],
+  },
+  {
     when: (pathname) => pathname === "/change-orders" || /^\/projects\/\d+\/change-orders$/.test(pathname),
     crumbs: [PROJECTS_HUB_CRUMB, { href: "/change-orders", label: "Change Orders" }],
   },
@@ -77,14 +80,12 @@ const hierarchyRules: HierarchyRule[] = [
   {
     when: (pathname) =>
       pathname === "/vendor-bills" ||
-      pathname === "/vendor-bills-placeholder" ||
       /^\/projects\/\d+\/vendor-bills$/.test(pathname),
     crumbs: [PROJECTS_HUB_CRUMB, { href: "/vendor-bills", label: "Vendor Bills" }],
   },
   {
     when: (pathname) =>
       pathname === "/expenses" ||
-      pathname === "/expenses-placeholder" ||
       /^\/projects\/\d+\/expenses$/.test(pathname),
     crumbs: [PROJECTS_HUB_CRUMB, { href: "/expenses", label: "Expenses" }],
   },
@@ -159,7 +160,7 @@ function buildCrumbs(pathname: string): Crumb[] {
 
 function isLegacyProjectScopedRoute(pathname: string): boolean {
   return legacyProjectScopedPrefixes.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`) || pathname === `${prefix}-placeholder`,
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
 }
 
@@ -181,6 +182,9 @@ function projectScopedHref(href: string, projectId: string): string {
   }
   if (href === "/change-orders") {
     return `/projects/${encodeURIComponent(projectId)}/change-orders`;
+  }
+  if (href === "/activity") {
+    return `/projects/${encodeURIComponent(projectId)}/activity`;
   }
   return href;
 }

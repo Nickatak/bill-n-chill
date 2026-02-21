@@ -493,6 +493,40 @@ class Command(BaseCommand):
             ]
         )
 
+        voided_change_order, _ = ChangeOrder.objects.get_or_create(
+            project=project,
+            number=2,
+            defaults={
+                "title": "Owner canceled fixture relocation",
+                "status": ChangeOrder.Status.VOID,
+                "amount_delta": Decimal("75.00"),
+                "days_delta": 0,
+                "reason": "Originally requested scope was canceled before approval.",
+                "requested_by": user,
+            },
+        )
+        voided_change_order.title = "Owner canceled fixture relocation"
+        voided_change_order.status = ChangeOrder.Status.VOID
+        voided_change_order.amount_delta = Decimal("75.00")
+        voided_change_order.days_delta = 0
+        voided_change_order.reason = "Originally requested scope was canceled before approval."
+        voided_change_order.requested_by = user
+        voided_change_order.approved_by = None
+        voided_change_order.approved_at = None
+        voided_change_order.save(
+            update_fields=[
+                "title",
+                "status",
+                "amount_delta",
+                "days_delta",
+                "reason",
+                "requested_by",
+                "approved_by",
+                "approved_at",
+                "updated_at",
+            ]
+        )
+
         invoice, _ = Invoice.objects.get_or_create(
             project=project,
             invoice_number="INV-0001",
@@ -1105,6 +1139,18 @@ class Command(BaseCommand):
         self._audit_once(
             project=project,
             user=user,
+            event_type=FinancialAuditEvent.EventType.CHANGE_ORDER_UPDATED,
+            object_type="change_order",
+            object_id=voided_change_order.id,
+            from_status=ChangeOrder.Status.DRAFT,
+            to_status=ChangeOrder.Status.VOID,
+            amount=voided_change_order.amount_delta,
+            note="Change order voided before approval.",
+            metadata={"number": voided_change_order.number},
+        )
+        self._audit_once(
+            project=project,
+            user=user,
             event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
             object_type="invoice",
             object_id=invoice.id,
@@ -1162,6 +1208,7 @@ class Command(BaseCommand):
         self.stdout.write(f"Child Models Project Name: {child_models_project_name}")
         self.stdout.write(f"Child Models Estimate Title: {child_models_estimate_title}")
         self.stdout.write("Child Models Estimate Family Versions: v1 archived, v2 rejected, v3 approved")
+        self.stdout.write("Child Models Change Orders: CO-1 approved, CO-2 void")
         self.stdout.write(f"Project ID: {project.id}")
         self.stdout.write("Manual flow entry points:")
         self.stdout.write("- /intake/quick-add")

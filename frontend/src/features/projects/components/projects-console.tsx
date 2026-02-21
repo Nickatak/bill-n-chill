@@ -534,6 +534,20 @@ export function ProjectsConsole() {
       ) : null}
 
       {selectedProject ? (
+        <section className={styles.mobileQuickActions}>
+          <h3>Mobile Quick Actions</h3>
+          <p>One-tap shortcuts for in-field updates.</p>
+          <p>
+            <Link href="/intake/quick-add">Quick Add Contact</Link> |{" "}
+            <Link href={`/projects/${selectedProject.id}/change-orders`}>Quick CO</Link> |{" "}
+            <Link href={`/invoices?project=${selectedProject.id}`}>Quick Invoice</Link> |{" "}
+            <Link href={`/vendor-bills?project=${selectedProject.id}`}>Quick Vendor Bill</Link> |{" "}
+            <Link href={`/payments?project=${selectedProject.id}`}>Quick Payment</Link>
+          </p>
+        </section>
+      ) : null}
+
+      {selectedProject ? (
         <section className={styles.overview}>
           <div className={styles.overviewHeader}>
             <div>
@@ -601,6 +615,9 @@ export function ProjectsConsole() {
                     <span className={styles.nodeCount}>
                       {summaryCounts ? summaryCounts.changeOrders : "--"}
                     </span>
+                  </div>
+                  <div className={styles.node}>
+                    <Link href={`/projects/${selectedProject.id}/activity`}>Activity Timeline</Link>
                   </div>
                 </div>
                 <div className={styles.branch}>
@@ -678,6 +695,42 @@ export function ProjectsConsole() {
               </p>
             </div>
           </div>
+        </section>
+      ) : null}
+
+      {selectedProject ? (
+        <section className={styles.commandCenterAttention}>
+          <h3>What Needs Attention</h3>
+          <ul>
+            {summary && Number(summary.ar_outstanding) > 0 ? (
+              <li>
+                AR outstanding is {summary.ar_outstanding}. <Link href={`/invoices?project=${selectedProject.id}`}>Open Invoices</Link>
+              </li>
+            ) : null}
+            {summary && Number(summary.ap_outstanding) > 0 ? (
+              <li>
+                AP outstanding is {summary.ap_outstanding}.{" "}
+                <Link href={`/projects/${selectedProject.id}/vendor-bills`}>Open Vendor Bills</Link>
+              </li>
+            ) : null}
+            {estimateStatusCounts && estimateStatusCounts.sent > 0 ? (
+              <li>
+                {estimateStatusCounts.sent} estimate(s) are still sent and pending outcome.{" "}
+                <Link href={`/projects/${selectedProject.id}/estimates`}>Open Estimates</Link>
+              </li>
+            ) : null}
+            {summaryCounts && summaryCounts.changeOrders > 0 ? (
+              <li>
+                {summaryCounts.changeOrders} approved CO source record(s) linked.{" "}
+                <Link href={`/projects/${selectedProject.id}/change-orders`}>Open Change Orders</Link>
+              </li>
+            ) : null}
+            {!summary ? (
+              <li>
+                Load summary first to populate contract/AR/AP attention details.
+              </li>
+            ) : null}
+          </ul>
         </section>
       ) : null}
 

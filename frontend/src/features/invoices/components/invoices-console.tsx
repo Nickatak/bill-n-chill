@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { ApiResponse, CostCode, InvoiceLineInput, InvoiceRecord, ProjectRecord } from "../types";
@@ -26,8 +27,30 @@ function emptyLine(localId: number, defaultCostCodeId = ""): InvoiceLineInput {
   };
 }
 
+function invoiceNextActionHint(status: string): string {
+  if (status === "draft") {
+    return "Next: send the invoice to move it into billable AR tracking.";
+  }
+  if (status === "sent") {
+    return "Next: record payments to move invoice to partially paid or paid.";
+  }
+  if (status === "partially_paid") {
+    return "Next: allocate remaining payment and close the outstanding balance.";
+  }
+  if (status === "overdue") {
+    return "Next: follow up with client and record payment once received.";
+  }
+  if (status === "paid") {
+    return "Invoice is fully settled.";
+  }
+  if (status === "void") {
+    return "Invoice is void and no longer billable.";
+  }
+  return "Select a status transition as needed.";
+}
+
 export function InvoicesConsole() {
-  const { token, authMessage } = useSharedSessionAuth();
+  const { token, authMessage, role } = useSharedSessionAuth();
   const [statusMessage, setStatusMessage] = useState("");
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -46,7 +69,12 @@ export function InvoicesConsole() {
   const [lineItems, setLineItems] = useState<InvoiceLineInput[]>([emptyLine(1)]);
   const [nextLineId, setNextLineId] = useState(2);
 
+  const searchParams = useSearchParams();
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+  const canMutateInvoices = role === "owner" || role === "pm" || role === "bookkeeping";
+  const scopedProjectIdParam = searchParams.get("project");
+  const scopedProjectId =
+    scopedProjectIdParam && /^\d+$/.test(scopedProjectIdParam) ? Number(scopedProjectIdParam) : null;
   async function loadDependencies() {
     setStatusMessage("Loading projects and cost codes...");
     try {
@@ -71,7 +99,12 @@ export function InvoicesConsole() {
       setProjects(projectRows);
       setCostCodes(codeRows);
 
-      if (projectRows[0]) setSelectedProjectId(String(projectRows[0].id));
+      if (projectRows[0]) {
+        const scopedProject = scopedProjectId
+          ? projectRows.find((project) => project.id === scopedProjectId)
+          : null;
+        setSelectedProjectId(String((scopedProject ?? projectRows[0]).id));
+      }
       if (codeRows[0]) {
         const defaultCostCodeId = String(codeRows[0].id);
         setLineItems((current) =>
@@ -138,6 +171,10 @@ export function InvoicesConsole() {
 
   async function handleCreateInvoice(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canMutateInvoices) {
+      setStatusMessage(`Role ${role} is read-only for invoice mutations.`);
+      return;
+    }
     const projectId = Number(selectedProjectId);
     if (!projectId) {
       setStatusMessage("Select a project first.");
@@ -181,6 +218,10 @@ export function InvoicesConsole() {
   }
 
   async function handleUpdateInvoiceStatus() {
+    if (!canMutateInvoices) {
+      setStatusMessage(`Role ${role} is read-only for invoice mutations.`);
+      return;
+    }
     const invoiceId = Number(selectedInvoiceId);
     if (!invoiceId) {
       setStatusMessage("Select an invoice first.");
@@ -217,6 +258,10 @@ export function InvoicesConsole() {
   }
 
   async function handleSendInvoice() {
+    if (!canMutateInvoices) {
+      setStatusMessage(`Role ${role} is read-only for invoice mutations.`);
+      return;
+    }
     const invoiceId = Number(selectedInvoiceId);
     if (!invoiceId) {
       setStatusMessage("Select an invoice first.");
@@ -252,12 +297,54 @@ export function InvoicesConsole() {
     }
   }
 
+  async function handleQuickInvoiceStatus(status: string) {
+    if (!canMutateInvoices) {
+      setStatusMessage(`Role ${role} is read-only for invoice mutations.`);
+      return;
+    }
+    const invoiceId = Number(selectedInvoiceId);
+    if (!invoiceId) {
+      setStatusMessage("Select an invoice first.");
+      return;
+    }
+
+    setStatusMessage(`Updating invoice to ${status}...`);
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/invoices/${invoiceId}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Token ${token}`,
+        },
+        body: JSON.stringify({
+          status,
+          scope_override: scopeOverride,
+          scope_override_note: scopeOverrideNote,
+        }),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setStatusMessage(payload.error?.message ?? "Quick status update failed.");
+        return;
+      }
+      const updated = payload.data as InvoiceRecord;
+      setInvoices((current) =>
+        current.map((invoice) => (invoice.id === updated.id ? updated : invoice)),
+      );
+      setSelectedStatus(updated.status);
+      setStatusMessage(`Updated invoice ${updated.invoice_number} to ${updated.status}.`);
+    } catch {
+      setStatusMessage("Could not reach invoice quick status endpoint.");
+    }
+  }
+
   return (
     <section>
       <h2>Invoice Composition and Send</h2>
       <p>Create invoice lines, calculate totals, and move invoices through lifecycle states.</p>
 
       <p>{authMessage}</p>
+      {!canMutateInvoices ? <p>Role `{role}` can view invoices but cannot create, update, or send.</p> : null}
 
       <button type="button" onClick={loadDependencies}>
         Load Projects + Cost Codes
@@ -349,10 +436,10 @@ export function InvoicesConsole() {
           </div>
         ))}
 
-        <button type="button" onClick={addLineItem}>
+        <button type="button" onClick={addLineItem} disabled={!canMutateInvoices}>
           Add Line Item
         </button>
-        <button type="submit" disabled={!selectedProjectId}>
+        <button type="submit" disabled={!selectedProjectId || !canMutateInvoices}>
           Create Invoice
         </button>
       </form>
@@ -375,11 +462,22 @@ export function InvoicesConsole() {
           >
             {invoices.map((invoice) => (
               <option key={invoice.id} value={invoice.id}>
-                {invoice.invoice_number} ({invoice.status}) - total ${invoice.total}
+                {invoice.invoice_number} ({invoice.status}) - total ${invoice.total} - due ${invoice.balance_due}
               </option>
             ))}
           </select>
         </label>
+      ) : (
+        <p>No invoices yet for this project. Create one from line items above.</p>
+      )}
+
+      {selectedInvoiceId ? (
+        <p>
+          Selected invoice hint:{" "}
+          {invoiceNextActionHint(
+            invoices.find((invoice) => String(invoice.id) === selectedInvoiceId)?.status || selectedStatus,
+          )}
+        </p>
       ) : null}
 
       <h3>Invoice Status</h3>
@@ -410,12 +508,28 @@ export function InvoicesConsole() {
           <option value="void">void</option>
         </select>
       </label>
-      <button type="button" onClick={handleUpdateInvoiceStatus} disabled={!selectedInvoiceId}>
+      <button
+        type="button"
+        onClick={handleUpdateInvoiceStatus}
+        disabled={!selectedInvoiceId || !canMutateInvoices}
+      >
         Update Invoice Status
       </button>
-      <button type="button" onClick={handleSendInvoice} disabled={!selectedInvoiceId}>
+      <button type="button" onClick={handleSendInvoice} disabled={!selectedInvoiceId || !canMutateInvoices}>
         Send Invoice
       </button>
+      <p>Mobile quick actions:</p>
+      <p>
+        <button type="button" onClick={() => handleQuickInvoiceStatus("sent")} disabled={!selectedInvoiceId || !canMutateInvoices}>
+          Mark Sent
+        </button>
+        <button type="button" onClick={() => handleQuickInvoiceStatus("paid")} disabled={!selectedInvoiceId || !canMutateInvoices}>
+          Mark Paid
+        </button>
+        <button type="button" onClick={() => handleQuickInvoiceStatus("void")} disabled={!selectedInvoiceId || !canMutateInvoices}>
+          Void
+        </button>
+      </p>
 
       <p>{statusMessage}</p>
     </section>

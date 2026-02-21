@@ -1,3 +1,6 @@
+import csv
+from io import StringIO
+
 from django.db.models import Q
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -5,6 +8,7 @@ from rest_framework.response import Response
 
 from core.models import Vendor
 from core.serializers import VendorSerializer, VendorWriteSerializer
+from core.views.helpers import _role_gate_error_payload
 
 
 def _find_duplicate_vendors(user, *, name: str, email: str, exclude_vendor_id=None):
@@ -170,5 +174,177 @@ def vendor_detail_view(request, vendor_id: int):
         {
             "data": VendorSerializer(vendor).data,
             "meta": {"duplicate_override_used": bool(duplicates and duplicate_override)},
+        }
+    )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def vendors_import_csv_view(request):
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm", "bookkeeping"})
+    if permission_error:
+        return Response(permission_error, status=403)
+
+    csv_text = request.data.get("csv_text", "")
+    dry_run = bool(request.data.get("dry_run", True))
+    if not csv_text or not str(csv_text).strip():
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "csv_text is required.",
+                    "fields": {"csv_text": ["Provide CSV content with headers."]},
+                }
+            },
+            status=400,
+        )
+
+    reader = csv.DictReader(StringIO(str(csv_text)))
+    expected_headers = {"name", "vendor_type", "email", "phone", "tax_id_last4", "notes", "is_active"}
+    incoming_headers = set(reader.fieldnames or [])
+    if "name" not in incoming_headers:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "CSV headers are invalid for vendor import.",
+                    "fields": {"headers": [f"Expected at least: name. Optional: vendor_type,email,phone,tax_id_last4,notes,is_active. Found: {', '.join(sorted(incoming_headers))}"]},
+                }
+            },
+            status=400,
+        )
+    unknown_headers = incoming_headers - expected_headers
+    if unknown_headers:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "CSV contains unsupported headers.",
+                    "fields": {"headers": [f"Unsupported: {', '.join(sorted(unknown_headers))}."]},
+                }
+            },
+            status=400,
+        )
+
+    rows_out = []
+    created_count = 0
+    updated_count = 0
+    error_count = 0
+
+    for index, row in enumerate(reader, start=2):
+        name = (row.get("name") or "").strip()
+        vendor_type = (row.get("vendor_type") or Vendor.VendorType.TRADE).strip().lower()
+        email = (row.get("email") or "").strip()
+        phone = (row.get("phone") or "").strip()
+        tax_id_last4 = (row.get("tax_id_last4") or "").strip()
+        notes = (row.get("notes") or "").strip()
+        is_active_raw = (row.get("is_active") or "true").strip().lower()
+
+        if not name:
+            error_count += 1
+            rows_out.append(
+                {"row_number": index, "name": name, "status": "error", "message": "name is required."}
+            )
+            continue
+        if vendor_type not in {Vendor.VendorType.TRADE, Vendor.VendorType.RETAIL}:
+            error_count += 1
+            rows_out.append(
+                {
+                    "row_number": index,
+                    "name": name,
+                    "status": "error",
+                    "message": "vendor_type must be trade or retail.",
+                }
+            )
+            continue
+        if is_active_raw not in {"true", "false", "1", "0", "yes", "no"}:
+            error_count += 1
+            rows_out.append(
+                {
+                    "row_number": index,
+                    "name": name,
+                    "status": "error",
+                    "message": "is_active must be true/false.",
+                }
+            )
+            continue
+        is_active = is_active_raw in {"true", "1", "yes"}
+
+        existing = Vendor.objects.filter(created_by=request.user, name__iexact=name).first()
+        if existing:
+            if dry_run:
+                rows_out.append(
+                    {
+                        "row_number": index,
+                        "name": name,
+                        "status": "would_update",
+                        "message": f"Would update vendor #{existing.id}.",
+                    }
+                )
+            else:
+                existing.vendor_type = vendor_type
+                existing.email = email
+                existing.phone = phone
+                existing.tax_id_last4 = tax_id_last4
+                existing.notes = notes
+                existing.is_active = is_active
+                existing.save(
+                    update_fields=[
+                        "vendor_type",
+                        "email",
+                        "phone",
+                        "tax_id_last4",
+                        "notes",
+                        "is_active",
+                        "updated_at",
+                    ]
+                )
+                updated_count += 1
+                rows_out.append(
+                    {
+                        "row_number": index,
+                        "name": name,
+                        "status": "updated",
+                        "message": f"Updated vendor #{existing.id}.",
+                    }
+                )
+            continue
+
+        if dry_run:
+            rows_out.append(
+                {
+                    "row_number": index,
+                    "name": name,
+                    "status": "would_create",
+                    "message": "Would create new vendor.",
+                }
+            )
+        else:
+            Vendor.objects.create(
+                created_by=request.user,
+                name=name,
+                vendor_type=vendor_type,
+                email=email,
+                phone=phone,
+                tax_id_last4=tax_id_last4,
+                notes=notes,
+                is_active=is_active,
+            )
+            created_count += 1
+            rows_out.append(
+                {"row_number": index, "name": name, "status": "created", "message": "Created vendor."}
+            )
+
+    return Response(
+        {
+            "data": {
+                "entity": "vendors",
+                "mode": "preview" if dry_run else "apply",
+                "total_rows": len(rows_out),
+                "created_count": created_count,
+                "updated_count": updated_count,
+                "error_count": error_count,
+                "rows": rows_out,
+            }
         }
     )

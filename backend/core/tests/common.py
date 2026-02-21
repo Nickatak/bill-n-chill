@@ -11,6 +11,7 @@ from core.models import (
     CostCode,
     Customer,
     Estimate,
+    EstimateLineItem,
     EstimateStatusEvent,
     FinancialAuditEvent,
     Invoice,
@@ -20,6 +21,8 @@ from core.models import (
     Payment,
     PaymentAllocation,
     Project,
+    Organization,
+    OrganizationMembership,
     VendorBill,
     Vendor,
 )
@@ -38,6 +41,7 @@ __all__ = [
     "CostCode",
     "Customer",
     "Estimate",
+    "EstimateLineItem",
     "EstimateStatusEvent",
     "FinancialAuditEvent",
     "Invoice",
@@ -47,6 +51,8 @@ __all__ = [
     "PaymentAllocation",
     "LeadContact",
     "Project",
+    "Organization",
+    "OrganizationMembership",
     "VendorBill",
     "Vendor",
 ]

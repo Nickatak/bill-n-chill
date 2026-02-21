@@ -48,6 +48,7 @@ export function useSharedSessionAuth() {
       return {
         token: parsed.token,
         email: parsed.email ?? "",
+        role: parsed.role,
       };
     } catch {
       return null;
@@ -55,8 +56,8 @@ export function useSharedSessionAuth() {
   }, [sessionSnapshot]);
   const token = session?.token ?? "";
   const authMessage = session
-    ? `Using shared session for ${session.email || "user"}.`
+    ? `Using shared session for ${session.email || "user"} (${session.role || "owner"}).`
     : NO_SHARED_SESSION_MESSAGE;
 
-  return { token, authMessage };
+  return { token, authMessage, role: session?.role || "owner" };
 }

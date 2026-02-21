@@ -1,6 +1,8 @@
 from decimal import Decimal
 
+from django.contrib.auth.models import Group
 from django.db.models import Sum
+from django.utils.text import slugify
 
 from core.models import (
     Budget,
@@ -16,6 +18,8 @@ from core.models import (
     InvoiceScopeOverrideEvent,
     Payment,
     Project,
+    Organization,
+    OrganizationMembership,
     VendorBill,
 )
 
@@ -123,12 +127,151 @@ BILLABLE_INVOICE_STATUSES = {
     Invoice.Status.OVERDUE,
 }
 
+RBAC_ROLE_OWNER = "owner"
+RBAC_ROLE_PM = "pm"
+RBAC_ROLE_BOOKKEEPING = "bookkeeping"
+RBAC_ROLE_WORKER = "worker"
+RBAC_ROLE_VIEWER = "viewer"
+RBAC_ROLE_PRECEDENCE = [
+    RBAC_ROLE_OWNER,
+    RBAC_ROLE_PM,
+    RBAC_ROLE_BOOKKEEPING,
+    RBAC_ROLE_WORKER,
+    RBAC_ROLE_VIEWER,
+]
+
 
 def _validate_project_for_user(project_id: int, user):
     try:
         return Project.objects.select_related("customer").get(id=project_id, created_by=user)
     except Project.DoesNotExist:
         return None
+
+
+def _normalize_legacy_role(role: str) -> str:
+    normalized = (role or "").strip().lower()
+    if normalized == "manager":
+        return RBAC_ROLE_PM
+    if normalized == "accounting":
+        return RBAC_ROLE_BOOKKEEPING
+    if normalized == "reception":
+        return RBAC_ROLE_VIEWER
+    if normalized == "support":
+        return RBAC_ROLE_VIEWER
+    if normalized == "readonly":
+        return RBAC_ROLE_VIEWER
+    if normalized == "read_only":
+        return RBAC_ROLE_VIEWER
+    if normalized == "read-only":
+        return RBAC_ROLE_VIEWER
+    if normalized == "field":
+        return RBAC_ROLE_WORKER
+    if normalized == "field_worker":
+        return RBAC_ROLE_WORKER
+    if normalized == "field-worker":
+        return RBAC_ROLE_WORKER
+    if normalized == "labor":
+        return RBAC_ROLE_WORKER
+    if normalized == "labour":
+        return RBAC_ROLE_WORKER
+    if normalized == "crew":
+        return RBAC_ROLE_WORKER
+    if normalized == "worker":
+        return RBAC_ROLE_WORKER
+    if normalized == "owner":
+        return RBAC_ROLE_OWNER
+    if normalized == "pm":
+        return RBAC_ROLE_PM
+    if normalized == "bookkeeping":
+        return RBAC_ROLE_BOOKKEEPING
+    if normalized == "viewer":
+        return RBAC_ROLE_VIEWER
+    return normalized
+
+
+def _default_org_name_for_user(user) -> str:
+    seed = (user.email or user.username or f"user-{user.id}").split("@")[0].strip()
+    humanized = seed.replace(".", " ").replace("_", " ").replace("-", " ").strip().title()
+    return f"{humanized or 'New'} Organization"
+
+
+def _next_org_slug(seed: str) -> str:
+    base_slug = slugify(seed) or "org"
+    candidate = base_slug
+    suffix = 2
+    while Organization.objects.filter(slug=candidate).exists():
+        candidate = f"{base_slug}-{suffix}"
+        suffix += 1
+    return candidate
+
+
+def _ensure_primary_membership(user):
+    membership = (
+        OrganizationMembership.objects.select_related("organization")
+        .filter(
+            user=user,
+            status=OrganizationMembership.Status.ACTIVE,
+        )
+        .first()
+    )
+    if membership:
+        return membership
+
+    organization = Organization.objects.create(
+        display_name=_default_org_name_for_user(user),
+        slug=_next_org_slug((user.email or user.username or f"user-{user.id}").split("@")[0]),
+        created_by=user,
+    )
+    return OrganizationMembership.objects.create(
+        organization=organization,
+        user=user,
+        role=OrganizationMembership.Role.OWNER,
+        status=OrganizationMembership.Status.ACTIVE,
+    )
+
+
+def _resolve_user_role(user) -> str:
+    membership = (
+        OrganizationMembership.objects.filter(
+            user=user,
+            status=OrganizationMembership.Status.ACTIVE,
+        )
+        .only("role")
+        .first()
+    )
+    if membership:
+        return _normalize_legacy_role(membership.role)
+
+    user_group_names = set(
+        Group.objects.filter(user=user).values_list("name", flat=True)
+    )
+    normalized_names = {_normalize_legacy_role(name.strip().lower()) for name in user_group_names}
+    for role in RBAC_ROLE_PRECEDENCE:
+        if role in normalized_names:
+            return role
+    # Backward compatibility for existing users without explicit role assignment.
+    return RBAC_ROLE_OWNER
+
+
+def _role_gate_error_payload(user, allowed_roles):
+    effective_role = _resolve_user_role(user)
+    allowed_role_set = {_normalize_legacy_role(role.strip().lower()) for role in allowed_roles}
+    if effective_role in allowed_role_set:
+        return None, effective_role
+    return (
+        {
+            "error": {
+                "code": "forbidden",
+                "message": "Your role is not allowed to perform this action.",
+                "fields": {
+                    "role": [
+                        f"Required role in: {', '.join(sorted(allowed_role_set))}. Current role: {effective_role}."
+                    ]
+                },
+            }
+        },
+        effective_role,
+    )
 
 
 def _calculate_line_totals(line_items_data):

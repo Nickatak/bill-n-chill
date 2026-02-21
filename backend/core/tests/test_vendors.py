@@ -227,3 +227,40 @@ class VendorTests(TestCase):
         self.assertEqual(response.status_code, 200)
         vendor.refresh_from_db()
         self.assertEqual(vendor.vendor_type, Vendor.VendorType.RETAIL)
+
+    def test_vendor_csv_import_preview_and_apply(self):
+        Vendor.objects.create(
+            name="Stone Supply LLC",
+            vendor_type=Vendor.VendorType.TRADE,
+            email="old@stone.example.com",
+            created_by=self.user,
+        )
+
+        preview = self.client.post(
+            "/api/v1/vendors/import-csv/",
+            data={
+                "dry_run": True,
+                "csv_text": "name,vendor_type,email,phone,is_active\nStone Supply LLC,trade,ap@stone.example.com,555-1111,true\nFraming Crew,trade,frame@example.com,555-2222,true\n",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(preview.status_code, 200)
+        preview_data = preview.json()["data"]
+        self.assertEqual(preview_data["mode"], "preview")
+        self.assertEqual(preview_data["total_rows"], 2)
+
+        apply_response = self.client.post(
+            "/api/v1/vendors/import-csv/",
+            data={
+                "dry_run": False,
+                "csv_text": "name,vendor_type,email,phone,is_active\nStone Supply LLC,trade,ap@stone.example.com,555-1111,true\nFraming Crew,trade,frame@example.com,555-2222,true\n",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(apply_response.status_code, 200)
+        data = apply_response.json()["data"]
+        self.assertEqual(data["updated_count"], 1)
+        self.assertEqual(data["created_count"], 1)
+        self.assertEqual(Vendor.objects.filter(created_by=self.user).count(), 2)

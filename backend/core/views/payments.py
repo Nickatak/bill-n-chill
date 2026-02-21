@@ -16,6 +16,7 @@ from core.serializers import (
 )
 from core.views.helpers import (
     _record_financial_audit_event,
+    _role_gate_error_payload,
     _validate_payment_status_transition,
     _validate_project_for_user,
 )
@@ -140,6 +141,10 @@ def project_payments_view(request, project_id: int):
         )
         return Response({"data": PaymentSerializer(rows, many=True).data})
 
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "bookkeeping"})
+    if permission_error:
+        return Response(permission_error, status=403)
+
     serializer = PaymentWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
@@ -205,6 +210,10 @@ def payment_detail_view(request, payment_id: int):
 
     if request.method == "GET":
         return Response({"data": PaymentSerializer(payment).data})
+
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "bookkeeping"})
+    if permission_error:
+        return Response(permission_error, status=403)
 
     serializer = PaymentWriteSerializer(data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
@@ -317,6 +326,10 @@ def payment_allocate_view(request, payment_id: int):
             {"error": {"code": "not_found", "message": "Payment not found.", "fields": {}}},
             status=404,
         )
+
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "bookkeeping"})
+    if permission_error:
+        return Response(permission_error, status=403)
 
     if payment.status != Payment.Status.SETTLED:
         return Response(

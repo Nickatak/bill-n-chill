@@ -7,8 +7,11 @@ import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "@/features/projects/api";
 import {
   AccountingSyncEventRecord,
+  AttentionFeed,
   ApiResponse,
+  ChangeImpactSummary,
   FinancialAuditEventRecord,
+  PortfolioSnapshot,
   ProjectFinancialSummary,
   ProjectRecord,
 } from "@/features/projects/types";
@@ -29,6 +32,11 @@ export function FinancialsAuditingConsole() {
   const [syncStatus, setSyncStatus] = useState<"queued" | "success" | "failed">("queued");
   const [syncErrorMessage, setSyncErrorMessage] = useState("");
   const [retryTargetId, setRetryTargetId] = useState("");
+  const [reportDateFrom, setReportDateFrom] = useState("");
+  const [reportDateTo, setReportDateTo] = useState("");
+  const [portfolioSnapshot, setPortfolioSnapshot] = useState<PortfolioSnapshot | null>(null);
+  const [changeImpactSummary, setChangeImpactSummary] = useState<ChangeImpactSummary | null>(null);
+  const [attentionFeed, setAttentionFeed] = useState<AttentionFeed | null>(null);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const hasSelectedProject = Boolean(selectedProjectId);
@@ -250,6 +258,80 @@ export function FinancialsAuditingConsole() {
     }
   }
 
+  async function loadPortfolioSnapshot() {
+    setStatusMessage("Loading portfolio snapshot...");
+    try {
+      const params = new URLSearchParams();
+      if (reportDateFrom) {
+        params.set("date_from", reportDateFrom);
+      }
+      if (reportDateTo) {
+        params.set("date_to", reportDateTo);
+      }
+      const response = await fetch(
+        `${normalizedBaseUrl}/reports/portfolio/${params.toString() ? `?${params.toString()}` : ""}`,
+        {
+          headers: { Authorization: `Token ${token}` },
+        },
+      );
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setStatusMessage(payload.error?.message ?? "Could not load portfolio snapshot.");
+        return;
+      }
+      setPortfolioSnapshot(payload.data as PortfolioSnapshot);
+      setStatusMessage("Portfolio snapshot loaded.");
+    } catch {
+      setStatusMessage("Could not reach portfolio snapshot endpoint.");
+    }
+  }
+
+  async function loadChangeImpactSummary() {
+    setStatusMessage("Loading change impact summary...");
+    try {
+      const params = new URLSearchParams();
+      if (reportDateFrom) {
+        params.set("date_from", reportDateFrom);
+      }
+      if (reportDateTo) {
+        params.set("date_to", reportDateTo);
+      }
+      const response = await fetch(
+        `${normalizedBaseUrl}/reports/change-impact/${params.toString() ? `?${params.toString()}` : ""}`,
+        {
+          headers: { Authorization: `Token ${token}` },
+        },
+      );
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setStatusMessage(payload.error?.message ?? "Could not load change impact summary.");
+        return;
+      }
+      setChangeImpactSummary(payload.data as ChangeImpactSummary);
+      setStatusMessage("Change impact summary loaded.");
+    } catch {
+      setStatusMessage("Could not reach change impact summary endpoint.");
+    }
+  }
+
+  async function loadAttentionFeed() {
+    setStatusMessage("Loading attention feed...");
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/reports/attention-feed/`, {
+        headers: { Authorization: `Token ${token}` },
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setStatusMessage(payload.error?.message ?? "Could not load attention feed.");
+        return;
+      }
+      setAttentionFeed(payload.data as AttentionFeed);
+      setStatusMessage("Attention feed loaded.");
+    } catch {
+      setStatusMessage("Could not reach attention feed endpoint.");
+    }
+  }
+
   return (
     <section>
       <p>{authMessage}</p>
@@ -341,6 +423,91 @@ export function FinancialsAuditingConsole() {
                   .join("\n")}
               />
             </label>
+          </div>
+        ) : null}
+      </section>
+
+      <section>
+        <h3>Reporting Pack v1</h3>
+        <p>Portfolio snapshot + approved change impact rollup.</p>
+        <label>
+          Date from
+          <input
+            type="date"
+            value={reportDateFrom}
+            onChange={(event) => setReportDateFrom(event.target.value)}
+          />
+        </label>
+        <label>
+          Date to
+          <input
+            type="date"
+            value={reportDateTo}
+            onChange={(event) => setReportDateTo(event.target.value)}
+          />
+        </label>
+        <p>
+          <button type="button" onClick={loadPortfolioSnapshot}>
+            Load Portfolio Snapshot
+          </button>
+          <button type="button" onClick={loadChangeImpactSummary}>
+            Load Change Impact Summary
+          </button>
+          <button type="button" onClick={loadAttentionFeed}>
+            Load Attention Feed
+          </button>
+        </p>
+
+        {portfolioSnapshot ? (
+          <div>
+            <p>
+              Active projects: {portfolioSnapshot.active_projects_count} | AR outstanding{" "}
+              {portfolioSnapshot.ar_total_outstanding} | AP outstanding{" "}
+              {portfolioSnapshot.ap_total_outstanding}
+            </p>
+            <p>
+              Overdue invoices: {portfolioSnapshot.overdue_invoice_count} | Overdue vendor bills:{" "}
+              {portfolioSnapshot.overdue_vendor_bill_count}
+            </p>
+          </div>
+        ) : null}
+
+        {changeImpactSummary ? (
+          <div>
+            <p>
+              Approved CO count: {changeImpactSummary.approved_change_order_count} | Approved CO total:{" "}
+              {changeImpactSummary.approved_change_order_total}
+            </p>
+            <label>
+              Change impact by project
+              <textarea
+                readOnly
+                rows={Math.min(8, changeImpactSummary.projects.length + 1)}
+                value={changeImpactSummary.projects
+                  .map(
+                    (row) =>
+                      `${row.project_name} (#${row.project_id}) | count ${row.approved_change_order_count} | total ${row.approved_change_order_total}`,
+                  )
+                  .join("\n")}
+              />
+            </label>
+          </div>
+        ) : null}
+
+        {attentionFeed ? (
+          <div>
+            <p>
+              Attention items: {attentionFeed.item_count} | due soon window:{" "}
+              {attentionFeed.due_soon_window_days} days
+            </p>
+            <ul>
+              {attentionFeed.items.map((item, index) => (
+                <li key={`${item.kind}-${item.detail_endpoint}-${index}`}>
+                  [{item.severity.toUpperCase()}] {item.label} ({item.project_name}) | {item.detail} |{" "}
+                  <Link href={item.ui_route}>Open</Link>
+                </li>
+              ))}
+            </ul>
           </div>
         ) : null}
       </section>

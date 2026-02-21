@@ -12,6 +12,7 @@ from core.models.invoices import (
 )
 from core.models.payments import Payment, PaymentAllocation
 from core.models.projects import CostCode, Project
+from core.models.organizations import Organization, OrganizationMembership
 from core.models.vendors import Vendor
 
 __all__ = [
@@ -19,6 +20,8 @@ __all__ = [
     "Customer",
     "Project",
     "CostCode",
+    "Organization",
+    "OrganizationMembership",
     "Vendor",
     "Estimate",
     "EstimateLineItem",

@@ -7,7 +7,7 @@ type VendorBillsPageProps = {
 export default async function VendorBillsPage({ searchParams }: VendorBillsPageProps) {
   const { project } = await searchParams;
   if (!project || !/^\d+$/.test(project)) {
-    redirect("/vendor-bills-placeholder");
+    redirect("/projects");
   }
   redirect(`/projects/${project}/vendor-bills`);
 }

@@ -28,10 +28,8 @@ class DemoSeedCommandTests(TestCase):
         self.assertEqual(invoice.status, Invoice.Status.PAID)
         self.assertEqual(vendor_bill.status, VendorBill.Status.PAID)
         self.assertEqual(
-            str(
-                VendorBillAllocation.objects.filter(vendor_bill=vendor_bill).aggregate(total=Sum("amount"))["total"]
-            ),
-            "500.00",
+            VendorBillAllocation.objects.filter(vendor_bill=vendor_bill).aggregate(total=Sum("amount"))["total"],
+            Decimal("500.00"),
         )
 
         required_allocation_statuses = [
@@ -75,6 +73,22 @@ class DemoSeedCommandTests(TestCase):
         )
         self.assertGreaterEqual(Budget.objects.filter(project=project).count(), 1)
         self.assertEqual(ChangeOrder.objects.filter(project=project, number=1).count(), 1)
+        self.assertTrue(
+            ChangeOrder.objects.filter(
+                project=project,
+                number=2,
+                status=ChangeOrder.Status.VOID,
+            ).exists()
+        )
         self.assertEqual(Payment.objects.filter(project=project, reference_number="AR-1").count(), 1)
         self.assertEqual(Payment.objects.filter(project=project, reference_number="AP-1").count(), 1)
+        self.assertGreaterEqual(Invoice.objects.filter(project=project).count(), len(Invoice.Status.choices) + 1)
+        self.assertGreaterEqual(
+            VendorBill.objects.filter(project=project).count(),
+            len(VendorBill.Status.choices) + 1,
+        )
+        self.assertGreaterEqual(
+            Payment.objects.filter(project=project).count(),
+            (len(Payment.Status.choices) * len(Payment.Direction.choices)) + 2,
+        )
         self.assertEqual(FinancialAuditEvent.objects.filter(project=project).count() >= 8, True)

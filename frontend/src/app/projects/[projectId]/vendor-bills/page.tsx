@@ -1,4 +1,5 @@
 import { VendorBillsConsole } from "@/features/vendor-bills";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import styles from "../../../vendor-bills/page.module.css";
 
@@ -9,7 +10,7 @@ type ProjectVendorBillsPageProps = {
 export default async function ProjectVendorBillsPage({ params }: ProjectVendorBillsPageProps) {
   const { projectId } = await params;
   if (!/^\d+$/.test(projectId)) {
-    redirect("/vendor-bills-placeholder");
+    redirect("/projects");
   }
 
   return (
@@ -29,6 +30,10 @@ export default async function ProjectVendorBillsPage({ params }: ProjectVendorBi
           <p>
             Vendor Bills are intentionally modeled as a B2B contract/AP workflow. For quick field
             receipt intake, use the project-scoped <strong>Expenses</strong> flow.
+          </p>
+          <p>
+            <Link href={`/projects?project=${projectId}`}>Back to Project Hub</Link> |{" "}
+            <Link href={`/payments?project=${projectId}`}>Next: Record outgoing payment</Link>
           </p>
         </header>
         <section className={styles.card}>

@@ -72,3 +72,95 @@ class ProjectFinancialSummarySerializer(serializers.Serializer):
     inbound_unapplied_credit = serializers.DecimalField(max_digits=12, decimal_places=2)
     outbound_unapplied_credit = serializers.DecimalField(max_digits=12, decimal_places=2)
     traceability = serializers.JSONField()
+
+
+class PortfolioProjectSnapshotSerializer(serializers.Serializer):
+    project_id = serializers.IntegerField()
+    project_name = serializers.CharField()
+    project_status = serializers.CharField()
+    ar_outstanding = serializers.DecimalField(max_digits=12, decimal_places=2)
+    ap_outstanding = serializers.DecimalField(max_digits=12, decimal_places=2)
+    approved_change_orders_total = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+
+class PortfolioSnapshotSerializer(serializers.Serializer):
+    generated_at = serializers.DateTimeField()
+    date_filter = serializers.JSONField()
+    active_projects_count = serializers.IntegerField()
+    ar_total_outstanding = serializers.DecimalField(max_digits=12, decimal_places=2)
+    ap_total_outstanding = serializers.DecimalField(max_digits=12, decimal_places=2)
+    overdue_invoice_count = serializers.IntegerField()
+    overdue_vendor_bill_count = serializers.IntegerField()
+    projects = PortfolioProjectSnapshotSerializer(many=True)
+
+
+class ChangeImpactProjectSerializer(serializers.Serializer):
+    project_id = serializers.IntegerField()
+    project_name = serializers.CharField()
+    approved_change_order_count = serializers.IntegerField()
+    approved_change_order_total = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+
+class ChangeImpactSummarySerializer(serializers.Serializer):
+    generated_at = serializers.DateTimeField()
+    date_filter = serializers.JSONField()
+    approved_change_order_count = serializers.IntegerField()
+    approved_change_order_total = serializers.DecimalField(max_digits=12, decimal_places=2)
+    projects = ChangeImpactProjectSerializer(many=True)
+
+
+class AttentionFeedItemSerializer(serializers.Serializer):
+    kind = serializers.CharField()
+    severity = serializers.CharField()
+    label = serializers.CharField()
+    detail = serializers.CharField()
+    project_id = serializers.IntegerField()
+    project_name = serializers.CharField()
+    ui_route = serializers.CharField()
+    detail_endpoint = serializers.CharField()
+    due_date = serializers.DateField(allow_null=True)
+
+
+class AttentionFeedSerializer(serializers.Serializer):
+    generated_at = serializers.DateTimeField()
+    due_soon_window_days = serializers.IntegerField()
+    item_count = serializers.IntegerField()
+    items = AttentionFeedItemSerializer(many=True)
+
+
+class QuickJumpItemSerializer(serializers.Serializer):
+    kind = serializers.CharField()
+    record_id = serializers.IntegerField()
+    label = serializers.CharField()
+    sub_label = serializers.CharField()
+    project_id = serializers.IntegerField(allow_null=True)
+    project_name = serializers.CharField(allow_blank=True)
+    ui_href = serializers.CharField()
+    detail_endpoint = serializers.CharField()
+
+
+class QuickJumpSearchSerializer(serializers.Serializer):
+    query = serializers.CharField()
+    item_count = serializers.IntegerField()
+    items = QuickJumpItemSerializer(many=True)
+
+
+class ProjectTimelineItemSerializer(serializers.Serializer):
+    timeline_id = serializers.CharField()
+    category = serializers.ChoiceField(choices=["financial", "workflow"])
+    event_type = serializers.CharField()
+    occurred_at = serializers.DateTimeField()
+    label = serializers.CharField()
+    detail = serializers.CharField(allow_blank=True)
+    object_type = serializers.CharField()
+    object_id = serializers.IntegerField()
+    ui_route = serializers.CharField()
+    detail_endpoint = serializers.CharField()
+
+
+class ProjectTimelineSerializer(serializers.Serializer):
+    project_id = serializers.IntegerField()
+    project_name = serializers.CharField()
+    category = serializers.ChoiceField(choices=["all", "financial", "workflow"])
+    item_count = serializers.IntegerField()
+    items = ProjectTimelineItemSerializer(many=True)

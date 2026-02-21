@@ -1,4 +1,8 @@
+from datetime import timedelta
+
+from django.contrib.auth.models import Group
 from core.tests.common import *
+from django.utils import timezone
 
 class ProjectProfileTests(TestCase):
     def setUp(self):
@@ -220,6 +224,40 @@ class CostCodeTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 200)
+        self.code.refresh_from_db()
+        self.assertEqual(self.code.name, "General Conditions Updated")
+        self.assertFalse(self.code.is_active)
+
+    def test_cost_code_csv_import_preview_and_apply(self):
+        preview = self.client.post(
+            "/api/v1/cost-codes/import-csv/",
+            data={
+                "dry_run": True,
+                "csv_text": "code,name,is_active\n01-100,General Conditions Updated,false\n03-300,Site Work,true\n",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(preview.status_code, 200)
+        preview_data = preview.json()["data"]
+        self.assertEqual(preview_data["mode"], "preview")
+        self.assertEqual(preview_data["total_rows"], 2)
+        self.assertEqual(CostCode.objects.filter(created_by=self.user).count(), 1)
+
+        apply_response = self.client.post(
+            "/api/v1/cost-codes/import-csv/",
+            data={
+                "dry_run": False,
+                "csv_text": "code,name,is_active\n01-100,General Conditions Updated,false\n03-300,Site Work,true\n",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(apply_response.status_code, 200)
+        data = apply_response.json()["data"]
+        self.assertEqual(data["updated_count"], 1)
+        self.assertEqual(data["created_count"], 1)
+        self.assertEqual(CostCode.objects.filter(created_by=self.user).count(), 2)
         self.code.refresh_from_db()
         self.assertEqual(self.code.name, "General Conditions Updated")
         self.assertFalse(self.code.is_active)
@@ -459,3 +497,605 @@ class ProjectFinancialSummaryTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(hidden.status_code, 404)
+
+
+class ReportingPackTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="pm24",
+            email="pm24@example.com",
+            password="secret123",
+        )
+        self.other_user = User.objects.create_user(
+            username="pm25",
+            email="pm25@example.com",
+            password="secret123",
+        )
+        self.token, _ = Token.objects.get_or_create(user=self.user)
+
+        self.customer = Customer.objects.create(
+            display_name="Owner Reporting",
+            email="owner-reporting@example.com",
+            phone="555-8181",
+            billing_address="81 Main St",
+            created_by=self.user,
+        )
+        self.project = Project.objects.create(
+            customer=self.customer,
+            name="Reporting Active Project",
+            status=Project.Status.ACTIVE,
+            contract_value_original="10000.00",
+            contract_value_current="10800.00",
+            created_by=self.user,
+        )
+        self.project_prospect = Project.objects.create(
+            customer=self.customer,
+            name="Reporting Prospect Project",
+            status=Project.Status.PROSPECT,
+            contract_value_original="5000.00",
+            contract_value_current="5000.00",
+            created_by=self.user,
+        )
+        self.vendor = Vendor.objects.create(
+            name="Reporting Vendor",
+            email="billing@reporting-vendor.example.com",
+            created_by=self.user,
+        )
+
+    def _seed_reporting_records(self):
+        ChangeOrder.objects.create(
+            project=self.project,
+            number=1,
+            title="Approved CO 1",
+            status=ChangeOrder.Status.APPROVED,
+            amount_delta="300.00",
+            days_delta=1,
+            requested_by=self.user,
+            approved_by=self.user,
+            approved_at="2026-02-10T00:00:00Z",
+        )
+        ChangeOrder.objects.create(
+            project=self.project,
+            number=2,
+            title="Approved CO 2",
+            status=ChangeOrder.Status.APPROVED,
+            amount_delta="500.00",
+            days_delta=1,
+            requested_by=self.user,
+            approved_by=self.user,
+            approved_at="2026-03-10T00:00:00Z",
+        )
+
+        Invoice.objects.create(
+            project=self.project,
+            customer=self.project.customer,
+            invoice_number="INV-RPT-1",
+            status=Invoice.Status.SENT,
+            issue_date="2026-02-01",
+            due_date="2026-02-15",
+            subtotal="400.00",
+            total="400.00",
+            balance_due="400.00",
+            created_by=self.user,
+        )
+        Invoice.objects.create(
+            project=self.project,
+            customer=self.project.customer,
+            invoice_number="INV-RPT-2",
+            status=Invoice.Status.PAID,
+            issue_date="2026-02-01",
+            due_date="2026-03-01",
+            subtotal="600.00",
+            total="600.00",
+            balance_due="0.00",
+            created_by=self.user,
+        )
+
+        VendorBill.objects.create(
+            project=self.project,
+            vendor=self.vendor,
+            bill_number="VB-RPT-1",
+            status=VendorBill.Status.RECEIVED,
+            issue_date="2026-02-01",
+            due_date="2026-02-20",
+            total="250.00",
+            balance_due="250.00",
+            created_by=self.user,
+        )
+        VendorBill.objects.create(
+            project=self.project,
+            vendor=self.vendor,
+            bill_number="VB-RPT-2",
+            status=VendorBill.Status.PAID,
+            issue_date="2026-02-01",
+            due_date="2026-03-20",
+            total="100.00",
+            balance_due="0.00",
+            created_by=self.user,
+        )
+
+    def test_portfolio_snapshot_reports_rollups(self):
+        self._seed_reporting_records()
+
+        response = self.client.get(
+            "/api/v1/reports/portfolio/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data["active_projects_count"], 1)
+        self.assertEqual(data["ar_total_outstanding"], "1000.00")
+        self.assertEqual(data["ap_total_outstanding"], "350.00")
+        self.assertEqual(data["overdue_invoice_count"], 1)
+        self.assertEqual(data["overdue_vendor_bill_count"], 1)
+        self.assertEqual(len(data["projects"]), 2)
+
+    def test_change_impact_summary_supports_date_filters(self):
+        self._seed_reporting_records()
+
+        all_rows = self.client.get(
+            "/api/v1/reports/change-impact/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(all_rows.status_code, 200)
+        all_data = all_rows.json()["data"]
+        self.assertEqual(all_data["approved_change_order_count"], 2)
+        self.assertEqual(all_data["approved_change_order_total"], "800.00")
+        self.assertEqual(len(all_data["projects"]), 1)
+
+        filtered = self.client.get(
+            "/api/v1/reports/change-impact/?date_from=2026-03-01&date_to=2026-03-31",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(filtered.status_code, 200)
+        filtered_data = filtered.json()["data"]
+        self.assertEqual(filtered_data["approved_change_order_count"], 1)
+        self.assertEqual(filtered_data["approved_change_order_total"], "500.00")
+
+    def test_reporting_endpoints_validate_dates_and_scope_to_user(self):
+        invalid = self.client.get(
+            "/api/v1/reports/portfolio/?date_from=2026-03-20&date_to=2026-03-01",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(invalid.json()["error"]["code"], "validation_error")
+
+        invalid_format = self.client.get(
+            "/api/v1/reports/change-impact/?date_from=03-01-2026",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(invalid_format.status_code, 400)
+        self.assertEqual(invalid_format.json()["error"]["code"], "validation_error")
+
+        other_customer = Customer.objects.create(
+            display_name="Other Reporting Owner",
+            email="other-reporting-owner@example.com",
+            phone="555-9191",
+            billing_address="91 Main St",
+            created_by=self.other_user,
+        )
+        other_project = Project.objects.create(
+            customer=other_customer,
+            name="Other User Project",
+            status=Project.Status.ACTIVE,
+            contract_value_original="1000.00",
+            contract_value_current="1200.00",
+            created_by=self.other_user,
+        )
+        ChangeOrder.objects.create(
+            project=other_project,
+            number=1,
+            title="Other User CO",
+            status=ChangeOrder.Status.APPROVED,
+            amount_delta="999.00",
+            days_delta=1,
+            requested_by=self.other_user,
+            approved_by=self.other_user,
+            approved_at="2026-02-10T00:00:00Z",
+        )
+
+        scoped = self.client.get(
+            "/api/v1/reports/change-impact/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(scoped.status_code, 200)
+        scoped_data = scoped.json()["data"]
+        self.assertEqual(scoped_data["approved_change_order_total"], "0.00")
+
+    def test_attention_feed_returns_actionable_items(self):
+        today = timezone.localdate()
+        overdue_due_date = today - timedelta(days=1)
+        due_soon_date = today + timedelta(days=4)
+        Invoice.objects.create(
+            project=self.project,
+            customer=self.project.customer,
+            invoice_number="INV-ATTN-1",
+            status=Invoice.Status.SENT,
+            issue_date=today,
+            due_date=overdue_due_date,
+            subtotal="250.00",
+            total="250.00",
+            balance_due="250.00",
+            created_by=self.user,
+        )
+        VendorBill.objects.create(
+            project=self.project,
+            vendor=self.vendor,
+            bill_number="VB-ATTN-1",
+            status=VendorBill.Status.RECEIVED,
+            issue_date=today,
+            due_date=due_soon_date,
+            total="180.00",
+            balance_due="180.00",
+            created_by=self.user,
+        )
+        ChangeOrder.objects.create(
+            project=self.project,
+            number=21,
+            title="Pending Approval CO",
+            status=ChangeOrder.Status.PENDING_APPROVAL,
+            amount_delta="90.00",
+            days_delta=1,
+            requested_by=self.user,
+        )
+        Payment.objects.create(
+            project=self.project,
+            direction=Payment.Direction.INBOUND,
+            method=Payment.Method.ACH,
+            status=Payment.Status.FAILED,
+            amount="120.00",
+            payment_date=today,
+            created_by=self.user,
+        )
+
+        response = self.client.get(
+            "/api/v1/reports/attention-feed/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data["due_soon_window_days"], 7)
+        self.assertEqual(data["item_count"], 4)
+        kinds = {item["kind"] for item in data["items"]}
+        self.assertIn("overdue_invoice", kinds)
+        self.assertIn("vendor_bill_due_soon", kinds)
+        self.assertIn("change_order_pending_approval", kinds)
+        self.assertIn("payment_problem", kinds)
+
+    def test_quick_jump_search_returns_cross_entity_results(self):
+        self.project.name = "Kitchen Main Project"
+        self.project.save(update_fields=["name", "updated_at"])
+        estimate = Estimate.objects.create(
+            project=self.project,
+            version=1,
+            status=Estimate.Status.DRAFT,
+            title="Kitchen Scope",
+            created_by=self.user,
+        )
+        change_order = ChangeOrder.objects.create(
+            project=self.project,
+            number=5,
+            title="Kitchen Delta",
+            status=ChangeOrder.Status.PENDING_APPROVAL,
+            amount_delta="250.00",
+            days_delta=1,
+            requested_by=self.user,
+        )
+        invoice = Invoice.objects.create(
+            project=self.project,
+            customer=self.project.customer,
+            invoice_number="INV-KITCHEN-1",
+            status=Invoice.Status.DRAFT,
+            issue_date=timezone.localdate(),
+            due_date=timezone.localdate(),
+            subtotal="100.00",
+            total="100.00",
+            balance_due="100.00",
+            created_by=self.user,
+        )
+        vendor_bill = VendorBill.objects.create(
+            project=self.project,
+            vendor=self.vendor,
+            bill_number="VB-KITCHEN-1",
+            status=VendorBill.Status.PLANNED,
+            issue_date=timezone.localdate(),
+            due_date=timezone.localdate(),
+            total="80.00",
+            balance_due="80.00",
+            created_by=self.user,
+        )
+        payment = Payment.objects.create(
+            project=self.project,
+            direction=Payment.Direction.INBOUND,
+            method=Payment.Method.ACH,
+            status=Payment.Status.PENDING,
+            amount="75.00",
+            payment_date=timezone.localdate(),
+            reference_number="KITCHEN-PAY",
+            created_by=self.user,
+        )
+
+        response = self.client.get(
+            "/api/v1/search/quick-jump/?q=kitchen",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertGreaterEqual(data["item_count"], 6)
+        kinds = {item["kind"] for item in data["items"]}
+        self.assertIn("project", kinds)
+        self.assertIn("estimate", kinds)
+        self.assertIn("change_order", kinds)
+        self.assertIn("invoice", kinds)
+        self.assertIn("vendor_bill", kinds)
+        self.assertIn("payment", kinds)
+        endpoints = {item["detail_endpoint"] for item in data["items"]}
+        self.assertIn(f"/api/v1/estimates/{estimate.id}/", endpoints)
+        self.assertIn(f"/api/v1/change-orders/{change_order.id}/", endpoints)
+        self.assertIn(f"/api/v1/invoices/{invoice.id}/", endpoints)
+        self.assertIn(f"/api/v1/vendor-bills/{vendor_bill.id}/", endpoints)
+        self.assertIn(f"/api/v1/payments/{payment.id}/", endpoints)
+
+    def test_quick_jump_search_minimum_query_and_scope(self):
+        short_response = self.client.get(
+            "/api/v1/search/quick-jump/?q=a",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(short_response.status_code, 200)
+        short_data = short_response.json()["data"]
+        self.assertEqual(short_data["item_count"], 0)
+        self.assertEqual(short_data["items"], [])
+
+        other_customer = Customer.objects.create(
+            display_name="Other Search Owner",
+            email="other-search-owner@example.com",
+            phone="555-9292",
+            billing_address="92 Main St",
+            created_by=self.other_user,
+        )
+        other_project = Project.objects.create(
+            customer=other_customer,
+            name="Other Kitchen Project",
+            status=Project.Status.ACTIVE,
+            contract_value_original="1000.00",
+            contract_value_current="1000.00",
+            created_by=self.other_user,
+        )
+        Estimate.objects.create(
+            project=other_project,
+            version=1,
+            status=Estimate.Status.DRAFT,
+            title="Other Kitchen Scope",
+            created_by=self.other_user,
+        )
+
+        scoped_response = self.client.get(
+            "/api/v1/search/quick-jump/?q=other",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(scoped_response.status_code, 200)
+        scoped_data = scoped_response.json()["data"]
+        self.assertEqual(scoped_data["item_count"], 0)
+
+
+class ProjectTimelineTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="pm26",
+            email="pm26@example.com",
+            password="secret123",
+        )
+        self.other_user = User.objects.create_user(
+            username="pm27",
+            email="pm27@example.com",
+            password="secret123",
+        )
+        self.token, _ = Token.objects.get_or_create(user=self.user)
+
+        self.customer = Customer.objects.create(
+            display_name="Owner Timeline",
+            email="owner-timeline@example.com",
+            phone="555-8383",
+            billing_address="83 Main St",
+            created_by=self.user,
+        )
+        self.project = Project.objects.create(
+            customer=self.customer,
+            name="Timeline Project",
+            status=Project.Status.ACTIVE,
+            created_by=self.user,
+        )
+
+    def test_project_timeline_merges_financial_and_workflow_events(self):
+        estimate = Estimate.objects.create(
+            project=self.project,
+            version=1,
+            status=Estimate.Status.SENT,
+            title="Timeline Estimate",
+            created_by=self.user,
+        )
+        EstimateStatusEvent.objects.create(
+            estimate=estimate,
+            from_status=Estimate.Status.DRAFT,
+            to_status=Estimate.Status.SENT,
+            note="Sent for review",
+            changed_by=self.user,
+        )
+        FinancialAuditEvent.objects.create(
+            project=self.project,
+            event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
+            object_type="invoice",
+            object_id=123,
+            from_status=Invoice.Status.DRAFT,
+            to_status=Invoice.Status.SENT,
+            amount="125.00",
+            note="Invoice sent",
+            created_by=self.user,
+        )
+
+        response = self.client.get(
+            f"/api/v1/projects/{self.project.id}/timeline/?category=all",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data["project_id"], self.project.id)
+        self.assertEqual(data["category"], "all")
+        self.assertEqual(data["item_count"], 2)
+        categories = {item["category"] for item in data["items"]}
+        self.assertEqual(categories, {"financial", "workflow"})
+        for item in data["items"]:
+            self.assertIn("ui_route", item)
+            self.assertIn("detail_endpoint", item)
+
+    def test_project_timeline_category_filter_validation_and_scope(self):
+        invalid = self.client.get(
+            f"/api/v1/projects/{self.project.id}/timeline/?category=bad",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(invalid.json()["error"]["code"], "validation_error")
+
+        other_customer = Customer.objects.create(
+            display_name="Other Timeline Owner",
+            email="other-timeline-owner@example.com",
+            phone="555-9393",
+            billing_address="93 Main St",
+            created_by=self.other_user,
+        )
+        other_project = Project.objects.create(
+            customer=other_customer,
+            name="Other Timeline Project",
+            status=Project.Status.ACTIVE,
+            created_by=self.other_user,
+        )
+        hidden = self.client.get(
+            f"/api/v1/projects/{other_project.id}/timeline/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(hidden.status_code, 404)
+
+
+class RoleHardeningTests(TestCase):
+    def setUp(self):
+        self.owner_user = User.objects.create_user(
+            username="role-owner",
+            email="role-owner@example.com",
+            password="secret123",
+        )
+        self.viewer_user = User.objects.create_user(
+            username="role-viewer",
+            email="role-viewer@example.com",
+            password="secret123",
+        )
+        self.bookkeeping_user = User.objects.create_user(
+            username="role-bookkeeping",
+            email="role-bookkeeping@example.com",
+            password="secret123",
+        )
+        self.owner_token, _ = Token.objects.get_or_create(user=self.owner_user)
+        self.viewer_token, _ = Token.objects.get_or_create(user=self.viewer_user)
+        self.bookkeeping_token, _ = Token.objects.get_or_create(user=self.bookkeeping_user)
+
+        viewer_group, _ = Group.objects.get_or_create(name="viewer")
+        bookkeeping_group, _ = Group.objects.get_or_create(name="bookkeeping")
+        self.viewer_user.groups.add(viewer_group)
+        self.bookkeeping_user.groups.add(bookkeeping_group)
+
+        self.viewer_customer = Customer.objects.create(
+            display_name="Viewer Owner",
+            email="viewer-owner@example.com",
+            phone="555-1111",
+            billing_address="111 Main St",
+            created_by=self.viewer_user,
+        )
+        self.viewer_project = Project.objects.create(
+            customer=self.viewer_customer,
+            name="Viewer Project",
+            status=Project.Status.ACTIVE,
+            created_by=self.viewer_user,
+        )
+        self.viewer_cost_code = CostCode.objects.create(
+            code="01-010",
+            name="General Conditions",
+            created_by=self.viewer_user,
+        )
+        self.viewer_vendor = Vendor.objects.create(
+            name="Viewer Vendor",
+            email="viewer-vendor@example.com",
+            created_by=self.viewer_user,
+        )
+
+        self.bookkeeping_customer = Customer.objects.create(
+            display_name="Bookkeeping Owner",
+            email="bookkeeping-owner@example.com",
+            phone="555-2222",
+            billing_address="222 Main St",
+            created_by=self.bookkeeping_user,
+        )
+        self.bookkeeping_project = Project.objects.create(
+            customer=self.bookkeeping_customer,
+            name="Bookkeeping Project",
+            status=Project.Status.ACTIVE,
+            created_by=self.bookkeeping_user,
+        )
+
+    def test_auth_me_returns_effective_role(self):
+        response = self.client.get(
+            "/api/v1/auth/me/",
+            HTTP_AUTHORIZATION=f"Token {self.viewer_token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["role"], "viewer")
+
+    def test_viewer_cannot_create_invoice_or_payment(self):
+        invoice_response = self.client.post(
+            f"/api/v1/projects/{self.viewer_project.id}/invoices/",
+            data={
+                "issue_date": "2026-02-01",
+                "due_date": "2026-02-28",
+                "line_items": [
+                    {
+                        "cost_code": self.viewer_cost_code.id,
+                        "description": "Scope line",
+                        "quantity": "1.00",
+                        "unit": "ea",
+                        "unit_price": "100.00",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.viewer_token.key}",
+        )
+        self.assertEqual(invoice_response.status_code, 403)
+        self.assertEqual(invoice_response.json()["error"]["code"], "forbidden")
+
+        payment_response = self.client.post(
+            f"/api/v1/projects/{self.viewer_project.id}/payments/",
+            data={
+                "direction": "inbound",
+                "method": "ach",
+                "status": "pending",
+                "amount": "50.00",
+                "payment_date": "2026-02-01",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.viewer_token.key}",
+        )
+        self.assertEqual(payment_response.status_code, 403)
+        self.assertEqual(payment_response.json()["error"]["code"], "forbidden")
+
+    def test_bookkeeping_can_create_payment(self):
+        response = self.client.post(
+            f"/api/v1/projects/{self.bookkeeping_project.id}/payments/",
+            data={
+                "direction": "inbound",
+                "method": "ach",
+                "status": "pending",
+                "amount": "75.00",
+                "payment_date": "2026-02-01",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.bookkeeping_token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
