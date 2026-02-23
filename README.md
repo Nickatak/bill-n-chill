@@ -86,13 +86,10 @@ Stable service names for overrides:
 - `docs/architecture.md`: detailed system boundaries and conventions.
 - `docs/api.md`: endpoint reference and API standards.
 - `docs/contributing.md`: workflow, branching, testing, and code style.
-- `docs/product-map.md`: Beam/Buildertrend/Procore capability comparison and replacement implications.
 - `docs/mvp-v1.md`: initial MVP scope, acceptance criteria, and phased delivery.
 - `docs/domain-model.md`: core entities, lifecycles, and API direction for construction billing workflows.
-- `docs/gc-pm-use-case.md`: step-by-step GC/PM scenario with required features, device posture, and edge conditions.
-- `docs/feature-list.md`: complete ordered feature backlog with dependencies and acceptance checks.
+- `docs/feature-list.md`: compact implementation ledger for shipped feature slices.
 - `docs/phase-2-operational-hardening-and-product-development.md`: next-phase plan for operational hardening and UX/use-case product development.
-- `docs/dashboard-home-auth-gate.md`: auth-gated dashboard-home UX sketch and interaction rules.
 - `docs/quick-add-ux-v2.md`: Quick Add Contact v2 UX goals, interaction rules, and acceptance checks.
 
 ## Notes

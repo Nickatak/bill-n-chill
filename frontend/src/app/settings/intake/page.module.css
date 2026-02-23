@@ -1,0 +1,34 @@
+.page {
+  --background: #f5f7fa;
+  --foreground: #ffffff;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --border: #d1d5db;
+
+  min-height: 100dvh;
+  padding: 20px;
+  background: var(--background);
+  font-family: var(--font-geist-sans);
+}
+
+.main {
+  width: min(760px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 12px;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  background: var(--foreground);
+}
+
+:global(html[data-theme="dark"]) .page {
+  --background: #0b1220;
+  --foreground: #111827;
+  --text-primary: #f3f4f6;
+  --text-secondary: #cbd5e1;
+  --border: #334155;
+}

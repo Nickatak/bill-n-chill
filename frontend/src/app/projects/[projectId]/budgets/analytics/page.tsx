@@ -1,7 +1,7 @@
 import { BudgetAnalyticsConsole } from "@/features/budgets";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import styles from "../../../../budgets/page.module.css";
+import styles from "./page.module.css";
 
 type ProjectBudgetAnalyticsPageProps = {
   params: Promise<{ projectId: string }>;
@@ -12,7 +12,7 @@ export default async function ProjectBudgetAnalyticsPage({
 }: ProjectBudgetAnalyticsPageProps) {
   const { projectId } = await params;
   if (!/^\d+$/.test(projectId)) {
-    redirect("/budgets-placeholder");
+    redirect("/projects");
   }
 
   return (

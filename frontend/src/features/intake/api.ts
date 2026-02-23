@@ -4,3 +4,66 @@ export const defaultApiBaseUrl =
 export function normalizeApiBaseUrl(baseUrl: string): string {
   return baseUrl.trim().replace(/\/$/, "");
 }
+
+export async function fetchIntakeAuthMe({
+  baseUrl,
+  token,
+}: {
+  baseUrl: string;
+  token: string;
+}) {
+  const response = await fetch(`${normalizeApiBaseUrl(baseUrl)}/auth/me/`, {
+    headers: { Authorization: `Token ${token}` },
+  });
+  return response;
+}
+
+export async function postQuickAddLead({
+  baseUrl,
+  token,
+  body,
+}: {
+  baseUrl: string;
+  token: string;
+  body: Record<string, unknown>;
+}) {
+  const response = await fetch(`${normalizeApiBaseUrl(baseUrl)}/lead-contacts/quick-add/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Token ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+  return response;
+}
+
+export async function postConvertLeadToProject({
+  baseUrl,
+  token,
+  leadId,
+  projectName,
+  projectStatus,
+}: {
+  baseUrl: string;
+  token: string;
+  leadId: number;
+  projectName: string;
+  projectStatus: string;
+}) {
+  const response = await fetch(
+    `${normalizeApiBaseUrl(baseUrl)}/lead-contacts/${leadId}/convert-to-project/`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Token ${token}`,
+      },
+      body: JSON.stringify({
+        project_name: projectName,
+        project_status: projectStatus,
+      }),
+    },
+  );
+  return response;
+}

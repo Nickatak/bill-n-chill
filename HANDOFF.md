@@ -2,124 +2,137 @@
 
 ## Session State
 
+- Workspace: `/home/nick/bill_n_chill`
 - Branch: `main`
-- Base HEAD commit: `df49b4a`
-- Worktree state: dirty (intentionally), no commit yet for current view-layer pass.
-- User context: paused for account swap; requested that we continue by stepping through views together.
+- Current HEAD: `20b187d`
+- Worktree: dirty (intentionally; large frontend refactor/docs pass not committed yet)
+- User context: finished for the night after frontend architecture cleanup and pattern enforcement.
 
-## What Is Complete (Current Worktree)
+## What Was Completed This Session
 
-### 1) View domain packaging refactor (breaking, no shims)
+### 1) Frontend architecture pattern finalized and enforced
 
-Flat modules under `backend/core/views/` were moved into domain packages:
+We standardized and documented these rules:
 
-- `backend/core/views/accounts_receivable/invoices.py`
-- `backend/core/views/accounts_payable/vendor_bills.py`
-- `backend/core/views/cash_management/payments.py`
-- `backend/core/views/change_orders/change_orders.py`
-- `backend/core/views/estimating/estimates.py`
-- `backend/core/views/estimating/budgets.py`
-- `backend/core/views/shared_operations/accounting.py`
-- `backend/core/views/shared_operations/intake.py`
-- `backend/core/views/shared_operations/projects.py`
-- `backend/core/views/shared_operations/cost_codes.py`
-- `backend/core/views/shared_operations/vendors.py`
+1. **Route Shim Policy**
+   - `src/app/**/page.tsx` should be thin route/layout shims only.
+   - No workflow orchestration or business mutation logic in route files.
 
-`backend/core/views/__init__.py` was updated to re-export from new module paths, preserving URL imports through `core.views`.
+2. **Parent Controller API Policy**
+   - Feature parent component (`*Console`) consumes one `use<Feature>Controller` hook.
+   - Controller returns one explicit typed API object (`...ControllerApi`).
 
-### 2) Transactional consistency hardening in views
+3. **Function Style Convention**
+   - Top-level exported units: `function name(...) {}`
+   - Local callbacks/closures: `const name = (...) => {}`
 
-Applied/confirmed atomic grouping for create/update flows where operational writes and immutable captures must stay consistent.
+### 2) Intake feature modularization completed
 
-Key enforced paths:
+`frontend/src/features/intake/hooks/use-quick-add-controller.ts` was split by domain and now composes:
 
-- Invoice create path (`project_invoices_view`) now atomic.
-- Vendor bill create path (`project_vendor_bills_view`) now writes audit event inside create transaction.
-- Existing prior hardening retained for accounting/intake/payments/create-update flows.
+- `frontend/src/features/intake/hooks/quick-add-controller.types.ts`
+- `frontend/src/features/intake/hooks/quick-add-validation.ts`
+- `frontend/src/features/intake/hooks/use-quick-add-auth-status.ts`
+- `frontend/src/features/intake/hooks/use-quick-add-business-workflow.ts`
+- `frontend/src/features/intake/hooks/use-quick-add-controller.ts` (parent composition)
 
-### 3) Rollback tests for immutable-capture failure scenarios
+`QuickAddConsole` now consumes explicit `controllerApi` naming.
 
-Added/updated tests verifying no partial persistence when capture writes fail:
+### 3) New feature extraction to enforce pattern
 
-- `backend/core/tests/test_invoices.py`
-- `backend/core/tests/test_vendor_bills.py`
-- `backend/core/tests/test_change_orders.py`
-- `backend/core/tests/test_payments.py`
-- `backend/core/tests/test_accounting_sync.py`
-- `backend/core/tests/test_intake.py`
-- `backend/core/tests/test_contacts_management.py`
+`/settings/intake` route was converted to a true route shim and moved into feature layer:
 
-### 4) Route-level contract docstrings
+- New feature: `frontend/src/features/settings-intake/`
+  - `components/intake-settings-console.tsx`
+  - `hooks/use-intake-settings-controller.ts`
+  - `hooks/intake-settings-controller.types.ts`
+  - `index.ts`
+  - `FEATURE_MAP.md`
+- Route file now just mounts the console:
+  - `frontend/src/app/settings/intake/page.tsx`
 
-Contract-style docstrings were added to endpoint handlers (`@api_view` functions) across:
+### 4) Feature maps and docs standardized
 
-- `backend/core/views/auth.py`
-- `backend/core/views/accounts_receivable/invoices.py`
-- `backend/core/views/accounts_payable/vendor_bills.py`
-- `backend/core/views/cash_management/payments.py`
-- `backend/core/views/change_orders/change_orders.py`
-- `backend/core/views/estimating/estimates.py`
-- `backend/core/views/estimating/budgets.py`
-- `backend/core/views/shared_operations/accounting.py`
-- `backend/core/views/shared_operations/intake.py`
-- `backend/core/views/shared_operations/projects.py`
-- `backend/core/views/shared_operations/cost_codes.py`
-- `backend/core/views/shared_operations/vendors.py`
+- `frontend/src/features/FEATURE_MAP_TEMPLATE.md` finalized.
+- Feature maps were added/normalized across features (including intake and settings-intake).
+- Added/updated:
+  - `frontend/ARCHITECTURE_MAP.md`
+  - `frontend/README.md`
 
-Intent: each route now describes methods, expected payload shape/guards, and side effects at a glance.
+### 5) Route/dir cleanup in `src/app`
+
+- Deleted obsolete placeholder route:
+  - `frontend/src/app/budgets-placeholder/page.tsx`
+  - `frontend/src/app/budgets-placeholder/page.module.css`
+- Updated invalid project fallback in budget analytics route to `/projects`.
+- Removed orphan route directories with no pages:
+  - `frontend/src/app/budgets/`
+  - `frontend/src/app/estimates/[estimateId]/`
+  - `frontend/src/app/project-snapshot/[publicRef]/` and parent
+- Moved orphan stylesheet to actual route:
+  - `frontend/src/app/budgets/page.module.css`
+  - -> `frontend/src/app/projects/[projectId]/budgets/analytics/page.module.css`
+
+### 6) VS Code workspace ergonomics
+
+- Set `explorer.compactFolders` to `false` in `.vscode/settings.json` to show full route segment folder chains.
+- User enabled built-in TS/JS language features extension; Go To Definition now works.
 
 ## Validation Performed
 
-- Full backend tests:
-  - `cd backend && .venv/bin/python manage.py test core.tests --keepdb`
-  - Result: `Ran 179 tests ... OK`
-- Targeted transaction-sensitive suites also passed during this pass.
-- Migration drift check passed earlier in session:
-  - `cd backend && .venv/bin/python manage.py makemigrations --check --dry-run`
-  - Result: `No changes detected`
+All checks passed after latest frontend changes:
 
-## Current Worktree Changes (Not Committed)
+- `npm run lint --prefix frontend`
+- `npm run build --prefix frontend`
 
-Includes modified/deleted/added files from the view refactor and docs/tests pass.
+(Executed multiple times through the refactor; final run also passed after route/dir cleanup.)
 
-Top-level notable edits:
+## Template Repo Status (separate repo)
 
-- `HANDOFF.md`
-- `README.md`
-- `backend/core/views/__init__.py`
-- New view packages under:
-  - `backend/core/views/accounts_payable/`
-  - `backend/core/views/accounts_receivable/`
-  - `backend/core/views/cash_management/`
-  - `backend/core/views/change_orders/`
-  - `backend/core/views/estimating/`
-  - `backend/core/views/shared_operations/`
-- Legacy flat view files removed (moved content).
-- Test modules updated (rollback tests + patch import targets).
+Repo: `/home/nick/template`
 
-## In-Progress Collaboration Point
+- Branch: `chore/cicd-shakedown`
+- Latest pushed commit: `8ba86e4`
+- Template worktree: clean
 
-User asked for a "map" style walkthrough of endpoints by file, focusing on actual routes and expected contracts.
+Template includes:
 
-Where we stopped:
+- Demo route-shim feature (`app/demo-feature` + `features/demo-feature/*`)
+- Controller API pattern + function-style policy documented
+- Demo feature map aligned to the same structure
 
-- Completed walkthrough for `backend/core/views/accounts_payable/vendor_bills.py` route behavior.
-- User approved contract-oriented style and requested this approach going forward.
+## Current Uncommitted Changes in `bill_n_chill`
 
-## Resume Plan (Next Session)
+Major pending frontend files include:
 
-1. Continue route-by-route walkthrough in this order:
-   - `backend/core/views/accounts_receivable/invoices.py`
-   - `backend/core/views/cash_management/payments.py`
-   - `backend/core/views/change_orders/change_orders.py`
-   - `backend/core/views/estimating/estimates.py`
-   - `backend/core/views/estimating/budgets.py`
-   - `backend/core/views/shared_operations/*`
-2. Keep helper-level discussion light unless user asks to dive deeper.
-3. After walkthrough approval, perform final polish pass (if requested), then commit and push.
+- `frontend/README.md`
+- `frontend/ARCHITECTURE_MAP.md` (new)
+- `frontend/src/features/FEATURE_MAP_TEMPLATE.md` (new)
+- all feature `FEATURE_MAP.md` files (new)
+- intake refactor files (console/form/hooks split)
+- settings-intake new feature files
+- route cleanup changes in `src/app`
+- `.vscode/settings.json`
 
-## Important Notes
+(See `git status --short` for exact list.)
 
-- Do not commit yet; user explicitly requested review/walkthrough before commit.
+## Resume Point (next session)
+
+User ended while stepping through intake modularized hooks and was focused on:
+
+- `frontend/src/features/intake/hooks/use-quick-add-business-workflow.ts`
+
+Suggested first actions next session:
+
+1. Continue file-by-file review from `use-quick-add-business-workflow.ts`.
+2. Optionally do aggressive route cleanup of redirect-helper legacy routes (`/estimates`, `/vendor-bills`, `/expenses`) only if user confirms removal strategy.
+3. Batch commit/push the pending frontend work in `bill_n_chill` once user approves.
+
+## Notes
+
 - No destructive git operations were used.
-- API routing still resolves through `core.views` re-export surface; URL patterns unchanged at endpoint level.
+- Template repo is already committed/pushed; only `bill_n_chill` remains uncommitted.
+- Temporary accepted tradeoff in intake auth flow:
+  - `/` home auth gate verifies `GET /auth/me/` before mounting authenticated intake.
+  - `QuickAddConsole` performs its own `GET /auth/me/` verification for standalone `/intake/quick-add` correctness.
+  - Duplicate verification overhead is intentionally accepted for now; defer shared-auth-context refactor until later.

@@ -1,0 +1,46 @@
+"use client";
+
+import { useIntakeSettingsController } from "../hooks/use-intake-settings-controller";
+
+export function IntakeSettingsConsole() {
+  // Composition owner: wires controller state/actions into the settings form rendering.
+  const controllerApi = useIntakeSettingsController();
+
+  return (
+    <>
+      <h1>Intake Form Settings</h1>
+      <p>
+        Configure intake guardrails for operations use. These settings are local-only for now, and
+        will be connected to server-side policy in a later phase.
+      </p>
+      <form onSubmit={controllerApi.save}>
+        <label>
+          <input
+            type="checkbox"
+            checked={controllerApi.settings.requireFullName}
+            onChange={(event) => controllerApi.update("requireFullName", event.target.checked)}
+          />
+          Require contact full name
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={controllerApi.settings.requirePhoneOrEmail}
+            onChange={(event) => controllerApi.update("requirePhoneOrEmail", event.target.checked)}
+          />
+          Require at least one contact method (phone or email)
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={controllerApi.settings.requireProjectAddress}
+            onChange={(event) => controllerApi.update("requireProjectAddress", event.target.checked)}
+          />
+          Require project address
+        </label>
+        <button type="submit">Save Settings</button>
+      </form>
+      <p>{controllerApi.message}</p>
+    </>
+  );
+}
