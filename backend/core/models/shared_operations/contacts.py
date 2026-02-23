@@ -1,5 +1,7 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 
 User = get_user_model()
 
@@ -16,6 +18,8 @@ class LeadContact(models.Model):
     Current policy:
     - Lead conversion is intended to be idempotent at the API layer.
     - Converted leads keep references to created/reused customer and project shell.
+    - Lifecycle control: `user-managed` intake with conversion side-effects.
+    - Visibility: `internal-facing`.
 
     Notes:
     - `initial_contract_value` is optional intake-time context and may be used when
@@ -39,6 +43,17 @@ class LeadContact(models.Model):
         WEB_FORM = "web_form", "Web Form"
         REFERRAL = "referral", "Referral"
         OTHER = "other", "Other"
+
+    # Transition-map format:
+    # {from_status: {allowed_to_status_1, allowed_to_status_2, ...}}
+    # Example: `new_contact -> qualified` is allowed because
+    # `Status.QUALIFIED` is in `ALLOWED_STATUS_TRANSITIONS[Status.NEW_CONTACT]`.
+    ALLOWED_STATUS_TRANSITIONS = {
+        Status.NEW_CONTACT: {Status.QUALIFIED, Status.PROJECT_CREATED, Status.ARCHIVED},
+        Status.QUALIFIED: {Status.PROJECT_CREATED, Status.ARCHIVED},
+        Status.PROJECT_CREATED: {Status.ARCHIVED},
+        Status.ARCHIVED: set(),
+    }
 
     full_name = models.CharField(max_length=255)
     phone = models.CharField(max_length=50, blank=True)
@@ -86,6 +101,89 @@ class LeadContact(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~Q(status="project_created") | (
+                    Q(converted_customer__isnull=False)
+                    & Q(converted_project__isnull=False)
+                    & Q(converted_at__isnull=False)
+                ),
+                name="lead_project_created_requires_conversion_links",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(converted_customer__isnull=True)
+                    & Q(converted_project__isnull=True)
+                    & Q(converted_at__isnull=True)
+                )
+                | (
+                    Q(converted_customer__isnull=False)
+                    & Q(converted_project__isnull=False)
+                    & Q(converted_at__isnull=False)
+                ),
+                name="lead_conversion_links_all_or_none",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(converted_customer__isnull=True)
+                    & Q(converted_project__isnull=True)
+                    & Q(converted_at__isnull=True)
+                )
+                | Q(status__in=["project_created", "archived"]),
+                name="lead_conversion_links_status_gate",
+            ),
+        ]
+
+    @classmethod
+    def is_transition_allowed(cls, current_status: str, next_status: str) -> bool:
+        if current_status == next_status:
+            return True
+        return next_status in cls.ALLOWED_STATUS_TRANSITIONS.get(current_status, set())
+
+    def clean(self):
+        errors = {}
+
+        conversion_values = [
+            self.converted_customer_id is not None,
+            self.converted_project_id is not None,
+            self.converted_at is not None,
+        ]
+        has_any_conversion_link = any(conversion_values)
+        has_complete_conversion_link = all(conversion_values)
+
+        if self.status == self.Status.PROJECT_CREATED and not has_complete_conversion_link:
+            errors.setdefault("status", []).append(
+                "project_created requires converted customer, project, and converted_at."
+            )
+
+        if has_any_conversion_link and not has_complete_conversion_link:
+            errors.setdefault("converted_customer", []).append(
+                "Conversion links must be set together (customer, project, converted_at)."
+            )
+
+        if has_complete_conversion_link and self.status not in {
+            self.Status.PROJECT_CREATED,
+            self.Status.ARCHIVED,
+        }:
+            errors.setdefault("status", []).append(
+                "Converted leads must be project_created or archived."
+            )
+
+        if self.pk:
+            previous_status = (
+                type(self).objects.filter(pk=self.pk).values_list("status", flat=True).first()
+            )
+            if previous_status and not self.is_transition_allowed(previous_status, self.status):
+                errors.setdefault("status", []).append(
+                    f"Invalid lead contact status transition: {previous_status} -> {self.status}."
+                )
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         contact_hint = self.phone or self.email or "no-contact"
@@ -106,6 +204,8 @@ class Customer(models.Model):
       project-level `site_address`/service location data.
     - Deduplication/reuse behavior is handled by intake conversion logic, not by
       a hard unique constraint on this model.
+    - Lifecycle control: `user-managed`.
+    - Visibility: `internal-facing`.
     """
 
     display_name = models.CharField(max_length=255)

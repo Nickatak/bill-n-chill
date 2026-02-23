@@ -428,10 +428,55 @@ class PaymentTests(TestCase):
         self.assertEqual(events[2].metadata_json["allocations"][0]["target_type"], "invoice")
         self.assertEqual(events[2].metadata_json["allocations"][0]["target_id"], invoice.id)
         self.assertEqual(events[2].metadata_json["allocations"][0]["applied_amount"], "200.00")
+        self.assertIn("payment_allocation_id", events[2].metadata_json["allocations"][0])
+
+        allocation_events = list(
+            PaymentAllocationRecord.objects.filter(payment_id=payment_id).order_by("created_at", "id")
+        )
+        self.assertEqual(len(allocation_events), 1)
+        self.assertEqual(allocation_events[0].event_type, PaymentAllocationRecord.EventType.APPLIED)
+        self.assertEqual(
+            allocation_events[0].capture_source,
+            PaymentAllocationRecord.CaptureSource.MANUAL_UI,
+        )
+        self.assertEqual(allocation_events[0].recorded_by_id, self.user.id)
+        self.assertEqual(allocation_events[0].target_type, PaymentAllocationRecord.TargetType.INVOICE)
+        self.assertEqual(allocation_events[0].target_object_id, invoice.id)
+        self.assertEqual(str(allocation_events[0].applied_amount), "200.00")
+        self.assertEqual(
+            allocation_events[0].snapshot_json["allocation"]["id"],
+            allocation_events[0].payment_allocation_id,
+        )
+        self.assertEqual(allocation_events[0].snapshot_json["allocation"]["invoice_id"], invoice.id)
 
     def test_payment_record_is_immutable(self):
         payment_id = self._create_payment(status="pending", amount="500.00", direction="inbound")
         record = PaymentRecord.objects.filter(payment_id=payment_id).first()
+        self.assertIsNotNone(record)
+
+        record.note = "mutate"
+        with self.assertRaises(ValidationError):
+            record.save()
+        with self.assertRaises(ValidationError):
+            record.delete()
+
+    def test_payment_allocation_record_is_immutable(self):
+        payment_id = self._create_payment(status="settled", amount="500.00", direction="inbound")
+        invoice = self._create_invoice(total="500.00")
+
+        response = self.client.post(
+            f"/api/v1/payments/{payment_id}/allocate/",
+            data={
+                "allocations": [
+                    {"target_type": "invoice", "target_id": invoice.id, "applied_amount": "200.00"}
+                ]
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+
+        record = PaymentAllocationRecord.objects.filter(payment_id=payment_id).first()
         self.assertIsNotNone(record)
 
         record.note = "mutate"

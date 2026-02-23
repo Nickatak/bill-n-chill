@@ -1,4 +1,5 @@
 from core.tests.common import *
+from django.core.exceptions import ValidationError
 
 
 class ContactsManagementTests(TestCase):
@@ -74,6 +75,10 @@ class ContactsManagementTests(TestCase):
         self.assertEqual(self.contact.email, "alice-updated@example.com")
         self.assertEqual(self.contact.notes, "Updated note")
         self.assertEqual(self.contact.status, LeadContact.Status.QUALIFIED)
+        record = LeadContactRecord.objects.get(lead_contact_id=self.contact.id)
+        self.assertEqual(record.event_type, LeadContactRecord.EventType.STATUS_CHANGED)
+        self.assertEqual(record.from_status, LeadContact.Status.NEW_CONTACT)
+        self.assertEqual(record.to_status, LeadContact.Status.QUALIFIED)
 
     def test_contact_patch_requires_phone_or_email(self):
         response = self.client.patch(
@@ -86,6 +91,20 @@ class ContactsManagementTests(TestCase):
         payload = response.json()
         self.assertIn("phone", payload)
         self.assertIn("email", payload)
+
+    def test_contact_patch_rejects_invalid_status_transition(self):
+        self.contact.status = LeadContact.Status.QUALIFIED
+        self.contact.save(update_fields=["status", "updated_at"])
+
+        response = self.client.patch(
+            f"/api/v1/contacts/{self.contact.id}/",
+            data={"status": LeadContact.Status.NEW_CONTACT},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertIn("status", payload)
 
     def test_contact_detail_is_user_scoped(self):
         response = self.client.get(
@@ -101,6 +120,9 @@ class ContactsManagementTests(TestCase):
         )
         self.assertEqual(response.status_code, 204)
         self.assertFalse(LeadContact.objects.filter(id=self.contact.id).exists())
+        record = LeadContactRecord.objects.get(event_type=LeadContactRecord.EventType.DELETED)
+        self.assertEqual(record.capture_source, LeadContactRecord.CaptureSource.MANUAL_UI)
+        self.assertIsNone(record.lead_contact_id)
 
     def test_contact_delete_is_user_scoped(self):
         response = self.client.delete(
@@ -109,3 +131,46 @@ class ContactsManagementTests(TestCase):
         )
         self.assertEqual(response.status_code, 404)
         self.assertTrue(LeadContact.objects.filter(id=self.other_contact.id).exists())
+
+    def test_lead_contact_and_customer_records_are_immutable(self):
+        lead_record = LeadContactRecord.objects.create(
+            lead_contact=self.contact,
+            event_type=LeadContactRecord.EventType.UPDATED,
+            capture_source=LeadContactRecord.CaptureSource.SYSTEM,
+            from_status=self.contact.status,
+            to_status=self.contact.status,
+            snapshot_json={"lead_contact": {"id": self.contact.id}},
+            metadata_json={},
+            recorded_by=self.user,
+        )
+        customer = Customer.objects.create(
+            display_name="Immutable Customer",
+            email="immutable@example.com",
+            phone="555-1212",
+            billing_address="101 Audit Ln",
+            created_by=self.user,
+        )
+        customer_record = CustomerRecord.objects.create(
+            customer=customer,
+            event_type=CustomerRecord.EventType.CREATED,
+            capture_source=CustomerRecord.CaptureSource.SYSTEM,
+            snapshot_json={"customer": {"id": customer.id}},
+            metadata_json={},
+            recorded_by=self.user,
+        )
+
+        lead_record.note = "edited"
+        with self.assertRaises(ValidationError):
+            lead_record.save()
+        with self.assertRaises(ValidationError):
+            lead_record.delete()
+        with self.assertRaises(ValidationError):
+            LeadContactRecord.objects.filter(pk=lead_record.pk).delete()
+
+        customer_record.note = "edited"
+        with self.assertRaises(ValidationError):
+            customer_record.save()
+        with self.assertRaises(ValidationError):
+            customer_record.delete()
+        with self.assertRaises(ValidationError):
+            CustomerRecord.objects.filter(pk=customer_record.pk).delete()

@@ -5,7 +5,21 @@ User = get_user_model()
 
 
 class AccountingSyncEvent(models.Model):
-    """Sync event log for accounting push/pull activity and retries."""
+    """Operational sync-attempt log for external accounting integrations.
+
+    Business workflow:
+    - Tracks one push/pull synchronization attempt for a project-scoped object.
+    - Supports integration observability across queued/success/failed outcomes.
+    - Stores retry and error context so failed syncs can be diagnosed and replayed.
+    - Links internal object identity (`object_type`/`object_id`) to provider identity
+      (`external_id`) when available.
+
+    Current policy:
+    - Lifecycle control: `system-managed` via sync/retry workflows.
+    - Visibility: `internal-facing` integration telemetry artifact.
+    - This model is operational sync state/history, not immutable financial-audit truth.
+    - Lifecycle transitions must append immutable `AccountingSyncRecord` captures.
+    """
 
     class Provider(models.TextChoices):
         QUICKBOOKS_ONLINE = "quickbooks_online", "QuickBooks Online"

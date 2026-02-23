@@ -3,9 +3,55 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import AccountingSyncEvent
+from core.models import AccountingSyncEvent, AccountingSyncRecord
 from core.serializers import AccountingSyncEventSerializer, AccountingSyncEventWriteSerializer
 from core.views.helpers import _role_gate_error_payload, _validate_project_for_user
+
+
+def _build_accounting_sync_snapshot(sync_event: AccountingSyncEvent) -> dict:
+    return {
+        "accounting_sync_event": {
+            "id": sync_event.id,
+            "project_id": sync_event.project_id,
+            "provider": sync_event.provider,
+            "object_type": sync_event.object_type,
+            "object_id": sync_event.object_id,
+            "direction": sync_event.direction,
+            "status": sync_event.status,
+            "external_id": sync_event.external_id,
+            "error_message": sync_event.error_message,
+            "retry_count": sync_event.retry_count,
+            "last_attempt_at": (
+                sync_event.last_attempt_at.isoformat() if sync_event.last_attempt_at else None
+            ),
+        }
+    }
+
+
+def _record_accounting_sync_record(
+    *,
+    sync_event: AccountingSyncEvent,
+    event_type: str,
+    capture_source: str,
+    recorded_by,
+    from_status: str | None = None,
+    to_status: str | None = None,
+    source_reference: str = "",
+    note: str = "",
+    metadata: dict | None = None,
+):
+    AccountingSyncRecord.objects.create(
+        accounting_sync_event=sync_event,
+        event_type=event_type,
+        capture_source=capture_source,
+        source_reference=source_reference,
+        from_status=from_status,
+        to_status=to_status,
+        note=note,
+        snapshot_json=_build_accounting_sync_snapshot(sync_event),
+        metadata_json=metadata or {},
+        recorded_by=recorded_by,
+    )
 
 
 @api_view(["GET", "POST"])
@@ -65,6 +111,21 @@ def project_accounting_sync_events_view(request, project_id: int):
     if sync_event.status in {AccountingSyncEvent.Status.SUCCESS, AccountingSyncEvent.Status.FAILED}:
         sync_event.last_attempt_at = timezone.now()
         sync_event.save(update_fields=["last_attempt_at", "updated_at"])
+    _record_accounting_sync_record(
+        sync_event=sync_event,
+        event_type=AccountingSyncRecord.EventType.CREATED,
+        capture_source=AccountingSyncRecord.CaptureSource.MANUAL_UI,
+        recorded_by=request.user,
+        from_status=None,
+        to_status=sync_event.status,
+        note="Accounting sync event created.",
+        metadata={
+            "provider": sync_event.provider,
+            "object_type": sync_event.object_type,
+            "object_id": sync_event.object_id,
+            "direction": sync_event.direction,
+        },
+    )
 
     return Response({"data": AccountingSyncEventSerializer(sync_event).data}, status=201)
 
@@ -107,6 +168,7 @@ def accounting_sync_event_retry_view(request, sync_event_id: int):
             status=400,
         )
 
+    previous_status = sync_event.status
     sync_event.status = AccountingSyncEvent.Status.QUEUED
     sync_event.error_message = ""
     sync_event.retry_count = sync_event.retry_count + 1
@@ -119,6 +181,21 @@ def accounting_sync_event_retry_view(request, sync_event_id: int):
             "last_attempt_at",
             "updated_at",
         ]
+    )
+    _record_accounting_sync_record(
+        sync_event=sync_event,
+        event_type=AccountingSyncRecord.EventType.RETRIED,
+        capture_source=AccountingSyncRecord.CaptureSource.MANUAL_UI,
+        recorded_by=request.user,
+        from_status=previous_status,
+        to_status=sync_event.status,
+        note="Accounting sync event retried.",
+        metadata={
+            "retry_count": sync_event.retry_count,
+            "direction": sync_event.direction,
+            "object_type": sync_event.object_type,
+            "object_id": sync_event.object_id,
+        },
     )
     return Response(
         {

@@ -9,6 +9,7 @@ Define the core construction and billing entities for the initial bill-n-chill p
 - One source of truth per concept.
 - Explicit lifecycle states for financial records.
 - Immutable snapshots for approved baselines.
+- Mutable operational workflow rows paired with append-only immutable capture rows.
 - Money relationships are traceable end-to-end.
 - Revisioned artifacts use 1-based version numbering (`v1` is first revision/version).
 
@@ -16,13 +17,31 @@ Define the core construction and billing entities for the initial bill-n-chill p
 
 - We separate model ownership into two broad collections:
   - `financial_auditing`: models whose primary job is canonical identity and auditable reconciliation/history.
-  - Operational domains: models whose primary job is workflow authoring and lifecycle progression.
+  - Operational domains: models whose primary job is workflow authoring and lifecycle progression (including shared lanes like cash management).
 - Mutation posture:
   - `financial_auditing` is not automatically immutable, but mutation exposure should be minimal and deliberate.
   - Prefer append-only/audit-snapshot patterns; any mutable behavior requires explicit justification and coverage.
 - `ScopeItem` is the first explicit canonical-identity model in this split:
   - It is user-originated via estimate flows but exists to provide stable cross-artifact identity.
   - It is therefore treated as non-client-facing financial-auditing infrastructure, not estimate-only workflow data.
+
+## Lifecycle Capture Pattern
+
+- Policy:
+  - User/internal operators can create or edit operational records where workflow requires it.
+  - Financially relevant changes are captured as append-only immutable records in `financial_auditing`.
+- Current pairings:
+  - `LeadContact` -> `LeadContactRecord`
+  - `Customer` -> `CustomerRecord`
+  - `Organization` -> `OrganizationRecord`
+  - `OrganizationMembership` -> `OrganizationMembershipRecord`
+  - `Payment` -> `PaymentRecord`
+  - `PaymentAllocation` -> `PaymentAllocationRecord`
+  - `AccountingSyncEvent` -> `AccountingSyncRecord`
+  - `Estimate` -> `EstimateStatusEvent`
+  - `Invoice` -> `InvoiceStatusEvent`
+  - `ChangeOrder` -> `ChangeOrderSnapshot`
+  - `VendorBill` -> `VendorBillSnapshot`
 
 ## Core Entities
 
@@ -35,6 +54,69 @@ Key fields:
 - `display_name`
 - `slug`
 - `created_by`
+
+Policy:
+- Internal-facing tenant boundary object.
+- Bootstrap lifecycle captures are append-only in `OrganizationRecord`.
+
+## OrganizationMembership
+
+Represents one user's active organization context and base RBAC role.
+
+Key fields:
+- `id`
+- `organization_id`
+- `user_id`
+- `role` (`owner`, `pm`, `worker`, `bookkeeping`, `viewer`)
+- `status` (`active`, `disabled`)
+- `role_template_id` (nullable)
+- `capability_flags_json`
+
+Policy:
+- Internal-facing RBAC membership row.
+- Bootstrap and lifecycle changes are append-only in `OrganizationMembershipRecord`.
+
+## OrganizationRecord
+
+Immutable audit record for organization lifecycle/provenance captures.
+
+Key fields:
+- `id`
+- `organization_id`
+- `event_type` (`created`, `updated`)
+- `capture_source` (`auth_bootstrap`, `manual_ui`, `manual_api`, `system`)
+- `snapshot_json`
+- `metadata_json`
+- `recorded_by` (nullable for system-originated captures)
+- `created_at`
+
+Policy:
+- Append-only immutable capture model for org-level forensics.
+- Internal-facing audit artifact.
+
+## OrganizationMembershipRecord
+
+Immutable audit record for membership lifecycle/provenance captures.
+
+Key fields:
+- `id`
+- `organization_id`
+- `organization_membership_id` (nullable if subject row is later removed)
+- `membership_user_id`
+- `event_type` (`created`, `status_changed`, `role_changed`, `role_template_changed`, `capability_flags_updated`)
+- `capture_source` (`auth_bootstrap`, `manual_ui`, `manual_api`, `system`)
+- `from_status` (nullable)
+- `to_status` (nullable)
+- `from_role` (blank when not applicable)
+- `to_role` (blank when not applicable)
+- `snapshot_json`
+- `metadata_json`
+- `recorded_by` (nullable for system-originated captures)
+- `created_at`
+
+Policy:
+- Append-only immutable capture model for RBAC provenance and incident forensics.
+- Internal-facing audit artifact.
 
 ## LeadContact
 
@@ -53,6 +135,11 @@ Key fields:
 - `converted_customer_id` (nullable)
 - `converted_project_id` (nullable)
 
+Policy:
+- Internal-facing intake lifecycle object with model-level status transition guards.
+- Conversion state consistency is enforced at model + DB constraint layers.
+- Canonical immutable lifecycle provenance is captured in `LeadContactRecord`.
+
 ## Customer
 
 Client/owner for whom work is performed.
@@ -64,6 +151,48 @@ Key fields:
 - `email`
 - `phone`
 - `billing_address`
+
+Policy:
+- Internal-facing customer anchor object.
+- Canonical immutable lifecycle provenance is captured in `CustomerRecord`.
+
+## LeadContactRecord
+
+Immutable audit record for lead-contact lifecycle and conversion captures.
+
+Key fields:
+- `id`
+- `lead_contact_id` (nullable if source row is deleted)
+- `event_type` (`created`, `updated`, `status_changed`, `converted`, `deleted`)
+- `capture_source` (`manual_ui`, `manual_api`, `import`, `system`)
+- `from_status` (nullable)
+- `to_status` (nullable)
+- `snapshot_json`
+- `metadata_json`
+- `recorded_by` (nullable for system-originated captures)
+- `created_at`
+
+Policy:
+- Append-only immutable capture model for intake/replay forensics.
+- Internal-facing audit artifact.
+
+## CustomerRecord
+
+Immutable audit record for customer lifecycle captures.
+
+Key fields:
+- `id`
+- `customer_id` (nullable if source row is deleted)
+- `event_type` (`created`, `updated`)
+- `capture_source` (`manual_ui`, `manual_api`, `import`, `system`)
+- `snapshot_json`
+- `metadata_json`
+- `recorded_by` (nullable for system-originated captures)
+- `created_at`
+
+Policy:
+- Append-only immutable capture model for customer provenance.
+- Internal-facing audit artifact.
 
 ## Project
 
@@ -384,6 +513,29 @@ Key fields:
 Policy:
 - Internal/system-managed reconciliation artifact.
 - Not intended as client-facing representation.
+- Canonical immutable provenance is captured in `PaymentAllocationRecord`.
+
+## PaymentAllocationRecord
+
+Immutable audit record for payment-allocation provenance captures.
+
+Key fields:
+- `id`
+- `payment_id`
+- `payment_allocation_id` (nullable)
+- `event_type` (`applied`, `reversed`)
+- `capture_source` (`manual_ui`, `manual_api`, `ach_webhook`, `processor_sync`, `csv_import`, `system`)
+- `target_type` (`invoice`, `vendor_bill`)
+- `target_object_id`
+- `applied_amount`
+- `snapshot_json`
+- `metadata_json`
+- `recorded_by` (nullable for system-originated captures)
+- `created_at`
+
+Policy:
+- Append-only immutable capture model for allocation forensics/RBAC provenance.
+- Internal-facing audit artifact.
 
 ## PaymentRecord
 
@@ -424,15 +576,45 @@ Key fields:
 - `last_attempt_at`
 - `created_by`
 
+Policy:
+- Internal-facing operational integration state row.
+- Canonical immutable lifecycle provenance is captured in `AccountingSyncRecord`.
+
+## AccountingSyncRecord
+
+Immutable audit record for accounting-sync lifecycle and retry captures.
+
+Key fields:
+- `id`
+- `accounting_sync_event_id`
+- `event_type` (`created`, `status_changed`, `retried`, `imported`, `synced`)
+- `capture_source` (`manual_ui`, `manual_api`, `job_runner`, `webhook`, `system`)
+- `from_status` (nullable)
+- `to_status` (nullable)
+- `snapshot_json`
+- `metadata_json`
+- `recorded_by` (nullable for system-originated captures)
+- `created_at`
+
+Policy:
+- Append-only immutable capture model for sync forensics/replay.
+- Internal-facing audit artifact.
+
 ## Relationship Summary
 
 - `Organization` has many `OrganizationMemberships`, `Vendors`, `CostCodes`, and `ScopeItems`.
+- `Organization` has many `OrganizationRecords` and `OrganizationMembershipRecords`.
+- `LeadContact` has many `LeadContactRecords`.
+- `Customer` has many `CustomerRecords`.
 - `User` owns/scopes `LeadContacts`, `Customers`, `Projects`, and financial workflow records via `created_by`.
+- `OrganizationMembership` has many `OrganizationMembershipRecords`.
 - `Project` has many `Estimates`, `Budgets`, `ChangeOrders`, `Invoices`, `VendorBills`, `Payments`, and `AccountingSyncEvents`.
+- `AccountingSyncEvent` has many `AccountingSyncRecords`.
 - `Estimate` has many `EstimateLineItems`.
 - `Budget` has many `BudgetLines`.
 - `Invoice` has many `InvoiceLines`.
 - `Payment` has many `PaymentAllocations`.
+- `Payment` has many `PaymentAllocationRecords`.
 - `Payment` has many `PaymentRecords`.
 
 ## Financial Lifecycle (Happy Path)

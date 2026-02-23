@@ -9,10 +9,11 @@
 - Domain packaging is active:
   - `accounts_receivable`: `Invoice`, `InvoiceLine`
   - `accounts_payable`: `VendorBill`, `VendorBillAllocation`
+  - `cash_management`: `Payment`, `PaymentAllocation`
   - `estimating`: `Estimate`, `EstimateLineItem`
   - `change_orders`: `ChangeOrder`, `ChangeOrderLine`
-  - `operations`: `Project`, `CostCode`, org/role models
-  - `financial_auditing`: snapshots/events/identity models (`ScopeItem`, `ChangeOrderSnapshot`, `VendorBillSnapshot`, `EstimateStatusEvent`, `InvoiceStatusEvent`, `InvoiceScopeOverrideEvent`, `PaymentRecord`, `FinancialAuditEvent`)
+  - `shared_operations`: `Project`, `CostCode`, org/role models, `AccountingSyncEvent`, `LeadContact`, `Customer`
+  - `financial_auditing`: snapshots/events/identity models (`ScopeItem`, `ChangeOrderSnapshot`, `VendorBillSnapshot`, `EstimateStatusEvent`, `InvoiceStatusEvent`, `InvoiceScopeOverrideEvent`, `PaymentRecord`, `PaymentAllocationRecord`, `AccountingSyncRecord`, `OrganizationRecord`, `OrganizationMembershipRecord`, `LeadContactRecord`, `CustomerRecord`, `FinancialAuditEvent`)
 
 ## Major Changes Landed (2026-02-23)
 
@@ -34,6 +35,73 @@
   - payment create appends `created`
   - payment patch appends `updated` or `status_changed`
   - payment allocate appends `allocation_applied`
+
+### 2b) Allocation provenance capture added
+- Added immutable `PaymentAllocationRecord` model:
+  - `backend/core/models/financial_auditing/payment_allocation_record.py`
+  - migration: `backend/core/migrations/0049_paymentallocationrecord.py`
+- Write-path wiring:
+  - payment allocate appends one `PaymentAllocationRecord(applied)` row per created allocation
+  - captures actor/source + target + applied amount + snapshot/metadata
+
+### 2c) Lifecycle capture pattern formalized
+- Project policy is now explicit:
+  - allow user-managed operational workflow entry/edit where needed
+  - append immutable capture records for financially relevant writes
+- Canonical pair examples:
+  - `Organization` -> `OrganizationRecord`
+  - `OrganizationMembership` -> `OrganizationMembershipRecord`
+  - `Payment` -> `PaymentRecord`
+  - `PaymentAllocation` -> `PaymentAllocationRecord`
+  - `AccountingSyncEvent` -> `AccountingSyncRecord`
+  - `Estimate` -> `EstimateStatusEvent`
+  - `Invoice` -> `InvoiceStatusEvent`
+  - `ChangeOrder` -> `ChangeOrderSnapshot`
+  - `VendorBill` -> `VendorBillSnapshot`
+
+### 2d) Accounting sync lifecycle capture added
+- Added immutable `AccountingSyncRecord` model:
+  - `backend/core/models/financial_auditing/accounting_sync_record.py`
+  - migration: `backend/core/migrations/0050_accountingsyncrecord.py`
+- Write-path wiring:
+  - accounting sync create appends `AccountingSyncRecord(created)`
+  - accounting sync retry (`failed -> queued`) appends `AccountingSyncRecord(retried)`
+  - captures actor/source + from/to status + snapshot/metadata
+
+### 2e) Auth bootstrap lifecycle capture added
+- Added immutable bootstrap capture models:
+  - `backend/core/models/financial_auditing/organization_record.py`
+  - `backend/core/models/financial_auditing/organization_membership_record.py`
+  - migration: `backend/core/migrations/0051_organizationmembershiprecord_organizationrecord.py`
+- Write-path wiring:
+  - auth bootstrap (`_ensure_primary_membership`) appends `OrganizationRecord(created)`
+  - auth bootstrap appends `OrganizationMembershipRecord(created)`
+  - captures actor/source + bootstrap reason + snapshot/metadata
+
+### 2f) Accounting sync moved to shared-operations domain package
+- `AccountingSyncEvent` model moved from `backend/core/models/accounting.py`
+  to `backend/core/models/shared_operations/accounting_sync_event.py`.
+- Root export remains stable via `core.models.AccountingSyncEvent`.
+- No schema change required (model name/app label unchanged).
+
+### 2g) Contacts modernization completed (LeadContact + Customer)
+- Added model-level LeadContact lifecycle enforcement:
+  - `ALLOWED_STATUS_TRANSITIONS` + `is_transition_allowed`
+  - conversion-link integrity checks at model + DB constraint layers
+- Added immutable capture models:
+  - `backend/core/models/financial_auditing/lead_contact_record.py`
+  - `backend/core/models/financial_auditing/customer_record.py`
+  - migration: `backend/core/migrations/0052_customerrecord_leadcontactrecord_and_more.py`
+- Domain move:
+  - `LeadContact` and `Customer` moved from `backend/core/models/contacts.py`
+    to `backend/core/models/shared_operations/contacts.py`.
+  - Root exports remain stable via `core.models.LeadContact` and `core.models.Customer`.
+- Write-path wiring in intake/contact flows:
+  - quick add appends `LeadContactRecord(created)`
+  - duplicate merge appends `LeadContactRecord(updated|status_changed)`
+  - contact patch appends `LeadContactRecord(updated|status_changed)`
+  - contact delete appends `LeadContactRecord(deleted)`
+  - lead conversion appends `LeadContactRecord(converted)` and `CustomerRecord(created|updated)` as applicable
 
 ### 3) Status-transition policy moved to models
 - Transition maps and checks are model-owned via `ALLOWED_STATUS_TRANSITIONS` + `is_transition_allowed`.
@@ -92,18 +160,24 @@
 
 ## Migrations
 
-- Latest core migration: `0048_paymentrecord`
-- Local migration state checked and applied through `0048`.
+- Latest core migration: `0052_customerrecord_leadcontactrecord_and_more`
+- Local migration state checked and applied through `0052`.
 
 ## Validation Runs (This Session)
 
 Passing targeted suites:
+- `core.tests.test_health_auth`
 - `core.tests.test_estimates`
 - `core.tests.test_invoices`
 - `core.tests.test_payments`
 - `core.tests.test_change_orders`
 - `core.tests.test_projects_cost_codes.ProjectProfileTests`
 - `core.tests.test_audit_trail`
+- `core.tests.test_intake`
+- `core.tests.test_contacts_management`
+- `core.tests.test_demo_seed`
+- `core.tests.test_mvp_regression`
+- `core.tests` (full suite, 173 tests)
 
 Also verified:
 - `manage.py makemigrations --check --dry-run` => no drift

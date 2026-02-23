@@ -136,6 +136,17 @@ class LeadContactManageSerializer(serializers.ModelSerializer):
                     "email": ["Provide phone or email."],
                 }
             )
+
+        if self.instance is not None and "status" in attrs:
+            next_status = attrs["status"]
+            if not LeadContact.is_transition_allowed(self.instance.status, next_status):
+                raise serializers.ValidationError(
+                    {
+                        "status": [
+                            f"Invalid lead contact status transition: {self.instance.status} -> {next_status}.",
+                        ]
+                    }
+                )
         return attrs
 
 

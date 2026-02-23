@@ -12,6 +12,7 @@ from core.models import (
     Invoice,
     Payment,
     PaymentAllocation,
+    PaymentAllocationRecord,
     PaymentRecord,
     VendorBill,
 )
@@ -168,6 +169,50 @@ def _record_payment_record(
         to_status=to_status,
         note=note,
         snapshot_json=_build_payment_snapshot(payment),
+        metadata_json=metadata or {},
+        recorded_by=recorded_by,
+    )
+
+
+def _build_payment_allocation_snapshot(*, payment: Payment, allocation: PaymentAllocation) -> dict:
+    return {
+        "payment": _build_payment_snapshot(payment)["payment"],
+        "allocation": {
+            "id": allocation.id,
+            "target_type": allocation.target_type,
+            "invoice_id": allocation.invoice_id,
+            "vendor_bill_id": allocation.vendor_bill_id,
+            "applied_amount": str(allocation.applied_amount),
+            "created_by_id": allocation.created_by_id,
+            "created_at": allocation.created_at.isoformat() if allocation.created_at else None,
+        },
+    }
+
+
+def _record_payment_allocation_record(
+    *,
+    payment: Payment,
+    allocation: PaymentAllocation,
+    event_type: str,
+    capture_source: str,
+    target_type: str,
+    target_object_id: int,
+    recorded_by,
+    source_reference: str = "",
+    note: str = "",
+    metadata: dict | None = None,
+):
+    PaymentAllocationRecord.objects.create(
+        payment=payment,
+        payment_allocation=allocation,
+        event_type=event_type,
+        capture_source=capture_source,
+        source_reference=source_reference,
+        target_type=target_type,
+        target_object_id=target_object_id,
+        applied_amount=allocation.applied_amount,
+        note=note,
+        snapshot_json=_build_payment_allocation_snapshot(payment=payment, allocation=allocation),
         metadata_json=metadata or {},
         recorded_by=recorded_by,
     )
@@ -531,19 +576,23 @@ def payment_allocate_view(request, payment_id: int):
         )
 
     with transaction.atomic():
-        creates = []
+        created_allocations = []
         for row, invoice, vendor_bill in resolved_targets:
-            creates.append(
-                PaymentAllocation(
+            created_allocations.append(
+                (
+                    PaymentAllocation.objects.create(
                     payment=payment,
                     target_type=row["target_type"],
                     invoice=invoice,
                     vendor_bill=vendor_bill,
                     applied_amount=row["applied_amount"],
                     created_by=request.user,
+                    ),
+                    row,
+                    invoice,
+                    vendor_bill,
                 )
             )
-        PaymentAllocation.objects.bulk_create(creates)
 
         touched_invoice_ids = [invoice.id for _, invoice, _ in resolved_targets if invoice]
         touched_vendor_bill_ids = [vendor_bill.id for _, _, vendor_bill in resolved_targets if vendor_bill]
@@ -554,7 +603,7 @@ def payment_allocate_view(request, payment_id: int):
         for vendor_bill in VendorBill.objects.filter(id__in=touched_vendor_bill_ids):
             _set_vendor_bill_balance_from_allocations(vendor_bill)
 
-        for row, invoice, vendor_bill in resolved_targets:
+        for allocation, row, invoice, vendor_bill in created_allocations:
             target_id = invoice.id if invoice else vendor_bill.id
             target_type = "invoice" if invoice else "vendor_bill"
             _record_financial_audit_event(
@@ -569,6 +618,23 @@ def payment_allocate_view(request, payment_id: int):
                 created_by=request.user,
                 metadata={
                     "payment_id": payment.id,
+                    "payment_allocation_id": allocation.id,
+                    "target_type": target_type,
+                    "target_id": target_id,
+                },
+            )
+            _record_payment_allocation_record(
+                payment=payment,
+                allocation=allocation,
+                event_type=PaymentAllocationRecord.EventType.APPLIED,
+                capture_source=PaymentAllocationRecord.CaptureSource.MANUAL_UI,
+                target_type=target_type,
+                target_object_id=target_id,
+                recorded_by=request.user,
+                note=f"Allocation applied to {target_type} #{target_id}.",
+                metadata={
+                    "payment_id": payment.id,
+                    "payment_allocation_id": allocation.id,
                     "target_type": target_type,
                     "target_id": target_id,
                 },
@@ -588,15 +654,16 @@ def payment_allocate_view(request, payment_id: int):
                         "target_type": "invoice" if invoice else "vendor_bill",
                         "target_id": invoice.id if invoice else vendor_bill.id,
                         "applied_amount": str(row["applied_amount"]),
+                        "payment_allocation_id": allocation.id,
                     }
-                    for row, invoice, vendor_bill in resolved_targets
+                    for allocation, row, invoice, vendor_bill in created_allocations
                 ],
             },
         )
 
     payment.refresh_from_db()
     payment = Payment.objects.select_related("project").prefetch_related("allocations").get(id=payment.id)
-    created_rows = PaymentAllocation.objects.filter(payment=payment).order_by("-created_at", "-id")[: len(creates)]
+    created_rows = [allocation for allocation, _, _, _ in created_allocations]
 
     return Response(
         {

@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth.models import Group
+from django.db import transaction
 from django.db.models import Q
 from django.db.models import Sum
 from django.utils.text import slugify
@@ -23,6 +24,8 @@ from core.models import (
     Project,
     Organization,
     OrganizationMembership,
+    OrganizationMembershipRecord,
+    OrganizationRecord,
     VendorBill,
 )
 from core.utils.money import MONEY_ZERO, quantize_money
@@ -121,6 +124,87 @@ def _legacy_group_role(user) -> str | None:
     return None
 
 
+def _build_organization_snapshot(organization: Organization) -> dict:
+    return {
+        "organization": {
+            "id": organization.id,
+            "display_name": organization.display_name,
+            "slug": organization.slug,
+            "created_by_id": organization.created_by_id,
+            "created_at": organization.created_at.isoformat() if organization.created_at else None,
+        }
+    }
+
+
+def _build_organization_membership_snapshot(membership: OrganizationMembership) -> dict:
+    return {
+        "organization_membership": {
+            "id": membership.id,
+            "organization_id": membership.organization_id,
+            "user_id": membership.user_id,
+            "role": membership.role,
+            "status": membership.status,
+            "role_template_id": membership.role_template_id,
+            "capability_flags_json": membership.capability_flags_json or {},
+            "created_at": membership.created_at.isoformat() if membership.created_at else None,
+        }
+    }
+
+
+def _record_organization_record(
+    *,
+    organization: Organization,
+    event_type: str,
+    capture_source: str,
+    recorded_by,
+    source_reference: str = "",
+    note: str = "",
+    metadata: dict | None = None,
+):
+    OrganizationRecord.objects.create(
+        organization=organization,
+        event_type=event_type,
+        capture_source=capture_source,
+        source_reference=source_reference,
+        note=note,
+        snapshot_json=_build_organization_snapshot(organization),
+        metadata_json=metadata or {},
+        recorded_by=recorded_by,
+    )
+
+
+def _record_organization_membership_record(
+    *,
+    membership: OrganizationMembership,
+    event_type: str,
+    capture_source: str,
+    recorded_by,
+    from_status: str | None = None,
+    to_status: str | None = None,
+    from_role: str = "",
+    to_role: str = "",
+    source_reference: str = "",
+    note: str = "",
+    metadata: dict | None = None,
+):
+    OrganizationMembershipRecord.objects.create(
+        organization=membership.organization,
+        organization_membership=membership,
+        membership_user=membership.user,
+        event_type=event_type,
+        capture_source=capture_source,
+        source_reference=source_reference,
+        from_status=from_status,
+        to_status=to_status,
+        from_role=from_role,
+        to_role=to_role,
+        note=note,
+        snapshot_json=_build_organization_membership_snapshot(membership),
+        metadata_json=metadata or {},
+        recorded_by=recorded_by,
+    )
+
+
 def _ensure_primary_membership(user):
     membership = (
         OrganizationMembership.objects.select_related("organization")
@@ -133,18 +217,40 @@ def _ensure_primary_membership(user):
     if membership:
         return membership
 
-    organization = Organization.objects.create(
-        display_name=_default_org_name_for_user(user),
-        slug=_next_org_slug((user.email or user.username or f"user-{user.id}").split("@")[0]),
-        created_by=user,
-    )
-    bootstrap_role = _legacy_group_role(user) or OrganizationMembership.Role.OWNER
-    return OrganizationMembership.objects.create(
-        organization=organization,
-        user=user,
-        role=bootstrap_role,
-        status=OrganizationMembership.Status.ACTIVE,
-    )
+    with transaction.atomic():
+        organization = Organization.objects.create(
+            display_name=_default_org_name_for_user(user),
+            slug=_next_org_slug((user.email or user.username or f"user-{user.id}").split("@")[0]),
+            created_by=user,
+        )
+        _record_organization_record(
+            organization=organization,
+            event_type=OrganizationRecord.EventType.CREATED,
+            capture_source=OrganizationRecord.CaptureSource.AUTH_BOOTSTRAP,
+            recorded_by=user,
+            note="Organization bootstrap created during auth self-heal.",
+            metadata={"bootstrap_reason": "missing_active_membership"},
+        )
+        bootstrap_role = _legacy_group_role(user) or OrganizationMembership.Role.OWNER
+        membership = OrganizationMembership.objects.create(
+            organization=organization,
+            user=user,
+            role=bootstrap_role,
+            status=OrganizationMembership.Status.ACTIVE,
+        )
+        _record_organization_membership_record(
+            membership=membership,
+            event_type=OrganizationMembershipRecord.EventType.CREATED,
+            capture_source=OrganizationMembershipRecord.CaptureSource.AUTH_BOOTSTRAP,
+            recorded_by=user,
+            from_status=None,
+            to_status=membership.status,
+            from_role="",
+            to_role=membership.role,
+            note="Organization membership bootstrap created during auth self-heal.",
+            metadata={"bootstrap_reason": "missing_active_membership"},
+        )
+        return membership
 
 
 def _resolve_user_role(user) -> str:

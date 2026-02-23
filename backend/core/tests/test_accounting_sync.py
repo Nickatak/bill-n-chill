@@ -1,3 +1,5 @@
+from django.core.exceptions import ValidationError
+
 from core.tests.common import *
 
 
@@ -63,6 +65,15 @@ class AccountingSyncEventTests(TestCase):
         self.assertEqual(created["status"], "failed")
         self.assertEqual(created["error_message"], "Remote API timeout")
         self.assertIsNotNone(created["last_attempt_at"])
+        created_event_id = created["id"]
+
+        record = AccountingSyncRecord.objects.filter(accounting_sync_event_id=created_event_id).first()
+        self.assertIsNotNone(record)
+        self.assertEqual(record.event_type, AccountingSyncRecord.EventType.CREATED)
+        self.assertEqual(record.capture_source, AccountingSyncRecord.CaptureSource.MANUAL_UI)
+        self.assertIsNone(record.from_status)
+        self.assertEqual(record.to_status, AccountingSyncEvent.Status.FAILED)
+        self.assertEqual(record.recorded_by_id, self.user.id)
 
         AccountingSyncEvent.objects.create(
             project=self.other_project,
@@ -109,6 +120,12 @@ class AccountingSyncEventTests(TestCase):
         self.assertEqual(event.error_message, "")
         self.assertEqual(event.retry_count, 1)
         self.assertIsNotNone(event.last_attempt_at)
+        retry_record = AccountingSyncRecord.objects.filter(accounting_sync_event=event).first()
+        self.assertIsNotNone(retry_record)
+        self.assertEqual(retry_record.event_type, AccountingSyncRecord.EventType.RETRIED)
+        self.assertEqual(retry_record.from_status, AccountingSyncEvent.Status.FAILED)
+        self.assertEqual(retry_record.to_status, AccountingSyncEvent.Status.QUEUED)
+        self.assertEqual(retry_record.recorded_by_id, self.user.id)
 
         second_retry = self.client.post(
             f"/api/v1/accounting-sync-events/{event.id}/retry/",
@@ -148,3 +165,28 @@ class AccountingSyncEventTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.other_token.key}",
         )
         self.assertEqual(hidden.status_code, 404)
+
+    def test_accounting_sync_record_is_immutable(self):
+        event = AccountingSyncEvent.objects.create(
+            project=self.project,
+            provider=AccountingSyncEvent.Provider.QUICKBOOKS_ONLINE,
+            object_type="invoice",
+            object_id=57,
+            direction=AccountingSyncEvent.Direction.PUSH,
+            status=AccountingSyncEvent.Status.FAILED,
+            created_by=self.user,
+        )
+        record = AccountingSyncRecord.objects.create(
+            accounting_sync_event=event,
+            event_type=AccountingSyncRecord.EventType.CREATED,
+            capture_source=AccountingSyncRecord.CaptureSource.SYSTEM,
+            from_status=None,
+            to_status=AccountingSyncEvent.Status.FAILED,
+            snapshot_json={"accounting_sync_event": {"id": event.id}},
+            recorded_by=self.user,
+        )
+        record.note = "mutate"
+        with self.assertRaises(ValidationError):
+            record.save()
+        with self.assertRaises(ValidationError):
+            record.delete()

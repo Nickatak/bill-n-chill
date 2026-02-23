@@ -740,6 +740,9 @@ class Command(BaseCommand):
 
         for idx, (status, _) in enumerate(LeadContact.Status.choices, start=1):
             lead_phone = f"555-22{idx:02d}"
+            converted_customer = customer if status == LeadContact.Status.PROJECT_CREATED else None
+            converted_project = project if status == LeadContact.Status.PROJECT_CREATED else None
+            converted_at = timezone.now() if status == LeadContact.Status.PROJECT_CREATED else None
             scoped_lead, _ = LeadContact.objects.get_or_create(
                 created_by=user,
                 phone=lead_phone,
@@ -750,6 +753,9 @@ class Command(BaseCommand):
                     "status": status,
                     "source": LeadContact.Source.FIELD_MANUAL,
                     "notes": f"Seeded lead in status {status}.",
+                    "converted_customer": converted_customer,
+                    "converted_project": converted_project,
+                    "converted_at": converted_at,
                 },
             )
             scoped_lead.full_name = f"Seed Lead {status.title().replace('_', ' ')}"

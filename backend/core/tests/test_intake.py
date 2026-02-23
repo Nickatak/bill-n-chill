@@ -38,6 +38,9 @@ class LeadContactQuickAddTests(TestCase):
         lead = LeadContact.objects.first()
         self.assertEqual(lead.created_by_id, self.user.id)
         self.assertEqual(lead.full_name, "Jane Doe")
+        record = LeadContactRecord.objects.get(lead_contact_id=lead.id)
+        self.assertEqual(record.event_type, LeadContactRecord.EventType.CREATED)
+        self.assertEqual(record.capture_source, LeadContactRecord.CaptureSource.MANUAL_UI)
 
     def test_quick_add_accepts_optional_initial_contract_value(self):
         response = self.client.post(
@@ -204,6 +207,9 @@ class LeadContactQuickAddTests(TestCase):
         self.assertEqual(existing.project_address, "123 Main St")
         self.assertIn("Old note", existing.notes)
         self.assertIn("New note", existing.notes)
+        record = LeadContactRecord.objects.get(lead_contact_id=existing.id)
+        self.assertEqual(record.event_type, LeadContactRecord.EventType.UPDATED)
+        self.assertEqual(record.capture_source, LeadContactRecord.CaptureSource.MANUAL_UI)
 
 
 class LeadConversionTests(TestCase):
@@ -248,6 +254,13 @@ class LeadConversionTests(TestCase):
         self.assertIsNotNone(self.lead.converted_project_id)
         self.assertEqual(project.site_address, "321 Build St")
         self.assertEqual(response.json()["meta"]["conversion_status"], "converted")
+        lead_record = LeadContactRecord.objects.get(lead_contact_id=self.lead.id)
+        self.assertEqual(lead_record.event_type, LeadContactRecord.EventType.CONVERTED)
+        self.assertEqual(lead_record.from_status, LeadContact.Status.NEW_CONTACT)
+        self.assertEqual(lead_record.to_status, LeadContact.Status.PROJECT_CREATED)
+        customer_record = CustomerRecord.objects.get(customer_id=self.lead.converted_customer_id)
+        self.assertEqual(customer_record.event_type, CustomerRecord.EventType.CREATED)
+        self.assertEqual(customer_record.capture_source, CustomerRecord.CaptureSource.MANUAL_UI)
 
     def test_convert_uses_initial_contract_value_when_present(self):
         self.lead.initial_contract_value = "14500.00"
@@ -283,6 +296,13 @@ class LeadConversionTests(TestCase):
         self.assertEqual(second.json()["meta"]["conversion_status"], "already_converted")
         self.assertEqual(Customer.objects.count(), 1)
         self.assertEqual(Project.objects.count(), 1)
+        self.assertEqual(
+            LeadContactRecord.objects.filter(
+                lead_contact_id=self.lead.id,
+                event_type=LeadContactRecord.EventType.CONVERTED,
+            ).count(),
+            1,
+        )
 
     def test_convert_reused_customer_keeps_billing_address_and_sets_project_site_address(self):
         existing_customer = Customer.objects.create(

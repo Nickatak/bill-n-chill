@@ -1,5 +1,6 @@
 from core.tests.common import *
 from django.contrib.auth.models import Group
+from django.core.exceptions import ValidationError
 
 class HealthEndpointTests(TestCase):
     def test_health_endpoint_returns_ok_payload(self):
@@ -93,6 +94,49 @@ class AuthEndpointTests(TestCase):
         self.assertTrue(OrganizationMembership.objects.filter(user=legacy_user).exists())
         self.assertOrganizationPayload(login_response.json()["data"]["organization"])
 
+    def test_login_self_heal_writes_org_and_membership_records(self):
+        legacy_user = User.objects.create_user(
+            username="legacy-audit",
+            email="legacy-audit@example.com",
+            password="secret123",
+        )
+        self.assertFalse(OrganizationMembership.objects.filter(user=legacy_user).exists())
+
+        login_response = self.client.post(
+            "/api/v1/auth/login/",
+            data={"email": "legacy-audit@example.com", "password": "secret123"},
+            content_type="application/json",
+        )
+        self.assertEqual(login_response.status_code, 200)
+        membership = OrganizationMembership.objects.get(user=legacy_user)
+
+        org_records = OrganizationRecord.objects.filter(organization=membership.organization)
+        membership_records = OrganizationMembershipRecord.objects.filter(
+            organization_membership=membership
+        )
+
+        self.assertEqual(org_records.count(), 1)
+        self.assertEqual(membership_records.count(), 1)
+
+        org_record = org_records.get()
+        self.assertEqual(org_record.event_type, OrganizationRecord.EventType.CREATED)
+        self.assertEqual(org_record.capture_source, OrganizationRecord.CaptureSource.AUTH_BOOTSTRAP)
+        self.assertEqual(org_record.recorded_by_id, legacy_user.id)
+
+        membership_record = membership_records.get()
+        self.assertEqual(
+            membership_record.event_type,
+            OrganizationMembershipRecord.EventType.CREATED,
+        )
+        self.assertEqual(
+            membership_record.capture_source,
+            OrganizationMembershipRecord.CaptureSource.AUTH_BOOTSTRAP,
+        )
+        self.assertEqual(membership_record.recorded_by_id, legacy_user.id)
+        self.assertIsNone(membership_record.from_status)
+        self.assertEqual(membership_record.to_status, OrganizationMembership.Status.ACTIVE)
+        self.assertEqual(membership_record.to_role, OrganizationMembership.Role.OWNER)
+
     def test_me_self_heals_legacy_user_missing_membership(self):
         legacy_user = User.objects.create_user(
             username="legacy-me",
@@ -109,6 +153,33 @@ class AuthEndpointTests(TestCase):
         self.assertEqual(me_response.status_code, 200)
         self.assertTrue(OrganizationMembership.objects.filter(user=legacy_user).exists())
         self.assertOrganizationPayload(me_response.json()["data"]["organization"])
+
+    def test_org_and_membership_records_are_immutable(self):
+        login_response = self.client.post(
+            "/api/v1/auth/login/",
+            data={"email": "pm@example.com", "password": "secret123"},
+            content_type="application/json",
+        )
+        self.assertEqual(login_response.status_code, 200)
+        membership = OrganizationMembership.objects.get(user=self.user)
+        org_record = OrganizationRecord.objects.get(organization=membership.organization)
+        membership_record = OrganizationMembershipRecord.objects.get(organization_membership=membership)
+
+        org_record.note = "edited"
+        with self.assertRaises(ValidationError):
+            org_record.save()
+        with self.assertRaises(ValidationError):
+            org_record.delete()
+        with self.assertRaises(ValidationError):
+            OrganizationRecord.objects.filter(pk=org_record.pk).delete()
+
+        membership_record.note = "edited"
+        with self.assertRaises(ValidationError):
+            membership_record.save()
+        with self.assertRaises(ValidationError):
+            membership_record.delete()
+        with self.assertRaises(ValidationError):
+            OrganizationMembershipRecord.objects.filter(pk=membership_record.pk).delete()
 
     def test_org_slug_generation_handles_email_local_part_collisions(self):
         user_a = User.objects.create_user(

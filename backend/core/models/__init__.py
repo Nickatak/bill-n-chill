@@ -1,23 +1,30 @@
 from core.models.accounts_payable import VendorBill, VendorBillAllocation
-from core.models.accounting import AccountingSyncEvent
 from core.models.accounts_receivable import Invoice, InvoiceLine
 from core.models.change_orders import ChangeOrder, ChangeOrderLine
-from core.models.contacts import Customer, LeadContact
 from core.models.estimating import Estimate, EstimateLineItem
 from core.models.financial_auditing import (
+    AccountingSyncRecord,
     Budget,
     BudgetLine,
     ChangeOrderSnapshot,
+    CustomerRecord,
     EstimateStatusEvent,
     FinancialAuditEvent,
     InvoiceScopeOverrideEvent,
     InvoiceStatusEvent,
+    LeadContactRecord,
+    OrganizationMembershipRecord,
+    OrganizationRecord,
+    PaymentAllocationRecord,
     PaymentRecord,
     ScopeItem,
     VendorBillSnapshot,
 )
-from core.models.operations import (
+from core.models.shared_operations import (
+    AccountingSyncEvent,
+    Customer,
     CostCode,
+    LeadContact,
     Organization,
     OrganizationMembership,
     Permission,
@@ -26,7 +33,7 @@ from core.models.operations import (
     RoleTemplatePermission,
     Vendor,
 )
-from core.models.payments import Payment, PaymentAllocation
+from core.models.cash_management import Payment, PaymentAllocation
 __all__ = [
     "LeadContact",
     "Customer",
@@ -45,15 +52,21 @@ __all__ = [
     "Budget",
     "BudgetLine",
     "ChangeOrderSnapshot",
+    "CustomerRecord",
     "ChangeOrder",
     "ChangeOrderLine",
     "AccountingSyncEvent",
+    "AccountingSyncRecord",
     "FinancialAuditEvent",
     "VendorBillSnapshot",
     "Invoice",
     "InvoiceLine",
     "InvoiceStatusEvent",
     "InvoiceScopeOverrideEvent",
+    "LeadContactRecord",
+    "OrganizationMembershipRecord",
+    "OrganizationRecord",
+    "PaymentAllocationRecord",
     "PaymentRecord",
     "VendorBill",
     "VendorBillAllocation",

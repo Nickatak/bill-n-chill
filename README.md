@@ -23,12 +23,26 @@ Next.js App  <----HTTP/JSON---->  Django/DRF API  <---->  Database
 
 ## Backend Domain Layout
 
-- `backend/core/models/operations`: project/org/role/cost-code/vendor operational models
+- `backend/core/models/shared_operations`: project/org/role/cost-code/vendor/accounting-sync/contact shared operational models
 - `backend/core/models/estimating`: estimate authoring + estimate lines
 - `backend/core/models/change_orders`: change-order workflow models
 - `backend/core/models/accounts_receivable`: invoice + invoice lines
 - `backend/core/models/accounts_payable`: vendor bill + allocations
+- `backend/core/models/cash_management`: cross-domain cash movement models (`Payment`, `PaymentAllocation`)
 - `backend/core/models/financial_auditing`: immutable snapshots/events and canonical scope identity
+
+## Architecture Decisions
+
+- Enforcement hierarchy: DB constraints first, model-level guards second, views/serializers last.
+- Mutable + immutable policy:
+  - allow user-managed operational workflow entry/edit where needed
+  - append immutable audit captures for financially relevant writes
+  - system-managed state machines must append immutable capture rows for lifecycle transitions
+- Cross-domain placement policy:
+  - if a model is shared across AR/AP flows and does not fit one lane cleanly, keep it in a dedicated shared domain package (for example `cash_management`) instead of forcing it into one side.
+- Details and examples live in:
+  - `docs/contributing.md`
+  - `docs/domain-model.md`
 
 ## Local Setup
 

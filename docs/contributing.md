@@ -39,11 +39,44 @@
   - For domain models, prefer explicitly stating lifecycle control and audience in docstrings.
   - Do not use "internal" to mean "not user-editable"; use `system-managed` or `user-managed` explicitly.
 
+## Mutable + Immutable Pattern
+
+- Baseline rule:
+  - Operational workflow models can be user-managed/mutable.
+  - Financially relevant actions on those models must append immutable capture rows.
+  - System-managed state machines must append immutable capture rows on each lifecycle transition.
+- Why:
+  - We accept user-driven workflow input, but still need replayable provenance for RBAC, forensics, and audit timelines.
+- Capture requirements (minimum):
+  - actor (`recorded_by`/equivalent)
+  - capture source (`manual_ui`, automation/webhook/import lanes, etc.)
+  - event type (`created`, `updated`, `status_changed`, `applied`, etc.)
+  - immutable timestamp (`created_at`)
+  - point-in-time snapshot payload (`snapshot_json`)
+  - supplemental context (`metadata_json`/note/source reference)
+- Immutability enforcement:
+  - Capture models should block update/delete at model/queryset level.
+  - Prefer append-only `*Record` or `*Snapshot` models in `financial_auditing`.
+- Current examples:
+  - `LeadContact` -> `LeadContactRecord`
+  - `Customer` -> `CustomerRecord`
+  - `Organization` -> `OrganizationRecord`
+  - `OrganizationMembership` -> `OrganizationMembershipRecord`
+  - `Payment` -> `PaymentRecord`
+  - `PaymentAllocation` -> `PaymentAllocationRecord`
+  - `AccountingSyncEvent` -> `AccountingSyncRecord`
+  - `Estimate` -> `EstimateStatusEvent`
+  - `Invoice` -> `InvoiceStatusEvent`
+  - `ChangeOrder` -> `ChangeOrderSnapshot`
+  - `VendorBill` -> `VendorBillSnapshot`
+- Testing expectation:
+  - For each new write path, add/extend tests proving capture-row creation and immutability behavior.
+
 ## Model Domain Boundaries
 
 - Package-level split:
   - `core/models/financial_auditing/`: canonical identity and traceability anchors used to preserve auditable financial history.
-  - Non-auditing domains: operational workflow entities (estimating, projects, contacts, etc.).
+  - Non-auditing domains: operational workflow entities (estimating, projects, contacts, cash-management, etc.).
 - Placement rule:
   - If a model's primary purpose is immutable financial traceability/reconciliation, place it in `financial_auditing`.
   - If a model's primary purpose is user workflow state/authoring, place it in an operational domain.

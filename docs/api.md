@@ -76,6 +76,10 @@ bill-n-chill currently uses DRF token authentication for API access.
     - `email`
     - `role` (`owner` | `pm` | `bookkeeping` | `worker` | `viewer`)
     - `organization` (`id`, `display_name`, `slug`)
+- Auth bootstrap audit behavior:
+  - if a user has no active org membership, auth self-heal creates an `Organization` and `OrganizationMembership`
+  - the bootstrap write appends immutable `OrganizationRecord(event_type=created, capture_source=auth_bootstrap)`
+  - the bootstrap write appends immutable `OrganizationMembershipRecord(event_type=created, capture_source=auth_bootstrap)`
 
 ## Role Matrix (RBAC Thin Pass)
 
@@ -104,6 +108,8 @@ bill-n-chill currently uses DRF token authentication for API access.
     - `notes`
     - `source` (`field_manual`, `office_manual`, `import`, `web_form`, `referral`, `other`)
   - Success response includes created lead contact record under `data`.
+  - Audit behavior:
+    - appends immutable `LeadContactRecord(event_type=created, capture_source=manual_ui)`
 
 ## Duplicate Detection and Resolution (INT-02)
 
@@ -138,6 +144,9 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
     - creates or reuses a matching `Customer`
     - creates a `Project` shell (job `site_address` seeded from lead `project_address`)
     - marks lead as `project_created` and stores conversion links
+  - Audit behavior:
+    - appends immutable `LeadContactRecord(event_type=converted, capture_source=manual_ui)`
+    - appends immutable `CustomerRecord(event_type=created|updated, capture_source=manual_ui)` when customer rows are created/updated during conversion
   - Idempotency:
     - If lead is already converted, returns existing customer/project with `meta.conversion_status = "already_converted"`.
 
@@ -748,6 +757,7 @@ INV-02 extends invoice billing actions with a scope guard based on approved proj
     - `meta.unapplied_amount`
   - Audit behavior:
     - appends immutable `PaymentRecord(event_type=allocation_applied, capture_source=manual_ui)`
+    - appends immutable `PaymentAllocationRecord(event_type=applied, capture_source=manual_ui)` per created allocation row
 
 ## Project Financial Summary (FIN-01)
 
@@ -846,6 +856,8 @@ Each bucket contains:
     - `error_message` (optional)
   - Behavior:
     - sets `last_attempt_at` when created in terminal states (`success`/`failed`).
+  - Audit behavior:
+    - appends immutable `AccountingSyncRecord(event_type=created, capture_source=manual_ui)`
 
 - `POST /api/v1/accounting-sync-events/{sync_event_id}/retry/`
   - Auth required
@@ -860,6 +872,8 @@ Each bucket contains:
       - returns `meta.retry_status = "already_queued"`
     - `success`:
       - blocked with validation error
+  - Audit behavior:
+    - appends immutable `AccountingSyncRecord(event_type=retried, capture_source=manual_ui)` on `failed -> queued`
 
 ## Financial Audit Trail (QA-01)
 
@@ -869,6 +883,7 @@ Each bucket contains:
   - Note:
     - this endpoint is a compatibility timeline/index surface, not the canonical source of truth for every lane.
     - canonical payment provenance/lifecycle capture is append-only `PaymentRecord`.
+    - canonical accounting-sync lifecycle capture is append-only `AccountingSyncRecord`.
   - Event coverage includes:
     - estimate status transitions
     - estimate-to-budget conversions
