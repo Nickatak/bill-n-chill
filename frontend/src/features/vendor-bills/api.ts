@@ -4,3 +4,16 @@ export const defaultApiBaseUrl =
 export function normalizeApiBaseUrl(baseUrl: string): string {
   return baseUrl.trim().replace(/\/$/, "");
 }
+
+export async function fetchVendorBillPolicyContract({
+  baseUrl,
+  token,
+}: {
+  baseUrl: string;
+  token: string;
+}) {
+  const response = await fetch(`${normalizeApiBaseUrl(baseUrl)}/contracts/vendor-bills/`, {
+    headers: { Authorization: `Token ${token}` },
+  });
+  return response;
+}

@@ -14,6 +14,7 @@ from core.models import (
     EstimateStatusEvent,
     FinancialAuditEvent,
 )
+from core.policies import get_estimate_policy_contract
 from core.serializers import (
     BudgetSerializer,
     EstimateDuplicateSerializer,
@@ -56,6 +57,36 @@ def public_estimate_detail_view(request, public_token: str):
         "customer_billing_address": estimate.project.customer.billing_address,
     }
     return Response({"data": serialized})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def estimate_contract_view(_request):
+    """Return canonical estimate workflow policy for client-side UX guards.
+
+    Contract:
+    - `GET`:
+      - `200`: estimate policy contract returned.
+        - Guarantees:
+          - statuses/transitions mirror backend model-level transition guards. `[APP]`
+          - no object mutations. `[APP]`
+      - `401`: authentication missing/invalid.
+        - Guarantees: no object mutations. `[APP]`
+
+    - Preconditions:
+      - caller must be authenticated (`IsAuthenticated`).
+
+    - Object mutations:
+      - `GET`: none.
+
+    - Idempotency and retry semantics:
+      - `GET` is idempotent and read-only.
+
+    - Test anchors:
+      - `backend/core/tests/test_estimates.py::EstimateTests::test_estimate_contract_requires_authentication`
+      - `backend/core/tests/test_estimates.py::EstimateTests::test_estimate_contract_matches_model_transition_policy`
+    """
+    return Response({"data": get_estimate_policy_contract()})
 
 
 def _archive_estimate_family(*, project, user, title, exclude_ids, note):

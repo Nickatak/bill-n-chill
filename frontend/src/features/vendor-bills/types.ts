@@ -18,6 +18,8 @@ export type VendorRecord = {
   is_active: boolean;
 };
 
+export type VendorBillStatus = string;
+
 export type VendorBillRecord = {
   id: number;
   project: number;
@@ -25,7 +27,7 @@ export type VendorBillRecord = {
   vendor: number;
   vendor_name: string;
   bill_number: string;
-  status: "planned" | "received" | "approved" | "scheduled" | "paid" | "void";
+  status: VendorBillStatus;
   issue_date: string;
   due_date: string;
   scheduled_for: string | null;
@@ -58,13 +60,23 @@ export type VendorBillPayload = {
   projectId: number;
   vendor: number;
   bill_number: string;
-  status?: "planned" | "received" | "approved" | "scheduled" | "paid" | "void";
+  status?: VendorBillStatus;
   issue_date: string;
   due_date: string;
   scheduled_for?: string | null;
   total: string;
   notes: string;
   allocations?: VendorBillAllocationInput[];
+};
+
+export type VendorBillPolicyContract = {
+  policy_version: string;
+  status_labels: Record<string, string>;
+  statuses: string[];
+  default_create_status: string;
+  create_shortcut_statuses: string[];
+  allowed_status_transitions: Record<string, string[]>;
+  terminal_statuses: string[];
 };
 
 export type ApiResponse = {
@@ -74,6 +86,7 @@ export type ApiResponse = {
     | VendorRecord[]
     | VendorBillRecord[]
     | VendorBillRecord
+    | VendorBillPolicyContract
     | {
         duplicate_candidates?: VendorBillRecord[];
         allowed_resolutions?: string[];

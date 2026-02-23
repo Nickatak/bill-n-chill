@@ -3,6 +3,7 @@ from django.urls import path
 from core.views import (
     budget_line_detail_view,
     change_order_clone_revision_view,
+    change_order_contract_view,
     change_order_detail_view,
     cost_code_detail_view,
     cost_codes_import_csv_view,
@@ -12,6 +13,7 @@ from core.views import (
     convert_lead_to_project_view,
     estimate_convert_to_budget_view,
     estimate_clone_version_view,
+    estimate_contract_view,
     estimate_duplicate_view,
     estimate_detail_view,
     estimate_status_events_view,
@@ -28,6 +30,7 @@ from core.views import (
     change_impact_summary_view,
     payment_detail_view,
     payment_allocate_view,
+    payment_contract_view,
     project_budgets_view,
     project_change_orders_view,
     project_estimates_view,
@@ -45,6 +48,7 @@ from core.views import (
     projects_list_view,
     quick_add_lead_contact_view,
     vendor_bill_detail_view,
+    vendor_bill_contract_view,
     vendor_detail_view,
     vendors_import_csv_view,
     vendors_list_create_view,
@@ -110,6 +114,16 @@ urlpatterns = [
         name="project-change-orders",
     ),
     path(
+        "contracts/change-orders/",
+        change_order_contract_view,
+        name="contracts-change-orders",
+    ),
+    path(
+        "contracts/estimates/",
+        estimate_contract_view,
+        name="contracts-estimates",
+    ),
+    path(
         "projects/<int:project_id>/invoices/",
         project_invoices_view,
         name="project-invoices",
@@ -120,9 +134,19 @@ urlpatterns = [
         name="project-vendor-bills",
     ),
     path(
+        "contracts/vendor-bills/",
+        vendor_bill_contract_view,
+        name="contracts-vendor-bills",
+    ),
+    path(
         "projects/<int:project_id>/payments/",
         project_payments_view,
         name="project-payments",
+    ),
+    path(
+        "contracts/payments/",
+        payment_contract_view,
+        name="contracts-payments",
     ),
     path("estimates/<int:estimate_id>/", estimate_detail_view, name="estimate-detail"),
     path(

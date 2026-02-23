@@ -18,6 +18,7 @@ from core.models import (
     VendorBillAllocation,
     VendorBillSnapshot,
 )
+from core.policies import get_vendor_bill_policy_contract
 from core.serializers import VendorBillSerializer, VendorBillWriteSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
@@ -134,6 +135,36 @@ def _record_vendor_bill_status_snapshot(*, vendor_bill, capture_status, previous
         snapshot_json=snapshot,
         acted_by=acted_by,
     )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def vendor_bill_contract_view(_request):
+    """Return canonical vendor-bill workflow policy for client-side UX guards.
+
+    Contract:
+    - `GET`:
+      - `200`: vendor-bill policy contract returned.
+        - Guarantees:
+          - statuses/transitions mirror backend model-level transition guards. `[APP]`
+          - no object mutations. `[APP]`
+      - `401`: authentication missing/invalid.
+        - Guarantees: no object mutations. `[APP]`
+
+    - Preconditions:
+      - caller must be authenticated (`IsAuthenticated`).
+
+    - Object mutations:
+      - `GET`: none.
+
+    - Idempotency and retry semantics:
+      - `GET` is idempotent and read-only.
+
+    - Test anchors:
+      - `backend/core/tests/test_vendor_bills.py::VendorBillTests::test_vendor_bill_contract_requires_authentication`
+      - `backend/core/tests/test_vendor_bills.py::VendorBillTests::test_vendor_bill_contract_matches_model_transition_policy`
+    """
+    return Response({"data": get_vendor_bill_policy_contract()})
 
 
 @api_view(["GET", "POST"])

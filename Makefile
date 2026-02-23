@@ -114,7 +114,7 @@ local-superuser:
 local-test: local-test-backend local-test-frontend
 
 local-test-backend:
-	$(BACKEND_MANAGE) test
+	$(BACKEND_MANAGE) test core.tests --keepdb --noinput
 
 local-test-frontend:
 	npm run lint --prefix frontend

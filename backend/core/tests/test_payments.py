@@ -99,6 +99,53 @@ class PaymentTests(TestCase):
             created_by=self.user,
         )
 
+    def test_payment_contract_requires_authentication(self):
+        response = self.client.get("/api/v1/contracts/payments/")
+        self.assertEqual(response.status_code, 401)
+
+    def test_payment_contract_matches_model_transition_policy(self):
+        response = self.client.get(
+            "/api/v1/contracts/payments/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+
+        expected_statuses = [status for status, _label in Payment.Status.choices]
+        expected_labels = {status: label for status, label in Payment.Status.choices}
+        expected_transitions = {}
+        for status in expected_statuses:
+            next_statuses = list(Payment.ALLOWED_STATUS_TRANSITIONS.get(status, set()))
+            next_statuses.sort(key=lambda value: expected_statuses.index(value))
+            expected_transitions[status] = next_statuses
+        expected_terminal_statuses = [
+            status for status in expected_statuses if not expected_transitions.get(status, [])
+        ]
+
+        self.assertEqual(payload["statuses"], expected_statuses)
+        self.assertEqual(payload["status_labels"], expected_labels)
+        self.assertEqual(
+            payload["directions"],
+            [direction for direction, _label in Payment.Direction.choices],
+        )
+        self.assertEqual(
+            payload["methods"],
+            [method for method, _label in Payment.Method.choices],
+        )
+        self.assertEqual(payload["default_create_status"], Payment.Status.PENDING)
+        self.assertEqual(payload["default_create_direction"], Payment.Direction.INBOUND)
+        self.assertEqual(payload["default_create_method"], Payment.Method.ACH)
+        self.assertEqual(payload["allowed_status_transitions"], expected_transitions)
+        self.assertEqual(payload["terminal_statuses"], expected_terminal_statuses)
+        self.assertEqual(
+            payload["allocation_target_by_direction"],
+            {
+                Payment.Direction.INBOUND: "invoice",
+                Payment.Direction.OUTBOUND: "vendor_bill",
+            },
+        )
+        self.assertTrue(str(payload["policy_version"]).startswith("2026-02-23.payments."))
+
     def test_payment_create_and_project_list(self):
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/payments/",

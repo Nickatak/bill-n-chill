@@ -18,6 +18,7 @@ from core.models import (
     PaymentRecord,
     VendorBill,
 )
+from core.policies import get_payment_policy_contract
 from core.serializers import (
     PaymentAllocateSerializer,
     PaymentAllocationSerializer,
@@ -218,6 +219,36 @@ def _record_payment_allocation_record(
         metadata_json=metadata or {},
         recorded_by=recorded_by,
     )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def payment_contract_view(_request):
+    """Return canonical payment workflow policy for client-side UX guards.
+
+    Contract:
+    - `GET`:
+      - `200`: payment policy contract returned.
+        - Guarantees:
+          - statuses/transitions mirror backend model-level transition guards. `[APP]`
+          - no object mutations. `[APP]`
+      - `401`: authentication missing/invalid.
+        - Guarantees: no object mutations. `[APP]`
+
+    - Preconditions:
+      - caller must be authenticated (`IsAuthenticated`).
+
+    - Object mutations:
+      - `GET`: none.
+
+    - Idempotency and retry semantics:
+      - `GET` is idempotent and read-only.
+
+    - Test anchors:
+      - `backend/core/tests/test_payments.py::PaymentTests::test_payment_contract_requires_authentication`
+      - `backend/core/tests/test_payments.py::PaymentTests::test_payment_contract_matches_model_transition_policy`
+    """
+    return Response({"data": get_payment_policy_contract()})
 
 
 @api_view(["GET", "POST"])

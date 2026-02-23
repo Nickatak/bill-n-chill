@@ -21,6 +21,7 @@ from core.models import (
     FinancialAuditEvent,
     Project,
 )
+from core.policies import get_change_order_policy_contract
 from core.serializers import ChangeOrderSerializer, ChangeOrderWriteSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
@@ -30,6 +31,36 @@ from core.views.helpers import (
     _role_gate_error_payload,
     _validate_project_for_user,
 )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def change_order_contract_view(_request):
+    """Return canonical change-order workflow policy for client-side UX guards.
+
+    Contract:
+    - `GET`:
+      - `200`: change-order policy contract returned.
+        - Guarantees:
+          - statuses/transitions mirror backend model-level transition guards. `[APP]`
+          - no object mutations. `[APP]`
+      - `401`: authentication missing/invalid.
+        - Guarantees: no object mutations. `[APP]`
+
+    - Preconditions:
+      - caller must be authenticated (`IsAuthenticated`).
+
+    - Object mutations:
+      - `GET`: none.
+
+    - Idempotency and retry semantics:
+      - `GET` is idempotent and read-only.
+
+    - Test anchors:
+      - `backend/core/tests/test_change_orders.py::ChangeOrderTests::test_change_order_contract_requires_authentication`
+      - `backend/core/tests/test_change_orders.py::ChangeOrderTests::test_change_order_contract_matches_model_transition_policy`
+    """
+    return Response({"data": get_change_order_policy_contract()})
 
 
 @api_view(["GET", "POST"])

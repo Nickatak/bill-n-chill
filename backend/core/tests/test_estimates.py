@@ -92,6 +92,53 @@ class EstimateTests(TestCase):
         response = self.client.get("/api/v1/public/estimates/notarealtoken/")
         self.assertEqual(response.status_code, 404)
 
+    def test_estimate_contract_requires_authentication(self):
+        response = self.client.get("/api/v1/contracts/estimates/")
+        self.assertEqual(response.status_code, 401)
+
+    def test_estimate_contract_matches_model_transition_policy(self):
+        response = self.client.get(
+            "/api/v1/contracts/estimates/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+
+        expected_statuses = [status for status, _label in Estimate.Status.choices]
+        expected_labels = {status: label for status, label in Estimate.Status.choices}
+        expected_transitions = {}
+        for status in expected_statuses:
+            next_statuses = list(Estimate.ALLOWED_STATUS_TRANSITIONS.get(status, set()))
+            next_statuses.sort(key=lambda value: expected_statuses.index(value))
+            expected_transitions[status] = next_statuses
+        expected_terminal_statuses = [
+            status for status in expected_statuses if not expected_transitions.get(status, [])
+        ]
+
+        self.assertEqual(payload["statuses"], expected_statuses)
+        self.assertEqual(payload["status_labels"], expected_labels)
+        self.assertEqual(payload["default_create_status"], Estimate.Status.DRAFT)
+        self.assertEqual(
+            payload["default_status_filters"],
+            [
+                Estimate.Status.DRAFT,
+                Estimate.Status.SENT,
+                Estimate.Status.APPROVED,
+                Estimate.Status.REJECTED,
+            ],
+        )
+        self.assertEqual(payload["allowed_status_transitions"], expected_transitions)
+        self.assertEqual(payload["terminal_statuses"], expected_terminal_statuses)
+        self.assertEqual(
+            payload["quick_action_by_status"],
+            {
+                Estimate.Status.APPROVED: "change_order",
+                Estimate.Status.REJECTED: "revision",
+                Estimate.Status.ARCHIVED: "revision",
+            },
+        )
+        self.assertTrue(str(payload["policy_version"]).startswith("2026-02-23.estimates."))
+
     def test_project_estimates_create(self):
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/estimates/",

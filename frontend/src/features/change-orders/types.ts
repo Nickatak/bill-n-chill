@@ -50,12 +50,22 @@ export type ChangeOrderRecord = {
   updated_at: string;
 };
 
+export type ChangeOrderPolicyContract = {
+  policy_version: string;
+  status_labels: Record<string, string>;
+  statuses: string[];
+  default_create_status: string;
+  allowed_status_transitions: Record<string, string[]>;
+  terminal_statuses: string[];
+};
+
 export type ApiResponse = {
   data?:
     | UserData
     | ProjectRecord[]
     | ChangeOrderRecord[]
     | ChangeOrderRecord
+    | ChangeOrderPolicyContract
     | Array<{ id: number; status: string; line_items: BudgetLineRecord[] }>;
   error?: { code?: string; message?: string };
 };

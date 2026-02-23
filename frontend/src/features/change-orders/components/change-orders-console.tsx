@@ -1,11 +1,16 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  defaultApiBaseUrl,
+  fetchChangeOrderPolicyContract,
+  normalizeApiBaseUrl,
+} from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import {
   ApiResponse,
   BudgetLineRecord,
+  ChangeOrderPolicyContract,
   ChangeOrderRecord,
 } from "../types";
 import styles from "./change-orders-console.module.css";
@@ -35,9 +40,50 @@ function emptyLine(localId: number): ChangeOrderLineInput {
   };
 }
 
+function defaultChangeOrderTitle(projectName?: string): string {
+  const trimmed = (projectName || "").trim();
+  if (!trimmed) {
+    return "Change Order";
+  }
+  return `Change Order: ${trimmed}`;
+}
+
+function toNumber(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatMoney(value: number): string {
+  return value.toFixed(2);
+}
+
 type ChangeOrdersConsoleProps = {
   scopedProjectId?: number | null;
   initialOriginEstimateId?: number | null;
+};
+
+const CHANGE_ORDER_STATUS_FALLBACK = [
+  "draft",
+  "pending_approval",
+  "approved",
+  "rejected",
+  "void",
+];
+
+const CHANGE_ORDER_STATUS_LABELS_FALLBACK: Record<string, string> = {
+  draft: "Draft",
+  pending_approval: "Pending Approval",
+  approved: "Approved",
+  rejected: "Rejected",
+  void: "Void",
+};
+
+const CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
+  draft: ["pending_approval", "void"],
+  pending_approval: ["draft", "approved", "rejected", "void"],
+  approved: ["void"],
+  rejected: ["draft", "void"],
+  void: [],
 };
 
 export function ChangeOrdersConsole({
@@ -70,6 +116,15 @@ export function ChangeOrdersConsole({
   const [editStatus, setEditStatus] = useState("draft");
   const [editLineItems, setEditLineItems] = useState<ChangeOrderLineInput[]>([emptyLine(1)]);
   const [quickStatus, setQuickStatus] = useState("pending_approval");
+  const [changeOrderStatuses, setChangeOrderStatuses] = useState<string[]>(
+    CHANGE_ORDER_STATUS_FALLBACK,
+  );
+  const [changeOrderStatusLabels, setChangeOrderStatusLabels] = useState<
+    Record<string, string>
+  >(CHANGE_ORDER_STATUS_LABELS_FALLBACK);
+  const [changeOrderAllowedTransitions, setChangeOrderAllowedTransitions] = useState<
+    Record<string, string[]>
+  >(CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const canMutateChangeOrders = role === "owner" || role === "pm";
@@ -90,9 +145,6 @@ export function ChangeOrdersConsole({
     viewerChangeOrders.find((changeOrder) => String(changeOrder.id) === selectedChangeOrderId) ??
     viewerChangeOrders[0] ??
     null;
-  const selectedLineDeltaTotal = selectedChangeOrder?.line_total_delta ?? "0.00";
-  const selectedLineDeltaMismatch =
-    selectedChangeOrder !== null && selectedChangeOrder.amount_delta !== selectedLineDeltaTotal;
   const newLineDeltaTotal = useMemo(
     () =>
       newLineItems.reduce((sum, line) => sum + toNumber(line.amountDelta), 0),
@@ -120,36 +172,16 @@ export function ChangeOrdersConsole({
     }
     return map;
   }, [budgetLines]);
-  const allowedStatusTransitions: Record<string, string[]> = {
-    draft: ["pending_approval", "void"],
-    pending_approval: ["draft", "approved", "rejected", "void"],
-    approved: ["void"],
-    rejected: ["draft", "void"],
-    void: [],
-  };
   const quickStatusOptions = selectedViewerChangeOrder
-    ? allowedStatusTransitions[selectedViewerChangeOrder.status] ?? []
+    ? changeOrderAllowedTransitions[selectedViewerChangeOrder.status] ?? []
     : [];
 
   function statusLabel(status: string): string {
-    return status.replaceAll("_", " ").toUpperCase();
-  }
-
-  function defaultChangeOrderTitle(projectName?: string): string {
-    const trimmed = (projectName || "").trim();
-    if (!trimmed) {
-      return "Change Order";
+    const label = changeOrderStatusLabels[status];
+    if (label) {
+      return label.toUpperCase();
     }
-    return `Change Order: ${trimmed}`;
-  }
-
-  function toNumber(value: string): number {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-
-  function formatMoney(value: number): string {
-    return value.toFixed(2);
+    return status.replaceAll("_", " ").toUpperCase();
   }
 
   function originalApprovedAmountForLine(budgetLineId: string): string {
@@ -183,7 +215,7 @@ export function ChangeOrdersConsole({
       .join("")}`;
     return styles[key] ?? "";
   }
-  function hydrateEditForm(changeOrder: ChangeOrderRecord | undefined) {
+  const hydrateEditForm = useCallback((changeOrder: ChangeOrderRecord | undefined) => {
     if (!changeOrder) {
       setSelectedChangeOrderId("");
       setEditTitle("");
@@ -191,6 +223,7 @@ export function ChangeOrdersConsole({
       setEditStatus("draft");
       setEditLineItems([emptyLine(1)]);
       setNextLineLocalId(2);
+      setQuickStatus(changeOrderAllowedTransitions.draft?.[0] ?? "pending_approval");
       return;
     }
 
@@ -211,108 +244,56 @@ export function ChangeOrdersConsole({
     setEditLineItems(hydratedLines);
     const maxLocalId = hydratedLines.reduce((maxId, line) => Math.max(maxId, line.localId), 1);
     setNextLineLocalId(maxLocalId + 1);
-  }
-
-  async function loadProjects() {
-    if (!token) {
-      return;
+    if (changeOrder.origin_estimate) {
+      setSelectedViewerEstimateId(String(changeOrder.origin_estimate));
     }
-    setStatusMessage("Loading projects...");
+    const nextQuickStatuses = changeOrderAllowedTransitions[changeOrder.status] ?? [];
+    setQuickStatus(nextQuickStatuses[0] ?? changeOrder.status);
+  }, [changeOrderAllowedTransitions]);
+
+  const loadChangeOrderPolicy = useCallback(async () => {
     try {
-      const response = await fetch(`${normalizedBaseUrl}/projects/`, {
-        headers: { Authorization: `Token ${token}` },
+      const response = await fetchChangeOrderPolicyContract({
+        baseUrl: normalizedBaseUrl,
+        token,
       });
       const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setStatusMessage("Could not load projects.");
+      if (!response.ok || !payload.data || Array.isArray(payload.data)) {
         return;
       }
-      const rows = (payload.data as Array<{ id: number; name: string }>) ?? [];
-      setNewLineItems([emptyLine(1)]);
-      setNextLineLocalId(2);
-      if (rows[0]) {
-        const scopedMatch = scopedProjectId
-          ? rows.find((project) => project.id === scopedProjectId)
-          : null;
-        const nextProject = scopedMatch ?? rows[0];
-        const scopeFallbackNote =
-          scopedProjectId && !scopedMatch
-            ? ` Project #${scopedProjectId} was not found in scope; defaulted to #${nextProject.id}.`
-            : "";
-        setSelectedProjectId(String(nextProject.id));
-        setSelectedProjectName(nextProject.name || "");
-        await Promise.all([
-          loadBudgetLines(nextProject.id),
-          loadProjectEstimates(nextProject.id),
-        ]);
-        const { rows: changeOrderRows, error } = await fetchProjectChangeOrders(nextProject.id);
-        if (!changeOrderRows) {
-          setChangeOrders([]);
-          hydrateEditForm(undefined);
-          setStatusMessage(`${error}${scopeFallbackNote}`);
-          return;
-        }
-        setChangeOrders(changeOrderRows);
-        hydrateEditForm(changeOrderRows[0]);
-        setStatusMessage(
-          `Loaded ${rows.length} project(s) and ${changeOrderRows.length} change order(s).${scopeFallbackNote}`,
-        );
-      } else {
-        setSelectedProjectId("");
-        setSelectedProjectName("");
-        setBudgetLines([]);
-        setProjectEstimates([]);
-        setChangeOrders([]);
-        hydrateEditForm(undefined);
-        setStatusMessage("No projects found.");
+      const contract = payload.data as ChangeOrderPolicyContract;
+      if (
+        !Array.isArray(contract.statuses) ||
+        !contract.statuses.length ||
+        !contract.allowed_status_transitions
+      ) {
+        return;
       }
+      const normalizedTransitions = contract.statuses.reduce<Record<string, string[]>>(
+        (acc, status) => {
+          const nextStatuses = contract.allowed_status_transitions[status];
+          acc[status] = Array.isArray(nextStatuses) ? nextStatuses : [];
+          return acc;
+        },
+        {},
+      );
+      setChangeOrderStatuses(contract.statuses);
+      setChangeOrderStatusLabels({
+        ...CHANGE_ORDER_STATUS_LABELS_FALLBACK,
+        ...(contract.status_labels || {}),
+      });
+      setChangeOrderAllowedTransitions(normalizedTransitions);
+      setEditStatus((current) =>
+        contract.statuses.includes(current)
+          ? current
+          : contract.default_create_status || contract.statuses[0] || "draft",
+      );
     } catch {
-      setStatusMessage("Could not reach projects endpoint.");
+      // Policy contract fetch is best-effort; fallback map remains active.
     }
-  }
+  }, [normalizedBaseUrl, token]);
 
-  useEffect(() => {
-    if (!token) {
-      return;
-    }
-    void loadProjects();
-  }, [token, scopedProjectId]);
-
-  useEffect(() => {
-    if (!newTitleManuallyEdited) {
-      setNewTitle(defaultChangeOrderTitle(selectedProjectName));
-    }
-  }, [newTitleManuallyEdited, selectedProjectName]);
-
-  useEffect(() => {
-    if (!selectedChangeOrder?.origin_estimate) {
-      return;
-    }
-    const nextEstimateId = String(selectedChangeOrder.origin_estimate);
-    setSelectedViewerEstimateId((current) => (current === nextEstimateId ? current : nextEstimateId));
-  }, [selectedChangeOrder]);
-
-  useEffect(() => {
-    if (!selectedViewerChangeOrder) {
-      return;
-    }
-    const options = allowedStatusTransitions[selectedViewerChangeOrder.status] ?? [];
-    setQuickStatus(options[0] ?? selectedViewerChangeOrder.status);
-  }, [selectedViewerChangeOrder]);
-
-  useEffect(() => {
-    const projectId = Number(selectedProjectId);
-    if (!projectId || !newOriginEstimateId || !/^\d+$/.test(newOriginEstimateId)) {
-      return;
-    }
-    const sourceEstimateId = Number(newOriginEstimateId);
-    void (async () => {
-      const nextLines = await loadBudgetLines(projectId, sourceEstimateId);
-      prefillNewLinesFromBudgetLines(nextLines);
-    })();
-  }, [newOriginEstimateId, selectedProjectId]);
-
-  async function loadBudgetLines(projectId: number, sourceEstimateId?: number | null) {
+  const loadBudgetLines = useCallback(async (projectId: number, sourceEstimateId?: number | null) => {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/budgets/`, {
         headers: { Authorization: `Token ${token}` },
@@ -341,9 +322,9 @@ export function ChangeOrdersConsole({
       setBudgetLines([]);
       return [] as BudgetLineRecord[];
     }
-  }
+  }, [normalizedBaseUrl, token]);
 
-  async function loadProjectEstimates(projectId: number) {
+  const loadProjectEstimates = useCallback(async (projectId: number) => {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
         headers: { Authorization: `Token ${token}` },
@@ -384,7 +365,131 @@ export function ChangeOrdersConsole({
       setNewOriginEstimateId("");
       setSelectedViewerEstimateId("");
     }
-  }
+  }, [initialOriginEstimateId, normalizedBaseUrl, token]);
+
+  const prefillNewLinesFromBudgetLines = useCallback((lines: BudgetLineRecord[]) => {
+    if (!lines.length) {
+      setNewLineItems([emptyLine(1)]);
+      setNextLineLocalId(2);
+      return;
+    }
+    const mapped: ChangeOrderLineInput[] = lines.map((line, index) => ({
+      localId: index + 1,
+      budgetLineId: String(line.id),
+      description: line.description || "",
+      amountDelta: "0.00",
+      daysDelta: "0",
+    }));
+    setNewLineItems(mapped);
+    setNextLineLocalId(mapped.length + 1);
+  }, []);
+
+  const fetchProjectChangeOrders = useCallback(async (projectId: number) => {
+    const response = await fetch(
+      `${normalizedBaseUrl}/projects/${projectId}/change-orders/`,
+      {
+        headers: { Authorization: `Token ${token}` },
+      },
+    );
+    const payload: ApiResponse = await response.json();
+    if (!response.ok) {
+      return { rows: null as ChangeOrderRecord[] | null, error: "Could not load change orders." };
+    }
+    return { rows: (payload.data as ChangeOrderRecord[]) ?? [], error: "" };
+  }, [normalizedBaseUrl, token]);
+
+  const loadProjects = useCallback(async () => {
+    if (!token) {
+      return;
+    }
+    setStatusMessage("Loading projects...");
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/projects/`, {
+        headers: { Authorization: `Token ${token}` },
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setStatusMessage("Could not load projects.");
+        return;
+      }
+      const rows = (payload.data as Array<{ id: number; name: string }>) ?? [];
+      setNewLineItems([emptyLine(1)]);
+      setNextLineLocalId(2);
+      if (rows[0]) {
+        const scopedMatch = scopedProjectId
+          ? rows.find((project) => project.id === scopedProjectId)
+          : null;
+        const nextProject = scopedMatch ?? rows[0];
+        const scopeFallbackNote =
+          scopedProjectId && !scopedMatch
+            ? ` Project #${scopedProjectId} was not found in scope; defaulted to #${nextProject.id}.`
+            : "";
+        setSelectedProjectId(String(nextProject.id));
+        setSelectedProjectName(nextProject.name || "");
+        if (!newTitleManuallyEdited) {
+          setNewTitle(defaultChangeOrderTitle(nextProject.name || ""));
+        }
+        await Promise.all([
+          loadBudgetLines(nextProject.id),
+          loadProjectEstimates(nextProject.id),
+        ]);
+        const { rows: changeOrderRows, error } = await fetchProjectChangeOrders(nextProject.id);
+        if (!changeOrderRows) {
+          setChangeOrders([]);
+          hydrateEditForm(undefined);
+          setStatusMessage(`${error}${scopeFallbackNote}`);
+          return;
+        }
+        setChangeOrders(changeOrderRows);
+        hydrateEditForm(changeOrderRows[0]);
+        setStatusMessage(
+          `Loaded ${rows.length} project(s) and ${changeOrderRows.length} change order(s).${scopeFallbackNote}`,
+        );
+      } else {
+        setSelectedProjectId("");
+        setSelectedProjectName("");
+        setBudgetLines([]);
+        setProjectEstimates([]);
+        setChangeOrders([]);
+        hydrateEditForm(undefined);
+        setStatusMessage("No projects found.");
+      }
+    } catch {
+      setStatusMessage("Could not reach projects endpoint.");
+    }
+  }, [fetchProjectChangeOrders, hydrateEditForm, loadBudgetLines, loadProjectEstimates, newTitleManuallyEdited, normalizedBaseUrl, scopedProjectId, token]);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    const run = window.setTimeout(() => {
+      void loadChangeOrderPolicy();
+    }, 0);
+    return () => window.clearTimeout(run);
+  }, [loadChangeOrderPolicy, token]);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    const run = window.setTimeout(() => {
+      void loadProjects();
+    }, 0);
+    return () => window.clearTimeout(run);
+  }, [loadProjects, token]);
+
+  useEffect(() => {
+    const projectId = Number(selectedProjectId);
+    if (!projectId || !newOriginEstimateId || !/^\d+$/.test(newOriginEstimateId)) {
+      return;
+    }
+    const sourceEstimateId = Number(newOriginEstimateId);
+    void (async () => {
+      const nextLines = await loadBudgetLines(projectId, sourceEstimateId);
+      prefillNewLinesFromBudgetLines(nextLines);
+    })();
+  }, [loadBudgetLines, newOriginEstimateId, prefillNewLinesFromBudgetLines, selectedProjectId]);
 
   async function handleNewOriginEstimateChange(value: string) {
     setNewOriginEstimateId(value);
@@ -424,23 +529,6 @@ export function ChangeOrdersConsole({
     setter((current) => (current.length > 1 ? current.filter((line) => line.localId !== localId) : current));
   }
 
-  function prefillNewLinesFromBudgetLines(lines: BudgetLineRecord[]) {
-    if (!lines.length) {
-      setNewLineItems([emptyLine(1)]);
-      setNextLineLocalId(2);
-      return;
-    }
-    const mapped: ChangeOrderLineInput[] = lines.map((line, index) => ({
-      localId: index + 1,
-      budgetLineId: String(line.id),
-      description: line.description || "",
-      amountDelta: "0.00",
-      daysDelta: "0",
-    }));
-    setNewLineItems(mapped);
-    setNextLineLocalId(mapped.length + 1);
-  }
-
   function handleStartNewChangeOrder() {
     const fallbackOriginEstimateId = projectEstimates[0] ? String(projectEstimates[0].id) : "";
     const nextOriginEstimateId =
@@ -458,20 +546,6 @@ export function ChangeOrdersConsole({
       setNextLineLocalId(2);
     }
     setStatusMessage("Add form reset for a new change order.");
-  }
-
-  async function fetchProjectChangeOrders(projectId: number) {
-    const response = await fetch(
-      `${normalizedBaseUrl}/projects/${projectId}/change-orders/`,
-      {
-        headers: { Authorization: `Token ${token}` },
-      },
-    );
-    const payload: ApiResponse = await response.json();
-    if (!response.ok) {
-      return { rows: null as ChangeOrderRecord[] | null, error: "Could not load change orders." };
-    }
-    return { rows: (payload.data as ChangeOrderRecord[]) ?? [], error: "" };
   }
 
   async function handleCreateChangeOrder(event: FormEvent<HTMLFormElement>) {
@@ -1096,11 +1170,11 @@ export function ChangeOrdersConsole({
               value={editStatus}
               onChange={(event) => setEditStatus(event.target.value)}
             >
-              <option value="draft">draft</option>
-              <option value="pending_approval">pending_approval</option>
-              <option value="approved">approved</option>
-              <option value="rejected">rejected</option>
-              <option value="void">void</option>
+              {changeOrderStatuses.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
             </select>
           </label>
           <label className={`${estimateStyles.inlineField} ${styles.coMetaField} ${styles.coFieldWide}`}>

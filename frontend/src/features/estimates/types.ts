@@ -67,6 +67,17 @@ export type EstimateLineInput = {
   markupPercent: string;
 };
 
+export type EstimatePolicyContract = {
+  policy_version: string;
+  status_labels: Record<string, string>;
+  statuses: string[];
+  default_create_status: string;
+  default_status_filters: string[];
+  allowed_status_transitions: Record<string, string[]>;
+  terminal_statuses: string[];
+  quick_action_by_status: Record<string, "change_order" | "revision">;
+};
+
 export type ApiResponse = {
   data?:
     | UserData
@@ -74,6 +85,7 @@ export type ApiResponse = {
     | CostCode[]
     | EstimateRecord
     | EstimateRecord[]
+    | EstimatePolicyContract
     | EstimateStatusEventRecord[]
     | EstimateRelatedChangeOrderRecord[];
   meta?: { cloned_from?: number; duplicated_from?: number };

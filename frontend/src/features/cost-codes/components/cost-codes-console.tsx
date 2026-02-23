@@ -2,12 +2,11 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
-import { loadClientSession } from "../../session/client-session";
+import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { ApiResponse, CostCode, CsvImportResult } from "../types";
 
 export function CostCodesConsole() {
-  const [token, setToken] = useState("");
-  const [authMessage, setAuthMessage] = useState("Checking session...");
+  const { token, authMessage } = useSharedSessionAuth();
 
   const [rows, setRows] = useState<CostCode[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
@@ -23,16 +22,6 @@ export function CostCodesConsole() {
   const [importResult, setImportResult] = useState<CsvImportResult | null>(null);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
-  useEffect(() => {
-    const session = loadClientSession();
-    if (!session?.token) {
-      setToken("");
-      setAuthMessage("No shared session found. Go to / and login first.");
-      return;
-    }
-    setToken(session.token);
-    setAuthMessage(`Using shared session for ${session.email || "user"}.`);
-  }, []);
 
   function hydrate(item: CostCode) {
     setCode(item.code);
@@ -70,7 +59,10 @@ export function CostCodesConsole() {
     if (!token) {
       return;
     }
-    void loadCostCodes();
+    const run = window.setTimeout(() => {
+      void loadCostCodes();
+    }, 0);
+    return () => window.clearTimeout(run);
   }, [loadCostCodes, token]);
 
   function handleSelect(id: string) {

@@ -1,9 +1,13 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
+import {
+  defaultApiBaseUrl,
+  fetchPaymentPolicyContract,
+  normalizeApiBaseUrl,
+} from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import {
   ApiResponse,
@@ -12,6 +16,7 @@ import {
   PaymentAllocationTargetType,
   PaymentDirection,
   PaymentMethod,
+  PaymentPolicyContract,
   PaymentRecord,
   PaymentStatus,
   ProjectRecord,
@@ -21,6 +26,26 @@ import {
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
+
+const PAYMENT_STATUSES_FALLBACK = ["pending", "settled", "failed", "void"];
+const PAYMENT_STATUS_LABELS_FALLBACK: Record<string, string> = {
+  pending: "Pending",
+  settled: "Settled",
+  failed: "Failed",
+  void: "Void",
+};
+const PAYMENT_DIRECTIONS_FALLBACK = ["inbound", "outbound"];
+const PAYMENT_METHODS_FALLBACK = ["ach", "card", "check", "wire", "cash", "other"];
+const PAYMENT_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
+  pending: ["settled", "failed", "void"],
+  settled: ["void"],
+  failed: ["void"],
+  void: [],
+};
+const PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK: Record<string, PaymentAllocationTargetType> = {
+  inbound: "invoice",
+  outbound: "vendor_bill",
+};
 
 function paymentNextActionHint(status: PaymentStatus): string {
   if (status === "pending") {
@@ -32,7 +57,10 @@ function paymentNextActionHint(status: PaymentStatus): string {
   if (status === "failed") {
     return "Next: retry collection/disbursement or void if cancelled.";
   }
-  return "Payment is void and cannot be allocated.";
+  if (status === "void") {
+    return "Payment is void and cannot be allocated.";
+  }
+  return "Use allowed transitions from the policy contract.";
 }
 
 export function PaymentsConsole() {
@@ -43,6 +71,21 @@ export function PaymentsConsole() {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [selectedPaymentId, setSelectedPaymentId] = useState("");
+  const [paymentStatuses, setPaymentStatuses] = useState<string[]>(PAYMENT_STATUSES_FALLBACK);
+  const [paymentStatusLabels, setPaymentStatusLabels] = useState<Record<string, string>>(
+    PAYMENT_STATUS_LABELS_FALLBACK,
+  );
+  const [paymentDirections, setPaymentDirections] = useState<string[]>(PAYMENT_DIRECTIONS_FALLBACK);
+  const [paymentMethods, setPaymentMethods] = useState<string[]>(PAYMENT_METHODS_FALLBACK);
+  const [paymentAllowedTransitions, setPaymentAllowedTransitions] = useState<Record<string, string[]>>(
+    PAYMENT_ALLOWED_STATUS_TRANSITIONS_FALLBACK,
+  );
+  const [allocationTargetByDirection, setAllocationTargetByDirection] = useState<
+    Record<string, PaymentAllocationTargetType>
+  >(PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK);
+  const [defaultCreateDirection, setDefaultCreateDirection] = useState<string>("inbound");
+  const [defaultCreateMethod, setDefaultCreateMethod] = useState<string>("ach");
+  const [defaultCreateStatus, setDefaultCreateStatus] = useState<string>("pending");
 
   const [newDirection, setNewDirection] = useState<PaymentDirection>("inbound");
   const [newMethod, setNewMethod] = useState<PaymentMethod>("ach");
@@ -76,6 +119,13 @@ export function PaymentsConsole() {
     () => payments.find((payment) => String(payment.id) === selectedPaymentId),
     [payments, selectedPaymentId],
   );
+  const selectedPaymentAllowedStatuses = selectedPayment
+    ? [selectedPayment.status, ...(paymentAllowedTransitions[selectedPayment.status] ?? [])]
+        .filter((value, index, source) => source.indexOf(value) === index)
+    : paymentStatuses;
+  const quickStatusOptions = selectedPayment
+    ? paymentAllowedTransitions[selectedPayment.status] ?? []
+    : [];
 
   function hydratePayment(payment: PaymentRecord) {
     setDirection(payment.direction);
@@ -85,17 +135,89 @@ export function PaymentsConsole() {
     setPaymentDate(payment.payment_date);
     setReferenceNumber(payment.reference_number);
     setNotes(payment.notes);
-    setAllocationTargetType(payment.direction === "inbound" ? "invoice" : "vendor_bill");
+    setAllocationTargetType(
+      allocationTargetByDirection[payment.direction] ??
+        PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK.inbound,
+    );
   }
 
   function clearCreateForm() {
-    setNewDirection("inbound");
-    setNewMethod("ach");
-    setNewStatus("pending");
+    setNewDirection(defaultCreateDirection);
+    setNewMethod(defaultCreateMethod);
+    setNewStatus(defaultCreateStatus);
     setNewAmount("0.00");
     setNewPaymentDate(todayIsoDate());
     setNewReferenceNumber("");
     setNewNotes("");
+  }
+
+  function paymentStatusDisplayLabel(value: string): string {
+    return paymentStatusLabels[value] ?? value;
+  }
+
+  async function loadPaymentPolicy() {
+    try {
+      const response = await fetchPaymentPolicyContract({
+        baseUrl: normalizedBaseUrl,
+        token,
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok || !payload.data || Array.isArray(payload.data)) {
+        return;
+      }
+      const contract = payload.data as PaymentPolicyContract;
+      if (
+        !Array.isArray(contract.statuses) ||
+        !contract.statuses.length ||
+        !Array.isArray(contract.directions) ||
+        !contract.directions.length ||
+        !Array.isArray(contract.methods) ||
+        !contract.methods.length ||
+        !contract.allowed_status_transitions
+      ) {
+        return;
+      }
+      const normalizedTransitions = contract.statuses.reduce<Record<string, string[]>>(
+        (acc, statusValue) => {
+          const nextStatuses = contract.allowed_status_transitions[statusValue];
+          acc[statusValue] = Array.isArray(nextStatuses) ? nextStatuses : [];
+          return acc;
+        },
+        {},
+      );
+      const nextDefaultDirection =
+        contract.default_create_direction || contract.directions[0] || PAYMENT_DIRECTIONS_FALLBACK[0];
+      const nextDefaultMethod =
+        contract.default_create_method || contract.methods[0] || PAYMENT_METHODS_FALLBACK[0];
+      const nextDefaultStatus =
+        contract.default_create_status || contract.statuses[0] || PAYMENT_STATUSES_FALLBACK[0];
+
+      setPaymentStatuses(contract.statuses);
+      setPaymentStatusLabels({
+        ...PAYMENT_STATUS_LABELS_FALLBACK,
+        ...(contract.status_labels || {}),
+      });
+      setPaymentDirections(contract.directions);
+      setPaymentMethods(contract.methods);
+      setPaymentAllowedTransitions(normalizedTransitions);
+      setAllocationTargetByDirection({
+        ...PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK,
+        ...(contract.allocation_target_by_direction || {}),
+      });
+      setDefaultCreateDirection(nextDefaultDirection);
+      setDefaultCreateMethod(nextDefaultMethod);
+      setDefaultCreateStatus(nextDefaultStatus);
+      setNewDirection((current) =>
+        contract.directions.includes(current) ? current : nextDefaultDirection,
+      );
+      setDirection((current) => (contract.directions.includes(current) ? current : nextDefaultDirection));
+      setNewMethod((current) => (contract.methods.includes(current) ? current : nextDefaultMethod));
+      setMethod((current) => (contract.methods.includes(current) ? current : nextDefaultMethod));
+      setNewStatus((current) => (contract.statuses.includes(current) ? current : nextDefaultStatus));
+      setStatus((current) => (contract.statuses.includes(current) ? current : nextDefaultStatus));
+    } catch {
+      // Policy load is best-effort; static fallback remains active.
+    }
   }
 
   async function loadProjects() {
@@ -276,7 +398,10 @@ export function PaymentsConsole() {
 
     setStatusMessage("Loading allocation targets...");
     try {
-      if (selectedPayment.direction === "inbound") {
+      const expectedTargetType =
+        allocationTargetByDirection[selectedPayment.direction] ??
+        PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK.inbound;
+      if (expectedTargetType === "invoice") {
         const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/invoices/`, {
           headers: { Authorization: `Token ${token}` },
         });
@@ -408,6 +533,14 @@ export function PaymentsConsole() {
     }
   }
 
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    void loadPaymentPolicy();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
   return (
     <section>
       <h2>Payment Recording</h2>
@@ -441,28 +574,31 @@ export function PaymentsConsole() {
             value={newDirection}
             onChange={(event) => setNewDirection(event.target.value as PaymentDirection)}
           >
-            <option value="inbound">inbound</option>
-            <option value="outbound">outbound</option>
+            {paymentDirections.map((value) => (
+              <option key={`create-direction-${value}`} value={value}>
+                {value}
+              </option>
+            ))}
           </select>
         </label>
         <label>
           Method
           <select value={newMethod} onChange={(event) => setNewMethod(event.target.value as PaymentMethod)}>
-            <option value="ach">ach</option>
-            <option value="card">card</option>
-            <option value="check">check</option>
-            <option value="wire">wire</option>
-            <option value="cash">cash</option>
-            <option value="other">other</option>
+            {paymentMethods.map((value) => (
+              <option key={`create-method-${value}`} value={value}>
+                {value}
+              </option>
+            ))}
           </select>
         </label>
         <label>
           Status
           <select value={newStatus} onChange={(event) => setNewStatus(event.target.value as PaymentStatus)}>
-            <option value="pending">pending</option>
-            <option value="settled">settled</option>
-            <option value="failed">failed</option>
-            <option value="void">void</option>
+            {paymentStatuses.map((value) => (
+              <option key={`create-status-${value}`} value={value}>
+                {paymentStatusDisplayLabel(value)}
+              </option>
+            ))}
           </select>
         </label>
         <label>
@@ -516,7 +652,8 @@ export function PaymentsConsole() {
 
       {selectedPayment ? (
         <p>
-          Selected payment #{selectedPayment.id}: status {selectedPayment.status} | allocated{" "}
+          Selected payment #{selectedPayment.id}: status{" "}
+          {paymentStatusDisplayLabel(selectedPayment.status)} | allocated{" "}
           {selectedPayment.allocated_total} | unapplied {selectedPayment.unapplied_amount}.{" "}
           {paymentNextActionHint(selectedPayment.status)}
         </p>
@@ -527,28 +664,31 @@ export function PaymentsConsole() {
         <label>
           Direction
           <select value={direction} onChange={(event) => setDirection(event.target.value as PaymentDirection)}>
-            <option value="inbound">inbound</option>
-            <option value="outbound">outbound</option>
+            {paymentDirections.map((value) => (
+              <option key={`edit-direction-${value}`} value={value}>
+                {value}
+              </option>
+            ))}
           </select>
         </label>
         <label>
           Method
           <select value={method} onChange={(event) => setMethod(event.target.value as PaymentMethod)}>
-            <option value="ach">ach</option>
-            <option value="card">card</option>
-            <option value="check">check</option>
-            <option value="wire">wire</option>
-            <option value="cash">cash</option>
-            <option value="other">other</option>
+            {paymentMethods.map((value) => (
+              <option key={`edit-method-${value}`} value={value}>
+                {value}
+              </option>
+            ))}
           </select>
         </label>
         <label>
           Status
           <select value={status} onChange={(event) => setStatus(event.target.value as PaymentStatus)}>
-            <option value="pending">pending</option>
-            <option value="settled">settled</option>
-            <option value="failed">failed</option>
-            <option value="void">void</option>
+            {selectedPaymentAllowedStatuses.map((value) => (
+              <option key={`edit-status-${value}`} value={value}>
+                {paymentStatusDisplayLabel(value)}
+              </option>
+            ))}
           </select>
         </label>
         <label>
@@ -578,15 +718,16 @@ export function PaymentsConsole() {
         </button>
         <p>Mobile quick actions:</p>
         <p>
-          <button type="button" onClick={() => handleQuickPaymentStatus("settled")} disabled={!selectedPaymentId || !canMutatePayments}>
-            Mark Settled
-          </button>
-          <button type="button" onClick={() => handleQuickPaymentStatus("failed")} disabled={!selectedPaymentId || !canMutatePayments}>
-            Mark Failed
-          </button>
-          <button type="button" onClick={() => handleQuickPaymentStatus("void")} disabled={!selectedPaymentId || !canMutatePayments}>
-            Void
-          </button>
+          {quickStatusOptions.map((nextStatus) => (
+            <button
+              key={`quick-status-${nextStatus}`}
+              type="button"
+              onClick={() => handleQuickPaymentStatus(nextStatus)}
+              disabled={!selectedPaymentId || !canMutatePayments}
+            >
+              {paymentStatusDisplayLabel(nextStatus)}
+            </button>
+          ))}
         </p>
       </form>
 

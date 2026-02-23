@@ -9,9 +9,9 @@ export type ProjectRecord = {
   customer_display_name: string;
 };
 
-export type PaymentDirection = "inbound" | "outbound";
-export type PaymentMethod = "ach" | "card" | "check" | "wire" | "cash" | "other";
-export type PaymentStatus = "pending" | "settled" | "failed" | "void";
+export type PaymentDirection = string;
+export type PaymentMethod = string;
+export type PaymentStatus = string;
 export type PaymentAllocationTargetType = "invoice" | "vendor_bill";
 
 export type PaymentAllocationRecord = {
@@ -64,12 +64,27 @@ export type PaymentAllocateResult = {
   created_allocations: PaymentAllocationRecord[];
 };
 
+export type PaymentPolicyContract = {
+  policy_version: string;
+  status_labels: Record<string, string>;
+  statuses: string[];
+  directions: string[];
+  methods: string[];
+  default_create_status: string;
+  default_create_direction: string;
+  default_create_method: string;
+  allowed_status_transitions: Record<string, string[]>;
+  terminal_statuses: string[];
+  allocation_target_by_direction: Record<string, PaymentAllocationTargetType>;
+};
+
 export type ApiResponse = {
   data?:
     | UserData
     | ProjectRecord[]
     | PaymentRecord[]
     | PaymentRecord
+    | PaymentPolicyContract
     | InvoiceRecord[]
     | VendorBillRecord[]
     | PaymentAllocateResult;

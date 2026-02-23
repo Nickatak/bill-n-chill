@@ -7,6 +7,7 @@ from core.views.shared_operations.accounting import (
 from core.views.auth import health_view, login_view, me_view, register_view
 from core.views.estimating.budgets import budget_line_detail_view, project_budgets_view
 from core.views.change_orders.change_orders import (
+    change_order_contract_view,
     change_order_clone_revision_view,
     change_order_detail_view,
     project_change_orders_view,
@@ -18,6 +19,7 @@ from core.views.shared_operations.cost_codes import (
 )
 from core.views.estimating.estimates import (
     estimate_clone_version_view,
+    estimate_contract_view,
     estimate_convert_to_budget_view,
     estimate_detail_view,
     estimate_duplicate_view,
@@ -37,7 +39,12 @@ from core.views.accounts_receivable.invoices import (
     invoice_status_events_view,
     project_invoices_view,
 )
-from core.views.cash_management.payments import payment_allocate_view, payment_detail_view, project_payments_view
+from core.views.cash_management.payments import (
+    payment_allocate_view,
+    payment_contract_view,
+    payment_detail_view,
+    project_payments_view,
+)
 from core.views.shared_operations.projects import (
     attention_feed_view,
     change_impact_summary_view,
@@ -50,7 +57,11 @@ from core.views.shared_operations.projects import (
     quick_jump_search_view,
     projects_list_view,
 )
-from core.views.accounts_payable.vendor_bills import project_vendor_bills_view, vendor_bill_detail_view
+from core.views.accounts_payable.vendor_bills import (
+    project_vendor_bills_view,
+    vendor_bill_contract_view,
+    vendor_bill_detail_view,
+)
 from core.views.shared_operations.vendors import vendor_detail_view, vendors_import_csv_view, vendors_list_create_view
 
 __all__ = [
@@ -78,6 +89,7 @@ __all__ = [
     "cost_code_detail_view",
     "cost_codes_import_csv_view",
     "project_estimates_view",
+    "estimate_contract_view",
     "public_estimate_detail_view",
     "estimate_detail_view",
     "estimate_clone_version_view",
@@ -87,6 +99,7 @@ __all__ = [
     "project_budgets_view",
     "budget_line_detail_view",
     "project_change_orders_view",
+    "change_order_contract_view",
     "change_order_detail_view",
     "change_order_clone_revision_view",
     "project_invoices_view",
@@ -94,11 +107,13 @@ __all__ = [
     "invoice_send_view",
     "invoice_status_events_view",
     "project_payments_view",
+    "payment_contract_view",
     "payment_detail_view",
     "payment_allocate_view",
     "vendors_list_create_view",
     "vendor_detail_view",
     "vendors_import_csv_view",
     "project_vendor_bills_view",
+    "vendor_bill_contract_view",
     "vendor_bill_detail_view",
 ]

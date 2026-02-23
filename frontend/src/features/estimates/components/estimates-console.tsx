@@ -1,7 +1,11 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
+import {
+  defaultApiBaseUrl,
+  fetchEstimatePolicyContract,
+  normalizeApiBaseUrl,
+} from "../api";
 import { loadClientSession } from "../../session/client-session";
 import styles from "./estimates-console.module.css";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -15,6 +19,7 @@ import {
   CostCode,
   EstimateLineInput,
   EstimateLineItemRecord,
+  EstimatePolicyContract,
   EstimateRelatedChangeOrderRecord,
   EstimateRecord,
   EstimateStatusEventRecord,
@@ -23,9 +28,45 @@ import {
 import { EstimateSheet } from "./estimate-sheet";
 
 type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amount";
-type EstimateStatusValue = "draft" | "sent" | "approved" | "rejected" | "archived";
+type EstimateStatusValue = string;
 type EstimatesConsoleProps = {
   scopedProjectId?: number | null;
+};
+
+const ESTIMATE_STATUSES_FALLBACK: string[] = [
+  "draft",
+  "sent",
+  "approved",
+  "rejected",
+  "void",
+  "archived",
+];
+const ESTIMATE_STATUS_LABELS_FALLBACK: Record<string, string> = {
+  draft: "Draft",
+  sent: "Sent",
+  approved: "Approved",
+  rejected: "Rejected",
+  void: "Void",
+  archived: "Archived",
+};
+const ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK: string[] = [
+  "draft",
+  "sent",
+  "approved",
+  "rejected",
+];
+const ESTIMATE_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, EstimateStatusValue[]> = {
+  draft: ["sent", "void", "archived"],
+  sent: ["sent", "approved", "rejected", "void", "archived"],
+  approved: [],
+  rejected: ["void"],
+  void: [],
+  archived: [],
+};
+const ESTIMATE_QUICK_ACTION_BY_STATUS_FALLBACK: Record<string, "change_order" | "revision"> = {
+  approved: "change_order",
+  rejected: "revision",
+  archived: "revision",
 };
 
 function emptyLine(localId: number, defaultCostCodeId = ""): EstimateLineInput {
@@ -38,6 +79,21 @@ function emptyLine(localId: number, defaultCostCodeId = ""): EstimateLineInput {
     unitCost: "0",
     markupPercent: "0",
   };
+}
+
+function mapEstimateLineItemsToInputs(items: EstimateLineItemRecord[] = []): EstimateLineInput[] {
+  if (!items.length) {
+    return [emptyLine(1)];
+  }
+  return items.map((item, index) => ({
+    localId: index + 1,
+    costCodeId: String(item.cost_code ?? ""),
+    description: item.description || "",
+    quantity: String(item.quantity ?? ""),
+    unit: item.unit || "ea",
+    unitCost: String(item.unit_cost ?? ""),
+    markupPercent: String(item.markup_percent ?? ""),
+  }));
 }
 
 export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }: EstimatesConsoleProps) {
@@ -53,6 +109,17 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
   const [estimates, setEstimates] = useState<EstimateRecord[]>([]);
   const [selectedEstimateId, setSelectedEstimateId] = useState("");
+  const [estimateStatuses, setEstimateStatuses] = useState<string[]>(ESTIMATE_STATUSES_FALLBACK);
+  const [estimateStatusLabels, setEstimateStatusLabels] = useState<Record<string, string>>(
+    ESTIMATE_STATUS_LABELS_FALLBACK,
+  );
+  const [estimateAllowedStatusTransitions, setEstimateAllowedStatusTransitions] = useState<
+    Record<string, string[]>
+  >(ESTIMATE_ALLOWED_STATUS_TRANSITIONS_FALLBACK);
+  const [estimateQuickActionByStatus, setEstimateQuickActionByStatus] = useState<
+    Record<string, "change_order" | "revision">
+  >(ESTIMATE_QUICK_ACTION_BY_STATUS_FALLBACK);
+  const [defaultCreateStatus, setDefaultCreateStatus] = useState("draft");
   const [selectedStatus, setSelectedStatus] = useState<EstimateStatusValue>("draft");
   const [statusNote, setStatusNote] = useState("");
   const [statusEvents, setStatusEvents] = useState<EstimateStatusEventRecord[]>([]);
@@ -72,9 +139,11 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const [showDuplicatePanel, setShowDuplicatePanel] = useState(false);
   const [duplicateTitle, setDuplicateTitle] = useState("");
   const [isViewerExpanded, setIsViewerExpanded] = useState(true);
-  const defaultEstimateStatusFilters: EstimateStatusValue[] = ["draft", "sent", "approved", "rejected"];
+  const [defaultEstimateStatusFilters, setDefaultEstimateStatusFilters] = useState<string[]>(
+    ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK,
+  );
   const [estimateStatusFilters, setEstimateStatusFilters] = useState<EstimateStatusValue[]>(
-    defaultEstimateStatusFilters,
+    ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK,
   );
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
@@ -95,30 +164,23 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     sent: styles.statusSent,
     approved: styles.statusApproved,
     rejected: styles.statusRejected,
+    void: styles.statusArchived,
     archived: styles.statusArchived,
   };
-  const statusOptions: Array<{ value: EstimateStatusValue; label: string }> = [
-    { value: "draft", label: "Draft" },
-    { value: "sent", label: "Sent" },
-    { value: "approved", label: "Approved" },
-    { value: "rejected", label: "Rejected" },
-    { value: "archived", label: "Voided" },
-  ];
+  const statusOptions: Array<{ value: EstimateStatusValue; label: string }> = estimateStatuses.map(
+    (statusValue) => ({
+      value: statusValue,
+      label: estimateStatusLabels[statusValue] ?? statusValue,
+    }),
+  );
   const estimateStatusFilterValues = statusOptions.map((option) => option.value);
   const statusDisplayOptions = statusOptions;
   const statusLabelByValue = statusDisplayOptions.reduce<Record<string, string>>((labels, option) => {
     labels[option.value] = option.label;
     return labels;
   }, {});
-  const allowedStatusTransitions: Record<string, EstimateStatusValue[]> = {
-    draft: ["sent", "archived"],
-    sent: ["sent", "approved", "rejected", "archived"],
-    approved: [],
-    rejected: [],
-    archived: [],
-  };
   const nextStatusValues = selectedEstimate
-    ? allowedStatusTransitions[selectedEstimate.status] ?? []
+    ? estimateAllowedStatusTransitions[selectedEstimate.status] ?? []
     : [];
   const nextStatusOptions = statusOptions
     .filter((option) => nextStatusValues.includes(option.value))
@@ -144,7 +206,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       sent: "Sent",
       approved: "Approved",
       rejected: "Rejected",
-      archived: "Voided",
+      void: "Voided",
+      archived: "Archived",
     };
     return actionByStatus[event.to_status] ?? formatEstimateStatus(event.to_status);
   }
@@ -174,13 +237,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   }
 
   function quickActionKindForStatus(status: string): "change_order" | "revision" | null {
-    if (status === "approved") {
-      return "change_order";
-    }
-    if (status === "rejected" || status === "archived") {
-      return "revision";
-    }
-    return null;
+    return estimateQuickActionByStatus[status] ?? null;
   }
 
   function quickActionTitleForStatus(status: string): string {
@@ -193,6 +250,67 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     }
     return "";
   }
+
+  const loadEstimatePolicy = useCallback(async () => {
+    try {
+      const response = await fetchEstimatePolicyContract({
+        baseUrl: normalizedBaseUrl,
+        token,
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok || !payload.data || Array.isArray(payload.data)) {
+        return;
+      }
+      const contract = payload.data as EstimatePolicyContract;
+      if (
+        !Array.isArray(contract.statuses) ||
+        !contract.statuses.length ||
+        !contract.allowed_status_transitions
+      ) {
+        return;
+      }
+      const normalizedTransitions = contract.statuses.reduce<Record<string, string[]>>(
+        (acc, statusValue) => {
+          const nextStatuses = contract.allowed_status_transitions[statusValue];
+          acc[statusValue] = Array.isArray(nextStatuses) ? nextStatuses : [];
+          return acc;
+        },
+        {},
+      );
+      const nextDefaultCreateStatus =
+        contract.default_create_status || contract.statuses[0] || ESTIMATE_STATUSES_FALLBACK[0];
+      const nextDefaultFilters =
+        Array.isArray(contract.default_status_filters) && contract.default_status_filters.length
+          ? contract.default_status_filters.filter((value) => contract.statuses.includes(value))
+          : ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK.filter((value) => contract.statuses.includes(value));
+      const resolvedDefaultFilters = nextDefaultFilters.length ? nextDefaultFilters : contract.statuses;
+
+      setEstimateStatuses(contract.statuses);
+      setEstimateStatusLabels({
+        ...ESTIMATE_STATUS_LABELS_FALLBACK,
+        ...(contract.status_labels || {}),
+      });
+      setEstimateAllowedStatusTransitions(normalizedTransitions);
+      setEstimateQuickActionByStatus({
+        ...ESTIMATE_QUICK_ACTION_BY_STATUS_FALLBACK,
+        ...(contract.quick_action_by_status || {}),
+      });
+      setDefaultCreateStatus(nextDefaultCreateStatus);
+      setDefaultEstimateStatusFilters(resolvedDefaultFilters);
+      setEstimateStatusFilters((current) => {
+        const retained = current.filter((value) => contract.statuses.includes(value));
+        if (retained.length) {
+          return retained;
+        }
+        return resolvedDefaultFilters;
+      });
+      setSelectedStatus((current) =>
+        contract.statuses.includes(current) ? current : nextDefaultCreateStatus,
+      );
+    } catch {
+      // Policy load is best-effort; static fallback remains active.
+    }
+  }, [normalizedBaseUrl, token]);
 
   async function cloneEstimateRevision(sourceEstimate: EstimateRecord) {
     const sourceWasSent = sourceEstimate.status === "sent";
@@ -313,42 +431,23 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     return date.toISOString().slice(0, 10);
   }
 
-  function formatDateFromIso(dateValue?: string): string {
-    return formatDateInputFromIso(dateValue);
-  }
-
-  function mapLineItemsToInputs(items: EstimateLineItemRecord[] = []): EstimateLineInput[] {
-    if (!items.length) {
-      return [emptyLine(1)];
-    }
-    return items.map((item, index) => ({
-      localId: index + 1,
-      costCodeId: String(item.cost_code ?? ""),
-      description: item.description || "",
-      quantity: String(item.quantity ?? ""),
-      unit: item.unit || "ea",
-      unitCost: String(item.unit_cost ?? ""),
-      markupPercent: String(item.markup_percent ?? ""),
-    }));
-  }
-
-  function loadEstimateIntoForm(estimate: EstimateRecord) {
+  const loadEstimateIntoForm = useCallback((estimate: EstimateRecord) => {
     setEstimateTitle(estimate.title || "Untitled");
     setTaxPercent(String(estimate.tax_percent ?? "0"));
-    const mapped = mapLineItemsToInputs(estimate.line_items ?? []);
+    const mapped = mapEstimateLineItemsToInputs(estimate.line_items ?? []);
     setLineItems(mapped);
     setNextLineId(mapped.length + 1);
-    const createdDate = formatDateFromIso(estimate.created_at);
+    const createdDate = formatDateInputFromIso(estimate.created_at);
     if (createdDate) {
       setEstimateDate(createdDate);
     }
-  }
+  }, []);
 
-  function handleSelectEstimate(estimate: EstimateRecord) {
+  const handleSelectEstimate = useCallback((estimate: EstimateRecord) => {
     const nextEstimateId = String(estimate.id);
     const isSameEstimate = nextEstimateId === selectedEstimateId;
     setSelectedEstimateId(nextEstimateId);
-    const nextStatuses = allowedStatusTransitions[estimate.status] ?? [];
+    const nextStatuses = estimateAllowedStatusTransitions[estimate.status] ?? [];
     setSelectedStatus(nextStatuses[0] ?? estimate.status);
     if (!isSameEstimate) {
       setStatusEvents([]);
@@ -357,13 +456,13 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setLineSortDirection("asc");
     loadEstimateIntoForm(estimate);
     setDuplicateTitle(`${estimate.title || "Estimate"} Copy`);
-  }
+  }, [estimateAllowedStatusTransitions, loadEstimateIntoForm, selectedEstimateId]);
 
   function startNewEstimate() {
     const defaultCostCodeId = costCodes[0] ? String(costCodes[0].id) : "";
     setIsViewerExpanded(false);
     setSelectedEstimateId("");
-    setSelectedStatus("draft");
+    setSelectedStatus(defaultCreateStatus);
     setStatusNote("");
     setStatusEvents([]);
     setEstimateTitle("New Estimate");
@@ -498,7 +597,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     } catch {
       setStatusMessage("Could not reach estimate endpoint.");
     }
-  }, [normalizedBaseUrl, scopedEstimateId, selectedProjectId, token]);
+  }, [handleSelectEstimate, normalizedBaseUrl, scopedEstimateId, selectedProjectId, token]);
 
   const loadProjectChangeOrders = useCallback(async () => {
     const projectId = Number(selectedProjectId);
@@ -520,6 +619,13 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setProjectChangeOrders([]);
     }
   }, [normalizedBaseUrl, selectedProjectId, token]);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    void loadEstimatePolicy();
+  }, [loadEstimatePolicy, token]);
 
   useEffect(() => {
     if (!token) {
@@ -848,7 +954,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setEstimates((current) =>
         current.map((estimate) => (estimate.id === updated.id ? updated : estimate)),
       );
-      const updatedNextStatuses = allowedStatusTransitions[updated.status] ?? [];
+      const updatedNextStatuses = estimateAllowedStatusTransitions[updated.status] ?? [];
       setSelectedStatus(updatedNextStatuses[0] ?? updated.status);
       setStatusNote("");
       await loadStatusEvents({ estimateId: updated.id, quiet: true });

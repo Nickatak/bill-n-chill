@@ -2,21 +2,25 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
+import {
+  defaultApiBaseUrl,
+  fetchVendorBillPolicyContract,
+  normalizeApiBaseUrl,
+} from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import {
   ApiResponse,
   ProjectRecord,
   VendorBillAllocationInput,
+  VendorBillPolicyContract,
   VendorBillPayload,
   VendorBillRecord,
+  VendorBillStatus,
   VendorRecord,
 } from "../types";
 import styles from "./vendor-bills-console.module.css";
 
-type VendorBillStatus = "planned" | "received" | "approved" | "scheduled" | "paid" | "void";
-
-const billStatuses: VendorBillStatus[] = [
+const VENDOR_BILL_STATUSES_FALLBACK: string[] = [
   "planned",
   "received",
   "approved",
@@ -24,11 +28,7 @@ const billStatuses: VendorBillStatus[] = [
   "paid",
   "void",
 ];
-const defaultBillStatusFilters: VendorBillStatus[] = billStatuses.filter(
-  (status) => status !== "void",
-);
-
-const allowedStatusTransitions: Record<VendorBillStatus, VendorBillStatus[]> = {
+const VENDOR_BILL_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
   planned: ["received", "void"],
   received: ["approved", "void"],
   approved: ["scheduled", "paid", "void"],
@@ -36,15 +36,14 @@ const allowedStatusTransitions: Record<VendorBillStatus, VendorBillStatus[]> = {
   paid: ["void"],
   void: [],
 };
-const createStatusOptions: VendorBillStatus[] = ["planned", "received"];
-
-const statusLabelByValue: Record<VendorBillStatus, string> = {
-  planned: "planned",
-  received: "received",
-  approved: "approved",
-  scheduled: "scheduled",
-  paid: "paid",
-  void: "void",
+const VENDOR_BILL_CREATE_SHORTCUT_STATUSES_FALLBACK = ["planned", "received"];
+const VENDOR_BILL_STATUS_LABELS_FALLBACK: Record<string, string> = {
+  planned: "Planned",
+  received: "Received",
+  approved: "Approved",
+  scheduled: "Scheduled",
+  paid: "Paid",
+  void: "Void",
 };
 
 function todayIsoDate() {
@@ -60,6 +59,11 @@ function dueDateIsoDate(daysFromNow = 30) {
 type VendorBillsConsoleProps = {
   scopedProjectId?: number | null;
 };
+
+function defaultBillStatusFilters(statuses: string[]): string[] {
+  const withoutVoid = statuses.filter((value) => value !== "void");
+  return withoutVoid.length ? withoutVoid : statuses;
+}
 
 export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null }: VendorBillsConsoleProps) {
   const { token, role } = useSharedSessionAuth();
@@ -87,8 +91,18 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [selectedVendorBillId, setSelectedVendorBillId] = useState("");
-  const [billStatusFilters, setBillStatusFilters] = useState<VendorBillStatus[]>(
-    defaultBillStatusFilters,
+  const [billStatuses, setBillStatuses] = useState<string[]>(VENDOR_BILL_STATUSES_FALLBACK);
+  const [billStatusLabels, setBillStatusLabels] = useState<Record<string, string>>(
+    VENDOR_BILL_STATUS_LABELS_FALLBACK,
+  );
+  const [allowedStatusTransitions, setAllowedStatusTransitions] = useState<Record<string, string[]>>(
+    VENDOR_BILL_ALLOWED_STATUS_TRANSITIONS_FALLBACK,
+  );
+  const [createStatusOptions, setCreateStatusOptions] = useState<string[]>(
+    VENDOR_BILL_CREATE_SHORTCUT_STATUSES_FALLBACK,
+  );
+  const [billStatusFilters, setBillStatusFilters] = useState<string[]>(
+    defaultBillStatusFilters(VENDOR_BILL_STATUSES_FALLBACK),
   );
   const [dueFilter, setDueFilter] = useState<"all" | "due_soon" | "overdue">("all");
   const [currentBillPage, setCurrentBillPage] = useState(1);
@@ -98,7 +112,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const [newIssueDate, setNewIssueDate] = useState("");
   const [newDueDate, setNewDueDate] = useState("");
   const [newScheduledFor, setNewScheduledFor] = useState("");
-  const [newStatus, setNewStatus] = useState<VendorBillStatus>("received");
+  const [newStatus, setNewStatus] = useState<string>("planned");
   const [newTotal, setNewTotal] = useState("0.00");
   const [newNotes, setNewNotes] = useState("");
   const [newAllocations, setNewAllocations] = useState<VendorBillAllocationInput[]>([
@@ -115,7 +129,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const [allocations, setAllocations] = useState<VendorBillAllocationInput[]>([
     { budget_line: 0, amount: "", note: "" },
   ]);
-  const [status, setStatus] = useState<VendorBillStatus>("planned");
+  const [status, setStatus] = useState<string>("planned");
 
   const [duplicateCandidates, setDuplicateCandidates] = useState<VendorBillRecord[]>([]);
   const activeVendors = vendors.filter((vendor) => vendor.is_active);
@@ -201,6 +215,9 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     ? [persistedStatus, ...(allowedStatusTransitions[persistedStatus] ?? [])]
         .filter((value, index, source) => source.indexOf(value) === index)
         .filter((value) => value !== "planned")
+    : [];
+  const quickStatusOptions = selectedVendorBill
+    ? allowedStatusTransitions[selectedVendorBill.status] ?? []
     : [];
   const hasUnsavedChanges = useMemo(() => {
     if (!isEditingMode || !selectedVendorBill) {
@@ -378,7 +395,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   }
 
   function statusDisplayLabel(value: VendorBillStatus): string {
-    return statusLabelByValue[value] ?? value;
+    return billStatusLabels[value] ?? value;
   }
 
   function statusBadgeClass(value: VendorBillStatus): string {
@@ -395,6 +412,64 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
         ? current.filter((status) => status !== nextStatus)
         : [...current, nextStatus],
     );
+  }
+
+  async function loadVendorBillPolicy() {
+    try {
+      const response = await fetchVendorBillPolicyContract({
+        baseUrl: normalizedBaseUrl,
+        token,
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok || !payload.data || Array.isArray(payload.data)) {
+        return;
+      }
+      const contract = payload.data as VendorBillPolicyContract;
+      if (
+        !Array.isArray(contract.statuses) ||
+        !contract.statuses.length ||
+        !contract.allowed_status_transitions
+      ) {
+        return;
+      }
+      const normalizedTransitions = contract.statuses.reduce<Record<string, string[]>>(
+        (acc, statusValue) => {
+          const nextStatuses = contract.allowed_status_transitions[statusValue];
+          acc[statusValue] = Array.isArray(nextStatuses) ? nextStatuses : [];
+          return acc;
+        },
+        {},
+      );
+      const shortcuts =
+        Array.isArray(contract.create_shortcut_statuses) && contract.create_shortcut_statuses.length
+          ? contract.create_shortcut_statuses
+          : VENDOR_BILL_CREATE_SHORTCUT_STATUSES_FALLBACK.filter((statusValue) =>
+              contract.statuses.includes(statusValue),
+            );
+      const fallbackCreateStatus =
+        contract.default_create_status || contract.statuses[0] || VENDOR_BILL_STATUSES_FALLBACK[0];
+
+      setBillStatuses(contract.statuses);
+      setBillStatusLabels({
+        ...VENDOR_BILL_STATUS_LABELS_FALLBACK,
+        ...(contract.status_labels || {}),
+      });
+      setAllowedStatusTransitions(normalizedTransitions);
+      setCreateStatusOptions(shortcuts.length ? shortcuts : [fallbackCreateStatus]);
+      setBillStatusFilters((current) => {
+        const retained = current.filter((statusValue) => contract.statuses.includes(statusValue));
+        return retained.length ? retained : defaultBillStatusFilters(contract.statuses);
+      });
+      setNewStatus((current) => {
+        if (contract.statuses.includes(current)) {
+          return current;
+        }
+        return shortcuts[0] || fallbackCreateStatus;
+      });
+      setStatus((current) => (contract.statuses.includes(current) ? current : fallbackCreateStatus));
+    } catch {
+      // Contract load is best-effort; static fallback remains active.
+    }
   }
 
   async function loadDependencies() {
@@ -656,7 +731,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setNewIssueDate(today);
     setNewDueDate(due);
     setNewScheduledFor("");
-    setNewStatus("received");
+    setNewStatus(createStatusOptions[0] ?? billStatuses[0] ?? "planned");
     setNewTotal("0.00");
     setNewNotes("");
     setNewAllocations([{ budget_line: 0, amount: "", note: "" }]);
@@ -803,6 +878,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       return;
     }
     const timer = window.setTimeout(() => {
+      void loadVendorBillPolicy();
       void loadDependencies();
     }, 0);
     return () => window.clearTimeout(timer);
@@ -1249,18 +1325,16 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
         {isEditingMode ? (
           <p>
             Mobile quick actions:
-            <button type="button" onClick={() => handleQuickVendorBillStatus("received")} disabled={!selectedVendorBillId || !canMutateVendorBills}>
-              Received
-            </button>
-            <button type="button" onClick={() => handleQuickVendorBillStatus("approved")} disabled={!selectedVendorBillId || !canMutateVendorBills}>
-              Approved
-            </button>
-            <button type="button" onClick={() => handleQuickVendorBillStatus("paid")} disabled={!selectedVendorBillId || !canMutateVendorBills}>
-              Paid
-            </button>
-            <button type="button" onClick={() => handleQuickVendorBillStatus("void")} disabled={!selectedVendorBillId || !canMutateVendorBills}>
-              Void
-            </button>
+            {quickStatusOptions.map((nextStatus) => (
+              <button
+                key={`quick-status-${nextStatus}`}
+                type="button"
+                onClick={() => handleQuickVendorBillStatus(nextStatus)}
+                disabled={!selectedVendorBillId || !canMutateVendorBills}
+              >
+                {statusDisplayLabel(nextStatus)}
+              </button>
+            ))}
           </p>
         ) : null}
         {isEditingMode ? (

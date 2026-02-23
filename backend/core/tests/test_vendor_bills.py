@@ -104,6 +104,40 @@ class VendorBillTests(TestCase):
         self.assertEqual(response.status_code, 201)
         return response.json()["data"]["id"]
 
+    def test_vendor_bill_contract_requires_authentication(self):
+        response = self.client.get("/api/v1/contracts/vendor-bills/")
+        self.assertEqual(response.status_code, 401)
+
+    def test_vendor_bill_contract_matches_model_transition_policy(self):
+        response = self.client.get(
+            "/api/v1/contracts/vendor-bills/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+
+        expected_statuses = [status for status, _label in VendorBill.Status.choices]
+        expected_labels = {status: label for status, label in VendorBill.Status.choices}
+        expected_transitions = {}
+        for status in expected_statuses:
+            next_statuses = list(VendorBill.ALLOWED_STATUS_TRANSITIONS.get(status, set()))
+            next_statuses.sort(key=lambda value: expected_statuses.index(value))
+            expected_transitions[status] = next_statuses
+        expected_terminal_statuses = [
+            status for status in expected_statuses if not expected_transitions.get(status, [])
+        ]
+
+        self.assertEqual(payload["statuses"], expected_statuses)
+        self.assertEqual(payload["status_labels"], expected_labels)
+        self.assertEqual(payload["default_create_status"], VendorBill.Status.PLANNED)
+        self.assertEqual(
+            payload["create_shortcut_statuses"],
+            [VendorBill.Status.PLANNED, VendorBill.Status.RECEIVED],
+        )
+        self.assertEqual(payload["allowed_status_transitions"], expected_transitions)
+        self.assertEqual(payload["terminal_statuses"], expected_terminal_statuses)
+        self.assertTrue(str(payload["policy_version"]).startswith("2026-02-23.vendor_bills."))
+
     def test_vendor_bill_create_and_project_list(self):
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/vendor-bills/",
