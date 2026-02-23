@@ -1,0 +1,155 @@
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.db.models import Q
+
+User = get_user_model()
+
+
+class ChangeOrder(models.Model):
+    """Post-baseline contract delta request for scope/time/cost changes.
+
+    Business workflow:
+    - Represents change governance after baseline, not a full estimate restart.
+    - Routed through draft -> pending approval -> approved/rejected/void lifecycle.
+    - Approved amount deltas propagate to project contract current and budget CO total.
+
+    Current policy:
+    - Lifecycle control: `user-managed` with status-transition guards.
+    - Visibility: `internal-facing` workflow artifact that may drive client-facing communication.
+    """
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        PENDING_APPROVAL = "pending_approval", "Pending Approval"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        VOID = "void", "Void"
+
+    # Transition-map format:
+    # {from_status: {allowed_to_status_1, allowed_to_status_2, ...}}
+    # Example: `draft -> pending_approval` is allowed because
+    # `Status.PENDING_APPROVAL` is in `ALLOWED_STATUS_TRANSITIONS[Status.DRAFT]`.
+    ALLOWED_STATUS_TRANSITIONS = {
+        Status.DRAFT: {
+            Status.PENDING_APPROVAL,
+            Status.VOID,
+        },
+        Status.PENDING_APPROVAL: {
+            Status.DRAFT,
+            Status.APPROVED,
+            Status.REJECTED,
+            Status.VOID,
+        },
+        Status.APPROVED: {
+            Status.VOID,
+        },
+        Status.REJECTED: {
+            Status.DRAFT,
+            Status.VOID,
+        },
+        Status.VOID: set(),
+    }
+
+    project = models.ForeignKey(
+        "Project",
+        on_delete=models.PROTECT,
+        related_name="change_orders",
+    )
+    # Stable family/thread identifier across revisions within a project.
+    # Intended as a semantic key (not DB/FK id) and may be numeric or string.
+    family_key = models.CharField(max_length=64)
+    revision_number = models.PositiveIntegerField(default=1)
+    title = models.CharField(max_length=255)
+    status = models.CharField(
+        max_length=32,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+    amount_delta = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    days_delta = models.IntegerField(default=0)
+    reason = models.TextField(blank=True)
+    origin_estimate = models.ForeignKey(
+        "Estimate",
+        on_delete=models.PROTECT,
+        related_name="originated_change_orders",
+        null=True,
+        blank=True,
+    )
+    # Explicit parent revision pointer.
+    # This relationship is derivable from (`family_key`, `revision_number - 1`),
+    # but stored directly for audit/replay clarity and parent-chain integrity.
+    previous_change_order = models.ForeignKey(
+        "ChangeOrder",
+        on_delete=models.PROTECT,
+        related_name="revision_children",
+        null=True,
+        blank=True,
+    )
+    requested_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="requested_change_orders",
+    )
+    approved_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="approved_change_orders",
+        null=True,
+        blank=True,
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        unique_together = ("project", "family_key", "revision_number")
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(status="approved", approved_by__isnull=False, approved_at__isnull=False)
+                | ~Q(status="approved"),
+                name="co_approved_requires_actor_and_timestamp",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["project", "family_key"], name="core_changeo_proj_fam_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.project.name} CO-{self.family_key} v{self.revision_number}"
+
+    @classmethod
+    def is_transition_allowed(cls, current_status: str, next_status: str) -> bool:
+        if current_status == next_status:
+            return True
+        return next_status in cls.ALLOWED_STATUS_TRANSITIONS.get(current_status, set())
+
+    def clean(self):
+        errors = {}
+
+        if self.status == self.Status.APPROVED:
+            if self.approved_by_id is None:
+                errors.setdefault("approved_by", []).append(
+                    "approved_by is required when status is approved."
+                )
+            if self.approved_at is None:
+                errors.setdefault("approved_at", []).append(
+                    "approved_at is required when status is approved."
+                )
+
+        if self.pk:
+            previous_status = (
+                type(self).objects.filter(pk=self.pk).values_list("status", flat=True).first()
+            )
+            if previous_status and not self.is_transition_allowed(previous_status, self.status):
+                errors.setdefault("status", []).append(
+                    f"Invalid change-order status transition: {previous_status} -> {self.status}."
+                )
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)

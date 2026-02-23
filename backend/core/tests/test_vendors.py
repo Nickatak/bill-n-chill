@@ -71,6 +71,64 @@ class VendorTests(TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["name"], "Owner Vendor")
 
+    def test_vendor_list_includes_rows_created_by_other_user_in_same_org(self):
+        shared_org = Organization.objects.create(
+            display_name="Shared Vendor Org",
+            slug="shared-vendor-org-tests",
+            created_by=self.user,
+        )
+        OrganizationMembership.objects.update_or_create(
+            user=self.user,
+            defaults={
+                "organization": shared_org,
+                "role": OrganizationMembership.Role.OWNER,
+                "status": OrganizationMembership.Status.ACTIVE,
+            },
+        )
+        OrganizationMembership.objects.update_or_create(
+            user=self.other_user,
+            defaults={
+                "organization": shared_org,
+                "role": OrganizationMembership.Role.PM,
+                "status": OrganizationMembership.Status.ACTIVE,
+            },
+        )
+
+        owner_vendor = Vendor.objects.create(
+            name="Owner Shared Vendor",
+            email="owner-shared@example.com",
+            organization=shared_org,
+            created_by=self.user,
+        )
+        shared_vendor = Vendor.objects.create(
+            name="Other Shared Vendor",
+            email="other-shared@example.com",
+            organization=shared_org,
+            created_by=self.other_user,
+        )
+        isolated_org = Organization.objects.create(
+            display_name="Isolated Vendor Org",
+            slug="isolated-vendor-org-tests",
+            created_by=self.other_user,
+        )
+        isolated_vendor = Vendor.objects.create(
+            name="Isolated Vendor",
+            email="isolated@example.com",
+            organization=isolated_org,
+            created_by=self.other_user,
+        )
+
+        response = self.client.get(
+            "/api/v1/vendors/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        rows = response.json()["data"]
+        returned_ids = {row["id"] for row in rows}
+        self.assertIn(owner_vendor.id, returned_ids)
+        self.assertIn(shared_vendor.id, returned_ids)
+        self.assertNotIn(isolated_vendor.id, returned_ids)
+
     def test_vendor_duplicate_warning_on_create_by_name_or_email(self):
         Vendor.objects.create(
             name="Tile House",
@@ -212,6 +270,30 @@ class VendorTests(TestCase):
         self.assertEqual(payload["vendor_type"], Vendor.VendorType.RETAIL)
         self.assertFalse(payload["is_canonical"])
 
+    def test_vendor_create_assigns_active_organization(self):
+        membership = OrganizationMembership.objects.update_or_create(
+            user=self.user,
+            defaults={
+                "organization": Organization.objects.create(
+                    display_name="Vendor Org",
+                    slug="vendor-org-tests",
+                    created_by=self.user,
+                ),
+                "role": OrganizationMembership.Role.OWNER,
+                "status": OrganizationMembership.Status.ACTIVE,
+            },
+        )[0]
+
+        response = self.client.post(
+            "/api/v1/vendors/",
+            data={"name": "Org Scoped Vendor", "email": "org-scoped@example.com"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        vendor = Vendor.objects.get(id=response.json()["data"]["id"])
+        self.assertEqual(vendor.organization_id, membership.organization_id)
+
     def test_vendor_patch_updates_vendor_type(self):
         vendor = Vendor.objects.create(
             name="Switchable Vendor",
@@ -264,3 +346,21 @@ class VendorTests(TestCase):
         self.assertEqual(data["updated_count"], 1)
         self.assertEqual(data["created_count"], 1)
         self.assertEqual(Vendor.objects.filter(created_by=self.user).count(), 2)
+
+    def test_vendor_csv_import_applies_when_dry_run_string_false(self):
+        response = self.client.post(
+            "/api/v1/vendors/import-csv/",
+            data={
+                "dry_run": "false",
+                "csv_text": "name,vendor_type,email,phone,is_active\nFraming Crew,trade,frame@example.com,555-2222,true\n",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        self.assertEqual(payload["mode"], "apply")
+        self.assertEqual(payload["created_count"], 1)
+        self.assertTrue(
+            Vendor.objects.filter(created_by=self.user, name="Framing Crew").exists()
+        )

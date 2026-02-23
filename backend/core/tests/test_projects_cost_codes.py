@@ -385,6 +385,24 @@ class CostCodeTests(TestCase):
         self.assertEqual(self.code.name, "General Conditions Updated")
         self.assertFalse(self.code.is_active)
 
+    def test_cost_code_csv_import_applies_when_dry_run_string_false(self):
+        response = self.client.post(
+            "/api/v1/cost-codes/import-csv/",
+            data={
+                "dry_run": "false",
+                "csv_text": "code,name,is_active\n03-300,Site Work,true\n",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        self.assertEqual(payload["mode"], "apply")
+        self.assertEqual(payload["created_count"], 1)
+        self.assertTrue(
+            CostCode.objects.filter(created_by=self.user, code="03-300", name="Site Work").exists()
+        )
+
 
 class ProjectFinancialSummaryTests(TestCase):
     def setUp(self):
@@ -426,7 +444,7 @@ class ProjectFinancialSummaryTests(TestCase):
     def _seed_financial_records(self):
         ChangeOrder.objects.create(
             project=self.project,
-            number=1,
+            family_key="1",
             title="Approved CO",
             status=ChangeOrder.Status.APPROVED,
             amount_delta="2000.00",
@@ -437,7 +455,7 @@ class ProjectFinancialSummaryTests(TestCase):
         )
         ChangeOrder.objects.create(
             project=self.project,
-            number=2,
+            family_key="2",
             title="Rejected CO",
             status=ChangeOrder.Status.REJECTED,
             amount_delta="500.00",
@@ -668,7 +686,7 @@ class ReportingPackTests(TestCase):
     def _seed_reporting_records(self):
         ChangeOrder.objects.create(
             project=self.project,
-            number=1,
+            family_key="1",
             title="Approved CO 1",
             status=ChangeOrder.Status.APPROVED,
             amount_delta="300.00",
@@ -679,7 +697,7 @@ class ReportingPackTests(TestCase):
         )
         ChangeOrder.objects.create(
             project=self.project,
-            number=2,
+            family_key="2",
             title="Approved CO 2",
             status=ChangeOrder.Status.APPROVED,
             amount_delta="500.00",
@@ -807,7 +825,7 @@ class ReportingPackTests(TestCase):
         )
         ChangeOrder.objects.create(
             project=other_project,
-            number=1,
+            family_key="1",
             title="Other User CO",
             status=ChangeOrder.Status.APPROVED,
             amount_delta="999.00",
@@ -827,6 +845,7 @@ class ReportingPackTests(TestCase):
 
     def test_attention_feed_returns_actionable_items(self):
         today = timezone.localdate()
+        invoice_issue_date = today - timedelta(days=2)
         overdue_due_date = today - timedelta(days=1)
         due_soon_date = today + timedelta(days=4)
         Invoice.objects.create(
@@ -834,7 +853,7 @@ class ReportingPackTests(TestCase):
             customer=self.project.customer,
             invoice_number="INV-ATTN-1",
             status=Invoice.Status.SENT,
-            issue_date=today,
+            issue_date=invoice_issue_date,
             due_date=overdue_due_date,
             subtotal="250.00",
             total="250.00",
@@ -854,7 +873,7 @@ class ReportingPackTests(TestCase):
         )
         ChangeOrder.objects.create(
             project=self.project,
-            number=21,
+            family_key="21",
             title="Pending Approval CO",
             status=ChangeOrder.Status.PENDING_APPROVAL,
             amount_delta="90.00",
@@ -897,7 +916,7 @@ class ReportingPackTests(TestCase):
         )
         change_order = ChangeOrder.objects.create(
             project=self.project,
-            number=5,
+            family_key="5",
             title="Kitchen Delta",
             status=ChangeOrder.Status.PENDING_APPROVAL,
             amount_delta="250.00",
@@ -1222,3 +1241,40 @@ class RoleHardeningTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.bookkeeping_token.key}",
         )
         self.assertEqual(response.status_code, 201)
+
+    def test_viewer_cannot_mutate_cost_codes_or_vendors(self):
+        cost_code_create = self.client.post(
+            "/api/v1/cost-codes/",
+            data={"code": "09-900", "name": "Blocked for Viewer", "is_active": True},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.viewer_token.key}",
+        )
+        self.assertEqual(cost_code_create.status_code, 403)
+        self.assertEqual(cost_code_create.json()["error"]["code"], "forbidden")
+
+        cost_code_patch = self.client.patch(
+            f"/api/v1/cost-codes/{self.viewer_cost_code.id}/",
+            data={"name": "Should Not Update"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.viewer_token.key}",
+        )
+        self.assertEqual(cost_code_patch.status_code, 403)
+        self.assertEqual(cost_code_patch.json()["error"]["code"], "forbidden")
+
+        vendor_create = self.client.post(
+            "/api/v1/vendors/",
+            data={"name": "Blocked Vendor"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.viewer_token.key}",
+        )
+        self.assertEqual(vendor_create.status_code, 403)
+        self.assertEqual(vendor_create.json()["error"]["code"], "forbidden")
+
+        vendor_patch = self.client.patch(
+            f"/api/v1/vendors/{self.viewer_vendor.id}/",
+            data={"name": "Should Not Update Vendor"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.viewer_token.key}",
+        )
+        self.assertEqual(vendor_patch.status_code, 403)
+        self.assertEqual(vendor_patch.json()["error"]["code"], "forbidden")

@@ -1,4 +1,5 @@
 from core.tests.common import *
+from core.serializers import EstimateWriteSerializer
 
 class EstimateTests(TestCase):
     def setUp(self):
@@ -144,6 +145,156 @@ class EstimateTests(TestCase):
         self.assertEqual(payload["tax_total"], "0.01")
         self.assertEqual(payload["grand_total"], "0.06")
 
+    def test_project_estimates_create_reuses_scope_item_for_normalized_line_identity(self):
+        first = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Scope Identity A",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo and Prep",
+                        "quantity": "1",
+                        "unit": "EA",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(first.status_code, 201)
+
+        second = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Scope Identity B",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "  demo   and prep  ",
+                        "quantity": "2",
+                        "unit": "ea",
+                        "unit_cost": "250",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(second.status_code, 201)
+
+        first_line = EstimateLineItem.objects.get(estimate_id=first.json()["data"]["id"])
+        second_line = EstimateLineItem.objects.get(estimate_id=second.json()["data"]["id"])
+        self.assertIsNotNone(first_line.scope_item_id)
+        self.assertEqual(first_line.scope_item_id, second_line.scope_item_id)
+        self.assertEqual(ScopeItem.objects.count(), 1)
+
+    def test_project_estimates_create_creates_distinct_scope_items_for_different_units(self):
+        first = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Unit Identity A",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Bleach",
+                        "quantity": "1",
+                        "unit": "1gal",
+                        "unit_cost": "20",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(first.status_code, 201)
+
+        second = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Unit Identity B",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "bleach",
+                        "quantity": "1",
+                        "unit": "5gal",
+                        "unit_cost": "80",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(second.status_code, 201)
+
+        first_line = EstimateLineItem.objects.get(estimate_id=first.json()["data"]["id"])
+        second_line = EstimateLineItem.objects.get(estimate_id=second.json()["data"]["id"])
+        self.assertIsNotNone(first_line.scope_item_id)
+        self.assertIsNotNone(second_line.scope_item_id)
+        self.assertNotEqual(first_line.scope_item_id, second_line.scope_item_id)
+        self.assertEqual(ScopeItem.objects.count(), 2)
+
+    def test_project_estimates_create_creates_distinct_scope_items_for_different_cost_codes(self):
+        alt_cost_code = CostCode.objects.create(
+            code="01-200",
+            name="Temporary Facilities",
+            is_active=True,
+            created_by=self.user,
+        )
+
+        first = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "CostCode Identity A",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo setup",
+                        "quantity": "1",
+                        "unit": "ea",
+                        "unit_cost": "100",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(first.status_code, 201)
+
+        second = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "CostCode Identity B",
+                "line_items": [
+                    {
+                        "cost_code": alt_cost_code.id,
+                        "description": "demo setup",
+                        "quantity": "1",
+                        "unit": "ea",
+                        "unit_cost": "100",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(second.status_code, 201)
+
+        first_line = EstimateLineItem.objects.get(estimate_id=first.json()["data"]["id"])
+        second_line = EstimateLineItem.objects.get(estimate_id=second.json()["data"]["id"])
+        self.assertIsNotNone(first_line.scope_item_id)
+        self.assertIsNotNone(second_line.scope_item_id)
+        self.assertNotEqual(first_line.scope_item_id, second_line.scope_item_id)
+        self.assertEqual(ScopeItem.objects.count(), 2)
+
     def test_project_estimates_create_requires_title(self):
         missing = self.client.post(
             f"/api/v1/projects/{self.project.id}/estimates/",
@@ -283,6 +434,49 @@ class EstimateTests(TestCase):
         rows = response.json()["data"]
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["title"], "Mine")
+
+    def test_estimate_status_write_contract_distinguishes_void_from_archived(self):
+        archived_serializer = EstimateWriteSerializer(
+            data={
+                "title": "Contract Test",
+                "status": "archived",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo line",
+                        "quantity": "1",
+                        "unit": "ea",
+                        "unit_cost": "100.00",
+                        "markup_percent": "0.00",
+                    }
+                ],
+            }
+        )
+        self.assertFalse(archived_serializer.is_valid())
+        self.assertIn("status", archived_serializer.errors)
+        self.assertIn(
+            "Archived status is system-controlled and cannot be set directly.",
+            archived_serializer.errors["status"],
+        )
+
+        void_serializer = EstimateWriteSerializer(
+            data={
+                "title": "Contract Test",
+                "status": "void",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo line",
+                        "quantity": "1",
+                        "unit": "ea",
+                        "unit_cost": "100.00",
+                        "markup_percent": "0.00",
+                    }
+                ],
+            }
+        )
+        self.assertTrue(void_serializer.is_valid(), void_serializer.errors)
+        self.assertEqual(void_serializer.validated_data["status"], Estimate.Status.VOID)
 
     def test_estimate_clone_creates_next_version(self):
         create = self.client.post(
@@ -471,6 +665,26 @@ class EstimateTests(TestCase):
         self.assertEqual(cloned["status"], Estimate.Status.DRAFT)
         self.assertEqual(cloned["title"], source.title)
 
+    def test_estimate_clone_allowed_when_source_is_void(self):
+        source = Estimate.objects.create(
+            project=self.project,
+            version=1,
+            status=Estimate.Status.VOID,
+            title="Voided Source",
+            created_by=self.user,
+        )
+
+        clone = self.client.post(
+            f"/api/v1/estimates/{source.id}/clone-version/",
+            data={},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(clone.status_code, 201)
+        cloned = clone.json()["data"]
+        self.assertEqual(cloned["status"], Estimate.Status.DRAFT)
+        self.assertEqual(cloned["title"], source.title)
+
     def test_estimate_status_transition_validates_allowed_paths(self):
         create = self.client.post(
             f"/api/v1/projects/{self.project.id}/estimates/",
@@ -586,11 +800,11 @@ class EstimateTests(TestCase):
         self.assertEqual(convert.json()["meta"]["conversion_status"], "already_converted")
         self.assertEqual(Budget.objects.filter(source_estimate_id=estimate_id).count(), 1)
 
-    def test_estimate_status_transition_allows_sent_to_archived(self):
+    def test_estimate_status_transition_allows_sent_to_void(self):
         create = self.client.post(
             f"/api/v1/projects/{self.project.id}/estimates/",
             data={
-                "title": "Archived Block",
+                "title": "Void Block",
                 "line_items": [
                     {
                         "cost_code": self.cost_code.id,
@@ -615,14 +829,50 @@ class EstimateTests(TestCase):
         )
         self.assertEqual(sent.status_code, 200)
 
-        archived = self.client.patch(
+        voided = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"status": "void"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(voided.status_code, 200)
+        self.assertEqual(voided.json()["data"]["status"], Estimate.Status.VOID)
+
+        estimate = Estimate.objects.get(id=estimate_id)
+        self.assertEqual(estimate.status, Estimate.Status.VOID)
+
+    def test_estimate_status_transition_rejects_user_archived_patch(self):
+        create = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Archived Patch Block",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo and prep",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        estimate_id = create.json()["data"]["id"]
+
+        response = self.client.patch(
             f"/api/v1/estimates/{estimate_id}/",
             data={"status": "archived"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(archived.status_code, 200)
-        self.assertEqual(archived.json()["data"]["status"], Estimate.Status.ARCHIVED)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["status"][0],
+            "Archived status is system-controlled and cannot be set directly.",
+        )
 
     def test_estimate_status_transition_creates_audit_events(self):
         create = self.client.post(

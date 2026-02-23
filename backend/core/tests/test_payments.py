@@ -1,3 +1,5 @@
+from django.core.exceptions import ValidationError
+
 from core.tests.common import *
 
 
@@ -89,6 +91,7 @@ class PaymentTests(TestCase):
             status=status,
             issue_date="2026-02-13",
             due_date="2026-03-15",
+            scheduled_for="2026-02-25" if status == VendorBill.Status.SCHEDULED else None,
             total=total,
             balance_due=total,
             created_by=self.user,
@@ -124,6 +127,12 @@ class PaymentTests(TestCase):
         rows = list_response.json()["data"]
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["project"], self.project.id)
+        record = PaymentRecord.objects.get(payment_id=payload["id"])
+        self.assertEqual(record.event_type, PaymentRecord.EventType.CREATED)
+        self.assertEqual(record.capture_source, PaymentRecord.CaptureSource.MANUAL_UI)
+        self.assertIsNone(record.from_status)
+        self.assertEqual(record.to_status, Payment.Status.PENDING)
+        self.assertEqual(record.recorded_by_id, self.user.id)
 
     def test_payment_list_scoped_by_project_and_user(self):
         self._create_payment()
@@ -176,6 +185,54 @@ class PaymentTests(TestCase):
         )
         self.assertEqual(to_void.status_code, 200)
         self.assertEqual(to_void.json()["data"]["status"], "void")
+
+    def test_payment_failed_only_transitions_to_void_and_void_is_terminal(self):
+        payment_id = self._create_payment(status="pending")
+
+        to_failed = self.client.patch(
+            f"/api/v1/payments/{payment_id}/",
+            data={"status": "failed"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_failed.status_code, 200)
+        self.assertEqual(to_failed.json()["data"]["status"], "failed")
+
+        failed_to_pending = self.client.patch(
+            f"/api/v1/payments/{payment_id}/",
+            data={"status": "pending"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(failed_to_pending.status_code, 400)
+        self.assertEqual(failed_to_pending.json()["error"]["code"], "validation_error")
+
+        failed_to_settled = self.client.patch(
+            f"/api/v1/payments/{payment_id}/",
+            data={"status": "settled"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(failed_to_settled.status_code, 400)
+        self.assertEqual(failed_to_settled.json()["error"]["code"], "validation_error")
+
+        to_void = self.client.patch(
+            f"/api/v1/payments/{payment_id}/",
+            data={"status": "void"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_void.status_code, 200)
+        self.assertEqual(to_void.json()["data"]["status"], "void")
+
+        void_to_pending = self.client.patch(
+            f"/api/v1/payments/{payment_id}/",
+            data={"status": "pending"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(void_to_pending.status_code, 400)
+        self.assertEqual(void_to_pending.json()["error"]["code"], "validation_error")
 
     def test_payment_patch_updates_direction_method_status_reference(self):
         payment_id = self._create_payment(status="pending", direction="inbound")
@@ -332,6 +389,56 @@ class PaymentTests(TestCase):
         self.assertEqual(to_void.status_code, 200)
         invoice.refresh_from_db()
         self.assertEqual(str(invoice.balance_due), "500.00")
+
+    def test_payment_records_append_for_status_change_and_allocation(self):
+        payment_id = self._create_payment(status="pending", amount="500.00", direction="inbound")
+        invoice = self._create_invoice(total="500.00")
+
+        to_settled = self.client.patch(
+            f"/api/v1/payments/{payment_id}/",
+            data={"status": "settled"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_settled.status_code, 200)
+
+        created = self.client.post(
+            f"/api/v1/payments/{payment_id}/allocate/",
+            data={
+                "allocations": [
+                    {"target_type": "invoice", "target_id": invoice.id, "applied_amount": "200.00"}
+                ]
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(created.status_code, 201)
+
+        events = list(
+            PaymentRecord.objects.filter(payment_id=payment_id).order_by("created_at", "id")
+        )
+        self.assertEqual(len(events), 3)
+        self.assertEqual(events[0].event_type, PaymentRecord.EventType.CREATED)
+        self.assertEqual(events[1].event_type, PaymentRecord.EventType.STATUS_CHANGED)
+        self.assertEqual(events[1].from_status, Payment.Status.PENDING)
+        self.assertEqual(events[1].to_status, Payment.Status.SETTLED)
+        self.assertEqual(events[2].event_type, PaymentRecord.EventType.ALLOCATION_APPLIED)
+        self.assertEqual(events[2].capture_source, PaymentRecord.CaptureSource.MANUAL_UI)
+        self.assertEqual(events[2].metadata_json["allocation_count"], 1)
+        self.assertEqual(events[2].metadata_json["allocations"][0]["target_type"], "invoice")
+        self.assertEqual(events[2].metadata_json["allocations"][0]["target_id"], invoice.id)
+        self.assertEqual(events[2].metadata_json["allocations"][0]["applied_amount"], "200.00")
+
+    def test_payment_record_is_immutable(self):
+        payment_id = self._create_payment(status="pending", amount="500.00", direction="inbound")
+        record = PaymentRecord.objects.filter(payment_id=payment_id).first()
+        self.assertIsNotNone(record)
+
+        record.note = "mutate"
+        with self.assertRaises(ValidationError):
+            record.save()
+        with self.assertRaises(ValidationError):
+            record.delete()
 
     def test_payment_validates_required_fields_and_positive_amount(self):
         missing_fields = self.client.post(

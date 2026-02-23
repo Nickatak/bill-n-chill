@@ -6,7 +6,18 @@ User = get_user_model()
 
 
 class FinancialAuditEvent(models.Model):
-    """Immutable project-scoped audit event for money-impacting actions."""
+    """DEPRECATED: Immutable project-scoped financial activity index row.
+
+    Deprecation status:
+    - This model is currently retained for timeline/index read paths and backward compatibility.
+    - It is not the canonical source of financial truth.
+    - Canonical financial replay/forensics should come from domain-specific immutable
+      capture models (for example `Budget`, `ChangeOrderSnapshot`) and any future
+      workflow-specific immutable capture artifacts.
+    - Planned direction is to remove this table after timeline/reporting paths are
+      fully migrated to domain-specific capture models.
+    - Do not add new product dependencies or expand usage of this model.
+    """
 
     class EventType(models.TextChoices):
         ESTIMATE_STATUS_CHANGED = "estimate_status_changed", "Estimate Status Changed"

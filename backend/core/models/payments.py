@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Sum
 
@@ -8,7 +9,20 @@ User = get_user_model()
 
 
 class Payment(models.Model):
-    """Recorded money movement for a project (AR inbound or AP outbound)."""
+    """Recorded money movement for a project (AR inbound or AP outbound).
+
+    Business workflow:
+    - Represents a single cash movement entry, independent from specific invoice/bill rows.
+    - `direction` determines valid allocation lane (`inbound` to invoices, `outbound` to vendor bills).
+    - Can be partially allocated across multiple targets after settlement.
+    - `created_by` captures who created/owns the payment record.
+
+    Current policy:
+    - Lifecycle control: `user-managed` with transition rules enforced in payment flows.
+    - Visibility: `internal-facing` operational ledger object.
+    - Immutable event trail is currently captured via `FinancialAuditEvent`;
+      dedicated payment capture objects are planned.
+    """
 
     class Direction(models.TextChoices):
         INBOUND = "inbound", "Inbound"
@@ -27,6 +41,17 @@ class Payment(models.Model):
         SETTLED = "settled", "Settled"
         FAILED = "failed", "Failed"
         VOID = "void", "Void"
+
+    # Transition-map format:
+    # {from_status: {allowed_to_status_1, allowed_to_status_2, ...}}
+    # Example: `pending -> settled` is allowed because
+    # `Status.SETTLED` is in `ALLOWED_STATUS_TRANSITIONS[Status.PENDING]`.
+    ALLOWED_STATUS_TRANSITIONS = {
+        Status.PENDING: {Status.SETTLED, Status.FAILED, Status.VOID},
+        Status.SETTLED: {Status.VOID},
+        Status.FAILED: {Status.VOID},
+        Status.VOID: set(),
+    }
 
     project = models.ForeignKey(
         "Project",
@@ -55,6 +80,12 @@ class Payment(models.Model):
     class Meta:
         ordering = ["-payment_date", "-created_at"]
 
+    @classmethod
+    def is_transition_allowed(cls, current_status: str, next_status: str) -> bool:
+        if current_status == next_status:
+            return True
+        return next_status in cls.ALLOWED_STATUS_TRANSITIONS.get(current_status, set())
+
     @property
     def allocated_total(self) -> Decimal:
         return (
@@ -67,12 +98,42 @@ class Payment(models.Model):
         remainder = Decimal(str(self.amount)) - self.allocated_total
         return remainder if remainder > Decimal("0") else Decimal("0")
 
+    def clean(self):
+        errors = {}
+
+        if self.pk:
+            previous_status = (
+                type(self).objects.filter(pk=self.pk).values_list("status", flat=True).first()
+            )
+            if previous_status and not self.is_transition_allowed(previous_status, self.status):
+                errors.setdefault("status", []).append(
+                    f"Invalid payment status transition: {previous_status} -> {self.status}."
+                )
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
     def __str__(self) -> str:
         return f"{self.project.name} {self.direction} {self.amount}"
 
 
 class PaymentAllocation(models.Model):
-    """Applied amount from one payment to one invoice or vendor bill."""
+    """Applied amount from one payment to one invoice or vendor bill.
+
+    Business workflow:
+    - Allocation join row attributing part of a payment to a concrete AR/AP target.
+    - Supports split allocations from one payment across multiple targets.
+    - Drives recalculation of target balances and payment unapplied remainder.
+    - Exactly one target FK is expected based on `target_type`.
+
+    Current policy:
+    - Lifecycle control: `system-managed` via allocation endpoint write paths.
+    - Visibility: `internal-facing` reconciliation artifact.
+    """
 
     class TargetType(models.TextChoices):
         INVOICE = "invoice", "Invoice"

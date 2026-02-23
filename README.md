@@ -1,18 +1,17 @@
 # bill-n-chill
 
-`bill-n-chill` is an exploratory full-stack project using:
+`bill-n-chill` is a full-stack construction finance workflow app using:
 
 - Backend: Django + Django REST Framework (DRF)
 - Frontend: Next.js
 
-## Project Goals
+## Current Stack
 
-- Build a clean API-first backend with DRF.
-- Build a fast, modern frontend with Next.js.
-- Keep backend and frontend loosely coupled for independent iteration.
-- Establish a structure that supports local development first, then production deployment.
+- Backend: Django + Django REST Framework
+- Frontend: Next.js
+- Database: MySQL (local via Docker Compose)
 
-## Architecture (High Level)
+## Architecture (High-Level)
 
 - `backend` handles business logic, authentication, persistence, and API endpoints.
 - `frontend` handles UI rendering, routing, and API consumption.
@@ -22,39 +21,19 @@
 Next.js App  <----HTTP/JSON---->  Django/DRF API  <---->  Database
 ```
 
-## Suggested Repository Layout
+## Backend Domain Layout
 
-```text
-bill-n-chill/
-  backend/         # Django project + DRF apps
-  frontend/        # Next.js app
-  docs/            # Additional project documentation
-  README.md
-```
+- `backend/core/models/operations`: project/org/role/cost-code/vendor operational models
+- `backend/core/models/estimating`: estimate authoring + estimate lines
+- `backend/core/models/change_orders`: change-order workflow models
+- `backend/core/models/accounts_receivable`: invoice + invoice lines
+- `backend/core/models/accounts_payable`: vendor bill + allocations
+- `backend/core/models/financial_auditing`: immutable snapshots/events and canonical scope identity
 
-## Backend Plan (Django + DRF)
+## Local Setup
 
-- Initialize Django project in `backend/`.
-- Add DRF and core dependencies.
-- Set up app modules by domain (example: `users`, `projects`, `tasks`).
-- Add API versioning (`/api/v1/...`).
-- Configure auth strategy (session + token/JWT, depending on product needs).
-- Add `pytest` or Django test suite from day one.
-
-## Frontend Plan (Next.js)
-
-- Initialize Next.js app in `frontend/`.
-- Use `app/` router.
-- Add API client layer (`lib/api.ts`) to centralize backend calls.
-- Organize UI by feature/domain where possible.
-- Add linting and formatting early.
-
-## Local Development Strategy
-
-- Run backend and frontend independently during development.
-- Run MySQL in Docker for consistent local persistence.
-- Use environment variables for API base URLs and secrets.
-- Enable CORS in Django for local frontend origin.
+- Use `docs/setup.md` for full backend/frontend setup and run steps.
+- Use `docs/api.md` and `docs/domain-model.md` as the current contract references.
 
 ## Orchestration Contract
 
@@ -74,13 +53,6 @@ Stable service names for overrides:
 - `backend`
 - `db`
 
-## Recommended First Milestones
-
-1. Scaffold both apps (`backend/` and `frontend/`).
-2. Add health endpoint in DRF (`GET /api/v1/health/`).
-3. Render a Next.js home page that calls and displays health status.
-4. Add container/dev scripts once the first end-to-end request works.
-
 ## Documentation Roadmap
 
 - `docs/setup.md`: local setup instructions.
@@ -98,4 +70,8 @@ Stable service names for overrides:
 
 ## Notes
 
-This file is intentionally lightweight and practical. As implementation begins, move decisions from "plan" to concrete docs in `docs/`.
+This file is intentionally lightweight and practical; detailed behavior/contracts live in `docs/`.
+
+Current implementation state and active review queue are tracked in:
+- `HANDOFF.md`
+- `work/for_me.md`

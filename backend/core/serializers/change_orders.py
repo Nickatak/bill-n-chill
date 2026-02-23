@@ -37,7 +37,7 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
     def get_is_latest_revision(self, obj) -> bool:
         return not ChangeOrder.objects.filter(
             project=obj.project,
-            number=obj.number,
+            family_key=obj.family_key,
             revision_number__gt=obj.revision_number,
         ).exists()
 
@@ -51,7 +51,7 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "project",
-            "number",
+            "family_key",
             "revision_number",
             "title",
             "status",
@@ -59,8 +59,7 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
             "days_delta",
             "reason",
             "origin_estimate",
-            "origin_estimate_version",
-            "supersedes_change_order",
+            "previous_change_order",
             "requested_by",
             "requested_by_email",
             "approved_by",
@@ -75,10 +74,9 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "project",
-            "number",
+            "family_key",
             "revision_number",
-            "origin_estimate_version",
-            "supersedes_change_order",
+            "previous_change_order",
             "requested_by",
             "requested_by_email",
             "approved_by",

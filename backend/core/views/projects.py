@@ -32,26 +32,6 @@ from core.serializers import (
     ProjectSerializer,
 )
 
-ALLOWED_PROJECT_STATUS_TRANSITIONS = {
-    Project.Status.PROSPECT: {
-        Project.Status.ACTIVE,
-        Project.Status.CANCELLED,
-    },
-    Project.Status.ACTIVE: {
-        Project.Status.ON_HOLD,
-        Project.Status.COMPLETED,
-        Project.Status.CANCELLED,
-    },
-    Project.Status.ON_HOLD: {
-        Project.Status.ACTIVE,
-        Project.Status.COMPLETED,
-        Project.Status.CANCELLED,
-    },
-    Project.Status.COMPLETED: set(),
-    Project.Status.CANCELLED: set(),
-}
-
-
 def _parse_optional_date(value: str):
     if not value:
         return None, None
@@ -171,7 +151,7 @@ def _build_project_financial_summary_data(project: Project, user):
             "records": [
                 {
                     "id": row.id,
-                    "label": f"CO-{row.number}",
+                    "label": f"CO-{row.family_key}",
                     "status": row.status,
                     "amount": f"{row.amount_delta:.2f}",
                     "detail_endpoint": f"/api/v1/change-orders/{row.id}/",
@@ -316,8 +296,7 @@ def project_detail_view(request, project_id: int):
         next_status = request.data.get("status")
         current_status = project.status
         if next_status != current_status:
-            allowed_statuses = ALLOWED_PROJECT_STATUS_TRANSITIONS.get(current_status, set())
-            if next_status not in allowed_statuses:
+            if not Project.is_transition_allowed(current_status, next_status):
                 return Response(
                     {
                         "error": {
@@ -573,7 +552,7 @@ def change_impact_summary_view(request):
     project_map = {}
     total_amount = Decimal("0")
     total_count = 0
-    for row in approved_rows.order_by("project_id", "number", "revision_number"):
+    for row in approved_rows.order_by("project_id", "family_key", "revision_number"):
         total_amount += row.amount_delta
         total_count += 1
         project_bucket = project_map.setdefault(
@@ -673,7 +652,7 @@ def attention_feed_view(request):
             {
                 "kind": "change_order_pending_approval",
                 "severity": "medium",
-                "label": f"CO-{row.number} pending approval",
+                "label": f"CO-{row.family_key} pending approval",
                 "detail": f"{row.title} | amount delta {row.amount_delta}",
                 "project_id": row.project_id,
                 "project_name": row.project.name,
@@ -774,13 +753,13 @@ def quick_jump_search_view(request):
 
     change_orders = ChangeOrder.objects.filter(requested_by=request.user).select_related("project")
     for row in change_orders:
-        candidate = f"co-{row.number} v{row.revision_number} {row.title or ''}".lower()
+        candidate = f"co-{row.family_key} v{row.revision_number} {row.title or ''}".lower()
         if query_lower in candidate or query_lower in str(row.id):
             items.append(
                 {
                     "kind": "change_order",
                     "record_id": row.id,
-                    "label": f"CO-{row.number} v{row.revision_number}",
+                    "label": f"CO-{row.family_key} v{row.revision_number}",
                     "sub_label": f"{row.title} ({row.status})",
                     "project_id": row.project_id,
                     "project_name": row.project.name,

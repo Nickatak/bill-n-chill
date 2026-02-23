@@ -6,6 +6,7 @@ from core.models import Estimate, EstimateLineItem, EstimateStatusEvent
 
 
 class EstimateLineItemSerializer(serializers.ModelSerializer):
+    scope_item = serializers.IntegerField(source="scope_item_id", read_only=True)
     cost_code_code = serializers.CharField(source="cost_code.code", read_only=True)
     cost_code_name = serializers.CharField(source="cost_code.name", read_only=True)
 
@@ -14,6 +15,7 @@ class EstimateLineItemSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "estimate",
+            "scope_item",
             "cost_code",
             "cost_code_code",
             "cost_code_name",
@@ -108,8 +110,7 @@ class EstimateWriteSerializer(serializers.Serializer):
         return trimmed
 
     def validate_status(self, value: str) -> str:
-        allow_archived_status = bool(self.context.get("allow_archived_status", False))
-        if value == Estimate.Status.ARCHIVED and not allow_archived_status:
+        if value == Estimate.Status.ARCHIVED:
             raise serializers.ValidationError(
                 "Archived status is system-controlled and cannot be set directly."
             )

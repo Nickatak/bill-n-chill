@@ -466,3 +466,91 @@ class VendorBillTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["error"]["code"], "validation_error")
+
+    def test_vendor_bill_status_transitions_create_snapshots_for_all_captured_statuses(self):
+        vendor_bill_id = self._create_vendor_bill(total="300.00")
+
+        received = self.client.patch(
+            f"/api/v1/vendor-bills/{vendor_bill_id}/",
+            data={"status": "received"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(received.status_code, 200)
+
+        approved = self.client.patch(
+            f"/api/v1/vendor-bills/{vendor_bill_id}/",
+            data={
+                "status": "approved",
+                "allocations": [
+                    {"budget_line": self.budget_line.id, "amount": "300.00", "note": "Full alloc"}
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(approved.status_code, 200)
+
+        scheduled = self.client.patch(
+            f"/api/v1/vendor-bills/{vendor_bill_id}/",
+            data={"status": "scheduled", "scheduled_for": "2026-02-25"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(scheduled.status_code, 200)
+
+        paid = self.client.patch(
+            f"/api/v1/vendor-bills/{vendor_bill_id}/",
+            data={"status": "paid"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(paid.status_code, 200)
+
+        voided = self.client.patch(
+            f"/api/v1/vendor-bills/{vendor_bill_id}/",
+            data={"status": "void"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(voided.status_code, 200)
+
+        snapshots = VendorBillSnapshot.objects.filter(vendor_bill_id=vendor_bill_id).order_by("created_at", "id")
+        self.assertEqual(snapshots.count(), 5)
+        self.assertEqual(
+            list(snapshots.values_list("capture_status", flat=True)),
+            ["received", "approved", "scheduled", "paid", "void"],
+        )
+        self.assertTrue(all(snapshot.acted_by_id == self.user.id for snapshot in snapshots))
+
+    def test_vendor_bill_snapshot_payload_captures_allocation_and_context(self):
+        vendor_bill_id = self._create_vendor_bill(total="200.00")
+
+        self.client.patch(
+            f"/api/v1/vendor-bills/{vendor_bill_id}/",
+            data={"status": "received"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.client.patch(
+            f"/api/v1/vendor-bills/{vendor_bill_id}/",
+            data={
+                "status": "approved",
+                "allocations": [
+                    {"budget_line": self.budget_line.id, "amount": "200.00", "note": "Approved alloc"}
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+
+        snapshot = VendorBillSnapshot.objects.filter(
+            vendor_bill_id=vendor_bill_id,
+            capture_status=VendorBillSnapshot.CaptureStatus.APPROVED,
+        ).latest("id")
+        self.assertEqual(snapshot.snapshot_json["vendor_bill"]["status"], "approved")
+        self.assertEqual(snapshot.snapshot_json["vendor_bill"]["total"], "200.00")
+        self.assertEqual(snapshot.snapshot_json["decision_context"]["previous_status"], "received")
+        self.assertEqual(snapshot.snapshot_json["decision_context"]["capture_status"], "approved")
+        self.assertEqual(len(snapshot.snapshot_json["allocations"]), 1)
+        self.assertEqual(snapshot.snapshot_json["allocations"][0]["budget_line_id"], self.budget_line.id)

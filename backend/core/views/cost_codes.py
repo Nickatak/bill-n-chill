@@ -8,7 +8,7 @@ from rest_framework.response import Response
 
 from core.models import CostCode
 from core.serializers import CostCodeSerializer
-from core.views.helpers import _ensure_primary_membership, _role_gate_error_payload
+from core.views.helpers import _ensure_primary_membership, _parse_request_bool, _role_gate_error_payload
 
 
 def _cost_code_scope_filter(user):
@@ -27,6 +27,10 @@ def cost_codes_list_create_view(request):
         rows = CostCode.objects.filter(scope_filter).order_by("code", "name")
         return Response({"data": CostCodeSerializer(rows, many=True).data})
 
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    if permission_error:
+        return Response(permission_error, status=403)
+
     serializer = CostCodeSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     membership = _ensure_primary_membership(request.user)
@@ -40,6 +44,10 @@ def cost_codes_list_create_view(request):
 @api_view(["PATCH"])
 @permission_classes([IsAuthenticated])
 def cost_code_detail_view(request, cost_code_id: int):
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    if permission_error:
+        return Response(permission_error, status=403)
+
     scope_filter = _cost_code_scope_filter(request.user)
     try:
         row = CostCode.objects.get(scope_filter, id=cost_code_id)
@@ -82,7 +90,7 @@ def cost_codes_import_csv_view(request):
     membership = _ensure_primary_membership(request.user)
 
     csv_text = request.data.get("csv_text", "")
-    dry_run = bool(request.data.get("dry_run", True))
+    dry_run = _parse_request_bool(request.data.get("dry_run", True), default=True)
     if not csv_text or not str(csv_text).strip():
         return Response(
             {
@@ -232,5 +240,3 @@ def cost_codes_import_csv_view(request):
             }
         }
     )
-    scope_filter = _cost_code_scope_filter(request.user)
-    membership = _ensure_primary_membership(request.user)

@@ -7,7 +7,7 @@
 	local-test local-test-backend local-test-frontend local-build local-lint local-clean \
 	replace-backend replace-frontend replace-app \
 	docker-build docker-up docker-down docker-logs docker-ps docker-config docker-seed docker-migrate docker-reset-fresh \
-	db-up db-down db-logs db-reset \
+	db-up db-down db-logs db-reset db-grant-test-db-perms \
 	docker-prod-build docker-prod-up docker-prod-down docker-prod-logs docker-prod-ps docker-prod-config docker-prod-seed \
 	db-prod-up db-prod-down db-prod-logs db-prod-reset
 
@@ -55,6 +55,7 @@ help:
 	@echo "  make docker-reset-fresh    - Destructive DB flush + Bob demo reseed (dev DB)"
 	@echo "  make db-up                 - Start only MySQL container (for local host workflow)"
 	@echo "  make db-down               - Stop only MySQL container"
+	@echo "  make db-grant-test-db-perms - Grant MySQL CREATE/DROP perms for Django test DBs"
 	@echo "  make db-reset              - Drop dev DB volume and recreate MySQL container"
 	@echo "  make docker-seed           - Seed Bob demo data into dev MySQL database"
 	@echo ""
@@ -222,6 +223,9 @@ db-logs: local-env-local
 db-reset: local-env-local
 	$(DEV_COMPOSE) down -v --remove-orphans
 	$(DEV_COMPOSE) up -d $(DB_SERVICE)
+
+db-grant-test-db-perms: local-env-local
+	$(DEV_COMPOSE) exec -T $(DB_SERVICE) sh -lc 'mysql -uroot -p"$$MYSQL_ROOT_PASSWORD" -e "GRANT CREATE, DROP ON *.* TO '\''$$MYSQL_USER'\''@'\''%'\''; GRANT ALL PRIVILEGES ON test_bill_n_chill.* TO '\''$$MYSQL_USER'\''@'\''%'\''; FLUSH PRIVILEGES;"'
 
 # ============================================================================
 # DOCKER PROD-LIKE (.env.prod)

@@ -458,7 +458,7 @@ class Command(BaseCommand):
 
         change_order, _ = ChangeOrder.objects.get_or_create(
             project=project,
-            number=1,
+            family_key="1",
             defaults={
                 "title": "Trim upgrade",
                 "status": ChangeOrder.Status.APPROVED,
@@ -495,7 +495,7 @@ class Command(BaseCommand):
 
         voided_change_order, _ = ChangeOrder.objects.get_or_create(
             project=project,
-            number=2,
+            family_key="2",
             defaults={
                 "title": "Owner canceled fixture relocation",
                 "status": ChangeOrder.Status.VOID,
@@ -860,7 +860,7 @@ class Command(BaseCommand):
         for idx, (status, _) in enumerate(ChangeOrder.Status.choices, start=1):
             scoped_change_order, _ = ChangeOrder.objects.get_or_create(
                 project=project,
-                number=100 + idx,
+                family_key=str(100 + idx),
                 defaults={
                     "title": f"Status Coverage CO ({status})",
                     "status": status,
@@ -868,6 +868,8 @@ class Command(BaseCommand):
                     "days_delta": idx,
                     "reason": f"Seeded change order in status {status}.",
                     "requested_by": user,
+                    "approved_by": user if status == ChangeOrder.Status.APPROVED else None,
+                    "approved_at": timezone.now() if status == ChangeOrder.Status.APPROVED else None,
                 },
             )
             scoped_change_order.title = f"Status Coverage CO ({status})"
@@ -1134,7 +1136,7 @@ class Command(BaseCommand):
             to_status=ChangeOrder.Status.APPROVED,
             amount=change_order.amount_delta,
             note="Change order approved.",
-            metadata={"number": change_order.number},
+            metadata={"family_key": change_order.family_key},
         )
         self._audit_once(
             project=project,
@@ -1146,7 +1148,7 @@ class Command(BaseCommand):
             to_status=ChangeOrder.Status.VOID,
             amount=voided_change_order.amount_delta,
             note="Change order voided before approval.",
-            metadata={"number": voided_change_order.number},
+            metadata={"family_key": voided_change_order.family_key},
         )
         self._audit_once(
             project=project,

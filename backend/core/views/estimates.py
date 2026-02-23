@@ -25,7 +25,6 @@ from core.views.helpers import (
     _record_financial_audit_event,
     _record_estimate_status_event,
     _role_gate_error_payload,
-    _validate_estimate_status_transition,
     _validate_project_for_user,
 )
 
@@ -67,7 +66,7 @@ def _archive_estimate_family(*, project, user, title, exclude_ids, note):
         .exclude(status=Estimate.Status.ARCHIVED)
     )
     for candidate in candidates:
-        if not _validate_estimate_status_transition(
+        if not Estimate.is_transition_allowed(
             current_status=candidate.status,
             next_status=Estimate.Status.ARCHIVED,
         ):
@@ -290,7 +289,6 @@ def estimate_detail_view(request, estimate_id: int):
     serializer = EstimateWriteSerializer(
         data=request.data,
         partial=True,
-        context={"allow_archived_status": True},
     )
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
@@ -326,7 +324,7 @@ def estimate_detail_view(request, estimate_id: int):
     status_changing = "status" in data
     next_status = data.get("status", estimate.status)
 
-    if status_changing and not _validate_estimate_status_transition(
+    if status_changing and not Estimate.is_transition_allowed(
         current_status=estimate.status,
         next_status=next_status,
     ):
@@ -458,16 +456,17 @@ def estimate_clone_version_view(request, estimate_id: int):
     if estimate.status not in {
         Estimate.Status.SENT,
         Estimate.Status.REJECTED,
+        Estimate.Status.VOID,
         Estimate.Status.ARCHIVED,
     }:
         return Response(
             {
                 "error": {
                     "code": "validation_error",
-                    "message": "Revisions can only be created from sent, rejected, or voided estimates. Draft estimates can be edited directly in the estimate viewer.",
+                    "message": "Revisions can only be created from sent, rejected, voided, or archived estimates. Draft estimates can be edited directly in the estimate viewer.",
                     "fields": {
                         "status": [
-                            "Only sent, rejected, or voided estimates can create revisions. Edit draft estimates directly."
+                            "Only sent, rejected, voided, or archived estimates can create revisions. Edit draft estimates directly."
                         ]
                     },
                 }

@@ -26,6 +26,7 @@ from core.serializers.invoices import (
     InvoiceLineItemInputSerializer,
     InvoiceLineSerializer,
     InvoiceScopeOverrideSerializer,
+    InvoiceStatusEventSerializer,
     InvoiceSerializer,
     InvoiceWriteSerializer,
 )
@@ -90,6 +91,7 @@ __all__ = [
     "InvoiceLineItemInputSerializer",
     "InvoiceWriteSerializer",
     "InvoiceScopeOverrideSerializer",
+    "InvoiceStatusEventSerializer",
     "PaymentSerializer",
     "PaymentWriteSerializer",
     "PaymentAllocationSerializer",

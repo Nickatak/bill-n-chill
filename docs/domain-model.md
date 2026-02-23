@@ -10,18 +10,31 @@ Define the core construction and billing entities for the initial bill-n-chill p
 - Explicit lifecycle states for financial records.
 - Immutable snapshots for approved baselines.
 - Money relationships are traceable end-to-end.
+- Revisioned artifacts use 1-based version numbering (`v1` is first revision/version).
+
+## Domain Packaging Boundary
+
+- We separate model ownership into two broad collections:
+  - `financial_auditing`: models whose primary job is canonical identity and auditable reconciliation/history.
+  - Operational domains: models whose primary job is workflow authoring and lifecycle progression.
+- Mutation posture:
+  - `financial_auditing` is not automatically immutable, but mutation exposure should be minimal and deliberate.
+  - Prefer append-only/audit-snapshot patterns; any mutable behavior requires explicit justification and coverage.
+- `ScopeItem` is the first explicit canonical-identity model in this split:
+  - It is user-originated via estimate flows but exists to provide stable cross-artifact identity.
+  - It is therefore treated as non-client-facing financial-auditing infrastructure, not estimate-only workflow data.
 
 ## Core Entities
 
-## Company
+## Organization
 
 Represents an account/tenant using bill-n-chill.
 
 Key fields:
 - `id`
-- `name`
-- `timezone`
-- `default_currency`
+- `display_name`
+- `slug`
+- `created_by`
 
 ## LeadContact
 
@@ -29,7 +42,7 @@ Lightweight intake record captured before full project/customer setup.
 
 Key fields:
 - `id`
-- `company_id`
+- `created_by`
 - `status` (`new_contact`, `qualified`, `project_created`, `archived`)
 - `full_name`
 - `phone`
@@ -46,7 +59,7 @@ Client/owner for whom work is performed.
 
 Key fields:
 - `id`
-- `company_id`
+- `created_by`
 - `display_name`
 - `email`
 - `phone`
@@ -58,7 +71,7 @@ Container for scope, schedule intent, and all financial workflows.
 
 Key fields:
 - `id`
-- `company_id`
+- `created_by`
 - `customer_id`
 - `name`
 - `site_address` (job/site address; distinct from customer billing address)
@@ -75,7 +88,9 @@ Pre-contract or pre-baseline pricing model.
 Key fields:
 - `id`
 - `project_id`
-- `status` (`draft`, `sent`, `approved`, `rejected`, `archived`)
+- `status` (`draft`, `sent`, `approved`, `rejected`, `void`, `archived`)
+  - `void`: explicit user cancellation
+  - `archived`: internal superseded-history state
 - `version`
 - `subtotal`
 - `markup_total`
@@ -96,6 +111,40 @@ Key fields:
 - `unit_cost`
 - `markup_percent`
 - `line_total`
+
+## EstimateStatusEvent
+
+Audit trail of estimate status transitions.
+
+Key fields:
+- `id`
+- `estimate_id`
+- `from_status` (nullable)
+- `to_status`
+- `note`
+- `changed_by`
+- `changed_at`
+
+Policy:
+- Append-only status-history record for estimate lifecycle decisions.
+- Internal-facing operational audit artifact.
+
+## ScopeItem
+
+Canonical non-client-facing identity for "same work" line items across lifecycle artifacts.
+
+Why this exists:
+- `EstimateLineItem` and `BudgetLine` are context-specific rows (versioned proposal vs. working budget).
+- We still need one stable identity to reconcile analytics and history across revisions/conversions.
+- `ScopeItem` is that source-of-truth identity key; rows in other models can reference it.
+
+Key fields:
+- `id`
+- `organization_id`
+- `cost_code_id`
+- `name`
+- `normalized_name`
+- `unit`
 
 ## Budget
 
@@ -127,7 +176,8 @@ Normalized classification for costs and billing lines.
 
 Key fields:
 - `id`
-- `company_id`
+- `organization_id` (nullable for legacy rows)
+- `created_by`
 - `code`
 - `name`
 - `is_active`
@@ -136,10 +186,14 @@ Key fields:
 
 Formal scope/price/time change affecting contract and budget.
 
+Current scope:
+- Internal-facing workflow object (not yet client-facing like Estimate public approval loop).
+- Future direction is to add a client delivery/decision loop without coupling it to core financial propagation rules.
+
 Key fields:
 - `id`
 - `project_id`
-- `number`
+- `family_key`
 - `status` (`draft`, `pending_approval`, `approved`, `rejected`, `void`)
 - `requested_by_user_id`
 - `approved_by_user_id`
@@ -148,9 +202,60 @@ Key fields:
 - `reason`
 - `approved_at`
 
+## ChangeOrderSnapshot
+
+Immutable financial-audit snapshot for change-order decision outcomes.
+
+Current policy:
+- Captured for terminal decision states: `approved`, `rejected`, and `void`.
+- Not captured for non-terminal workflow states: `draft`, `pending_approval`.
+- Append-only audit representation used for strict decision traceability.
+- Includes `origin_estimate_version` in snapshot payload for historical replay/forensics,
+  not as a primary mutable operational field.
+- Includes decision context (`previous_status`, `applied_financial_delta`) to support
+  replay and reversal forensics.
+
+Key fields:
+- `id`
+- `change_order_id`
+- `decision_status` (`approved`, `rejected`, `void`)
+- `snapshot_json`
+- `decided_by`
+- `created_at`
+
+## FinancialAuditEvent (Deprecated Index Layer)
+
+`FinancialAuditEvent` currently exists as a project-scoped immutable activity index used by
+legacy financial timeline/reporting reads.
+
+Policy:
+- Not canonical financial truth.
+- Canonical replay/forensics should come from domain-specific immutable capture models.
+- Planned removal after timeline/reporting migration is complete.
+
+## VendorBillSnapshot
+
+Immutable AP lifecycle snapshot for vendor-bill status transitions.
+
+Current policy:
+- Captured for: `received`, `approved`, `scheduled`, `paid`, `void`.
+- Append-only audit representation for AP lifecycle replay/traceability.
+- Stores vendor-bill header + allocation context + transition context.
+
+Key fields:
+- `id`
+- `vendor_bill_id`
+- `capture_status` (`received`, `approved`, `scheduled`, `paid`, `void`)
+- `snapshot_json`
+- `acted_by`
+- `created_at`
+
 ## Commitment
 
 Agreement with vendor/subcontractor for a defined amount/scope.
+
+Current policy:
+- Planned domain object; not implemented in the backend model layer yet.
 
 Key fields:
 - `id`
@@ -166,7 +271,8 @@ Payee record for AP and commitments.
 
 Key fields:
 - `id`
-- `company_id`
+- `organization_id` (nullable for legacy rows)
+- `created_by`
 - `name`
 - `email`
 - `phone`
@@ -189,18 +295,46 @@ Key fields:
 - `total`
 - `balance_due`
 
+Current policy:
+- One canonical invoice line set is used for both client-facing and internal-facing views.
+- Invoice lines may reference canonical `ScopeItem` directly for strict cross-artifact lineage.
+- Invoice lines do not require direct FK coupling to `EstimateLineItem` or `BudgetLine`.
+- Non-scope billing is represented explicitly as adjustment lines with reason metadata.
+
 ## InvoiceLine
 
-Billed line items, optionally tied to cost code and source scope.
+Billed line items, optionally tied to cost code and canonical scope identity.
 
 Key fields:
 - `id`
 - `invoice_id`
+- `line_type` (`scope`, `adjustment`)
 - `cost_code_id`
+- `scope_item_id` (optional canonical scope identity)
+- `adjustment_reason` (required when `line_type=adjustment`)
+- `internal_note` (optional internal-only context)
 - `description`
 - `quantity`
+- `unit`
 - `unit_price`
 - `line_total`
+
+## InvoiceStatusEvent
+
+Audit trail of invoice status transitions.
+
+Key fields:
+- `id`
+- `invoice_id`
+- `from_status` (nullable)
+- `to_status`
+- `note`
+- `changed_by`
+- `changed_at`
+
+Policy:
+- Append-only status-history record for invoice lifecycle decisions.
+- Internal-facing operational audit artifact (separate from client-facing invoice rendering).
 
 ## VendorBill
 
@@ -210,7 +344,7 @@ Key fields:
 - `id`
 - `project_id`
 - `vendor_id`
-- `status` (`draft`, `received`, `approved`, `scheduled`, `paid`, `void`)
+- `status` (`planned`, `received`, `approved`, `scheduled`, `paid`, `void`)
 - `bill_number`
 - `issue_date`
 - `due_date`
@@ -231,6 +365,11 @@ Key fields:
 - `payment_date`
 - `reference_number`
 
+Policy:
+- Internal-facing operator-managed ledger row.
+- Lifecycle transitions are model-enforced.
+- Canonical immutable audit provenance is captured in `PaymentRecord`.
+
 ## PaymentAllocation
 
 Join model mapping one payment across one or more invoices/bills.
@@ -242,13 +381,38 @@ Key fields:
 - `target_id`
 - `applied_amount`
 
+Policy:
+- Internal/system-managed reconciliation artifact.
+- Not intended as client-facing representation.
+
+## PaymentRecord
+
+Immutable audit record for payment lifecycle and provenance captures.
+
+Key fields:
+- `id`
+- `payment_id`
+- `event_type` (`created`, `updated`, `status_changed`, `allocation_applied`, `imported`, `synced`)
+- `capture_source` (`manual_ui`, `manual_api`, `ach_webhook`, `processor_sync`, `csv_import`, `system`)
+- `source_reference`
+- `from_status` (nullable)
+- `to_status` (nullable)
+- `snapshot_json`
+- `metadata_json`
+- `recorded_by` (nullable for system-originated captures)
+- `created_at`
+
+Policy:
+- Append-only immutable capture model for payment replay/forensics.
+- Internal-facing audit artifact.
+
 ## AccountingSyncEvent
 
 Tracks data exchange with accounting system.
 
 Key fields:
 - `id`
-- `company_id`
+- `project_id`
 - `provider` (`quickbooks_online`)
 - `object_type`
 - `object_id`
@@ -256,16 +420,20 @@ Key fields:
 - `status` (`queued`, `success`, `failed`)
 - `external_id`
 - `error_message`
-- `synced_at`
+- `retry_count`
+- `last_attempt_at`
+- `created_by`
 
 ## Relationship Summary
 
-- `Company` has many `LeadContacts`, `Customers`, `Projects`, `Vendors`, `CostCodes`.
-- `Project` has many `Estimates`, `Budgets`, `ChangeOrders`, `Commitments`, `Invoices`, `VendorBills`, `Payments`.
+- `Organization` has many `OrganizationMemberships`, `Vendors`, `CostCodes`, and `ScopeItems`.
+- `User` owns/scopes `LeadContacts`, `Customers`, `Projects`, and financial workflow records via `created_by`.
+- `Project` has many `Estimates`, `Budgets`, `ChangeOrders`, `Invoices`, `VendorBills`, `Payments`, and `AccountingSyncEvents`.
 - `Estimate` has many `EstimateLineItems`.
 - `Budget` has many `BudgetLines`.
 - `Invoice` has many `InvoiceLines`.
 - `Payment` has many `PaymentAllocations`.
+- `Payment` has many `PaymentRecords`.
 
 ## Financial Lifecycle (Happy Path)
 
@@ -294,10 +462,11 @@ Key fields:
 - `POST /api/v1/lead-contacts/quick-add/`
 - `POST /api/v1/lead-contacts/{id}/convert-to-project/`
 - `GET /api/v1/projects/{id}/financial-summary/`
-- `POST /api/v1/projects/{id}/estimates/{estimate_id}/convert-to-budget/`
-- `POST /api/v1/projects/{id}/change-orders/{id}/approve/`
+- `PATCH /api/v1/estimates/{estimate_id}/`
+- `POST /api/v1/estimates/{estimate_id}/convert-to-budget/`
+- `PATCH /api/v1/change-orders/{change_order_id}/`
 - `POST /api/v1/invoices/{id}/send/`
-- `POST /api/v1/payments/`
+- `POST /api/v1/projects/{project_id}/payments/`
 - `POST /api/v1/payments/{id}/allocate/`
 
 ## Open Modeling Questions
@@ -311,5 +480,5 @@ Key fields:
 3. Commitment depth:
 - Minimal commitment object in v1, or full subcontract/change-event chain?
 
-4. Multi-company structures:
-- Single-tenant per company in v1, or parent-child entities early?
+4. Multi-organization structures:
+- Keep one active organization per user, or add first-class multi-org switching early?

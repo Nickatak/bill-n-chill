@@ -8,14 +8,20 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import BudgetLine, FinancialAuditEvent, Vendor, VendorBill, VendorBillAllocation
+from core.models import (
+    BudgetLine,
+    FinancialAuditEvent,
+    Vendor,
+    VendorBill,
+    VendorBillAllocation,
+    VendorBillSnapshot,
+)
 from core.serializers import VendorBillSerializer, VendorBillWriteSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
     _record_financial_audit_event,
     _role_gate_error_payload,
     _validate_project_for_user,
-    _validate_vendor_bill_status_transition,
 )
 
 
@@ -75,6 +81,51 @@ def _sync_vendor_bill_allocations(*, vendor_bill, allocations):
             )
             for entry in allocations
         ]
+    )
+
+
+def _record_vendor_bill_status_snapshot(*, vendor_bill, capture_status, previous_status, acted_by):
+    allocation_rows = list(
+        VendorBillAllocation.objects.filter(vendor_bill=vendor_bill)
+        .select_related("budget_line", "budget_line__cost_code")
+        .order_by("id")
+    )
+    snapshot = {
+        "vendor_bill": {
+            "id": vendor_bill.id,
+            "project_id": vendor_bill.project_id,
+            "vendor_id": vendor_bill.vendor_id,
+            "bill_number": vendor_bill.bill_number,
+            "status": vendor_bill.status,
+            "issue_date": vendor_bill.issue_date.isoformat() if vendor_bill.issue_date else None,
+            "due_date": vendor_bill.due_date.isoformat() if vendor_bill.due_date else None,
+            "scheduled_for": vendor_bill.scheduled_for.isoformat() if vendor_bill.scheduled_for else None,
+            "total": str(vendor_bill.total),
+            "balance_due": str(vendor_bill.balance_due),
+            "notes": vendor_bill.notes,
+        },
+        "decision_context": {
+            "capture_status": capture_status,
+            "previous_status": previous_status,
+        },
+        "allocations": [
+            {
+                "vendor_bill_allocation_id": row.id,
+                "budget_line_id": row.budget_line_id,
+                "cost_code_id": row.budget_line.cost_code_id,
+                "cost_code_code": row.budget_line.cost_code.code,
+                "cost_code_name": row.budget_line.cost_code.name,
+                "amount": str(row.amount),
+                "note": row.note,
+            }
+            for row in allocation_rows
+        ],
+    }
+    VendorBillSnapshot.objects.create(
+        vendor_bill=vendor_bill,
+        capture_status=capture_status,
+        snapshot_json=snapshot,
+        acted_by=acted_by,
     )
 
 
@@ -334,7 +385,7 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
     previous_status = vendor_bill.status
     next_status = data.get("status", previous_status)
     status_changing = "status" in data
-    if status_changing and not _validate_vendor_bill_status_transition(
+    if status_changing and not VendorBill.is_transition_allowed(
         current_status=previous_status,
         next_status=next_status,
     ):
@@ -478,6 +529,24 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
                 )
         if allocations is not None:
             _sync_vendor_bill_allocations(vendor_bill=vendor_bill, allocations=allocations)
+        if (
+            status_changing
+            and previous_status != next_status
+            and next_status
+            in {
+                VendorBill.Status.RECEIVED,
+                VendorBill.Status.APPROVED,
+                VendorBill.Status.SCHEDULED,
+                VendorBill.Status.PAID,
+                VendorBill.Status.VOID,
+            }
+        ):
+            _record_vendor_bill_status_snapshot(
+                vendor_bill=vendor_bill,
+                capture_status=next_status,
+                previous_status=previous_status,
+                acted_by=request.user,
+            )
 
     vendor_bill = (
         VendorBill.objects.select_related("project", "vendor")

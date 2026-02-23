@@ -72,11 +72,11 @@ class DemoSeedCommandTests(TestCase):
             len(Estimate.Status.choices) + 3,
         )
         self.assertGreaterEqual(Budget.objects.filter(project=project).count(), 1)
-        self.assertEqual(ChangeOrder.objects.filter(project=project, number=1).count(), 1)
+        self.assertEqual(ChangeOrder.objects.filter(project=project, family_key="1").count(), 1)
         self.assertTrue(
             ChangeOrder.objects.filter(
                 project=project,
-                number=2,
+                family_key="2",
                 status=ChangeOrder.Status.VOID,
             ).exists()
         )

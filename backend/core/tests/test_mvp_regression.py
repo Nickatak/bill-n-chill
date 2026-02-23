@@ -65,6 +65,14 @@ class MvpRegressionMoneyLoopTests(TestCase):
         estimate_id = estimate_create.json()["data"]["id"]
         self.assertEqual(estimate_create.json()["data"]["grand_total"], "1000.00")
 
+        send_estimate = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"status": "sent", "status_note": "Sent to client."},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(send_estimate.status_code, 200)
+
         approve_estimate = self.client.patch(
             f"/api/v1/estimates/{estimate_id}/",
             data={"status": "approved", "status_note": "Accepted by client."},
@@ -79,7 +87,7 @@ class MvpRegressionMoneyLoopTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(budget_convert.status_code, 201)
+        self.assertIn(budget_convert.status_code, {200, 201})
         budget = budget_convert.json()["data"]
         self.assertEqual(budget["status"], "active")
         self.assertEqual(len(budget["line_items"]), 2)
@@ -193,14 +201,22 @@ class MvpRegressionMoneyLoopTests(TestCase):
         self.assertEqual(to_received.status_code, 200)
         to_approved = self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "approved"},
+            data={
+                "status": "approved",
+                "allocations": [
+                    {"budget_line": budget["line_items"][0]["id"], "amount": "500.00", "note": "Full alloc"}
+                ],
+            },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(to_approved.status_code, 200)
         to_scheduled = self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "scheduled"},
+            data={
+                "status": "scheduled",
+                "scheduled_for": "2026-02-25",
+            },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )

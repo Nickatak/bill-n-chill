@@ -7,8 +7,13 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import FinancialAuditEvent, Invoice
-from core.serializers import InvoiceScopeOverrideSerializer, InvoiceSerializer, InvoiceWriteSerializer
+from core.models import FinancialAuditEvent, Invoice, InvoiceStatusEvent
+from core.serializers import (
+    InvoiceScopeOverrideSerializer,
+    InvoiceSerializer,
+    InvoiceStatusEventSerializer,
+    InvoiceWriteSerializer,
+)
 from core.utils.money import quantize_money
 from core.views.helpers import (
     _apply_invoice_lines_and_totals,
@@ -18,10 +23,56 @@ from core.views.helpers import (
     _next_invoice_number,
     _resolve_invoice_cost_codes_for_user,
     _record_financial_audit_event,
+    _record_invoice_status_event,
     _role_gate_error_payload,
-    _validate_invoice_status_transition,
     _validate_project_for_user,
 )
+
+
+def _invoice_line_apply_error_response(apply_error):
+    if "missing_cost_codes" in apply_error:
+        return (
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "One or more cost codes are invalid for this user.",
+                    "fields": {"cost_code": apply_error["missing_cost_codes"]},
+                }
+            },
+            400,
+        )
+    if "missing_scope_items" in apply_error:
+        return (
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "One or more scope items are invalid for this user.",
+                    "fields": {"scope_item": apply_error["missing_scope_items"]},
+                }
+            },
+            400,
+        )
+    if "invalid_lines" in apply_error:
+        return (
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "One or more invoice lines are invalid.",
+                    "fields": {"line_items": apply_error["invalid_lines"]},
+                }
+            },
+            400,
+        )
+    return (
+        {
+            "error": {
+                "code": "validation_error",
+                "message": "Invoice line validation failed.",
+                "fields": {},
+            }
+        },
+        400,
+    )
 
 
 @api_view(["GET", "POST"])
@@ -38,7 +89,7 @@ def project_invoices_view(request, project_id: int):
         rows = (
             Invoice.objects.filter(project=project, created_by=request.user)
             .select_related("customer")
-            .prefetch_related("line_items", "line_items__cost_code")
+            .prefetch_related("line_items", "line_items__cost_code", "line_items__scope_item")
             .order_by("-created_at")
         )
         return Response({"data": InvoiceSerializer(rows, many=True).data})
@@ -96,18 +147,17 @@ def project_invoices_view(request, project_id: int):
     )
     if apply_error:
         invoice.delete()
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "One or more cost codes are invalid for this user.",
-                    "fields": {"cost_code": apply_error["missing_cost_codes"]},
-                }
-            },
-            status=400,
-        )
+        payload, status_code = _invoice_line_apply_error_response(apply_error)
+        return Response(payload, status=status_code)
 
     invoice.refresh_from_db()
+    _record_invoice_status_event(
+        invoice=invoice,
+        from_status=None,
+        to_status=invoice.status,
+        note="Invoice created.",
+        changed_by=request.user,
+    )
     _record_financial_audit_event(
         project=project,
         event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
@@ -153,7 +203,7 @@ def invoice_detail_view(request, invoice_id: int):
     status_changing = "status" in data
     previous_status = invoice.status
     next_status = data.get("status", invoice.status)
-    if status_changing and not _validate_invoice_status_transition(
+    if status_changing and not Invoice.is_transition_allowed(
         current_status=invoice.status,
         next_status=next_status,
     ):
@@ -213,7 +263,11 @@ def invoice_detail_view(request, invoice_id: int):
     else:
         line_items_for_preview = [
             {
+                "line_type": line.line_type,
                 "cost_code": line.cost_code_id,
+                "scope_item": line.scope_item_id,
+                "adjustment_reason": line.adjustment_reason,
+                "internal_note": line.internal_note,
                 "description": line.description,
                 "quantity": line.quantity,
                 "unit": line.unit,
@@ -274,20 +328,16 @@ def invoice_detail_view(request, invoice_id: int):
             )
             if apply_error:
                 transaction.set_rollback(True)
-                return Response(
-                    {
-                        "error": {
-                            "code": "validation_error",
-                            "message": "One or more cost codes are invalid for this user.",
-                            "fields": {"cost_code": apply_error["missing_cost_codes"]},
-                        }
-                    },
-                    status=400,
-                )
+                payload, status_code = _invoice_line_apply_error_response(apply_error)
+                return Response(payload, status=status_code)
         elif "tax_percent" in data:
             existing_lines = [
                 {
+                    "line_type": line.line_type,
                     "cost_code": line.cost_code_id,
+                    "scope_item": line.scope_item_id,
+                    "adjustment_reason": line.adjustment_reason,
+                    "internal_note": line.internal_note,
                     "description": line.description,
                     "quantity": line.quantity,
                     "unit": line.unit,
@@ -308,6 +358,14 @@ def invoice_detail_view(request, invoice_id: int):
             invoice.save(update_fields=["balance_due", "updated_at"])
 
         if previous_status != next_status or totals_changing:
+            if previous_status != next_status:
+                _record_invoice_status_event(
+                    invoice=invoice,
+                    from_status=previous_status,
+                    to_status=next_status,
+                    note="Invoice status updated.",
+                    changed_by=request.user,
+                )
             _record_financial_audit_event(
                 project=invoice.project,
                 event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
@@ -344,7 +402,7 @@ def invoice_send_view(request, invoice_id: int):
     if permission_error:
         return Response(permission_error, status=403)
 
-    if not _validate_invoice_status_transition(
+    if not Invoice.is_transition_allowed(
         current_status=invoice.status,
         next_status=Invoice.Status.SENT,
     ):
@@ -379,6 +437,13 @@ def invoice_send_view(request, invoice_id: int):
 
         invoice.status = Invoice.Status.SENT
         invoice.save(update_fields=["status", "updated_at"])
+        _record_invoice_status_event(
+            invoice=invoice,
+            from_status=previous_status,
+            to_status=Invoice.Status.SENT,
+            note="Invoice sent.",
+            changed_by=request.user,
+        )
         _record_financial_audit_event(
             project=invoice.project,
             event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
@@ -393,3 +458,18 @@ def invoice_send_view(request, invoice_id: int):
         )
 
     return Response({"data": InvoiceSerializer(invoice).data})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def invoice_status_events_view(request, invoice_id: int):
+    try:
+        invoice = Invoice.objects.get(id=invoice_id, created_by=request.user)
+    except Invoice.DoesNotExist:
+        return Response(
+            {"error": {"code": "not_found", "message": "Invoice not found.", "fields": {}}},
+            status=404,
+        )
+
+    events = InvoiceStatusEvent.objects.filter(invoice=invoice).select_related("changed_by")
+    return Response({"data": InvoiceStatusEventSerializer(events, many=True).data})

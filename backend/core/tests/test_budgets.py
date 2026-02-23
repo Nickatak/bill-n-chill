@@ -132,6 +132,31 @@ class BudgetTests(TestCase):
             "500.00",
         )
 
+    def test_convert_to_budget_propagates_scope_item_from_estimate_line(self):
+        estimate_id = self._create_estimate(title="Approved Estimate", unit_cost="500")
+        self._approve_estimate(estimate_id)
+
+        response = self.client.post(
+            f"/api/v1/estimates/{estimate_id}/convert-to-budget/",
+            data={},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        estimate_line = EstimateLineItem.objects.get(estimate_id=estimate_id)
+        budget_line = BudgetLine.objects.get(budget_id=response.json()["data"]["id"])
+        self.assertIsNotNone(estimate_line.scope_item_id)
+        self.assertEqual(budget_line.scope_item_id, estimate_line.scope_item_id)
+        self.assertEqual(
+            response.json()["data"]["line_items"][0]["scope_item"],
+            estimate_line.scope_item_id,
+        )
+        self.assertEqual(
+            response.json()["data"]["baseline_snapshot_json"]["line_items"][0]["scope_item_id"],
+            estimate_line.scope_item_id,
+        )
+
     def test_convert_to_budget_is_idempotent_for_same_estimate(self):
         estimate_id = self._create_estimate(title="Approved Estimate", unit_cost="500")
         self._approve_estimate(estimate_id)
@@ -181,6 +206,88 @@ class BudgetTests(TestCase):
         second_budget = Budget.objects.get(id=second_conversion.json()["data"]["id"])
         self.assertEqual(first_budget.status, Budget.Status.SUPERSEDED)
         self.assertEqual(second_budget.status, Budget.Status.ACTIVE)
+
+    def test_superseded_budget_line_patch_is_blocked(self):
+        first_estimate_id = self._create_estimate(title="Approved Estimate A", unit_cost="500")
+        self._approve_estimate(first_estimate_id)
+        first_conversion = self.client.post(
+            f"/api/v1/estimates/{first_estimate_id}/convert-to-budget/",
+            data={},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(first_conversion.status_code, 200)
+        first_budget_id = first_conversion.json()["data"]["id"]
+        first_line_id = first_conversion.json()["data"]["line_items"][0]["id"]
+
+        second_estimate_id = self._create_estimate(title="Approved Estimate B", unit_cost="700")
+        self._approve_estimate(second_estimate_id)
+        second_conversion = self.client.post(
+            f"/api/v1/estimates/{second_estimate_id}/convert-to-budget/",
+            data={},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(second_conversion.status_code, 200)
+
+        blocked = self.client.patch(
+            f"/api/v1/budgets/{first_budget_id}/lines/{first_line_id}/",
+            data={"description": "Should Not Update", "budget_amount": "900.00"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(blocked.status_code, 400)
+        self.assertEqual(blocked.json()["error"]["code"], "validation_error")
+        self.assertIn("status", blocked.json()["error"]["fields"])
+
+    def test_multiple_budget_conversions_keep_single_active_budget(self):
+        estimate_a = self._create_estimate(title="Approved Estimate A", unit_cost="500")
+        self._approve_estimate(estimate_a)
+        self.client.post(
+            f"/api/v1/estimates/{estimate_a}/convert-to-budget/",
+            data={},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+
+        estimate_b = self._create_estimate(title="Approved Estimate B", unit_cost="700")
+        self._approve_estimate(estimate_b)
+        self.client.post(
+            f"/api/v1/estimates/{estimate_b}/convert-to-budget/",
+            data={},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+
+        estimate_c = self._create_estimate(title="Approved Estimate C", unit_cost="900")
+        self._approve_estimate(estimate_c)
+        self.client.post(
+            f"/api/v1/estimates/{estimate_c}/convert-to-budget/",
+            data={},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+
+        self.assertEqual(
+            Budget.objects.filter(project=self.project, created_by=self.user).count(),
+            3,
+        )
+        self.assertEqual(
+            Budget.objects.filter(
+                project=self.project,
+                created_by=self.user,
+                status=Budget.Status.ACTIVE,
+            ).count(),
+            1,
+        )
+        self.assertEqual(
+            Budget.objects.filter(
+                project=self.project,
+                created_by=self.user,
+                status=Budget.Status.SUPERSEDED,
+            ).count(),
+            2,
+        )
 
     def test_budget_line_patch_updates_working_budget_without_mutating_snapshot(self):
         estimate_id = self._create_estimate(title="Approved Estimate", unit_cost="500")

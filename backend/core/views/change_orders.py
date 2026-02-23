@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F
 from django.db.models import Sum
@@ -8,15 +9,23 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import Budget, BudgetLine, ChangeOrder, ChangeOrderLine, Estimate, FinancialAuditEvent, Project
+from core.models import (
+    Budget,
+    BudgetLine,
+    ChangeOrder,
+    ChangeOrderLine,
+    ChangeOrderSnapshot,
+    Estimate,
+    FinancialAuditEvent,
+    Project,
+)
 from core.serializers import ChangeOrderSerializer, ChangeOrderWriteSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
     _get_active_budget_for_project,
-    _next_change_order_number,
+    _next_change_order_family_key,
     _record_financial_audit_event,
     _role_gate_error_payload,
-    _validate_change_order_status_transition,
     _validate_project_for_user,
 )
 
@@ -35,7 +44,7 @@ def project_change_orders_view(request, project_id: int):
         rows = (
             ChangeOrder.objects.filter(project=project, requested_by=request.user)
             .prefetch_related("line_items", "line_items__budget_line", "line_items__budget_line__cost_code")
-            .order_by("-number", "-revision_number")
+            .order_by("-created_at", "-revision_number")
         )
         return Response({"data": ChangeOrderSerializer(rows, many=True).data})
 
@@ -140,36 +149,42 @@ def project_change_orders_view(request, project_id: int):
                 status=400,
             )
 
-    change_order = ChangeOrder.objects.create(
-        project=project,
-        number=_next_change_order_number(project=project),
-        revision_number=1,
-        title=data["title"],
-        status=ChangeOrder.Status.DRAFT,
-        amount_delta=data["amount_delta"],
-        days_delta=data.get("days_delta", 0),
-        reason=data.get("reason", ""),
-        origin_estimate=origin_estimate,
-        origin_estimate_version=origin_estimate.version if origin_estimate else None,
-        requested_by=request.user,
-    )
-    _record_financial_audit_event(
-        project=project,
-        event_type=FinancialAuditEvent.EventType.CHANGE_ORDER_UPDATED,
-        object_type="change_order",
-        object_id=change_order.id,
-        from_status="",
-        to_status=ChangeOrder.Status.DRAFT,
-        amount=change_order.amount_delta,
-        note="Change order created.",
-        created_by=request.user,
-        metadata={"number": change_order.number},
-    )
-    if incoming_line_items:
-        _sync_change_order_lines(
-            change_order=change_order,
-            line_items=incoming_line_items,
-            line_map=line_map,
+    try:
+        with transaction.atomic():
+            change_order = ChangeOrder.objects.create(
+                project=project,
+                family_key=_next_change_order_family_key(project=project),
+                revision_number=1,
+                title=data["title"],
+                status=ChangeOrder.Status.DRAFT,
+                amount_delta=data["amount_delta"],
+                days_delta=data.get("days_delta", 0),
+                reason=data.get("reason", ""),
+                origin_estimate=origin_estimate,
+                requested_by=request.user,
+            )
+            _record_financial_audit_event(
+                project=project,
+                event_type=FinancialAuditEvent.EventType.CHANGE_ORDER_UPDATED,
+                object_type="change_order",
+                object_id=change_order.id,
+                from_status="",
+                to_status=ChangeOrder.Status.DRAFT,
+                amount=change_order.amount_delta,
+                note="Change order created.",
+                created_by=request.user,
+                metadata={"family_key": change_order.family_key},
+            )
+            if incoming_line_items:
+                _sync_change_order_lines(
+                    change_order=change_order,
+                    line_items=incoming_line_items,
+                    line_map=line_map,
+                )
+    except ValidationError as exc:
+        return _model_validation_error_response(
+            exc=exc,
+            message="Change-order line items are invalid for this project/budget context.",
         )
     created = (
         ChangeOrder.objects.filter(id=change_order.id)
@@ -209,7 +224,7 @@ def change_order_detail_view(request, change_order_id: int):
 
     latest_revision_exists = ChangeOrder.objects.filter(
         project=change_order.project,
-        number=change_order.number,
+        family_key=change_order.family_key,
         revision_number__gt=change_order.revision_number,
     ).exists()
     if latest_revision_exists:
@@ -229,7 +244,7 @@ def change_order_detail_view(request, change_order_id: int):
     next_amount_delta = quantize_money(data.get("amount_delta", current_amount_delta))
     status_changing = "status" in data
     next_status = data.get("status", previous_status)
-    if status_changing and not _validate_change_order_status_transition(
+    if status_changing and not ChangeOrder.is_transition_allowed(
         current_status=previous_status,
         next_status=next_status,
     ):
@@ -367,8 +382,7 @@ def change_order_detail_view(request, change_order_id: int):
                     status=400,
                 )
             change_order.origin_estimate = origin_estimate
-            change_order.origin_estimate_version = origin_estimate.version
-            update_fields.extend(["origin_estimate", "origin_estimate_version"])
+            update_fields.append("origin_estimate")
     if "title" in data:
         change_order.title = data["title"]
         update_fields.append("title")
@@ -390,44 +404,66 @@ def change_order_detail_view(request, change_order_id: int):
         change_order.approved_at = timezone.now()
         update_fields.extend(["approved_by", "approved_at"])
 
-    with transaction.atomic():
-        if len(update_fields) > 1:
-            change_order.save(update_fields=update_fields)
-        if incoming_line_items is not None:
-            _sync_change_order_lines(
-                change_order=change_order,
-                line_items=incoming_line_items,
-                line_map=line_map,
-            )
-        if financial_delta != MONEY_ZERO:
-            Project.objects.filter(
-                id=change_order.project_id,
-                created_by=request.user,
-            ).update(
-                contract_value_current=F("contract_value_current") + financial_delta,
-            )
-            Budget.objects.filter(id=active_budget.id).update(
-                approved_change_order_total=F("approved_change_order_total") + financial_delta,
-            )
-        if previous_status != next_status or financial_delta != MONEY_ZERO:
-            event_note = "Change order status updated."
+    try:
+        with transaction.atomic():
+            if len(update_fields) > 1:
+                change_order.save(update_fields=update_fields)
+            if incoming_line_items is not None:
+                _sync_change_order_lines(
+                    change_order=change_order,
+                    line_items=incoming_line_items,
+                    line_map=line_map,
+                )
             if financial_delta != MONEY_ZERO:
-                event_note = f"{event_note} Financial delta applied: {financial_delta}."
-            _record_financial_audit_event(
-                project=change_order.project,
-                event_type=FinancialAuditEvent.EventType.CHANGE_ORDER_UPDATED,
-                object_type="change_order",
-                object_id=change_order.id,
-                from_status=previous_status,
-                to_status=next_status,
-                amount=next_amount_delta,
-                note=event_note,
-                created_by=request.user,
-                metadata={
-                    "number": change_order.number,
-                    "financial_delta": str(financial_delta),
-                },
-            )
+                Project.objects.filter(
+                    id=change_order.project_id,
+                    created_by=request.user,
+                ).update(
+                    contract_value_current=F("contract_value_current") + financial_delta,
+                )
+                Budget.objects.filter(id=active_budget.id).update(
+                    approved_change_order_total=F("approved_change_order_total") + financial_delta,
+                )
+            if previous_status != next_status or financial_delta != MONEY_ZERO:
+                event_note = "Change order status updated."
+                if financial_delta != MONEY_ZERO:
+                    event_note = f"{event_note} Financial delta applied: {financial_delta}."
+                _record_financial_audit_event(
+                    project=change_order.project,
+                    event_type=FinancialAuditEvent.EventType.CHANGE_ORDER_UPDATED,
+                    object_type="change_order",
+                    object_id=change_order.id,
+                    from_status=previous_status,
+                    to_status=next_status,
+                    amount=next_amount_delta,
+                    note=event_note,
+                    created_by=request.user,
+                    metadata={
+                        "family_key": change_order.family_key,
+                        "financial_delta": str(financial_delta),
+                    },
+                )
+            if (
+                status_changing
+                and previous_status != next_status
+                and next_status in {
+                    ChangeOrder.Status.APPROVED,
+                    ChangeOrder.Status.REJECTED,
+                    ChangeOrder.Status.VOID,
+                }
+            ):
+                _record_change_order_decision_snapshot(
+                    change_order=change_order,
+                    decision_status=next_status,
+                    previous_status=previous_status,
+                    applied_financial_delta=financial_delta,
+                    decided_by=request.user,
+                )
+    except ValidationError as exc:
+        return _model_validation_error_response(
+            exc=exc,
+            message="Change-order line items are invalid for this project/budget context.",
+        )
     refreshed = (
         ChangeOrder.objects.filter(id=change_order.id)
         .prefetch_related("line_items", "line_items__budget_line", "line_items__budget_line__cost_code")
@@ -458,7 +494,7 @@ def change_order_clone_revision_view(request, change_order_id: int):
     latest = (
         ChangeOrder.objects.filter(
             project=change_order.project,
-            number=change_order.number,
+            family_key=change_order.family_key,
             requested_by=request.user,
         )
         .order_by("-revision_number")
@@ -480,7 +516,7 @@ def change_order_clone_revision_view(request, change_order_id: int):
     with transaction.atomic():
         clone = ChangeOrder.objects.create(
             project=change_order.project,
-            number=change_order.number,
+            family_key=change_order.family_key,
             revision_number=next_revision,
             title=change_order.title,
             status=ChangeOrder.Status.DRAFT,
@@ -488,8 +524,7 @@ def change_order_clone_revision_view(request, change_order_id: int):
             days_delta=change_order.days_delta,
             reason=change_order.reason,
             origin_estimate=change_order.origin_estimate,
-            origin_estimate_version=change_order.origin_estimate_version,
-            supersedes_change_order=change_order,
+            previous_change_order=change_order,
             requested_by=request.user,
         )
         _sync_change_order_lines(
@@ -513,12 +548,12 @@ def change_order_clone_revision_view(request, change_order_id: int):
             from_status="",
             to_status=clone.status,
             amount=clone.amount_delta,
-            note=f"Change order revision created from CO-{change_order.number} v{change_order.revision_number}.",
+            note=f"Change order revision created from CO-{change_order.family_key} v{change_order.revision_number}.",
             created_by=request.user,
             metadata={
-                "number": clone.number,
+                "family_key": clone.family_key,
                 "revision_number": clone.revision_number,
-                "supersedes_change_order_id": change_order.id,
+                "previous_change_order_id": change_order.id,
             },
         )
 
@@ -556,8 +591,6 @@ def _validate_change_order_lines(*, project, line_items):
         row.id: row
         for row in BudgetLine.objects.select_related("budget", "cost_code").filter(
             id__in=unique_budget_line_ids,
-            budget__project=project,
-            budget__status=Budget.Status.ACTIVE,
         )
     }
     if len(line_map) != len(unique_budget_line_ids):
@@ -568,8 +601,8 @@ def _validate_change_order_lines(*, project, line_items):
                 {
                     "error": {
                         "code": "validation_error",
-                        "message": "One or more line_items budget_line values are invalid for this project.",
-                        "fields": {"line_items": ["Use active budget lines for this project."]},
+                        "message": "One or more line_items budget_line values are invalid.",
+                        "fields": {"line_items": ["Use valid budget_line ids."]},
                     }
                 },
                 status=400,
@@ -584,15 +617,92 @@ def _validate_change_order_lines(*, project, line_items):
 
 def _sync_change_order_lines(*, change_order, line_items, line_map):
     ChangeOrderLine.objects.filter(change_order=change_order).delete()
-    ChangeOrderLine.objects.bulk_create(
-        [
-            ChangeOrderLine(
-                change_order=change_order,
-                budget_line=line_map[int(row["budget_line"])],
-                description=row.get("description", ""),
-                amount_delta=quantize_money(row["amount_delta"]),
-                days_delta=row.get("days_delta", 0),
-            )
-            for row in line_items
-        ]
+    for row in line_items:
+        ChangeOrderLine.objects.create(
+            change_order=change_order,
+            budget_line=line_map[int(row["budget_line"])],
+            description=row.get("description", ""),
+            amount_delta=quantize_money(row["amount_delta"]),
+            days_delta=row.get("days_delta", 0),
+        )
+
+
+def _record_change_order_decision_snapshot(
+    *,
+    change_order,
+    decision_status,
+    previous_status,
+    applied_financial_delta,
+    decided_by,
+):
+    line_rows = list(
+        ChangeOrderLine.objects.filter(change_order=change_order)
+        .select_related("budget_line", "budget_line__cost_code")
+        .order_by("id")
+    )
+    origin_estimate_version = None
+    if change_order.origin_estimate_id is not None:
+        origin_estimate_version = (
+            Estimate.objects.filter(id=change_order.origin_estimate_id).values_list("version", flat=True).first()
+        )
+
+    snapshot = {
+        "change_order": {
+            "id": change_order.id,
+            "project_id": change_order.project_id,
+            "family_key": change_order.family_key,
+            "revision_number": change_order.revision_number,
+            "title": change_order.title,
+            "status": change_order.status,
+            "amount_delta": str(change_order.amount_delta),
+            "days_delta": change_order.days_delta,
+            "reason": change_order.reason,
+            "origin_estimate_id": change_order.origin_estimate_id,
+            "origin_estimate_version": origin_estimate_version,
+            "previous_change_order_id": change_order.previous_change_order_id,
+            "approved_by_id": change_order.approved_by_id,
+            "approved_at": change_order.approved_at.isoformat() if change_order.approved_at else None,
+        },
+        "decision_context": {
+            "decision_status": decision_status,
+            "previous_status": previous_status,
+            "applied_financial_delta": str(applied_financial_delta),
+        },
+        "line_items": [
+            {
+                "change_order_line_id": row.id,
+                "budget_line_id": row.budget_line_id,
+                "cost_code_id": row.budget_line.cost_code_id,
+                "cost_code_code": row.budget_line.cost_code.code,
+                "cost_code_name": row.budget_line.cost_code.name,
+                "description": row.description,
+                "amount_delta": str(row.amount_delta),
+                "days_delta": row.days_delta,
+            }
+            for row in line_rows
+        ],
+    }
+    ChangeOrderSnapshot.objects.create(
+        change_order=change_order,
+        decision_status=decision_status,
+        snapshot_json=snapshot,
+        decided_by=decided_by,
+    )
+
+
+def _model_validation_error_response(*, exc: ValidationError, message: str):
+    fields = {}
+    if hasattr(exc, "message_dict"):
+        fields = exc.message_dict
+    else:
+        fields = {"non_field_errors": exc.messages}
+    return Response(
+        {
+            "error": {
+                "code": "validation_error",
+                "message": message,
+                "fields": fields,
+            }
+        },
+        status=400,
     )

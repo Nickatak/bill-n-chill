@@ -1,3 +1,5 @@
+from django.core.exceptions import ValidationError
+
 from core.tests.common import *
 
 class InvoiceTests(TestCase):
@@ -104,6 +106,10 @@ class InvoiceTests(TestCase):
         self.assertEqual(payload["balance_due"], "1100.00")
         self.assertEqual(Invoice.objects.count(), 1)
         self.assertEqual(InvoiceLine.objects.count(), 1)
+        self.assertEqual(InvoiceStatusEvent.objects.count(), 1)
+        created_event = InvoiceStatusEvent.objects.first()
+        self.assertIsNone(created_event.from_status)
+        self.assertEqual(created_event.to_status, Invoice.Status.DRAFT)
 
     def test_invoice_create_rounds_tax_half_up_to_cents(self):
         response = self.client.post(
@@ -192,6 +198,10 @@ class InvoiceTests(TestCase):
         self.assertEqual(to_paid.status_code, 200)
         self.assertEqual(to_paid.json()["data"]["status"], "paid")
         self.assertEqual(to_paid.json()["data"]["balance_due"], "0.00")
+        history = list(
+            InvoiceStatusEvent.objects.filter(invoice_id=invoice_id).values_list("to_status", flat=True)
+        )
+        self.assertEqual(history, [Invoice.Status.PAID, Invoice.Status.SENT, Invoice.Status.DRAFT])
 
     def test_invoice_send_endpoint_moves_draft_to_sent(self):
         invoice_id = self._create_invoice()
@@ -203,6 +213,32 @@ class InvoiceTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["data"]["status"], "sent")
+        latest_event = InvoiceStatusEvent.objects.filter(invoice_id=invoice_id).first()
+        self.assertIsNotNone(latest_event)
+        self.assertEqual(latest_event.from_status, Invoice.Status.DRAFT)
+        self.assertEqual(latest_event.to_status, Invoice.Status.SENT)
+
+    def test_invoice_status_events_endpoint_returns_history(self):
+        invoice_id = self._create_invoice()
+        sent = self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(sent.status_code, 200)
+
+        response = self.client.get(
+            f"/api/v1/invoices/{invoice_id}/status-events/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        rows = response.json()["data"]
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["from_status"], Invoice.Status.DRAFT)
+        self.assertEqual(rows[0]["to_status"], Invoice.Status.SENT)
+        self.assertEqual(rows[1]["from_status"], None)
+        self.assertEqual(rows[1]["to_status"], Invoice.Status.DRAFT)
 
     def test_invoice_patch_line_items_recalculates_totals(self):
         invoice_id = self._create_invoice()
@@ -344,3 +380,130 @@ class InvoiceTests(TestCase):
         self.assertEqual(overridden.status_code, 200)
         self.assertEqual(overridden.json()["data"]["total"], "1650.00")
         self.assertEqual(InvoiceScopeOverrideEvent.objects.filter(invoice_id=invoice_id).count(), 1)
+
+    def test_invoice_create_adjustment_line_requires_adjustment_reason(self):
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/invoices/",
+            data={
+                "issue_date": "2026-02-13",
+                "due_date": "2026-03-15",
+                "line_items": [
+                    {
+                        "line_type": "adjustment",
+                        "description": "Manual billing adjustment",
+                        "quantity": "1",
+                        "unit": "ea",
+                        "unit_price": "100.00",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "validation_error")
+        self.assertIn("line_items", payload["error"]["fields"])
+
+    def test_invoice_create_adjustment_line_with_reason_succeeds(self):
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/invoices/",
+            data={
+                "issue_date": "2026-02-13",
+                "due_date": "2026-03-15",
+                "line_items": [
+                    {
+                        "line_type": "adjustment",
+                        "adjustment_reason": "mobilization",
+                        "internal_note": "Allowed quick adjustment for kickoff expense.",
+                        "description": "Mobilization adjustment",
+                        "quantity": "1",
+                        "unit": "ea",
+                        "unit_price": "100.00",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["data"]
+        self.assertEqual(payload["line_items"][0]["line_type"], "adjustment")
+        self.assertEqual(payload["line_items"][0]["adjustment_reason"], "mobilization")
+
+    def test_invoice_tax_only_patch_preserves_adjustment_line_metadata(self):
+        create = self.client.post(
+            f"/api/v1/projects/{self.project.id}/invoices/",
+            data={
+                "issue_date": "2026-02-13",
+                "due_date": "2026-03-15",
+                "line_items": [
+                    {
+                        "line_type": "adjustment",
+                        "adjustment_reason": "mobilization",
+                        "internal_note": "Initial mobilization note.",
+                        "description": "Mobilization adjustment",
+                        "quantity": "1",
+                        "unit": "ea",
+                        "unit_price": "100.00",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(create.status_code, 201)
+        invoice_id = create.json()["data"]["id"]
+
+        patch = self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"tax_percent": "8.25"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(patch.status_code, 200)
+        line = patch.json()["data"]["line_items"][0]
+        self.assertEqual(line["line_type"], "adjustment")
+        self.assertEqual(line["adjustment_reason"], "mobilization")
+        self.assertEqual(line["internal_note"], "Initial mobilization note.")
+
+    def test_invoice_model_blocks_invalid_status_transition_on_direct_save(self):
+        invoice_id = self._create_invoice()
+        invoice = Invoice.objects.get(id=invoice_id)
+        invoice.status = Invoice.Status.PAID
+        with self.assertRaises(ValidationError):
+            invoice.save()
+
+    def test_invoice_model_blocks_due_date_before_issue_date(self):
+        with self.assertRaises(ValidationError):
+            Invoice.objects.create(
+                project=self.project,
+                customer=self.project.customer,
+                invoice_number="INV-BAD-DATES",
+                status=Invoice.Status.DRAFT,
+                issue_date="2026-02-15",
+                due_date="2026-02-14",
+                subtotal="100.00",
+                tax_total="0.00",
+                total="100.00",
+                balance_due="100.00",
+                created_by=self.user,
+            )
+
+    def test_invoice_model_paid_status_sets_zero_balance_due(self):
+        invoice_id = self._create_invoice()
+
+        sent = self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(sent.status_code, 200)
+
+        invoice = Invoice.objects.get(id=invoice_id)
+        invoice.status = Invoice.Status.PAID
+        invoice.balance_due = "999.99"
+        invoice.save()
+        invoice.refresh_from_db()
+        self.assertEqual(str(invoice.balance_due), "0.00")

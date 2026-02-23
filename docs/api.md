@@ -157,17 +157,19 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
     - `name`
     - `status`
     - `site_address`
-    - `contract_value_original`
-    - `contract_value_current`
     - `start_date_planned`
     - `end_date_planned`
-  - Purpose: maintain project shell and contract baseline fields after lead conversion.
+  - Guardrails:
+    - `contract_value_original` is immutable after create
+    - `contract_value_current` is system-derived and cannot be set directly
+    - `completed` / `cancelled` projects are terminal and blocked from further edits
 
 ## Cost Code Management (EST-01)
 
 - `GET /api/v1/cost-codes/`
   - Auth required
-  - Returns cost codes scoped to the current user.
+  - Returns cost codes scoped to active organization context.
+  - Transitional fallback includes legacy null-org rows created by current user.
 
 - `POST /api/v1/cost-codes/`
   - Auth required
@@ -178,7 +180,8 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
 
 - `PATCH /api/v1/cost-codes/{cost_code_id}/`
   - Auth required
-  - Updates `code`, `name`, and/or `is_active`.
+  - Updates `name` and/or `is_active`.
+  - `code` is immutable after create.
 
 - `POST /api/v1/cost-codes/import-csv/`
   - Auth required
@@ -219,6 +222,7 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
 - `PATCH /api/v1/estimates/{estimate_id}/`
   - Auth required
   - Supports updating estimate status/title/tax and replacing line items.
+  - Note: `archived` is system-controlled and cannot be set directly by API clients.
 
 - `POST /api/v1/estimates/{estimate_id}/clone-version/`
   - Auth required
@@ -232,11 +236,13 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
     - `status`
     - `status_note`
   - Allowed transitions:
-    - `draft -> sent | approved | archived`
-    - `sent -> draft | approved | rejected | archived`
-    - `approved -> archived`
-    - `rejected -> draft | archived`
-    - `archived -> (no further transitions)`
+    - `draft -> sent | void`
+    - `sent -> approved | rejected | void`
+    - `rejected -> void`
+    - `approved -> (no further transitions)`
+    - `void -> (no further transitions)`
+  - Internal/system transition:
+    - `draft|sent -> archived` is used for superseded estimate-family history and is not client-settable.
 
 - `GET /api/v1/estimates/{estimate_id}/status-events/`
   - Auth required
@@ -274,17 +280,20 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
 
 ## Change Order Lifecycle (CO-01)
 
+Current product posture:
+- Change orders are currently internal-facing workflow records (internal user operated).
+- Client-facing delivery/approval mechanics (estimate-style public send/re-send loop) are planned but not yet implemented.
+
 - `GET /api/v1/projects/{project_id}/change-orders/`
   - Auth required
   - Returns change-order revisions for the selected project, scoped to current user.
   - Family semantics:
-    - `number` = family number
+    - `family_key` = family/thread key
     - `revision_number` = revision inside family
     - `is_latest_revision` marks editable/latest record
   - Traceability fields:
     - `origin_estimate` (nullable)
-    - `origin_estimate_version` (nullable snapshot)
-    - `supersedes_change_order` (nullable link to prior revision)
+    - `previous_change_order` (nullable explicit pointer to prior revision)
 
 - `POST /api/v1/projects/{project_id}/change-orders/`
   - Auth required
@@ -310,9 +319,9 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
 - `POST /api/v1/change-orders/{change_order_id}/clone-revision/`
   - Auth required
   - Creates next draft revision within same CO family:
-    - keeps `number` (family)
+    - keeps `family_key` (family)
     - increments `revision_number`
-    - sets `supersedes_change_order` to source revision
+    - sets `previous_change_order` to source revision
     - copies title/amount/days/reason/origin-estimate and line items
 
 - `PATCH /api/v1/change-orders/{change_order_id}/`
@@ -357,6 +366,23 @@ CO-02 extends existing CO endpoints with propagation behavior.
 
 - Billable amount basis in current v1:
   - billable basis is derived from project contract current value until invoice composition features are implemented.
+
+## Change Order Decision Snapshots (CO-03)
+
+- Immutable decision snapshots are captured for financially relevant decision outcomes.
+- Triggered on `PATCH /api/v1/change-orders/{change_order_id}/` when status transitions to:
+  - `approved`
+  - `rejected`
+  - `void`
+- Not captured for non-decision/internal workflow states:
+  - `draft`
+  - `pending_approval`
+- Snapshot payload stores point-in-time:
+  - change-order header data
+  - linked line-item rows
+  - actor/timestamp metadata
+  - decision context (`previous_status`, `applied_financial_delta`)
+  - `origin_estimate_version` for historical replay/traceability (not primary operational usage)
 
 ## Reporting Pack v1 (RPT-01)
 
@@ -434,7 +460,11 @@ CO-02 extends existing CO endpoints with propagation behavior.
     - `due_date` (optional; defaults to `issue_date + 30 days`)
     - `tax_percent` (optional; default `0`)
     - `line_items[]` (required)
+      - `line_type` (optional; `scope` or `adjustment`, default `scope`)
       - `cost_code` (optional)
+      - `scope_item` (optional; canonical scope identity)
+      - `adjustment_reason` (optional string; required when `line_type=adjustment`)
+      - `internal_note` (optional string; internal-only context)
       - `description` (required)
       - `quantity` (required)
       - `unit` (optional; default `ea`)
@@ -442,13 +472,21 @@ CO-02 extends existing CO endpoints with propagation behavior.
   - Validation:
     - at least one line item is required
     - due date must be on/after issue date
+    - if `line_type=adjustment`, `adjustment_reason` is required
+    - if both `scope_item` and `cost_code` are provided, their cost-code identity must match
+    - `scope_item` must be accessible in the current active organization scope
   - Behavior:
     - computes line totals, subtotal, tax total, total, and balance due
     - auto-generates `invoice_number` per project (`INV-####`)
+    - stores one canonical line set (no separate internal/client editable line universes)
 
 - `GET /api/v1/invoices/{invoice_id}/`
   - Auth required
   - Returns one invoice record with line items.
+
+- `GET /api/v1/invoices/{invoice_id}/status-events/`
+  - Auth required
+  - Returns invoice status transition history (`InvoiceStatusEvent` rows), including actor and timestamp.
 
 - `PATCH /api/v1/invoices/{invoice_id}/`
   - Auth required
@@ -458,10 +496,11 @@ CO-02 extends existing CO endpoints with propagation behavior.
     - `due_date`
     - `tax_percent`
     - `line_items` (replaces existing lines)
+      - accepts same line schema as create (`line_type`, `scope_item`, adjustment metadata)
   - Allowed transitions:
     - `draft -> sent | void`
     - `sent -> draft | partially_paid | paid | overdue | void`
-    - `partially_paid -> paid | overdue | void`
+    - `partially_paid -> sent | paid | overdue | void`
     - `paid -> void`
     - `overdue -> partially_paid | paid | void`
     - `void -> (no further transitions)`
@@ -472,6 +511,14 @@ CO-02 extends existing CO endpoints with propagation behavior.
 - `POST /api/v1/invoices/{invoice_id}/send/`
   - Auth required
   - Convenience action to set status to `sent` from an allowed prior state.
+
+### Invoice Lineage Decision
+
+- Invoice lines are billing-time composition rows and may regroup/split partial scope across invoice cycles.
+- `ScopeItem` is the canonical cross-artifact identity anchor used when strict lineage is needed.
+- `EstimateLineItem` and `BudgetLine` are context rows and are not required invoice FKs.
+- Non-estimate/non-scope billing is allowed only as explicit `adjustment` lines with required reason metadata.
+- External/public invoice views should hide internal-only metadata fields (for example `internal_note`).
 
 ## Unapproved Scope Billing Protection (INV-02)
 
@@ -513,7 +560,8 @@ INV-02 extends invoice billing actions with a scope guard based on approved proj
 
 - `GET /api/v1/vendors/`
   - Auth required
-  - Returns vendors scoped to current user.
+  - Returns vendors scoped to the current active organization.
+  - Transitional fallback includes legacy null-org rows created by current user.
   - Supports optional search query:
     - `q` (matches name/email/phone/tax_id_last4, case-insensitive contains)
 
@@ -527,7 +575,7 @@ INV-02 extends invoice billing actions with a scope guard based on approved proj
     - `notes` (optional)
     - `is_active` (optional; default `true`)
   - Duplicate warning behavior:
-    - checks duplicates by exact name/email within current user scope
+    - checks duplicates by exact name/email within active organization scope
     - if duplicates are found and `duplicate_override != true`:
       - returns `409` with `error.code = "duplicate_detected"`
       - returns `data.duplicate_candidates[]`
@@ -536,7 +584,7 @@ INV-02 extends invoice billing actions with a scope guard based on approved proj
 
 - `GET /api/v1/vendors/{vendor_id}/`
   - Auth required
-  - Returns one vendor record scoped to current user.
+  - Returns one vendor record scoped to the current active organization.
 
 - `PATCH /api/v1/vendors/{vendor_id}/`
   - Auth required
@@ -573,7 +621,7 @@ INV-02 extends invoice billing actions with a scope guard based on approved proj
 
 - `POST /api/v1/projects/{project_id}/vendor-bills/`
   - Auth required
-  - Creates vendor bill in `draft` with:
+  - Creates vendor bill in `planned` with:
     - `vendor` (required)
     - `bill_number` (required)
     - `total` (required)
@@ -606,10 +654,10 @@ INV-02 extends invoice billing actions with a scope guard based on approved proj
     - `notes`
     - `status`
   - Status transitions:
-    - `draft -> received | void`
-    - `received -> draft | approved | void`
-    - `approved -> scheduled | void`
-    - `scheduled -> approved | paid | void`
+    - `planned -> received | void`
+    - `received -> approved | void`
+    - `approved -> scheduled | paid | void`
+    - `scheduled -> paid | void`
     - `paid -> void`
     - `void -> (no further transitions)`
   - Balance behavior:
@@ -642,6 +690,8 @@ INV-02 extends invoice billing actions with a scope guard based on approved proj
   - Validation:
     - required fields must be present (`direction`, `method`, `amount`)
     - amount must be greater than `0`
+  - Audit behavior:
+    - appends immutable `PaymentRecord(event_type=created, capture_source=manual_ui)`
 
 - `GET /api/v1/payments/{payment_id}/`
   - Auth required
@@ -660,11 +710,13 @@ INV-02 extends invoice billing actions with a scope guard based on approved proj
   - Status transitions:
     - `pending -> settled | failed | void`
     - `settled -> void`
-    - `failed -> pending | void`
+    - `failed -> void`
     - `void -> (no further transitions)`
   - Allocation safeguards:
     - payment `amount` cannot be reduced below existing allocated total
     - `direction` cannot be changed after allocations exist
+  - Audit behavior:
+    - appends immutable `PaymentRecord(event_type=updated|status_changed, capture_source=manual_ui)`
 
 ## Payment Allocation (PAY-02)
 
@@ -694,6 +746,8 @@ INV-02 extends invoice billing actions with a scope guard based on approved proj
     - `data.created_allocations[]`
     - `meta.allocated_total`
     - `meta.unapplied_amount`
+  - Audit behavior:
+    - appends immutable `PaymentRecord(event_type=allocation_applied, capture_source=manual_ui)`
 
 ## Project Financial Summary (FIN-01)
 
@@ -811,7 +865,10 @@ Each bucket contains:
 
 - `GET /api/v1/projects/{project_id}/audit-events/`
   - Auth required
-  - Returns immutable money-workflow audit rows scoped to current user/project.
+  - Returns immutable project-scoped financial index rows (`FinancialAuditEvent`) for current user/project.
+  - Note:
+    - this endpoint is a compatibility timeline/index surface, not the canonical source of truth for every lane.
+    - canonical payment provenance/lifecycle capture is append-only `PaymentRecord`.
   - Event coverage includes:
     - estimate status transitions
     - estimate-to-budget conversions

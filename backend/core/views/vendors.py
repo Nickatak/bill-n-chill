@@ -8,11 +8,23 @@ from rest_framework.response import Response
 
 from core.models import Vendor
 from core.serializers import VendorSerializer, VendorWriteSerializer
-from core.views.helpers import _role_gate_error_payload
+from core.views.helpers import (
+    _ensure_primary_membership,
+    _parse_request_bool,
+    _role_gate_error_payload,
+)
+
+
+def _vendor_scope_filter(user):
+    membership = _ensure_primary_membership(user)
+    return Q(organization_id=membership.organization_id) | Q(
+        organization__isnull=True,
+        created_by=user,
+    )
 
 
 def _find_duplicate_vendors(user, *, name: str, email: str, exclude_vendor_id=None):
-    rows = Vendor.objects.filter(created_by=user)
+    rows = Vendor.objects.filter(_vendor_scope_filter(user))
     if exclude_vendor_id:
         rows = rows.exclude(id=exclude_vendor_id)
 
@@ -32,8 +44,9 @@ def _find_duplicate_vendors(user, *, name: str, email: str, exclude_vendor_id=No
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def vendors_list_create_view(request):
+    scope_filter = _vendor_scope_filter(request.user)
     if request.method == "GET":
-        rows = Vendor.objects.filter(created_by=request.user).order_by("name", "id")
+        rows = Vendor.objects.filter(scope_filter).order_by("name", "id")
         search = request.query_params.get("q", "").strip()
         if search:
             rows = rows.filter(
@@ -44,6 +57,11 @@ def vendors_list_create_view(request):
             )
         return Response({"data": VendorSerializer(rows, many=True).data})
 
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm", "bookkeeping"})
+    if permission_error:
+        return Response(permission_error, status=403)
+
+    membership = _ensure_primary_membership(request.user)
     serializer = VendorWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
@@ -83,6 +101,7 @@ def vendors_list_create_view(request):
         )
 
     vendor = Vendor.objects.create(
+        organization_id=membership.organization_id,
         name=data["name"],
         vendor_type=data.get("vendor_type", Vendor.VendorType.TRADE),
         email=data.get("email", ""),
@@ -104,8 +123,9 @@ def vendors_list_create_view(request):
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def vendor_detail_view(request, vendor_id: int):
+    scope_filter = _vendor_scope_filter(request.user)
     try:
-        vendor = Vendor.objects.get(id=vendor_id, created_by=request.user)
+        vendor = Vendor.objects.get(scope_filter, id=vendor_id)
     except Vendor.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Vendor not found.", "fields": {}}},
@@ -114,6 +134,10 @@ def vendor_detail_view(request, vendor_id: int):
 
     if request.method == "GET":
         return Response({"data": VendorSerializer(vendor).data})
+
+    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm", "bookkeeping"})
+    if permission_error:
+        return Response(permission_error, status=403)
 
     serializer = VendorWriteSerializer(data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
@@ -186,7 +210,9 @@ def vendors_import_csv_view(request):
         return Response(permission_error, status=403)
 
     csv_text = request.data.get("csv_text", "")
-    dry_run = bool(request.data.get("dry_run", True))
+    dry_run = _parse_request_bool(request.data.get("dry_run", True), default=True)
+    membership = _ensure_primary_membership(request.user)
+    scope_filter = _vendor_scope_filter(request.user)
     if not csv_text or not str(csv_text).strip():
         return Response(
             {
@@ -270,7 +296,7 @@ def vendors_import_csv_view(request):
             continue
         is_active = is_active_raw in {"true", "1", "yes"}
 
-        existing = Vendor.objects.filter(created_by=request.user, name__iexact=name).first()
+        existing = Vendor.objects.filter(scope_filter, name__iexact=name).first()
         if existing:
             if dry_run:
                 rows_out.append(
@@ -322,6 +348,7 @@ def vendors_import_csv_view(request):
         else:
             Vendor.objects.create(
                 created_by=request.user,
+                organization_id=membership.organization_id,
                 name=name,
                 vendor_type=vendor_type,
                 email=email,

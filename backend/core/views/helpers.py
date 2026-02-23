@@ -13,9 +13,11 @@ from core.models import (
     Estimate,
     EstimateLineItem,
     EstimateStatusEvent,
+    ScopeItem,
     FinancialAuditEvent,
     Invoice,
     InvoiceLine,
+    InvoiceStatusEvent,
     InvoiceScopeOverrideEvent,
     Payment,
     Project,
@@ -24,103 +26,6 @@ from core.models import (
     VendorBill,
 )
 from core.utils.money import MONEY_ZERO, quantize_money
-
-ALLOWED_ESTIMATE_STATUS_TRANSITIONS = {
-    Estimate.Status.DRAFT: {
-        Estimate.Status.SENT,
-        Estimate.Status.ARCHIVED,
-    },
-    Estimate.Status.SENT: {
-        Estimate.Status.APPROVED,
-        Estimate.Status.REJECTED,
-        Estimate.Status.ARCHIVED,
-    },
-    Estimate.Status.APPROVED: set(),
-    Estimate.Status.REJECTED: set(),
-    Estimate.Status.ARCHIVED: set(),
-}
-
-ALLOWED_CHANGE_ORDER_STATUS_TRANSITIONS = {
-    ChangeOrder.Status.DRAFT: {
-        ChangeOrder.Status.PENDING_APPROVAL,
-        ChangeOrder.Status.VOID,
-    },
-    ChangeOrder.Status.PENDING_APPROVAL: {
-        ChangeOrder.Status.DRAFT,
-        ChangeOrder.Status.APPROVED,
-        ChangeOrder.Status.REJECTED,
-        ChangeOrder.Status.VOID,
-    },
-    ChangeOrder.Status.APPROVED: {ChangeOrder.Status.VOID},
-    ChangeOrder.Status.REJECTED: {
-        ChangeOrder.Status.DRAFT,
-        ChangeOrder.Status.VOID,
-    },
-    ChangeOrder.Status.VOID: set(),
-}
-
-ALLOWED_INVOICE_STATUS_TRANSITIONS = {
-    Invoice.Status.DRAFT: {Invoice.Status.SENT, Invoice.Status.VOID},
-    Invoice.Status.SENT: {
-        Invoice.Status.DRAFT,
-        Invoice.Status.PARTIALLY_PAID,
-        Invoice.Status.PAID,
-        Invoice.Status.OVERDUE,
-        Invoice.Status.VOID,
-    },
-    Invoice.Status.PARTIALLY_PAID: {
-        Invoice.Status.PAID,
-        Invoice.Status.OVERDUE,
-        Invoice.Status.VOID,
-    },
-    Invoice.Status.PAID: {Invoice.Status.VOID},
-    Invoice.Status.OVERDUE: {
-        Invoice.Status.PARTIALLY_PAID,
-        Invoice.Status.PAID,
-        Invoice.Status.VOID,
-    },
-    Invoice.Status.VOID: set(),
-}
-
-ALLOWED_VENDOR_BILL_STATUS_TRANSITIONS = {
-    VendorBill.Status.PLANNED: {
-        VendorBill.Status.RECEIVED,
-        VendorBill.Status.VOID,
-    },
-    VendorBill.Status.RECEIVED: {
-        VendorBill.Status.APPROVED,
-        VendorBill.Status.VOID,
-    },
-    VendorBill.Status.APPROVED: {
-        VendorBill.Status.SCHEDULED,
-        VendorBill.Status.PAID,
-        VendorBill.Status.VOID,
-    },
-    VendorBill.Status.SCHEDULED: {
-        VendorBill.Status.PAID,
-        VendorBill.Status.VOID,
-    },
-    VendorBill.Status.PAID: {
-        VendorBill.Status.VOID,
-    },
-    VendorBill.Status.VOID: set(),
-}
-
-ALLOWED_PAYMENT_STATUS_TRANSITIONS = {
-    Payment.Status.PENDING: {
-        Payment.Status.SETTLED,
-        Payment.Status.FAILED,
-        Payment.Status.VOID,
-    },
-    Payment.Status.SETTLED: {
-        Payment.Status.VOID,
-    },
-    Payment.Status.FAILED: {
-        Payment.Status.PENDING,
-        Payment.Status.VOID,
-    },
-    Payment.Status.VOID: set(),
-}
 
 BILLABLE_INVOICE_STATUSES = {
     Invoice.Status.SENT,
@@ -282,6 +187,24 @@ def _role_gate_error_payload(user, allowed_roles):
     )
 
 
+def _parse_request_bool(raw_value, *, default: bool = True) -> bool:
+    if raw_value is None:
+        return default
+    if isinstance(raw_value, bool):
+        return raw_value
+    if isinstance(raw_value, int):
+        return raw_value != 0
+
+    normalized = str(raw_value).strip().lower()
+    if not normalized:
+        return default
+    if normalized in {"true", "1", "yes", "y", "on"}:
+        return True
+    if normalized in {"false", "0", "no", "n", "off"}:
+        return False
+    return default
+
+
 def _calculate_line_totals(line_items_data):
     subtotal = MONEY_ZERO
     markup_total = MONEY_ZERO
@@ -332,6 +255,7 @@ def _apply_estimate_lines_and_totals(estimate, line_items_data, tax_percent, use
     code_map, missing = _resolve_cost_codes_for_user(user, normalized_items)
     if missing:
         return {"missing_cost_codes": missing}
+    membership = _ensure_primary_membership(user)
 
     tax_percent = Decimal(str(tax_percent))
     tax_total = quantize_money((subtotal + markup_total) * (tax_percent / Decimal("100")))
@@ -340,13 +264,39 @@ def _apply_estimate_lines_and_totals(estimate, line_items_data, tax_percent, use
     estimate.line_items.all().delete()
     new_lines = []
     for item in normalized_items:
+        description = (item.get("description") or "").strip()
+        normalized_scope_name = " ".join(description.lower().split())
+        unit_value = (item.get("unit") or "ea").strip().lower() or "ea"
+        scope_item = None
+        if normalized_scope_name:
+            scope_item = (
+                ScopeItem.objects.filter(
+                    organization_id=membership.organization_id,
+                    cost_code=code_map[item["cost_code"]],
+                    normalized_name=normalized_scope_name,
+                    unit=unit_value,
+                )
+                .order_by("id")
+                .first()
+            )
+            if not scope_item:
+                scope_item = ScopeItem.objects.create(
+                    organization_id=membership.organization_id,
+                    cost_code=code_map[item["cost_code"]],
+                    name=description[:255],
+                    normalized_name=normalized_scope_name,
+                    unit=unit_value,
+                    created_by=user,
+                )
+
         new_lines.append(
             EstimateLineItem(
                 estimate=estimate,
+                scope_item=scope_item,
                 cost_code=code_map[item["cost_code"]],
-                description=item["description"],
+                description=description,
                 quantity=item["quantity"],
-                unit=item.get("unit", "ea"),
+                unit=unit_value,
                 unit_cost=item["unit_cost"],
                 markup_percent=item["markup_percent"],
                 line_total=item["line_total"],
@@ -393,6 +343,16 @@ def _record_estimate_status_event(*, estimate, from_status, to_status, note, cha
     )
 
 
+def _record_invoice_status_event(*, invoice, from_status, to_status, note, changed_by):
+    InvoiceStatusEvent.objects.create(
+        invoice=invoice,
+        from_status=from_status,
+        to_status=to_status,
+        note=note,
+        changed_by=changed_by,
+    )
+
+
 def _record_financial_audit_event(
     *,
     project,
@@ -420,44 +380,14 @@ def _record_financial_audit_event(
     )
 
 
-def _validate_estimate_status_transition(*, current_status, next_status):
-    if current_status == next_status:
-        return True
-    allowed = ALLOWED_ESTIMATE_STATUS_TRANSITIONS.get(current_status, set())
-    return next_status in allowed
-
-
-def _validate_change_order_status_transition(*, current_status, next_status):
-    if current_status == next_status:
-        return True
-    allowed = ALLOWED_CHANGE_ORDER_STATUS_TRANSITIONS.get(current_status, set())
-    return next_status in allowed
-
-
-def _next_change_order_number(*, project):
-    latest = ChangeOrder.objects.filter(project=project).order_by("-number").first()
-    return (latest.number + 1) if latest else 1
-
-
-def _validate_invoice_status_transition(*, current_status, next_status):
-    if current_status == next_status:
-        return True
-    allowed = ALLOWED_INVOICE_STATUS_TRANSITIONS.get(current_status, set())
-    return next_status in allowed
-
-
-def _validate_vendor_bill_status_transition(*, current_status, next_status):
-    if current_status == next_status:
-        return True
-    allowed = ALLOWED_VENDOR_BILL_STATUS_TRANSITIONS.get(current_status, set())
-    return next_status in allowed
-
-
-def _validate_payment_status_transition(*, current_status, next_status):
-    if current_status == next_status:
-        return True
-    allowed = ALLOWED_PAYMENT_STATUS_TRANSITIONS.get(current_status, set())
-    return next_status in allowed
+def _next_change_order_family_key(*, project):
+    existing_keys = ChangeOrder.objects.filter(project=project).values_list("family_key", flat=True)
+    numeric_keys = []
+    for key in existing_keys:
+        key_str = str(key or "").strip()
+        if key_str.isdigit():
+            numeric_keys.append(int(key_str))
+    return str((max(numeric_keys) + 1) if numeric_keys else 1)
 
 
 def _is_billable_invoice_status(status):
@@ -620,11 +550,29 @@ def _resolve_invoice_cost_codes_for_user(user, line_items_data):
     return code_map, missing
 
 
+def _resolve_invoice_scope_items_for_user(user, line_items_data):
+    ids = [item["scope_item"] for item in line_items_data if item.get("scope_item")]
+    if not ids:
+        return {}, []
+
+    membership = _ensure_primary_membership(user)
+    rows = ScopeItem.objects.filter(id__in=ids, organization_id=membership.organization_id)
+    item_map = {row.id: row for row in rows}
+    missing = [scope_item_id for scope_item_id in ids if scope_item_id not in item_map]
+    return item_map, missing
+
+
 def _apply_invoice_lines_and_totals(invoice, line_items_data, tax_percent, user):
     normalized_items, subtotal = _calculate_invoice_line_totals(line_items_data)
     code_map, missing = _resolve_invoice_cost_codes_for_user(user, normalized_items)
     if missing:
         return {"missing_cost_codes": missing}
+    scope_item_map, missing_scope_items = _resolve_invoice_scope_items_for_user(
+        user,
+        normalized_items,
+    )
+    if missing_scope_items:
+        return {"missing_scope_items": missing_scope_items}
 
     tax_percent = Decimal(str(tax_percent))
     tax_total = quantize_money(subtotal * (tax_percent / Decimal("100")))
@@ -632,13 +580,44 @@ def _apply_invoice_lines_and_totals(invoice, line_items_data, tax_percent, user)
 
     invoice.line_items.all().delete()
     new_lines = []
-    for item in normalized_items:
+    invalid_lines = []
+    for index, item in enumerate(normalized_items, start=1):
+        line_type = item.get("line_type", InvoiceLine.LineType.SCOPE)
+        adjustment_reason = (item.get("adjustment_reason") or "").strip()
+        internal_note = (item.get("internal_note") or "").strip()
         cost_code_id = item.get("cost_code")
         cost_code = code_map.get(cost_code_id) if cost_code_id else None
+        scope_item_id = item.get("scope_item")
+        scope_item = scope_item_map.get(scope_item_id) if scope_item_id else None
+
+        if line_type == InvoiceLine.LineType.ADJUSTMENT and not adjustment_reason:
+            invalid_lines.append(
+                {
+                    "line_index": index,
+                    "field": "adjustment_reason",
+                    "message": "Adjustment lines require adjustment_reason.",
+                }
+            )
+            continue
+
+        if scope_item and cost_code and scope_item.cost_code_id != cost_code.id:
+            invalid_lines.append(
+                {
+                    "line_index": index,
+                    "field": "scope_item",
+                    "message": "scope_item cost code must match the line cost_code when both are set.",
+                }
+            )
+            continue
+
         new_lines.append(
             InvoiceLine(
                 invoice=invoice,
+                line_type=line_type,
                 cost_code=cost_code,
+                scope_item=scope_item,
+                adjustment_reason=adjustment_reason,
+                internal_note=internal_note,
                 description=item["description"],
                 quantity=item["quantity"],
                 unit=item.get("unit", "ea"),
@@ -646,6 +625,10 @@ def _apply_invoice_lines_and_totals(invoice, line_items_data, tax_percent, user)
                 line_total=item["line_total"],
             )
         )
+
+    if invalid_lines:
+        return {"invalid_lines": invalid_lines}
+
     InvoiceLine.objects.bulk_create(new_lines)
 
     invoice.subtotal = subtotal
@@ -685,6 +668,7 @@ def _build_budget_baseline_snapshot(estimate):
         "line_items": [
             {
                 "estimate_line_item_id": line.id,
+                "scope_item_id": line.scope_item_id,
                 "cost_code_id": line.cost_code_id,
                 "cost_code_code": line.cost_code.code,
                 "cost_code_name": line.cost_code.name,
@@ -724,6 +708,7 @@ def _create_budget_from_estimate(*, estimate, user):
     budget_lines = [
         BudgetLine(
             budget=budget,
+            scope_item=line.scope_item,
             cost_code=line.cost_code,
             description=line.description,
             budget_amount=line.line_total,

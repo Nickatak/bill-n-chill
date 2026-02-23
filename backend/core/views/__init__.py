@@ -22,7 +22,12 @@ from core.views.intake import (
     convert_lead_to_project_view,
     quick_add_lead_contact_view,
 )
-from core.views.invoices import invoice_detail_view, invoice_send_view, project_invoices_view
+from core.views.invoices import (
+    invoice_detail_view,
+    invoice_send_view,
+    invoice_status_events_view,
+    project_invoices_view,
+)
 from core.views.payments import payment_allocate_view, payment_detail_view, project_payments_view
 from core.views.projects import (
     attention_feed_view,
@@ -78,6 +83,7 @@ __all__ = [
     "project_invoices_view",
     "invoice_detail_view",
     "invoice_send_view",
+    "invoice_status_events_view",
     "project_payments_view",
     "payment_detail_view",
     "payment_allocate_view",

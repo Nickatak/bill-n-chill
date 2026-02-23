@@ -6,6 +6,7 @@ from core.models import Budget, BudgetLine
 
 
 class BudgetLineSerializer(serializers.ModelSerializer):
+    scope_item = serializers.IntegerField(source="scope_item_id", read_only=True)
     cost_code_code = serializers.CharField(source="cost_code.code", read_only=True)
     cost_code_name = serializers.CharField(source="cost_code.name", read_only=True)
     planned_amount = serializers.SerializerMethodField()
@@ -19,6 +20,7 @@ class BudgetLineSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "budget",
+            "scope_item",
             "cost_code",
             "cost_code_code",
             "cost_code_name",

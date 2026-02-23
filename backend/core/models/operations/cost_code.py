@@ -1,0 +1,60 @@
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.db import models
+
+User = get_user_model()
+
+
+class CostCode(models.Model):
+    """Reusable financial classification used across estimating/budgeting/billing line items.
+
+    Business workflow:
+    - Managed per company/user as a shared catalog.
+    - Applied to estimate lines, budget lines, and invoice lines for rollups.
+
+    Current policy:
+    - Cost codes are scoped by `organization` and unique per organization catalog.
+    - Code values are immutable identifiers in practice; renames should keep semantic continuity.
+    - `is_active=False` deprecates selection in UI flows without deleting historical references.
+    - Cost codes are non-deletable by policy to preserve historical financial traceability.
+    - Lifecycle control: `user-managed` catalog with constrained mutation (`code` immutable, no delete).
+    - Visibility: `internal-facing`.
+    """
+
+    class CostCodeQuerySet(models.QuerySet):
+        def delete(self):
+            raise ValidationError(
+                "Cost codes are non-deletable. Set is_active=false to retire a code."
+            )
+
+    objects = CostCodeQuerySet.as_manager()
+
+    code = models.CharField(max_length=50)
+    name = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+    organization = models.ForeignKey(
+        "Organization",
+        on_delete=models.PROTECT,
+        related_name="cost_codes",
+        null=True,
+        blank=True,
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="cost_codes",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["code", "name"]
+        unique_together = ("organization", "code")
+
+    def __str__(self) -> str:
+        return f"{self.code} - {self.name}"
+
+    def delete(self, using=None, keep_parents=False):
+        raise ValidationError(
+            "Cost codes are non-deletable. Set is_active=false to retire a code."
+        )

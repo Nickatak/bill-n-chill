@@ -7,7 +7,14 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import FinancialAuditEvent, Invoice, Payment, PaymentAllocation, VendorBill
+from core.models import (
+    FinancialAuditEvent,
+    Invoice,
+    Payment,
+    PaymentAllocation,
+    PaymentRecord,
+    VendorBill,
+)
 from core.serializers import (
     PaymentAllocateSerializer,
     PaymentAllocationSerializer,
@@ -18,7 +25,6 @@ from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
     _record_financial_audit_event,
     _role_gate_error_payload,
-    _validate_payment_status_transition,
     _validate_project_for_user,
 )
 
@@ -123,6 +129,50 @@ def _direction_target_mismatch(direction: str, target_type: str) -> bool:
     )
 
 
+def _build_payment_snapshot(payment: Payment) -> dict:
+    return {
+        "payment": {
+            "id": payment.id,
+            "project_id": payment.project_id,
+            "direction": payment.direction,
+            "method": payment.method,
+            "status": payment.status,
+            "amount": str(payment.amount),
+            "payment_date": payment.payment_date.isoformat() if payment.payment_date else None,
+            "reference_number": payment.reference_number,
+            "notes": payment.notes,
+            "allocated_total": str(payment.allocated_total),
+            "unapplied_amount": str(payment.unapplied_amount),
+        }
+    }
+
+
+def _record_payment_record(
+    *,
+    payment: Payment,
+    event_type: str,
+    capture_source: str,
+    recorded_by,
+    from_status: str | None = None,
+    to_status: str | None = None,
+    source_reference: str = "",
+    note: str = "",
+    metadata: dict | None = None,
+):
+    PaymentRecord.objects.create(
+        payment=payment,
+        event_type=event_type,
+        capture_source=capture_source,
+        source_reference=source_reference,
+        from_status=from_status,
+        to_status=to_status,
+        note=note,
+        snapshot_json=_build_payment_snapshot(payment),
+        metadata_json=metadata or {},
+        recorded_by=recorded_by,
+    )
+
+
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_payments_view(request, project_id: int):
@@ -180,6 +230,16 @@ def project_payments_view(request, project_id: int):
         notes=data.get("notes", ""),
         created_by=request.user,
     )
+    _record_payment_record(
+        payment=payment,
+        event_type=PaymentRecord.EventType.CREATED,
+        capture_source=PaymentRecord.CaptureSource.MANUAL_UI,
+        recorded_by=request.user,
+        from_status=None,
+        to_status=payment.status,
+        note="Payment created.",
+        metadata={"direction": payment.direction, "method": payment.method},
+    )
     _record_financial_audit_event(
         project=project,
         event_type=FinancialAuditEvent.EventType.PAYMENT_UPDATED,
@@ -223,7 +283,7 @@ def payment_detail_view(request, payment_id: int):
     has_allocations = payment.allocations.exists()
     previous_status = payment.status
 
-    if "status" in data and not _validate_payment_status_transition(
+    if "status" in data and not Payment.is_transition_allowed(
         current_status=payment.status,
         next_status=data["status"],
     ):
@@ -293,6 +353,24 @@ def payment_detail_view(request, payment_id: int):
         } & {Payment.Status.SETTLED}:
             _recalculate_payment_allocation_targets(payment)
         if len(update_fields) > 1:
+            _record_payment_record(
+                payment=payment,
+                event_type=(
+                    PaymentRecord.EventType.STATUS_CHANGED
+                    if status_changed
+                    else PaymentRecord.EventType.UPDATED
+                ),
+                capture_source=PaymentRecord.CaptureSource.MANUAL_UI,
+                recorded_by=request.user,
+                from_status=previous_status,
+                to_status=payment.status,
+                note="Payment updated.",
+                metadata={
+                    "direction": payment.direction,
+                    "method": payment.method,
+                    "status_changed": status_changed,
+                },
+            )
             _record_financial_audit_event(
                 project=payment.project,
                 event_type=FinancialAuditEvent.EventType.PAYMENT_UPDATED,
@@ -495,6 +573,26 @@ def payment_allocate_view(request, payment_id: int):
                     "target_id": target_id,
                 },
             )
+        _record_payment_record(
+            payment=payment,
+            event_type=PaymentRecord.EventType.ALLOCATION_APPLIED,
+            capture_source=PaymentRecord.CaptureSource.MANUAL_UI,
+            recorded_by=request.user,
+            from_status=payment.status,
+            to_status=payment.status,
+            note=f"Applied {len(resolved_targets)} allocation row(s).",
+            metadata={
+                "allocation_count": len(resolved_targets),
+                "allocations": [
+                    {
+                        "target_type": "invoice" if invoice else "vendor_bill",
+                        "target_id": invoice.id if invoice else vendor_bill.id,
+                        "applied_amount": str(row["applied_amount"]),
+                    }
+                    for row, invoice, vendor_bill in resolved_targets
+                ],
+            },
+        )
 
     payment.refresh_from_db()
     payment = Payment.objects.select_related("project").prefetch_related("allocations").get(id=payment.id)

@@ -19,6 +19,7 @@ from core.views import (
     health_view,
     invoice_detail_view,
     invoice_send_view,
+    invoice_status_events_view,
     login_view,
     me_view,
     register_view,
@@ -166,6 +167,11 @@ urlpatterns = [
     ),
     path("invoices/<int:invoice_id>/", invoice_detail_view, name="invoice-detail"),
     path("invoices/<int:invoice_id>/send/", invoice_send_view, name="invoice-send"),
+    path(
+        "invoices/<int:invoice_id>/status-events/",
+        invoice_status_events_view,
+        name="invoice-status-events",
+    ),
     path(
         "vendor-bills/<int:vendor_bill_id>/",
         vendor_bill_detail_view,

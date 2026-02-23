@@ -25,6 +25,8 @@ class Project(models.Model):
     - `contract_value_original` is set at project creation and treated as immutable.
     - `contract_value_current` is system-derived financial truth (for example approved CO deltas).
     - `site_address` is job-location context and is distinct from `Customer.billing_address`.
+    - Lifecycle control: `user-managed`.
+    - Visibility: `internal-facing` primary record with selective client-facing derivatives.
     """
 
     class Status(models.TextChoices):
@@ -33,6 +35,16 @@ class Project(models.Model):
         ON_HOLD = "on_hold", "On Hold"
         COMPLETED = "completed", "Completed"
         CANCELLED = "cancelled", "Cancelled"
+
+    # Transition-map format:
+    # {from_status: {allowed_to_status_1, allowed_to_status_2, ...}}
+    ALLOWED_STATUS_TRANSITIONS = {
+        Status.PROSPECT: {Status.ACTIVE, Status.CANCELLED},
+        Status.ACTIVE: {Status.ON_HOLD, Status.COMPLETED, Status.CANCELLED},
+        Status.ON_HOLD: {Status.ACTIVE, Status.COMPLETED, Status.CANCELLED},
+        Status.COMPLETED: set(),
+        Status.CANCELLED: set(),
+    }
 
     customer = models.ForeignKey(
         "Customer",
@@ -75,55 +87,36 @@ class Project(models.Model):
     def __str__(self) -> str:
         return self.name
 
+    @classmethod
+    def is_transition_allowed(cls, current_status: str, next_status: str) -> bool:
+        if current_status == next_status:
+            return True
+        return next_status in cls.ALLOWED_STATUS_TRANSITIONS.get(current_status, set())
 
-class CostCode(models.Model):
-    """Reusable financial classification used across estimating/budgeting/billing line items.
+    def clean(self):
+        errors = {}
 
-    Business workflow:
-    - Managed per company/user as a shared catalog.
-    - Applied to estimate lines, budget lines, and invoice lines for rollups.
-
-    Current policy:
-    - Cost codes are scoped by `organization` and unique per organization catalog.
-    - Code values are immutable identifiers in practice; renames should keep semantic continuity.
-    - `is_active=False` deprecates selection in UI flows without deleting historical references.
-    - Cost codes are non-deletable by policy to preserve historical financial traceability.
-    """
-
-    class CostCodeQuerySet(models.QuerySet):
-        def delete(self):
-            raise ValidationError(
-                "Cost codes are non-deletable. Set is_active=false to retire a code."
+        if (
+            self.start_date_planned
+            and self.end_date_planned
+            and self.end_date_planned < self.start_date_planned
+        ):
+            errors.setdefault("end_date_planned", []).append(
+                "Planned end date must be on or after planned start date."
             )
 
-    objects = CostCodeQuerySet.as_manager()
+        if self.pk:
+            previous_status = (
+                type(self).objects.filter(pk=self.pk).values_list("status", flat=True).first()
+            )
+            if previous_status and not self.is_transition_allowed(previous_status, self.status):
+                errors.setdefault("status", []).append(
+                    f"Invalid project status transition: {previous_status} -> {self.status}."
+                )
 
-    code = models.CharField(max_length=50)
-    name = models.CharField(max_length=255)
-    is_active = models.BooleanField(default=True)
-    organization = models.ForeignKey(
-        "Organization",
-        on_delete=models.PROTECT,
-        related_name="cost_codes",
-        null=True,
-        blank=True,
-    )
-    created_by = models.ForeignKey(
-        User,
-        on_delete=models.PROTECT,
-        related_name="cost_codes",
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+        if errors:
+            raise ValidationError(errors)
 
-    class Meta:
-        ordering = ["code", "name"]
-        unique_together = ("organization", "code")
-
-    def __str__(self) -> str:
-        return f"{self.code} - {self.name}"
-
-    def delete(self, using=None, keep_parents=False):
-        raise ValidationError(
-            "Cost codes are non-deletable. Set is_active=false to retire a code."
-        )
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
