@@ -1,0 +1,1 @@
+"""Accounts receivable API views."""

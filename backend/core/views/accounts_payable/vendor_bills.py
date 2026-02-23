@@ -1,3 +1,5 @@
+"""Accounts payable vendor-bill endpoints and allocation lifecycle."""
+
 from datetime import timedelta
 from decimal import Decimal
 
@@ -32,6 +34,7 @@ def _find_duplicate_vendor_bills(
     bill_number: str,
     exclude_vendor_bill_id=None,
 ):
+    """Return same-user vendor bills matching vendor+bill number (case-insensitive)."""
     bill_number_norm = (bill_number or "").strip()
     if not vendor_id or not bill_number_norm:
         return []
@@ -48,6 +51,7 @@ def _find_duplicate_vendor_bills(
 
 
 def _allocation_total(*, vendor_bill):
+    """Return the quantized sum of allocations currently attached to a vendor bill."""
     total = (
         VendorBillAllocation.objects.filter(vendor_bill=vendor_bill).aggregate(sum=Sum("amount"))["sum"]
         or MONEY_ZERO
@@ -56,6 +60,7 @@ def _allocation_total(*, vendor_bill):
 
 
 def _validate_allocation_budget_lines(*, project, user, allocations):
+    """Resolve allocation budget lines scoped to the same project and owner."""
     budget_line_ids = [entry["budget_line"] for entry in allocations]
     if not budget_line_ids:
         return {}
@@ -68,6 +73,7 @@ def _validate_allocation_budget_lines(*, project, user, allocations):
 
 
 def _sync_vendor_bill_allocations(*, vendor_bill, allocations):
+    """Replace all allocations for a vendor bill with the provided allocation set."""
     VendorBillAllocation.objects.filter(vendor_bill=vendor_bill).delete()
     if not allocations:
         return
@@ -85,6 +91,7 @@ def _sync_vendor_bill_allocations(*, vendor_bill, allocations):
 
 
 def _record_vendor_bill_status_snapshot(*, vendor_bill, capture_status, previous_status, acted_by):
+    """Persist an immutable vendor-bill snapshot for status transition auditability."""
     allocation_rows = list(
         VendorBillAllocation.objects.filter(vendor_bill=vendor_bill)
         .select_related("budget_line", "budget_line__cost_code")
@@ -132,6 +139,76 @@ def _record_vendor_bill_status_snapshot(*, vendor_bill, capture_status, previous
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_vendor_bills_view(request, project_id: int):
+    """Project vendor-bill collection endpoint: `GET` lists bills, `POST` creates a planned bill.
+
+    Contract:
+    - `GET` (user/project-scoped list):
+      - `200`: vendor-bill list returned.
+        - Guarantees: no object mutations. `[APP]`
+      - `404`: project not found for this user.
+        - Guarantees: no object mutations. `[APP]`
+    - `POST` (requires role `owner|pm|bookkeeping`):
+      - `201`: planned vendor bill created and returned.
+        - Guarantees:
+          - newly created vendor bill status is `planned`. `[APP]`
+          - newly created vendor bill satisfies `due_date >= issue_date`. `[DB+APP]`
+          - allocation total (if provided) is less than or equal to bill total. `[APP]`
+      - `400`: validation or business-rule failure.
+        - Guarantees: no durable partial mutation from failed request path. `[DB+APP]`
+      - `403`: role gate denied for create.
+        - Guarantees: no object mutations. `[APP]`
+      - `404`: project not found for this user.
+        - Guarantees: no object mutations. `[APP]`
+      - `409`: duplicate non-void vendor bill exists for `vendor + bill_number`.
+        - Guarantees: no object mutations. `[APP]`
+
+    - Preconditions:
+      - caller is authenticated (`IsAuthenticated`).
+      - project must resolve through user scope (`_validate_project_for_user`).
+      - caller role must be `owner|pm|bookkeeping`.
+
+    - Object mutations:
+      - `GET`: none.
+      - `POST`:
+        - Creates:
+          - Standard: `VendorBill` and optional `VendorBillAllocation` rows.
+          - Audit: `FinancialAuditEvent`.
+        - Edits:
+          - Standard: initial computed `balance_due` on the created bill.
+          - Audit: none.
+        - Deletes: none.
+
+    - Incoming payload (`POST`) shape:
+      - `_comment_*` keys in this example are documentation-only (not accepted API fields).
+      - JSON map:
+        {
+          "_comment_required": "vendor, bill_number, and total are required",
+          "vendor": "integer (required)",
+          "bill_number": "string (required)",
+          "total": "decimal (required)",
+          "issue_date": "YYYY-MM-DD (optional, default=today)",
+          "due_date": "YYYY-MM-DD (optional, must be >= issue_date, default=issue_date+30d)",
+          "scheduled_for": "YYYY-MM-DD (optional)",
+          "notes": "string (optional)",
+          "allocations": [
+            {
+              "budget_line": "integer (required)",
+              "amount": "decimal (required)",
+              "note": "string (optional)"
+            }
+          ]
+        }
+
+    - Idempotency and retry semantics:
+      - `GET` is read-only and idempotent.
+      - `POST` is not idempotent.
+      - duplicate-protected retries may return `409` until conflicting row is voided.
+
+    - Test anchors:
+      - `backend/core/tests/test_vendor_bills.py::test_vendor_bill_create_and_project_list`
+      - `backend/core/tests/test_vendor_bills.py::test_vendor_bill_duplicate_requires_existing_match_to_be_void`
+      - `backend/core/tests/test_vendor_bills.py::test_vendor_bill_create_rolls_back_when_audit_write_fails`
+    """
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -274,18 +351,18 @@ def project_vendor_bills_view(request, project_id: int):
         )
         if allocations:
             _sync_vendor_bill_allocations(vendor_bill=vendor_bill, allocations=allocations)
-    _record_financial_audit_event(
-        project=project,
-        event_type=FinancialAuditEvent.EventType.VENDOR_BILL_UPDATED,
-        object_type="vendor_bill",
-        object_id=vendor_bill.id,
-        from_status="",
-        to_status=VendorBill.Status.PLANNED,
-        amount=vendor_bill.total,
-        note="Vendor bill created.",
-        created_by=request.user,
-        metadata={"bill_number": vendor_bill.bill_number},
-    )
+        _record_financial_audit_event(
+            project=project,
+            event_type=FinancialAuditEvent.EventType.VENDOR_BILL_UPDATED,
+            object_type="vendor_bill",
+            object_id=vendor_bill.id,
+            from_status="",
+            to_status=VendorBill.Status.PLANNED,
+            amount=vendor_bill.total,
+            note="Vendor bill created.",
+            created_by=request.user,
+            metadata={"bill_number": vendor_bill.bill_number},
+        )
     return Response(
         {
             "data": VendorBillSerializer(
@@ -302,6 +379,75 @@ def project_vendor_bills_view(request, project_id: int):
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def vendor_bill_detail_view(request, vendor_bill_id: int):
+    """Fetch or patch one vendor bill with lifecycle and allocation guardrails.
+
+    Contract:
+    - `GET`:
+      - `200`: hydrated vendor-bill detail returned.
+        - Guarantees: no object mutations. `[APP]`
+      - `404`: vendor bill not found for this user.
+        - Guarantees: no object mutations. `[APP]`
+    - `PATCH` (requires role `owner|pm|bookkeeping`):
+      - `200`: patch applied and updated bill returned.
+        - Guarantees:
+          - status/date/allocation invariants remain valid. `[DB+APP]`
+          - bill `balance_due` remains aligned with status and totals. `[APP]`
+      - `400`: validation/transition/allocation failure.
+        - Guarantees: no durable partial mutation from failed request path. `[DB+APP]`
+      - `403`: role gate denied for patch.
+        - Guarantees: no object mutations. `[APP]`
+      - `404`: vendor bill not found for this user.
+        - Guarantees: no object mutations. `[APP]`
+      - `409`: duplicate non-void vendor bill would result from identity change.
+        - Guarantees: no object mutations. `[APP]`
+
+    - Preconditions:
+      - caller is authenticated (`IsAuthenticated`).
+      - vendor bill must belong to requesting user.
+      - caller role must be `owner|pm|bookkeeping`.
+
+    - Object mutations:
+      - `GET`: none.
+      - `PATCH`:
+        - Creates:
+          - Standard: replacement `VendorBillAllocation` rows when `allocations` is provided.
+          - Audit: `FinancialAuditEvent`; `VendorBillSnapshot` on captured terminal transitions.
+        - Edits:
+          - Standard: `VendorBill` fields (`vendor`, dates, status, totals, notes, balance).
+          - Audit: none.
+        - Deletes: existing `VendorBillAllocation` rows when replacing allocations.
+
+    - Incoming payload (`PATCH`) shape:
+      - `_comment_*` keys in this example are documentation-only (not accepted API fields).
+      - JSON map:
+        {
+          "vendor": "integer (optional)",
+          "_comment_bill_number_immutable": "bill_number cannot be changed after creation",
+          "status": "planned|received|approved|scheduled|paid|void (optional)",
+          "issue_date": "YYYY-MM-DD (optional)",
+          "due_date": "YYYY-MM-DD (optional, must be >= issue_date)",
+          "scheduled_for": "YYYY-MM-DD (required when status=scheduled)",
+          "total": "decimal (optional)",
+          "notes": "string (optional)",
+          "allocations": [
+            {
+              "budget_line": "integer (required)",
+              "amount": "decimal (required)",
+              "note": "string (optional)"
+            }
+          ]
+        }
+
+    - Idempotency and retry semantics:
+      - `GET` is read-only and idempotent.
+      - `PATCH` is conditionally idempotent when payload values equal persisted values.
+      - failed `PATCH` retries do not persist partial writes.
+
+    - Test anchors:
+      - `backend/core/tests/test_vendor_bills.py::test_vendor_bill_status_transition_and_balance_due`
+      - `backend/core/tests/test_vendor_bills.py::test_vendor_bill_patch_rejects_bill_number_change`
+      - `backend/core/tests/test_vendor_bills.py::test_vendor_bill_status_transitions_create_snapshots_for_all_captured_statuses`
+    """
     try:
         vendor_bill = VendorBill.objects.select_related("project", "vendor").get(
             id=vendor_bill_id,

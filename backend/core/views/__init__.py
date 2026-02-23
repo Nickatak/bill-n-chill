@@ -1,13 +1,22 @@
-from core.views.accounting import accounting_sync_event_retry_view, project_accounting_sync_events_view
+"""Public export surface for API views used by URL routing."""
+
+from core.views.shared_operations.accounting import (
+    accounting_sync_event_retry_view,
+    project_accounting_sync_events_view,
+)
 from core.views.auth import health_view, login_view, me_view, register_view
-from core.views.budgets import budget_line_detail_view, project_budgets_view
-from core.views.change_orders import (
+from core.views.estimating.budgets import budget_line_detail_view, project_budgets_view
+from core.views.change_orders.change_orders import (
     change_order_clone_revision_view,
     change_order_detail_view,
     project_change_orders_view,
 )
-from core.views.cost_codes import cost_code_detail_view, cost_codes_import_csv_view, cost_codes_list_create_view
-from core.views.estimates import (
+from core.views.shared_operations.cost_codes import (
+    cost_code_detail_view,
+    cost_codes_import_csv_view,
+    cost_codes_list_create_view,
+)
+from core.views.estimating.estimates import (
     estimate_clone_version_view,
     estimate_convert_to_budget_view,
     estimate_detail_view,
@@ -16,20 +25,20 @@ from core.views.estimates import (
     public_estimate_detail_view,
     project_estimates_view,
 )
-from core.views.intake import (
+from core.views.shared_operations.intake import (
     contact_detail_view,
     contacts_list_view,
     convert_lead_to_project_view,
     quick_add_lead_contact_view,
 )
-from core.views.invoices import (
+from core.views.accounts_receivable.invoices import (
     invoice_detail_view,
     invoice_send_view,
     invoice_status_events_view,
     project_invoices_view,
 )
-from core.views.payments import payment_allocate_view, payment_detail_view, project_payments_view
-from core.views.projects import (
+from core.views.cash_management.payments import payment_allocate_view, payment_detail_view, project_payments_view
+from core.views.shared_operations.projects import (
     attention_feed_view,
     change_impact_summary_view,
     portfolio_snapshot_view,
@@ -41,8 +50,8 @@ from core.views.projects import (
     quick_jump_search_view,
     projects_list_view,
 )
-from core.views.vendor_bills import project_vendor_bills_view, vendor_bill_detail_view
-from core.views.vendors import vendor_detail_view, vendors_import_csv_view, vendors_list_create_view
+from core.views.accounts_payable.vendor_bills import project_vendor_bills_view, vendor_bill_detail_view
+from core.views.shared_operations.vendors import vendor_detail_view, vendors_import_csv_view, vendors_list_create_view
 
 __all__ = [
     "health_view",

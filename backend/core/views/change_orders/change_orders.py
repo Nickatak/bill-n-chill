@@ -1,3 +1,5 @@
+"""Change-order creation, revision, and lifecycle endpoints."""
+
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
@@ -33,6 +35,13 @@ from core.views.helpers import (
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_change_orders_view(request, project_id: int):
+    """List project change orders or create a new family revision-1 draft.
+
+    Contract:
+    - `GET`: project/user-scoped list with line items.
+    - `POST`: requires role `owner|pm`, active budget, approved origin estimate, and valid line totals.
+    - Create writes are atomic: change-order row, optional lines, financial audit event.
+    """
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -197,6 +206,14 @@ def project_change_orders_view(request, project_id: int):
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def change_order_detail_view(request, change_order_id: int):
+    """Fetch or update a change order with strict revision and status semantics.
+
+    Contract:
+    - `GET`: returns change-order detail.
+    - `PATCH`: requires role `owner|pm`; only latest revision can be edited.
+    - Enforces transition rules, line/amount consistency, and origin-estimate immutability policy.
+    - Atomic update path may propagate financial deltas to project/budget and append immutable snapshot/audit rows.
+    """
     try:
         change_order = ChangeOrder.objects.select_related("project").prefetch_related(
                 "line_items", "line_items__budget_line", "line_items__budget_line__cost_code"
@@ -475,6 +492,13 @@ def change_order_detail_view(request, change_order_id: int):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def change_order_clone_revision_view(request, change_order_id: int):
+    """Clone the latest change-order revision into a new draft revision in the same family.
+
+    Contract:
+    - Requires role `owner|pm`.
+    - Source must be latest family revision.
+    - Clone writes are atomic: cloned row, cloned lines, financial audit event.
+    """
     try:
         change_order = (
             ChangeOrder.objects.select_related("project", "origin_estimate")

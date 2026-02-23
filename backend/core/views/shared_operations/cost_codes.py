@@ -1,3 +1,5 @@
+"""Shared operational cost-code endpoints."""
+
 import csv
 from io import StringIO
 
@@ -22,6 +24,12 @@ def _cost_code_scope_filter(user):
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def cost_codes_list_create_view(request):
+    """List organization-scoped cost codes or create a new cost code.
+
+    Contract:
+    - `GET`: organization/user-scoped list.
+    - `POST`: requires role `owner|pm`.
+    """
     scope_filter = _cost_code_scope_filter(request.user)
     if request.method == "GET":
         rows = CostCode.objects.filter(scope_filter).order_by("code", "name")
@@ -44,6 +52,7 @@ def cost_codes_list_create_view(request):
 @api_view(["PATCH"])
 @permission_classes([IsAuthenticated])
 def cost_code_detail_view(request, cost_code_id: int):
+    """Patch mutable cost-code fields while enforcing `code` immutability."""
     permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
     if permission_error:
         return Response(permission_error, status=403)
@@ -82,6 +91,7 @@ def cost_code_detail_view(request, cost_code_id: int):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def cost_codes_import_csv_view(request):
+    """Import cost codes from CSV in preview/apply mode with header and row validation."""
     permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
     if permission_error:
         return Response(permission_error, status=403)

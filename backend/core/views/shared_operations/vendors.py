@@ -1,3 +1,5 @@
+"""Shared operational vendor endpoints."""
+
 import csv
 from io import StringIO
 
@@ -44,6 +46,7 @@ def _find_duplicate_vendors(user, *, name: str, email: str, exclude_vendor_id=No
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def vendors_list_create_view(request):
+    """List scoped vendors or create a vendor with duplicate-detection guardrails."""
     scope_filter = _vendor_scope_filter(request.user)
     if request.method == "GET":
         rows = Vendor.objects.filter(scope_filter).order_by("name", "id")
@@ -123,6 +126,7 @@ def vendors_list_create_view(request):
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def vendor_detail_view(request, vendor_id: int):
+    """Fetch or patch one vendor with duplicate checks on identity-changing updates."""
     scope_filter = _vendor_scope_filter(request.user)
     try:
         vendor = Vendor.objects.get(scope_filter, id=vendor_id)
@@ -205,6 +209,7 @@ def vendor_detail_view(request, vendor_id: int):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def vendors_import_csv_view(request):
+    """Import vendors from CSV in preview/apply mode with strict header validation."""
     permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm", "bookkeeping"})
     if permission_error:
         return Response(permission_error, status=403)

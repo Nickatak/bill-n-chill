@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.core.exceptions import ValidationError
 
 from core.tests.common import *
@@ -507,3 +509,28 @@ class PaymentTests(TestCase):
         )
         self.assertEqual(invalid_amount.status_code, 400)
         self.assertIn("amount", invalid_amount.json())
+
+    def test_payment_create_rolls_back_when_audit_write_fails(self):
+        with patch(
+            "core.views.cash_management.payments._record_financial_audit_event",
+            side_effect=RuntimeError("audit-write-failed"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.post(
+                    f"/api/v1/projects/{self.project.id}/payments/",
+                    data={
+                        "direction": "inbound",
+                        "method": "ach",
+                        "amount": "1200.00",
+                        "payment_date": "2026-02-13",
+                        "reference_number": "DEP-ROLLBACK",
+                        "notes": "Atomic rollback test.",
+                    },
+                    content_type="application/json",
+                    HTTP_AUTHORIZATION=f"Token {self.token.key}",
+                )
+
+        self.assertFalse(
+            Payment.objects.filter(project=self.project, reference_number="DEP-ROLLBACK").exists()
+        )
+        self.assertFalse(PaymentRecord.objects.filter(note="Payment created.").exists())

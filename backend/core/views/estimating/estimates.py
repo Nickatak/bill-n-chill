@@ -1,3 +1,5 @@
+"""Estimate authoring, public sharing, and budget-conversion endpoints."""
+
 from datetime import timedelta
 from decimal import Decimal
 
@@ -32,6 +34,7 @@ from core.views.helpers import (
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def public_estimate_detail_view(request, public_token: str):
+    """Return public estimate detail for share links, including lightweight project context."""
     try:
         estimate = (
             Estimate.objects.select_related("project__customer")
@@ -130,6 +133,13 @@ def _ensure_budget_from_approved_estimate(*, estimate, user, note: str):
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_estimates_view(request, project_id: int):
+    """List project estimates or create a new estimate version within a title family.
+
+    Contract:
+    - `GET`: user/project-scoped list.
+    - `POST`: requires role `owner|pm`, at least one line item, and valid cost-code scope.
+    - Applies duplicate-submit suppression window and archives superseded family rows after create.
+    """
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -272,6 +282,14 @@ def project_estimates_view(request, project_id: int):
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def estimate_detail_view(request, estimate_id: int):
+    """Fetch or patch one estimate with draft-locking and status-transition enforcement.
+
+    Contract:
+    - `GET`: returns estimate detail.
+    - `PATCH`: requires role `owner|pm`; non-draft value edits are blocked.
+    - Records immutable status events for workflow transitions.
+    - Approved transitions trigger budget conversion guard path.
+    """
     try:
         estimate = Estimate.objects.get(id=estimate_id, created_by=request.user)
     except Estimate.DoesNotExist:
@@ -438,6 +456,7 @@ def estimate_detail_view(request, estimate_id: int):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def estimate_clone_version_view(request, estimate_id: int):
+    """Create a new draft revision from a prior estimate version in the same title family."""
     try:
         estimate = Estimate.objects.prefetch_related("line_items").get(
             id=estimate_id,
@@ -535,6 +554,7 @@ def estimate_clone_version_view(request, estimate_id: int):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def estimate_duplicate_view(request, estimate_id: int):
+    """Duplicate an estimate into a draft for same or another project/title context."""
     try:
         estimate = Estimate.objects.prefetch_related("line_items").get(
             id=estimate_id,
@@ -641,6 +661,7 @@ def estimate_duplicate_view(request, estimate_id: int):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def estimate_status_events_view(request, estimate_id: int):
+    """Return immutable estimate status transition history."""
     try:
         estimate = Estimate.objects.get(id=estimate_id, created_by=request.user)
     except Estimate.DoesNotExist:
@@ -656,6 +677,7 @@ def estimate_status_events_view(request, estimate_id: int):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def estimate_convert_to_budget_view(request, estimate_id: int):
+    """Convert an approved estimate to a budget (idempotent if already converted)."""
     try:
         estimate = (
             Estimate.objects.select_related("project")

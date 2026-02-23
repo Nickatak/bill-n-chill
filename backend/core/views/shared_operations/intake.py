@@ -1,3 +1,5 @@
+"""Shared lead/contact intake and conversion endpoints."""
+
 import re
 
 from django.db import transaction
@@ -134,6 +136,7 @@ def _record_customer_record(
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def contacts_list_view(request):
+    """List user-owned lead contacts with optional free-text filtering."""
     rows = LeadContact.objects.filter(created_by=request.user).order_by("-created_at")
     query = (request.query_params.get("q") or "").strip()
     if query:
@@ -149,6 +152,12 @@ def contacts_list_view(request):
 @api_view(["GET", "PATCH", "DELETE"])
 @permission_classes([IsAuthenticated])
 def contact_detail_view(request, contact_id: int):
+    """Fetch, update, or delete a lead contact with immutable record capture on writes.
+
+    Contract:
+    - `PATCH`: appends `LeadContactRecord(updated|status_changed)` in-transaction.
+    - `DELETE`: appends `LeadContactRecord(deleted)` before delete in-transaction.
+    """
     try:
         contact = LeadContact.objects.get(id=contact_id, created_by=request.user)
     except LeadContact.DoesNotExist:
@@ -167,48 +176,56 @@ def contact_detail_view(request, contact_id: int):
         return Response({"data": LeadContactManageSerializer(contact).data})
 
     if request.method == "DELETE":
-        _record_lead_contact_record(
-            lead=contact,
-            event_type=LeadContactRecord.EventType.DELETED,
-            capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
-            recorded_by=request.user,
-            from_status=contact.status,
-            to_status=None,
-            note="Lead contact deleted.",
-        )
-        contact.delete()
+        with transaction.atomic():
+            _record_lead_contact_record(
+                lead=contact,
+                event_type=LeadContactRecord.EventType.DELETED,
+                capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
+                recorded_by=request.user,
+                from_status=contact.status,
+                to_status=None,
+                note="Lead contact deleted.",
+            )
+            contact.delete()
         return Response(status=204)
 
-    previous_status = contact.status
-    serializer = LeadContactManageSerializer(contact, data=request.data, partial=True)
-    serializer.is_valid(raise_exception=True)
-    serializer.save()
-    if contact.status != previous_status:
-        _record_lead_contact_record(
-            lead=contact,
-            event_type=LeadContactRecord.EventType.STATUS_CHANGED,
-            capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
-            recorded_by=request.user,
-            from_status=previous_status,
-            to_status=contact.status,
-            note="Lead contact status changed.",
-        )
-    else:
-        _record_lead_contact_record(
-            lead=contact,
-            event_type=LeadContactRecord.EventType.UPDATED,
-            capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
-            recorded_by=request.user,
-            from_status=previous_status,
-            to_status=contact.status,
-            note="Lead contact updated.",
-        )
+    with transaction.atomic():
+        previous_status = contact.status
+        serializer = LeadContactManageSerializer(contact, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        if contact.status != previous_status:
+            _record_lead_contact_record(
+                lead=contact,
+                event_type=LeadContactRecord.EventType.STATUS_CHANGED,
+                capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
+                recorded_by=request.user,
+                from_status=previous_status,
+                to_status=contact.status,
+                note="Lead contact status changed.",
+            )
+        else:
+            _record_lead_contact_record(
+                lead=contact,
+                event_type=LeadContactRecord.EventType.UPDATED,
+                capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
+                recorded_by=request.user,
+                from_status=previous_status,
+                to_status=contact.status,
+                note="Lead contact updated.",
+            )
     return Response({"data": LeadContactManageSerializer(contact).data})
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def quick_add_lead_contact_view(request):
+    """Create a lead quickly, with duplicate resolution flow and immutable capture rows.
+
+    Contract:
+    - Supports duplicate resolutions: `use_existing|merge_existing|create_anyway`.
+    - Create/merge writes append immutable `LeadContactRecord` rows atomically.
+    """
     initial_contract_value = request.data.get("initial_contract_value", None)
     if initial_contract_value == "":
         initial_contract_value = None
@@ -298,44 +315,45 @@ def quick_add_lead_contact_view(request):
         target = next(lead for lead in duplicates if lead.id == target_id)
 
         if duplicate_resolution == "merge_existing":
-            previous_status = target.status
-            if payload["full_name"]:
-                target.full_name = payload["full_name"]
-            if payload["phone"]:
-                target.phone = payload["phone"]
-            if payload["project_address"]:
-                target.project_address = payload["project_address"]
-            if payload["email"]:
-                target.email = payload["email"]
-            if payload.get("initial_contract_value") is not None:
-                target.initial_contract_value = payload["initial_contract_value"]
-            target.source = payload["source"] or target.source
-            if payload["notes"]:
-                if target.notes:
-                    target.notes = f"{target.notes}\n{payload['notes']}"
+            with transaction.atomic():
+                previous_status = target.status
+                if payload["full_name"]:
+                    target.full_name = payload["full_name"]
+                if payload["phone"]:
+                    target.phone = payload["phone"]
+                if payload["project_address"]:
+                    target.project_address = payload["project_address"]
+                if payload["email"]:
+                    target.email = payload["email"]
+                if payload.get("initial_contract_value") is not None:
+                    target.initial_contract_value = payload["initial_contract_value"]
+                target.source = payload["source"] or target.source
+                if payload["notes"]:
+                    if target.notes:
+                        target.notes = f"{target.notes}\n{payload['notes']}"
+                    else:
+                        target.notes = payload["notes"]
+                target.save()
+                if target.status != previous_status:
+                    _record_lead_contact_record(
+                        lead=target,
+                        event_type=LeadContactRecord.EventType.STATUS_CHANGED,
+                        capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
+                        recorded_by=request.user,
+                        from_status=previous_status,
+                        to_status=target.status,
+                        note="Lead contact merged with duplicate payload (status changed).",
+                    )
                 else:
-                    target.notes = payload["notes"]
-            target.save()
-            if target.status != previous_status:
-                _record_lead_contact_record(
-                    lead=target,
-                    event_type=LeadContactRecord.EventType.STATUS_CHANGED,
-                    capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
-                    recorded_by=request.user,
-                    from_status=previous_status,
-                    to_status=target.status,
-                    note="Lead contact merged with duplicate payload (status changed).",
-                )
-            else:
-                _record_lead_contact_record(
-                    lead=target,
-                    event_type=LeadContactRecord.EventType.UPDATED,
-                    capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
-                    recorded_by=request.user,
-                    from_status=previous_status,
-                    to_status=target.status,
-                    note="Lead contact merged with duplicate payload.",
-                )
+                    _record_lead_contact_record(
+                        lead=target,
+                        event_type=LeadContactRecord.EventType.UPDATED,
+                        capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
+                        recorded_by=request.user,
+                        from_status=previous_status,
+                        to_status=target.status,
+                        note="Lead contact merged with duplicate payload.",
+                    )
 
         return Response(
             {
@@ -345,16 +363,17 @@ def quick_add_lead_contact_view(request):
             status=200,
         )
 
-    lead = serializer.save()
-    _record_lead_contact_record(
-        lead=lead,
-        event_type=LeadContactRecord.EventType.CREATED,
-        capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
-        recorded_by=request.user,
-        from_status=None,
-        to_status=lead.status,
-        note="Lead contact created.",
-    )
+    with transaction.atomic():
+        lead = serializer.save()
+        _record_lead_contact_record(
+            lead=lead,
+            event_type=LeadContactRecord.EventType.CREATED,
+            capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
+            recorded_by=request.user,
+            from_status=None,
+            to_status=lead.status,
+            note="Lead contact created.",
+        )
 
     return Response(
         {
@@ -372,6 +391,7 @@ def quick_add_lead_contact_view(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def convert_lead_to_project_view(request, lead_id: int):
+    """Convert a lead contact into customer + project shell with immutable provenance records."""
     try:
         lead = LeadContact.objects.get(id=lead_id, created_by=request.user)
     except LeadContact.DoesNotExist:

@@ -1,203 +1,125 @@
-# Handoff - 2026-02-23
+# HANDOFF - 2026-02-23
 
-## Current Snapshot
+## Session State
 
-- Architecture direction is now explicit and enforced:
-  - DB constraints first
-  - model-level lifecycle/state enforcement second
-  - views as orchestration/request-shaping layer last
-- Domain packaging is active:
-  - `accounts_receivable`: `Invoice`, `InvoiceLine`
-  - `accounts_payable`: `VendorBill`, `VendorBillAllocation`
-  - `cash_management`: `Payment`, `PaymentAllocation`
-  - `estimating`: `Estimate`, `EstimateLineItem`
-  - `change_orders`: `ChangeOrder`, `ChangeOrderLine`
-  - `shared_operations`: `Project`, `CostCode`, org/role models, `AccountingSyncEvent`, `LeadContact`, `Customer`
-  - `financial_auditing`: snapshots/events/identity models (`ScopeItem`, `ChangeOrderSnapshot`, `VendorBillSnapshot`, `EstimateStatusEvent`, `InvoiceStatusEvent`, `InvoiceScopeOverrideEvent`, `PaymentRecord`, `PaymentAllocationRecord`, `AccountingSyncRecord`, `OrganizationRecord`, `OrganizationMembershipRecord`, `LeadContactRecord`, `CustomerRecord`, `FinancialAuditEvent`)
+- Branch: `main`
+- Base HEAD commit: `df49b4a`
+- Worktree state: dirty (intentionally), no commit yet for current view-layer pass.
+- User context: paused for account swap; requested that we continue by stepping through views together.
 
-## Major Changes Landed (2026-02-23)
+## What Is Complete (Current Worktree)
 
-### 1) Invoice lane finalized under AR package
-- Canonical invoice models moved to:
-  - `backend/core/models/accounts_receivable/invoice.py`
-- Legacy shim modules were intentionally removed (breaking change accepted).
-- Invoice status and scope-override events live in `financial_auditing`.
+### 1) View domain packaging refactor (breaking, no shims)
 
-### 2) Payment audit layering added
-- Added immutable `PaymentRecord` model:
-  - `backend/core/models/financial_auditing/payment_record.py`
-  - migration: `backend/core/migrations/0048_paymentrecord.py`
-- `PaymentRecord` captures:
-  - event type (`created`, `updated`, `status_changed`, `allocation_applied`, `imported`, `synced`)
-  - capture source (`manual_ui`, `manual_api`, `ach_webhook`, `processor_sync`, `csv_import`, `system`)
-  - from/to status, source reference, immutable snapshot payload, metadata, actor
-- Write-path wiring:
-  - payment create appends `created`
-  - payment patch appends `updated` or `status_changed`
-  - payment allocate appends `allocation_applied`
+Flat modules under `backend/core/views/` were moved into domain packages:
 
-### 2b) Allocation provenance capture added
-- Added immutable `PaymentAllocationRecord` model:
-  - `backend/core/models/financial_auditing/payment_allocation_record.py`
-  - migration: `backend/core/migrations/0049_paymentallocationrecord.py`
-- Write-path wiring:
-  - payment allocate appends one `PaymentAllocationRecord(applied)` row per created allocation
-  - captures actor/source + target + applied amount + snapshot/metadata
+- `backend/core/views/accounts_receivable/invoices.py`
+- `backend/core/views/accounts_payable/vendor_bills.py`
+- `backend/core/views/cash_management/payments.py`
+- `backend/core/views/change_orders/change_orders.py`
+- `backend/core/views/estimating/estimates.py`
+- `backend/core/views/estimating/budgets.py`
+- `backend/core/views/shared_operations/accounting.py`
+- `backend/core/views/shared_operations/intake.py`
+- `backend/core/views/shared_operations/projects.py`
+- `backend/core/views/shared_operations/cost_codes.py`
+- `backend/core/views/shared_operations/vendors.py`
 
-### 2c) Lifecycle capture pattern formalized
-- Project policy is now explicit:
-  - allow user-managed operational workflow entry/edit where needed
-  - append immutable capture records for financially relevant writes
-- Canonical pair examples:
-  - `Organization` -> `OrganizationRecord`
-  - `OrganizationMembership` -> `OrganizationMembershipRecord`
-  - `Payment` -> `PaymentRecord`
-  - `PaymentAllocation` -> `PaymentAllocationRecord`
-  - `AccountingSyncEvent` -> `AccountingSyncRecord`
-  - `Estimate` -> `EstimateStatusEvent`
-  - `Invoice` -> `InvoiceStatusEvent`
-  - `ChangeOrder` -> `ChangeOrderSnapshot`
-  - `VendorBill` -> `VendorBillSnapshot`
+`backend/core/views/__init__.py` was updated to re-export from new module paths, preserving URL imports through `core.views`.
 
-### 2d) Accounting sync lifecycle capture added
-- Added immutable `AccountingSyncRecord` model:
-  - `backend/core/models/financial_auditing/accounting_sync_record.py`
-  - migration: `backend/core/migrations/0050_accountingsyncrecord.py`
-- Write-path wiring:
-  - accounting sync create appends `AccountingSyncRecord(created)`
-  - accounting sync retry (`failed -> queued`) appends `AccountingSyncRecord(retried)`
-  - captures actor/source + from/to status + snapshot/metadata
+### 2) Transactional consistency hardening in views
 
-### 2e) Auth bootstrap lifecycle capture added
-- Added immutable bootstrap capture models:
-  - `backend/core/models/financial_auditing/organization_record.py`
-  - `backend/core/models/financial_auditing/organization_membership_record.py`
-  - migration: `backend/core/migrations/0051_organizationmembershiprecord_organizationrecord.py`
-- Write-path wiring:
-  - auth bootstrap (`_ensure_primary_membership`) appends `OrganizationRecord(created)`
-  - auth bootstrap appends `OrganizationMembershipRecord(created)`
-  - captures actor/source + bootstrap reason + snapshot/metadata
+Applied/confirmed atomic grouping for create/update flows where operational writes and immutable captures must stay consistent.
 
-### 2f) Accounting sync moved to shared-operations domain package
-- `AccountingSyncEvent` model moved from `backend/core/models/accounting.py`
-  to `backend/core/models/shared_operations/accounting_sync_event.py`.
-- Root export remains stable via `core.models.AccountingSyncEvent`.
-- No schema change required (model name/app label unchanged).
+Key enforced paths:
 
-### 2g) Contacts modernization completed (LeadContact + Customer)
-- Added model-level LeadContact lifecycle enforcement:
-  - `ALLOWED_STATUS_TRANSITIONS` + `is_transition_allowed`
-  - conversion-link integrity checks at model + DB constraint layers
-- Added immutable capture models:
-  - `backend/core/models/financial_auditing/lead_contact_record.py`
-  - `backend/core/models/financial_auditing/customer_record.py`
-  - migration: `backend/core/migrations/0052_customerrecord_leadcontactrecord_and_more.py`
-- Domain move:
-  - `LeadContact` and `Customer` moved from `backend/core/models/contacts.py`
-    to `backend/core/models/shared_operations/contacts.py`.
-  - Root exports remain stable via `core.models.LeadContact` and `core.models.Customer`.
-- Write-path wiring in intake/contact flows:
-  - quick add appends `LeadContactRecord(created)`
-  - duplicate merge appends `LeadContactRecord(updated|status_changed)`
-  - contact patch appends `LeadContactRecord(updated|status_changed)`
-  - contact delete appends `LeadContactRecord(deleted)`
-  - lead conversion appends `LeadContactRecord(converted)` and `CustomerRecord(created|updated)` as applicable
+- Invoice create path (`project_invoices_view`) now atomic.
+- Vendor bill create path (`project_vendor_bills_view`) now writes audit event inside create transaction.
+- Existing prior hardening retained for accounting/intake/payments/create-update flows.
 
-### 3) Status-transition policy moved to models
-- Transition maps and checks are model-owned via `ALLOWED_STATUS_TRANSITIONS` + `is_transition_allowed`.
-- Model-level `clean/save` enforcement is now active for:
-  - `Estimate`
-  - `Project`
-  - `Payment`
-  - (already present) `Invoice`, `VendorBill`, `ChangeOrder`
-- View-level transition helper wrappers were removed.
+### 3) Rollback tests for immutable-capture failure scenarios
 
-## Current Transition Policies (Source of Truth = Models)
+Added/updated tests verifying no partial persistence when capture writes fail:
 
-- `Estimate`
-  - `draft -> sent | void | archived`
-  - `sent -> approved | rejected | void | archived`
-  - `rejected -> void`
-  - `approved -> none`
-  - `void -> none`
-  - `archived -> none`
+- `backend/core/tests/test_invoices.py`
+- `backend/core/tests/test_vendor_bills.py`
+- `backend/core/tests/test_change_orders.py`
+- `backend/core/tests/test_payments.py`
+- `backend/core/tests/test_accounting_sync.py`
+- `backend/core/tests/test_intake.py`
+- `backend/core/tests/test_contacts_management.py`
 
-- `Invoice`
-  - `draft -> sent | void`
-  - `sent -> draft | partially_paid | paid | overdue | void`
-  - `partially_paid -> sent | paid | overdue | void`
-  - `paid -> void`
-  - `overdue -> partially_paid | paid | void`
-  - `void -> none`
+### 4) Route-level contract docstrings
 
-- `Payment`
-  - `pending -> settled | failed | void`
-  - `settled -> void`
-  - `failed -> void`
-  - `void -> none`
+Contract-style docstrings were added to endpoint handlers (`@api_view` functions) across:
 
-- `VendorBill`
-  - `planned -> received | void`
-  - `received -> approved | void`
-  - `approved -> scheduled | paid | void`
-  - `scheduled -> paid | void`
-  - `paid -> void`
-  - `void -> none`
+- `backend/core/views/auth.py`
+- `backend/core/views/accounts_receivable/invoices.py`
+- `backend/core/views/accounts_payable/vendor_bills.py`
+- `backend/core/views/cash_management/payments.py`
+- `backend/core/views/change_orders/change_orders.py`
+- `backend/core/views/estimating/estimates.py`
+- `backend/core/views/estimating/budgets.py`
+- `backend/core/views/shared_operations/accounting.py`
+- `backend/core/views/shared_operations/intake.py`
+- `backend/core/views/shared_operations/projects.py`
+- `backend/core/views/shared_operations/cost_codes.py`
+- `backend/core/views/shared_operations/vendors.py`
 
-- `ChangeOrder`
-  - `draft -> pending_approval | void`
-  - `pending_approval -> draft | approved | rejected | void`
-  - `approved -> void`
-  - `rejected -> draft | void`
-  - `void -> none`
+Intent: each route now describes methods, expected payload shape/guards, and side effects at a glance.
 
-- `Project`
-  - `prospect -> active | cancelled`
-  - `active -> on_hold | completed | cancelled`
-  - `on_hold -> active | completed | cancelled`
-  - `completed -> none`
-  - `cancelled -> none`
+## Validation Performed
 
-## Migrations
+- Full backend tests:
+  - `cd backend && .venv/bin/python manage.py test core.tests --keepdb`
+  - Result: `Ran 179 tests ... OK`
+- Targeted transaction-sensitive suites also passed during this pass.
+- Migration drift check passed earlier in session:
+  - `cd backend && .venv/bin/python manage.py makemigrations --check --dry-run`
+  - Result: `No changes detected`
 
-- Latest core migration: `0052_customerrecord_leadcontactrecord_and_more`
-- Local migration state checked and applied through `0052`.
+## Current Worktree Changes (Not Committed)
 
-## Validation Runs (This Session)
+Includes modified/deleted/added files from the view refactor and docs/tests pass.
 
-Passing targeted suites:
-- `core.tests.test_health_auth`
-- `core.tests.test_estimates`
-- `core.tests.test_invoices`
-- `core.tests.test_payments`
-- `core.tests.test_change_orders`
-- `core.tests.test_projects_cost_codes.ProjectProfileTests`
-- `core.tests.test_audit_trail`
-- `core.tests.test_intake`
-- `core.tests.test_contacts_management`
-- `core.tests.test_demo_seed`
-- `core.tests.test_mvp_regression`
-- `core.tests` (full suite, 173 tests)
+Top-level notable edits:
 
-Also verified:
-- `manage.py makemigrations --check --dry-run` => no drift
+- `HANDOFF.md`
+- `README.md`
+- `backend/core/views/__init__.py`
+- New view packages under:
+  - `backend/core/views/accounts_payable/`
+  - `backend/core/views/accounts_receivable/`
+  - `backend/core/views/cash_management/`
+  - `backend/core/views/change_orders/`
+  - `backend/core/views/estimating/`
+  - `backend/core/views/shared_operations/`
+- Legacy flat view files removed (moved content).
+- Test modules updated (rollback tests + patch import targets).
 
-## Known Issue (Pre-existing Test Data Path)
+## In-Progress Collaboration Point
 
-- A broader mixed run including `ProjectFinancialSummaryTests` can fail when test seed creates `VendorBill(status=scheduled)` without `scheduled_for`.
-- This is consistent with current model validation (scheduled requires `scheduled_for`).
-- Impact: test data setup alignment task, not a lifecycle-ownership regression.
+User asked for a "map" style walkthrough of endpoints by file, focusing on actual routes and expected contracts.
 
-## Updated Docs in This Pass
+Where we stopped:
 
-- `HANDOFF.md` (rewritten)
-- `README.md` (current-state architecture/doc map refresh)
-- `docs/domain-model.md` (status/policy/model updates)
-- `docs/api.md` (endpoint contract/status transition corrections)
+- Completed walkthrough for `backend/core/views/accounts_payable/vendor_bills.py` route behavior.
+- User approved contract-oriented style and requested this approach going forward.
 
-## Suggested Next Step
+## Resume Plan (Next Session)
 
-- Continue payment-lane field hardening pass for `PaymentAllocation` model-level invariants:
-  - target XOR guard (`invoice` vs `vendor_bill`)
-  - amount positivity/check constraints
-  - optional direction/target consistency constraints where feasible
+1. Continue route-by-route walkthrough in this order:
+   - `backend/core/views/accounts_receivable/invoices.py`
+   - `backend/core/views/cash_management/payments.py`
+   - `backend/core/views/change_orders/change_orders.py`
+   - `backend/core/views/estimating/estimates.py`
+   - `backend/core/views/estimating/budgets.py`
+   - `backend/core/views/shared_operations/*`
+2. Keep helper-level discussion light unless user asks to dive deeper.
+3. After walkthrough approval, perform final polish pass (if requested), then commit and push.
+
+## Important Notes
+
+- Do not commit yet; user explicitly requested review/walkthrough before commit.
+- No destructive git operations were used.
+- API routing still resolves through `core.views` re-export surface; URL patterns unchanged at endpoint level.

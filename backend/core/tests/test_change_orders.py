@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.core.exceptions import ValidationError
 
 from core.tests.common import *
@@ -212,6 +214,35 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(first.json()["data"]["family_key"], "1")
         self.assertEqual(second.json()["data"]["family_key"], "2")
         self.assertEqual(ChangeOrder.objects.count(), 2)
+
+    def test_change_order_create_rolls_back_when_audit_write_fails(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+
+        with patch(
+            "core.views.change_orders.change_orders._record_financial_audit_event",
+            side_effect=RuntimeError("capture-write-failed"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.post(
+                    f"/api/v1/projects/{self.project.id}/change-orders/",
+                    data={
+                        "title": "Rollback CO",
+                        "amount_delta": "2500.00",
+                        "days_delta": 3,
+                        "reason": "Rollback path",
+                        "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+                    },
+                    content_type="application/json",
+                    HTTP_AUTHORIZATION=f"Token {self.token.key}",
+                )
+
+        self.assertEqual(ChangeOrder.objects.count(), 0)
+        self.assertEqual(ChangeOrderLine.objects.count(), 0)
+        self.assertEqual(FinancialAuditEvent.objects.filter(object_type="change_order").count(), 0)
 
     def test_change_order_create_with_line_items_scaffold(self):
         self._create_active_budget(

@@ -1,3 +1,5 @@
+"""Cash-management payment and allocation endpoints."""
+
 from decimal import Decimal
 
 from django.db import transaction
@@ -221,6 +223,63 @@ def _record_payment_allocation_record(
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_payments_view(request, project_id: int):
+    """Project payment collection endpoint: `GET` lists payments, `POST` creates a payment.
+
+    Contract:
+    - `GET` (user/project-scoped list):
+      - `200`: payment list returned.
+        - Guarantees: no object mutations. `[APP]`
+      - `404`: project not found for this user.
+        - Guarantees: no object mutations. `[APP]`
+    - `POST` (requires role `owner|bookkeeping`):
+      - `201`: payment created and returned.
+        - Guarantees:
+          - newly created payment includes valid direction/method/amount fields. `[APP]`
+          - immutable `PaymentRecord(created)` and `FinancialAuditEvent(payment_updated)` are appended. `[APP]`
+      - `400`: payload/business validation failed.
+        - Guarantees: no durable partial mutation from failed request path. `[DB+APP]`
+      - `403`: role gate denied for create.
+        - Guarantees: no object mutations. `[APP]`
+      - `404`: project not found for this user.
+        - Guarantees: no object mutations. `[APP]`
+
+    - Preconditions:
+      - caller is authenticated (`IsAuthenticated`).
+      - project must resolve through user scope (`_validate_project_for_user`).
+      - caller role must be `owner|bookkeeping` for `POST`.
+
+    - Object mutations:
+      - `GET`: none.
+      - `POST`:
+        - Creates:
+          - Standard: `Payment`.
+          - Audit: `PaymentRecord`, `FinancialAuditEvent`.
+        - Edits: none.
+        - Deletes: none.
+
+    - Incoming payload (`POST`) shape:
+      - `_comment_*` keys in this example are documentation-only (not accepted API fields).
+      - JSON map:
+        {
+          "_comment_required": "direction, method, and amount are required",
+          "direction": "inbound|outbound (required)",
+          "method": "cash|check|ach|wire|credit_card|other (required)",
+          "amount": "decimal (required)",
+          "status": "pending|settled|failed|void (optional, default=pending)",
+          "payment_date": "YYYY-MM-DD (optional, default=today)",
+          "reference_number": "string (optional)",
+          "notes": "string (optional)"
+        }
+
+    - Idempotency and retry semantics:
+      - `GET` is read-only and idempotent.
+      - `POST` is not idempotent.
+
+    - Test anchors:
+      - `backend/core/tests/test_payments.py::test_payment_create_and_project_list`
+      - `backend/core/tests/test_payments.py::test_payment_validates_required_fields_and_positive_amount`
+      - `backend/core/tests/test_payments.py::test_payment_create_rolls_back_when_audit_write_fails`
+    """
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -264,45 +323,104 @@ def project_payments_view(request, project_id: int):
             status=400,
         )
 
-    payment = Payment.objects.create(
-        project=project,
-        direction=data["direction"],
-        method=data["method"],
-        status=data.get("status", Payment.Status.PENDING),
-        amount=data["amount"],
-        payment_date=data.get("payment_date") or timezone.localdate(),
-        reference_number=data.get("reference_number", ""),
-        notes=data.get("notes", ""),
-        created_by=request.user,
-    )
-    _record_payment_record(
-        payment=payment,
-        event_type=PaymentRecord.EventType.CREATED,
-        capture_source=PaymentRecord.CaptureSource.MANUAL_UI,
-        recorded_by=request.user,
-        from_status=None,
-        to_status=payment.status,
-        note="Payment created.",
-        metadata={"direction": payment.direction, "method": payment.method},
-    )
-    _record_financial_audit_event(
-        project=project,
-        event_type=FinancialAuditEvent.EventType.PAYMENT_UPDATED,
-        object_type="payment",
-        object_id=payment.id,
-        from_status="",
-        to_status=payment.status,
-        amount=payment.amount,
-        note="Payment created.",
-        created_by=request.user,
-        metadata={"direction": payment.direction, "method": payment.method},
-    )
+    with transaction.atomic():
+        payment = Payment.objects.create(
+            project=project,
+            direction=data["direction"],
+            method=data["method"],
+            status=data.get("status", Payment.Status.PENDING),
+            amount=data["amount"],
+            payment_date=data.get("payment_date") or timezone.localdate(),
+            reference_number=data.get("reference_number", ""),
+            notes=data.get("notes", ""),
+            created_by=request.user,
+        )
+        _record_payment_record(
+            payment=payment,
+            event_type=PaymentRecord.EventType.CREATED,
+            capture_source=PaymentRecord.CaptureSource.MANUAL_UI,
+            recorded_by=request.user,
+            from_status=None,
+            to_status=payment.status,
+            note="Payment created.",
+            metadata={"direction": payment.direction, "method": payment.method},
+        )
+        _record_financial_audit_event(
+            project=project,
+            event_type=FinancialAuditEvent.EventType.PAYMENT_UPDATED,
+            object_type="payment",
+            object_id=payment.id,
+            from_status="",
+            to_status=payment.status,
+            amount=payment.amount,
+            note="Payment created.",
+            created_by=request.user,
+            metadata={"direction": payment.direction, "method": payment.method},
+        )
     return Response({"data": PaymentSerializer(payment).data}, status=201)
 
 
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def payment_detail_view(request, payment_id: int):
+    """Fetch or update a payment while enforcing transition and allocation safety rules.
+
+    Contract:
+    - `GET`:
+      - `200`: payment detail returned.
+        - Guarantees: no object mutations. `[APP]`
+      - `404`: payment not found for this user.
+        - Guarantees: no object mutations. `[APP]`
+    - `PATCH` (requires role `owner|bookkeeping`):
+      - `200`: patch applied and updated payment returned.
+        - Guarantees:
+          - payment transition/allocation safety rules remain satisfied. `[APP]`
+          - immutable payment record and financial audit row are appended when fields changed. `[APP]`
+      - `400`: validation or transition/allocation safety failure.
+        - Guarantees: no durable partial mutation from failed request path. `[DB+APP]`
+      - `403`: role gate denied for patch.
+        - Guarantees: no object mutations. `[APP]`
+      - `404`: payment not found for this user.
+        - Guarantees: no object mutations. `[APP]`
+
+    - Preconditions:
+      - caller is authenticated (`IsAuthenticated`).
+      - payment must belong to requesting user.
+      - caller role must be `owner|bookkeeping`.
+
+    - Object mutations:
+      - `GET`: none.
+      - `PATCH`:
+        - Creates:
+          - Standard: none.
+          - Audit: `PaymentRecord`, `FinancialAuditEvent` when updates occur.
+        - Edits:
+          - Standard: `Payment` fields (direction/method/status/amount/date/reference/notes).
+          - Audit: none.
+        - Deletes: none.
+
+    - Incoming payload (`PATCH`) shape:
+      - `_comment_*` keys in this example are documentation-only (not accepted API fields).
+      - JSON map:
+        {
+          "direction": "inbound|outbound (optional; blocked after allocations exist)",
+          "method": "cash|check|ach|wire|credit_card|other (optional)",
+          "status": "pending|settled|failed|void (optional; transition rules apply)",
+          "amount": "decimal (optional; cannot be below allocated total)",
+          "payment_date": "YYYY-MM-DD (optional)",
+          "reference_number": "string (optional)",
+          "notes": "string (optional)"
+        }
+
+    - Idempotency and retry semantics:
+      - `GET` is read-only and idempotent.
+      - `PATCH` is conditionally idempotent when payload values equal persisted values.
+
+    - Test anchors:
+      - `backend/core/tests/test_payments.py::test_payment_status_transition_validation`
+      - `backend/core/tests/test_payments.py::test_payment_patch_updates_direction_method_status_reference`
+      - `backend/core/tests/test_payments.py::test_payment_records_append_for_status_change_and_allocation`
+    """
     try:
         payment = Payment.objects.select_related("project").prefetch_related("allocations").get(
             id=payment_id,
@@ -440,6 +558,62 @@ def payment_detail_view(request, payment_id: int):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def payment_allocate_view(request, payment_id: int):
+    """Allocate a settled payment to invoices or vendor bills based on payment direction.
+
+    Contract:
+    - `POST` (requires role `owner|bookkeeping`):
+      - `200`: allocations applied and updated payment returned.
+        - Guarantees:
+          - all allocation rows satisfy direction/target/scope eligibility rules. `[APP]`
+          - target balances/statuses and payment allocation totals are recalculated consistently. `[APP]`
+          - immutable allocation records and financial audit row are appended. `[APP]`
+      - `400`: validation/allocation eligibility failure.
+        - Guarantees: no durable partial mutation from failed request path. `[DB+APP]`
+      - `403`: role gate denied for allocation.
+        - Guarantees: no object mutations. `[APP]`
+      - `404`: payment not found for this user.
+        - Guarantees: no object mutations. `[APP]`
+
+    - Preconditions:
+      - caller is authenticated (`IsAuthenticated`).
+      - payment must belong to requesting user.
+      - payment status must be `settled`.
+      - inbound allocations target invoices; outbound allocations target vendor bills.
+
+    - Object mutations:
+      - `POST`:
+        - Creates:
+          - Standard: `PaymentAllocation` rows.
+          - Audit: `PaymentRecord`, `PaymentAllocationRecord`, `FinancialAuditEvent`.
+        - Edits:
+          - Standard: payment allocation totals plus target invoice/vendor-bill balances and statuses.
+          - Audit: none.
+        - Deletes: none.
+
+    - Incoming payload (`POST`) shape:
+      - `_comment_*` keys in this example are documentation-only (not accepted API fields).
+      - JSON map:
+        {
+          "_comment_required": "allocations must include at least 1 row",
+          "allocations": [
+            {
+              "target_type": "invoice|vendor_bill (required; must match payment direction)",
+              "target_id": "integer (required)",
+              "applied_amount": "decimal (required, must be > 0)",
+              "note": "string (optional)"
+            }
+          ]
+        }
+
+    - Idempotency and retry semantics:
+      - `POST` is not idempotent; repeating same payload will stack additional allocations unless rejected by remaining-balance rules.
+      - failed allocation retries do not persist partial writes.
+
+    - Test anchors:
+      - `backend/core/tests/test_payments.py::test_payment_allocation_inbound_partial_updates_invoice_balances`
+      - `backend/core/tests/test_payments.py::test_payment_allocation_outbound_partial_updates_vendor_bill_balances`
+      - `backend/core/tests/test_payments.py::test_payment_allocation_blocks_direction_mismatch_and_overallocation`
+    """
     try:
         payment = Payment.objects.select_related("project").prefetch_related("allocations").get(
             id=payment_id,

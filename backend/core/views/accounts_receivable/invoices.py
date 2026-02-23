@@ -1,3 +1,5 @@
+"""Accounts receivable invoice endpoints and state transitions."""
+
 from datetime import timedelta
 from decimal import Decimal
 
@@ -78,6 +80,79 @@ def _invoice_line_apply_error_response(apply_error):
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_invoices_view(request, project_id: int):
+    """Project invoice collection endpoint: `GET` lists invoices, `POST` creates a draft with audit trail.
+
+    Contract:
+    - `GET` (user/project-scoped list):
+      - `200`: invoice list returned.
+        - Guarantees: no object mutations. `[APP]`
+      - `404`: project not found for this user.
+        - Guarantees: no object mutations. `[APP]`
+    - `POST` (requires role `owner|pm|bookkeeping`):
+      - `201`: draft invoice created and returned.
+        - Guarantees:
+          - newly created invoice status is `draft`. `[APP]`
+          - newly created invoice satisfies `due_date >= issue_date`. `[DB+APP]`
+          - newly created invoice totals and balance are recalculated from canonical line items + tax. `[APP]`
+          - newly created invoice number remains unique per project. `[DB+APP]`
+      - `400`: validation or business-rule failure.
+        - Guarantees:
+          - no durable partial mutation from the failed request (atomic rollback). `[DB+APP]`
+      - `403`: role gate denied for create.
+        - Guarantees: no object mutations. `[APP]`
+      - `404`: project not found for this user.
+        - Guarantees: no object mutations. `[APP]`
+
+    - Preconditions:
+      - caller is authenticated (`IsAuthenticated`).
+      - project must resolve through user scope (`_validate_project_for_user`).
+      - `POST` requires effective role in `owner|pm|bookkeeping`.
+
+    - Object mutations:
+      - `GET`: none.
+      - `POST`:
+        - Creates:
+          - Standard: `Invoice`, `InvoiceLine` rows.
+          - Audit: `InvoiceStatusEvent`, `FinancialAuditEvent`.
+        - Edits:
+          - Standard: computed invoice totals/balance fields.
+          - Audit: none.
+        - Deletes: none.
+
+    - Incoming payload (`POST`) shape:
+      - requires `line_items` with at least 1 row.
+      - `_comment_*` keys in this example are documentation-only (not accepted API fields).
+      - JSON map:
+        {
+          "issue_date": "YYYY-MM-DD (optional, default=today)",
+          "due_date": "YYYY-MM-DD (optional, must be >= issue_date, default=issue_date+30d)",
+          "tax_percent": "decimal (optional, default=0)",
+          "_comment_line_items_requirement": "line_items is required and must include at least 1 row",
+          "line_items": [
+            {
+              "line_type": "scope|adjustment (optional, default=scope)",
+              "cost_code": "integer|null (optional)",
+              "scope_item": "integer|null (optional)",
+              "adjustment_reason": "string (required when line_type=adjustment)",
+              "internal_note": "string (optional)",
+              "description": "string (required)",
+              "quantity": "decimal (required)",
+              "unit": "string (optional, default=ea)",
+              "unit_price": "decimal (required)"
+            }
+          ]
+        }
+
+    - Idempotency and retry semantics:
+      - `GET` is read-only and idempotent.
+      - `POST` is not idempotent; each successful retry creates another invoice.
+      - failed `POST` writes are rolled back atomically (no partial invoice/line/event persistence).
+
+    - Test anchors:
+      - `backend/core/tests/test_invoices.py::test_project_invoices_list_scoped_by_project_and_user`
+      - `backend/core/tests/test_invoices.py::test_invoice_create_calculates_totals_and_lines`
+      - `backend/core/tests/test_invoices.py::test_invoice_create_rolls_back_when_status_event_write_fails`
+    """
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -128,54 +203,127 @@ def project_invoices_view(request, project_id: int):
             status=400,
         )
 
-    invoice = Invoice.objects.create(
-        project=project,
-        customer=project.customer,
-        invoice_number=_next_invoice_number(project=project, user=request.user),
-        status=Invoice.Status.DRAFT,
-        issue_date=issue_date,
-        due_date=due_date,
-        tax_percent=data.get("tax_percent", Decimal("0")),
-        created_by=request.user,
-    )
+    with transaction.atomic():
+        invoice = Invoice.objects.create(
+            project=project,
+            customer=project.customer,
+            invoice_number=_next_invoice_number(project=project, user=request.user),
+            status=Invoice.Status.DRAFT,
+            issue_date=issue_date,
+            due_date=due_date,
+            tax_percent=data.get("tax_percent", Decimal("0")),
+            created_by=request.user,
+        )
 
-    apply_error = _apply_invoice_lines_and_totals(
-        invoice=invoice,
-        line_items_data=line_items,
-        tax_percent=data.get("tax_percent", Decimal("0")),
-        user=request.user,
-    )
-    if apply_error:
-        invoice.delete()
-        payload, status_code = _invoice_line_apply_error_response(apply_error)
-        return Response(payload, status=status_code)
+        apply_error = _apply_invoice_lines_and_totals(
+            invoice=invoice,
+            line_items_data=line_items,
+            tax_percent=data.get("tax_percent", Decimal("0")),
+            user=request.user,
+        )
+        if apply_error:
+            transaction.set_rollback(True)
+            payload, status_code = _invoice_line_apply_error_response(apply_error)
+            return Response(payload, status=status_code)
 
-    invoice.refresh_from_db()
-    _record_invoice_status_event(
-        invoice=invoice,
-        from_status=None,
-        to_status=invoice.status,
-        note="Invoice created.",
-        changed_by=request.user,
-    )
-    _record_financial_audit_event(
-        project=project,
-        event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
-        object_type="invoice",
-        object_id=invoice.id,
-        from_status="",
-        to_status=Invoice.Status.DRAFT,
-        amount=invoice.total,
-        note="Invoice created.",
-        created_by=request.user,
-        metadata={"invoice_number": invoice.invoice_number},
-    )
+        invoice.refresh_from_db()
+        _record_invoice_status_event(
+            invoice=invoice,
+            from_status=None,
+            to_status=invoice.status,
+            note="Invoice created.",
+            changed_by=request.user,
+        )
+        _record_financial_audit_event(
+            project=project,
+            event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
+            object_type="invoice",
+            object_id=invoice.id,
+            from_status="",
+            to_status=Invoice.Status.DRAFT,
+            amount=invoice.total,
+            note="Invoice created.",
+            created_by=request.user,
+            metadata={"invoice_number": invoice.invoice_number},
+        )
     return Response({"data": InvoiceSerializer(invoice).data}, status=201)
 
 
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def invoice_detail_view(request, invoice_id: int):
+    """Fetch or update one invoice while enforcing lifecycle, totals, and scope-guard rules.
+
+    Contract:
+    - `GET`:
+      - `200`: invoice detail returned.
+        - Guarantees: no object mutations. `[APP]`
+      - `404`: invoice not found for this user.
+        - Guarantees: no object mutations. `[APP]`
+    - `PATCH` (requires role `owner|pm|bookkeeping`):
+      - `200`: patch applied and updated invoice returned.
+        - Guarantees:
+          - updated invoice satisfies lifecycle/date invariants. `[DB+APP]`
+          - invoice totals/balance remain consistent with stored lines and tax settings. `[APP]`
+      - `400`: validation, transition, scope-guard, or line/totals failure.
+        - Guarantees: no durable partial mutation from failed request path. `[DB+APP]`
+      - `403`: role gate denied for patch.
+        - Guarantees: no object mutations. `[APP]`
+      - `404`: invoice not found for this user.
+        - Guarantees: no object mutations. `[APP]`
+
+    - Preconditions:
+      - caller is authenticated (`IsAuthenticated`).
+      - invoice must belong to requesting user.
+      - `PATCH` requires effective role in `owner|pm|bookkeeping`.
+
+    - Object mutations:
+      - `GET`: none.
+      - `PATCH`:
+        - Creates:
+          - Standard: `InvoiceLine` replacement rows (when `line_items` is provided).
+          - Audit: `InvoiceStatusEvent`, `FinancialAuditEvent`, and `InvoiceScopeOverrideEvent` when applicable.
+        - Edits:
+          - Standard: `Invoice` fields (`status`, dates, tax/totals, balance).
+          - Audit: none.
+        - Deletes: existing `InvoiceLine` rows when replacing line items.
+
+    - Incoming payload (`PATCH`) shape:
+      - `_comment_*` keys in this example are documentation-only (not accepted API fields).
+      - JSON map:
+        {
+          "status": "draft|sent|partially_paid|paid|overdue|void (optional)",
+          "issue_date": "YYYY-MM-DD (optional)",
+          "due_date": "YYYY-MM-DD (optional, must be >= issue_date)",
+          "tax_percent": "decimal (optional)",
+          "_comment_line_items": "if present, line_items must include at least 1 row",
+          "line_items": [
+            {
+              "line_type": "scope|adjustment (optional, default=scope)",
+              "cost_code": "integer|null (optional)",
+              "scope_item": "integer|null (optional)",
+              "adjustment_reason": "string (required when line_type=adjustment)",
+              "internal_note": "string (optional)",
+              "description": "string (required)",
+              "quantity": "decimal (required)",
+              "unit": "string (optional, default=ea)",
+              "unit_price": "decimal (required)"
+            }
+          ],
+          "scope_override": "boolean (optional)",
+          "scope_override_note": "string (required when scope override is needed)"
+        }
+
+    - Idempotency and retry semantics:
+      - `GET` is read-only and idempotent.
+      - `PATCH` is conditionally idempotent when payload values equal current persisted values.
+      - `PATCH` retries that fail validation do not persist partial writes.
+
+    - Test anchors:
+      - `backend/core/tests/test_invoices.py::test_invoice_status_transition_validation_and_paid_balance`
+      - `backend/core/tests/test_invoices.py::test_invoice_patch_line_items_recalculates_totals`
+      - `backend/core/tests/test_invoices.py::test_invoice_patch_billable_totals_over_scope_requires_override`
+    """
     try:
         invoice = Invoice.objects.select_related("customer").get(
             id=invoice_id,
@@ -390,6 +538,54 @@ def invoice_detail_view(request, invoice_id: int):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def invoice_send_view(request, invoice_id: int):
+    """Send an invoice by transitioning to `sent` with optional scope override metadata.
+
+    Contract:
+    - `POST` (requires role `owner|pm|bookkeeping`):
+      - `200`: invoice transitioned to `sent` and returned.
+        - Guarantees:
+          - invoice status is `sent`. `[APP]`
+          - send-path audit/status records are persisted. `[APP]`
+      - `400`: transition invalid or scope-guard/override validation failed.
+        - Guarantees: no durable partial mutation from failed request path. `[DB+APP]`
+      - `403`: role gate denied for send.
+        - Guarantees: no object mutations. `[APP]`
+      - `404`: invoice not found for this user.
+        - Guarantees: no object mutations. `[APP]`
+
+    - Preconditions:
+      - caller is authenticated (`IsAuthenticated`).
+      - invoice must belong to requesting user.
+      - caller role must be `owner|pm|bookkeeping`.
+
+    - Object mutations:
+      - `POST`:
+        - Creates:
+          - Standard: none.
+          - Audit: `InvoiceStatusEvent`, `FinancialAuditEvent`, and possibly `InvoiceScopeOverrideEvent`.
+        - Edits:
+          - Standard: `Invoice.status` (to `sent`).
+          - Audit: none.
+        - Deletes: none.
+
+    - Incoming payload (`POST`) shape:
+      - `_comment_*` keys in this example are documentation-only (not accepted API fields).
+      - JSON map:
+        {
+          "scope_override": "boolean (optional)",
+          "_comment_scope_override_note": "required when scope override is needed",
+          "scope_override_note": "string (optional)"
+        }
+
+    - Idempotency and retry semantics:
+      - `POST` is not idempotent for state transitions.
+      - retries after success may fail transition validation if already `sent`.
+
+    - Test anchors:
+      - `backend/core/tests/test_invoices.py::test_invoice_send_endpoint_moves_draft_to_sent`
+      - `backend/core/tests/test_invoices.py::test_invoice_send_blocks_when_total_exceeds_approved_scope_without_override`
+      - `backend/core/tests/test_invoices.py::test_invoice_send_scope_override_creates_audit_note`
+    """
     try:
         invoice = Invoice.objects.get(id=invoice_id, created_by=request.user)
     except Invoice.DoesNotExist:
@@ -463,6 +659,28 @@ def invoice_send_view(request, invoice_id: int):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def invoice_status_events_view(request, invoice_id: int):
+    """Return immutable invoice status transition history for one invoice.
+
+    Contract:
+    - `GET`:
+      - `200`: status-event list returned.
+        - Guarantees: no object mutations. `[APP]`
+      - `404`: invoice not found for this user.
+        - Guarantees: no object mutations. `[APP]`
+
+    - Preconditions:
+      - caller is authenticated (`IsAuthenticated`).
+      - invoice must belong to requesting user.
+
+    - Object mutations:
+      - `GET`: none.
+
+    - Idempotency and retry semantics:
+      - `GET` is read-only and idempotent.
+
+    - Test anchors:
+      - `backend/core/tests/test_invoices.py::test_invoice_status_events_endpoint_returns_history`
+    """
     try:
         invoice = Invoice.objects.get(id=invoice_id, created_by=request.user)
     except Invoice.DoesNotExist:

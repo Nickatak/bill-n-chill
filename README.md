@@ -31,6 +31,17 @@ Next.js App  <----HTTP/JSON---->  Django/DRF API  <---->  Database
 - `backend/core/models/cash_management`: cross-domain cash movement models (`Payment`, `PaymentAllocation`)
 - `backend/core/models/financial_auditing`: immutable snapshots/events and canonical scope identity
 
+## Backend View Layout
+
+- `backend/core/views/shared_operations`: auth-adjacent/project-wide operational endpoints (`accounting`, `intake`, `projects`, `cost_codes`, `vendors`)
+- `backend/core/views/estimating`: estimate + budget endpoints
+- `backend/core/views/change_orders`: change-order endpoints
+- `backend/core/views/accounts_receivable`: invoice endpoints
+- `backend/core/views/accounts_payable`: vendor-bill endpoints
+- `backend/core/views/cash_management`: payment/allocation endpoints
+- `backend/core/views/helpers.py`: shared orchestration helpers (RBAC, guardrails, capture helpers)
+- `backend/core/views/__init__.py`: canonical export surface used by `backend/core/urls.py`
+
 ## Architecture Decisions
 
 - Enforcement hierarchy: DB constraints first, model-level guards second, views/serializers last.
@@ -40,6 +51,8 @@ Next.js App  <----HTTP/JSON---->  Django/DRF API  <---->  Database
   - system-managed state machines must append immutable capture rows for lifecycle transitions
 - Cross-domain placement policy:
   - if a model is shared across AR/AP flows and does not fit one lane cleanly, keep it in a dedicated shared domain package (for example `cash_management`) instead of forcing it into one side.
+- View write-path policy:
+  - when an endpoint performs multiple financially relevant writes (operational row + immutable record/event), perform them inside one `transaction.atomic()` block to avoid partial persistence.
 - Details and examples live in:
   - `docs/contributing.md`
   - `docs/domain-model.md`

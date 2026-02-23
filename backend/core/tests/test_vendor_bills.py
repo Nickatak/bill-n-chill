@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from core.tests.common import *
 
 
@@ -132,6 +134,32 @@ class VendorBillTests(TestCase):
         rows = list_response.json()["data"]
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["project"], self.project.id)
+
+    def test_vendor_bill_create_rolls_back_when_audit_write_fails(self):
+        with patch(
+            "core.views.accounts_payable.vendor_bills._record_financial_audit_event",
+            side_effect=RuntimeError("capture-write-failed"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.post(
+                    f"/api/v1/projects/{self.project.id}/vendor-bills/",
+                    data={
+                        "vendor": self.vendor.id,
+                        "bill_number": "B-ROLLBACK",
+                        "issue_date": "2026-02-13",
+                        "due_date": "2026-03-15",
+                        "total": "1250.00",
+                        "notes": "Rollback path.",
+                    },
+                    content_type="application/json",
+                    HTTP_AUTHORIZATION=f"Token {self.token.key}",
+                )
+
+        self.assertFalse(VendorBill.objects.filter(bill_number="B-ROLLBACK").exists())
+        self.assertEqual(
+            FinancialAuditEvent.objects.filter(object_type="vendor_bill").count(),
+            0,
+        )
 
     def test_vendor_bill_list_scoped_by_project_and_user(self):
         self._create_vendor_bill()

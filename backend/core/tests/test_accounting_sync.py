@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.core.exceptions import ValidationError
 
 from core.tests.common import *
@@ -190,3 +192,26 @@ class AccountingSyncEventTests(TestCase):
             record.save()
         with self.assertRaises(ValidationError):
             record.delete()
+
+    def test_create_rolls_back_when_record_capture_fails(self):
+        with patch(
+            "core.views.shared_operations.accounting._record_accounting_sync_record",
+            side_effect=RuntimeError("capture-write-failed"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.post(
+                    f"/api/v1/projects/{self.project.id}/accounting-sync-events/",
+                    data={
+                        "provider": "quickbooks_online",
+                        "object_type": "invoice",
+                        "object_id": 44,
+                        "direction": "push",
+                    },
+                    content_type="application/json",
+                    HTTP_AUTHORIZATION=f"Token {self.token.key}",
+                )
+
+        self.assertEqual(
+            AccountingSyncEvent.objects.filter(project=self.project, object_id=44).count(),
+            0,
+        )

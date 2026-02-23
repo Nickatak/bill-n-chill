@@ -1,5 +1,6 @@
 from core.tests.common import *
 from django.core.exceptions import ValidationError
+from unittest.mock import patch
 
 
 class ContactsManagementTests(TestCase):
@@ -174,3 +175,16 @@ class ContactsManagementTests(TestCase):
             customer_record.delete()
         with self.assertRaises(ValidationError):
             CustomerRecord.objects.filter(pk=customer_record.pk).delete()
+
+    def test_contact_delete_rolls_back_when_record_capture_fails(self):
+        with patch(
+            "core.views.shared_operations.intake._record_lead_contact_record",
+            side_effect=RuntimeError("capture-write-failed"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.delete(
+                    f"/api/v1/contacts/{self.contact.id}/",
+                    HTTP_AUTHORIZATION=f"Token {self.token.key}",
+                )
+
+        self.assertTrue(LeadContact.objects.filter(id=self.contact.id).exists())

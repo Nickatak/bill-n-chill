@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from core.tests.common import *
 
 class LeadContactQuickAddTests(TestCase):
@@ -210,6 +212,25 @@ class LeadContactQuickAddTests(TestCase):
         record = LeadContactRecord.objects.get(lead_contact_id=existing.id)
         self.assertEqual(record.event_type, LeadContactRecord.EventType.UPDATED)
         self.assertEqual(record.capture_source, LeadContactRecord.CaptureSource.MANUAL_UI)
+
+    def test_quick_add_rolls_back_when_record_capture_fails(self):
+        with patch(
+            "core.views.shared_operations.intake._record_lead_contact_record",
+            side_effect=RuntimeError("capture-write-failed"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.post(
+                    "/api/v1/lead-contacts/quick-add/",
+                    data={
+                        "full_name": "Rollback Lead",
+                        "phone": "555-0102",
+                        "project_address": "124 Main St",
+                    },
+                    content_type="application/json",
+                    HTTP_AUTHORIZATION=f"Token {self.token.key}",
+                )
+
+        self.assertFalse(LeadContact.objects.filter(full_name="Rollback Lead").exists())
 
 
 class LeadConversionTests(TestCase):

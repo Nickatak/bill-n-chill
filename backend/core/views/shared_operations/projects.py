@@ -1,3 +1,5 @@
+"""Shared project/reporting endpoints used across domains."""
+
 import csv
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -241,6 +243,7 @@ def _build_project_financial_summary_data(project: Project, user):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def projects_list_view(request):
+    """List projects visible to the authenticated owner context."""
     rows = Project.objects.filter(created_by=request.user).select_related("customer")
     return Response({"data": ProjectSerializer(rows, many=True).data})
 
@@ -248,6 +251,7 @@ def projects_list_view(request):
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def project_detail_view(request, project_id: int):
+    """Fetch or patch a project profile with terminal-state and transition protections."""
     try:
         project = Project.objects.select_related("customer").get(id=project_id, created_by=request.user)
     except Project.DoesNotExist:
@@ -330,6 +334,7 @@ def project_detail_view(request, project_id: int):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def project_financial_summary_view(request, project_id: int):
+    """Return normalized AR/AP/CO financial summary plus traceability for one project."""
     try:
         project = Project.objects.get(id=project_id, created_by=request.user)
     except Project.DoesNotExist:
@@ -346,6 +351,7 @@ def project_financial_summary_view(request, project_id: int):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def project_accounting_export_view(request, project_id: int):
+    """Export project accounting summary as JSON or CSV (`export_format` query param)."""
     try:
         project = Project.objects.get(id=project_id, created_by=request.user)
     except Project.DoesNotExist:
@@ -433,6 +439,7 @@ def project_accounting_export_view(request, project_id: int):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def project_audit_events_view(request, project_id: int):
+    """Return immutable financial audit events for the requested project."""
     try:
         project = Project.objects.get(id=project_id, created_by=request.user)
     except Project.DoesNotExist:
@@ -451,6 +458,7 @@ def project_audit_events_view(request, project_id: int):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def portfolio_snapshot_view(request):
+    """Return portfolio-level snapshot metrics with optional date filtering."""
     date_from, date_to, filter_error = _date_filter_from_query(request)
     if filter_error:
         return Response(
@@ -527,6 +535,7 @@ def portfolio_snapshot_view(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def change_impact_summary_view(request):
+    """Return approved change-order impact totals, grouped by project, with date filters."""
     date_from, date_to, filter_error = _date_filter_from_query(request)
     if filter_error:
         return Response(
@@ -583,6 +592,7 @@ def change_impact_summary_view(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def attention_feed_view(request):
+    """Return prioritized operational attention items (overdue, pending, and problem states)."""
     today = django_timezone.localdate()
     due_soon_window_days = 7
     due_soon_date = today + timedelta(days=due_soon_window_days)
@@ -708,6 +718,7 @@ def attention_feed_view(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def quick_jump_search_view(request):
+    """Search key entities by lightweight text query for fast navigation jump points."""
     query = (request.query_params.get("q") or "").strip()
     if len(query) < 2:
         return Response({"data": QuickJumpSearchSerializer({"query": query, "item_count": 0, "items": []}).data})
@@ -837,6 +848,7 @@ def quick_jump_search_view(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def project_timeline_events_view(request, project_id: int):
+    """Return merged project timeline events by category (`all|financial|workflow`)."""
     try:
         project = Project.objects.get(id=project_id, created_by=request.user)
     except Project.DoesNotExist:

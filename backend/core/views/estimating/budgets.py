@@ -1,3 +1,5 @@
+"""Budget read/update endpoints and coupled financial rollups."""
+
 from decimal import Decimal
 
 from django.db.models import Sum
@@ -13,6 +15,7 @@ from core.views.helpers import _role_gate_error_payload, _validate_project_for_u
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def project_budgets_view(request, project_id: int):
+    """List project budgets with computed spend and approved-CO deltas per line item."""
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -74,6 +77,13 @@ def project_budgets_view(request, project_id: int):
 @api_view(["PATCH"])
 @permission_classes([IsAuthenticated])
 def budget_line_detail_view(request, budget_id: int, line_id: int):
+    """Patch one budget line on an active budget and return refreshed computed line metrics.
+
+    Contract:
+    - Requires role `owner|pm`.
+    - Only active budgets are editable.
+    - Supports `description` and `budget_amount` updates.
+    """
     permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
     if permission_error:
         return Response(permission_error, status=403)

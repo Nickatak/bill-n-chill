@@ -1,3 +1,6 @@
+"""Shared operational accounting sync endpoints."""
+
+from django.db import transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -57,6 +60,13 @@ def _record_accounting_sync_record(
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_accounting_sync_events_view(request, project_id: int):
+    """List project accounting sync events or enqueue a new sync event record.
+
+    Contract:
+    - `GET`: project/user-scoped sync event history.
+    - `POST`: requires role `owner|bookkeeping` and core sync identity fields.
+    - Create writes are atomic: sync row plus immutable `AccountingSyncRecord(created)`.
+    """
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -97,35 +107,36 @@ def project_accounting_sync_events_view(request, project_id: int):
             status=400,
         )
 
-    sync_event = AccountingSyncEvent.objects.create(
-        project=project,
-        provider=data["provider"],
-        object_type=data["object_type"],
-        object_id=data.get("object_id"),
-        direction=data["direction"],
-        status=data.get("status", AccountingSyncEvent.Status.QUEUED),
-        external_id=data.get("external_id", ""),
-        error_message=data.get("error_message", ""),
-        created_by=request.user,
-    )
-    if sync_event.status in {AccountingSyncEvent.Status.SUCCESS, AccountingSyncEvent.Status.FAILED}:
-        sync_event.last_attempt_at = timezone.now()
-        sync_event.save(update_fields=["last_attempt_at", "updated_at"])
-    _record_accounting_sync_record(
-        sync_event=sync_event,
-        event_type=AccountingSyncRecord.EventType.CREATED,
-        capture_source=AccountingSyncRecord.CaptureSource.MANUAL_UI,
-        recorded_by=request.user,
-        from_status=None,
-        to_status=sync_event.status,
-        note="Accounting sync event created.",
-        metadata={
-            "provider": sync_event.provider,
-            "object_type": sync_event.object_type,
-            "object_id": sync_event.object_id,
-            "direction": sync_event.direction,
-        },
-    )
+    with transaction.atomic():
+        sync_event = AccountingSyncEvent.objects.create(
+            project=project,
+            provider=data["provider"],
+            object_type=data["object_type"],
+            object_id=data.get("object_id"),
+            direction=data["direction"],
+            status=data.get("status", AccountingSyncEvent.Status.QUEUED),
+            external_id=data.get("external_id", ""),
+            error_message=data.get("error_message", ""),
+            created_by=request.user,
+        )
+        if sync_event.status in {AccountingSyncEvent.Status.SUCCESS, AccountingSyncEvent.Status.FAILED}:
+            sync_event.last_attempt_at = timezone.now()
+            sync_event.save(update_fields=["last_attempt_at", "updated_at"])
+        _record_accounting_sync_record(
+            sync_event=sync_event,
+            event_type=AccountingSyncRecord.EventType.CREATED,
+            capture_source=AccountingSyncRecord.CaptureSource.MANUAL_UI,
+            recorded_by=request.user,
+            from_status=None,
+            to_status=sync_event.status,
+            note="Accounting sync event created.",
+            metadata={
+                "provider": sync_event.provider,
+                "object_type": sync_event.object_type,
+                "object_id": sync_event.object_id,
+                "direction": sync_event.direction,
+            },
+        )
 
     return Response({"data": AccountingSyncEventSerializer(sync_event).data}, status=201)
 
@@ -133,6 +144,13 @@ def project_accounting_sync_events_view(request, project_id: int):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def accounting_sync_event_retry_view(request, sync_event_id: int):
+    """Retry a failed accounting sync event by moving it back to `queued`.
+
+    Contract:
+    - Requires role `owner|bookkeeping`.
+    - Successful sync rows are not retryable; already queued rows return no-op meta.
+    - Retry writes are atomic: status fields update plus immutable `AccountingSyncRecord(retried)`.
+    """
     try:
         sync_event = AccountingSyncEvent.objects.get(
             id=sync_event_id,
@@ -168,35 +186,36 @@ def accounting_sync_event_retry_view(request, sync_event_id: int):
             status=400,
         )
 
-    previous_status = sync_event.status
-    sync_event.status = AccountingSyncEvent.Status.QUEUED
-    sync_event.error_message = ""
-    sync_event.retry_count = sync_event.retry_count + 1
-    sync_event.last_attempt_at = timezone.now()
-    sync_event.save(
-        update_fields=[
-            "status",
-            "error_message",
-            "retry_count",
-            "last_attempt_at",
-            "updated_at",
-        ]
-    )
-    _record_accounting_sync_record(
-        sync_event=sync_event,
-        event_type=AccountingSyncRecord.EventType.RETRIED,
-        capture_source=AccountingSyncRecord.CaptureSource.MANUAL_UI,
-        recorded_by=request.user,
-        from_status=previous_status,
-        to_status=sync_event.status,
-        note="Accounting sync event retried.",
-        metadata={
-            "retry_count": sync_event.retry_count,
-            "direction": sync_event.direction,
-            "object_type": sync_event.object_type,
-            "object_id": sync_event.object_id,
-        },
-    )
+    with transaction.atomic():
+        previous_status = sync_event.status
+        sync_event.status = AccountingSyncEvent.Status.QUEUED
+        sync_event.error_message = ""
+        sync_event.retry_count = sync_event.retry_count + 1
+        sync_event.last_attempt_at = timezone.now()
+        sync_event.save(
+            update_fields=[
+                "status",
+                "error_message",
+                "retry_count",
+                "last_attempt_at",
+                "updated_at",
+            ]
+        )
+        _record_accounting_sync_record(
+            sync_event=sync_event,
+            event_type=AccountingSyncRecord.EventType.RETRIED,
+            capture_source=AccountingSyncRecord.CaptureSource.MANUAL_UI,
+            recorded_by=request.user,
+            from_status=previous_status,
+            to_status=sync_event.status,
+            note="Accounting sync event retried.",
+            metadata={
+                "retry_count": sync_event.retry_count,
+                "direction": sync_event.direction,
+                "object_type": sync_event.object_type,
+                "object_id": sync_event.object_id,
+            },
+        )
     return Response(
         {
             "data": AccountingSyncEventSerializer(sync_event).data,

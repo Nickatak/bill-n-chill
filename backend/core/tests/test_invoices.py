@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.core.exceptions import ValidationError
 
 from core.tests.common import *
@@ -137,6 +139,37 @@ class InvoiceTests(TestCase):
         self.assertEqual(payload["tax_total"], "0.01")
         self.assertEqual(payload["total"], "0.06")
         self.assertEqual(payload["balance_due"], "0.06")
+
+    def test_invoice_create_rolls_back_when_status_event_write_fails(self):
+        with patch(
+            "core.views.accounts_receivable.invoices._record_invoice_status_event",
+            side_effect=RuntimeError("capture-write-failed"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.post(
+                    f"/api/v1/projects/{self.project.id}/invoices/",
+                    data={
+                        "issue_date": "2026-02-13",
+                        "due_date": "2026-03-15",
+                        "tax_percent": "10.00",
+                        "line_items": [
+                            {
+                                "cost_code": self.cost_code.id,
+                                "description": "Progress draw",
+                                "quantity": "2",
+                                "unit": "phase",
+                                "unit_price": "500.00",
+                            }
+                        ],
+                    },
+                    content_type="application/json",
+                    HTTP_AUTHORIZATION=f"Token {self.token.key}",
+                )
+
+        self.assertEqual(Invoice.objects.count(), 0)
+        self.assertEqual(InvoiceLine.objects.count(), 0)
+        self.assertEqual(InvoiceStatusEvent.objects.count(), 0)
+        self.assertEqual(FinancialAuditEvent.objects.filter(object_type="invoice").count(), 0)
 
     def test_project_invoices_list_scoped_by_project_and_user(self):
         self._create_invoice()
