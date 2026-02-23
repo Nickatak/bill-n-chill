@@ -1,19 +1,18 @@
 import { ContactsConsole } from "@/features/contacts";
-import styles from "../vendors/page.module.css";
+import styles from "./page.module.css";
 
 export default function ContactsPage() {
   return (
     <div className={styles.page}>
       <main className={styles.main}>
         <header className={styles.header}>
-          <h1>Customers: View + Edit</h1>
+          <h1>Customers Workspace</h1>
           <p>
-            This non-workflow route gives operations users a dedicated place to inspect and
-            correct customer records.
+            This route is the dedicated operations surface for customer data quality.
           </p>
           <p>
-            It supports debugging and data hygiene by letting you search and patch canonical
-            client data without rerunning the full intake flow.
+            Search and update canonical customer/contact records without rerunning the full intake
+            workflow.
           </p>
         </header>
         <section className={styles.card}>

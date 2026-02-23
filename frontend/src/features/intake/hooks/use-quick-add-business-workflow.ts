@@ -63,8 +63,24 @@ export function useQuickAddBusinessWorkflow({
   const [pendingSubmission, setPendingSubmission] = useState<PendingSubmission | null>(null);
 
   const [lastLead, setLastLead] = useState<LeadContactCandidate | null>(null);
+  const [lastSubmissionIntent, setLastSubmissionIntent] = useState<SubmitIntent | null>(null);
+  const [lastDuplicateResolution, setLastDuplicateResolution] = useState("none");
+  const [lastConvertedCustomerId, setLastConvertedCustomerId] = useState<number | null>(null);
+  const [lastConvertedProjectId, setLastConvertedProjectId] = useState<number | null>(null);
 
-  async function convertLeadToProject(leadId: number, name: string, status: string): Promise<boolean> {
+  function clearLastSuccessState() {
+    setLastLead(null);
+    setLastSubmissionIntent(null);
+    setLastDuplicateResolution("none");
+    setLastConvertedCustomerId(null);
+    setLastConvertedProjectId(null);
+  }
+
+  async function convertLeadToProject(leadId: number, name: string, status: string): Promise<{
+    ok: boolean;
+    customerId: number | null;
+    projectId: number | null;
+  }> {
     setConversionMessage("Converting lead to customer + project...");
 
     const response = await postConvertLeadToProject({
@@ -78,15 +94,24 @@ export function useQuickAddBusinessWorkflow({
     const payload: ApiResponse = await response.json();
     if (!response.ok) {
       setConversionMessage(payload.error?.message ?? "Lead conversion failed.");
-      return false;
+      return { ok: false, customerId: null, projectId: null };
     }
 
     const result = payload.data as LeadConvertResult;
     const resultStatus = payload.meta?.conversion_status ?? "converted";
+    const customerId = typeof result.customer?.id === "number" ? result.customer.id : null;
+    const projectId = typeof result.project?.id === "number" ? result.project.id : null;
+    const successStatus = resultStatus === "converted" || resultStatus === "already_converted";
+
+    if (successStatus) {
+      setConversionMessage("");
+      return { ok: true, customerId, projectId };
+    }
+
     setConversionMessage(
-      `Conversion ${resultStatus}: customer #${result.customer?.id ?? "?"}, project #${result.project?.id ?? "?"}.`,
+      `Conversion status: ${resultStatus.replaceAll("_", " ")}.`,
     );
-    return true;
+    return { ok: true, customerId, projectId };
   }
 
   async function submitQuickAdd(
@@ -121,18 +146,34 @@ export function useQuickAddBusinessWorkflow({
 
     const result = payload.data as LeadContactCandidate;
     const resolution = payload.meta?.duplicate_resolution ?? "none";
-    setLeadMessage(`Lead contact saved (#${result.id}) via resolution: ${resolution}.`);
+    setLeadMessage("");
     setDuplicateCandidates([]);
     setSelectedDuplicateId("");
     setPendingSubmission(null);
     setLastLead(result);
+    setLastSubmissionIntent(submission.intent);
+    setLastDuplicateResolution(resolution);
 
-    const conversionSucceeded =
-      submission.intent === "contact_and_project"
-        ? await convertLeadToProject(result.id, submission.projectName, submission.projectStatus)
-        : true;
-    if (submission.intent !== "contact_and_project") {
+    let conversionSucceeded = true;
+    if (submission.intent === "contact_and_project") {
+      const outcome = await convertLeadToProject(
+        result.id,
+        submission.projectName,
+        submission.projectStatus,
+      );
+      setLastConvertedCustomerId(outcome.customerId);
+      setLastConvertedProjectId(outcome.projectId);
+      conversionSucceeded = outcome.ok;
+      if (outcome.ok) {
+        setLeadMessage("Contact + project created.");
+      } else {
+        setLeadMessage("Contact saved, but project conversion failed.");
+      }
+    } else {
       setConversionMessage("");
+      setLastConvertedCustomerId(null);
+      setLastConvertedProjectId(null);
+      setLeadMessage("Contact created.");
     }
 
     // Keep entered values when contact was created but conversion failed so the user can adjust and retry.
@@ -155,9 +196,11 @@ export function useQuickAddBusinessWorkflow({
     const intent: SubmitIntent =
       submitter?.value === "contact_and_project" ? "contact_and_project" : "contact_only";
 
+    clearLastSuccessState();
     setLeadMessage(
       intent === "contact_only" ? "Submitting lead contact..." : "Creating contact + project...",
     );
+    setConversionMessage("");
 
     if (!token) {
       setLeadMessage("No shared session token found. Go to / and sign in.");
@@ -227,6 +270,10 @@ export function useQuickAddBusinessWorkflow({
   return {
     leadMessage,
     conversionMessage,
+    lastSubmissionIntent,
+    lastDuplicateResolution,
+    lastConvertedCustomerId,
+    lastConvertedProjectId,
     duplicateCandidates,
     selectedDuplicateId,
     setSelectedDuplicateId,

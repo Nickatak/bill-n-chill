@@ -58,8 +58,9 @@ def _build_lead_contact_snapshot(lead: LeadContact) -> dict:
                 str(lead.initial_contract_value) if lead.initial_contract_value is not None else None
             ),
             "notes": lead.notes,
-            "status": lead.status,
             "source": lead.source,
+            "is_archived": lead.is_archived,
+            "has_project": lead.converted_project_id is not None,
             "converted_customer_id": lead.converted_customer_id,
             "converted_project_id": lead.converted_project_id,
             "converted_at": lead.converted_at.isoformat() if lead.converted_at else None,
@@ -182,27 +183,27 @@ def contact_detail_view(request, contact_id: int):
                 event_type=LeadContactRecord.EventType.DELETED,
                 capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
                 recorded_by=request.user,
-                from_status=contact.status,
-                to_status=None,
                 note="Lead contact deleted.",
             )
             contact.delete()
         return Response(status=204)
 
     with transaction.atomic():
-        previous_status = contact.status
+        previous_is_archived = contact.is_archived
         serializer = LeadContactManageSerializer(contact, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        if contact.status != previous_status:
+        if contact.is_archived != previous_is_archived:
             _record_lead_contact_record(
                 lead=contact,
                 event_type=LeadContactRecord.EventType.STATUS_CHANGED,
                 capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
                 recorded_by=request.user,
-                from_status=previous_status,
-                to_status=contact.status,
-                note="Lead contact status changed.",
+                note="Lead contact archive state changed.",
+                metadata={
+                    "from_is_archived": previous_is_archived,
+                    "to_is_archived": contact.is_archived,
+                },
             )
         else:
             _record_lead_contact_record(
@@ -210,8 +211,6 @@ def contact_detail_view(request, contact_id: int):
                 event_type=LeadContactRecord.EventType.UPDATED,
                 capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
                 recorded_by=request.user,
-                from_status=previous_status,
-                to_status=contact.status,
                 note="Lead contact updated.",
             )
     return Response({"data": LeadContactManageSerializer(contact).data})
@@ -316,7 +315,6 @@ def quick_add_lead_contact_view(request):
 
         if duplicate_resolution == "merge_existing":
             with transaction.atomic():
-                previous_status = target.status
                 if payload["full_name"]:
                     target.full_name = payload["full_name"]
                 if payload["phone"]:
@@ -334,26 +332,13 @@ def quick_add_lead_contact_view(request):
                     else:
                         target.notes = payload["notes"]
                 target.save()
-                if target.status != previous_status:
-                    _record_lead_contact_record(
-                        lead=target,
-                        event_type=LeadContactRecord.EventType.STATUS_CHANGED,
-                        capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
-                        recorded_by=request.user,
-                        from_status=previous_status,
-                        to_status=target.status,
-                        note="Lead contact merged with duplicate payload (status changed).",
-                    )
-                else:
-                    _record_lead_contact_record(
-                        lead=target,
-                        event_type=LeadContactRecord.EventType.UPDATED,
-                        capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
-                        recorded_by=request.user,
-                        from_status=previous_status,
-                        to_status=target.status,
-                        note="Lead contact merged with duplicate payload.",
-                    )
+                _record_lead_contact_record(
+                    lead=target,
+                    event_type=LeadContactRecord.EventType.UPDATED,
+                    capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
+                    recorded_by=request.user,
+                    note="Lead contact merged with duplicate payload.",
+                )
 
         return Response(
             {
@@ -370,8 +355,6 @@ def quick_add_lead_contact_view(request):
             event_type=LeadContactRecord.EventType.CREATED,
             capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
             recorded_by=request.user,
-            from_status=None,
-            to_status=lead.status,
             note="Lead contact created.",
         )
 
@@ -422,16 +405,13 @@ def convert_lead_to_project_view(request, lead_id: int):
             }
         )
 
-    if not LeadContact.is_transition_allowed(lead.status, LeadContact.Status.PROJECT_CREATED):
+    if lead.is_archived:
         return Response(
             {
                 "error": {
                     "code": "validation_error",
-                    "message": (
-                        f"Invalid lead contact status transition: "
-                        f"{lead.status} -> {LeadContact.Status.PROJECT_CREATED}."
-                    ),
-                    "fields": {"status": ["This transition is not allowed."]},
+                    "message": "Archived leads cannot be converted to a project.",
+                    "fields": {"is_archived": ["Unarchive this lead before conversion."]},
                 }
             },
             status=400,
@@ -490,14 +470,11 @@ def convert_lead_to_project_view(request, lead_id: int):
             created_by=request.user,
         )
 
-        previous_status = lead.status
-        lead.status = LeadContact.Status.PROJECT_CREATED
         lead.converted_customer = customer
         lead.converted_project = project
         lead.converted_at = timezone.now()
         lead.save(
             update_fields=[
-                "status",
                 "converted_customer",
                 "converted_project",
                 "converted_at",
@@ -509,8 +486,6 @@ def convert_lead_to_project_view(request, lead_id: int):
             event_type=LeadContactRecord.EventType.CONVERTED,
             capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
             recorded_by=request.user,
-            from_status=previous_status,
-            to_status=lead.status,
             note="Lead converted to customer + project.",
             metadata={
                 "converted_customer_id": customer.id,

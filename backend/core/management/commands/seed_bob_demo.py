@@ -320,20 +320,21 @@ class Command(BaseCommand):
                 "full_name": "Bob Homeowner",
                 "email": "bob@example.com",
                 "notes": "Seeded demo intake lead.",
-                "status": LeadContact.Status.PROJECT_CREATED,
                 "converted_customer": customer,
                 "converted_project": project,
                 "converted_at": timezone.now(),
             },
         )
-        if lead.status != LeadContact.Status.PROJECT_CREATED:
-            lead.status = LeadContact.Status.PROJECT_CREATED
+        if (
+            lead.converted_customer_id != customer.id
+            or lead.converted_project_id != project.id
+            or lead.converted_at is None
+        ):
             lead.converted_customer = customer
             lead.converted_project = project
             lead.converted_at = timezone.now()
             lead.save(
                 update_fields=[
-                    "status",
                     "converted_customer",
                     "converted_project",
                     "converted_at",
@@ -738,32 +739,41 @@ class Command(BaseCommand):
             },
         )
 
-        for idx, (status, _) in enumerate(LeadContact.Status.choices, start=1):
+        lead_coverage_specs = [
+            {"label": "active_unconverted", "is_archived": False, "is_converted": False},
+            {"label": "inactive_unconverted", "is_archived": True, "is_converted": False},
+            {"label": "active_converted", "is_archived": False, "is_converted": True},
+            {"label": "inactive_converted", "is_archived": True, "is_converted": True},
+        ]
+        for idx, spec in enumerate(lead_coverage_specs, start=1):
             lead_phone = f"555-22{idx:02d}"
-            converted_customer = customer if status == LeadContact.Status.PROJECT_CREATED else None
-            converted_project = project if status == LeadContact.Status.PROJECT_CREATED else None
-            converted_at = timezone.now() if status == LeadContact.Status.PROJECT_CREATED else None
+            label = spec["label"]
+            is_archived = spec["is_archived"]
+            is_converted = spec["is_converted"]
+            converted_customer = customer if is_converted else None
+            converted_project = project if is_converted else None
+            converted_at = timezone.now() if is_converted else None
             scoped_lead, _ = LeadContact.objects.get_or_create(
                 created_by=user,
                 phone=lead_phone,
                 project_address=f"{100 + idx} Seed Status Ave",
                 defaults={
-                    "full_name": f"Seed Lead {status.title().replace('_', ' ')}",
-                    "email": f"lead-{status}@example.com",
-                    "status": status,
+                    "full_name": f"Seed Lead {label.replace('_', ' ')}",
+                    "email": f"lead-{label}@example.com",
                     "source": LeadContact.Source.FIELD_MANUAL,
-                    "notes": f"Seeded lead in status {status}.",
+                    "notes": f"Seeded lead in lifecycle state {label}.",
+                    "is_archived": is_archived,
                     "converted_customer": converted_customer,
                     "converted_project": converted_project,
                     "converted_at": converted_at,
                 },
             )
-            scoped_lead.full_name = f"Seed Lead {status.title().replace('_', ' ')}"
-            scoped_lead.email = f"lead-{status}@example.com"
-            scoped_lead.status = status
+            scoped_lead.full_name = f"Seed Lead {label.replace('_', ' ')}"
+            scoped_lead.email = f"lead-{label}@example.com"
             scoped_lead.source = LeadContact.Source.FIELD_MANUAL
-            scoped_lead.notes = f"Seeded lead in status {status}."
-            if status == LeadContact.Status.PROJECT_CREATED:
+            scoped_lead.notes = f"Seeded lead in lifecycle state {label}."
+            scoped_lead.is_archived = is_archived
+            if is_converted:
                 scoped_lead.converted_customer = customer
                 scoped_lead.converted_project = project
                 scoped_lead.converted_at = timezone.now()
@@ -775,9 +785,9 @@ class Command(BaseCommand):
                 update_fields=[
                     "full_name",
                     "email",
-                    "status",
                     "source",
                     "notes",
+                    "is_archived",
                     "converted_customer",
                     "converted_project",
                     "converted_at",

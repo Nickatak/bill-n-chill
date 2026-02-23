@@ -30,6 +30,10 @@ export type QuickAddControllerApi = {
   authMessage: string;
   leadMessage: string;
   conversionMessage: string;
+  lastSubmissionIntent: SubmitIntent | null;
+  lastDuplicateResolution: string;
+  lastConvertedCustomerId: number | null;
+  lastConvertedProjectId: number | null;
   fullName: string;
   setFullName: (value: string) => void;
   phone: string;

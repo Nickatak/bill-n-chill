@@ -24,17 +24,13 @@ class LeadContact(models.Model):
     Notes:
     - `initial_contract_value` is optional intake-time context and may be used when
       creating the project baseline during conversion.
-    - `status` currently has minimal UX usage and is primarily lifecycle scaffolding.
-      Full status-driven lead handling is deferred until intake workflow expansion.
+    - Lead lifecycle is represented by:
+      - `is_archived` for active/inactive intent.
+      - Conversion links (`converted_customer`, `converted_project`, `converted_at`)
+        for project-converted state.
     - `source` is currently low-impact metadata; richer usage is deferred until
       importer/integration workflows (for example CRM or form ingestion) are expanded.
     """
-
-    class Status(models.TextChoices):
-        NEW_CONTACT = "new_contact", "New Contact"
-        QUALIFIED = "qualified", "Qualified"
-        PROJECT_CREATED = "project_created", "Project Created"
-        ARCHIVED = "archived", "Archived"
 
     class Source(models.TextChoices):
         FIELD_MANUAL = "field_manual", "Field Manual"
@@ -43,17 +39,6 @@ class LeadContact(models.Model):
         WEB_FORM = "web_form", "Web Form"
         REFERRAL = "referral", "Referral"
         OTHER = "other", "Other"
-
-    # Transition-map format:
-    # {from_status: {allowed_to_status_1, allowed_to_status_2, ...}}
-    # Example: `new_contact -> qualified` is allowed because
-    # `Status.QUALIFIED` is in `ALLOWED_STATUS_TRANSITIONS[Status.NEW_CONTACT]`.
-    ALLOWED_STATUS_TRANSITIONS = {
-        Status.NEW_CONTACT: {Status.QUALIFIED, Status.PROJECT_CREATED, Status.ARCHIVED},
-        Status.QUALIFIED: {Status.PROJECT_CREATED, Status.ARCHIVED},
-        Status.PROJECT_CREATED: {Status.ARCHIVED},
-        Status.ARCHIVED: set(),
-    }
 
     full_name = models.CharField(max_length=255)
     phone = models.CharField(max_length=50, blank=True)
@@ -66,16 +51,12 @@ class LeadContact(models.Model):
         blank=True,
     )
     notes = models.TextField(blank=True)
-    status = models.CharField(
-        max_length=32,
-        choices=Status.choices,
-        default=Status.NEW_CONTACT,
-    )
     source = models.CharField(
         max_length=32,
         choices=Source.choices,
         default=Source.FIELD_MANUAL,
     )
+    is_archived = models.BooleanField(default=False)
     created_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -103,14 +84,6 @@ class LeadContact(models.Model):
         ordering = ["-created_at"]
         constraints = [
             models.CheckConstraint(
-                condition=~Q(status="project_created") | (
-                    Q(converted_customer__isnull=False)
-                    & Q(converted_project__isnull=False)
-                    & Q(converted_at__isnull=False)
-                ),
-                name="lead_project_created_requires_conversion_links",
-            ),
-            models.CheckConstraint(
                 condition=(
                     Q(converted_customer__isnull=True)
                     & Q(converted_project__isnull=True)
@@ -123,22 +96,7 @@ class LeadContact(models.Model):
                 ),
                 name="lead_conversion_links_all_or_none",
             ),
-            models.CheckConstraint(
-                condition=(
-                    Q(converted_customer__isnull=True)
-                    & Q(converted_project__isnull=True)
-                    & Q(converted_at__isnull=True)
-                )
-                | Q(status__in=["project_created", "archived"]),
-                name="lead_conversion_links_status_gate",
-            ),
         ]
-
-    @classmethod
-    def is_transition_allowed(cls, current_status: str, next_status: str) -> bool:
-        if current_status == next_status:
-            return True
-        return next_status in cls.ALLOWED_STATUS_TRANSITIONS.get(current_status, set())
 
     def clean(self):
         errors = {}
@@ -151,32 +109,10 @@ class LeadContact(models.Model):
         has_any_conversion_link = any(conversion_values)
         has_complete_conversion_link = all(conversion_values)
 
-        if self.status == self.Status.PROJECT_CREATED and not has_complete_conversion_link:
-            errors.setdefault("status", []).append(
-                "project_created requires converted customer, project, and converted_at."
-            )
-
         if has_any_conversion_link and not has_complete_conversion_link:
             errors.setdefault("converted_customer", []).append(
                 "Conversion links must be set together (customer, project, converted_at)."
             )
-
-        if has_complete_conversion_link and self.status not in {
-            self.Status.PROJECT_CREATED,
-            self.Status.ARCHIVED,
-        }:
-            errors.setdefault("status", []).append(
-                "Converted leads must be project_created or archived."
-            )
-
-        if self.pk:
-            previous_status = (
-                type(self).objects.filter(pk=self.pk).values_list("status", flat=True).first()
-            )
-            if previous_status and not self.is_transition_allowed(previous_status, self.status):
-                errors.setdefault("status", []).append(
-                    f"Invalid lead contact status transition: {previous_status} -> {self.status}."
-                )
 
         if errors:
             raise ValidationError(errors)
@@ -188,6 +124,10 @@ class LeadContact(models.Model):
     def __str__(self) -> str:
         contact_hint = self.phone or self.email or "no-contact"
         return f"{self.full_name} ({contact_hint})"
+
+    @property
+    def has_project(self) -> bool:
+        return self.converted_project_id is not None
 
 
 class Customer(models.Model):

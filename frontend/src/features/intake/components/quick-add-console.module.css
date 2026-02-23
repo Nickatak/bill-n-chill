@@ -64,6 +64,10 @@
   font-size: 0.92rem;
 }
 
+.summaryLink {
+  font-weight: 700;
+}
+
 .inlineActions {
   display: flex;
   flex-wrap: wrap;

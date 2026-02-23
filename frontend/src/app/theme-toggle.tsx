@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { clearClientSession } from "@/features/session/client-session";
 import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import Link from "next/link";
@@ -41,7 +41,14 @@ export function ThemeToggle() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<QuickJumpItem[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const quickJumpMenuRef = useRef<HTMLDetailsElement>(null);
+  const opsMetaMenuRef = useRef<HTMLDetailsElement>(null);
   const normalizedBaseUrl = useMemo(() => defaultApiBaseUrl.trim().replace(/\/$/, ""), []);
+
+  function closeMenus() {
+    quickJumpMenuRef.current?.removeAttribute("open");
+    opsMetaMenuRef.current?.removeAttribute("open");
+  }
 
   function toggleTheme() {
     const current =
@@ -103,6 +110,29 @@ export function ThemeToggle() {
     };
   }, [hasSession, normalizedBaseUrl, searchQuery, token]);
 
+  useEffect(() => {
+    closeMenus();
+  }, [pathname]);
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node | null;
+      if (!target) {
+        return;
+      }
+      if (
+        quickJumpMenuRef.current?.contains(target) ||
+        opsMetaMenuRef.current?.contains(target)
+      ) {
+        return;
+      }
+      closeMenus();
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    return () => window.removeEventListener("pointerdown", handlePointerDown);
+  }, []);
+
   return (
     <div className="themeControls">
       {hasSession && isPublicEstimateRoute ? (
@@ -111,7 +141,7 @@ export function ThemeToggle() {
         </Link>
       ) : null}
       {hasSession && !isPublicEstimateRoute ? (
-        <details className="nonWorkflowMenu quickJumpMenu">
+        <details ref={quickJumpMenuRef} className="nonWorkflowMenu quickJumpMenu">
           <summary className="themeControlButton">Quick Jump</summary>
           <div className="nonWorkflowList quickJumpList" role="menu" aria-label="Global quick jump">
             <label className="quickJumpInputWrap">
@@ -128,7 +158,13 @@ export function ThemeToggle() {
               <p className="quickJumpHint">No matches.</p>
             ) : null}
             {searchResults.map((item) => (
-              <Link key={`${item.kind}-${item.record_id}`} href={item.ui_href} className="nonWorkflowItem" role="menuitem">
+              <Link
+                key={`${item.kind}-${item.record_id}`}
+                href={item.ui_href}
+                className="nonWorkflowItem"
+                role="menuitem"
+                onClick={closeMenus}
+              >
                 <strong>{item.label}</strong>
                 <span className="quickJumpSubLabel">{item.sub_label}</span>
               </Link>
@@ -137,7 +173,7 @@ export function ThemeToggle() {
         </details>
       ) : null}
       {hasSession && !isPublicEstimateRoute ? (
-        <details className="nonWorkflowMenu">
+        <details ref={opsMetaMenuRef} className="nonWorkflowMenu">
           <summary className={`themeControlButton ${hasActiveOpsMeta ? "isActive" : ""}`}>
             Ops / Meta
           </summary>
@@ -148,6 +184,7 @@ export function ThemeToggle() {
                 href={route.href}
                 className={`nonWorkflowItem ${isRouteActive(pathname, route) ? "isActive" : ""}`}
                 role="menuitem"
+                onClick={closeMenus}
               >
                 {route.label}
               </Link>

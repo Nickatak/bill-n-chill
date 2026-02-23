@@ -65,7 +65,6 @@ class ContactsManagementTests(TestCase):
                 "phone": "",
                 "email": "alice-updated@example.com",
                 "notes": "Updated note",
-                "status": LeadContact.Status.QUALIFIED,
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -75,11 +74,8 @@ class ContactsManagementTests(TestCase):
         self.assertEqual(self.contact.phone, "")
         self.assertEqual(self.contact.email, "alice-updated@example.com")
         self.assertEqual(self.contact.notes, "Updated note")
-        self.assertEqual(self.contact.status, LeadContact.Status.QUALIFIED)
         record = LeadContactRecord.objects.get(lead_contact_id=self.contact.id)
-        self.assertEqual(record.event_type, LeadContactRecord.EventType.STATUS_CHANGED)
-        self.assertEqual(record.from_status, LeadContact.Status.NEW_CONTACT)
-        self.assertEqual(record.to_status, LeadContact.Status.QUALIFIED)
+        self.assertEqual(record.event_type, LeadContactRecord.EventType.UPDATED)
 
     def test_contact_patch_requires_phone_or_email(self):
         response = self.client.patch(
@@ -93,19 +89,32 @@ class ContactsManagementTests(TestCase):
         self.assertIn("phone", payload)
         self.assertIn("email", payload)
 
-    def test_contact_patch_rejects_invalid_status_transition(self):
-        self.contact.status = LeadContact.Status.QUALIFIED
-        self.contact.save(update_fields=["status", "updated_at"])
-
+    def test_contact_patch_ignores_unknown_status_field(self):
         response = self.client.patch(
             f"/api/v1/contacts/{self.contact.id}/",
-            data={"status": LeadContact.Status.NEW_CONTACT},
+            data={"status": "new_contact", "notes": "Still updated"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(response.status_code, 400)
-        payload = response.json()
-        self.assertIn("status", payload)
+        self.assertEqual(response.status_code, 200)
+        self.contact.refresh_from_db()
+        self.assertEqual(self.contact.notes, "Still updated")
+
+    def test_contact_patch_can_toggle_archive_flag(self):
+        response = self.client.patch(
+            f"/api/v1/contacts/{self.contact.id}/",
+            data={"is_archived": True},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        self.contact.refresh_from_db()
+        self.assertTrue(self.contact.is_archived)
+        record = LeadContactRecord.objects.get(lead_contact_id=self.contact.id)
+        self.assertEqual(record.event_type, LeadContactRecord.EventType.STATUS_CHANGED)
+        self.assertEqual(record.metadata_json.get("from_is_archived"), False)
+        self.assertEqual(record.metadata_json.get("to_is_archived"), True)
 
     def test_contact_detail_is_user_scoped(self):
         response = self.client.get(
@@ -138,8 +147,8 @@ class ContactsManagementTests(TestCase):
             lead_contact=self.contact,
             event_type=LeadContactRecord.EventType.UPDATED,
             capture_source=LeadContactRecord.CaptureSource.SYSTEM,
-            from_status=self.contact.status,
-            to_status=self.contact.status,
+            from_status=None,
+            to_status=None,
             snapshot_json={"lead_contact": {"id": self.contact.id}},
             metadata_json={},
             recorded_by=self.user,

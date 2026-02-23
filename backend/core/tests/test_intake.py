@@ -270,15 +270,14 @@ class LeadConversionTests(TestCase):
 
         self.lead.refresh_from_db()
         project = Project.objects.get(id=self.lead.converted_project_id)
-        self.assertEqual(self.lead.status, LeadContact.Status.PROJECT_CREATED)
         self.assertIsNotNone(self.lead.converted_customer_id)
         self.assertIsNotNone(self.lead.converted_project_id)
         self.assertEqual(project.site_address, "321 Build St")
         self.assertEqual(response.json()["meta"]["conversion_status"], "converted")
         lead_record = LeadContactRecord.objects.get(lead_contact_id=self.lead.id)
         self.assertEqual(lead_record.event_type, LeadContactRecord.EventType.CONVERTED)
-        self.assertEqual(lead_record.from_status, LeadContact.Status.NEW_CONTACT)
-        self.assertEqual(lead_record.to_status, LeadContact.Status.PROJECT_CREATED)
+        self.assertIsNone(lead_record.from_status)
+        self.assertIsNone(lead_record.to_status)
         customer_record = CustomerRecord.objects.get(customer_id=self.lead.converted_customer_id)
         self.assertEqual(customer_record.event_type, CustomerRecord.EventType.CREATED)
         self.assertEqual(customer_record.capture_source, CustomerRecord.CaptureSource.MANUAL_UI)
@@ -297,6 +296,24 @@ class LeadConversionTests(TestCase):
         project = Project.objects.get(id=response.json()["data"]["project"]["id"])
         self.assertEqual(str(project.contract_value_original), "14500.00")
         self.assertEqual(str(project.contract_value_current), "14500.00")
+
+    def test_convert_rejects_archived_lead(self):
+        self.lead.is_archived = True
+        self.lead.save(update_fields=["is_archived", "updated_at"])
+
+        response = self.client.post(
+            f"/api/v1/lead-contacts/{self.lead.id}/convert-to-project/",
+            data={"project_name": "Kitchen Remodel"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "validation_error")
+        self.assertIn("is_archived", payload["error"]["fields"])
+        self.assertEqual(Customer.objects.count(), 0)
+        self.assertEqual(Project.objects.count(), 0)
 
     def test_convert_is_idempotent_if_already_converted(self):
         first = self.client.post(

@@ -5,8 +5,9 @@ export type ContactRecord = {
   project_address: string;
   email: string;
   notes: string;
-  status: string;
   source: string;
+  is_archived?: boolean;
+  has_project?: boolean;
   converted_customer?: number | null;
   converted_project?: number | null;
   converted_at?: string | null;

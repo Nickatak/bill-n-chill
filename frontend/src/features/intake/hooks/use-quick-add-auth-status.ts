@@ -18,6 +18,9 @@ export function useQuickAddAuthStatus({
   normalizedBaseUrl,
 }: UseQuickAddAuthStatusArgs): string {
   const [authVerificationMessage, setAuthVerificationMessage] = useState("");
+  const effectiveBaseMessage = baseAuthMessage.startsWith("Using shared session for ")
+    ? ""
+    : baseAuthMessage;
 
   useEffect(() => {
     let cancelled = false;
@@ -37,8 +40,7 @@ export function useQuickAddAuthStatus({
           baseUrl: normalizedBaseUrl,
           token,
         });
-        const payload: ApiResponse = await response.json();
-        const userData = payload.data as { email?: string } | undefined;
+        await response.json() as ApiResponse;
         if (!response.ok) {
           clearClientSession();
           if (!cancelled) {
@@ -47,7 +49,7 @@ export function useQuickAddAuthStatus({
           return;
         }
         if (!cancelled) {
-          setAuthVerificationMessage("Using shared session for " + (userData?.email || "user") + ".");
+          setAuthVerificationMessage("");
         }
       } catch {
         if (!cancelled) {
@@ -63,5 +65,5 @@ export function useQuickAddAuthStatus({
     };
   }, [normalizedBaseUrl, token]);
 
-  return authVerificationMessage || baseAuthMessage;
+  return authVerificationMessage || effectiveBaseMessage;
 }

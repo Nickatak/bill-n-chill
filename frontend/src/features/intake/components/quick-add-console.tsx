@@ -12,6 +12,10 @@ export function QuickAddConsole() {
   // Composition owner: bridges shared-session auth into the controller before child workflows run.
   const { token, authMessage: baseAuthMessage } = useSharedSessionAuth();
   const controllerApi = useQuickAddController({ token, baseAuthMessage });
+  const duplicateResolutionLabel =
+    controllerApi.lastDuplicateResolution === "none"
+      ? ""
+      : controllerApi.lastDuplicateResolution.replaceAll("_", " ");
 
   return (
     <section className={styles.section}>
@@ -25,7 +29,7 @@ export function QuickAddConsole() {
         shell used by every downstream route in the financial loop.
       </p>
       <p>Use one form for both capture-only and capture-with-project actions.</p>
-      <p>{controllerApi.authMessage}</p>
+      {controllerApi.authMessage ? <p>{controllerApi.authMessage}</p> : null}
 
       <QuickAddForm
         fullNameRef={controllerApi.fullNameRef}
@@ -54,26 +58,50 @@ export function QuickAddConsole() {
         onResolve={controllerApi.resolveDuplicate}
       />
 
-      <p>{controllerApi.leadMessage}</p>
+      {controllerApi.leadMessage ? <p>{controllerApi.leadMessage}</p> : null}
 
-      {controllerApi.lastLead ? (
+      {controllerApi.lastLead && controllerApi.lastSubmissionIntent ? (
         <div className={styles.summaryCard}>
-          <p className={styles.summaryTitle}>Lead created</p>
-          <p className={styles.summaryText}>
-            #{controllerApi.lastLead.id} - {controllerApi.lastLead.full_name} (
-            {controllerApi.lastLead.phone || controllerApi.lastLead.email})
+          <p className={styles.summaryTitle}>
+            {controllerApi.lastSubmissionIntent === "contact_and_project"
+              ? "Contact + project created."
+              : "Contact created."}
           </p>
+          <p className={styles.summaryText}>
+            Lead{" "}
+            <Link className={styles.summaryLink} href={`/contacts?contact=${controllerApi.lastLead.id}`}>
+              #{controllerApi.lastLead.id}
+            </Link>{" "}
+            ({controllerApi.lastLead.full_name})
+            {controllerApi.lastSubmissionIntent === "contact_and_project" &&
+            controllerApi.lastConvertedCustomerId !== null &&
+            controllerApi.lastConvertedProjectId !== null ? (
+              <>
+                , Customer{" "}
+                <Link
+                  className={styles.summaryLink}
+                  href={`/contacts?customer=${controllerApi.lastConvertedCustomerId}`}
+                >
+                  #{controllerApi.lastConvertedCustomerId}
+                </Link>
+                , Project{" "}
+                <Link
+                  className={styles.summaryLink}
+                  href={`/projects?project=${controllerApi.lastConvertedProjectId}`}
+                >
+                  #{controllerApi.lastConvertedProjectId}
+                </Link>
+              </>
+            ) : null}
+            .
+          </p>
+          {duplicateResolutionLabel ? (
+            <p className={styles.summaryText}>Duplicate resolution: {duplicateResolutionLabel}.</p>
+          ) : null}
         </div>
       ) : null}
 
-      <p>{controllerApi.conversionMessage}</p>
-      {controllerApi.conversionMessage.includes("customer #") ? (
-        <div className={styles.inlineActions}>
-          <Link className={styles.secondaryLink} href="/projects">
-            Go to Projects
-          </Link>
-        </div>
-      ) : null}
+      {controllerApi.conversionMessage ? <p>{controllerApi.conversionMessage}</p> : null}
     </section>
   );
 }

@@ -25,6 +25,8 @@ def _is_valid_phone(value: str) -> bool:
 
 
 class LeadContactQuickAddSerializer(serializers.ModelSerializer):
+    has_project = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = LeadContact
         fields = [
@@ -35,8 +37,9 @@ class LeadContactQuickAddSerializer(serializers.ModelSerializer):
             "email",
             "initial_contract_value",
             "notes",
-            "status",
             "source",
+            "is_archived",
+            "has_project",
             "converted_customer",
             "converted_project",
             "converted_at",
@@ -44,7 +47,8 @@ class LeadContactQuickAddSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
-            "status",
+            "is_archived",
+            "has_project",
             "converted_customer",
             "converted_project",
             "converted_at",
@@ -92,6 +96,8 @@ class LeadContactQuickAddSerializer(serializers.ModelSerializer):
 
 
 class LeadContactManageSerializer(serializers.ModelSerializer):
+    has_project = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = LeadContact
         fields = [
@@ -102,8 +108,9 @@ class LeadContactManageSerializer(serializers.ModelSerializer):
             "email",
             "initial_contract_value",
             "notes",
-            "status",
             "source",
+            "is_archived",
+            "has_project",
             "converted_customer",
             "converted_project",
             "converted_at",
@@ -136,17 +143,6 @@ class LeadContactManageSerializer(serializers.ModelSerializer):
                     "email": ["Provide phone or email."],
                 }
             )
-
-        if self.instance is not None and "status" in attrs:
-            next_status = attrs["status"]
-            if not LeadContact.is_transition_allowed(self.instance.status, next_status):
-                raise serializers.ValidationError(
-                    {
-                        "status": [
-                            f"Invalid lead contact status transition: {self.instance.status} -> {next_status}.",
-                        ]
-                    }
-                )
         return attrs
 
 

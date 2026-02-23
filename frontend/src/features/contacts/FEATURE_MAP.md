@@ -20,7 +20,9 @@ Provide operational lookup and maintenance for canonical customer/contact record
 3. Controller/Hook:
    console-level state/effects manage query/filter state, selected row, and save/delete flows.
 4. Children:
-   search/filter panel, contacts table, contact edit form.
+   - `ContactsFilters`: query + activity controls
+   - `ContactsList`: selectable customer records list
+   - `ContactEditorForm`: selected record edit/delete form
 5. Default behavior:
    load contact rows and support search/filter plus selected-record edits.
 6. Overrides:
