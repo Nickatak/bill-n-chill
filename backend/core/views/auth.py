@@ -5,6 +5,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from core.serializers import LoginSerializer, RegisterSerializer
+from core.utils.runtime_metadata import get_app_revision, get_last_data_reset_at
 from core.views.helpers import _ensure_primary_membership, _resolve_user_role
 
 User = get_user_model()
@@ -32,7 +33,15 @@ def health_view(_request):
     - Test anchors:
       - `backend/core/tests/test_health_auth.py::test_health_endpoint_returns_ok_payload`
     """
-    return Response({"data": {"status": "ok"}})
+    return Response(
+        {
+            "data": {
+                "status": "ok",
+                "app_revision": get_app_revision(),
+                "data_reset_at": get_last_data_reset_at(),
+            }
+        }
+    )
 
 
 @api_view(["POST"])

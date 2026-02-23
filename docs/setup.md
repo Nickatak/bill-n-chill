@@ -25,6 +25,9 @@ Backend:
 - `MYSQL_ROOT_PASSWORD`
 - `MYSQL_PORT`
 - `CORS_ALLOWED_ORIGINS`
+- `APP_REVISION` (optional; commit/release id shown in `/health/` and login/register warning panel)
+- `DATA_RESET_AT` (optional override for last-reset display in `/health/`)
+- `DATA_RESET_MARKER_PATH` (optional path for persisted last-reset marker file)
 
 Frontend:
 
@@ -144,6 +147,8 @@ backend/.venv/bin/python backend/manage.py reset_fresh_demo
 # or (with dev env selection)
 make docker-reset-fresh
 ```
+
+`reset_fresh_demo` also updates a runtime marker timestamp used by `/api/v1/health/` and login/register warning panels so testers can see when demo data was last reset.
 
 Options:
 

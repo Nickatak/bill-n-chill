@@ -19,6 +19,7 @@ __pycache__/
 *.py[cod]
 .venv/
 backend/.venv/
+backend/.runtime/
 backend/db.sqlite3
 *.sqlite3
 

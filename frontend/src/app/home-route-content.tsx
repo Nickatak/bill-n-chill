@@ -13,6 +13,8 @@ type HomeRouteContentProps = {
   health: {
     ok: boolean;
     message: string;
+    appRevision?: string;
+    dataResetAt?: string;
   };
 };
 

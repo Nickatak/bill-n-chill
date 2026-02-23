@@ -91,6 +91,7 @@ Stable service names for overrides:
 - `docs/feature-list.md`: compact implementation ledger for shipped feature slices.
 - `docs/phase-2-operational-hardening-and-product-development.md`: next-phase plan for operational hardening and UX/use-case product development.
 - `docs/quick-add-ux-v2.md`: Quick Add Contact v2 UX goals, interaction rules, and acceptance checks.
+- `docs/pre-alpha-friend-testing-checklist.md`: controlled friend-testing launch checklist for pre-alpha feedback rounds.
 
 ## Notes
 

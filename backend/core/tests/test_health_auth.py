@@ -7,7 +7,10 @@ class HealthEndpointTests(TestCase):
         response = self.client.get("/api/v1/health/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"data": {"status": "ok"}})
+        payload = response.json()
+        self.assertEqual(payload["data"]["status"], "ok")
+        self.assertIn("app_revision", payload["data"])
+        self.assertIn("data_reset_at", payload["data"])
 
 
 class AuthEndpointTests(TestCase):

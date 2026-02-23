@@ -47,6 +47,14 @@
   font-size: 0.9rem;
 }
 
+.warningMeta {
+  margin: 0;
+  color: #92400e;
+  font-size: 0.8rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
+}
+
 .form {
   display: grid;
   gap: 10px;
@@ -197,6 +205,10 @@
 
 :global(html[data-theme="dark"]) .warningText {
   color: #fde68a;
+}
+
+:global(html[data-theme="dark"]) .warningMeta {
+  color: #fcd34d;
 }
 
 :global(html[data-theme="dark"]) .form input,

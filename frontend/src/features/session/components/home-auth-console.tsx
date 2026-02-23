@@ -34,10 +34,23 @@ type HomeAuthConsoleProps = {
   health: {
     ok: boolean;
     message: string;
+    appRevision?: string;
+    dataResetAt?: string;
   };
 };
 
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+
+function formatTimestamp(value?: string): string {
+  if (!value) {
+    return "unknown";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleString();
+}
 
 export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
   const [email, setEmail] = useState("");
@@ -159,6 +172,10 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
             <p className={styles.warningText}>
               This environment is still in active development. Data may be reset, changed, or removed at any
               time.
+            </p>
+            <p className={styles.warningMeta}>Last data reset: {formatTimestamp(health.dataResetAt)}</p>
+            <p className={styles.warningMeta}>
+              Deployed commit: {health.appRevision?.slice(0, 12) || "unknown"}
             </p>
           </div>
           <form className={styles.form} onSubmit={handleLogin}>
