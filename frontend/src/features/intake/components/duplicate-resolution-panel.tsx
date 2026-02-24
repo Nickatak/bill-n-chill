@@ -69,18 +69,21 @@ export function DuplicateResolutionPanel({
 
   const isProjectFlow = duplicateResolutionIntent === "customer_and_project";
   const resolveActionLabel = isProjectFlow
-    ? "Use Existing Customer + Create Project"
-    : "Use Existing Customer";
+    ? "Create Project for This Customer"
+    : "Use This Customer";
   const createAnywayLabel = isProjectFlow
-    ? "Create New Customer + Project Anyway"
-    : "Create New Customer Anyway";
+    ? "Create New Customer + Project Instead"
+    : "Create New Customer Instead";
   const helperText = isProjectFlow
-    ? "Pick an existing customer for project creation, or create a new customer + project."
-    : "Pick an existing customer, or create a new customer anyway.";
+    ? "Choose an existing customer to attach this project, or create a brand-new customer + project."
+    : "Choose an existing customer, or create a brand-new customer instead.";
 
   return (
     <section className={styles.duplicatePanel} aria-label="Duplicate resolution">
-      <h3 className={styles.duplicateTitle}>Possible duplicates found</h3>
+      <div className={styles.duplicateHeader}>
+        <h3 className={styles.duplicateTitle}>Possible duplicates found</h3>
+        <span className={styles.duplicateCount}>{duplicateCandidates.length} matches</span>
+      </div>
       <p className={styles.duplicateHint}>{helperText}</p>
       <div className={styles.duplicateList}>
         {duplicateCandidates.map((candidate) => {

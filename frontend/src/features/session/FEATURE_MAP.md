@@ -1,7 +1,7 @@
 # Feature Map: Session
 
 ## Purpose
-Provide login/registration UX, persisted browser session state, and shared auth signal for all feature consoles.
+Provide login/registration UX, persisted browser session state (token + role + organization), and shared auth signal for all feature consoles.
 
 ## Route Surface
 1. `/` (unauthenticated shell uses login component)
@@ -9,7 +9,7 @@ Provide login/registration UX, persisted browser session state, and shared auth 
 
 ## Mutation Map
 1. `BrowserSession`
-   - create/update local session token (`POST /auth/login/`, `POST /auth/register/`)
+   - create/update local session auth context (`POST /auth/login/`, `POST /auth/register/`)
    - clear local session token (signout or expiry path)
 2. `UserSessionValidation`
    - verify token validity (`GET /auth/me/`)
@@ -26,7 +26,7 @@ Provide login/registration UX, persisted browser session state, and shared auth 
 4. Children:
    `HomeAuthConsole`, `HomeRegisterConsole`, shared session utility modules.
 5. Default behavior:
-   login/register submit creates local session state, then `auth/me` verification drives authenticated shell rendering.
+   login/register submit creates local session auth context, then `auth/me` verification drives authenticated shell rendering.
 6. Overrides:
    invalid or expired tokens clear local session and force unauthenticated rendering path.
 7. Relationship flow:
@@ -41,6 +41,9 @@ Provide login/registration UX, persisted browser session state, and shared auth 
    validates stored token and hydrates authenticated user context.
 4. `GET /health/`:
    consumed by route wrappers and surfaced through session-aware home rendering.
+5. Authenticated feature requests:
+   all token-authenticated frontend calls now send `X-Organization-Id` and `X-Organization-Slug`
+   headers when organization context exists in the local shared session.
 
 ## Backend Contracts Used
 - Contract endpoint(s): none

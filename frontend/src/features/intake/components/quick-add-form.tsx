@@ -101,7 +101,7 @@ export function QuickAddForm({
         {fieldErrors.project_name ? <p className={styles.errorText}>{fieldErrors.project_name}</p> : null}
       </label>
 
-      <details className={styles.optionalDetails}>
+      <details className={`${styles.optionalDetails} ${styles.fullRow}`}>
         <summary>Optional details</summary>
         <div className={styles.optionalBody}>
           <label className={styles.field}>
@@ -139,12 +139,12 @@ export function QuickAddForm({
         </div>
       </details>
 
-      <div className={styles.stickyActions}>
+      <div className={`${styles.stickyActions} ${styles.fullRow}`}>
         <div className={styles.inlineActions}>
-          <button type="submit" value="customer_and_project">
+          <button className={styles.actionPrimary} type="submit" value="customer_and_project">
             Create Customer + Project
           </button>
-          <button type="submit" value="customer_only">
+          <button className={styles.actionSecondary} type="submit" value="customer_only">
             Create Customer Only
           </button>
         </div>

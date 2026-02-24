@@ -21,7 +21,6 @@ type ContactEditorFormProps = {
   activeProjectCount: number;
   hasActiveOrOnHoldProject: boolean;
   onSubmit: FormEventHandler<HTMLFormElement>;
-  onDelete: () => void;
 };
 
 export function ContactEditorForm({
@@ -41,7 +40,6 @@ export function ContactEditorForm({
   activeProjectCount,
   hasActiveOrOnHoldProject,
   onSubmit,
-  onDelete,
 }: ContactEditorFormProps) {
   const archiveToggleBlocked = hasActiveOrOnHoldProject && !isArchived;
 
@@ -103,6 +101,11 @@ export function ContactEditorForm({
           <span className={styles.switchLabel}>{isArchived ? "Archived" : "Active"}</span>
         </span>
       </label>
+      {selectedId && isArchived ? (
+        <p className={styles.inlineWarning}>
+          Saving as archived will automatically cancel this customer&apos;s prospect projects.
+        </p>
+      ) : null}
       <label className={styles.field}>
         Project coverage
         <input value={`${projectCount} total, ${activeProjectCount} active/on hold`} readOnly />
@@ -116,9 +119,6 @@ export function ContactEditorForm({
       <div className={styles.actionRow}>
         <button className={styles.primaryButton} type="submit" disabled={!selectedId}>
           Save Customer
-        </button>
-        <button className={styles.dangerButton} type="button" disabled={!selectedId} onClick={onDelete}>
-          Delete Customer
         </button>
       </div>
     </form>

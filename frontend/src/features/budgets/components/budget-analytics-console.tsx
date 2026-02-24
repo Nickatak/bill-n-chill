@@ -1,5 +1,6 @@
 "use client";
 
+import { buildAuthHeaders } from "@/features/session/auth-headers";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -87,10 +88,10 @@ export function BudgetAnalyticsConsole({ initialProjectId }: BudgetAnalyticsCons
       try {
         const [projectResponse, budgetsResponse] = await Promise.all([
           fetch(`${normalizedBaseUrl}/projects/${projectId}/`, {
-            headers: { Authorization: `Token ${token}` },
+            headers: buildAuthHeaders(token),
           }),
           fetch(`${normalizedBaseUrl}/projects/${projectId}/budgets/`, {
-            headers: { Authorization: `Token ${token}` },
+            headers: buildAuthHeaders(token),
           }),
         ]);
 

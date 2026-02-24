@@ -25,6 +25,7 @@ from core.serializers import (
 from core.views.helpers import (
     _apply_estimate_lines_and_totals,
     _create_budget_from_estimate,
+    _organization_user_ids,
     _record_financial_audit_event,
     _record_estimate_status_event,
     _role_gate_error_payload,
@@ -93,9 +94,14 @@ def _archive_estimate_family(*, project, user, title, exclude_ids, note):
     normalized_title = (title or "").strip()
     if not normalized_title:
         return
+    actor_user_ids = _organization_user_ids(user)
 
     candidates = (
-        Estimate.objects.filter(project=project, created_by=user, title=normalized_title)
+        Estimate.objects.filter(
+            project=project,
+            created_by_id__in=actor_user_ids,
+            title=normalized_title,
+        )
         .exclude(id__in=exclude_ids)
         .exclude(status=Estimate.Status.ARCHIVED)
     )
@@ -119,8 +125,13 @@ def _archive_estimate_family(*, project, user, title, exclude_ids, note):
 
 def _next_estimate_family_version(*, project, user, title):
     normalized_title = (title or "").strip()
+    actor_user_ids = _organization_user_ids(user)
     latest = (
-        Estimate.objects.filter(project=project, created_by=user, title=normalized_title)
+        Estimate.objects.filter(
+            project=project,
+            created_by_id__in=actor_user_ids,
+            title=normalized_title,
+        )
         .order_by("-version")
         .first()
     )
@@ -128,8 +139,9 @@ def _next_estimate_family_version(*, project, user, title):
 
 
 def _ensure_budget_from_approved_estimate(*, estimate, user, note: str):
+    actor_user_ids = _organization_user_ids(user)
     existing = (
-        Budget.objects.filter(source_estimate=estimate, created_by=user)
+        Budget.objects.filter(source_estimate=estimate, created_by_id__in=actor_user_ids)
         .select_related("source_estimate")
         .prefetch_related("line_items", "line_items__cost_code")
         .first()
@@ -171,6 +183,7 @@ def project_estimates_view(request, project_id: int):
     - `POST`: requires role `owner|pm`, at least one line item, and valid cost-code scope.
     - Applies duplicate-submit suppression window and archives superseded family rows after create.
     """
+    actor_user_ids = _organization_user_ids(request.user)
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -180,7 +193,7 @@ def project_estimates_view(request, project_id: int):
 
     if request.method == "GET":
         estimates = (
-            Estimate.objects.filter(project=project, created_by=request.user)
+            Estimate.objects.filter(project=project, created_by_id__in=actor_user_ids)
             .prefetch_related("line_items", "line_items__cost_code")
             .order_by("-version")
         )
@@ -239,7 +252,7 @@ def project_estimates_view(request, project_id: int):
     recent_estimates = (
         Estimate.objects.filter(
             project=project,
-            created_by=request.user,
+            created_by_id__in=actor_user_ids,
             created_at__gte=window_start,
         )
         .prefetch_related("line_items")
@@ -321,8 +334,9 @@ def estimate_detail_view(request, estimate_id: int):
     - Records immutable status events for workflow transitions.
     - Approved transitions trigger budget conversion guard path.
     """
+    actor_user_ids = _organization_user_ids(request.user)
     try:
-        estimate = Estimate.objects.get(id=estimate_id, created_by=request.user)
+        estimate = Estimate.objects.get(id=estimate_id, created_by_id__in=actor_user_ids)
     except Estimate.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Estimate not found.", "fields": {}}},
@@ -488,10 +502,11 @@ def estimate_detail_view(request, estimate_id: int):
 @permission_classes([IsAuthenticated])
 def estimate_clone_version_view(request, estimate_id: int):
     """Create a new draft revision from a prior estimate version in the same title family."""
+    actor_user_ids = _organization_user_ids(request.user)
     try:
         estimate = Estimate.objects.prefetch_related("line_items").get(
             id=estimate_id,
-            created_by=request.user,
+            created_by_id__in=actor_user_ids,
         )
     except Estimate.DoesNotExist:
         return Response(
@@ -586,10 +601,11 @@ def estimate_clone_version_view(request, estimate_id: int):
 @permission_classes([IsAuthenticated])
 def estimate_duplicate_view(request, estimate_id: int):
     """Duplicate an estimate into a draft for same or another project/title context."""
+    actor_user_ids = _organization_user_ids(request.user)
     try:
         estimate = Estimate.objects.prefetch_related("line_items").get(
             id=estimate_id,
-            created_by=request.user,
+            created_by_id__in=actor_user_ids,
         )
     except Estimate.DoesNotExist:
         return Response(
@@ -693,8 +709,9 @@ def estimate_duplicate_view(request, estimate_id: int):
 @permission_classes([IsAuthenticated])
 def estimate_status_events_view(request, estimate_id: int):
     """Return immutable estimate status transition history."""
+    actor_user_ids = _organization_user_ids(request.user)
     try:
-        estimate = Estimate.objects.get(id=estimate_id, created_by=request.user)
+        estimate = Estimate.objects.get(id=estimate_id, created_by_id__in=actor_user_ids)
     except Estimate.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Estimate not found.", "fields": {}}},
@@ -709,11 +726,12 @@ def estimate_status_events_view(request, estimate_id: int):
 @permission_classes([IsAuthenticated])
 def estimate_convert_to_budget_view(request, estimate_id: int):
     """Convert an approved estimate to a budget (idempotent if already converted)."""
+    actor_user_ids = _organization_user_ids(request.user)
     try:
         estimate = (
             Estimate.objects.select_related("project")
             .prefetch_related("line_items", "line_items__cost_code")
-            .get(id=estimate_id, created_by=request.user)
+            .get(id=estimate_id, created_by_id__in=actor_user_ids)
         )
     except Estimate.DoesNotExist:
         return Response(

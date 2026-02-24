@@ -1,5 +1,6 @@
 "use client";
 
+import { buildAuthHeaders } from "@/features/session/auth-headers";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -29,7 +30,7 @@ export function ProjectActivityConsole({ projectId }: ProjectActivityConsoleProp
       const response = await fetch(
         `${normalizedBaseUrl}/projects/${projectId}/timeline/?category=${nextCategory}`,
         {
-          headers: { Authorization: `Token ${token}` },
+          headers: buildAuthHeaders(token),
         },
       );
       const payload: ApiResponse = await response.json();

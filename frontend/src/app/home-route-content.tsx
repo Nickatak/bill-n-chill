@@ -1,5 +1,6 @@
 "use client";
 
+import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { useEffect, useState } from "react";
 
 import { QuickAddConsole } from "@/features/intake";
@@ -41,7 +42,7 @@ export function HomeRouteContent({ health }: HomeRouteContentProps) {
 
       try {
         const response = await fetch(`${defaultApiBaseUrl}/auth/me/`, {
-          headers: { Authorization: `Token ${token}` },
+          headers: buildAuthHeaders(token),
         });
         await response.json();
         if (!response.ok) {

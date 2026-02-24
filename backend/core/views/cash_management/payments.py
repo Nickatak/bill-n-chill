@@ -27,6 +27,7 @@ from core.serializers import (
 )
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
+    _organization_user_ids,
     _record_financial_audit_event,
     _role_gate_error_payload,
     _validate_project_for_user,
@@ -311,6 +312,7 @@ def project_payments_view(request, project_id: int):
       - `backend/core/tests/test_payments.py::test_payment_validates_required_fields_and_positive_amount`
       - `backend/core/tests/test_payments.py::test_payment_create_rolls_back_when_audit_write_fails`
     """
+    actor_user_ids = _organization_user_ids(request.user)
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -320,7 +322,7 @@ def project_payments_view(request, project_id: int):
 
     if request.method == "GET":
         rows = (
-            Payment.objects.filter(project=project, created_by=request.user)
+            Payment.objects.filter(project=project, created_by_id__in=actor_user_ids)
             .select_related("project")
             .prefetch_related("allocations")
             .order_by("-payment_date", "-created_at")
@@ -452,10 +454,11 @@ def payment_detail_view(request, payment_id: int):
       - `backend/core/tests/test_payments.py::test_payment_patch_updates_direction_method_status_reference`
       - `backend/core/tests/test_payments.py::test_payment_records_append_for_status_change_and_allocation`
     """
+    actor_user_ids = _organization_user_ids(request.user)
     try:
         payment = Payment.objects.select_related("project").prefetch_related("allocations").get(
             id=payment_id,
-            created_by=request.user,
+            created_by_id__in=actor_user_ids,
         )
     except Payment.DoesNotExist:
         return Response(
@@ -645,10 +648,11 @@ def payment_allocate_view(request, payment_id: int):
       - `backend/core/tests/test_payments.py::test_payment_allocation_outbound_partial_updates_vendor_bill_balances`
       - `backend/core/tests/test_payments.py::test_payment_allocation_blocks_direction_mismatch_and_overallocation`
     """
+    actor_user_ids = _organization_user_ids(request.user)
     try:
         payment = Payment.objects.select_related("project").prefetch_related("allocations").get(
             id=payment_id,
-            created_by=request.user,
+            created_by_id__in=actor_user_ids,
         )
     except Payment.DoesNotExist:
         return Response(
@@ -706,7 +710,7 @@ def payment_allocate_view(request, payment_id: int):
         if target_type == PaymentAllocation.TargetType.INVOICE:
             target = Invoice.objects.filter(
                 id=target_id,
-                created_by=request.user,
+                created_by_id__in=actor_user_ids,
                 project=payment.project,
             ).first()
             if not target:
@@ -728,7 +732,7 @@ def payment_allocate_view(request, payment_id: int):
         else:
             target = VendorBill.objects.filter(
                 id=target_id,
-                created_by=request.user,
+                created_by_id__in=actor_user_ids,
                 project=payment.project,
             ).first()
             if not target:

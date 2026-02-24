@@ -1,5 +1,6 @@
 "use client";
 
+import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   defaultApiBaseUrl,
@@ -7,6 +8,7 @@ import {
   normalizeApiBaseUrl,
 } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
+import { hasAnyRole } from "../../session/rbac";
 import {
   ApiResponse,
   BudgetLineRecord,
@@ -127,7 +129,7 @@ export function ChangeOrdersConsole({
   >(CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
-  const canMutateChangeOrders = role === "owner" || role === "pm";
+  const canMutateChangeOrders = hasAnyRole(role, ["owner", "pm"]);
   const scopedProjectId = scopedProjectIdProp;
   const initialOriginEstimateId = initialOriginEstimateIdProp;
   const selectedChangeOrder =
@@ -296,7 +298,7 @@ export function ChangeOrdersConsole({
   const loadBudgetLines = useCallback(async (projectId: number, sourceEstimateId?: number | null) => {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/budgets/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -327,7 +329,7 @@ export function ChangeOrdersConsole({
   const loadProjectEstimates = useCallback(async (projectId: number) => {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -388,7 +390,7 @@ export function ChangeOrdersConsole({
     const response = await fetch(
       `${normalizedBaseUrl}/projects/${projectId}/change-orders/`,
       {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       },
     );
     const payload: ApiResponse = await response.json();
@@ -405,7 +407,7 @@ export function ChangeOrdersConsole({
     setStatusMessage("Loading projects...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -566,10 +568,7 @@ export function ChangeOrdersConsole({
         `${normalizedBaseUrl}/projects/${projectId}/change-orders/`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Token ${token}`,
-          },
+          headers: buildAuthHeaders(token, { contentType: "application/json" }),
           body: JSON.stringify({
             title: newTitle,
             amount_delta: formatMoney(newLineDeltaTotal),
@@ -627,7 +626,7 @@ export function ChangeOrdersConsole({
     try {
       const response = await fetch(`${normalizedBaseUrl}/change-orders/${changeOrderId}/clone-revision/`, {
         method: "POST",
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -665,10 +664,7 @@ export function ChangeOrdersConsole({
         `${normalizedBaseUrl}/change-orders/${changeOrderId}/`,
         {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Token ${token}`,
-          },
+          headers: buildAuthHeaders(token, { contentType: "application/json" }),
           body: JSON.stringify({
             title: editTitle,
             amount_delta: formatMoney(editLineDeltaTotal),
@@ -728,10 +724,7 @@ export function ChangeOrdersConsole({
         `${normalizedBaseUrl}/change-orders/${selectedViewerChangeOrder.id}/`,
         {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Token ${token}`,
-          },
+          headers: buildAuthHeaders(token, { contentType: "application/json" }),
           body: JSON.stringify({ status: quickStatus }),
         },
       );

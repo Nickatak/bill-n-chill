@@ -27,6 +27,7 @@ from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
     _get_active_budget_for_project,
     _next_change_order_family_key,
+    _organization_user_ids,
     _record_financial_audit_event,
     _role_gate_error_payload,
     _validate_project_for_user,
@@ -73,6 +74,7 @@ def project_change_orders_view(request, project_id: int):
     - `POST`: requires role `owner|pm`, active budget, approved origin estimate, and valid line totals.
     - Create writes are atomic: change-order row, optional lines, financial audit event.
     """
+    actor_user_ids = _organization_user_ids(request.user)
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -82,7 +84,7 @@ def project_change_orders_view(request, project_id: int):
 
     if request.method == "GET":
         rows = (
-            ChangeOrder.objects.filter(project=project, requested_by=request.user)
+            ChangeOrder.objects.filter(project=project, requested_by_id__in=actor_user_ids)
             .prefetch_related("line_items", "line_items__budget_line", "line_items__budget_line__cost_code")
             .order_by("-created_at", "-revision_number")
         )
@@ -143,7 +145,7 @@ def project_change_orders_view(request, project_id: int):
         origin_estimate = Estimate.objects.get(
             id=data["origin_estimate"],
             project=project,
-            created_by=request.user,
+            created_by_id__in=actor_user_ids,
         )
     except Estimate.DoesNotExist:
         return Response(
@@ -245,12 +247,13 @@ def change_order_detail_view(request, change_order_id: int):
     - Enforces transition rules, line/amount consistency, and origin-estimate immutability policy.
     - Atomic update path may propagate financial deltas to project/budget and append immutable snapshot/audit rows.
     """
+    actor_user_ids = _organization_user_ids(request.user)
     try:
         change_order = ChangeOrder.objects.select_related("project").prefetch_related(
                 "line_items", "line_items__budget_line", "line_items__budget_line__cost_code"
         ).get(
             id=change_order_id,
-            requested_by=request.user,
+            requested_by_id__in=actor_user_ids,
         )
     except ChangeOrder.DoesNotExist:
         return Response(
@@ -405,7 +408,7 @@ def change_order_detail_view(request, change_order_id: int):
                 origin_estimate = Estimate.objects.get(
                     id=data["origin_estimate"],
                     project=change_order.project,
-                    created_by=request.user,
+                    created_by_id__in=actor_user_ids,
                 )
             except Estimate.DoesNotExist:
                 return Response(
@@ -465,7 +468,7 @@ def change_order_detail_view(request, change_order_id: int):
             if financial_delta != MONEY_ZERO:
                 Project.objects.filter(
                     id=change_order.project_id,
-                    created_by=request.user,
+                    created_by_id__in=actor_user_ids,
                 ).update(
                     contract_value_current=F("contract_value_current") + financial_delta,
                 )
@@ -530,11 +533,12 @@ def change_order_clone_revision_view(request, change_order_id: int):
     - Source must be latest family revision.
     - Clone writes are atomic: cloned row, cloned lines, financial audit event.
     """
+    actor_user_ids = _organization_user_ids(request.user)
     try:
         change_order = (
             ChangeOrder.objects.select_related("project", "origin_estimate")
             .prefetch_related("line_items")
-            .get(id=change_order_id, requested_by=request.user)
+            .get(id=change_order_id, requested_by_id__in=actor_user_ids)
         )
     except ChangeOrder.DoesNotExist:
         return Response(
@@ -550,7 +554,7 @@ def change_order_clone_revision_view(request, change_order_id: int):
         ChangeOrder.objects.filter(
             project=change_order.project,
             family_key=change_order.family_key,
-            requested_by=request.user,
+            requested_by_id__in=actor_user_ids,
         )
         .order_by("-revision_number")
         .first()

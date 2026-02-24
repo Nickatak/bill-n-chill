@@ -1,5 +1,6 @@
 "use client";
 
+import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 
@@ -7,6 +8,8 @@ import {
   clearClientSession,
   loadClientSession,
   saveClientSession,
+  type SessionOrganization,
+  type SessionRole,
 } from "../client-session";
 import styles from "./home-auth-console.module.css";
 
@@ -15,7 +18,12 @@ type LoginResponse = {
     token?: string;
     user?: {
       email?: string;
-      role?: "owner" | "pm" | "bookkeeping" | "worker" | "viewer";
+      role?: SessionRole;
+    };
+    organization?: {
+      id?: number;
+      display_name?: string;
+      slug?: string;
     };
   };
   error?: {
@@ -26,7 +34,12 @@ type LoginResponse = {
 type MeResponse = {
   data?: {
     email?: string;
-    role?: "owner" | "pm" | "bookkeeping" | "worker" | "viewer";
+    role?: SessionRole;
+    organization?: {
+      id?: number;
+      display_name?: string;
+      slug?: string;
+    };
   };
 };
 
@@ -52,6 +65,25 @@ function formatTimestamp(value?: string): string {
   return parsed.toLocaleString();
 }
 
+function toSessionOrganization(
+  raw:
+    | {
+        id?: number;
+        display_name?: string;
+        slug?: string;
+      }
+    | undefined,
+): SessionOrganization | undefined {
+  if (!raw?.id || !raw.display_name || !raw.slug) {
+    return undefined;
+  }
+  return {
+    id: raw.id,
+    displayName: raw.display_name,
+    slug: raw.slug,
+  };
+}
+
 export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
   const [messageTone, setMessageTone] = useState<"neutral" | "error">("neutral");
   const [email, setEmail] = useState("");
@@ -72,11 +104,12 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
   async function verifySession(
     activeToken: string,
     fallbackEmail: string,
-    fallbackRole: "owner" | "pm" | "bookkeeping" | "worker" | "viewer" = "owner",
+    fallbackRole: SessionRole = "owner",
+    fallbackOrganization?: SessionOrganization,
   ) {
     try {
       const response = await fetch(`${defaultApiBaseUrl}/auth/me/`, {
-        headers: { Authorization: `Token ${activeToken}` },
+        headers: buildAuthHeaders(activeToken),
       });
       const payload: MeResponse = await response.json();
       if (!response.ok) {
@@ -89,12 +122,22 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
       }
       const nextEmail = payload.data?.email ?? fallbackEmail;
       const nextRole = payload.data?.role ?? fallbackRole;
+      const nextOrganization = toSessionOrganization(payload.data?.organization) ?? fallbackOrganization;
       if (nextEmail && nextEmail !== email) {
         setEmail(nextEmail);
       }
-      saveClientSession({ token: activeToken, email: nextEmail, role: nextRole });
+      saveClientSession({
+        token: activeToken,
+        email: nextEmail,
+        role: nextRole,
+        organization: nextOrganization,
+      });
       setIsAuthenticated(true);
-      setMessage(`Using shared session for ${nextEmail || "user"} (${nextRole}).`);
+      setMessage(
+        `Using shared session for ${nextEmail || "user"} (${nextRole})${
+          nextOrganization ? ` in ${nextOrganization.displayName}` : ""
+        }.`,
+      );
       setMessageTone("neutral");
     } catch {
       setIsAuthenticated(false);
@@ -142,6 +185,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
       const nextToken = payload.data?.token ?? "";
       const nextEmail = payload.data?.user?.email ?? email;
       const nextRole = payload.data?.user?.role ?? "owner";
+      const nextOrganization = toSessionOrganization(payload.data?.organization);
       if (!response.ok || !nextToken) {
         setMessage(normalizeLoginError(payload.error?.message));
         setMessageTone("error");
@@ -151,7 +195,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
 
       setToken(nextToken);
       setPassword("");
-      await verifySession(nextToken, nextEmail, nextRole);
+      await verifySession(nextToken, nextEmail, nextRole, nextOrganization);
     } catch {
       setMessage("Could not reach login endpoint.");
       setMessageTone("error");

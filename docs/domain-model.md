@@ -159,6 +159,8 @@ Key fields:
 Policy:
 - Internal-facing customer anchor object.
 - Canonical immutable lifecycle provenance is captured in `CustomerRecord`.
+- API lifecycle contract is archive/unarchive via `is_archived`; hard-delete is intentionally unsupported.
+- Archive transition contract: archiving a customer auto-cancels any remaining `prospect` projects.
 
 ## CustomerIntakeRecord
 
@@ -648,7 +650,6 @@ Policy:
 - `POST /api/v1/customers/quick-add/`
 - `GET /api/v1/customers/`
 - `PATCH /api/v1/customers/{id}/`
-- `DELETE /api/v1/customers/{id}/`
 - `GET /api/v1/projects/{id}/financial-summary/`
 - `PATCH /api/v1/estimates/{estimate_id}/`
 - `POST /api/v1/estimates/{estimate_id}/convert-to-budget/`

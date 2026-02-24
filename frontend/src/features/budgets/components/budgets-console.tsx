@@ -1,5 +1,6 @@
 "use client";
 
+import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { useEffect, useState } from "react";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
@@ -84,7 +85,7 @@ export function BudgetsConsole({ scopedProjectId }: BudgetsConsoleProps) {
     setStatusMessage("Loading project...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -117,10 +118,10 @@ export function BudgetsConsole({ scopedProjectId }: BudgetsConsoleProps) {
     try {
       const [estimatesResponse, budgetsResponse] = await Promise.all([
         fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
-          headers: { Authorization: `Token ${token}` },
+          headers: buildAuthHeaders(token),
         }),
         fetch(`${normalizedBaseUrl}/projects/${projectId}/budgets/`, {
-          headers: { Authorization: `Token ${token}` },
+          headers: buildAuthHeaders(token),
         }),
       ]);
       const estimatesPayload: ApiResponse = await estimatesResponse.json();
@@ -207,10 +208,7 @@ export function BudgetsConsole({ scopedProjectId }: BudgetsConsoleProps) {
         `${normalizedBaseUrl}/estimates/${estimateId}/convert-to-budget/`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Token ${token}`,
-          },
+          headers: buildAuthHeaders(token, { contentType: "application/json" }),
           body: JSON.stringify({}),
         },
       );

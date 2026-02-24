@@ -4,7 +4,11 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { saveClientSession } from "../client-session";
+import {
+  saveClientSession,
+  type SessionOrganization,
+  type SessionRole,
+} from "../client-session";
 import styles from "./home-auth-console.module.css";
 
 type RegisterResponse = {
@@ -12,7 +16,12 @@ type RegisterResponse = {
     token?: string;
     user?: {
       email?: string;
-      role?: "owner" | "pm" | "bookkeeping" | "worker" | "viewer";
+      role?: SessionRole;
+    };
+    organization?: {
+      id?: number;
+      display_name?: string;
+      slug?: string;
     };
   };
   error?: {
@@ -43,6 +52,25 @@ function formatTimestamp(value?: string): string {
     return value;
   }
   return parsed.toLocaleString();
+}
+
+function toSessionOrganization(
+  raw:
+    | {
+        id?: number;
+        display_name?: string;
+        slug?: string;
+      }
+    | undefined,
+): SessionOrganization | undefined {
+  if (!raw?.id || !raw.display_name || !raw.slug) {
+    return undefined;
+  }
+  return {
+    id: raw.id,
+    displayName: raw.display_name,
+    slug: raw.slug,
+  };
 }
 
 export function HomeRegisterConsole({ health }: HomeRegisterConsoleProps) {
@@ -88,6 +116,7 @@ export function HomeRegisterConsole({ health }: HomeRegisterConsoleProps) {
       const token = payload.data?.token ?? "";
       const nextEmail = payload.data?.user?.email ?? email;
       const nextRole = payload.data?.user?.role ?? "owner";
+      const nextOrganization = toSessionOrganization(payload.data?.organization);
 
       if (!response.ok || !token) {
         setMessage(normalizeRegisterError(payload));
@@ -96,7 +125,12 @@ export function HomeRegisterConsole({ health }: HomeRegisterConsoleProps) {
         return;
       }
 
-      saveClientSession({ token, email: nextEmail, role: nextRole });
+      saveClientSession({
+        token,
+        email: nextEmail,
+        role: nextRole,
+        organization: nextOrganization,
+      });
       setMessage("Account created. Redirecting...");
       setMessageTone("neutral");
       router.push("/");

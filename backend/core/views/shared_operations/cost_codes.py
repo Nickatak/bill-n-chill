@@ -10,14 +10,20 @@ from rest_framework.response import Response
 
 from core.models import CostCode
 from core.serializers import CostCodeSerializer
-from core.views.helpers import _ensure_primary_membership, _parse_request_bool, _role_gate_error_payload
+from core.views.helpers import (
+    _ensure_primary_membership,
+    _organization_user_ids,
+    _parse_request_bool,
+    _role_gate_error_payload,
+)
 
 
 def _cost_code_scope_filter(user):
     membership = _ensure_primary_membership(user)
+    actor_user_ids = _organization_user_ids(user)
     return Q(organization_id=membership.organization_id) | Q(
         organization__isnull=True,
-        created_by=user,
+        created_by_id__in=actor_user_ids,
     )
 
 

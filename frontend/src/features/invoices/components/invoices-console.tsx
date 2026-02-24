@@ -1,9 +1,11 @@
 "use client";
 
+import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
+import { hasAnyRole } from "../../session/rbac";
 import { ApiResponse, CostCode, InvoiceLineInput, InvoiceRecord, ProjectRecord } from "../types";
 
 function todayIsoDate() {
@@ -71,7 +73,7 @@ export function InvoicesConsole() {
 
   const searchParams = useSearchParams();
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
-  const canMutateInvoices = role === "owner" || role === "pm" || role === "bookkeeping";
+  const canMutateInvoices = hasAnyRole(role, ["owner", "pm", "bookkeeping"]);
   const scopedProjectIdParam = searchParams.get("project");
   const scopedProjectId =
     scopedProjectIdParam && /^\d+$/.test(scopedProjectIdParam) ? Number(scopedProjectIdParam) : null;
@@ -80,10 +82,10 @@ export function InvoicesConsole() {
     try {
       const [projectsRes, codesRes] = await Promise.all([
         fetch(`${normalizedBaseUrl}/projects/`, {
-          headers: { Authorization: `Token ${token}` },
+          headers: buildAuthHeaders(token),
         }),
         fetch(`${normalizedBaseUrl}/cost-codes/`, {
-          headers: { Authorization: `Token ${token}` },
+          headers: buildAuthHeaders(token),
         }),
       ]);
       const projectsJson: ApiResponse = await projectsRes.json();
@@ -131,7 +133,7 @@ export function InvoicesConsole() {
     setStatusMessage("Loading invoices...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/invoices/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -185,10 +187,7 @@ export function InvoicesConsole() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/invoices/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
           issue_date: issueDate,
           due_date: dueDate,
@@ -232,10 +231,7 @@ export function InvoicesConsole() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/invoices/${invoiceId}/`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
           status: selectedStatus,
           scope_override: scopeOverride,
@@ -272,10 +268,7 @@ export function InvoicesConsole() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/invoices/${invoiceId}/send/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
           scope_override: scopeOverride,
           scope_override_note: scopeOverrideNote,
@@ -312,10 +305,7 @@ export function InvoicesConsole() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/invoices/${invoiceId}/`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
           status,
           scope_override: scopeOverride,

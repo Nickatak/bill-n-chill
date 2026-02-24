@@ -1,5 +1,6 @@
 "use client";
 
+import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import {
@@ -8,6 +9,7 @@ import {
   normalizeApiBaseUrl,
 } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
+import { hasAnyRole } from "../../session/rbac";
 import {
   ApiResponse,
   ProjectRecord,
@@ -183,7 +185,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   }, [budgetLineGroups]);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
-  const canMutateVendorBills = role === "owner" || role === "pm" || role === "bookkeeping";
+  const canMutateVendorBills = hasAnyRole(role, ["owner", "pm", "bookkeeping"]);
   const scopedProjectId = scopedProjectIdProp;
   const isProjectScoped = scopedProjectId !== null;
   const selectedProject =
@@ -478,10 +480,10 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     try {
       const [projectsResponse, vendorsResponse] = await Promise.all([
         fetch(`${normalizedBaseUrl}/projects/`, {
-          headers: { Authorization: `Token ${token}` },
+          headers: buildAuthHeaders(token),
         }),
         fetch(`${normalizedBaseUrl}/vendors/`, {
-          headers: { Authorization: `Token ${token}` },
+          headers: buildAuthHeaders(token),
         }),
       ]);
 
@@ -536,7 +538,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setStatusMessage("Loading vendor bills...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/vendor-bills/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -568,7 +570,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   async function loadBudgetLineOptions(projectId: number) {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/budgets/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -621,10 +623,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       `${normalizedBaseUrl}/projects/${payloadBody.projectId}/vendor-bills/`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
           vendor: payloadBody.vendor,
           bill_number: payloadBody.bill_number,
@@ -762,10 +761,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     try {
       const response = await fetch(`${normalizedBaseUrl}/vendor-bills/${vendorBillId}/`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
           vendor,
           bill_number: billNumber,
@@ -821,10 +817,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     try {
       const response = await fetch(`${normalizedBaseUrl}/vendor-bills/${vendorBillId}/`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({ status: nextStatus }),
       });
       const payload: ApiResponse = await response.json();

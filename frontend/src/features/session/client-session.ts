@@ -1,10 +1,19 @@
 export const SESSION_STORAGE_KEY = "bnc-session-v1";
 export const SESSION_CHANGE_EVENT = "bnc-session-change";
 
+export type SessionRole = "owner" | "pm" | "bookkeeping" | "worker" | "viewer";
+
+export type SessionOrganization = {
+  id: number;
+  displayName: string;
+  slug: string;
+};
+
 export type ClientSession = {
   token: string;
   email: string;
-  role?: "owner" | "pm" | "bookkeeping" | "worker" | "viewer";
+  role?: SessionRole;
+  organization?: SessionOrganization;
 };
 
 export function loadClientSession(): ClientSession | null {
@@ -26,6 +35,7 @@ export function loadClientSession(): ClientSession | null {
       token: parsed.token,
       email: parsed.email ?? "",
       role: parsed.role,
+      organization: parsed.organization,
     };
   } catch {
     return null;

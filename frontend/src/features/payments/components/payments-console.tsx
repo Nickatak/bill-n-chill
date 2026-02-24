@@ -1,5 +1,6 @@
 "use client";
 
+import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -9,6 +10,7 @@ import {
   normalizeApiBaseUrl,
 } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
+import { hasAnyRole } from "../../session/rbac";
 import {
   ApiResponse,
   InvoiceRecord,
@@ -111,7 +113,7 @@ export function PaymentsConsole() {
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const searchParams = useSearchParams();
-  const canMutatePayments = role === "owner" || role === "bookkeeping";
+  const canMutatePayments = hasAnyRole(role, ["owner", "bookkeeping"]);
   const scopedProjectIdParam = searchParams.get("project");
   const scopedProjectId =
     scopedProjectIdParam && /^\d+$/.test(scopedProjectIdParam) ? Number(scopedProjectIdParam) : null;
@@ -225,7 +227,7 @@ export function PaymentsConsole() {
 
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -259,7 +261,7 @@ export function PaymentsConsole() {
     setStatusMessage("Loading payments...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/payments/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -300,10 +302,7 @@ export function PaymentsConsole() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/payments/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
           direction: newDirection,
           method: newMethod,
@@ -358,10 +357,7 @@ export function PaymentsConsole() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/payments/${paymentId}/`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
           direction,
           method,
@@ -403,7 +399,7 @@ export function PaymentsConsole() {
         PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK.inbound;
       if (expectedTargetType === "invoice") {
         const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/invoices/`, {
-          headers: { Authorization: `Token ${token}` },
+          headers: buildAuthHeaders(token),
         });
         const payload: ApiResponse = await response.json();
         if (!response.ok) {
@@ -422,7 +418,7 @@ export function PaymentsConsole() {
       }
 
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/vendor-bills/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -460,10 +456,7 @@ export function PaymentsConsole() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/payments/${paymentId}/allocate/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
           allocations: [
             {
@@ -511,10 +504,7 @@ export function PaymentsConsole() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/payments/${paymentId}/`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({ status: nextStatus }),
       });
       const payload: ApiResponse = await response.json();

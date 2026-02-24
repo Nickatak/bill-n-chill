@@ -1,5 +1,6 @@
 "use client";
 
+import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
@@ -33,7 +34,7 @@ export function CostCodesConsole() {
     setStatusMessage("Loading cost codes...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/cost-codes/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -78,10 +79,7 @@ export function CostCodesConsole() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/cost-codes/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({ code: newCode, name: newName, is_active: true }),
       });
       const payload: ApiResponse = await response.json();
@@ -113,10 +111,7 @@ export function CostCodesConsole() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/cost-codes/${id}/`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({ code, name, is_active: isActive }),
       });
       const payload: ApiResponse = await response.json();
@@ -137,10 +132,7 @@ export function CostCodesConsole() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/cost-codes/import-csv/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({ csv_text: importCsvText, dry_run: dryRun }),
       });
       const payload: ApiResponse = await response.json();

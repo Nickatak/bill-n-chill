@@ -5,7 +5,6 @@ Manage project-scoped AP bill intake, lifecycle transitions, and budget-line all
 
 ## Route Surface
 1. `/projects/[projectId]/vendor-bills`
-2. `/vendor-bills` (redirect helper)
 
 ## Mutation Map
 1. `VendorBill`
@@ -17,7 +16,6 @@ Manage project-scoped AP bill intake, lifecycle transitions, and budget-line all
 ## Composition and Entry Flow
 1. Entry sources:
    - direct route entry: `frontend/src/app/projects/[projectId]/vendor-bills/page.tsx` renders `VendorBillsConsole`
-   - redirect route entry: `/vendor-bills` redirects into project-scoped page
    - feature export entry: `frontend/src/features/vendor-bills/index.ts` exports `VendorBillsConsole`
 2. Parent/Owner:
    `VendorBillsConsole` owns project scope, selected bill, and allocation/editor workflow.

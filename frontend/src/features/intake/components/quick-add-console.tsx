@@ -44,17 +44,14 @@ export function QuickAddConsole() {
   return (
     <section className={styles.section}>
       <h2>Intake: Quick Add</h2>
-      <p>
-        Use this page to quickly create a customer and optionally create a project in one step.
-      </p>
-      <p>
-        If we detect a possible duplicate, pick how to resolve it so we do not create overlapping
-        customer records.
-      </p>
-      <p>
-        Choose <strong>Create Customer + Project</strong> for the normal flow, or{" "}
-        <strong>Create Customer Only</strong> if you are just capturing customer details for now.
-      </p>
+      <div className={styles.introCard}>
+        <p className={styles.introLead}>
+          Capture a customer fast, then optionally create a project in the same submit.
+        </p>
+        <p className={styles.introMeta}>
+          If duplicates are detected, resolve them inline so we avoid overlapping customer records.
+        </p>
+      </div>
       {controllerApi.authMessage ? <p>{controllerApi.authMessage}</p> : null}
       <div ref={statusAnchorRef} />
       {statusMessage ? (

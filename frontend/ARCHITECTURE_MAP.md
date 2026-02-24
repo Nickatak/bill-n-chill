@@ -52,8 +52,6 @@ This map defines how to trace behavior from route to feature code and how to com
 | Route | Redirect Behavior |
 | --- | --- |
 | `/estimates` | redirects to `/projects/[projectId]/estimates` when `project` query is present |
-| `/vendor-bills` | redirects to `/projects/[projectId]/vendor-bills` when `project` query is present |
-| `/expenses` | redirects to `/projects/[projectId]/expenses` when `project` query is present |
 | `/projects/[projectId]` | redirects to `/projects?project=[projectId]` |
 
 ## Workflow Contract Features

@@ -1,5 +1,6 @@
 "use client";
 
+import { buildAuthHeaders } from "@/features/session/auth-headers";
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 
@@ -48,7 +49,7 @@ export function FinancialsAuditingConsole() {
     setStatusMessage("Loading projects...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -85,7 +86,7 @@ export function FinancialsAuditingConsole() {
     setStatusMessage("Loading financial summary...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/financial-summary/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -110,7 +111,7 @@ export function FinancialsAuditingConsole() {
       const response = await fetch(
         `${normalizedBaseUrl}/projects/${projectId}/accounting-export/?export_format=csv`,
         {
-          headers: { Authorization: `Token ${token}` },
+          headers: buildAuthHeaders(token),
         },
       );
       if (!response.ok) {
@@ -142,7 +143,7 @@ export function FinancialsAuditingConsole() {
     setStatusMessage("Loading audit events...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/audit-events/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -168,7 +169,7 @@ export function FinancialsAuditingConsole() {
       const response = await fetch(
         `${normalizedBaseUrl}/projects/${projectId}/accounting-sync-events/`,
         {
-          headers: { Authorization: `Token ${token}` },
+          headers: buildAuthHeaders(token),
         },
       );
       const payload: ApiResponse = await response.json();
@@ -199,10 +200,7 @@ export function FinancialsAuditingConsole() {
         `${normalizedBaseUrl}/projects/${projectId}/accounting-sync-events/`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Token ${token}`,
-          },
+          headers: buildAuthHeaders(token, { contentType: "application/json" }),
           body: JSON.stringify({
             provider: syncProvider,
             object_type: syncObjectType,
@@ -240,10 +238,7 @@ export function FinancialsAuditingConsole() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/accounting-sync-events/${syncEventId}/retry/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -271,7 +266,7 @@ export function FinancialsAuditingConsole() {
       const response = await fetch(
         `${normalizedBaseUrl}/reports/portfolio/${params.toString() ? `?${params.toString()}` : ""}`,
         {
-          headers: { Authorization: `Token ${token}` },
+          headers: buildAuthHeaders(token),
         },
       );
       const payload: ApiResponse = await response.json();
@@ -299,7 +294,7 @@ export function FinancialsAuditingConsole() {
       const response = await fetch(
         `${normalizedBaseUrl}/reports/change-impact/${params.toString() ? `?${params.toString()}` : ""}`,
         {
-          headers: { Authorization: `Token ${token}` },
+          headers: buildAuthHeaders(token),
         },
       );
       const payload: ApiResponse = await response.json();
@@ -318,7 +313,7 @@ export function FinancialsAuditingConsole() {
     setStatusMessage("Loading attention feed...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/reports/attention-feed/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {

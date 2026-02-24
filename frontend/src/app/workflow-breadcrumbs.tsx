@@ -1,5 +1,6 @@
 "use client";
 
+import { buildAuthHeaders } from "@/features/session/auth-headers";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -23,13 +24,12 @@ type HierarchyRule = {
 
 const ROOT_CRUMB: CrumbDef = { href: "/", label: "Intake" };
 const PROJECTS_HUB_CRUMB: CrumbDef = { href: "/projects", label: "Projects" };
+const META_HUB_CRUMB: CrumbDef = { href: "/ops/meta", label: "Meta" };
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 const legacyProjectScopedPrefixes = [
   "/estimates",
   "/change-orders",
   "/invoices",
-  "/vendor-bills",
-  "/expenses",
   "/payments",
 ];
 
@@ -79,15 +79,13 @@ const hierarchyRules: HierarchyRule[] = [
   },
   {
     when: (pathname) =>
-      pathname === "/vendor-bills" ||
       /^\/projects\/\d+\/vendor-bills$/.test(pathname),
-    crumbs: [PROJECTS_HUB_CRUMB, { href: "/vendor-bills", label: "Vendor Bills" }],
+    crumbs: [PROJECTS_HUB_CRUMB, { href: "/projects", label: "Vendor Bills" }],
   },
   {
     when: (pathname) =>
-      pathname === "/expenses" ||
       /^\/projects\/\d+\/expenses$/.test(pathname),
-    crumbs: [PROJECTS_HUB_CRUMB, { href: "/expenses", label: "Expenses" }],
+    crumbs: [PROJECTS_HUB_CRUMB, { href: "/projects", label: "Expenses" }],
   },
   {
     when: (pathname) => pathname === "/payments",
@@ -96,65 +94,64 @@ const hierarchyRules: HierarchyRule[] = [
   {
     when: (pathname) => pathname === "/ops/meta",
     crumbs: [
-      PROJECTS_HUB_CRUMB,
-      { href: "/ops/meta", label: "Meta" },
+      META_HUB_CRUMB,
       { href: "/ops/meta", label: "Notes" },
     ],
   },
   {
     when: (pathname) => pathname === "/customers",
     crumbs: [
-      PROJECTS_HUB_CRUMB,
-      { href: "/customers", label: "Meta" },
+      META_HUB_CRUMB,
       { href: "/customers", label: "Customers" },
     ],
   },
   {
     when: (pathname) => pathname === "/vendors",
     crumbs: [
-      PROJECTS_HUB_CRUMB,
-      { href: "/vendors", label: "Meta" },
+      META_HUB_CRUMB,
       { href: "/vendors", label: "Vendors" },
     ],
   },
   {
     when: (pathname) => pathname === "/cost-codes",
     crumbs: [
-      PROJECTS_HUB_CRUMB,
-      { href: "/cost-codes", label: "Meta" },
+      META_HUB_CRUMB,
       { href: "/cost-codes", label: "Cost Codes" },
     ],
   },
   {
     when: (pathname) => pathname === "/financials-auditing",
     crumbs: [
-      PROJECTS_HUB_CRUMB,
-      { href: "/financials-auditing", label: "Meta" },
+      META_HUB_CRUMB,
       { href: "/financials-auditing", label: "Financials & Auditing" },
     ],
   },
   {
     when: (pathname) => pathname === "/settings/intake",
     crumbs: [
-      PROJECTS_HUB_CRUMB,
-      { href: "/settings/intake", label: "Meta" },
+      META_HUB_CRUMB,
       { href: "/settings/intake", label: "Intake Form" },
     ],
   },
   {
     when: (pathname) => pathname.startsWith("/settings/"),
-    crumbs: [PROJECTS_HUB_CRUMB, { href: "/settings/intake", label: "Meta" }],
+    crumbs: [META_HUB_CRUMB, { href: "/settings/intake", label: "Settings" }],
   },
 ];
 
-function buildCrumbs(pathname: string): Crumb[] {
+function buildCrumbs(pathname: string, organizationLabel: string): Crumb[] {
   const matchingRule = hierarchyRules.find((rule) => rule.when(pathname));
   const crumbDefs = matchingRule?.crumbs ?? [PROJECTS_HUB_CRUMB];
+  const orgRootCrumb: CrumbDef = {
+    href: "/projects",
+    label: organizationLabel,
+  };
+  const fullCrumbDefs = [orgRootCrumb, ...crumbDefs];
 
-  return crumbDefs.map((crumb, index) => ({
+  return fullCrumbDefs.map((crumb, index) => ({
     href: crumb.href,
     label: crumb.label,
-    isCurrent: index === crumbDefs.length - 1,
+    isCurrent: index === fullCrumbDefs.length - 1,
   }));
 }
 
@@ -174,12 +171,6 @@ function projectScopedHref(href: string, projectId: string): string {
   if (href === "/budgets/analytics") {
     return `/projects/${encodeURIComponent(projectId)}/budgets/analytics`;
   }
-  if (href === "/vendor-bills") {
-    return `/projects/${encodeURIComponent(projectId)}/vendor-bills`;
-  }
-  if (href === "/expenses") {
-    return `/projects/${encodeURIComponent(projectId)}/expenses`;
-  }
   if (href === "/change-orders") {
     return `/projects/${encodeURIComponent(projectId)}/change-orders`;
   }
@@ -190,7 +181,7 @@ function projectScopedHref(href: string, projectId: string): string {
 }
 
 export function WorkflowBreadcrumbs() {
-  const { token } = useSharedSessionAuth();
+  const { token, organization } = useSharedSessionAuth();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const pathnameValue = pathname || "/";
@@ -200,8 +191,9 @@ export function WorkflowBreadcrumbs() {
   const projectId =
     pathProjectId ??
     (queryProjectId && /^\d+$/.test(queryProjectId) ? queryProjectId : null);
+  const organizationLabel = organization?.displayName?.trim() || "Organization";
   const [projectTitle, setProjectTitle] = useState("");
-  const baseCrumbs = buildCrumbs(pathnameValue);
+  const baseCrumbs = buildCrumbs(pathnameValue, organizationLabel);
   const shouldShowProjectCrumb = Boolean(
     projectId &&
       /^\d+$/.test(projectId) &&
@@ -219,7 +211,7 @@ export function WorkflowBreadcrumbs() {
 
       try {
         const response = await fetch(`${defaultApiBaseUrl}/projects/${projectId}/`, {
-          headers: { Authorization: `Token ${token}` },
+          headers: buildAuthHeaders(token),
         });
         const payload = await response.json();
         if (!response.ok) {

@@ -1,11 +1,12 @@
 "use client";
 
+import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { clearClientSession } from "@/features/session/client-session";
 import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { isRouteActive, opsMetaRoutes } from "./nav-routes";
+import { isRouteActive, opsMetaRoutes, opsMetaWipRoutes } from "./nav-routes";
 
 const THEME_KEY = "bnc-theme";
 type ThemeMode = "light" | "dark";
@@ -34,20 +35,23 @@ function applyTheme(theme: ThemeMode) {
 export function ThemeToggle() {
   const pathname = usePathname() ?? "";
   const router = useRouter();
-  const { token } = useSharedSessionAuth();
+  const { token, organization } = useSharedSessionAuth();
   const hasSession = Boolean(token);
   const isPublicEstimateRoute = Boolean(pathname && /^\/estimate\/[^/]+\/?$/.test(pathname));
   const hasActiveOpsMeta = opsMetaRoutes.some((route) => isRouteActive(pathname, route));
+  const hasActiveOpsMetaWip = opsMetaWipRoutes.some((route) => isRouteActive(pathname, route));
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<QuickJumpItem[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const quickJumpMenuRef = useRef<HTMLDetailsElement>(null);
   const opsMetaMenuRef = useRef<HTMLDetailsElement>(null);
+  const opsMetaWipMenuRef = useRef<HTMLDetailsElement>(null);
   const normalizedBaseUrl = useMemo(() => defaultApiBaseUrl.trim().replace(/\/$/, ""), []);
 
   function closeMenus() {
     quickJumpMenuRef.current?.removeAttribute("open");
     opsMetaMenuRef.current?.removeAttribute("open");
+    opsMetaWipMenuRef.current?.removeAttribute("open");
   }
 
   function toggleTheme() {
@@ -76,7 +80,7 @@ export function ThemeToggle() {
         const response = await fetch(
           `${normalizedBaseUrl}/search/quick-jump/?q=${encodeURIComponent(searchQuery.trim())}`,
           {
-            headers: { Authorization: `Token ${token}` },
+            headers: buildAuthHeaders(token),
           },
         );
         const payload = await response.json();
@@ -122,7 +126,8 @@ export function ThemeToggle() {
       }
       if (
         quickJumpMenuRef.current?.contains(target) ||
-        opsMetaMenuRef.current?.contains(target)
+        opsMetaMenuRef.current?.contains(target) ||
+        opsMetaWipMenuRef.current?.contains(target)
       ) {
         return;
       }
@@ -135,6 +140,11 @@ export function ThemeToggle() {
 
   return (
     <div className="themeControls">
+      {hasSession && !isPublicEstimateRoute && organization ? (
+        <span className="sessionOrgBadge" title={`Organization slug: ${organization.slug}`}>
+          {organization.displayName}
+        </span>
+      ) : null}
       {hasSession && isPublicEstimateRoute ? (
         <Link href="/" className="themeControlButton">
           Home
@@ -179,6 +189,26 @@ export function ThemeToggle() {
           </summary>
           <div className="nonWorkflowList" role="menu" aria-label="Ops and metadata tools">
             {opsMetaRoutes.map((route) => (
+              <Link
+                key={route.href}
+                href={route.href}
+                className={`nonWorkflowItem ${isRouteActive(pathname, route) ? "isActive" : ""}`}
+                role="menuitem"
+                onClick={closeMenus}
+              >
+                {route.label}
+              </Link>
+            ))}
+          </div>
+        </details>
+      ) : null}
+      {hasSession && !isPublicEstimateRoute ? (
+        <details ref={opsMetaWipMenuRef} className="nonWorkflowMenu">
+          <summary className={`themeControlButton ${hasActiveOpsMetaWip ? "isActive" : ""}`}>
+            WIP
+          </summary>
+          <div className="nonWorkflowList" role="menu" aria-label="Work in progress tools">
+            {opsMetaWipRoutes.map((route) => (
               <Link
                 key={route.href}
                 href={route.href}

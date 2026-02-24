@@ -1,5 +1,6 @@
 "use client";
 
+import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { ReactNode, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -46,7 +47,7 @@ export function AuthGate({ children }: AuthGateProps) {
 
       try {
         const response = await fetch(`${defaultApiBaseUrl}/auth/me/`, {
-          headers: { Authorization: `Token ${session.token}` },
+          headers: buildAuthHeaders(session.token),
         });
         await response.json();
         if (!response.ok) {

@@ -5,7 +5,6 @@ import re
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Count, Q
-from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -18,6 +17,7 @@ from core.serializers import (
     CustomerSerializer,
     ProjectSerializer,
 )
+from core.views.helpers import _organization_user_ids
 
 
 def _normalized_phone(value: str) -> str:
@@ -25,7 +25,8 @@ def _normalized_phone(value: str) -> str:
 
 
 def _find_duplicate_customers(user, *, phone: str, email: str):
-    customers = Customer.objects.filter(created_by=user)
+    actor_user_ids = _organization_user_ids(user)
+    customers = Customer.objects.filter(created_by_id__in=actor_user_ids)
     phone_norm = _normalized_phone(phone)
     email_norm = (email or "").strip().lower()
 
@@ -166,9 +167,10 @@ def _record_customer_record(
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def customers_list_view(request):
-    """List user-owned customers with optional free-text filtering."""
+    """List organization-scoped customers with optional free-text filtering."""
+    actor_user_ids = _organization_user_ids(request.user)
     rows = (
-        Customer.objects.filter(created_by=request.user)
+        Customer.objects.filter(created_by_id__in=actor_user_ids)
         .annotate(
             project_count=Count(
                 "projects",
@@ -198,17 +200,20 @@ def customers_list_view(request):
     return Response({"data": data})
 
 
-@api_view(["GET", "PATCH", "DELETE"])
+@api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def customer_detail_view(request, customer_id: int):
-    """Fetch, update, or delete a customer with immutable record capture on writes.
+    """Fetch or update a customer with immutable record capture on writes.
 
     Contract:
     - `PATCH`: appends `CustomerRecord(updated)` in-transaction.
-    - `DELETE`: appends `CustomerRecord(deleted)` before delete in-transaction.
+      - When `is_archived` changes `false -> true`, all `prospect` projects for that customer
+        are transitioned to `cancelled` in the same transaction.
+    - `DELETE`: intentionally unsupported (`405`); archive via `PATCH is_archived`.
     """
+    actor_user_ids = _organization_user_ids(request.user)
     contact = (
-        Customer.objects.filter(id=customer_id, created_by=request.user)
+        Customer.objects.filter(id=customer_id, created_by_id__in=actor_user_ids)
         .annotate(
             project_count=Count(
                 "projects",
@@ -241,30 +246,6 @@ def customer_detail_view(request, customer_id: int):
         payload["has_active_or_on_hold_project"] = payload["active_project_count"] > 0
         return Response({"data": payload})
 
-    if request.method == "DELETE":
-        try:
-            with transaction.atomic():
-                _record_customer_record(
-                    customer=contact,
-                    event_type=CustomerRecord.EventType.DELETED,
-                    capture_source=CustomerRecord.CaptureSource.MANUAL_UI,
-                    recorded_by=request.user,
-                    note="Customer deleted.",
-                )
-                contact.delete()
-        except ProtectedError:
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_error",
-                        "message": "Cannot delete customer while projects still reference it.",
-                        "fields": {"id": ["Delete or reassign linked projects first."]},
-                    }
-                },
-                status=400,
-            )
-        return Response(status=204)
-
     with transaction.atomic():
         previous_is_archived = contact.is_archived
         serializer = CustomerManageSerializer(contact, data=request.data, partial=True)
@@ -275,6 +256,13 @@ def customer_detail_view(request, customer_id: int):
             if hasattr(exc, "message_dict"):
                 return Response(exc.message_dict, status=400)
             return Response({"non_field_errors": exc.messages}, status=400)
+
+        cancelled_prospect_project_count = 0
+        if not previous_is_archived and contact.is_archived:
+            cancelled_prospect_project_count = contact.projects.filter(
+                status=Project.Status.PROSPECT
+            ).update(status=Project.Status.CANCELLED, updated_at=timezone.now())
+
         _record_customer_record(
             customer=contact,
             event_type=CustomerRecord.EventType.UPDATED,
@@ -288,13 +276,14 @@ def customer_detail_view(request, customer_id: int):
             metadata={
                 "from_is_archived": previous_is_archived,
                 "to_is_archived": contact.is_archived,
+                "cancelled_prospect_project_count": cancelled_prospect_project_count,
             }
             if contact.is_archived != previous_is_archived
             else {},
         )
 
     refreshed = (
-        Customer.objects.filter(id=contact.id, created_by=request.user)
+        Customer.objects.filter(id=contact.id, created_by_id__in=actor_user_ids)
         .annotate(
             project_count=Count(
                 "projects",

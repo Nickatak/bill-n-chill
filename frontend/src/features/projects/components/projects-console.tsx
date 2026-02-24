@@ -1,5 +1,6 @@
 "use client";
 
+import { buildAuthHeaders } from "@/features/session/auth-headers";
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -143,7 +144,7 @@ export function ProjectsConsole() {
     setStatusMessage("Loading projects...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -193,7 +194,7 @@ export function ProjectsConsole() {
     setStatusMessage("Loading financial summary...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/financial-summary/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -211,7 +212,7 @@ export function ProjectsConsole() {
   async function loadEstimateStatusCounts(projectId: number) {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -319,10 +320,7 @@ export function ProjectsConsole() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
           name: projectName,
           status: projectStatus,
@@ -358,7 +356,7 @@ export function ProjectsConsole() {
       const response = await fetch(
         `${normalizedBaseUrl}/projects/${projectId}/accounting-export/?export_format=csv`,
         {
-          headers: { Authorization: `Token ${token}` },
+          headers: buildAuthHeaders(token),
         },
       );
       if (!response.ok) {
@@ -541,7 +539,7 @@ export function ProjectsConsole() {
             <Link href="/intake/quick-add">Quick Add Customer</Link> |{" "}
             <Link href={`/projects/${selectedProject.id}/change-orders`}>Quick CO</Link> |{" "}
             <Link href={`/invoices?project=${selectedProject.id}`}>Quick Invoice</Link> |{" "}
-            <Link href={`/vendor-bills?project=${selectedProject.id}`}>Quick Vendor Bill</Link> |{" "}
+            <Link href={`/projects/${selectedProject.id}/vendor-bills`}>Quick Vendor Bill</Link> |{" "}
             <Link href={`/payments?project=${selectedProject.id}`}>Quick Payment</Link>
           </p>
         </section>

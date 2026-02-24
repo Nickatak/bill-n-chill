@@ -34,7 +34,6 @@ export function ContactsList({
             <th>Customer</th>
             <th>Phone / Email</th>
             <th>Projects</th>
-            <th>State</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -46,7 +45,7 @@ export function ContactsList({
             return (
               <tr key={row.id} className={isInactive ? styles.tableRowInactive : ""}>
                 <td>
-                  <p className={styles.rowPrimary}>#{row.id} - {row.display_name}</p>
+                  <p className={styles.rowPrimary}>{row.display_name}</p>
                   <p className={styles.rowSecondary}>{row.billing_address || "no billing address"}</p>
                 </td>
                 <td>
@@ -72,15 +71,6 @@ export function ContactsList({
                   ) : (
                     <span className={styles.rowSecondary}>No non-prospect projects</span>
                   )}
-                </td>
-                <td>
-                  <span
-                    className={`${styles.stateChip} ${
-                      isInactive ? styles.stateChipInactive : styles.stateChipActive
-                    }`}
-                  >
-                    {isInactive ? "inactive" : "active"}
-                  </span>
                 </td>
                 <td>
                   <div className={styles.actionsInline}>

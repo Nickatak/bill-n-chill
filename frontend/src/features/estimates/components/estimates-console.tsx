@@ -1,5 +1,6 @@
 "use client";
 
+import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   defaultApiBaseUrl,
@@ -318,10 +319,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     try {
       const response = await fetch(`${normalizedBaseUrl}/estimates/${sourceEstimate.id}/clone-version/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({}),
       });
       const payload: ApiResponse = await response.json();
@@ -522,10 +520,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     try {
       const [projectsRes, codesRes] = await Promise.all([
         fetch(`${normalizedBaseUrl}/projects/`, {
-          headers: { Authorization: `Token ${token}` },
+          headers: buildAuthHeaders(token),
         }),
         fetch(`${normalizedBaseUrl}/cost-codes/`, {
-          headers: { Authorization: `Token ${token}` },
+          headers: buildAuthHeaders(token),
         }),
       ]);
 
@@ -578,7 +576,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setStatusMessage("Loading estimates...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -607,7 +605,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     }
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/change-orders/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -800,10 +798,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       try {
         const response = await fetch(`${normalizedBaseUrl}/estimates/${selectedEstimate.id}/`, {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Token ${token}`,
-          },
+          headers: buildAuthHeaders(token, { contentType: "application/json" }),
           body: JSON.stringify({
             title: trimmedTitle,
             tax_percent: taxPercent,
@@ -843,10 +838,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
           title: trimmedTitle,
           tax_percent: taxPercent,
@@ -896,10 +888,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     try {
       const response = await fetch(`${normalizedBaseUrl}/estimates/${estimateId}/duplicate/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
           title: duplicateTitle.trim(),
         }),
@@ -939,10 +928,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     try {
       const response = await fetch(`${normalizedBaseUrl}/estimates/${estimateId}/`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({ status: selectedStatus, status_note: statusNote }),
       });
       const payload: ApiResponse = await response.json();
@@ -982,7 +968,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       }
       try {
         const response = await fetch(`${normalizedBaseUrl}/estimates/${estimateId}/status-events/`, {
-          headers: { Authorization: `Token ${token}` },
+          headers: buildAuthHeaders(token),
         });
         const payload: ApiResponse = await response.json();
         if (!response.ok) {

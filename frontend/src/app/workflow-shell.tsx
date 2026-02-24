@@ -1,5 +1,6 @@
 "use client";
 
+import { buildAuthHeaders } from "@/features/session/auth-headers";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -34,7 +35,7 @@ export function WorkflowShell() {
 
       try {
         const response = await fetch(`${defaultApiBaseUrl}/auth/me/`, {
-          headers: { Authorization: `Token ${token}` },
+          headers: buildAuthHeaders(token),
         });
         await response.json();
         if (!response.ok) {

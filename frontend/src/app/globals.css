@@ -71,6 +71,29 @@ html[data-theme="dark"] .themeToggle {
   gap: 8px;
 }
 
+.sessionOrgBadge {
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  min-height: 30px;
+  max-width: 220px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #1f2937;
+  background: #f8fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+html[data-theme="dark"] .sessionOrgBadge {
+  border-color: #334155;
+  background: #0f172a;
+  color: #dbeafe;
+}
+
 .workflowShellSpacer {
   min-height: 56px;
 }

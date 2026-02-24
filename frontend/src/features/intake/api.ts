@@ -1,3 +1,5 @@
+import { buildAuthHeaders } from "@/features/session/auth-headers";
+
 export const defaultApiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
@@ -13,7 +15,7 @@ export async function fetchIntakeAuthMe({
   token: string;
 }) {
   const response = await fetch(`${normalizeApiBaseUrl(baseUrl)}/auth/me/`, {
-    headers: { Authorization: `Token ${token}` },
+    headers: buildAuthHeaders(token),
   });
   return response;
 }
@@ -29,10 +31,7 @@ export async function postQuickAddCustomerIntake({
 }) {
   const response = await fetch(`${normalizeApiBaseUrl(baseUrl)}/customers/quick-add/`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Token ${token}`,
-    },
+    headers: buildAuthHeaders(token, { contentType: "application/json" }),
     body: JSON.stringify(body),
   });
   return response;

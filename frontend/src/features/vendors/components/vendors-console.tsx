@@ -1,5 +1,6 @@
 "use client";
 
+import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useEffect, useState } from "react";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
@@ -75,7 +76,7 @@ export function VendorsConsole() {
         ? `?q=${encodeURIComponent(searchQuery.trim())}`
         : "";
       const response = await fetch(`${normalizedBaseUrl}/vendors/${query}`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -112,10 +113,7 @@ export function VendorsConsole() {
   ) {
     const response = await fetch(`${normalizedBaseUrl}/vendors/`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Token ${token}`,
-      },
+      headers: buildAuthHeaders(token, { contentType: "application/json" }),
       body: JSON.stringify({ ...payloadBody, ...options }),
     });
     const payload: ApiResponse = await response.json();
@@ -189,10 +187,7 @@ export function VendorsConsole() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/vendors/${id}/`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
           name,
           vendor_type: vendorType,
@@ -229,10 +224,7 @@ export function VendorsConsole() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/vendors/import-csv/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({ csv_text: importCsvText, dry_run: dryRun }),
       });
       const payload: ApiResponse = await response.json();

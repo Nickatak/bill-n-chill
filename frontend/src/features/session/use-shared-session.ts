@@ -2,7 +2,12 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 
-import { SESSION_CHANGE_EVENT, SESSION_STORAGE_KEY, type ClientSession } from "./client-session";
+import {
+  SESSION_CHANGE_EVENT,
+  SESSION_STORAGE_KEY,
+  type ClientSession,
+  type SessionRole,
+} from "./client-session";
 
 const NO_SHARED_SESSION_MESSAGE = "No shared session found. Go to / and login first.";
 
@@ -49,15 +54,19 @@ export function useSharedSessionAuth() {
         token: parsed.token,
         email: parsed.email ?? "",
         role: parsed.role,
+        organization: parsed.organization,
       };
     } catch {
       return null;
     }
   }, [sessionSnapshot]);
   const token = session?.token ?? "";
+  const role: SessionRole = session?.role || "owner";
+  const organization = session?.organization ?? null;
+  const orgLabel = organization?.displayName || organization?.slug || "";
   const authMessage = session
-    ? `Using shared session for ${session.email || "user"} (${session.role || "owner"}).`
+    ? `Using shared session for ${session.email || "user"} (${role})${orgLabel ? ` in ${orgLabel}` : ""}.`
     : NO_SHARED_SESSION_MESSAGE;
 
-  return { token, authMessage, role: session?.role || "owner" };
+  return { token, authMessage, role, organization };
 }

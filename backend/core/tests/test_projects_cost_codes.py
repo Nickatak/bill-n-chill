@@ -62,6 +62,39 @@ class ProjectProfileTests(TestCase):
         self.assertEqual(projects[0]["name"], "Basement Remodel")
         self.assertIn("site_address", projects[0])
 
+    def test_projects_list_includes_rows_created_by_other_user_in_same_org(self):
+        shared_org = Organization.objects.create(
+            display_name="Shared Project Org",
+            slug="shared-project-org",
+            created_by=self.user,
+        )
+        OrganizationMembership.objects.update_or_create(
+            user=self.user,
+            defaults={
+                "organization": shared_org,
+                "role": OrganizationMembership.Role.OWNER,
+                "status": OrganizationMembership.Status.ACTIVE,
+            },
+        )
+        OrganizationMembership.objects.update_or_create(
+            user=self.other_user,
+            defaults={
+                "organization": shared_org,
+                "role": OrganizationMembership.Role.PM,
+                "status": OrganizationMembership.Status.ACTIVE,
+            },
+        )
+
+        response = self.client.get(
+            "/api/v1/projects/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        projects = response.json()["data"]
+        names = {row["name"] for row in projects}
+        self.assertIn("Basement Remodel", names)
+        self.assertIn("Other Project", names)
+
     def test_project_patch_updates_profile_fields(self):
         response = self.client.patch(
             f"/api/v1/projects/{self.project.id}/",

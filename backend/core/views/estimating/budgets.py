@@ -9,13 +9,14 @@ from rest_framework.response import Response
 
 from core.models import Budget, BudgetLine, ChangeOrder, ChangeOrderLine, VendorBill, VendorBillAllocation
 from core.serializers import BudgetLineSerializer, BudgetLineUpdateSerializer, BudgetSerializer
-from core.views.helpers import _role_gate_error_payload, _validate_project_for_user
+from core.views.helpers import _organization_user_ids, _role_gate_error_payload, _validate_project_for_user
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def project_budgets_view(request, project_id: int):
     """List project budgets with computed spend and approved-CO deltas per line item."""
+    actor_user_ids = _organization_user_ids(request.user)
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -24,7 +25,7 @@ def project_budgets_view(request, project_id: int):
         )
 
     budgets = (
-        Budget.objects.filter(project=project, created_by=request.user)
+        Budget.objects.filter(project=project, created_by_id__in=actor_user_ids)
         .select_related("source_estimate")
         .prefetch_related("line_items", "line_items__cost_code")
         .order_by("-created_at")
@@ -40,7 +41,7 @@ def project_budgets_view(request, project_id: int):
             VendorBillAllocation.objects.filter(
                 budget_line_id__in=line_ids,
                 vendor_bill__project=project,
-                vendor_bill__created_by=request.user,
+                vendor_bill__created_by_id__in=actor_user_ids,
                 vendor_bill__status=VendorBill.Status.PAID,
             )
             .values("budget_line_id")
@@ -53,7 +54,7 @@ def project_budgets_view(request, project_id: int):
             ChangeOrderLine.objects.filter(
                 budget_line_id__in=line_ids,
                 change_order__project=project,
-                change_order__requested_by=request.user,
+                change_order__requested_by_id__in=actor_user_ids,
                 change_order__status=ChangeOrder.Status.APPROVED,
             )
             .values("budget_line_id")
@@ -84,12 +85,13 @@ def budget_line_detail_view(request, budget_id: int, line_id: int):
     - Only active budgets are editable.
     - Supports `description` and `budget_amount` updates.
     """
+    actor_user_ids = _organization_user_ids(request.user)
     permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
     if permission_error:
         return Response(permission_error, status=403)
 
     try:
-        budget = Budget.objects.get(id=budget_id, created_by=request.user)
+        budget = Budget.objects.get(id=budget_id, created_by_id__in=actor_user_ids)
     except Budget.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Budget not found.", "fields": {}}},
@@ -134,7 +136,7 @@ def budget_line_detail_view(request, budget_id: int, line_id: int):
         VendorBillAllocation.objects.filter(
             budget_line_id=line.id,
             vendor_bill__project=budget.project,
-            vendor_bill__created_by=request.user,
+            vendor_bill__created_by_id__in=actor_user_ids,
             vendor_bill__status=VendorBill.Status.PAID,
         ).aggregate(total=Sum("amount"))["total"]
         or Decimal("0")
@@ -148,7 +150,7 @@ def budget_line_detail_view(request, budget_id: int, line_id: int):
                     ChangeOrderLine.objects.filter(
                         budget_line_id=line.id,
                         change_order__project=budget.project,
-                        change_order__requested_by=request.user,
+                        change_order__requested_by_id__in=actor_user_ids,
                         change_order__status=ChangeOrder.Status.APPROVED,
                     ).aggregate(total=Sum("amount_delta"))["total"]
                     or Decimal("0")

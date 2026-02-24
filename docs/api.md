@@ -177,12 +177,13 @@ Resolution fields accepted by `POST /api/v1/customers/quick-add/`:
   - Auth required
   - Updates editable customer fields (`display_name`, `phone`, `email`, `billing_address`, `is_archived`).
   - Write behavior appends immutable `CustomerRecord(event_type=updated, capture_source=manual_ui)`.
+  - Archive side effect:
+    - if `is_archived` transitions `false -> true`, all customer `prospect` projects are transitioned to `cancelled` in the same transaction.
 
 - `DELETE /api/v1/customers/{customer_id}/`
   - Auth required
-  - Deletes one customer when no protected project references remain.
-  - Write behavior appends immutable `CustomerRecord(event_type=deleted, capture_source=manual_ui)` before delete.
-
+  - Intentionally unsupported (`405 Method Not Allowed`).
+  - Policy: customers are archived/unarchived via `PATCH is_archived`; hard-delete is not exposed.
 
 ## Cost Code Management (EST-01)
 

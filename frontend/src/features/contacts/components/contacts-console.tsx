@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { FormEvent, MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import type { ProjectRecord } from "@/features/projects/types";
@@ -13,11 +14,11 @@ import { ContactsFilters } from "./contacts-filters";
 import { ContactsList } from "./contacts-list";
 import styles from "./contacts-console.module.css";
 
-type ActivityFilter = "all" | "active" | "inactive";
-type ProjectFilter = "all" | "with_project" | "without_project";
+type ActivityFilter = "all" | "active";
+type ProjectFilter = "all" | "with_project";
 
 export function ContactsConsole() {
-  const { token, authMessage } = useSharedSessionAuth();
+  const { token } = useSharedSessionAuth();
   const searchParams = useSearchParams();
 
   const [query, setQuery] = useState("");
@@ -26,7 +27,8 @@ export function ContactsConsole() {
   const [editingId, setEditingId] = useState("");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
-  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
+  const backdropPointerStartRef = useRef(false);
+  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("active");
   const [projectFilter, setProjectFilter] = useState<ProjectFilter>("all");
 
   const [displayName, setDisplayName] = useState("");
@@ -49,14 +51,10 @@ export function ContactsConsole() {
       const hasProject = row.has_project ?? (row.project_count ?? 0) > 0;
 
       const activityMatch =
-        activityFilter === "all" ||
-        (activityFilter === "active" && !inactive) ||
-        (activityFilter === "inactive" && inactive);
+        activityFilter === "all" || (activityFilter === "active" && !inactive);
 
       const projectMatch =
-        projectFilter === "all" ||
-        (projectFilter === "with_project" && hasProject) ||
-        (projectFilter === "without_project" && !hasProject);
+        projectFilter === "all" || (projectFilter === "with_project" && hasProject);
 
       return activityMatch && projectMatch;
     });
@@ -80,7 +78,7 @@ export function ContactsConsole() {
       }
       const url = `${normalizedBaseUrl}/customers/${params.toString() ? `?${params.toString()}` : ""}`;
       const response = await fetch(url, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -105,7 +103,7 @@ export function ContactsConsole() {
   async function loadProjectsIndex() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/`, {
-        headers: { Authorization: `Token ${token}` },
+        headers: buildAuthHeaders(token),
       });
       const payload: { data?: ProjectRecord[] } = await response.json();
       if (!response.ok) {
@@ -165,6 +163,18 @@ export function ContactsConsole() {
     setIsEditorOpen(false);
   }
 
+  function handleOverlayMouseDown(event: MouseEvent<HTMLDivElement>) {
+    backdropPointerStartRef.current = event.target === event.currentTarget;
+  }
+
+  function handleOverlayMouseUp(event: MouseEvent<HTMLDivElement>) {
+    const endedOnBackdrop = event.target === event.currentTarget;
+    if (backdropPointerStartRef.current && endedOnBackdrop) {
+      closeEditor();
+    }
+    backdropPointerStartRef.current = false;
+  }
+
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const customerId = Number(editingId);
@@ -178,10 +188,7 @@ export function ContactsConsole() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/customers/${customerId}/`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-        },
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
           display_name: displayName,
           phone,
@@ -206,57 +213,11 @@ export function ContactsConsole() {
     }
   }
 
-  async function handleDelete() {
-    const customerId = Number(editingId);
-    if (!customerId) {
-      setStatusMessage("Select a customer first.");
-      return;
-    }
-
-    const confirmed = window.confirm(`Delete customer #${customerId}? This cannot be undone.`);
-    if (!confirmed) {
-      return;
-    }
-
-    setStatusMessage("Deleting customer...");
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/customers/${customerId}/`, {
-        method: "DELETE",
-        headers: { Authorization: `Token ${token}` },
-      });
-
-      if (!response.ok) {
-        let message = "Delete failed.";
-        try {
-          const payload: ApiResponse = await response.json();
-          message = payload.error?.message ?? message;
-        } catch {
-          // no-op: non-json response
-        }
-        setStatusMessage(message);
-        return;
-      }
-
-      setRows((current) => current.filter((entry) => entry.id !== customerId));
-      setProjectsByCustomer((current) => {
-        const next = { ...current };
-        delete next[customerId];
-        return next;
-      });
-      setIsEditorOpen(false);
-      setEditingId("");
-      setStatusMessage(`Deleted customer #${customerId}.`);
-    } catch {
-      setStatusMessage("Could not reach customer detail endpoint.");
-    }
-  }
-
   return (
     <section className={styles.section}>
       <header className={styles.intro}>
         <h2>Customers</h2>
         <p>Find customers quickly and jump directly to their project workspaces.</p>
-        <p className={styles.authMessage}>{authMessage}</p>
       </header>
 
       <ContactsFilters
@@ -281,11 +242,8 @@ export function ContactsConsole() {
       {isEditorOpen && editingCustomer ? (
         <div
           className={styles.modalOverlay}
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              closeEditor();
-            }
-          }}
+          onMouseDown={handleOverlayMouseDown}
+          onMouseUp={handleOverlayMouseUp}
         >
           <section className={styles.modalCard} role="dialog" aria-modal="true" aria-label="Edit customer">
             <button type="button" className={styles.modalClose} onClick={closeEditor}>
@@ -308,7 +266,6 @@ export function ContactsConsole() {
               activeProjectCount={editingCustomer.active_project_count ?? 0}
               hasActiveOrOnHoldProject={Boolean(editingCustomer.has_active_or_on_hold_project)}
               onSubmit={handleSave}
-              onDelete={handleDelete}
             />
           </section>
         </div>

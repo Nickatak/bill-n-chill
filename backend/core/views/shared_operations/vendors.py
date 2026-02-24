@@ -12,6 +12,7 @@ from core.models import Vendor
 from core.serializers import VendorSerializer, VendorWriteSerializer
 from core.views.helpers import (
     _ensure_primary_membership,
+    _organization_user_ids,
     _parse_request_bool,
     _role_gate_error_payload,
 )
@@ -19,9 +20,10 @@ from core.views.helpers import (
 
 def _vendor_scope_filter(user):
     membership = _ensure_primary_membership(user)
+    actor_user_ids = _organization_user_ids(user)
     return Q(organization_id=membership.organization_id) | Q(
         organization__isnull=True,
-        created_by=user,
+        created_by_id__in=actor_user_ids,
     )
 
 

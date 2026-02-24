@@ -34,6 +34,7 @@ from core.serializers import (
     QuickJumpSearchSerializer,
     ProjectSerializer,
 )
+from core.views.helpers import _organization_user_ids
 
 def _parse_optional_date(value: str):
     if not value:
@@ -61,7 +62,10 @@ def _date_filter_from_query(request):
     return date_from, date_to, None
 
 
-def _build_project_financial_summary_data(project: Project, user):
+def _build_project_financial_summary_data(project: Project, user, *, actor_user_ids=None):
+    if actor_user_ids is None:
+        actor_user_ids = _organization_user_ids(user)
+
     approved_co_rows = list(
         ChangeOrder.objects.filter(
             project=project,
@@ -73,7 +77,7 @@ def _build_project_financial_summary_data(project: Project, user):
     invoice_rows = list(
         Invoice.objects.filter(
             project=project,
-            created_by=user,
+            created_by_id__in=actor_user_ids,
         )
         .exclude(status=Invoice.Status.VOID)
         .order_by("-created_at", "-id")
@@ -83,7 +87,7 @@ def _build_project_financial_summary_data(project: Project, user):
     inbound_alloc_rows = list(
         PaymentAllocation.objects.filter(
             payment__project=project,
-            payment__created_by=user,
+            payment__created_by_id__in=actor_user_ids,
             payment__status=Payment.Status.SETTLED,
             payment__direction=Payment.Direction.INBOUND,
         )
@@ -95,7 +99,7 @@ def _build_project_financial_summary_data(project: Project, user):
     vendor_bill_rows = list(
         VendorBill.objects.filter(
             project=project,
-            created_by=user,
+            created_by_id__in=actor_user_ids,
         )
         .exclude(status=VendorBill.Status.VOID)
         .order_by("-created_at", "-id")
@@ -105,7 +109,7 @@ def _build_project_financial_summary_data(project: Project, user):
     outbound_alloc_rows = list(
         PaymentAllocation.objects.filter(
             payment__project=project,
-            payment__created_by=user,
+            payment__created_by_id__in=actor_user_ids,
             payment__status=Payment.Status.SETTLED,
             payment__direction=Payment.Direction.OUTBOUND,
         )
@@ -124,7 +128,7 @@ def _build_project_financial_summary_data(project: Project, user):
 
     inbound_payment_rows = list(
         project.payments.filter(
-            created_by=user,
+            created_by_id__in=actor_user_ids,
             status=Payment.Status.SETTLED,
             direction=Payment.Direction.INBOUND,
         )
@@ -136,7 +140,7 @@ def _build_project_financial_summary_data(project: Project, user):
 
     outbound_payment_rows = list(
         project.payments.filter(
-            created_by=user,
+            created_by_id__in=actor_user_ids,
             status=Payment.Status.SETTLED,
             direction=Payment.Direction.OUTBOUND,
         )
@@ -245,7 +249,8 @@ def _build_project_financial_summary_data(project: Project, user):
 @permission_classes([IsAuthenticated])
 def projects_list_view(request):
     """List projects visible to the authenticated owner context."""
-    rows = Project.objects.filter(created_by=request.user).select_related("customer")
+    actor_user_ids = _organization_user_ids(request.user)
+    rows = Project.objects.filter(created_by_id__in=actor_user_ids).select_related("customer")
     return Response({"data": ProjectSerializer(rows, many=True).data})
 
 
@@ -253,8 +258,12 @@ def projects_list_view(request):
 @permission_classes([IsAuthenticated])
 def project_detail_view(request, project_id: int):
     """Fetch or patch a project profile with terminal-state and transition protections."""
+    actor_user_ids = _organization_user_ids(request.user)
     try:
-        project = Project.objects.select_related("customer").get(id=project_id, created_by=request.user)
+        project = Project.objects.select_related("customer").get(
+            id=project_id,
+            created_by_id__in=actor_user_ids,
+        )
     except Project.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Project not found.", "fields": {}}},
@@ -359,15 +368,20 @@ def project_detail_view(request, project_id: int):
 @permission_classes([IsAuthenticated])
 def project_financial_summary_view(request, project_id: int):
     """Return normalized AR/AP/CO financial summary plus traceability for one project."""
+    actor_user_ids = _organization_user_ids(request.user)
     try:
-        project = Project.objects.get(id=project_id, created_by=request.user)
+        project = Project.objects.get(id=project_id, created_by_id__in=actor_user_ids)
     except Project.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Project not found.", "fields": {}}},
             status=404,
         )
 
-    response_data = _build_project_financial_summary_data(project, request.user)
+    response_data = _build_project_financial_summary_data(
+        project,
+        request.user,
+        actor_user_ids=actor_user_ids,
+    )
 
     return Response({"data": ProjectFinancialSummarySerializer(response_data).data})
 
@@ -376,15 +390,20 @@ def project_financial_summary_view(request, project_id: int):
 @permission_classes([IsAuthenticated])
 def project_accounting_export_view(request, project_id: int):
     """Export project accounting summary as JSON or CSV (`export_format` query param)."""
+    actor_user_ids = _organization_user_ids(request.user)
     try:
-        project = Project.objects.get(id=project_id, created_by=request.user)
+        project = Project.objects.get(id=project_id, created_by_id__in=actor_user_ids)
     except Project.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Project not found.", "fields": {}}},
             status=404,
         )
 
-    summary = _build_project_financial_summary_data(project, request.user)
+    summary = _build_project_financial_summary_data(
+        project,
+        request.user,
+        actor_user_ids=actor_user_ids,
+    )
     serialized_summary = ProjectFinancialSummarySerializer(summary).data
     export_format = (request.query_params.get("export_format") or "csv").lower()
     generated_at = datetime.now(timezone.utc).isoformat()
@@ -464,8 +483,9 @@ def project_accounting_export_view(request, project_id: int):
 @permission_classes([IsAuthenticated])
 def project_audit_events_view(request, project_id: int):
     """Return immutable financial audit events for the requested project."""
+    actor_user_ids = _organization_user_ids(request.user)
     try:
-        project = Project.objects.get(id=project_id, created_by=request.user)
+        project = Project.objects.get(id=project_id, created_by_id__in=actor_user_ids)
     except Project.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Project not found.", "fields": {}}},
@@ -474,7 +494,7 @@ def project_audit_events_view(request, project_id: int):
 
     rows = FinancialAuditEvent.objects.filter(
         project=project,
-        created_by=request.user,
+        created_by_id__in=actor_user_ids,
     ).order_by("-created_at", "-id")
     return Response({"data": FinancialAuditEventSerializer(rows, many=True).data})
 
@@ -496,9 +516,12 @@ def portfolio_snapshot_view(request):
             status=400,
         )
 
+    actor_user_ids = _organization_user_ids(request.user)
     today = django_timezone.localdate()
     project_rows = list(
-        Project.objects.filter(created_by=request.user).select_related("customer").order_by("-created_at", "-id")
+        Project.objects.filter(created_by_id__in=actor_user_ids)
+        .select_related("customer")
+        .order_by("-created_at", "-id")
     )
     project_summaries = []
     ar_total_outstanding = Decimal("0")
@@ -508,7 +531,11 @@ def portfolio_snapshot_view(request):
     for project in project_rows:
         if project.status == Project.Status.ACTIVE:
             active_projects_count += 1
-        summary = _build_project_financial_summary_data(project, request.user)
+        summary = _build_project_financial_summary_data(
+            project,
+            request.user,
+            actor_user_ids=actor_user_ids,
+        )
         ar_total_outstanding += summary["ar_outstanding"]
         ap_total_outstanding += summary["ap_outstanding"]
         project_summaries.append(
@@ -523,13 +550,13 @@ def portfolio_snapshot_view(request):
         )
 
     overdue_invoices = Invoice.objects.filter(
-        project__created_by=request.user,
-        created_by=request.user,
+        project__created_by_id__in=actor_user_ids,
+        created_by_id__in=actor_user_ids,
         due_date__lt=today,
     ).exclude(status__in=[Invoice.Status.PAID, Invoice.Status.VOID])
     overdue_vendor_bills = VendorBill.objects.filter(
-        project__created_by=request.user,
-        created_by=request.user,
+        project__created_by_id__in=actor_user_ids,
+        created_by_id__in=actor_user_ids,
         due_date__lt=today,
     ).exclude(status__in=[VendorBill.Status.PAID, VendorBill.Status.VOID])
 
@@ -573,8 +600,9 @@ def change_impact_summary_view(request):
             status=400,
         )
 
+    actor_user_ids = _organization_user_ids(request.user)
     approved_rows = ChangeOrder.objects.filter(
-        requested_by=request.user,
+        requested_by_id__in=actor_user_ids,
         status=ChangeOrder.Status.APPROVED,
     ).select_related("project")
     if date_from:
@@ -617,6 +645,7 @@ def change_impact_summary_view(request):
 @permission_classes([IsAuthenticated])
 def attention_feed_view(request):
     """Return prioritized operational attention items (overdue, pending, and problem states)."""
+    actor_user_ids = _organization_user_ids(request.user)
     today = django_timezone.localdate()
     due_soon_window_days = 7
     due_soon_date = today + timedelta(days=due_soon_window_days)
@@ -624,8 +653,8 @@ def attention_feed_view(request):
 
     overdue_invoices = (
         Invoice.objects.filter(
-            project__created_by=request.user,
-            created_by=request.user,
+            project__created_by_id__in=actor_user_ids,
+            created_by_id__in=actor_user_ids,
             due_date__lt=today,
         )
         .exclude(status__in=[Invoice.Status.PAID, Invoice.Status.VOID])
@@ -649,8 +678,8 @@ def attention_feed_view(request):
 
     due_soon_vendor_bills = (
         VendorBill.objects.filter(
-            project__created_by=request.user,
-            created_by=request.user,
+            project__created_by_id__in=actor_user_ids,
+            created_by_id__in=actor_user_ids,
             due_date__gte=today,
             due_date__lte=due_soon_date,
         )
@@ -675,7 +704,7 @@ def attention_feed_view(request):
 
     pending_change_orders = (
         ChangeOrder.objects.filter(
-            requested_by=request.user,
+            requested_by_id__in=actor_user_ids,
             status=ChangeOrder.Status.PENDING_APPROVAL,
         )
         .select_related("project")
@@ -698,8 +727,8 @@ def attention_feed_view(request):
 
     problem_payments = (
         Payment.objects.filter(
-            project__created_by=request.user,
-            created_by=request.user,
+            project__created_by_id__in=actor_user_ids,
+            created_by_id__in=actor_user_ids,
             status__in=[Payment.Status.FAILED, Payment.Status.VOID],
         )
         .select_related("project")
@@ -747,10 +776,11 @@ def quick_jump_search_view(request):
     if len(query) < 2:
         return Response({"data": QuickJumpSearchSerializer({"query": query, "item_count": 0, "items": []}).data})
 
+    actor_user_ids = _organization_user_ids(request.user)
     query_lower = query.lower()
     items = []
 
-    projects = Project.objects.filter(created_by=request.user).select_related("customer")
+    projects = Project.objects.filter(created_by_id__in=actor_user_ids).select_related("customer")
     for row in projects:
         if query_lower in row.name.lower() or query_lower in str(row.id):
             items.append(
@@ -766,7 +796,7 @@ def quick_jump_search_view(request):
                 }
             )
 
-    estimates = Estimate.objects.filter(created_by=request.user).select_related("project")
+    estimates = Estimate.objects.filter(created_by_id__in=actor_user_ids).select_related("project")
     for row in estimates:
         if (
             query_lower in (row.title or "").lower()
@@ -786,7 +816,7 @@ def quick_jump_search_view(request):
                 }
             )
 
-    change_orders = ChangeOrder.objects.filter(requested_by=request.user).select_related("project")
+    change_orders = ChangeOrder.objects.filter(requested_by_id__in=actor_user_ids).select_related("project")
     for row in change_orders:
         candidate = f"co-{row.family_key} v{row.revision_number} {row.title or ''}".lower()
         if query_lower in candidate or query_lower in str(row.id):
@@ -803,7 +833,7 @@ def quick_jump_search_view(request):
                 }
             )
 
-    invoices = Invoice.objects.filter(created_by=request.user).select_related("project")
+    invoices = Invoice.objects.filter(created_by_id__in=actor_user_ids).select_related("project")
     for row in invoices:
         if query_lower in row.invoice_number.lower() or query_lower in str(row.id):
             items.append(
@@ -819,7 +849,7 @@ def quick_jump_search_view(request):
                 }
             )
 
-    vendor_bills = VendorBill.objects.filter(created_by=request.user).select_related("project")
+    vendor_bills = VendorBill.objects.filter(created_by_id__in=actor_user_ids).select_related("project")
     for row in vendor_bills:
         if query_lower in row.bill_number.lower() or query_lower in str(row.id):
             items.append(
@@ -835,7 +865,7 @@ def quick_jump_search_view(request):
                 }
             )
 
-    payments = Payment.objects.filter(created_by=request.user).select_related("project")
+    payments = Payment.objects.filter(created_by_id__in=actor_user_ids).select_related("project")
     for row in payments:
         candidate = f"{row.reference_number or ''} {row.id} {row.direction} {row.status}".lower()
         if query_lower in candidate:
@@ -873,8 +903,9 @@ def quick_jump_search_view(request):
 @permission_classes([IsAuthenticated])
 def project_timeline_events_view(request, project_id: int):
     """Return merged project timeline events by category (`all|financial|workflow`)."""
+    actor_user_ids = _organization_user_ids(request.user)
     try:
-        project = Project.objects.get(id=project_id, created_by=request.user)
+        project = Project.objects.get(id=project_id, created_by_id__in=actor_user_ids)
     except Project.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Project not found.", "fields": {}}},
@@ -898,7 +929,7 @@ def project_timeline_events_view(request, project_id: int):
     if category in {"all", "financial"}:
         financial_rows = FinancialAuditEvent.objects.filter(
             project=project,
-            created_by=request.user,
+            created_by_id__in=actor_user_ids,
         ).order_by("-created_at", "-id")
         for row in financial_rows:
             ui_route = "/financials-auditing"
@@ -937,7 +968,7 @@ def project_timeline_events_view(request, project_id: int):
         workflow_rows = (
             EstimateStatusEvent.objects.filter(
                 estimate__project=project,
-                changed_by=request.user,
+                changed_by_id__in=actor_user_ids,
             )
             .select_related("estimate")
             .order_by("-changed_at", "-id")

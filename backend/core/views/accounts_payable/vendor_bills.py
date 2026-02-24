@@ -22,6 +22,7 @@ from core.policies import get_vendor_bill_policy_contract
 from core.serializers import VendorBillSerializer, VendorBillWriteSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
+    _organization_user_ids,
     _record_financial_audit_event,
     _role_gate_error_payload,
     _validate_project_for_user,
@@ -39,9 +40,10 @@ def _find_duplicate_vendor_bills(
     bill_number_norm = (bill_number or "").strip()
     if not vendor_id or not bill_number_norm:
         return []
+    actor_user_ids = _organization_user_ids(user)
 
     rows = VendorBill.objects.filter(
-        created_by=user,
+        created_by_id__in=actor_user_ids,
         vendor_id=vendor_id,
         bill_number__iexact=bill_number_norm,
     )
@@ -65,10 +67,11 @@ def _validate_allocation_budget_lines(*, project, user, allocations):
     budget_line_ids = [entry["budget_line"] for entry in allocations]
     if not budget_line_ids:
         return {}
+    actor_user_ids = _organization_user_ids(user)
     rows = BudgetLine.objects.filter(
         id__in=budget_line_ids,
         budget__project=project,
-        budget__created_by=user,
+        budget__created_by_id__in=actor_user_ids,
     ).select_related("budget")
     return {row.id: row for row in rows}
 
@@ -240,6 +243,7 @@ def project_vendor_bills_view(request, project_id: int):
       - `backend/core/tests/test_vendor_bills.py::test_vendor_bill_duplicate_requires_existing_match_to_be_void`
       - `backend/core/tests/test_vendor_bills.py::test_vendor_bill_create_rolls_back_when_audit_write_fails`
     """
+    actor_user_ids = _organization_user_ids(request.user)
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -249,7 +253,7 @@ def project_vendor_bills_view(request, project_id: int):
 
     if request.method == "GET":
         rows = (
-            VendorBill.objects.filter(project=project, created_by=request.user)
+            VendorBill.objects.filter(project=project, created_by_id__in=actor_user_ids)
             .select_related("project", "vendor")
             .prefetch_related("allocations", "allocations__budget_line", "allocations__budget_line__cost_code")
             .order_by("-created_at")
@@ -283,7 +287,7 @@ def project_vendor_bills_view(request, project_id: int):
             status=400,
         )
 
-    vendor = Vendor.objects.filter(id=data["vendor"], created_by=request.user).first()
+    vendor = Vendor.objects.filter(id=data["vendor"], created_by_id__in=actor_user_ids).first()
     if not vendor:
         return Response(
             {
@@ -479,10 +483,11 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
       - `backend/core/tests/test_vendor_bills.py::test_vendor_bill_patch_rejects_bill_number_change`
       - `backend/core/tests/test_vendor_bills.py::test_vendor_bill_status_transitions_create_snapshots_for_all_captured_statuses`
     """
+    actor_user_ids = _organization_user_ids(request.user)
     try:
         vendor_bill = VendorBill.objects.select_related("project", "vendor").get(
             id=vendor_bill_id,
-            created_by=request.user,
+            created_by_id__in=actor_user_ids,
         )
     except VendorBill.DoesNotExist:
         return Response(
@@ -521,7 +526,7 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
             status=400,
         )
 
-    next_vendor = Vendor.objects.filter(id=next_vendor_id, created_by=request.user).first()
+    next_vendor = Vendor.objects.filter(id=next_vendor_id, created_by_id__in=actor_user_ids).first()
     if not next_vendor:
         return Response(
             {

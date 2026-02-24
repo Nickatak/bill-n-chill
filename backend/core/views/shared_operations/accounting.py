@@ -8,7 +8,7 @@ from rest_framework.response import Response
 
 from core.models import AccountingSyncEvent, AccountingSyncRecord
 from core.serializers import AccountingSyncEventSerializer, AccountingSyncEventWriteSerializer
-from core.views.helpers import _role_gate_error_payload, _validate_project_for_user
+from core.views.helpers import _organization_user_ids, _role_gate_error_payload, _validate_project_for_user
 
 
 def _build_accounting_sync_snapshot(sync_event: AccountingSyncEvent) -> dict:
@@ -67,6 +67,7 @@ def project_accounting_sync_events_view(request, project_id: int):
     - `POST`: requires role `owner|bookkeeping` and core sync identity fields.
     - Create writes are atomic: sync row plus immutable `AccountingSyncRecord(created)`.
     """
+    actor_user_ids = _organization_user_ids(request.user)
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -75,9 +76,10 @@ def project_accounting_sync_events_view(request, project_id: int):
         )
 
     if request.method == "GET":
-        rows = AccountingSyncEvent.objects.filter(project=project, created_by=request.user).order_by(
-            "-created_at", "-id"
-        )
+        rows = AccountingSyncEvent.objects.filter(
+            project=project,
+            created_by_id__in=actor_user_ids,
+        ).order_by("-created_at", "-id")
         return Response({"data": AccountingSyncEventSerializer(rows, many=True).data})
 
     permission_error, _ = _role_gate_error_payload(request.user, {"owner", "bookkeeping"})
@@ -151,10 +153,11 @@ def accounting_sync_event_retry_view(request, sync_event_id: int):
     - Successful sync rows are not retryable; already queued rows return no-op meta.
     - Retry writes are atomic: status fields update plus immutable `AccountingSyncRecord(retried)`.
     """
+    actor_user_ids = _organization_user_ids(request.user)
     try:
         sync_event = AccountingSyncEvent.objects.get(
             id=sync_event_id,
-            created_by=request.user,
+            created_by_id__in=actor_user_ids,
         )
     except AccountingSyncEvent.DoesNotExist:
         return Response(

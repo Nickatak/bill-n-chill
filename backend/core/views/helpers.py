@@ -52,8 +52,12 @@ RBAC_ROLE_PRECEDENCE = [
 
 
 def _validate_project_for_user(project_id: int, user):
+    actor_user_ids = _organization_user_ids(user)
     try:
-        return Project.objects.select_related("customer").get(id=project_id, created_by=user)
+        return Project.objects.select_related("customer").get(
+            id=project_id,
+            created_by_id__in=actor_user_ids,
+        )
     except Project.DoesNotExist:
         return None
 
@@ -272,6 +276,19 @@ def _resolve_user_role(user) -> str:
     return RBAC_ROLE_OWNER
 
 
+def _organization_user_ids(user):
+    membership = _ensure_primary_membership(user)
+    user_ids = list(
+        OrganizationMembership.objects.filter(
+            organization_id=membership.organization_id,
+            status=OrganizationMembership.Status.ACTIVE,
+        ).values_list("user_id", flat=True)
+    )
+    if user.id not in user_ids:
+        user_ids.append(user.id)
+    return user_ids
+
+
 def _role_gate_error_payload(user, allowed_roles):
     effective_role = _resolve_user_role(user)
     allowed_role_set = {_normalize_legacy_role(role.strip().lower()) for role in allowed_roles}
@@ -343,12 +360,13 @@ def _calculate_line_totals(line_items_data):
 def _resolve_cost_codes_for_user(user, line_items_data):
     ids = [item["cost_code"] for item in line_items_data]
     membership = _ensure_primary_membership(user)
+    actor_user_ids = _organization_user_ids(user)
     codes = CostCode.objects.filter(
         id__in=ids,
     ).filter(
         Q(organization_id=membership.organization_id) | Q(
             organization__isnull=True,
-            created_by=user,
+            created_by_id__in=actor_user_ids,
         )
     )
     code_map = {code.id: code for code in codes}
@@ -501,9 +519,10 @@ def _is_billable_invoice_status(status):
 
 
 def _project_billable_invoices_total(*, project, user, exclude_invoice_id=None):
+    actor_user_ids = _organization_user_ids(user)
     query = Invoice.objects.filter(
         project=project,
-        created_by=user,
+        created_by_id__in=actor_user_ids,
         status__in=BILLABLE_INVOICE_STATUSES,
     )
     if exclude_invoice_id:
@@ -596,7 +615,14 @@ def _enforce_invoice_scope_guard(
 
 
 def _next_invoice_number(*, project, user):
-    next_number = Invoice.objects.filter(project=project, created_by=user).count() + 1
+    actor_user_ids = _organization_user_ids(user)
+    next_number = (
+        Invoice.objects.filter(
+            project=project,
+            created_by_id__in=actor_user_ids,
+        ).count()
+        + 1
+    )
     candidate = f"INV-{next_number:04d}"
     while Invoice.objects.filter(project=project, invoice_number=candidate).exists():
         next_number += 1
@@ -605,10 +631,11 @@ def _next_invoice_number(*, project, user):
 
 
 def _get_active_budget_for_project(*, project, user):
+    actor_user_ids = _organization_user_ids(user)
     return (
         Budget.objects.filter(
             project=project,
-            created_by=user,
+            created_by_id__in=actor_user_ids,
             status=Budget.Status.ACTIVE,
         )
         .order_by("-created_at")
@@ -643,12 +670,13 @@ def _resolve_invoice_cost_codes_for_user(user, line_items_data):
         return {}, []
 
     membership = _ensure_primary_membership(user)
+    actor_user_ids = _organization_user_ids(user)
     codes = CostCode.objects.filter(
         id__in=ids,
     ).filter(
         Q(organization_id=membership.organization_id) | Q(
             organization__isnull=True,
-            created_by=user,
+            created_by_id__in=actor_user_ids,
         )
     )
     code_map = {code.id: code for code in codes}
@@ -791,9 +819,10 @@ def _build_budget_baseline_snapshot(estimate):
 
 
 def _supersede_active_project_budgets(*, project, user):
+    actor_user_ids = _organization_user_ids(user)
     active_budgets = Budget.objects.filter(
         project=project,
-        created_by=user,
+        created_by_id__in=actor_user_ids,
         status=Budget.Status.ACTIVE,
     )
     for budget in active_budgets:

@@ -2,8 +2,8 @@
 
 import styles from "./contacts-console.module.css";
 
-type ActivityFilter = "all" | "active" | "inactive";
-type ProjectFilter = "all" | "with_project" | "without_project";
+type ActivityFilter = "all" | "active";
+type ProjectFilter = "all" | "with_project";
 
 type ContactsFiltersProps = {
   query: string;
@@ -22,6 +22,9 @@ export function ContactsFilters({
   projectFilter,
   onProjectFilterChange,
 }: ContactsFiltersProps) {
+  const includeArchived = activityFilter === "all";
+  const withProjectOnly = projectFilter === "with_project";
+
   return (
     <div className={styles.controlsRow}>
       <label className={styles.controlLabel}>
@@ -32,28 +35,70 @@ export function ContactsFilters({
           placeholder="Name, phone, email, or address"
         />
       </label>
-      <label className={styles.controlLabel}>
-        Activity
-        <select
-          value={activityFilter}
-          onChange={(event) => onActivityFilterChange(event.target.value as ActivityFilter)}
-        >
-          <option value="all">all</option>
-          <option value="active">active</option>
-          <option value="inactive">inactive</option>
-        </select>
-      </label>
-      <label className={styles.controlLabel}>
-        Project
-        <select
-          value={projectFilter}
-          onChange={(event) => onProjectFilterChange(event.target.value as ProjectFilter)}
-        >
-          <option value="all">all</option>
-          <option value="with_project">with project</option>
-          <option value="without_project">without project</option>
-        </select>
-      </label>
+      <div className={styles.filterSwitchCard}>
+        <div className={styles.filterSwitchHeader}>
+          <span className={styles.filterSwitchTitle}>Projects</span>
+        </div>
+        <label className={styles.filterSwitchRow}>
+          <span
+            className={`${styles.filterSwitchState} ${
+              !withProjectOnly ? styles.filterSwitchStateSelected : ""
+            }`}
+          >
+            All
+          </span>
+          <input
+            className={styles.switchInput}
+            type="checkbox"
+            checked={withProjectOnly}
+            onChange={(event) => onProjectFilterChange(event.target.checked ? "with_project" : "all")}
+            aria-label="Toggle project filter between all customers and customers with projects only"
+          />
+          <span
+            className={`${styles.filterSwitchState} ${
+              withProjectOnly ? styles.filterSwitchStateSelected : ""
+            }`}
+          >
+            With projects
+          </span>
+        </label>
+        <p className={styles.filterSwitchSummary}>
+          {withProjectOnly ? "Showing customers with projects only" : "Showing all customers"}
+        </p>
+      </div>
+      <div className={styles.filterSwitchCard}>
+        <div className={styles.filterSwitchHeader}>
+          <span className={styles.filterSwitchTitle}>Customer visibility</span>
+        </div>
+        <label className={styles.filterSwitchRow}>
+          <span
+            className={`${styles.filterSwitchState} ${
+              !includeArchived ? styles.filterSwitchStateSelected : ""
+            }`}
+          >
+            Active only
+          </span>
+          <input
+            className={styles.switchInput}
+            type="checkbox"
+            checked={includeArchived}
+            onChange={(event) => onActivityFilterChange(event.target.checked ? "all" : "active")}
+            aria-label="Toggle customer visibility between active-only and including archived customers"
+          />
+          <span
+            className={`${styles.filterSwitchState} ${
+              includeArchived ? styles.filterSwitchStateSelected : ""
+            }`}
+          >
+            Include archived
+          </span>
+        </label>
+        <p className={styles.filterSwitchSummary}>
+          {includeArchived
+            ? "Showing active and archived customers"
+            : "Showing active customers only"}
+        </p>
+      </div>
     </div>
   );
 }
