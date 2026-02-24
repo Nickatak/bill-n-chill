@@ -111,12 +111,6 @@
   margin: 6px 8px 0 0;
 }
 
-.card section {
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-}
-
 @media (max-width: 640px) {
   .page {
     padding: 12px;

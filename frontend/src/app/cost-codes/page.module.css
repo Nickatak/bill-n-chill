@@ -6,84 +6,31 @@
   --border: #d1d5db;
 
   min-height: 100dvh;
-  padding: 20px;
+  padding: 18px;
   background: var(--background);
   font-family: var(--font-geist-sans);
 }
 
 .main {
-  width: min(760px, 100%);
+  width: min(1200px, 100%);
   margin: 0 auto;
-  display: grid;
-  gap: 12px;
-}
-
-.header {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 16px;
-  background: var(--foreground);
-}
-
-.header h1 {
-  margin: 0;
-  color: var(--text-primary);
-}
-
-.header p {
-  margin: 8px 0 12px;
-  color: var(--text-secondary);
 }
 
 .card {
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 16px;
+  padding: 18px;
   background: var(--foreground);
 }
 
-.card h2,
-.card h3 {
-  margin: 0 0 8px;
-  color: var(--text-primary);
-}
+@media (max-width: 640px) {
+  .page {
+    padding: 12px;
+  }
 
-.card p {
-  margin: 8px 0 12px;
-  color: var(--text-secondary);
-}
-
-.card form {
-  display: grid;
-  gap: 10px;
-  margin: 12px 0;
-}
-
-.card label {
-  display: grid;
-  gap: 4px;
-  color: var(--text-primary);
-  font-size: 0.9rem;
-}
-
-.card input,
-.card textarea,
-.card select {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: var(--foreground);
-  color: var(--text-primary);
-}
-
-.card button {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #111827;
-  color: #f9fafb;
-  padding: 8px 12px;
-  cursor: pointer;
-  width: fit-content;
+  .card {
+    padding: 14px;
+  }
 }
 
 :global(html[data-theme="dark"]) .page {
@@ -92,8 +39,4 @@
   --text-primary: #f3f4f6;
   --text-secondary: #cbd5e1;
   --border: #334155;
-}
-
-:global(html[data-theme="dark"]) .card button {
-  background: #1f2937;
 }

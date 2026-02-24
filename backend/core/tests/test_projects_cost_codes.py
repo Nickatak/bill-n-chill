@@ -371,6 +371,19 @@ class CostCodeTests(TestCase):
         self.assertEqual(created_code.organization_id, membership.organization_id)
         self.assertEqual(CostCode.objects.filter(created_by=self.user).count(), 2)
 
+    def test_cost_code_create_rejects_duplicate_code_in_same_org(self):
+        response = self.client.post(
+            "/api/v1/cost-codes/",
+            data={"code": "01-100", "name": "Duplicate General Conditions", "is_active": True},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "validation_error")
+        self.assertIn("code", payload["error"]["fields"])
+        self.assertEqual(CostCode.objects.filter(organization=self.user_org, code="01-100").count(), 1)
+
     def test_cost_code_patch(self):
         response = self.client.patch(
             f"/api/v1/cost-codes/{self.code.id}/",

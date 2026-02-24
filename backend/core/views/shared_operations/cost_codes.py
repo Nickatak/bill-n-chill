@@ -3,6 +3,7 @@
 import csv
 from io import StringIO
 
+from django.db import IntegrityError
 from django.db.models import Q
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -27,6 +28,19 @@ def _cost_code_scope_filter(user):
     )
 
 
+def _duplicate_code_error_response():
+    return Response(
+        {
+            "error": {
+                "code": "validation_error",
+                "message": "A cost code with this code already exists in your organization.",
+                "fields": {"code": ["Code must be unique within your organization."]},
+            }
+        },
+        status=400,
+    )
+
+
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def cost_codes_list_create_view(request):
@@ -48,10 +62,21 @@ def cost_codes_list_create_view(request):
     serializer = CostCodeSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     membership = _ensure_primary_membership(request.user)
-    code = serializer.save(
-        created_by=request.user,
+    incoming_code = str(serializer.validated_data.get("code", "")).strip()
+    if CostCode.objects.filter(
         organization_id=membership.organization_id,
-    )
+        code__iexact=incoming_code,
+    ).exists():
+        return _duplicate_code_error_response()
+
+    try:
+        code = serializer.save(
+            created_by=request.user,
+            organization_id=membership.organization_id,
+        )
+    except IntegrityError:
+        # Race-safe fallback in case duplicate is inserted between pre-check and insert.
+        return _duplicate_code_error_response()
     return Response({"data": CostCodeSerializer(code).data}, status=201)
 
 
