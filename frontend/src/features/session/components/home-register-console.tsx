@@ -47,6 +47,7 @@ function formatTimestamp(value?: string): string {
 
 export function HomeRegisterConsole({ health }: HomeRegisterConsoleProps) {
   const router = useRouter();
+  const [messageTone, setMessageTone] = useState<"neutral" | "error">("neutral");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -75,6 +76,7 @@ export function HomeRegisterConsole({ health }: HomeRegisterConsoleProps) {
     event.preventDefault();
     setIsSubmitting(true);
     setMessage("Creating account...");
+    setMessageTone("neutral");
 
     try {
       const response = await fetch(`${defaultApiBaseUrl}/auth/register/`, {
@@ -89,15 +91,18 @@ export function HomeRegisterConsole({ health }: HomeRegisterConsoleProps) {
 
       if (!response.ok || !token) {
         setMessage(normalizeRegisterError(payload));
+        setMessageTone("error");
         setIsSubmitting(false);
         return;
       }
 
       saveClientSession({ token, email: nextEmail, role: nextRole });
       setMessage("Account created. Redirecting...");
+      setMessageTone("neutral");
       router.push("/");
     } catch {
       setMessage("Could not reach register endpoint.");
+      setMessageTone("error");
     } finally {
       setIsSubmitting(false);
     }
@@ -150,7 +155,9 @@ export function HomeRegisterConsole({ health }: HomeRegisterConsoleProps) {
             Already have an account? <Link href="/">Sign in</Link>.
           </p>
         </form>
-        <p className={styles.message}>{message}</p>
+        <p className={`${styles.message} ${messageTone === "error" ? styles.messageError : ""}`}>
+          {message}
+        </p>
         <p className={health.ok ? styles.healthOk : styles.healthBad}>API Health: {health.message}</p>
       </div>
     </section>

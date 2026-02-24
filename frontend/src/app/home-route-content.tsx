@@ -95,10 +95,7 @@ export function HomeRouteContent({ health }: HomeRouteContentProps) {
     <div className={homeStyles.page}>
       <main className={homeStyles.main}>
         <h1 className={homeStyles.title}>bill-n-chill</h1>
-        <p className={homeStyles.subtitle}>
-          Auth-gated home: unauthenticated users see a clean sign-in screen, authenticated users
-          land directly in Intake.
-        </p>
+        <p className={homeStyles.subtitle}>Sign in to continue.</p>
         <HomeAuthConsole health={health} />
       </main>
     </div>

@@ -127,6 +127,11 @@
   font-size: 0.95rem;
 }
 
+.messageError {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
 .healthOk,
 .healthBad {
   margin: 0;
@@ -188,6 +193,10 @@
 :global(html[data-theme="dark"]) .quickHint,
 :global(html[data-theme="dark"]) .formHint {
   color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .messageError {
+  color: #fca5a5;
 }
 
 :global(html[data-theme="dark"]) .formHint a {

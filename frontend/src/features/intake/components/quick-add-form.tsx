@@ -47,8 +47,6 @@ export function QuickAddForm({
   // Presentational form only: renders fields and emits events; behavior stays in the controller hook.
   return (
     <form className={styles.formGrid} onSubmit={onSubmit}>
-      <h3>Lead Capture + Optional Project</h3>
-
       <label className={styles.field}>
         Full name
         <input

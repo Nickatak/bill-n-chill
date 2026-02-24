@@ -53,6 +53,7 @@ function formatTimestamp(value?: string): string {
 }
 
 export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
+  const [messageTone, setMessageTone] = useState<"neutral" | "error">("neutral");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState("");
@@ -83,6 +84,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
         setToken("");
         setIsAuthenticated(false);
         setMessage("Session expired. Sign in again.");
+        setMessageTone("error");
         return;
       }
       const nextEmail = payload.data?.email ?? fallbackEmail;
@@ -93,9 +95,11 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
       saveClientSession({ token: activeToken, email: nextEmail, role: nextRole });
       setIsAuthenticated(true);
       setMessage(`Using shared session for ${nextEmail || "user"} (${nextRole}).`);
+      setMessageTone("neutral");
     } catch {
       setIsAuthenticated(false);
       setMessage("Could not reach auth/me endpoint.");
+      setMessageTone("error");
     }
   }
 
@@ -127,6 +131,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
     event.preventDefault();
     setIsChecking(true);
     setMessage("Signing in...");
+    setMessageTone("neutral");
     try {
       const response = await fetch(`${defaultApiBaseUrl}/auth/login/`, {
         method: "POST",
@@ -139,6 +144,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
       const nextRole = payload.data?.user?.role ?? "owner";
       if (!response.ok || !nextToken) {
         setMessage(normalizeLoginError(payload.error?.message));
+        setMessageTone("error");
         setIsChecking(false);
         return;
       }
@@ -148,6 +154,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
       await verifySession(nextToken, nextEmail, nextRole);
     } catch {
       setMessage("Could not reach login endpoint.");
+      setMessageTone("error");
     } finally {
       setIsChecking(false);
     }
@@ -159,6 +166,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
     setPassword("");
     setIsAuthenticated(false);
     setMessage("Signed out.");
+    setMessageTone("neutral");
   }
 
   if (!isAuthenticated) {
@@ -208,7 +216,9 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
               Need an account? <Link href="/register">Create one</Link>.
             </p>
           </form>
-          <p className={styles.message}>{message}</p>
+          <p className={`${styles.message} ${messageTone === "error" ? styles.messageError : ""}`}>
+            {message}
+          </p>
           <p className={health.ok ? styles.healthOk : styles.healthBad}>API Health: {health.message}</p>
         </div>
       </section>
@@ -220,7 +230,9 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
       <div className={styles.card}>
         <h2 className={styles.title}>Session ready</h2>
         <p className={styles.text}>Signed in as {email || "user"}. Redirecting to Intake...</p>
-        <p className={styles.message}>{message}</p>
+        <p className={`${styles.message} ${messageTone === "error" ? styles.messageError : ""}`}>
+          {message}
+        </p>
         <p className={health.ok ? styles.healthOk : styles.healthBad}>API Health: {health.message}</p>
         <div className={styles.buttonRow}>
           <button className={styles.buttonSecondary} type="button" onClick={handleSignOut}>
