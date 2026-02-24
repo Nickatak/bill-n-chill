@@ -644,12 +644,12 @@ export function ProjectsConsole() {
                       href={`/projects/${selectedProject.id}/budgets/analytics`}
                       prefetch={false}
                     >
-                      Budget Analytics
+                      Budget Analytics (WIP)
                     </Link>
                     <span className={styles.nodeCount}>Auto</span>
                   </div>
                   <div className={styles.node}>
-                    <Link href={`/projects/${selectedProject.id}/activity`}>Activity Timeline</Link>
+                    <Link href={`/projects/${selectedProject.id}/activity`}>Activity Timeline (WIP)</Link>
                   </div>
                 </div>
                 <div className={styles.branch}>

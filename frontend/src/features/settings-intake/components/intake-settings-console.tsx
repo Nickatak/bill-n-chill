@@ -8,10 +8,10 @@ export function IntakeSettingsConsole() {
 
   return (
     <>
-      <h1>Intake Form Settings</h1>
+      <h1>Settings (WIP)</h1>
       <p>
-        Configure intake guardrails for operations use. These settings are local-only for now, and
-        will be connected to server-side policy in a later phase.
+        Configure intake guardrails for operations use. This settings surface is still WIP and
+        currently local-only.
       </p>
       <form onSubmit={controllerApi.save}>
         <label>

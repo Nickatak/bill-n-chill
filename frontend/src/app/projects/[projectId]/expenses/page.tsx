@@ -16,7 +16,7 @@ export default async function ProjectExpensesPage({ params }: ProjectExpensesPag
     <div className={styles.page}>
       <main className={styles.main}>
         <header className={styles.header}>
-          <h1>Expenses</h1>
+          <h1>Expenses (WIP)</h1>
           <p>
             Quick-add intake version of Vendor Bills for field purchases, retail receipts, and
             other on-the-fly spend that still needs budget-line attribution.

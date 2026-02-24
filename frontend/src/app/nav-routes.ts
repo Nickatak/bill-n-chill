@@ -23,12 +23,12 @@ export const workflowRoutes: NavRoute[] = [
   },
   {
     href: "/billing",
-    label: "4 Billing",
+    label: "4 Billing (WIP)",
     exact: ["/invoices"],
   },
   {
     href: "/financials-auditing",
-    label: "5 Financials & Accounting",
+    label: "5 Financials & Accounting (WIP)",
     exact: ["/financials-auditing"],
   },
 ];
@@ -36,13 +36,9 @@ export const workflowRoutes: NavRoute[] = [
 export const opsMetaRoutes: NavRoute[] = [
   { href: "/customers", label: "Customers", exact: ["/customers"] },
   { href: "/cost-codes", label: "Cost Codes", exact: ["/cost-codes"] },
-];
-
-export const opsMetaWipRoutes: NavRoute[] = [
-  { href: "/ops/meta", label: "Notes", exact: ["/ops/meta"] },
-  { href: "/ops/organization", label: "Organization", exact: ["/ops/organization"] },
-  { href: "/vendors", label: "Vendors", exact: ["/vendors"] },
-  { href: "/settings/intake", label: "Intake Settings", exact: ["/settings/intake"] },
+  { href: "/ops/organization", label: "Organization (WIP)", exact: ["/ops/organization"] },
+  { href: "/vendors", label: "Vendors (WIP)", exact: ["/vendors"] },
+  { href: "/settings/intake", label: "Settings (WIP)", exact: ["/settings/intake"] },
 ];
 
 export function isRouteActive(pathname: string, route: NavRoute): boolean {

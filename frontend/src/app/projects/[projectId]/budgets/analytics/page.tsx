@@ -19,7 +19,7 @@ export default async function ProjectBudgetAnalyticsPage({
     <div className={styles.page}>
       <main className={styles.main}>
         <header className={styles.header}>
-          <h1>Budget Analytics</h1>
+          <h1>Budget Analytics (WIP)</h1>
           <p>
             Read-only analytics surface for budget truth on this project. Use this view to monitor
             baseline, working totals, and variance without mutating budget records.

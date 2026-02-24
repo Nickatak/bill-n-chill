@@ -47,12 +47,6 @@ This map defines how to trace behavior from route to feature code and how to com
 | `/intake/quick-add` | `frontend/src/app/intake/quick-add/page.tsx` | `frontend/src/features/intake/components/quick-add-console.tsx` |
 | `/estimate/[publicRef]` | `frontend/src/app/estimate/[publicRef]/page.tsx` | `frontend/src/features/estimates/components/estimate-approval-preview.tsx` |
 
-## Redirect Routes
-| Route | Redirect Behavior |
-| --- | --- |
-| `/estimates` | redirects to `/projects/[projectId]/estimates` when `project` query is present |
-| `/projects/[projectId]` | redirects to `/projects?project=[projectId]` |
-
 ## Workflow Split (IA Decision)
 Use this ordering for navigation and page ownership.
 

@@ -70,7 +70,7 @@
 }
 
 .existingPanel {
-  gap: 12px;
+  gap: 14px;
 }
 
 .panelHeader {
@@ -81,7 +81,7 @@
 }
 
 .existingPanel .panelHeader {
-  padding-bottom: 6px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -118,6 +118,7 @@
 .searchBlock {
   display: grid;
   gap: 6px;
+  margin-top: 2px;
 }
 
 .searchInput {
@@ -289,10 +290,10 @@
 .filterSwitchCard {
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 8px 10px;
+  padding: 10px 12px;
   background: var(--surface-elevated);
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 
 .filterSwitchHeader {
@@ -303,7 +304,10 @@
 
 .filterSwitchTitle {
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .filterSwitchRow {

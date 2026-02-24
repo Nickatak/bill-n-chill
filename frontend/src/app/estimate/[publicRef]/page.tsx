@@ -22,8 +22,8 @@ export default async function EstimateReviewPage({ params }: EstimateReviewPageP
     <div className={styles.page}>
       <main className={styles.main}>
         <header className={styles.header}>
-          <h1>Estimate</h1>
-          <p>Customer-facing view for reviewing scope and making an approval decision.</p>
+          <h1>Estimate Review (WIP)</h1>
+          <p>Customer-facing preview while approval/denial UX and language are being finalized.</p>
         </header>
         <section className={styles.card}>
           <EstimateApprovalPreview publicToken={publicToken} />

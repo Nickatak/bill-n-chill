@@ -5,9 +5,7 @@ Manage estimate authoring, revision flow, status lifecycle, and customer-facing 
 
 ## Route Surface
 1. `/projects/[projectId]/estimates`
-2. `/estimates` (redirect helper)
-3. `/estimate/[publicRef]` (customer preview)
-4. `/estimates/post-create` (workflow handoff helper)
+2. `/estimate/[publicRef]` (customer preview)
 
 ## Mutation Map
 1. `Estimate`

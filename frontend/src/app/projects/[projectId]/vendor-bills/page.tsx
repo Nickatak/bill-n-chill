@@ -17,7 +17,7 @@ export default async function ProjectVendorBillsPage({ params }: ProjectVendorBi
     <div className={styles.page}>
       <main className={styles.main}>
         <header className={styles.header}>
-          <h1>Vendor Bills</h1>
+          <h1>Vendor Bills (WIP)</h1>
           <p>
             Budget impact rule of thumb: <strong>planned/received/approved/scheduled</strong> bills
             represent <strong>committed</strong> cost, while <strong>paid</strong> bills represent{" "}

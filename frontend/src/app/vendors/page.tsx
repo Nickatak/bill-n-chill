@@ -6,7 +6,7 @@ export default function VendorsPage() {
     <div className={styles.page}>
       <main className={styles.main}>
         <header className={styles.header}>
-          <h1>Vendors</h1>
+          <h1>Vendors (WIP)</h1>
           <p>
             This route gives users a canonical vendor directory with duplicate safeguards so AP
             records are attached to stable payee entities.

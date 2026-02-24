@@ -24,11 +24,10 @@ type HierarchyRule = {
 
 const ROOT_CRUMB: CrumbDef = { href: "/", label: "Intake" };
 const PROJECTS_HUB_CRUMB: CrumbDef = { href: "/projects", label: "Projects" };
-const BILLING_HUB_CRUMB: CrumbDef = { href: "/invoices", label: "Billing" };
-const META_HUB_CRUMB: CrumbDef = { href: "/ops/meta", label: "Meta" };
+const BILLING_HUB_CRUMB: CrumbDef = { href: "/invoices", label: "Billing (WIP)" };
+const META_HUB_CRUMB: CrumbDef = { href: "/customers", label: "Ops / Meta" };
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 const legacyProjectScopedPrefixes = [
-  "/estimates",
   "/change-orders",
   "/invoices",
 ];
@@ -43,62 +42,45 @@ const hierarchyRules: HierarchyRule[] = [
     crumbs: [PROJECTS_HUB_CRUMB],
   },
   {
-    when: (pathname) => pathname === "/estimates/post-create",
-    crumbs: [
-      PROJECTS_HUB_CRUMB,
-      { href: "/estimates", label: "Estimates" },
-      { href: "/estimates/post-create", label: "Post Create" },
-    ],
-  },
-  {
     when: (pathname) =>
-      pathname === "/estimates" ||
-      /^\/projects\/\d+\/estimates$/.test(pathname) ||
-      pathname.startsWith("/estimates/"),
+      /^\/projects\/\d+\/estimates$/.test(pathname),
     crumbs: [PROJECTS_HUB_CRUMB, { href: "/estimates", label: "Estimates" }],
   },
   {
     when: (pathname) => /^\/projects\/\d+\/budgets\/analytics$/.test(pathname),
     crumbs: [
       PROJECTS_HUB_CRUMB,
-      { href: "/budgets/analytics", label: "Budgets" },
-      { href: "/budgets/analytics", label: "Analytics" },
+      { href: "/budgets/analytics", label: "Budgets (WIP)" },
+      { href: "/budgets/analytics", label: "Analytics (WIP)" },
     ],
   },
   {
     when: (pathname) => /^\/projects\/\d+\/activity$/.test(pathname),
-    crumbs: [PROJECTS_HUB_CRUMB, { href: "/activity", label: "Activity" }],
+    crumbs: [PROJECTS_HUB_CRUMB, { href: "/activity", label: "Activity (WIP)" }],
   },
   {
     when: (pathname) => pathname === "/change-orders" || /^\/projects\/\d+\/change-orders$/.test(pathname),
-    crumbs: [PROJECTS_HUB_CRUMB, { href: "/change-orders", label: "Change Orders" }],
+    crumbs: [PROJECTS_HUB_CRUMB, { href: "/change-orders", label: "Change Orders (WIP)" }],
   },
   {
     when: (pathname) => pathname === "/invoices",
-    crumbs: [PROJECTS_HUB_CRUMB, BILLING_HUB_CRUMB, { href: "/invoices", label: "Invoices" }],
+    crumbs: [PROJECTS_HUB_CRUMB, BILLING_HUB_CRUMB, { href: "/invoices", label: "Invoices (WIP)" }],
   },
   {
     when: (pathname) =>
       /^\/projects\/\d+\/vendor-bills$/.test(pathname),
-    crumbs: [PROJECTS_HUB_CRUMB, BILLING_HUB_CRUMB, { href: "/projects", label: "Vendor Bills" }],
+    crumbs: [PROJECTS_HUB_CRUMB, BILLING_HUB_CRUMB, { href: "/projects", label: "Vendor Bills (WIP)" }],
   },
   {
     when: (pathname) =>
       /^\/projects\/\d+\/expenses$/.test(pathname),
-    crumbs: [PROJECTS_HUB_CRUMB, { href: "/projects", label: "Expenses" }],
-  },
-  {
-    when: (pathname) => pathname === "/ops/meta",
-    crumbs: [
-      META_HUB_CRUMB,
-      { href: "/ops/meta", label: "Notes" },
-    ],
+    crumbs: [PROJECTS_HUB_CRUMB, { href: "/projects", label: "Expenses (WIP)" }],
   },
   {
     when: (pathname) => pathname === "/ops/organization",
     crumbs: [
       META_HUB_CRUMB,
-      { href: "/ops/organization", label: "Organization" },
+      { href: "/ops/organization", label: "Organization (WIP)" },
     ],
   },
   {
@@ -112,7 +94,7 @@ const hierarchyRules: HierarchyRule[] = [
     when: (pathname) => pathname === "/vendors",
     crumbs: [
       META_HUB_CRUMB,
-      { href: "/vendors", label: "Vendors" },
+      { href: "/vendors", label: "Vendors (WIP)" },
     ],
   },
   {
@@ -126,19 +108,19 @@ const hierarchyRules: HierarchyRule[] = [
     when: (pathname) => pathname === "/financials-auditing",
     crumbs: [
       PROJECTS_HUB_CRUMB,
-      { href: "/financials-auditing", label: "Financials & Accounting" },
+      { href: "/financials-auditing", label: "Financials & Accounting (WIP)" },
     ],
   },
   {
     when: (pathname) => pathname === "/settings/intake",
     crumbs: [
       META_HUB_CRUMB,
-      { href: "/settings/intake", label: "Intake Form" },
+      { href: "/settings/intake", label: "Settings (WIP)" },
     ],
   },
   {
     when: (pathname) => pathname.startsWith("/settings/"),
-    crumbs: [META_HUB_CRUMB, { href: "/settings/intake", label: "Settings" }],
+    crumbs: [META_HUB_CRUMB, { href: "/settings/intake", label: "Settings (WIP)" }],
   },
 ];
 
@@ -166,7 +148,7 @@ function isLegacyProjectScopedRoute(pathname: string): boolean {
 
 function projectScopedHref(href: string, projectId: string): string {
   if (href === "/projects") {
-    return `/projects/${encodeURIComponent(projectId)}`;
+    return `/projects?project=${encodeURIComponent(projectId)}`;
   }
   if (href === "/estimates") {
     return `/projects/${encodeURIComponent(projectId)}/estimates`;
@@ -246,7 +228,7 @@ export function WorkflowBreadcrumbs() {
   const crumbs = shouldShowProjectCrumb
     ? (() => {
         const projectHubCrumb: Crumb = {
-          href: `/projects/${encodeURIComponent(projectId!)}`,
+          href: `/projects?project=${encodeURIComponent(projectId!)}`,
           label: `Project: ${projectTitle || `Project #${projectId}`}`,
           isCurrent: false,
         };

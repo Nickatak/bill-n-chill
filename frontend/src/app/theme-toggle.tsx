@@ -6,7 +6,7 @@ import { clearClientSession } from "@/features/session/client-session";
 import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { isRouteActive, opsMetaRoutes, opsMetaWipRoutes } from "./nav-routes";
+import { isRouteActive, opsMetaRoutes } from "./nav-routes";
 
 const THEME_KEY = "bnc-theme";
 type ThemeMode = "light" | "dark";
@@ -39,19 +39,16 @@ export function ThemeToggle() {
   const hasSession = Boolean(token);
   const isPublicEstimateRoute = Boolean(pathname && /^\/estimate\/[^/]+\/?$/.test(pathname));
   const hasActiveOpsMeta = opsMetaRoutes.some((route) => isRouteActive(pathname, route));
-  const hasActiveOpsMetaWip = opsMetaWipRoutes.some((route) => isRouteActive(pathname, route));
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<QuickJumpItem[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const quickJumpMenuRef = useRef<HTMLDetailsElement>(null);
   const opsMetaMenuRef = useRef<HTMLDetailsElement>(null);
-  const opsMetaWipMenuRef = useRef<HTMLDetailsElement>(null);
   const normalizedBaseUrl = useMemo(() => defaultApiBaseUrl.trim().replace(/\/$/, ""), []);
 
   function closeMenus() {
     quickJumpMenuRef.current?.removeAttribute("open");
     opsMetaMenuRef.current?.removeAttribute("open");
-    opsMetaWipMenuRef.current?.removeAttribute("open");
   }
 
   function toggleTheme() {
@@ -126,8 +123,7 @@ export function ThemeToggle() {
       }
       if (
         quickJumpMenuRef.current?.contains(target) ||
-        opsMetaMenuRef.current?.contains(target) ||
-        opsMetaWipMenuRef.current?.contains(target)
+        opsMetaMenuRef.current?.contains(target)
       ) {
         return;
       }
@@ -189,26 +185,6 @@ export function ThemeToggle() {
           </summary>
           <div className="nonWorkflowList" role="menu" aria-label="Ops and metadata tools">
             {opsMetaRoutes.map((route) => (
-              <Link
-                key={route.href}
-                href={route.href}
-                className={`nonWorkflowItem ${isRouteActive(pathname, route) ? "isActive" : ""}`}
-                role="menuitem"
-                onClick={closeMenus}
-              >
-                {route.label}
-              </Link>
-            ))}
-          </div>
-        </details>
-      ) : null}
-      {hasSession && !isPublicEstimateRoute ? (
-        <details ref={opsMetaWipMenuRef} className="nonWorkflowMenu">
-          <summary className={`themeControlButton ${hasActiveOpsMetaWip ? "isActive" : ""}`}>
-            WIP
-          </summary>
-          <div className="nonWorkflowList" role="menu" aria-label="Work in progress tools">
-            {opsMetaWipRoutes.map((route) => (
               <Link
                 key={route.href}
                 href={route.href}

@@ -17,7 +17,7 @@ export default async function ProjectActivityPage({ params }: ProjectActivityPag
     <div className={styles.page}>
       <main className={styles.main}>
         <header className={styles.header}>
-          <h1>Project Activity</h1>
+          <h1>Project Activity (WIP)</h1>
           <p>
             Read-only timeline for cross-domain activity. It merges financial audit events with
             workflow status history for this project.

@@ -24,7 +24,7 @@ export default async function ProjectChangeOrdersPage({
     <div className={styles.page}>
       <main className={styles.main}>
         <header className={styles.header}>
-          <h1>Change Orders</h1>
+          <h1>Change Orders (WIP)</h1>
           <p>Manage revisions for this project and keep scope history traceable.</p>
           <p>
             <Link href={`/projects?project=${projectId}`}>Back to Project Hub</Link> |{" "}

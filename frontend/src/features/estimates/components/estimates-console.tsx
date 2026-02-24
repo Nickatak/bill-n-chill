@@ -258,17 +258,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     return Number.isFinite(parsed) ? parsed : 0;
   }
 
-  function postEstimateWorkflowHref(estimateId: number): string {
-    if (!selectedProjectId) {
-      return "/projects";
-    }
-    const params = new URLSearchParams({
-      project: selectedProjectId,
-      estimate: String(estimateId),
-    });
-    return `/estimates/post-create?${params.toString()}`;
-  }
-
   function quickActionKindForStatus(status: string): "change_order" | "revision" | null {
     return estimateQuickActionByStatus[status] ?? null;
   }
@@ -1109,15 +1098,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
               >
                 Duplicate as New Estimate
               </button>
-              {selectedEstimate && selectedProjectId ? (
-                <Link
-                  href={postEstimateWorkflowHref(selectedEstimate.id)}
-                  className={styles.lifecycleLinkAction}
-                  prefetch={false}
-                >
-                  Open Post-Estimate Workflow
-                </Link>
-              ) : null}
             </div>
             {actionMessage ? <p className={styles.actionError}>{actionMessage}</p> : null}
             {showDuplicatePanel ? (

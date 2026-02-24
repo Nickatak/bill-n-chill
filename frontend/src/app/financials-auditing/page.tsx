@@ -7,7 +7,7 @@ export default function FinancialsAuditingPage() {
     <div className={styles.page}>
       <main className={styles.main}>
         <header className={styles.header}>
-          <h1>Financials & Accounting</h1>
+          <h1>Financials & Accounting (WIP)</h1>
           <p>
             This route centralizes finance controls: summary extraction, immutable
             audit visibility, and accounting sync event operations.
