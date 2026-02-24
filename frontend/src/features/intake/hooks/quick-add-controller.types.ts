@@ -10,8 +10,9 @@ export type LeadFieldErrors = {
 };
 
 export type SubmitIntent = "contact_only" | "contact_and_project";
+export type QuickAddMessageTone = "neutral" | "info" | "success" | "error";
 
-export type DuplicateResolution = "use_existing" | "merge_existing" | "create_anyway";
+export type DuplicateResolution = "use_existing" | "create_anyway";
 
 export type PendingSubmission = {
   payload: LeadPayload;
@@ -29,7 +30,9 @@ export type QuickAddControllerApi = {
   fullNameRef: RefObject<HTMLInputElement | null>;
   authMessage: string;
   leadMessage: string;
+  leadMessageTone: QuickAddMessageTone;
   conversionMessage: string;
+  conversionMessageTone: QuickAddMessageTone;
   lastSubmissionIntent: SubmitIntent | null;
   lastDuplicateResolution: string;
   lastConvertedCustomerId: number | null;
@@ -50,9 +53,11 @@ export type QuickAddControllerApi = {
   setProjectStatus: (value: string) => void;
   fieldErrors: LeadFieldErrors;
   duplicateCandidates: LeadContactCandidate[];
+  duplicateMatchPayload: LeadPayload | null;
+  duplicateResolutionIntent: SubmitIntent | null;
   selectedDuplicateId: string;
   setSelectedDuplicateId: (value: string) => void;
   lastLead: LeadContactCandidate | null;
   handleQuickAdd: (event: FormEvent<HTMLFormElement>) => Promise<void>;
-  resolveDuplicate: (resolution: DuplicateResolution) => Promise<void>;
+  resolveDuplicate: (resolution: DuplicateResolution, targetId?: number) => Promise<void>;
 };

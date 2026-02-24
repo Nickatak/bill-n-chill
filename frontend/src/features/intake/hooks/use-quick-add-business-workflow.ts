@@ -14,6 +14,7 @@ import {
   DuplicateResolution,
   LeadFieldErrors,
   PendingSubmission,
+  QuickAddMessageTone,
   SubmitIntent,
 } from "./quick-add-controller.types";
 import { validateLeadFields } from "./quick-add-validation";
@@ -56,7 +57,9 @@ export function useQuickAddBusinessWorkflow({
   setFieldErrors,
 }: UseQuickAddBusinessWorkflowArgs) {
   const [leadMessage, setLeadMessage] = useState("");
+  const [leadMessageTone, setLeadMessageTone] = useState<QuickAddMessageTone>("neutral");
   const [conversionMessage, setConversionMessage] = useState("");
+  const [conversionMessageTone, setConversionMessageTone] = useState<QuickAddMessageTone>("neutral");
 
   const [duplicateCandidates, setDuplicateCandidates] = useState<LeadContactCandidate[]>([]);
   const [selectedDuplicateId, setSelectedDuplicateId] = useState<string>("");
@@ -82,6 +85,7 @@ export function useQuickAddBusinessWorkflow({
     projectId: number | null;
   }> {
     setConversionMessage("Converting lead to customer + project...");
+    setConversionMessageTone("info");
 
     const response = await postConvertLeadToProject({
       baseUrl: normalizedBaseUrl,
@@ -94,6 +98,7 @@ export function useQuickAddBusinessWorkflow({
     const payload: ApiResponse = await response.json();
     if (!response.ok) {
       setConversionMessage(payload.error?.message ?? "Lead conversion failed.");
+      setConversionMessageTone("error");
       return { ok: false, customerId: null, projectId: null };
     }
 
@@ -105,12 +110,14 @@ export function useQuickAddBusinessWorkflow({
 
     if (successStatus) {
       setConversionMessage("");
+      setConversionMessageTone("neutral");
       return { ok: true, customerId, projectId };
     }
 
     setConversionMessage(
       `Conversion status: ${resultStatus.replaceAll("_", " ")}.`,
     );
+    setConversionMessageTone("info");
     return { ok: true, customerId, projectId };
   }
 
@@ -136,11 +143,13 @@ export function useQuickAddBusinessWorkflow({
       setSelectedDuplicateId(candidates[0] ? String(candidates[0].id) : "");
       setPendingSubmission(submission);
       setLeadMessage("Possible duplicate found. Choose a resolution below.");
+      setLeadMessageTone("info");
       return;
     }
 
     if (!response.ok) {
       setLeadMessage(payload.error?.message ?? "Quick Add failed. Check token and required fields.");
+      setLeadMessageTone("error");
       return;
     }
 
@@ -166,14 +175,18 @@ export function useQuickAddBusinessWorkflow({
       conversionSucceeded = outcome.ok;
       if (outcome.ok) {
         setLeadMessage("Contact + project created.");
+        setLeadMessageTone("success");
       } else {
         setLeadMessage("Contact saved, but project conversion failed.");
+        setLeadMessageTone("error");
       }
     } else {
       setConversionMessage("");
+      setConversionMessageTone("neutral");
       setLastConvertedCustomerId(null);
       setLastConvertedProjectId(null);
       setLeadMessage("Contact created.");
+      setLeadMessageTone("success");
     }
 
     // Keep entered values when contact was created but conversion failed so the user can adjust and retry.
@@ -193,17 +206,21 @@ export function useQuickAddBusinessWorkflow({
 
     const nativeEvent = event.nativeEvent as SubmitEvent;
     const submitter = nativeEvent.submitter as HTMLButtonElement | null;
+    const submitterValue = submitter?.value ?? "contact_and_project";
     const intent: SubmitIntent =
-      submitter?.value === "contact_and_project" ? "contact_and_project" : "contact_only";
+      submitterValue === "contact_only" ? "contact_only" : "contact_and_project";
 
     clearLastSuccessState();
     setLeadMessage(
       intent === "contact_only" ? "Submitting lead contact..." : "Creating contact + project...",
     );
+    setLeadMessageTone("info");
     setConversionMessage("");
+    setConversionMessageTone("neutral");
 
     if (!token) {
       setLeadMessage("No shared session token found. Go to / and sign in.");
+      setLeadMessageTone("error");
       return;
     }
 
@@ -228,6 +245,7 @@ export function useQuickAddBusinessWorkflow({
     setFieldErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       setLeadMessage("Fix the required fields and submit again.");
+      setLeadMessageTone("error");
       return;
     }
 
@@ -235,12 +253,14 @@ export function useQuickAddBusinessWorkflow({
       await submitQuickAdd(payload, submission);
     } catch {
       setLeadMessage("Lead submission failed due to an unexpected UI error.");
+      setLeadMessageTone("error");
     }
   }
 
-  async function resolveDuplicate(resolution: DuplicateResolution) {
+  async function resolveDuplicate(resolution: DuplicateResolution, targetId?: number) {
     if (!pendingSubmission) {
       setLeadMessage("No pending duplicate payload to resolve.");
+      setLeadMessageTone("error");
       return;
     }
 
@@ -252,29 +272,35 @@ export function useQuickAddBusinessWorkflow({
         return;
       }
 
-      const targetId = Number(selectedDuplicateId);
-      if (!targetId) {
+      const resolvedTargetId = targetId ?? Number(selectedDuplicateId);
+      if (!resolvedTargetId) {
         setLeadMessage("Select a duplicate candidate first.");
+        setLeadMessageTone("error");
         return;
       }
 
       await submitQuickAdd(pendingSubmission.payload, pendingSubmission, {
         duplicate_resolution: resolution,
-        duplicate_target_id: targetId,
+        duplicate_target_id: resolvedTargetId,
       });
     } catch {
       setLeadMessage("Could not resolve duplicate at this time.");
+      setLeadMessageTone("error");
     }
   }
 
   return {
     leadMessage,
+    leadMessageTone,
     conversionMessage,
+    conversionMessageTone,
     lastSubmissionIntent,
     lastDuplicateResolution,
     lastConvertedCustomerId,
     lastConvertedProjectId,
     duplicateCandidates,
+    duplicateMatchPayload: pendingSubmission?.payload ?? null,
+    duplicateResolutionIntent: pendingSubmission?.intent ?? null,
     selectedDuplicateId,
     setSelectedDuplicateId,
     lastLead,

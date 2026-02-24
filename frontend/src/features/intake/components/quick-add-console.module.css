@@ -8,6 +8,33 @@
   gap: 12px;
 }
 
+.formStatus {
+  margin: 0;
+  border: 1px solid;
+  border-radius: 10px;
+  padding: 9px 11px;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.formStatusInfo {
+  border-color: #93c5fd;
+  color: #1e3a8a;
+  background: #eff6ff;
+}
+
+.formStatusSuccess {
+  border-color: #86efac;
+  color: #166534;
+  background: #f0fdf4;
+}
+
+.formStatusError {
+  border-color: #fca5a5;
+  color: #991b1b;
+  background: #fef2f2;
+}
+
 .field {
   display: grid;
   gap: 5px;
@@ -74,6 +101,143 @@
   gap: 8px;
 }
 
+.duplicatePanel {
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.55);
+  display: grid;
+  gap: 10px;
+}
+
+.duplicateTitle {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.duplicateHint {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #334155;
+}
+
+.duplicateList {
+  display: grid;
+  gap: 10px;
+}
+
+.duplicateCard {
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #fff;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.duplicateCardTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.duplicateCardTitleWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.duplicateCardSelected {
+  border-color: #c8d9fb;
+  background: #f8fbff;
+}
+
+.duplicateCardSelect {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.duplicateCardTitle {
+  font-weight: 700;
+}
+
+.duplicateCardMeta {
+  font-size: 0.88rem;
+  color: #334155;
+}
+
+.duplicateFieldRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  border-radius: 6px;
+  padding: 3px 5px;
+  border: 1px solid transparent;
+}
+
+.duplicateFieldRowMatched {
+  background: #fff7ed;
+  border-color: #fdba74;
+  box-shadow: inset 3px 0 0 #f59e0b;
+}
+
+.duplicateFieldLabel {
+  width: 58px;
+  flex: 0 0 auto;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.duplicateFieldRow .duplicateCardMeta {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.duplicateFieldRowMatched .duplicateFieldLabel,
+.duplicateFieldRowMatched .duplicateCardMeta {
+  color: #9a3412;
+}
+
+.duplicateResolveButton,
+.duplicateCreateAnywayButton {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.duplicateResolveButton {
+  width: fit-content;
+  border-color: #1d4ed8;
+  color: #fff;
+  background: #1d4ed8;
+  white-space: nowrap;
+}
+
+.duplicateCreateAnywayButton {
+  width: 100%;
+  margin-top: 2px;
+  border-color: #fecaca;
+  color: #b91c1c;
+  background: #fff5f5;
+}
+
 .secondaryLink {
   border: 1px solid #d1d5db;
   border-radius: 999px;
@@ -84,6 +248,12 @@
 }
 
 @media (max-width: 640px) {
+  .formStatus {
+    position: sticky;
+    top: 8px;
+    z-index: 2;
+  }
+
   .stickyActions {
     margin-left: -4px;
     margin-right: -4px;
@@ -93,9 +263,28 @@
 }
 
 :global(html[data-theme="dark"]) .optionalDetails,
-:global(html[data-theme="dark"]) .summaryCard {
+:global(html[data-theme="dark"]) .summaryCard,
+:global(html[data-theme="dark"]) .duplicatePanel {
   border-color: #334155;
   background: rgba(15, 23, 42, 0.65);
+}
+
+:global(html[data-theme="dark"]) .formStatusInfo {
+  border-color: #2563eb;
+  color: #bfdbfe;
+  background: rgba(30, 64, 175, 0.25);
+}
+
+:global(html[data-theme="dark"]) .formStatusSuccess {
+  border-color: #15803d;
+  color: #bbf7d0;
+  background: rgba(22, 101, 52, 0.25);
+}
+
+:global(html[data-theme="dark"]) .formStatusError {
+  border-color: #b91c1c;
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.3);
 }
 
 :global(html[data-theme="dark"]) .errorText {
@@ -105,4 +294,50 @@
 :global(html[data-theme="dark"]) .secondaryLink {
   border-color: #334155;
   color: #e5e7eb;
+}
+
+:global(html[data-theme="dark"]) .duplicateHint,
+:global(html[data-theme="dark"]) .duplicateCardMeta {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .duplicateFieldLabel {
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .duplicateCard {
+  border-color: #2a364b;
+  background: rgba(15, 23, 42, 0.35);
+}
+
+:global(html[data-theme="dark"]) .duplicateCardSelected {
+  border-color: #3a4f74;
+  background: rgba(30, 64, 175, 0.25);
+}
+
+:global(html[data-theme="dark"]) .duplicateResolveButton,
+:global(html[data-theme="dark"]) .duplicateCreateAnywayButton {
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .duplicateFieldRowMatched {
+  background: rgba(180, 83, 9, 0.28);
+  border-color: #f59e0b;
+  box-shadow: inset 3px 0 0 #fbbf24;
+}
+
+:global(html[data-theme="dark"]) .duplicateFieldRowMatched .duplicateFieldLabel,
+:global(html[data-theme="dark"]) .duplicateFieldRowMatched .duplicateCardMeta {
+  color: #fed7aa;
+}
+
+:global(html[data-theme="dark"]) .duplicateResolveButton {
+  border-color: #3b82f6;
+  background: #1d4ed8;
+  color: #eff6ff;
+}
+
+:global(html[data-theme="dark"]) .duplicateCreateAnywayButton {
+  background: rgba(127, 29, 29, 0.25);
+  color: #fecaca;
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 
 import { useSharedSessionAuth } from "../../session/use-shared-session";
@@ -16,20 +17,71 @@ export function QuickAddConsole() {
     controllerApi.lastDuplicateResolution === "none"
       ? ""
       : controllerApi.lastDuplicateResolution.replaceAll("_", " ");
+  const statusMessage = controllerApi.conversionMessage || controllerApi.leadMessage;
+  const statusTone = controllerApi.conversionMessage
+    ? controllerApi.conversionMessageTone
+    : controllerApi.leadMessageTone;
+  const statusLiveMode = statusTone === "error" ? "assertive" : "polite";
+  const statusAnchorRef = useRef<HTMLDivElement | null>(null);
+  const lastScrollKeyRef = useRef("");
+
+  useEffect(() => {
+    const duplicateCount = controllerApi.duplicateCandidates.length;
+    const nextKey = `${statusMessage}|${duplicateCount}`;
+    if (!statusMessage && duplicateCount === 0) {
+      return;
+    }
+    if (nextKey === lastScrollKeyRef.current) {
+      return;
+    }
+    lastScrollKeyRef.current = nextKey;
+    statusAnchorRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, [controllerApi.duplicateCandidates.length, statusMessage]);
 
   return (
     <section className={styles.section}>
       <h2>Intake: Quick Add</h2>
       <p>
-        This route gives field and office users a fast way to capture a qualified lead with
-        duplicate detection and explicit resolution before bad data spreads.
+        Use this page to quickly log a new customer conversation and optionally create a project in
+        one step.
       </p>
       <p>
-        It is the workflow entry point: successful conversion here creates the Customer + Project
-        shell used by every downstream route in the financial loop.
+        If we detect a possible duplicate, pick how to resolve it so we do not create overlapping
+        customer records.
       </p>
-      <p>Use one form for both capture-only and capture-with-project actions.</p>
+      <p>
+        Choose <strong>Create Contact + Project</strong> for the normal flow, or{" "}
+        <strong>Create Contact Only</strong> if you are just capturing intake details for now.
+      </p>
       {controllerApi.authMessage ? <p>{controllerApi.authMessage}</p> : null}
+      <div ref={statusAnchorRef} />
+      {statusMessage ? (
+        <p
+          role={statusTone === "error" ? "alert" : "status"}
+          aria-live={statusLiveMode}
+          className={`${styles.formStatus} ${
+            statusTone === "success"
+              ? styles.formStatusSuccess
+              : statusTone === "error"
+                ? styles.formStatusError
+                : styles.formStatusInfo
+          }`}
+        >
+          {statusMessage}
+        </p>
+      ) : null}
+
+      <DuplicateResolutionPanel
+        duplicateCandidates={controllerApi.duplicateCandidates}
+        duplicateMatchPayload={controllerApi.duplicateMatchPayload}
+        duplicateResolutionIntent={controllerApi.duplicateResolutionIntent}
+        selectedDuplicateId={controllerApi.selectedDuplicateId}
+        onSelectDuplicateId={controllerApi.setSelectedDuplicateId}
+        onResolve={controllerApi.resolveDuplicate}
+      />
 
       <QuickAddForm
         fullNameRef={controllerApi.fullNameRef}
@@ -50,15 +102,6 @@ export function QuickAddConsole() {
         fieldErrors={controllerApi.fieldErrors}
         onSubmit={controllerApi.handleQuickAdd}
       />
-
-      <DuplicateResolutionPanel
-        duplicateCandidates={controllerApi.duplicateCandidates}
-        selectedDuplicateId={controllerApi.selectedDuplicateId}
-        onSelectDuplicateId={controllerApi.setSelectedDuplicateId}
-        onResolve={controllerApi.resolveDuplicate}
-      />
-
-      {controllerApi.leadMessage ? <p>{controllerApi.leadMessage}</p> : null}
 
       {controllerApi.lastLead && controllerApi.lastSubmissionIntent ? (
         <div className={styles.summaryCard}>
@@ -100,8 +143,6 @@ export function QuickAddConsole() {
           ) : null}
         </div>
       ) : null}
-
-      {controllerApi.conversionMessage ? <p>{controllerApi.conversionMessage}</p> : null}
     </section>
   );
 }
