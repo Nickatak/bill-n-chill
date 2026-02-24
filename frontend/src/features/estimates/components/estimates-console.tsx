@@ -97,11 +97,28 @@ function mapEstimateLineItemsToInputs(items: EstimateLineItemRecord[] = []): Est
   }));
 }
 
+function readApiErrorMessage(payload: ApiResponse | undefined, fallback: string): string {
+  const topLevelMessage = payload?.error?.message?.trim();
+  if (topLevelMessage) {
+    return topLevelMessage;
+  }
+  const fieldEntries = Object.entries(payload?.error?.fields ?? {});
+  for (const [fieldName, fieldMessages] of fieldEntries) {
+    if (!Array.isArray(fieldMessages)) {
+      continue;
+    }
+    const firstFieldMessage = fieldMessages.find((message) => Boolean((message || "").trim()));
+    if (firstFieldMessage) {
+      return `${fieldName}: ${firstFieldMessage}`;
+    }
+  }
+  return fallback;
+}
+
 export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }: EstimatesConsoleProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [token, setToken] = useState("");
-  const [, setStatusMessage] = useState("");
   const [formErrorMessage, setFormErrorMessage] = useState("");
   const [formSuccessMessage, setFormSuccessMessage] = useState("");
   const [formSuccessHref, setFormSuccessHref] = useState("");
@@ -139,6 +156,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const [validThrough, setValidThrough] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submitGuard = useRef(false);
+  const selectedEstimateIdRef = useRef("");
   const [openFamilyHistory, setOpenFamilyHistory] = useState<Set<string>>(() => new Set());
   const [showDuplicatePanel, setShowDuplicatePanel] = useState(false);
   const [duplicateTitle, setDuplicateTitle] = useState("");
@@ -318,7 +336,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
   async function cloneEstimateRevision(sourceEstimate: EstimateRecord) {
     const sourceWasSent = sourceEstimate.status === "sent";
-    setStatusMessage("Cloning estimate version...");
+    setActionMessage("Cloning estimate version...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/estimates/${sourceEstimate.id}/clone-version/`, {
         method: "POST",
@@ -327,7 +345,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setStatusMessage("Clone failed.");
+        setActionMessage(readApiErrorMessage(payload, "Clone failed."));
         return;
       }
       const cloned = payload.data as EstimateRecord;
@@ -341,10 +359,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       });
       handleSelectEstimate(cloned);
       setStatusEvents([]);
-      setStatusMessage(`Cloned estimate to version ${cloned.version}.`);
       setActionMessage("");
     } catch {
-      setStatusMessage("Could not reach clone endpoint.");
+      setActionMessage("Could not reach clone endpoint.");
     }
   }
 
@@ -355,7 +372,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     }
     if (actionKind === "change_order") {
       if (!selectedProjectId) {
-        setStatusMessage("Select a project first.");
+        setActionMessage("Select a project first.");
         return;
       }
       router.push(`/projects/${selectedProjectId}/change-orders?origin_estimate=${sourceEstimate.id}`);
@@ -443,7 +460,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
   const handleSelectEstimate = useCallback((estimate: EstimateRecord) => {
     const nextEstimateId = String(estimate.id);
-    const isSameEstimate = nextEstimateId === selectedEstimateId;
+    const isSameEstimate = nextEstimateId === selectedEstimateIdRef.current;
     setSelectedEstimateId(nextEstimateId);
     const nextStatuses = estimateAllowedStatusTransitions[estimate.status] ?? [];
     setSelectedStatus(nextStatuses[0] ?? estimate.status);
@@ -457,12 +474,16 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setFormSuccessHref("");
     loadEstimateIntoForm(estimate);
     setDuplicateTitle(`${estimate.title || "Estimate"} Copy`);
-  }, [estimateAllowedStatusTransitions, loadEstimateIntoForm, selectedEstimateId]);
+  }, [estimateAllowedStatusTransitions, loadEstimateIntoForm]);
 
-  function startNewEstimate() {
+  useEffect(() => {
+    selectedEstimateIdRef.current = selectedEstimateId;
+  }, [selectedEstimateId]);
+
+  const clearSelectedEstimateState = useCallback(() => {
     const defaultCostCodeId = costCodes[0] ? String(costCodes[0].id) : "";
-    setIsViewerExpanded(false);
     setSelectedEstimateId("");
+    selectedEstimateIdRef.current = "";
     setSelectedStatus(defaultCreateStatus);
     setStatusNote("");
     setStatusEvents([]);
@@ -472,9 +493,14 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setLineSortKey(null);
     setLineSortDirection("asc");
     setNextLineId(2);
-    setEstimateDate("");
+    setEstimateDate(new Date().toISOString().slice(0, 10));
     setValidThrough("");
     setShowDuplicatePanel(false);
+  }, [costCodes, defaultCreateStatus]);
+
+  function startNewEstimate() {
+    setIsViewerExpanded(false);
+    clearSelectedEstimateState();
     setActionMessage("");
     setFormErrorMessage("");
     setFormSuccessMessage("");
@@ -518,7 +544,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   }, [estimateDate]);
 
   const loadDependencies = useCallback(async () => {
-    setStatusMessage("Loading projects and cost codes...");
+    setActionMessage("");
     try {
       const [projectsRes, codesRes] = await Promise.all([
         fetch(`${normalizedBaseUrl}/projects/`, {
@@ -532,8 +558,12 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       const projectsJson: ApiResponse = await projectsRes.json();
       const codesJson: ApiResponse = await codesRes.json();
 
-      if (!projectsRes.ok || !codesRes.ok) {
-        setStatusMessage("Failed loading dependencies.");
+      if (!projectsRes.ok) {
+        setActionMessage(readApiErrorMessage(projectsJson, "Failed loading projects."));
+        return;
+      }
+      if (!codesRes.ok) {
+        setActionMessage(readApiErrorMessage(codesJson, "Failed loading cost codes."));
         return;
       }
 
@@ -560,29 +590,30 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         );
       }
 
-      setStatusMessage(
-        `Loaded ${projectRows.length} project(s) and ${codeRows.length} cost code(s).`,
-      );
     } catch {
-      setStatusMessage("Could not reach dependency endpoints.");
+      setActionMessage("Could not reach project and cost-code endpoints.");
     }
   }, [normalizedBaseUrl, scopedProjectId, token]);
 
   const loadEstimates = useCallback(async () => {
     const projectId = Number(selectedProjectId);
     if (!projectId) {
-      setStatusMessage("Select a project first.");
+      setActionMessage("Select a project first.");
       return;
     }
 
-    setStatusMessage("Loading estimates...");
+    clearSelectedEstimateState();
+    setFormErrorMessage("");
+    setFormSuccessMessage("");
+    setFormSuccessHref("");
+    setActionMessage("");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
         headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setStatusMessage("Failed loading estimates.");
+        setActionMessage(readApiErrorMessage(payload, "Failed loading estimates."));
         return;
       }
       const rows = (payload.data as EstimateRecord[]) ?? [];
@@ -593,11 +624,17 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
           : null;
         handleSelectEstimate(scopedEstimateMatch ?? rows[0]);
       }
-      setStatusMessage(`Loaded ${rows.length} estimate version(s).`);
     } catch {
-      setStatusMessage("Could not reach estimate endpoint.");
+      setActionMessage("Could not reach estimate endpoint.");
     }
-  }, [handleSelectEstimate, normalizedBaseUrl, scopedEstimateId, selectedProjectId, token]);
+  }, [
+    clearSelectedEstimateState,
+    handleSelectEstimate,
+    normalizedBaseUrl,
+    scopedEstimateId,
+    selectedProjectId,
+    token,
+  ]);
 
   const loadProjectChangeOrders = useCallback(async () => {
     const projectId = Number(selectedProjectId);
@@ -779,32 +816,28 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     }
     if (isReadOnly) {
       setFormErrorMessage("This estimate is read-only. Clone or add a new draft to edit.");
-      setStatusMessage("This estimate is read-only. Clone or add a new draft to edit.");
       return;
     }
     const projectId = Number(selectedProjectId);
     if (!projectId) {
       setFormErrorMessage("Select a project first.");
-      setStatusMessage("Select a project first.");
       return;
     }
 
     const trimmedTitle = estimateTitle.trim();
     if (!trimmedTitle) {
       setFormErrorMessage("Estimate title is required.");
-      setStatusMessage("Estimate title is required.");
       return;
     }
 
     const hasMissingCostCode = lineItems.some((line) => !line.costCodeId);
     if (hasMissingCostCode) {
       setFormErrorMessage("Every line item must have a cost code.");
-      setStatusMessage("Every line item must have a cost code.");
       return;
     }
 
     if (isEditingDraft && selectedEstimate) {
-      setStatusMessage("Saving draft changes...");
+      setActionMessage("");
       submitGuard.current = true;
       setIsSubmitting(true);
       try {
@@ -827,8 +860,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         });
         const payload: ApiResponse = await response.json();
         if (!response.ok) {
-          setFormErrorMessage("Save draft failed. Check values and try again.");
-          setStatusMessage("Save draft failed.");
+          setFormErrorMessage(
+            readApiErrorMessage(payload, "Save draft failed. Check values and try again."),
+          );
           return;
         }
         const updated = payload.data as EstimateRecord;
@@ -839,10 +873,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         setFormErrorMessage("");
         setFormSuccessMessage(`Saved draft estimate #${updated.id}.`);
         setFormSuccessHref(updated.public_ref ? publicEstimateHref(updated.public_ref) : "");
-        setStatusMessage(`Saved draft estimate #${updated.id}.`);
       } catch {
         setFormErrorMessage("Could not reach estimate update endpoint.");
-        setStatusMessage("Could not reach estimate update endpoint.");
       } finally {
         submitGuard.current = false;
         setIsSubmitting(false);
@@ -850,7 +882,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       return;
     }
 
-    setStatusMessage("Creating estimate...");
+    setActionMessage("");
     submitGuard.current = true;
     setIsSubmitting(true);
     try {
@@ -873,8 +905,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setFormErrorMessage("Create estimate failed. Check values and try again.");
-        setStatusMessage("Create estimate failed.");
+        setFormErrorMessage(
+          readApiErrorMessage(payload, "Create estimate failed. Check values and try again."),
+        );
         return;
       }
       const created = payload.data as EstimateRecord;
@@ -885,11 +918,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setFormErrorMessage("");
       setFormSuccessMessage(`Created estimate #${created.id} v${created.version}.`);
       setFormSuccessHref(created.public_ref ? publicEstimateHref(created.public_ref) : "");
-      setStatusMessage(`Created estimate #${created.id} v${created.version}.`);
       loadEstimateIntoForm(created);
     } catch {
       setFormErrorMessage("Could not reach estimate create endpoint.");
-      setStatusMessage("Could not reach estimate create endpoint.");
     } finally {
       submitGuard.current = false;
       setIsSubmitting(false);
@@ -899,16 +930,15 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   async function handleDuplicateEstimate() {
     const estimateId = Number(selectedEstimateId);
     if (!estimateId) {
-      setStatusMessage("Select an estimate first.");
       setActionMessage("Select an existing estimate version before duplicating.");
       return;
     }
     if (!duplicateTitle.trim()) {
-      setStatusMessage("Duplicate title is required.");
+      setActionMessage("Duplicate title is required.");
       return;
     }
 
-    setStatusMessage("Duplicating estimate as a new draft...");
+    setActionMessage("");
     try {
       const response = await fetch(`${normalizedBaseUrl}/estimates/${estimateId}/duplicate/`, {
         method: "POST",
@@ -919,9 +949,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        const message = payload.error?.message ?? "Duplicate failed.";
-        setStatusMessage(message);
-        setActionMessage(message);
+        setActionMessage(readApiErrorMessage(payload, "Duplicate failed."));
         return;
       }
       const duplicated = payload.data as EstimateRecord;
@@ -934,21 +962,20 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       handleSelectEstimate(duplicated);
       setShowDuplicatePanel(false);
       setStatusEvents([]);
-      setStatusMessage(`Duplicated estimate to #${duplicated.id} v${duplicated.version} as draft.`);
       setActionMessage("");
     } catch {
-      setStatusMessage("Could not reach duplicate endpoint.");
+      setActionMessage("Could not reach duplicate endpoint.");
     }
   }
 
   async function handleUpdateEstimateStatus() {
     const estimateId = Number(selectedEstimateId);
     if (!estimateId) {
-      setStatusMessage("Select an estimate first.");
+      setActionMessage("Select an estimate first.");
       return;
     }
 
-    setStatusMessage("Updating estimate status...");
+    setActionMessage("");
     try {
       const response = await fetch(`${normalizedBaseUrl}/estimates/${estimateId}/`, {
         method: "PATCH",
@@ -957,7 +984,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setStatusMessage("Status update failed.");
+        setActionMessage(readApiErrorMessage(payload, "Status update failed."));
         return;
       }
       const updated = payload.data as EstimateRecord;
@@ -968,11 +995,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setSelectedStatus(updatedNextStatuses[0] ?? updated.status);
       setStatusNote("");
       await loadStatusEvents({ estimateId: updated.id, quiet: true });
-      setStatusMessage(
-        `Updated estimate #${updated.id} to ${formatEstimateStatus(updated.status)}.`,
-      );
+      setActionMessage("");
     } catch {
-      setStatusMessage("Could not reach estimate status endpoint.");
+      setActionMessage("Could not reach estimate status endpoint.");
     }
   }
 
@@ -982,14 +1007,11 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       const quiet = options?.quiet ?? false;
       if (!estimateId) {
         if (!quiet) {
-          setStatusMessage("Select an estimate first.");
+          setActionMessage("Select an estimate first.");
         }
         return;
       }
 
-      if (!quiet) {
-        setStatusMessage("Loading status events...");
-      }
       try {
         const response = await fetch(`${normalizedBaseUrl}/estimates/${estimateId}/status-events/`, {
           headers: buildAuthHeaders(token),
@@ -997,18 +1019,15 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         const payload: ApiResponse = await response.json();
         if (!response.ok) {
           if (!quiet) {
-            setStatusMessage("Failed loading status events.");
+            setActionMessage(readApiErrorMessage(payload, "Failed loading status events."));
           }
           return;
         }
         const rows = (payload.data as EstimateStatusEventRecord[]) ?? [];
         setStatusEvents(rows);
-        if (!quiet) {
-          setStatusMessage(`Loaded ${rows.length} status event(s).`);
-        }
       } catch {
         if (!quiet) {
-          setStatusMessage("Could not reach status events endpoint.");
+          setActionMessage("Could not reach status events endpoint.");
         }
       }
     },
@@ -1051,7 +1070,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                 type="button"
                 onClick={() => {
                   if (!selectedEstimate) {
-                    setStatusMessage("Select an existing estimate version before duplicating.");
                     setActionMessage("Select an existing estimate version before duplicating.");
                     return;
                   }

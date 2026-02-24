@@ -91,12 +91,6 @@
   width: fit-content;
 }
 
-.card section {
-  border-top: 1px solid var(--border);
-  margin-top: 14px;
-  padding-top: 14px;
-}
-
 @media (min-width: 980px) {
   .card {
     padding: 20px;

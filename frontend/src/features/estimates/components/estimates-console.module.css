@@ -28,12 +28,6 @@
   font-size: 0.9rem;
 }
 
-.statusMessage {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-}
-
 .projectTableWrap {
   border: 1px solid var(--border);
   border-radius: 12px;

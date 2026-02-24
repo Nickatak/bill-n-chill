@@ -197,7 +197,7 @@
   background: #e0e7ff;
 }
 
-.projectRowActive {
+.projectRow.projectRowActive {
   background: #c7d2fe;
 }
 
@@ -367,7 +367,7 @@
   background: #1e293b;
 }
 
-:global(html[data-theme="dark"]) .projectRowActive {
+:global(html[data-theme="dark"]) .projectRow.projectRowActive {
   background: #334155;
 }
 

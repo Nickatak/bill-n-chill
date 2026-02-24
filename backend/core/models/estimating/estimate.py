@@ -46,6 +46,8 @@ class Estimate(models.Model):
     ALLOWED_STATUS_TRANSITIONS = {
         Status.DRAFT: {Status.SENT, Status.VOID, Status.ARCHIVED},
         Status.SENT: {
+            # Explicitly allow re-send to capture repeat sends as auditable events.
+            Status.SENT,
             Status.APPROVED,
             Status.REJECTED,
             Status.VOID,

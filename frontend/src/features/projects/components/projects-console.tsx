@@ -190,6 +190,12 @@ export function ProjectsConsole() {
           scopedItems.find((project) =>
             defaultProjectStatusFilters.includes(project.status as ProjectStatusValue),
           ) ?? scopedItems[0];
+        if (scopedMatch) {
+          const scopedStatus = scopedMatch.status as ProjectStatusValue;
+          setProjectStatusFilters((current) =>
+            current.includes(scopedStatus) ? current : [...current, scopedStatus],
+          );
+        }
         setSelectedProjectId(String(preferredProject.id));
         hydrateForm(preferredProject);
         setSummary(null);
@@ -325,6 +331,22 @@ export function ProjectsConsole() {
     setSummary(null);
     setEstimateStatusCounts(null);
   }, [selectedProjectId, statusFilteredProjects]);
+
+  useEffect(() => {
+    if (!selectedProjectId || statusFilteredProjects.length === 0) {
+      return;
+    }
+    const selectedIndex = statusFilteredProjects.findIndex(
+      (project) => String(project.id) === selectedProjectId,
+    );
+    if (selectedIndex < 0) {
+      return;
+    }
+    const targetPage = Math.floor(selectedIndex / projectPageSize) + 1;
+    if (targetPage !== currentProjectPageSafe) {
+      setCurrentProjectPage(targetPage);
+    }
+  }, [selectedProjectId, statusFilteredProjects, currentProjectPageSafe]);
 
   function handleSelectProject(project: ProjectRecord) {
     if (String(project.id) === selectedProjectId) {

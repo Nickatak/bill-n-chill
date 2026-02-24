@@ -137,7 +137,7 @@ class EstimateTests(TestCase):
                 Estimate.Status.ARCHIVED: "revision",
             },
         )
-        self.assertTrue(str(payload["policy_version"]).startswith("2026-02-23.estimates."))
+        self.assertTrue(str(payload["policy_version"]).startswith("2026-02-24.estimates."))
 
     def test_project_estimates_create(self):
         response = self.client.post(

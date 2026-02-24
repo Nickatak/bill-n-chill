@@ -2,7 +2,7 @@
 
 from core.models import Estimate
 
-ESTIMATE_POLICY_VERSION = "2026-02-23.estimates.v1"
+ESTIMATE_POLICY_VERSION = "2026-02-24.estimates.v2"
 
 
 def _status_order() -> list[str]:
