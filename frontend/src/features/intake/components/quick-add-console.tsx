@@ -52,8 +52,8 @@ export function QuickAddConsole() {
         customer records.
       </p>
       <p>
-        Choose <strong>Create Contact + Project</strong> for the normal flow, or{" "}
-        <strong>Create Contact Only</strong> if you are just capturing customer details for now.
+        Choose <strong>Create Customer + Project</strong> for the normal flow, or{" "}
+        <strong>Create Customer Only</strong> if you are just capturing customer details for now.
       </p>
       {controllerApi.authMessage ? <p>{controllerApi.authMessage}</p> : null}
       <div ref={statusAnchorRef} />
@@ -116,7 +116,7 @@ export function QuickAddConsole() {
                 {" | "}Customer{" "}
                 <Link
                   className={styles.summaryLink}
-                  href={`/contacts?customer=${controllerApi.lastConvertedCustomerId}`}
+                  href={`/customers?customer=${controllerApi.lastConvertedCustomerId}`}
                 >
                   #{controllerApi.lastConvertedCustomerId}
                 </Link>

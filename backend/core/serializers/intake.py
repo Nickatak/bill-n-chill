@@ -63,7 +63,7 @@ class LeadContactQuickAddSerializer(serializers.ModelSerializer):
         phone = (attrs.get("phone") or "").strip()
         email = (attrs.get("email") or "").strip()
 
-        # Intake allows one contact input that can be either phone or email.
+        # Intake allows one method input that can be either phone or email.
         # If the value came through `phone` but is actually an email, remap it.
         if phone and not email and _is_valid_email(phone):
             email = phone.lower()
@@ -73,7 +73,7 @@ class LeadContactQuickAddSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {
                     "phone": [
-                        "Contact method must be a valid phone number or email address.",
+                        "Input must be a valid phone number or email address.",
                     ]
                 }
             )

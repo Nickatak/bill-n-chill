@@ -1,20 +1,20 @@
 # Feature Map: Intake
 
 ## Purpose
-Capture qualified lead contacts quickly with duplicate detection and optional immediate project conversion.
+Capture qualified customers quickly with duplicate detection and optional immediate project creation.
 
 ## Route Surface
 1. `/intake/quick-add`
 2. `/` when authenticated (home route renders intake console)
 
 ## Mutation Map
-1. `LeadContact`
-   - create (`POST /lead-contacts/quick-add/`)
+1. `CustomerIntakeRecord`
+   - create intake record (`POST /lead-contacts/quick-add/`, legacy path naming)
    - duplicate-resolution create path (`POST /lead-contacts/quick-add/` with `duplicate_resolution` and optional `duplicate_target_id`)
 2. `Customer`
-   - create as conversion side effect (`POST /lead-contacts/{id}/convert-to-project/`)
+   - create/reuse inside quick-add submit (`POST /lead-contacts/quick-add/`)
 3. `Project`
-   - create as conversion side effect (`POST /lead-contacts/{id}/convert-to-project/`)
+   - optional create inside quick-add submit (`POST /lead-contacts/quick-add/`)
 
 ## Composition and Entry Flow
 1. Entry sources:
@@ -26,11 +26,11 @@ Capture qualified lead contacts quickly with duplicate detection and optional im
 3. Controller/Hook:
    `useQuickAddController` composes auth + workflow + validation modules and returns explicit parent API object `QuickAddControllerApi`.
 4. Children:
-   `QuickAddForm` (lead/project input + dual submit intents), `DuplicateResolutionPanel` (duplicate selection + resolution actions).
+   `QuickAddForm` (customer/project input + dual submit intents), `DuplicateResolutionPanel` (duplicate selection + resolution actions).
 5. Default behavior:
-   `QuickAddForm` is visible, duplicate panel is hidden, and console renders auth/lead/conversion messages.
+   `QuickAddForm` is visible, duplicate panel is hidden, and console renders auth/intake/project messages.
 6. Overrides:
-   duplicate conflict (`409 duplicate_detected`) shows `DuplicateResolutionPanel`; submit intent `contact_and_project` triggers post-create conversion flow; missing/invalid token shifts to auth-error messaging path.
+   duplicate conflict (`409 duplicate_detected`) shows `DuplicateResolutionPanel`; submit intent `contact_and_project` requests customer+project creation; missing/invalid token shifts to auth-error messaging path.
 7. Relationship flow:
    user action -> child callback -> controller mutation -> state update -> parent re-renders children with new state.
 
@@ -38,16 +38,13 @@ Capture qualified lead contacts quickly with duplicate detection and optional im
 1. `GET /auth/me/`:
    verifies shared token validity and resolves user-facing auth status messaging before submit flows.
 2. `POST /lead-contacts/quick-add/`:
-   creates lead/contact records, including duplicate-detection conflict response (`409 duplicate_detected`) used by resolution UI.
-3. `POST /lead-contacts/{id}/convert-to-project/`:
-   converts a created lead/contact into customer + project when submit intent is `contact_and_project`.
+   creates intake record + customer (and optional project), including duplicate-detection conflict response (`409 duplicate_detected`) used by resolution UI.
 
 ## Backend Contracts Used
 - Contract endpoint(s): none
 - Consumed fields: none
 - Behavior source: standard API responses from:
   - `POST /lead-contacts/quick-add/`
-  - `POST /lead-contacts/{id}/convert-to-project/`
   - `GET /auth/me/`
 - Fallback policy: n/a (no contract adapter in this feature)
 
@@ -62,10 +59,10 @@ Capture qualified lead contacts quickly with duplicate detection and optional im
 - State buckets:
   - Remote Data:
     - duplicate candidates
-    - last submitted lead
-    - conversion result messages
+    - last submitted intake record
+    - creation result messages
   - Local UI State:
-    - lead form fields
+    - intake form fields
     - pending submission context
     - selected duplicate
     - field errors
@@ -78,11 +75,11 @@ Capture qualified lead contacts quickly with duplicate detection and optional im
   - missing shared session token
   - field validation failures
   - duplicate conflict requiring resolution (`409 duplicate_detected`)
-  - conversion endpoint failures
+  - project create failures
 - Empty states:
   - no duplicate candidates (duplicate panel hidden)
-  - no last submitted lead yet
-  - no conversion result yet
+  - no last submitted intake record yet
+  - no creation result yet
 
 ## Test Anchors
 - Existing anchors:

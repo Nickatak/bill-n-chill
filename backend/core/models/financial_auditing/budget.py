@@ -8,11 +8,11 @@ class Budget(models.Model):
     """Internal execution budget baseline derived from an approved estimate.
 
     Business workflow:
-    - Auto-created when an estimate is accepted/approved by the client.
+    - Auto-created when an estimate is accepted/approved by the customer.
     - This is completely internal, the user will never be able to modify this directly.
     - Stores immutable baseline snapshot of the source estimate.
     - Exposes mutable working lines for internal planning/tracking.
-    - Distinction: client approves Estimate; team manages Budget internally.
+    - Distinction: customer approves Estimate; team manages Budget internally.
 
     Current policy:
     - Exactly one `active` budget should exist per project/user working set.

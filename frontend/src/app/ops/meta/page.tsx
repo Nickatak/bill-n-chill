@@ -31,7 +31,8 @@ export default function OpsMetaNotesPage() {
             <summary className={styles.accordionSummary}>1) Intake and Conversion Layer</summary>
             <ul className={styles.bulletList}>
               <li>
-                <Term href="#term-lead-contact" label="LeadContact" /> is pre-project signal capture
+                <Term href="#term-customer-intake" label="CustomerIntake" /> is pre-project signal
+                capture
                 only (interest, basic needs, fit).
               </li>
               <li>
@@ -44,7 +45,8 @@ export default function OpsMetaNotesPage() {
               </li>
               <li>
                 Conversion is the semantic boundary from potential work to tracked work. Nothing
-                fiscal should originate from <Term href="#term-lead-contact" label="LeadContact" />.
+                fiscal should originate from{" "}
+                <Term href="#term-customer-intake" label="CustomerIntake" />.
               </li>
             </ul>
           </details>
@@ -205,9 +207,11 @@ export default function OpsMetaNotesPage() {
           <details className={styles.accordion}>
             <summary className={styles.accordionSummary}>Verbiage / Expansion</summary>
             <div className={styles.definitionList}>
-              <article id="term-lead-contact" className={styles.definitionCard}>
-                <h4>`LeadContact`</h4>
-                <p>Pre-conversion intake lead record used for qualification and initial contact.</p>
+              <article id="term-customer-intake" className={styles.definitionCard}>
+                <h4>`CustomerIntake`</h4>
+                <p>
+                  Pre-conversion intake record used for qualification and initial customer details.
+                </p>
               </article>
               <article id="term-customer" className={styles.definitionCard}>
                 <h4>`Customer`</h4>

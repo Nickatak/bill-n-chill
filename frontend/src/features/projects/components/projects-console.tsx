@@ -538,7 +538,7 @@ export function ProjectsConsole() {
           <h3>Mobile Quick Actions</h3>
           <p>One-tap shortcuts for in-field updates.</p>
           <p>
-            <Link href="/intake/quick-add">Quick Add Contact</Link> |{" "}
+            <Link href="/intake/quick-add">Quick Add Customer</Link> |{" "}
             <Link href={`/projects/${selectedProject.id}/change-orders`}>Quick CO</Link> |{" "}
             <Link href={`/invoices?project=${selectedProject.id}`}>Quick Invoice</Link> |{" "}
             <Link href={`/vendor-bills?project=${selectedProject.id}`}>Quick Vendor Bill</Link> |{" "}

@@ -10,23 +10,23 @@ User = get_user_model()
 
 
 class Estimate(models.Model):
-    """Client-facing scope and price proposal for a project.
+    """Customer-facing scope and price proposal for a project.
 
     Business workflow:
-    - Pre-baseline commercial entity discussed with the client.
-    - Revised by version/status lifecycle until client approval.
+    - Pre-baseline commercial entity discussed with the customer.
+    - Revised by version/status lifecycle until customer approval.
     - Approved estimate can be converted into an internal Budget baseline.
-    - Distinction: an approved Estimate is still client-facing; Budget is internal.
+    - Distinction: an approved Estimate is still customer-facing; Budget is internal.
 
     Current policy:
-    - Plain English: this is the proposal the client reviews/approves.
+    - Plain English: this is the proposal the customer reviews/approves.
     - `title` is the family identifier for versioned estimates within a project.
     - `title` is required by API contract and treated as immutable after create.
     - Commercial values (tax/line items/totals) are locked once status leaves `draft`.
     - `public_token` powers read-only public estimate sharing links.
     - `void` is explicit user cancellation; `archived` is internal superseded-history state.
     - Lifecycle control: `user-managed` with status/value lock rules after send.
-    - Visibility: `client-facing` artifact (with internal workflow controls).
+    - Visibility: `customer-facing` artifact (with internal workflow controls).
     """
 
     class Status(models.TextChoices):

@@ -26,7 +26,7 @@ class Project(models.Model):
     - `contract_value_current` is system-derived financial truth (for example approved CO deltas).
     - `site_address` is job-location context and is distinct from `Customer.billing_address`.
     - Lifecycle control: `user-managed`.
-    - Visibility: `internal-facing` primary record with selective client-facing derivatives.
+    - Visibility: `internal-facing` primary record with selective customer-facing derivatives.
     """
 
     class Status(models.TextChoices):

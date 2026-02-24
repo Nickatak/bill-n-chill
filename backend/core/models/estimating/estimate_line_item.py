@@ -2,7 +2,7 @@ from django.db import models
 
 
 class EstimateLineItem(models.Model):
-    """Client-facing priced scope row inside an estimate version.
+    """Customer-facing priced scope row inside an estimate version.
 
     Business workflow:
     - Captures quantity/unit/cost/markup for proposed work.
@@ -10,7 +10,7 @@ class EstimateLineItem(models.Model):
 
     Current policy:
     - Lifecycle control: `user-managed` through estimate authoring/update flows.
-    - Visibility: `client-facing` as part of the estimate artifact.
+    - Visibility: `customer-facing` as part of the estimate artifact.
     """
 
     estimate = models.ForeignKey(

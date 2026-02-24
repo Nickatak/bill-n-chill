@@ -224,7 +224,7 @@ def _record_payment_allocation_record(
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def payment_contract_view(_request):
-    """Return canonical payment workflow policy for client-side UX guards.
+    """Return canonical payment workflow policy for frontend UX guards.
 
     Contract:
     - `GET`:

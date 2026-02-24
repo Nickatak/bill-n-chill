@@ -91,7 +91,7 @@ export function QuickAddForm({
       </label>
 
       <label className={styles.field}>
-        Project name (required for Create Contact + Project)
+        Project name (required for Create Customer + Project)
         <input
           name="project_name"
           value={projectName}
@@ -142,10 +142,10 @@ export function QuickAddForm({
       <div className={styles.stickyActions}>
         <div className={styles.inlineActions}>
           <button type="submit" value="contact_and_project">
-            Create Contact + Project
+            Create Customer + Project
           </button>
           <button type="submit" value="contact_only">
-            Create Contact Only
+            Create Customer Only
           </button>
         </div>
       </div>

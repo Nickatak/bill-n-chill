@@ -38,7 +38,7 @@ function invoiceNextActionHint(status: string): string {
     return "Next: allocate remaining payment and close the outstanding balance.";
   }
   if (status === "overdue") {
-    return "Next: follow up with client and record payment once received.";
+    return "Next: follow up with customer and record payment once received.";
   }
   if (status === "paid") {
     return "Invoice is fully settled.";

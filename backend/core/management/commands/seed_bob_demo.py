@@ -176,22 +176,22 @@ class Command(BaseCommand):
             ],
             Estimate.Status.SENT: [
                 (None, Estimate.Status.DRAFT, "Estimate created."),
-                (Estimate.Status.DRAFT, Estimate.Status.SENT, "Estimate sent to client."),
+                (Estimate.Status.DRAFT, Estimate.Status.SENT, "Estimate sent to customer."),
             ],
             Estimate.Status.APPROVED: [
                 (None, Estimate.Status.DRAFT, "Estimate created."),
-                (Estimate.Status.DRAFT, Estimate.Status.SENT, "Estimate sent to client."),
-                (Estimate.Status.SENT, Estimate.Status.APPROVED, "Estimate approved by client."),
+                (Estimate.Status.DRAFT, Estimate.Status.SENT, "Estimate sent to customer."),
+                (Estimate.Status.SENT, Estimate.Status.APPROVED, "Estimate approved by customer."),
             ],
             Estimate.Status.REJECTED: [
                 (None, Estimate.Status.DRAFT, "Estimate created."),
-                (Estimate.Status.DRAFT, Estimate.Status.SENT, "Estimate sent to client."),
-                (Estimate.Status.SENT, Estimate.Status.REJECTED, "Estimate rejected by client."),
+                (Estimate.Status.DRAFT, Estimate.Status.SENT, "Estimate sent to customer."),
+                (Estimate.Status.SENT, Estimate.Status.REJECTED, "Estimate rejected by customer."),
             ],
             Estimate.Status.ARCHIVED: [
                 (None, Estimate.Status.DRAFT, "Estimate created."),
-                (Estimate.Status.DRAFT, Estimate.Status.SENT, "Estimate sent to client."),
-                (Estimate.Status.SENT, Estimate.Status.REJECTED, "Estimate rejected by client."),
+                (Estimate.Status.DRAFT, Estimate.Status.SENT, "Estimate sent to customer."),
+                (Estimate.Status.SENT, Estimate.Status.REJECTED, "Estimate rejected by customer."),
                 (Estimate.Status.REJECTED, Estimate.Status.ARCHIVED, "Rejected version voided."),
             ],
         }
@@ -200,8 +200,12 @@ class Command(BaseCommand):
         if include_rework_cycle and target_status == Estimate.Status.APPROVED:
             events = [
                 (None, Estimate.Status.DRAFT, "Estimate created."),
-                (Estimate.Status.DRAFT, Estimate.Status.SENT, "Estimate sent to client."),
-                (Estimate.Status.SENT, Estimate.Status.REJECTED, "Client rejected first submitted scope."),
+                (Estimate.Status.DRAFT, Estimate.Status.SENT, "Estimate sent to customer."),
+                (
+                    Estimate.Status.SENT,
+                    Estimate.Status.REJECTED,
+                    "Customer rejected first submitted scope.",
+                ),
                 (Estimate.Status.REJECTED, Estimate.Status.ARCHIVED, "Rejected version voided after revision request."),
                 (Estimate.Status.ARCHIVED, Estimate.Status.APPROVED, "Revised scope approved after rejection/void cycle."),
             ]

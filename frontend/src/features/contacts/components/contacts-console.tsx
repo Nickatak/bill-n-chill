@@ -78,7 +78,7 @@ export function ContactsConsole() {
       if (searchQuery.trim()) {
         params.set("q", searchQuery.trim());
       }
-      const url = `${normalizedBaseUrl}/contacts/${params.toString() ? `?${params.toString()}` : ""}`;
+      const url = `${normalizedBaseUrl}/customers/${params.toString() ? `?${params.toString()}` : ""}`;
       const response = await fetch(url, {
         headers: { Authorization: `Token ${token}` },
       });
@@ -176,7 +176,7 @@ export function ContactsConsole() {
     setStatusMessage("Saving customer...");
 
     try {
-      const response = await fetch(`${normalizedBaseUrl}/contacts/${customerId}/`, {
+      const response = await fetch(`${normalizedBaseUrl}/customers/${customerId}/`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -220,7 +220,7 @@ export function ContactsConsole() {
 
     setStatusMessage("Deleting customer...");
     try {
-      const response = await fetch(`${normalizedBaseUrl}/contacts/${customerId}/`, {
+      const response = await fetch(`${normalizedBaseUrl}/customers/${customerId}/`, {
         method: "DELETE",
         headers: { Authorization: `Token ${token}` },
       });

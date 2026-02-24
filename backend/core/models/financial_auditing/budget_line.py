@@ -6,7 +6,7 @@ class BudgetLine(models.Model):
 
     Business workflow:
     - Used by the team/company to plan and track budgeted/actual/committed values.
-    - Not a client-facing artifact.
+    - Not a customer-facing artifact.
     - Acts as the concrete budget-context row that can optionally anchor to canonical `ScopeItem`.
 
     Current policy:

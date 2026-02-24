@@ -29,7 +29,7 @@ Track implementation-complete feature slices without duplicating full API/domain
 
 ### Phase 1: Intake and Project Setup
 
-4. `INT-01` Quick Add Contact (mobile-first)
+4. `INT-01` Quick Add Customer (mobile-first)
 5. `INT-02` Duplicate detection and resolution
 6. `INT-03` Convert lead to customer + project shell
 7. `PRJ-01` Project profile and contract baseline

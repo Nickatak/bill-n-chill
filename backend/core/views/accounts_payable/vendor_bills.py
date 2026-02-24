@@ -140,7 +140,7 @@ def _record_vendor_bill_status_snapshot(*, vendor_bill, capture_status, previous
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def vendor_bill_contract_view(_request):
-    """Return canonical vendor-bill workflow policy for client-side UX guards.
+    """Return canonical vendor-bill workflow policy for frontend UX guards.
 
     Contract:
     - `GET`:

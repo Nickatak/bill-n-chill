@@ -1,4 +1,4 @@
-"""Vendor-bill policy contracts shared with UI clients."""
+"""Vendor-bill policy contracts shared with UI consumers."""
 
 from core.models import VendorBill
 
@@ -10,7 +10,7 @@ def _status_order() -> list[str]:
 
 
 def get_vendor_bill_policy_contract() -> dict:
-    """Return canonical vendor-bill workflow policy for clients."""
+    """Return canonical vendor-bill workflow policy for UI consumers."""
     statuses = _status_order()
     status_index = {status: idx for idx, status in enumerate(statuses)}
     status_labels = {status: label for status, label in VendorBill.Status.choices}

@@ -38,7 +38,7 @@
 - Start simple and secure.
 - Choose one of:
   - Session auth (if mostly browser + same-site patterns)
-  - Token/JWT auth (if API consumed by multiple clients)
+  - Token/JWT auth (if API consumed by multiple consumer apps)
 
 ## Cross-Cutting Concerns
 

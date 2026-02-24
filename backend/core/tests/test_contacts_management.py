@@ -42,12 +42,19 @@ class ContactsManagementTests(TestCase):
         )
 
     def test_contacts_list_requires_authentication(self):
-        response = self.client.get("/api/v1/contacts/")
+        response = self.client.get("/api/v1/customers/")
         self.assertEqual(response.status_code, 401)
+
+    def test_contacts_list_legacy_alias_still_works(self):
+        response = self.client.get(
+            "/api/v1/contacts/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
 
     def test_contacts_list_returns_user_scoped_rows(self):
         response = self.client.get(
-            "/api/v1/contacts/",
+            "/api/v1/customers/",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 200)
@@ -58,7 +65,7 @@ class ContactsManagementTests(TestCase):
 
     def test_contacts_list_supports_search(self):
         response = self.client.get(
-            "/api/v1/contacts/?q=Alice",
+            "/api/v1/customers/?q=Alice",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 200)
@@ -77,7 +84,7 @@ class ContactsManagementTests(TestCase):
         )
 
         response = self.client.get(
-            "/api/v1/contacts/",
+            "/api/v1/customers/",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 200)
@@ -87,7 +94,7 @@ class ContactsManagementTests(TestCase):
 
     def test_contact_patch_updates_record(self):
         response = self.client.patch(
-            f"/api/v1/contacts/{self.customer.id}/",
+            f"/api/v1/customers/{self.customer.id}/",
             data={
                 "phone": "",
                 "email": "alice-updated@example.com",
@@ -108,7 +115,7 @@ class ContactsManagementTests(TestCase):
 
     def test_contact_patch_requires_phone_or_email(self):
         response = self.client.patch(
-            f"/api/v1/contacts/{self.customer.id}/",
+            f"/api/v1/customers/{self.customer.id}/",
             data={"phone": "", "email": ""},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -120,7 +127,7 @@ class ContactsManagementTests(TestCase):
 
     def test_contact_patch_can_toggle_archive_flag(self):
         response = self.client.patch(
-            f"/api/v1/contacts/{self.customer.id}/",
+            f"/api/v1/customers/{self.customer.id}/",
             data={"is_archived": True},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -146,7 +153,7 @@ class ContactsManagementTests(TestCase):
         )
 
         response = self.client.patch(
-            f"/api/v1/contacts/{self.customer.id}/",
+            f"/api/v1/customers/{self.customer.id}/",
             data={"is_archived": True},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -170,7 +177,7 @@ class ContactsManagementTests(TestCase):
         )
 
         response = self.client.patch(
-            f"/api/v1/contacts/{self.customer.id}/",
+            f"/api/v1/customers/{self.customer.id}/",
             data={"is_archived": True},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -182,14 +189,14 @@ class ContactsManagementTests(TestCase):
 
     def test_contact_detail_is_user_scoped(self):
         response = self.client.get(
-            f"/api/v1/contacts/{self.other_customer.id}/",
+            f"/api/v1/customers/{self.other_customer.id}/",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 404)
 
     def test_contact_delete_removes_record(self):
         response = self.client.delete(
-            f"/api/v1/contacts/{self.customer.id}/",
+            f"/api/v1/customers/{self.customer.id}/",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 204)
@@ -209,7 +216,7 @@ class ContactsManagementTests(TestCase):
         )
 
         response = self.client.delete(
-            f"/api/v1/contacts/{self.customer.id}/",
+            f"/api/v1/customers/{self.customer.id}/",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 400)
@@ -220,7 +227,7 @@ class ContactsManagementTests(TestCase):
 
     def test_contact_delete_is_user_scoped(self):
         response = self.client.delete(
-            f"/api/v1/contacts/{self.other_customer.id}/",
+            f"/api/v1/customers/{self.other_customer.id}/",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 404)
@@ -269,7 +276,7 @@ class ContactsManagementTests(TestCase):
         ):
             with self.assertRaises(RuntimeError):
                 self.client.delete(
-                    f"/api/v1/contacts/{self.customer.id}/",
+                    f"/api/v1/customers/{self.customer.id}/",
                     HTTP_AUTHORIZATION=f"Token {self.token.key}",
                 )
 

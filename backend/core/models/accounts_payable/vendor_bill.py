@@ -9,7 +9,7 @@ class VendorBill(models.Model):
     """AP bill received from a vendor/subcontractor for project costs.
 
     Business workflow:
-    - Internal payable document (vendor-facing), not client-facing billing.
+    - Internal payable document (vendor-facing), not customer-facing billing.
     - Tracks AP lifecycle from intake through approval/scheduling/payment.
     - Vendor + bill number must be unique for non-void bills (reuse allowed after void).
     - `created_by` captures who created/owns the bill record, not who performed

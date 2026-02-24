@@ -38,7 +38,7 @@ export default async function ProjectBudgetAnalyticsPage({
             Budgets are internal execution baselines derived from approved estimates. They are
             scoped per project to keep planned, committed, and actual cost tracking isolated by job.
           </p>
-          <p>This is the internal cost-control layer, not the client-facing estimate surface.</p>
+          <p>This is the internal cost-control layer, not the customer-facing estimate surface.</p>
         </section>
       </main>
     </div>

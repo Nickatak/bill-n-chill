@@ -1,4 +1,4 @@
-"""Estimate policy contracts shared with UI clients."""
+"""Estimate policy contracts shared with UI consumers."""
 
 from core.models import Estimate
 
@@ -10,7 +10,7 @@ def _status_order() -> list[str]:
 
 
 def get_estimate_policy_contract() -> dict:
-    """Return canonical estimate workflow policy for clients."""
+    """Return canonical estimate workflow policy for UI consumers."""
     statuses = _status_order()
     status_index = {status: idx for idx, status in enumerate(statuses)}
     status_labels = {status: label for status, label in Estimate.Status.choices}

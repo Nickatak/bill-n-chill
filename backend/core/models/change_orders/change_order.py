@@ -16,7 +16,7 @@ class ChangeOrder(models.Model):
 
     Current policy:
     - Lifecycle control: `user-managed` with status-transition guards.
-    - Visibility: `internal-facing` workflow artifact that may drive client-facing communication.
+    - Visibility: `internal-facing` workflow artifact that may drive customer-facing communication.
     """
 
     class Status(models.TextChoices):

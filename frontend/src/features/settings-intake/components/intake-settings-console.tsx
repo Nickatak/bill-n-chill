@@ -20,7 +20,7 @@ export function IntakeSettingsConsole() {
             checked={controllerApi.settings.requireFullName}
             onChange={(event) => controllerApi.update("requireFullName", event.target.checked)}
           />
-          Require contact full name
+          Require customer full name
         </label>
         <label>
           <input
@@ -28,7 +28,7 @@ export function IntakeSettingsConsole() {
             checked={controllerApi.settings.requirePhoneOrEmail}
             onChange={(event) => controllerApi.update("requirePhoneOrEmail", event.target.checked)}
           />
-          Require at least one contact method (phone or email)
+          Require at least one phone/email method
         </label>
         <label>
           <input

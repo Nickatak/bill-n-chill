@@ -26,7 +26,7 @@ export default async function ProjectEstimatesPage({
         <header className={styles.header}>
           <h1>Estimates</h1>
           <p>
-            This route gives users the client-facing pricing lifecycle: author scope lines, revise
+            This route gives users the customer-facing pricing lifecycle: author scope lines, revise
             versions, and move statuses through approval decisions.
           </p>
           <p>
@@ -47,7 +47,7 @@ export default async function ProjectEstimatesPage({
         <section className={styles.card}>
           <h2>Workflow Context</h2>
           <p>
-            Estimates are client-facing scope and pricing records. Each estimate stays project-scoped
+            Estimates are customer-facing scope and pricing records. Each estimate stays project-scoped
             so revisions, approvals, and downstream conversion stay tied to one job.
           </p>
           <p>Approved estimates become the baseline input for internal budget truth.</p>

@@ -1,4 +1,4 @@
-# Quick Add Contact UX v2
+# Quick Add Customer UX v2
 
 ## Purpose
 
@@ -6,18 +6,18 @@ Optimize intake for field speed while improving confidence and recovery when dat
 
 ## Design Goals
 
-1. Speed lane first: capture a lead in under 60 seconds.
+1. Speed lane first: capture a customer in under 60 seconds.
 2. Confidence lane second: clearly resolve duplicates and continue to project conversion.
 3. Recovery-first feedback: explicit next-step guidance after success/failure.
 
 ## Information Architecture
 
-### 1) Lead Capture (Primary)
+### 1) Customer Capture (Primary)
 
 Required fields (always visible):
 - Full name
 - Project address
-- Contact method: phone or email
+- Phone or email
 
 Optional fields (collapsed by default):
 - Email
@@ -25,8 +25,8 @@ Optional fields (collapsed by default):
 - Notes
 
 Primary CTA:
-- `Create Contact Only`
-- `Create Contact + Project` (requires project name)
+- `Create Customer Only`
+- `Create Customer + Project` (requires project name)
 
 ### 2) Duplicate Resolution (Conditional)
 
@@ -37,25 +37,25 @@ When duplicate candidates are detected:
   - Merge into Existing
   - Create Anyway
 
-### 3) Conversion (Secondary)
+### 3) Project Creation (Secondary)
 
-After lead creation:
-- Prefill lead ID
-- Offer immediate conversion to customer + project
-- Provide post-conversion path to Projects
+After customer intake:
+- Preserve intake ID for audit traceability
+- Offer immediate project creation
+- Provide a post-create path to Projects
 
 ## Interaction Rules
 
 - Auto-verify shared session on page load.
-- Show inline field errors for required lead inputs.
+- Show inline field errors for required intake inputs.
 - Use mobile-friendly input modes (`tel`) for phone capture.
-- Keep one primary action in lead capture; secondary actions appear only when relevant.
-- After successful lead create, show a concise summary with next-step CTA.
+- Keep one primary action in customer capture; secondary actions appear only when relevant.
+- After successful customer create, show a concise summary with next-step CTA.
 
 ## Acceptance Checks
 
-- Required-only lead capture works with optional details collapsed.
+- Required-only customer capture works with optional details collapsed.
 - Inline validation prevents empty required submissions.
 - Duplicate detection flow remains functional.
-- Created lead summary appears with clear next action.
-- Conversion flow remains functional and reports result status.
+- Created customer summary appears with clear next action.
+- Project-create flow remains functional and reports result status.

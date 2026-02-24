@@ -29,9 +29,9 @@
   - `system-managed`: not directly created/updated by users through normal API/UI flows; lifecycle changes occur as workflow side-effects.
   - `user-managed`: directly created and/or edited by authorized users (subject to role and status guards).
 - Audience labels:
-  - `client-facing`: intended for customer/client communication or visibility.
-  - `internal-facing`: intended for internal operators only (our users), not customers/clients.
-  - `non-client-facing`: acceptable plain-English synonym for `internal-facing`.
+  - `customer-facing`: intended for customer communication or visibility.
+  - `internal-facing`: intended for internal operators only (our users), not customers.
+  - `non-customer-facing`: acceptable plain-English synonym for `internal-facing`.
 - Clarification:
   - Some objects are user-originated but still `internal-facing` (for example, canonical identity records created/reused as side-effects of user input).
   - Do not equate `internal-facing` with `system-managed`; audience and lifecycle are separate dimensions.
@@ -58,7 +58,7 @@
   - Capture models should block update/delete at model/queryset level.
   - Prefer append-only `*Record` or `*Snapshot` models in `financial_auditing`.
 - Current examples:
-  - `LeadContact` -> `LeadContactRecord`
+  - `CustomerIntake` -> `CustomerIntakeRecord`
   - `Customer` -> `CustomerRecord`
   - `Organization` -> `OrganizationRecord`
   - `OrganizationMembership` -> `OrganizationMembershipRecord`
@@ -76,7 +76,7 @@
 
 - Package-level split:
   - `core/models/financial_auditing/`: canonical identity and traceability anchors used to preserve auditable financial history.
-  - Non-auditing domains: operational workflow entities (estimating, projects, contacts, cash-management, etc.).
+  - Non-auditing domains: operational workflow entities (estimating, projects, customer management, cash-management, etc.).
 - Placement rule:
   - If a model's primary purpose is immutable financial traceability/reconciliation, place it in `financial_auditing`.
   - If a model's primary purpose is user workflow state/authoring, place it in an operational domain.

@@ -1,4 +1,4 @@
-"""Payment policy contracts shared with UI clients."""
+"""Payment policy contracts shared with UI consumers."""
 
 from core.models import Payment
 
@@ -10,7 +10,7 @@ def _choice_values(choices) -> list[str]:
 
 
 def get_payment_policy_contract() -> dict:
-    """Return canonical payment workflow policy for clients."""
+    """Return canonical payment workflow policy for UI consumers."""
     statuses = _choice_values(Payment.Status.choices)
     status_index = {status: idx for idx, status in enumerate(statuses)}
     status_labels = {value: label for value, label in Payment.Status.choices}

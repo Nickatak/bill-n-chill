@@ -5,7 +5,7 @@ User = get_user_model()
 
 
 class ScopeItem(models.Model):
-    """Canonical non-client-facing scope-line identity across financial artifacts.
+    """Canonical non-customer-facing scope-line identity across financial artifacts.
 
     Business workflow:
     - User-authored estimate lines create/reuse this record during processing.
@@ -15,7 +15,7 @@ class ScopeItem(models.Model):
     Current policy:
     - This is not a duplicate of estimate/budget rows; it is the canonical identity layer.
     - Lifecycle control: `system-managed` create/reuse as a side-effect of user estimate authoring.
-    - Visibility: `internal-facing` (non-client-facing).
+    - Visibility: `internal-facing` (non-customer-facing).
     """
 
     organization = models.ForeignKey(

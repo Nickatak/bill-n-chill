@@ -1,4 +1,4 @@
-"""Shared lead/contact intake and conversion endpoints."""
+"""Shared customer-intake and conversion endpoints."""
 
 import re
 
@@ -124,6 +124,73 @@ def _build_customer_snapshot(customer: Customer) -> dict:
     }
 
 
+def _build_intake_payload(
+    *,
+    payload: dict,
+    intake_record_id: int | None,
+    created_at,
+    converted_customer_id: int | None = None,
+    converted_project_id: int | None = None,
+    converted_at=None,
+) -> dict:
+    return {
+        "id": intake_record_id,
+        "full_name": payload.get("full_name", ""),
+        "phone": payload.get("phone", ""),
+        "project_address": payload.get("project_address", ""),
+        "email": payload.get("email", ""),
+        "initial_contract_value": (
+            str(payload.get("initial_contract_value"))
+            if payload.get("initial_contract_value") is not None
+            else None
+        ),
+        "notes": payload.get("notes", ""),
+        "source": payload.get("source", ""),
+        "is_archived": False,
+        "has_project": converted_project_id is not None,
+        "converted_customer": converted_customer_id,
+        "converted_project": converted_project_id,
+        "converted_at": converted_at.isoformat() if converted_at else None,
+        "created_at": created_at.isoformat() if created_at else None,
+    }
+
+
+def _record_customer_intake_record(
+    *,
+    payload: dict,
+    event_type: str,
+    capture_source: str,
+    recorded_by,
+    source_reference: str = "",
+    note: str = "",
+    metadata: dict | None = None,
+    intake_record_id: int | None = None,
+    converted_customer_id: int | None = None,
+    converted_project_id: int | None = None,
+    converted_at=None,
+):
+    snapshot_json = {
+        "lead_contact": _build_intake_payload(
+            payload=payload,
+            intake_record_id=intake_record_id,
+            created_at=timezone.now(),
+            converted_customer_id=converted_customer_id,
+            converted_project_id=converted_project_id,
+            converted_at=converted_at,
+        )
+    }
+    return LeadContactRecord.objects.create(
+        lead_contact=None,
+        event_type=event_type,
+        capture_source=capture_source,
+        source_reference=source_reference,
+        note=note,
+        snapshot_json=snapshot_json,
+        metadata_json=metadata or {},
+        recorded_by=recorded_by,
+    )
+
+
 def _record_lead_contact_record(
     *,
     lead: LeadContact,
@@ -174,7 +241,7 @@ def _record_customer_record(
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def contacts_list_view(request):
+def customers_list_view(request):
     """List user-owned customers with optional free-text filtering."""
     rows = (
         Customer.objects.filter(created_by=request.user)
@@ -209,7 +276,7 @@ def contacts_list_view(request):
 
 @api_view(["GET", "PATCH", "DELETE"])
 @permission_classes([IsAuthenticated])
-def contact_detail_view(request, contact_id: int):
+def customer_detail_view(request, customer_id: int):
     """Fetch, update, or delete a customer with immutable record capture on writes.
 
     Contract:
@@ -217,7 +284,7 @@ def contact_detail_view(request, contact_id: int):
     - `DELETE`: appends `CustomerRecord(deleted)` before delete in-transaction.
     """
     contact = (
-        Customer.objects.filter(id=contact_id, created_by=request.user)
+        Customer.objects.filter(id=customer_id, created_by=request.user)
         .annotate(
             project_count=Count(
                 "projects",
@@ -324,15 +391,20 @@ def contact_detail_view(request, contact_id: int):
     return Response({"data": payload})
 
 
+# Backward compatibility aliases: keep legacy /contacts routes functional.
+contacts_list_view = customers_list_view
+contact_detail_view = customer_detail_view
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def quick_add_lead_contact_view(request):
-    """Create customer-first intake rows with lead provenance and optional project creation.
+    """Create customer-first intake rows with immutable provenance and optional project creation.
 
     Contract:
     - Supports duplicate resolutions: `use_existing|create_anyway`.
     - Duplicate detection and persistence are customer-first.
-    - `LeadContact` is retained as immutable provenance intake record.
+    - Intake provenance is captured as immutable `LeadContactRecord`.
     - Optional project creation is performed in the same request when `create_project=true`.
     """
     initial_contract_value = request.data.get("initial_contract_value", None)
@@ -442,6 +514,9 @@ def quick_add_lead_contact_view(request):
     customer = None
     customer_created = False
     project = None
+    converted_at = None
+    intake_record_id = None
+    intake_record_created_at = None
 
     try:
         with transaction.atomic():
@@ -464,18 +539,19 @@ def quick_add_lead_contact_view(request):
                     note="Customer created from intake quick add.",
                 )
 
-            lead = serializer.save()
-            _record_lead_contact_record(
-                lead=lead,
+            created_record = _record_customer_intake_record(
+                payload=payload,
                 event_type=LeadContactRecord.EventType.CREATED,
                 capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
                 recorded_by=request.user,
-                note="Intake lead captured.",
+                note="Customer intake captured.",
                 metadata={
                     "customer_id": customer.id,
                     "duplicate_resolution": duplicate_resolution or "none",
                 },
             )
+            intake_record_id = created_record.id
+            intake_record_created_at = created_record.created_at
 
             if create_project:
                 resolved_project_name = project_name or f"{payload['full_name']} Project"
@@ -488,28 +564,21 @@ def quick_add_lead_contact_view(request):
                     contract_value_current=payload.get("initial_contract_value") or 0,
                     created_by=request.user,
                 )
-
-                lead.converted_customer = customer
-                lead.converted_project = project
-                lead.converted_at = timezone.now()
-                lead.save(
-                    update_fields=[
-                        "converted_customer",
-                        "converted_project",
-                        "converted_at",
-                        "updated_at",
-                    ]
-                )
-                _record_lead_contact_record(
-                    lead=lead,
+                converted_at = timezone.now()
+                _record_customer_intake_record(
+                    payload=payload,
                     event_type=LeadContactRecord.EventType.CONVERTED,
                     capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
                     recorded_by=request.user,
-                    note="Lead converted during quick add.",
+                    note="Customer intake converted during quick add.",
                     metadata={
                         "converted_customer_id": customer.id,
                         "converted_project_id": project.id,
                     },
+                    intake_record_id=intake_record_id,
+                    converted_customer_id=customer.id,
+                    converted_project_id=project.id,
+                    converted_at=converted_at,
                 )
     except DjangoValidationError as exc:
         if hasattr(exc, "message_dict"):
@@ -534,10 +603,19 @@ def quick_add_lead_contact_view(request):
             status=400,
         )
 
+    lead_payload = _build_intake_payload(
+        payload=payload,
+        intake_record_id=intake_record_id,
+        created_at=intake_record_created_at or timezone.now(),
+        converted_customer_id=customer.id if project else None,
+        converted_project_id=project.id if project else None,
+        converted_at=converted_at,
+    )
+
     return Response(
         {
             "data": {
-                "lead_contact": LeadContactQuickAddSerializer(lead).data,
+                "lead_contact": lead_payload,
                 "customer": CustomerSerializer(customer).data,
                 "project": ProjectSerializer(project).data if project else None,
             },
@@ -556,7 +634,7 @@ def quick_add_lead_contact_view(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def convert_lead_to_project_view(request, lead_id: int):
-    """Convert a lead contact into customer + project shell with immutable provenance records."""
+    """Convert an intake record into customer + project shell with immutable provenance records."""
     try:
         lead = LeadContact.objects.get(id=lead_id, created_by=request.user)
     except LeadContact.DoesNotExist:
@@ -564,7 +642,7 @@ def convert_lead_to_project_view(request, lead_id: int):
             {
                 "error": {
                     "code": "not_found",
-                    "message": "Lead contact not found.",
+                    "message": "Intake record not found.",
                     "fields": {},
                 }
             },
@@ -592,8 +670,8 @@ def convert_lead_to_project_view(request, lead_id: int):
             {
                 "error": {
                     "code": "validation_error",
-                    "message": "Archived leads cannot be converted to a project.",
-                    "fields": {"is_archived": ["Unarchive this lead before conversion."]},
+                    "message": "Archived intake records cannot be converted to a project.",
+                    "fields": {"is_archived": ["Unarchive this intake record before conversion."]},
                 }
             },
             status=400,

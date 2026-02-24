@@ -99,10 +99,12 @@ bill-n-chill currently uses DRF token authentication for API access.
   - `bookkeeping`: invoice/vendor-bill/payment/accounting-sync writes.
   - `viewer`: read-only across protected surfaces.
 
-## Lead Contact Intake (INT-01)
+## Customer Intake (INT-01)
 
 - `POST /api/v1/lead-contacts/quick-add/`
   - Auth required: `Authorization: Token TOKEN_VALUE`
+  - Note: endpoint path is legacy-named; behavior is customer-first.
+  - Note: quick-add captures immutable intake records and does not create mutable `LeadContact` rows.
   - Required fields:
     - `full_name`
     - `phone`
@@ -111,9 +113,12 @@ bill-n-chill currently uses DRF token authentication for API access.
     - `email`
     - `notes`
     - `source` (`field_manual`, `office_manual`, `import`, `web_form`, `referral`, `other`)
-  - Success response includes created lead contact record under `data`.
+  - Success response includes:
+    - `data.lead_contact` (intake payload keyed by immutable intake-record id)
+    - `data.customer`
+    - `data.project` (nullable)
   - Audit behavior:
-    - appends immutable `LeadContactRecord(event_type=created, capture_source=manual_ui)`
+    - appends immutable intake/customer audit captures for create and duplicate-resolution flows.
 
 ## Duplicate Detection and Resolution (INT-02)
 
@@ -130,29 +135,30 @@ If duplicates are detected and no resolution is provided:
 Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
 
 - `duplicate_resolution`:
-  - `use_existing`: return selected existing contact without creating a new one
-  - `merge_existing`: update selected existing contact with incoming values
-  - `create_anyway`: create new contact despite duplicates
+  - `use_existing`: return selected existing customer without creating a new one
+  - `merge_existing`: update selected existing customer with incoming values
+  - `create_anyway`: create new customer despite duplicates
 - `duplicate_target_id`:
   - required for `use_existing` and `merge_existing`
 
-## Lead Conversion (INT-03)
+## Intake Conversion (INT-03)
 
 - `POST /api/v1/lead-contacts/{lead_id}/convert-to-project/`
   - Auth required: `Authorization: Token TOKEN_VALUE`
+  - Note: this route remains for compatibility; primary quick-add flow now supports direct optional project creation.
   - Request body:
-    - `project_name` (optional; defaults to `<lead full name> Project`)
+    - `project_name` (optional; defaults to `<intake full name> Project`)
     - `project_status` (optional; default `prospect`)
       - allowed: `prospect`, `active`, `on_hold`, `completed`, `cancelled`
   - Behavior:
     - creates or reuses a matching `Customer`
-    - creates a `Project` shell (job `site_address` seeded from lead `project_address`)
-    - marks lead as `project_created` and stores conversion links
+    - creates a `Project` shell (job `site_address` seeded from intake `project_address`)
+    - marks intake row as `project_created` and stores conversion links
   - Audit behavior:
-    - appends immutable `LeadContactRecord(event_type=converted, capture_source=manual_ui)`
+    - appends immutable intake conversion audit capture (`event_type=converted`, `capture_source=manual_ui`)
     - appends immutable `CustomerRecord(event_type=created|updated, capture_source=manual_ui)` when customer rows are created/updated during conversion
   - Idempotency:
-    - If lead is already converted, returns existing customer/project with `meta.conversion_status = "already_converted"`.
+    - If intake row is already converted, returns existing customer/project with `meta.conversion_status = "already_converted"`.
 
 ## Project Profile and Baseline (PRJ-01)
 
@@ -176,6 +182,30 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
     - `contract_value_original` is immutable after create
     - `contract_value_current` is system-derived and cannot be set directly
     - `completed` / `cancelled` projects are terminal and blocked from further edits
+
+## Customer Management (OPS-01)
+
+- `GET /api/v1/customers/`
+  - Auth required
+  - Returns user-scoped customer rows with optional query filter:
+    - `q` (free-text over name/phone/email/address)
+
+- `GET /api/v1/customers/{customer_id}/`
+  - Auth required
+  - Returns one user-scoped customer record.
+
+- `PATCH /api/v1/customers/{customer_id}/`
+  - Auth required
+  - Updates editable customer fields (`display_name`, `phone`, `email`, `billing_address`, `is_archived`).
+  - Write behavior appends immutable `CustomerRecord(event_type=updated, capture_source=manual_ui)`.
+
+- `DELETE /api/v1/customers/{customer_id}/`
+  - Auth required
+  - Deletes one customer when no protected project references remain.
+  - Write behavior appends immutable `CustomerRecord(event_type=deleted, capture_source=manual_ui)` before delete.
+
+- Legacy alias compatibility:
+  - `/api/v1/contacts/` and `/api/v1/contacts/{id}/` remain available as aliases for `/customers` routes.
 
 ## Cost Code Management (EST-01)
 
@@ -235,7 +265,7 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
 - `PATCH /api/v1/estimates/{estimate_id}/`
   - Auth required
   - Supports updating estimate status/title/tax and replacing line items.
-  - Note: `archived` is system-controlled and cannot be set directly by API clients.
+  - Note: `archived` is system-controlled and cannot be set directly by API consumers.
 
 - `POST /api/v1/estimates/{estimate_id}/clone-version/`
   - Auth required
@@ -255,7 +285,7 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
     - `approved -> (no further transitions)`
     - `void -> (no further transitions)`
   - Internal/system transition:
-    - `draft|sent -> archived` is used for superseded estimate-family history and is not client-settable.
+    - `draft|sent -> archived` is used for superseded estimate-family history and is not user-settable.
 
 - `GET /api/v1/estimates/{estimate_id}/status-events/`
   - Auth required
@@ -295,7 +325,7 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
 
 Current product posture:
 - Change orders are currently internal-facing workflow records (internal user operated).
-- Client-facing delivery/approval mechanics (estimate-style public send/re-send loop) are planned but not yet implemented.
+- Customer-facing delivery/approval mechanics (estimate-style public send/re-send loop) are planned but not yet implemented.
 
 - `GET /api/v1/projects/{project_id}/change-orders/`
   - Auth required
@@ -491,7 +521,7 @@ CO-02 extends existing CO endpoints with propagation behavior.
   - Behavior:
     - computes line totals, subtotal, tax total, total, and balance due
     - auto-generates `invoice_number` per project (`INV-####`)
-    - stores one canonical line set (no separate internal/client editable line universes)
+    - stores one canonical line set (no separate internal/customer editable line universes)
 
 - `GET /api/v1/invoices/{invoice_id}/`
   - Auth required

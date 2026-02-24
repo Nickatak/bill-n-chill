@@ -7,7 +7,7 @@ User = get_user_model()
 
 
 class Invoice(models.Model):
-    """Client-facing AR invoice issued to the project customer.
+    """Customer-facing AR invoice issued to the project customer.
 
     Business workflow:
     - Built from billed scope lines and moved through billing/payment statuses.
@@ -154,11 +154,11 @@ class Invoice(models.Model):
 
 
 class InvoiceLine(models.Model):
-    """Individual billed scope line included on a client invoice.
+    """Individual billed scope line included on a customer invoice.
 
     Business workflow:
-    - Canonical invoice row used for both client-facing and internal-facing views.
-    - Client view uses billed descriptors/amounts; internal view can additionally
+    - Canonical invoice row used for both customer-facing and internal-facing views.
+    - Customer view uses billed descriptors/amounts; internal view can additionally
       use linkage metadata (for example `line_type`, `scope_item`).
     - May reference cost code and/or canonical scope identity for internal traceability.
     """

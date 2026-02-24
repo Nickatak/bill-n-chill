@@ -23,7 +23,7 @@ Next.js App  <----HTTP/JSON---->  Django/DRF API  <---->  Database
 
 ## Backend Domain Layout
 
-- `backend/core/models/shared_operations`: project/org/role/cost-code/vendor/accounting-sync/contact shared operational models
+- `backend/core/models/shared_operations`: project/org/role/cost-code/vendor/accounting-sync/customer shared operational models
 - `backend/core/models/estimating`: estimate authoring + estimate lines
 - `backend/core/models/change_orders`: change-order workflow models
 - `backend/core/models/accounts_receivable`: invoice + invoice lines
@@ -90,7 +90,7 @@ Stable service names for overrides:
 - `docs/domain-model.md`: core entities, lifecycles, and API direction for construction billing workflows.
 - `docs/feature-list.md`: compact implementation ledger for shipped feature slices.
 - `docs/phase-2-operational-hardening-and-product-development.md`: next-phase plan for operational hardening and UX/use-case product development.
-- `docs/quick-add-ux-v2.md`: Quick Add Contact v2 UX goals, interaction rules, and acceptance checks.
+- `docs/quick-add-ux-v2.md`: Quick Add Customer v2 UX goals, interaction rules, and acceptance checks.
 - `docs/pre-alpha-friend-testing-checklist.md`: controlled friend-testing launch checklist for pre-alpha feedback rounds.
 
 ## Notes

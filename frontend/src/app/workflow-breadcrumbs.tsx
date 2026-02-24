@@ -102,11 +102,11 @@ const hierarchyRules: HierarchyRule[] = [
     ],
   },
   {
-    when: (pathname) => pathname === "/contacts",
+    when: (pathname) => pathname === "/customers" || pathname === "/contacts",
     crumbs: [
       PROJECTS_HUB_CRUMB,
-      { href: "/contacts", label: "Meta" },
-      { href: "/contacts", label: "Customers" },
+      { href: "/customers", label: "Meta" },
+      { href: "/customers", label: "Customers" },
     ],
   },
   {

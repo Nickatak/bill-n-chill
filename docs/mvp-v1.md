@@ -27,14 +27,14 @@ bill-n-chill is the operational and financial thread that keeps project scope ch
 
 - bill-n-chill starts after initial sales conversation and high-level project intent.
 - bill-n-chill owns project execution records and the financial lifecycle.
-- bill-n-chill includes a light contact-intake path so field teams can quickly create the customer record needed to start a project.
+- bill-n-chill includes a light customer-intake path so field teams can quickly create the customer record needed to start a project.
 
 ## In Scope (v1)
 
-1. Light contact intake and handoff
-- Quick Add Contact (mobile-first): name, phone, project address, optional email/notes.
+1. Light customer intake and handoff
+- Quick Add Customer (mobile-first): name, phone, project address, optional email/notes.
 - Duplicate checks by phone/email.
-- One-step convert from contact to customer + project shell.
+- One-step create/reuse customer + optional project shell.
 
 2. Project and contract setup
 - Create project, customer, contract value, and baseline start/end dates.
@@ -47,7 +47,7 @@ bill-n-chill is the operational and financial thread that keeps project scope ch
 - Draft, approve/reject, and apply change orders.
 - Auto-adjust budget and billing availability after approval.
 
-5. Owner/client invoicing
+5. Customer invoicing
 - Generate progress or milestone invoices from approved scope.
 - Track invoice status: draft, sent, partially paid, paid, overdue.
 
@@ -97,7 +97,7 @@ bill-n-chill is the operational and financial thread that keeps project scope ch
 - Desktop should optimize dense data workflows (tables, comparisons, multi-step edits).
 
 Primary mobile workflows:
-- Quick Add Contact and convert to project shell.
+- Quick Add Customer with optional project shell.
 - Field notes, status updates, and quick approvals.
 - Fast invoice/bill/payment status checks.
 

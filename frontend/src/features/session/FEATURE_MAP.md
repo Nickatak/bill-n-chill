@@ -1,14 +1,14 @@
 # Feature Map: Session
 
 ## Purpose
-Provide login/registration UX, persisted client session state, and shared auth signal for all feature consoles.
+Provide login/registration UX, persisted browser session state, and shared auth signal for all feature consoles.
 
 ## Route Surface
 1. `/` (unauthenticated shell uses login component)
 2. `/register`
 
 ## Mutation Map
-1. `ClientSession`
+1. `BrowserSession`
    - create/update local session token (`POST /auth/login/`, `POST /auth/register/`)
    - clear local session token (signout or expiry path)
 2. `UserSessionValidation`
@@ -22,7 +22,7 @@ Provide login/registration UX, persisted client session state, and shared auth s
 2. Parent/Owner:
    route-level auth pages own session console mounting.
 3. Controller/Hook:
-   `useSharedSessionAuth` coordinates cross-tab/session-change updates; `client-session` utilities own localStorage reads/writes.
+   `useSharedSessionAuth` coordinates cross-tab/session-change updates; local session-storage utilities own localStorage reads/writes.
 4. Children:
    `HomeAuthConsole`, `HomeRegisterConsole`, shared session utility modules.
 5. Default behavior:

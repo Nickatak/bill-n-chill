@@ -62,7 +62,7 @@ def public_estimate_detail_view(request, public_token: str):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def estimate_contract_view(_request):
-    """Return canonical estimate workflow policy for client-side UX guards.
+    """Return canonical estimate workflow policy for frontend UX guards.
 
     Contract:
     - `GET`:

@@ -32,7 +32,7 @@ export function ContactsList({
         <thead>
           <tr>
             <th>Customer</th>
-            <th>Contact</th>
+            <th>Phone / Email</th>
             <th>Projects</th>
             <th>State</th>
             <th>Actions</th>
@@ -50,7 +50,7 @@ export function ContactsList({
                   <p className={styles.rowSecondary}>{row.billing_address || "no billing address"}</p>
                 </td>
                 <td>
-                  <p className={styles.rowPrimary}>{row.phone || row.email || "no contact method"}</p>
+                  <p className={styles.rowPrimary}>{row.phone || row.email || "no phone/email"}</p>
                   {row.phone && row.email ? <p className={styles.rowSecondary}>{row.email}</p> : null}
                 </td>
                 <td>

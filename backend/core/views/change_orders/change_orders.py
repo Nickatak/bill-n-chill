@@ -36,7 +36,7 @@ from core.views.helpers import (
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def change_order_contract_view(_request):
-    """Return canonical change-order workflow policy for client-side UX guards.
+    """Return canonical change-order workflow policy for frontend UX guards.
 
     Contract:
     - `GET`:

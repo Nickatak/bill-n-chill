@@ -23,7 +23,7 @@ class LeadContactQuickAddTests(TestCase):
         )
         self.assertEqual(response.status_code, 401)
 
-    def test_quick_add_creates_customer_and_lead_provenance_with_required_fields(self):
+    def test_quick_add_creates_customer_and_intake_provenance_with_required_fields(self):
         response = self.client.post(
             "/api/v1/lead-contacts/quick-add/",
             data={
@@ -36,15 +36,17 @@ class LeadContactQuickAddTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(LeadContact.objects.count(), 1)
+        self.assertEqual(LeadContact.objects.count(), 0)
         self.assertEqual(Customer.objects.count(), 1)
-        lead = LeadContact.objects.first()
         customer = Customer.objects.first()
-        self.assertEqual(lead.created_by_id, self.user.id)
-        self.assertEqual(lead.full_name, "Jane Doe")
+        lead_payload = response.json()["data"]["lead_contact"]
+        self.assertEqual(lead_payload["full_name"], "Jane Doe")
         self.assertEqual(customer.display_name, "Jane Doe")
         self.assertEqual(customer.phone, "555-0100")
-        record = LeadContactRecord.objects.get(lead_contact_id=lead.id)
+        record = LeadContactRecord.objects.get(
+            lead_contact__isnull=True,
+            event_type=LeadContactRecord.EventType.CREATED,
+        )
         self.assertEqual(record.event_type, LeadContactRecord.EventType.CREATED)
         self.assertEqual(record.capture_source, LeadContactRecord.CaptureSource.MANUAL_UI)
         customer_record = CustomerRecord.objects.get(customer_id=customer.id)
@@ -63,8 +65,10 @@ class LeadContactQuickAddTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 201)
-        lead = LeadContact.objects.get(id=response.json()["data"]["lead_contact"]["id"])
-        self.assertEqual(str(lead.initial_contract_value), "25000.00")
+        self.assertEqual(
+            response.json()["data"]["lead_contact"]["initial_contract_value"],
+            "25000.00",
+        )
 
     def test_quick_add_allows_email_in_phone_field(self):
         response = self.client.post(
@@ -78,10 +82,10 @@ class LeadContactQuickAddTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 201)
-        lead = LeadContact.objects.get(id=response.json()["data"]["lead_contact"]["id"])
         customer = Customer.objects.get(id=response.json()["data"]["customer"]["id"])
-        self.assertEqual(lead.phone, "")
-        self.assertEqual(lead.email, "email-only@example.com")
+        lead_payload = response.json()["data"]["lead_contact"]
+        self.assertEqual(lead_payload["phone"], "")
+        self.assertEqual(lead_payload["email"], "email-only@example.com")
         self.assertEqual(customer.phone, "")
         self.assertEqual(customer.email, "email-only@example.com")
 
@@ -159,7 +163,7 @@ class LeadContactQuickAddTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(LeadContact.objects.count(), 1)
+        self.assertEqual(LeadContact.objects.count(), 0)
         self.assertEqual(Customer.objects.count(), 2)
         self.assertEqual(response.json()["meta"]["duplicate_resolution"], "create_anyway")
 
@@ -185,7 +189,7 @@ class LeadContactQuickAddTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(LeadContact.objects.count(), 1)
+        self.assertEqual(LeadContact.objects.count(), 0)
         self.assertEqual(Customer.objects.count(), 1)
         self.assertEqual(response.json()["data"]["customer"]["id"], existing.id)
         self.assertEqual(response.json()["meta"]["duplicate_resolution"], "use_existing")
@@ -232,20 +236,19 @@ class LeadContactQuickAddTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 201)
+        self.assertEqual(LeadContact.objects.count(), 0)
         self.assertEqual(Customer.objects.count(), 1)
         self.assertEqual(Project.objects.count(), 1)
         payload = response.json()
         self.assertEqual(payload["meta"]["conversion_status"], "converted")
         self.assertIsNotNone(payload["data"]["project"])
-
-        lead = LeadContact.objects.get(id=payload["data"]["lead_contact"]["id"])
         project = Project.objects.get(id=payload["data"]["project"]["id"])
-        self.assertEqual(lead.converted_project_id, project.id)
-        self.assertIsNotNone(lead.converted_customer_id)
+        self.assertEqual(payload["data"]["lead_contact"]["converted_project"], project.id)
+        self.assertIsNotNone(payload["data"]["lead_contact"]["converted_customer"])
 
     def test_quick_add_rolls_back_when_record_capture_fails(self):
         with patch(
-            "core.views.shared_operations.intake._record_lead_contact_record",
+            "core.views.shared_operations.intake._record_customer_intake_record",
             side_effect=RuntimeError("capture-write-failed"),
         ):
             with self.assertRaises(RuntimeError):
@@ -262,6 +265,7 @@ class LeadContactQuickAddTests(TestCase):
 
         self.assertFalse(LeadContact.objects.filter(full_name="Rollback Lead").exists())
         self.assertFalse(Customer.objects.filter(display_name="Rollback Lead").exists())
+        self.assertEqual(LeadContactRecord.objects.count(), 0)
 
 
 class LeadConversionTests(TestCase):

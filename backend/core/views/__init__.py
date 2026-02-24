@@ -28,6 +28,8 @@ from core.views.estimating.estimates import (
     project_estimates_view,
 )
 from core.views.shared_operations.intake import (
+    customer_detail_view,
+    customers_list_view,
     contact_detail_view,
     contacts_list_view,
     convert_lead_to_project_view,
@@ -72,6 +74,8 @@ __all__ = [
     "project_accounting_sync_events_view",
     "accounting_sync_event_retry_view",
     "quick_add_lead_contact_view",
+    "customers_list_view",
+    "customer_detail_view",
     "contacts_list_view",
     "contact_detail_view",
     "convert_lead_to_project_view",

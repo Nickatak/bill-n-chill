@@ -23,7 +23,7 @@ Define the core construction and billing entities for the initial bill-n-chill p
   - Prefer append-only/audit-snapshot patterns; any mutable behavior requires explicit justification and coverage.
 - `ScopeItem` is the first explicit canonical-identity model in this split:
   - It is user-originated via estimate flows but exists to provide stable cross-artifact identity.
-  - It is therefore treated as non-client-facing financial-auditing infrastructure, not estimate-only workflow data.
+  - It is therefore treated as non-customer-facing financial-auditing infrastructure, not estimate-only workflow data.
 
 ## Lifecycle Capture Pattern
 
@@ -31,7 +31,7 @@ Define the core construction and billing entities for the initial bill-n-chill p
   - User/internal operators can create or edit operational records where workflow requires it.
   - Financially relevant changes are captured as append-only immutable records in `financial_auditing`.
 - Current pairings:
-  - `LeadContact` -> `LeadContactRecord`
+  - `CustomerIntake` -> `CustomerIntakeRecord`
   - `Customer` -> `CustomerRecord`
   - `Organization` -> `OrganizationRecord`
   - `OrganizationMembership` -> `OrganizationMembershipRecord`
@@ -118,14 +118,18 @@ Policy:
 - Append-only immutable capture model for RBAC provenance and incident forensics.
 - Internal-facing audit artifact.
 
-## LeadContact
+## CustomerIntake
 
 Lightweight intake record captured before full project/customer setup.
+
+Current implementation note:
+- Quick Add (`POST /lead-contacts/quick-add/`) persists immutable intake provenance rows.
+- Legacy mutable `LeadContact` rows remain only for compatibility with existing conversion endpoints and historical data.
 
 Key fields:
 - `id`
 - `created_by`
-- `status` (`new_contact`, `qualified`, `project_created`, `archived`)
+- `status` (intake lifecycle state)
 - `full_name`
 - `phone`
 - `email`
@@ -138,11 +142,11 @@ Key fields:
 Policy:
 - Internal-facing intake lifecycle object with model-level status transition guards.
 - Conversion state consistency is enforced at model + DB constraint layers.
-- Canonical immutable lifecycle provenance is captured in `LeadContactRecord`.
+- Canonical immutable lifecycle provenance is captured in `CustomerIntakeRecord`.
 
 ## Customer
 
-Client/owner for whom work is performed.
+Customer/owner for whom work is performed.
 
 Key fields:
 - `id`
@@ -156,13 +160,13 @@ Policy:
 - Internal-facing customer anchor object.
 - Canonical immutable lifecycle provenance is captured in `CustomerRecord`.
 
-## LeadContactRecord
+## CustomerIntakeRecord
 
-Immutable audit record for lead-contact lifecycle and conversion captures.
+Immutable audit record for customer-intake lifecycle and conversion captures.
 
 Key fields:
 - `id`
-- `lead_contact_id` (nullable if source row is deleted)
+- `intake_record_id` (nullable if source row is deleted)
 - `event_type` (`created`, `updated`, `status_changed`, `converted`, `deleted`)
 - `capture_source` (`manual_ui`, `manual_api`, `import`, `system`)
 - `from_status` (nullable)
@@ -260,7 +264,7 @@ Policy:
 
 ## ScopeItem
 
-Canonical non-client-facing identity for "same work" line items across lifecycle artifacts.
+Canonical non-customer-facing identity for "same work" line items across lifecycle artifacts.
 
 Why this exists:
 - `EstimateLineItem` and `BudgetLine` are context-specific rows (versioned proposal vs. working budget).
@@ -316,8 +320,8 @@ Key fields:
 Formal scope/price/time change affecting contract and budget.
 
 Current scope:
-- Internal-facing workflow object (not yet client-facing like Estimate public approval loop).
-- Future direction is to add a client delivery/decision loop without coupling it to core financial propagation rules.
+- Internal-facing workflow object (not yet customer-facing like Estimate public approval loop).
+- Future direction is to add a customer delivery/decision loop without coupling it to core financial propagation rules.
 
 Key fields:
 - `id`
@@ -425,7 +429,7 @@ Key fields:
 - `balance_due`
 
 Current policy:
-- One canonical invoice line set is used for both client-facing and internal-facing views.
+- One canonical invoice line set is used for both customer-facing and internal-facing views.
 - Invoice lines may reference canonical `ScopeItem` directly for strict cross-artifact lineage.
 - Invoice lines do not require direct FK coupling to `EstimateLineItem` or `BudgetLine`.
 - Non-scope billing is represented explicitly as adjustment lines with reason metadata.
@@ -463,7 +467,7 @@ Key fields:
 
 Policy:
 - Append-only status-history record for invoice lifecycle decisions.
-- Internal-facing operational audit artifact (separate from client-facing invoice rendering).
+- Internal-facing operational audit artifact (separate from customer-facing invoice rendering).
 
 ## VendorBill
 
@@ -512,7 +516,7 @@ Key fields:
 
 Policy:
 - Internal/system-managed reconciliation artifact.
-- Not intended as client-facing representation.
+- Not intended as customer-facing representation.
 - Canonical immutable provenance is captured in `PaymentAllocationRecord`.
 
 ## PaymentAllocationRecord
@@ -604,9 +608,9 @@ Policy:
 
 - `Organization` has many `OrganizationMemberships`, `Vendors`, `CostCodes`, and `ScopeItems`.
 - `Organization` has many `OrganizationRecords` and `OrganizationMembershipRecords`.
-- `LeadContact` has many `LeadContactRecords`.
+- `CustomerIntake` has many `CustomerIntakeRecords`.
 - `Customer` has many `CustomerRecords`.
-- `User` owns/scopes `LeadContacts`, `Customers`, `Projects`, and financial workflow records via `created_by`.
+- `User` owns/scopes `CustomerIntake`, `Customers`, `Projects`, and financial workflow records via `created_by`.
 - `OrganizationMembership` has many `OrganizationMembershipRecords`.
 - `Project` has many `Estimates`, `Budgets`, `ChangeOrders`, `Invoices`, `VendorBills`, `Payments`, and `AccountingSyncEvents`.
 - `AccountingSyncEvent` has many `AccountingSyncRecords`.
@@ -619,8 +623,8 @@ Policy:
 
 ## Financial Lifecycle (Happy Path)
 
-1. Capture lead contact (usually from field/office quick add).
-2. Convert contact to customer + project shell.
+1. Capture customer intake (usually from field/office quick add).
+2. Create/reuse customer + optional project shell.
 3. Build estimate and mark approved.
 4. Convert estimate to budget baseline.
 5. Execute work and capture change orders.
@@ -641,8 +645,11 @@ Policy:
 
 ## API Surface (Initial DRF Direction)
 
-- `POST /api/v1/lead-contacts/quick-add/`
-- `POST /api/v1/lead-contacts/{id}/convert-to-project/`
+- `POST /api/v1/lead-contacts/quick-add/` (legacy path naming for customer-intake create)
+- `POST /api/v1/lead-contacts/{id}/convert-to-project/` (legacy compatibility route)
+- `GET /api/v1/customers/`
+- `PATCH /api/v1/customers/{id}/`
+- `DELETE /api/v1/customers/{id}/`
 - `GET /api/v1/projects/{id}/financial-summary/`
 - `PATCH /api/v1/estimates/{estimate_id}/`
 - `POST /api/v1/estimates/{estimate_id}/convert-to-budget/`
