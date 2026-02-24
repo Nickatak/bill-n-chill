@@ -1,6 +1,7 @@
 """Shared customer-intake endpoints."""
 
 import re
+from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
@@ -13,11 +14,17 @@ from rest_framework.response import Response
 from core.models import Customer, CustomerRecord, LeadContactRecord, Project
 from core.serializers import (
     CustomerIntakeQuickAddSerializer,
+    CustomerProjectCreateSerializer,
     CustomerManageSerializer,
     CustomerSerializer,
     ProjectSerializer,
 )
 from core.views.helpers import _organization_user_ids
+
+ALLOWED_PROJECT_CREATE_STATUSES = {
+    Project.Status.PROSPECT,
+    Project.Status.ACTIVE,
+}
 
 
 def _normalized_phone(value: str) -> str:
@@ -303,6 +310,102 @@ def customer_detail_view(request, customer_id: int):
     payload["has_active_or_on_hold_project"] = payload["active_project_count"] > 0
     return Response({"data": payload})
 
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def customer_project_create_view(request, customer_id: int):
+    """Create a new project directly from a customer context.
+
+    Contract:
+    - Customer must be visible to the caller's organization scope.
+    - Defaults:
+      - `name`: `<customer display name> Project`
+      - `site_address`: customer billing address
+      - `status`: `prospect`
+      - `initial_contract_value`: `0`
+    """
+    actor_user_ids = _organization_user_ids(request.user)
+    customer = Customer.objects.filter(id=customer_id, created_by_id__in=actor_user_ids).first()
+    if customer is None:
+        return Response(
+            {
+                "error": {
+                    "code": "not_found",
+                    "message": "Customer not found.",
+                    "fields": {},
+                }
+            },
+            status=404,
+        )
+
+    serializer = CustomerProjectCreateSerializer(data=request.data or {})
+    serializer.is_valid(raise_exception=True)
+    payload = serializer.validated_data
+
+    project_name = (payload.get("name") or "").strip() or f"{customer.display_name} Project"
+    site_address = (payload.get("site_address") or "").strip() or customer.billing_address
+    requested_status = payload.get("status", Project.Status.PROSPECT)
+    initial_contract_value = payload.get("initial_contract_value")
+    if initial_contract_value is None:
+        initial_contract_value = Decimal("0")
+
+    try:
+        with transaction.atomic():
+            project = Project.objects.create(
+                customer=customer,
+                name=project_name,
+                site_address=site_address,
+                status=Project.Status.PROSPECT,
+                contract_value_original=initial_contract_value,
+                contract_value_current=initial_contract_value,
+                created_by=request.user,
+            )
+            status_transition = "created_as_prospect"
+            if requested_status == Project.Status.ACTIVE:
+                project.status = Project.Status.ACTIVE
+                project.save()
+                status_transition = "prospect_to_active"
+            _record_customer_record(
+                customer=customer,
+                event_type=CustomerRecord.EventType.UPDATED,
+                capture_source=CustomerRecord.CaptureSource.MANUAL_UI,
+                recorded_by=request.user,
+                note="Project created from customer workspace.",
+                metadata={
+                    "project_id": project.id,
+                    "project_status_requested": requested_status,
+                    "project_status_created_as": Project.Status.PROSPECT,
+                    "project_status_final": project.status,
+                    "project_status_transition": status_transition,
+                },
+            )
+    except DjangoValidationError as exc:
+        if hasattr(exc, "message_dict"):
+            fields = exc.message_dict
+        else:
+            fields = {"non_field_errors": exc.messages}
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Project creation failed validation.",
+                    "fields": fields,
+                }
+            },
+            status=400,
+        )
+
+    return Response(
+        {
+            "data": {
+                "project": ProjectSerializer(project).data,
+                "customer": CustomerSerializer(customer).data,
+            }
+        },
+        status=201,
+    )
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def quick_add_customer_intake_view(request):
@@ -340,14 +443,17 @@ def quick_add_customer_intake_view(request):
     serializer.is_valid(raise_exception=True)
     payload = serializer.validated_data
 
-    valid_project_statuses = {choice for choice, _ in Project.Status.choices}
-    if create_project and project_status not in valid_project_statuses:
+    if create_project and project_status not in ALLOWED_PROJECT_CREATE_STATUSES:
         return Response(
             {
                 "error": {
                     "code": "validation_error",
-                    "message": "Invalid project status.",
-                    "fields": {"project_status": ["This value is not a valid project status."]},
+                    "message": "Invalid project creation status.",
+                    "fields": {
+                        "project_status": [
+                            "Project creation only allows: prospect or active."
+                        ]
+                    },
                 }
             },
             status=400,
@@ -461,15 +567,21 @@ def quick_add_customer_intake_view(request):
 
             if create_project:
                 resolved_project_name = project_name or f"{payload['full_name']} Project"
+                requested_project_status = project_status
                 project = Project.objects.create(
                     customer=customer,
                     name=resolved_project_name,
                     site_address=payload["project_address"],
-                    status=project_status,
+                    status=Project.Status.PROSPECT,
                     contract_value_original=payload.get("initial_contract_value") or 0,
                     contract_value_current=payload.get("initial_contract_value") or 0,
                     created_by=request.user,
                 )
+                status_transition = "created_as_prospect"
+                if requested_project_status == Project.Status.ACTIVE:
+                    project.status = Project.Status.ACTIVE
+                    project.save()
+                    status_transition = "prospect_to_active"
                 converted_at = timezone.now()
                 _record_customer_intake_record(
                     payload=payload,
@@ -480,6 +592,10 @@ def quick_add_customer_intake_view(request):
                     metadata={
                         "converted_customer_id": customer.id,
                         "converted_project_id": project.id,
+                        "project_status_requested": requested_project_status,
+                        "project_status_created_as": Project.Status.PROSPECT,
+                        "project_status_final": project.status,
+                        "project_status_transition": status_transition,
                     },
                     intake_record_id=intake_record_id,
                     converted_customer_id=customer.id,

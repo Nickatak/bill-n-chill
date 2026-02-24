@@ -9,6 +9,7 @@ from core.views import (
     cost_codes_import_csv_view,
     cost_codes_list_create_view,
     customer_detail_view,
+    customer_project_create_view,
     customers_list_view,
     estimate_convert_to_budget_view,
     estimate_clone_version_view,
@@ -62,6 +63,11 @@ urlpatterns = [
     # Canonical customer-management routes.
     path("customers/", customers_list_view, name="customers-list"),
     path("customers/<int:customer_id>/", customer_detail_view, name="customers-detail"),
+    path(
+        "customers/<int:customer_id>/projects/",
+        customer_project_create_view,
+        name="customers-projects-create",
+    ),
     path("projects/", projects_list_view, name="projects-list"),
     path("search/quick-jump/", quick_jump_search_view, name="search-quick-jump"),
     path("reports/attention-feed/", attention_feed_view, name="reports-attention-feed"),

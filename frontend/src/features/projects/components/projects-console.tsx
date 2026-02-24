@@ -11,6 +11,7 @@ import styles from "./projects-console.module.css";
 import { ApiResponse, ProjectFinancialSummary, ProjectRecord } from "../types";
 
 type ProjectStatusValue = "prospect" | "active" | "on_hold" | "completed" | "cancelled";
+type StatusMessageTone = "neutral" | "success" | "error";
 
 export function ProjectsConsole() {
   const searchParams = useSearchParams();
@@ -28,6 +29,7 @@ export function ProjectsConsole() {
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [statusMessage, setStatusMessage] = useState("");
+  const [statusMessageTone, setStatusMessageTone] = useState<StatusMessageTone>("neutral");
   const [projectSearch, setProjectSearch] = useState("");
   const [projectStatusFilters, setProjectStatusFilters] = useState<ProjectStatusValue[]>(
     defaultProjectStatusFilters,
@@ -48,10 +50,18 @@ export function ProjectsConsole() {
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const scopedProjectIdParam = searchParams.get("project");
+  const scopedCustomerIdParam = searchParams.get("customer");
   const scopedProjectId =
     scopedProjectIdParam && /^\d+$/.test(scopedProjectIdParam)
       ? Number(scopedProjectIdParam)
       : null;
+  const scopedCustomerId =
+    scopedCustomerIdParam && /^\d+$/.test(scopedCustomerIdParam)
+      ? Number(scopedCustomerIdParam)
+      : null;
+  const customerScopedProjects = scopedCustomerId
+    ? projects.filter((project) => project.customer === scopedCustomerId)
+    : projects;
   const hasSelectedProject = Boolean(selectedProjectId);
   const selectedProject =
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;
@@ -67,8 +77,8 @@ export function ProjectsConsole() {
   const hasInvalidDateRange = Boolean(startDate && endDate && endDate < startDate);
   const needle = projectSearch.trim().toLowerCase();
   const filteredProjects = !needle
-    ? projects
-    : projects.filter((project) => {
+    ? customerScopedProjects
+    : customerScopedProjects.filter((project) => {
         const haystack = [
           String(project.id),
           project.name,
@@ -140,72 +150,102 @@ export function ProjectsConsole() {
     setEndDate(project.end_date_planned ?? "");
   }
 
+  function setNeutralStatusMessage(message: string) {
+    setStatusMessageTone("neutral");
+    setStatusMessage(message);
+  }
+
+  function setSuccessStatusMessage(message: string) {
+    setStatusMessageTone("success");
+    setStatusMessage(message);
+  }
+
+  function setErrorStatusMessage(message: string) {
+    setStatusMessageTone("error");
+    setStatusMessage(message);
+  }
+
   async function loadProjects() {
-    setStatusMessage("Loading projects...");
+    setNeutralStatusMessage("Loading projects...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/`, {
         headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setStatusMessage("Could not load projects.");
+        setErrorStatusMessage("Could not load projects.");
         return;
       }
       const items = (payload.data as ProjectRecord[]) ?? [];
+      const scopedItems = scopedCustomerId
+        ? items.filter((project) => project.customer === scopedCustomerId)
+        : items;
       setProjects(items);
-      if (items[0]) {
+      if (scopedItems[0]) {
         const scopedMatch = scopedProjectId
-          ? items.find((project) => project.id === scopedProjectId)
+          ? scopedItems.find((project) => project.id === scopedProjectId)
           : null;
         const preferredProject =
           scopedMatch ??
-          items.find((project) =>
+          scopedItems.find((project) =>
             defaultProjectStatusFilters.includes(project.status as ProjectStatusValue),
-          ) ?? items[0];
+          ) ?? scopedItems[0];
         setSelectedProjectId(String(preferredProject.id));
         hydrateForm(preferredProject);
         setSummary(null);
         if (scopedProjectId && !scopedMatch) {
-          setStatusMessage(
+          setNeutralStatusMessage(
             `Project #${scopedProjectId} is not available in your scope. Loaded default project.`,
           );
           return;
         }
-        setStatusMessage(`Loaded ${items.length} project(s).`);
+        if (scopedCustomerId) {
+          setNeutralStatusMessage(
+            `Loaded ${scopedItems.length} project(s) for customer #${scopedCustomerId}.`,
+          );
+          return;
+        }
+        setNeutralStatusMessage(`Loaded ${items.length} project(s).`);
+      } else if (scopedCustomerId) {
+        setSelectedProjectId("");
+        setSummary(null);
+        setEstimateStatusCounts(null);
+        setNeutralStatusMessage(`No projects found for customer #${scopedCustomerId}.`);
       } else {
         setSelectedProjectId("");
         setSummary(null);
-        setStatusMessage(
+        setEstimateStatusCounts(null);
+        setNeutralStatusMessage(
           "No projects found for this user. Create one from Intake -> Convert Lead to Project.",
         );
       }
     } catch {
-      setStatusMessage("Could not reach projects endpoint.");
+      setErrorStatusMessage("Could not reach projects endpoint.");
     }
   }
 
   async function loadFinancialSummary() {
     const projectId = Number(selectedProjectId);
     if (!projectId) {
-      setStatusMessage("Select a project first.");
+      setErrorStatusMessage("Select a project first.");
       return;
     }
 
-    setStatusMessage("Loading financial summary...");
+    setNeutralStatusMessage("Loading financial summary...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/financial-summary/`, {
         headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setStatusMessage("Could not load financial summary.");
+        setErrorStatusMessage("Could not load financial summary.");
         return;
       }
 
       setSummary(payload.data as ProjectFinancialSummary);
-      setStatusMessage("Financial summary loaded.");
+      setNeutralStatusMessage("Financial summary loaded.");
     } catch {
-      setStatusMessage("Could not reach financial summary endpoint.");
+      setErrorStatusMessage("Could not reach financial summary endpoint.");
     }
   }
 
@@ -255,7 +295,7 @@ export function ProjectsConsole() {
     }
     void loadProjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, scopedProjectId, scopedCustomerId]);
 
   useEffect(() => {
     if (!token || !selectedProjectId) {
@@ -306,17 +346,17 @@ export function ProjectsConsole() {
     event.preventDefault();
     const projectId = Number(selectedProjectId);
     if (!projectId) {
-      setStatusMessage(
+      setErrorStatusMessage(
         "No project selected. Load projects first, then pick one from the project dropdown.",
       );
       return;
     }
     if (hasInvalidDateRange) {
-      setStatusMessage("Planned end date cannot be before planned start date.");
+      setErrorStatusMessage("Planned end date cannot be before planned start date.");
       return;
     }
 
-    setStatusMessage("Saving project profile...");
+    setNeutralStatusMessage("Saving project profile...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/`, {
         method: "PATCH",
@@ -330,7 +370,7 @@ export function ProjectsConsole() {
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setStatusMessage("Save failed. Check values and auth token.");
+        setErrorStatusMessage("Save failed. Check values and auth token.");
         return;
       }
 
@@ -338,20 +378,21 @@ export function ProjectsConsole() {
       setProjects((current) =>
         current.map((project) => (project.id === updated.id ? updated : project)),
       );
-      setStatusMessage(`Project #${updated.id} saved.`);
+      setIsProjectProfileOpen(false);
+      setSuccessStatusMessage(`Project #${updated.id} saved.`);
     } catch {
-      setStatusMessage("Could not reach project detail endpoint.");
+      setErrorStatusMessage("Could not reach project detail endpoint.");
     }
   }
 
   async function downloadAccountingExport() {
     const projectId = Number(selectedProjectId);
     if (!projectId) {
-      setStatusMessage("Select a project first.");
+      setErrorStatusMessage("Select a project first.");
       return;
     }
 
-    setStatusMessage("Downloading accounting export...");
+    setNeutralStatusMessage("Downloading accounting export...");
     try {
       const response = await fetch(
         `${normalizedBaseUrl}/projects/${projectId}/accounting-export/?export_format=csv`,
@@ -360,7 +401,7 @@ export function ProjectsConsole() {
         },
       );
       if (!response.ok) {
-        setStatusMessage("Could not download accounting export.");
+        setErrorStatusMessage("Could not download accounting export.");
         return;
       }
 
@@ -373,9 +414,9 @@ export function ProjectsConsole() {
       anchor.click();
       document.body.removeChild(anchor);
       window.URL.revokeObjectURL(url);
-      setStatusMessage("Accounting export downloaded.");
+      setSuccessStatusMessage("Accounting export downloaded.");
     } catch {
-      setStatusMessage("Could not reach accounting export endpoint.");
+      setErrorStatusMessage("Could not reach accounting export endpoint.");
     }
   }
 
@@ -383,6 +424,11 @@ export function ProjectsConsole() {
     <section>
       <h2>Project Profile Editor</h2>
       <p>Load project shells and update baseline profile fields.</p>
+      {scopedCustomerId ? (
+        <p>
+          Viewing projects for customer #{scopedCustomerId}. <Link href="/projects">Show all projects</Link>.
+        </p>
+      ) : null}
 
       <p>{authMessage}</p>
 
@@ -779,7 +825,19 @@ export function ProjectsConsole() {
         </form>
       ) : null}
 
-      <p>{statusMessage}</p>
+      {statusMessage ? (
+        <p
+          className={`${styles.statusMessage} ${
+            statusMessageTone === "success"
+              ? styles.statusMessageSuccess
+              : statusMessageTone === "error"
+                ? styles.statusMessageError
+                : ""
+          }`}
+        >
+          {statusMessage}
+        </p>
+      ) : null}
     </section>
   );
 }

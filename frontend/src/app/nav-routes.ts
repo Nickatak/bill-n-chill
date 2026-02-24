@@ -34,6 +34,7 @@ export const opsMetaRoutes: NavRoute[] = [
 
 export const opsMetaWipRoutes: NavRoute[] = [
   { href: "/ops/meta", label: "Notes", exact: ["/ops/meta"] },
+  { href: "/ops/organization", label: "Organization", exact: ["/ops/organization"] },
   { href: "/vendors", label: "Vendors", exact: ["/vendors"] },
   { href: "/cost-codes", label: "Cost Codes", exact: ["/cost-codes"] },
   {

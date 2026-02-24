@@ -2,7 +2,7 @@
 
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, MouseEvent, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import type { ProjectRecord } from "@/features/projects/types";
 
@@ -12,13 +12,27 @@ import { ApiResponse, CustomerRow } from "../types";
 import { ContactEditorForm } from "./contact-editor-form";
 import { ContactsFilters } from "./contacts-filters";
 import { ContactsList } from "./contacts-list";
+import { CustomerProjectCreateForm } from "./customer-project-create-form";
 import styles from "./contacts-console.module.css";
 
 type ActivityFilter = "all" | "active";
 type ProjectFilter = "all" | "with_project";
+type ProjectStatusValue = "prospect" | "active" | "on_hold" | "completed" | "cancelled";
+
+type ProjectCreateApiResponse = {
+  data?: {
+    project?: ProjectRecord;
+  };
+  error?: {
+    code?: string;
+    message?: string;
+    fields?: Record<string, string[]>;
+  };
+};
 
 export function ContactsConsole() {
   const { token } = useSharedSessionAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [query, setQuery] = useState("");
@@ -26,6 +40,8 @@ export function ContactsConsole() {
   const [projectsByCustomer, setProjectsByCustomer] = useState<Record<number, ProjectRecord[]>>({});
   const [editingId, setEditingId] = useState("");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [createProjectCustomerId, setCreateProjectCustomerId] = useState<number | null>(null);
+  const [isProjectCreatorOpen, setIsProjectCreatorOpen] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const backdropPointerStartRef = useRef(false);
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("active");
@@ -36,6 +52,9 @@ export function ContactsConsole() {
   const [billingAddress, setBillingAddress] = useState("");
   const [email, setEmail] = useState("");
   const [isArchived, setIsArchived] = useState(false);
+  const [projectName, setProjectName] = useState("");
+  const [projectSiteAddress, setProjectSiteAddress] = useState("");
+  const [projectStatus, setProjectStatus] = useState<ProjectStatusValue>("prospect");
 
   const normalizedBaseUrl = useMemo(() => normalizeApiBaseUrl(defaultApiBaseUrl), []);
   const scopedContactIdParam = searchParams.get("contact");
@@ -60,6 +79,10 @@ export function ContactsConsole() {
     });
   }, [activityFilter, projectFilter, rows]);
   const editingCustomer = rows.find((entry) => String(entry.id) === editingId) ?? null;
+  const createProjectCustomer =
+    createProjectCustomerId === null
+      ? null
+      : rows.find((entry) => entry.id === createProjectCustomerId) ?? null;
 
   function hydrate(customer: CustomerRow) {
     setDisplayName(customer.display_name ?? "");
@@ -113,9 +136,6 @@ export function ContactsConsole() {
       const rows = payload.data ?? [];
       const nextMap: Record<number, ProjectRecord[]> = {};
       for (const project of rows) {
-        if (project.status === "prospect") {
-          continue;
-        }
         if (!nextMap[project.customer]) {
           nextMap[project.customer] = [];
         }
@@ -154,6 +174,7 @@ export function ContactsConsole() {
     if (!row) {
       return;
     }
+    setIsProjectCreatorOpen(false);
     setEditingId(id);
     hydrate(row);
     setIsEditorOpen(true);
@@ -161,6 +182,19 @@ export function ContactsConsole() {
 
   function closeEditor() {
     setIsEditorOpen(false);
+  }
+
+  function openProjectCreator(customer: CustomerRow) {
+    setIsEditorOpen(false);
+    setCreateProjectCustomerId(customer.id);
+    setProjectName(`${customer.display_name} Project`);
+    setProjectSiteAddress(customer.billing_address ?? "");
+    setProjectStatus("prospect");
+    setIsProjectCreatorOpen(true);
+  }
+
+  function closeProjectCreator() {
+    setIsProjectCreatorOpen(false);
   }
 
   function handleOverlayMouseDown(event: MouseEvent<HTMLDivElement>) {
@@ -213,6 +247,51 @@ export function ContactsConsole() {
     }
   }
 
+  async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const customerId = createProjectCustomerId;
+    if (!customerId) {
+      setStatusMessage("Select a customer first.");
+      return;
+    }
+
+    setStatusMessage("Creating project...");
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/customers/${customerId}/projects/`, {
+        method: "POST",
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        body: JSON.stringify({
+          name: projectName,
+          site_address: projectSiteAddress,
+          status: projectStatus,
+        }),
+      });
+      const payload: ProjectCreateApiResponse = await response.json();
+      if (!response.ok) {
+        const fieldMessage = payload.error?.fields
+          ? Object.values(payload.error.fields).flat()[0]
+          : undefined;
+        setStatusMessage(
+          payload.error?.message ?? fieldMessage ?? "Could not create project for this customer.",
+        );
+        return;
+      }
+
+      const createdProject = payload.data?.project;
+      if (!createdProject) {
+        setStatusMessage("Project created, but response payload was incomplete.");
+        closeProjectCreator();
+        return;
+      }
+
+      closeProjectCreator();
+      setStatusMessage(`Created project #${createdProject.id}. Opening project workspace...`);
+      router.push(`/projects?project=${createdProject.id}`);
+    } catch {
+      setStatusMessage("Could not reach customer project creation endpoint.");
+    }
+  }
+
   return (
     <section className={styles.section}>
       <header className={styles.intro}>
@@ -237,6 +316,7 @@ export function ContactsConsole() {
         query={query}
         projectsByCustomer={projectsByCustomer}
         onEdit={openEditor}
+        onCreateProject={openProjectCreator}
       />
 
       {isEditorOpen && editingCustomer ? (
@@ -266,6 +346,30 @@ export function ContactsConsole() {
               activeProjectCount={editingCustomer.active_project_count ?? 0}
               hasActiveOrOnHoldProject={Boolean(editingCustomer.has_active_or_on_hold_project)}
               onSubmit={handleSave}
+            />
+          </section>
+        </div>
+      ) : null}
+
+      {isProjectCreatorOpen && createProjectCustomer ? (
+        <div
+          className={styles.modalOverlay}
+          onMouseDown={handleOverlayMouseDown}
+          onMouseUp={handleOverlayMouseUp}
+        >
+          <section className={styles.modalCard} role="dialog" aria-modal="true" aria-label="Create project">
+            <button type="button" className={styles.modalClose} onClick={closeProjectCreator}>
+              Close
+            </button>
+            <CustomerProjectCreateForm
+              customerName={createProjectCustomer.display_name}
+              projectName={projectName}
+              onProjectNameChange={setProjectName}
+              projectSiteAddress={projectSiteAddress}
+              onProjectSiteAddressChange={setProjectSiteAddress}
+              projectStatus={projectStatus}
+              onProjectStatusChange={setProjectStatus}
+              onSubmit={handleCreateProject}
             />
           </section>
         </div>

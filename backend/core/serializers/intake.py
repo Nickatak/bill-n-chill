@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
 from rest_framework import serializers
 
-from core.models import Customer
+from core.models import Customer, Project
 
 PHONE_ALLOWED_RE = re.compile(r"^[0-9+\-().\s]+$")
 
@@ -135,3 +135,23 @@ class CustomerSerializer(serializers.ModelSerializer):
             "is_archived",
             "created_at",
         ]
+
+
+class CustomerProjectCreateSerializer(serializers.Serializer):
+    name = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    site_address = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    status = serializers.ChoiceField(
+        choices=[
+            (Project.Status.PROSPECT, "Prospect"),
+            (Project.Status.ACTIVE, "Active"),
+        ],
+        required=False,
+        default=Project.Status.PROSPECT,
+    )
+    initial_contract_value = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        allow_null=True,
+        default=None,
+    )

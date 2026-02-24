@@ -18,6 +18,7 @@ from core.serializers.estimates import (
 )
 from core.serializers.intake import (
     CustomerIntakeQuickAddSerializer,
+    CustomerProjectCreateSerializer,
     CustomerSerializer,
     CustomerManageSerializer,
 )
@@ -56,6 +57,7 @@ __all__ = [
     "AccountingSyncEventWriteSerializer",
     "FinancialAuditEventSerializer",
     "CustomerIntakeQuickAddSerializer",
+    "CustomerProjectCreateSerializer",
     "CustomerSerializer",
     "CustomerManageSerializer",
     "ProjectSerializer",

@@ -240,8 +240,48 @@ class CustomerIntakeQuickAddTests(TestCase):
         self.assertEqual(payload["meta"]["conversion_status"], "converted")
         self.assertIsNotNone(payload["data"]["project"])
         project = Project.objects.get(id=payload["data"]["project"]["id"])
+        self.assertEqual(project.status, Project.Status.ACTIVE)
         self.assertEqual(payload["data"]["customer_intake"]["converted_project"], project.id)
         self.assertIsNotNone(payload["data"]["customer_intake"]["converted_customer"])
+        converted_record = LeadContactRecord.objects.filter(
+            intake_record_id=payload["data"]["customer_intake"]["id"],
+            event_type=LeadContactRecord.EventType.CONVERTED,
+        ).latest("id")
+        self.assertEqual(
+            converted_record.metadata_json.get("project_status_requested"),
+            Project.Status.ACTIVE,
+        )
+        self.assertEqual(
+            converted_record.metadata_json.get("project_status_created_as"),
+            Project.Status.PROSPECT,
+        )
+        self.assertEqual(
+            converted_record.metadata_json.get("project_status_final"),
+            Project.Status.ACTIVE,
+        )
+        self.assertEqual(
+            converted_record.metadata_json.get("project_status_transition"),
+            "prospect_to_active",
+        )
+
+    def test_quick_add_rejects_non_prospect_or_active_project_status(self):
+        response = self.client.post(
+            "/api/v1/customers/quick-add/",
+            data={
+                "full_name": "Jane Doe",
+                "phone": "555-0100",
+                "project_address": "123 Main St",
+                "create_project": True,
+                "project_name": "Kitchen Remodel",
+                "project_status": Project.Status.ON_HOLD,
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "validation_error")
+        self.assertIn("project_status", payload["error"]["fields"])
 
     def test_quick_add_rolls_back_when_record_capture_fails(self):
         with patch(

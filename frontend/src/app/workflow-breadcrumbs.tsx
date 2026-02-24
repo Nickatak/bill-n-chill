@@ -99,6 +99,13 @@ const hierarchyRules: HierarchyRule[] = [
     ],
   },
   {
+    when: (pathname) => pathname === "/ops/organization",
+    crumbs: [
+      META_HUB_CRUMB,
+      { href: "/ops/organization", label: "Organization" },
+    ],
+  },
+  {
     when: (pathname) => pathname === "/customers",
     crumbs: [
       META_HUB_CRUMB,

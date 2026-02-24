@@ -28,6 +28,7 @@ from core.views.estimating.estimates import (
     project_estimates_view,
 )
 from core.views.shared_operations.intake import (
+    customer_project_create_view,
     customer_detail_view,
     customers_list_view,
     quick_add_customer_intake_view,
@@ -73,6 +74,7 @@ __all__ = [
     "quick_add_customer_intake_view",
     "customers_list_view",
     "customer_detail_view",
+    "customer_project_create_view",
     "projects_list_view",
     "project_detail_view",
     "project_financial_summary_view",

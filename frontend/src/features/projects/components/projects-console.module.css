@@ -21,6 +21,28 @@
   color: var(--text-primary);
 }
 
+.statusMessage {
+  margin-top: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.9rem;
+}
+
+.statusMessageSuccess {
+  border-color: #16a34a;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.statusMessageError {
+  border-color: #dc2626;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 .searchEmpty {
   margin-top: 8px;
   color: var(--text-secondary);
@@ -239,6 +261,24 @@
   background: #0b1220;
   border-color: #334155;
   color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .statusMessage {
+  border-color: #334155;
+  background: #0f172a;
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .statusMessageSuccess {
+  border-color: #22c55e;
+  background: rgba(20, 83, 45, 0.45);
+  color: #bbf7d0;
+}
+
+:global(html[data-theme="dark"]) .statusMessageError {
+  border-color: #ef4444;
+  background: rgba(127, 29, 29, 0.45);
+  color: #fecaca;
 }
 
 :global(html[data-theme="dark"]) .projectFiltersLabel {

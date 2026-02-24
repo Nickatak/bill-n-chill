@@ -294,6 +294,110 @@ class ContactsManagementTests(TestCase):
         )
         self.assertEqual(response.status_code, 404)
 
+    def test_customer_project_create_creates_project_for_customer(self):
+        response = self.client.post(
+            f"/api/v1/customers/{self.customer.id}/projects/",
+            data={
+                "name": "Kitchen Refresh",
+                "site_address": "101 Oak Ave",
+                "status": Project.Status.PROSPECT,
+                "initial_contract_value": "25000.00",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["data"]
+        self.assertEqual(payload["customer"]["id"], self.customer.id)
+        self.assertEqual(payload["project"]["name"], "Kitchen Refresh")
+        self.assertEqual(payload["project"]["customer"], self.customer.id)
+        self.assertEqual(payload["project"]["status"], Project.Status.PROSPECT)
+
+        created_project = Project.objects.get(id=payload["project"]["id"])
+        self.assertEqual(created_project.created_by_id, self.user.id)
+        self.assertEqual(str(created_project.contract_value_original), "25000.00")
+        self.assertEqual(str(created_project.contract_value_current), "25000.00")
+
+    def test_customer_project_create_allows_same_org_customer(self):
+        shared_org = Organization.objects.create(
+            display_name="Shared Customer Project Org",
+            slug="shared-customer-project-org",
+            created_by=self.user,
+        )
+        OrganizationMembership.objects.update_or_create(
+            user=self.user,
+            defaults={
+                "organization": shared_org,
+                "role": OrganizationMembership.Role.OWNER,
+                "status": OrganizationMembership.Status.ACTIVE,
+            },
+        )
+        OrganizationMembership.objects.update_or_create(
+            user=self.other,
+            defaults={
+                "organization": shared_org,
+                "role": OrganizationMembership.Role.PM,
+                "status": OrganizationMembership.Status.ACTIVE,
+            },
+        )
+
+        response = self.client.post(
+            f"/api/v1/customers/{self.other_customer.id}/projects/",
+            data={"name": "Shared Org Project"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        project_id = response.json()["data"]["project"]["id"]
+        project = Project.objects.get(id=project_id)
+        self.assertEqual(project.customer_id, self.other_customer.id)
+        self.assertEqual(project.created_by_id, self.user.id)
+
+    def test_customer_project_create_rejects_active_project_for_archived_customer(self):
+        self.customer.is_archived = True
+        self.customer.save(update_fields=["is_archived", "updated_at"])
+
+        response = self.client.post(
+            f"/api/v1/customers/{self.customer.id}/projects/",
+            data={"name": "Archived Guard", "status": Project.Status.ACTIVE},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "validation_error")
+        self.assertIn("status", payload["error"]["fields"])
+
+    def test_customer_project_create_rejects_non_prospect_or_active_status(self):
+        response = self.client.post(
+            f"/api/v1/customers/{self.customer.id}/projects/",
+            data={"name": "Invalid Create Status", "status": Project.Status.ON_HOLD},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertIn("status", payload)
+
+    def test_customer_project_create_active_requests_transition_from_prospect(self):
+        response = self.client.post(
+            f"/api/v1/customers/{self.customer.id}/projects/",
+            data={"name": "Immediate Active", "status": Project.Status.ACTIVE},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["data"]
+        project = Project.objects.get(id=payload["project"]["id"])
+        self.assertEqual(project.status, Project.Status.ACTIVE)
+
+        record = CustomerRecord.objects.filter(customer_id=self.customer.id).latest("id")
+        self.assertEqual(record.event_type, CustomerRecord.EventType.UPDATED)
+        self.assertEqual(record.metadata_json.get("project_status_requested"), Project.Status.ACTIVE)
+        self.assertEqual(record.metadata_json.get("project_status_created_as"), Project.Status.PROSPECT)
+        self.assertEqual(record.metadata_json.get("project_status_final"), Project.Status.ACTIVE)
+        self.assertEqual(record.metadata_json.get("project_status_transition"), "prospect_to_active")
+
     def test_contact_delete_not_allowed(self):
         response = self.client.delete(
             f"/api/v1/customers/{self.customer.id}/",

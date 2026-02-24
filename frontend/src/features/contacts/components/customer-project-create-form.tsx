@@ -1,0 +1,74 @@
+"use client";
+
+import { FormEventHandler } from "react";
+
+import styles from "./contacts-console.module.css";
+
+type ProjectStatusValue = "prospect" | "active" | "on_hold" | "completed" | "cancelled";
+
+type CustomerProjectCreateFormProps = {
+  customerName: string;
+  projectName: string;
+  onProjectNameChange: (value: string) => void;
+  projectSiteAddress: string;
+  onProjectSiteAddressChange: (value: string) => void;
+  projectStatus: ProjectStatusValue;
+  onProjectStatusChange: (value: ProjectStatusValue) => void;
+  onSubmit: FormEventHandler<HTMLFormElement>;
+};
+
+export function CustomerProjectCreateForm({
+  customerName,
+  projectName,
+  onProjectNameChange,
+  projectSiteAddress,
+  onProjectSiteAddressChange,
+  projectStatus,
+  onProjectStatusChange,
+  onSubmit,
+}: CustomerProjectCreateFormProps) {
+  return (
+    <form className={styles.editorForm} onSubmit={onSubmit}>
+      <header className={styles.panelHeader}>
+        <h3 className={styles.panelTitle}>Create Project</h3>
+        <p className={styles.panelSubtle}>Creating for {customerName}.</p>
+      </header>
+
+      <label className={styles.field}>
+        Project name
+        <input
+          value={projectName}
+          onChange={(event) => onProjectNameChange(event.target.value)}
+          required
+        />
+      </label>
+      <label className={styles.field}>
+        Site address
+        <input
+          value={projectSiteAddress}
+          onChange={(event) => onProjectSiteAddressChange(event.target.value)}
+          placeholder="Optional"
+        />
+      </label>
+      <label className={styles.field}>
+        Status
+        <select
+          value={projectStatus}
+          onChange={(event) => onProjectStatusChange(event.target.value as ProjectStatusValue)}
+        >
+          <option value="prospect">Prospect</option>
+          <option value="active">Active</option>
+          <option value="on_hold">On Hold</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </label>
+
+      <div className={styles.actionRow}>
+        <button className={styles.primaryButton} type="submit">
+          Create Project
+        </button>
+      </div>
+    </form>
+  );
+}
