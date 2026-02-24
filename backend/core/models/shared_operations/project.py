@@ -96,6 +96,12 @@ class Project(models.Model):
     def clean(self):
         errors = {}
 
+        if self.status in {self.Status.ACTIVE, self.Status.ON_HOLD} and self.customer_id is not None:
+            if self.customer.is_archived:
+                errors.setdefault("status", []).append(
+                    "Cannot set project to active or on hold while customer is archived."
+                )
+
         if (
             self.start_date_planned
             and self.end_date_planned

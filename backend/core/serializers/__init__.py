@@ -18,6 +18,7 @@ from core.serializers.estimates import (
 )
 from core.serializers.intake import (
     CustomerSerializer,
+    CustomerManageSerializer,
     LeadContactManageSerializer,
     LeadContactQuickAddSerializer,
     LeadConvertSerializer,
@@ -60,6 +61,7 @@ __all__ = [
     "LeadContactManageSerializer",
     "LeadConvertSerializer",
     "CustomerSerializer",
+    "CustomerManageSerializer",
     "ProjectSerializer",
     "ProjectProfileSerializer",
     "ProjectFinancialSummarySerializer",

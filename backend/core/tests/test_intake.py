@@ -179,13 +179,12 @@ class LeadContactQuickAddTests(TestCase):
         self.assertEqual(response.json()["data"]["id"], existing.id)
         self.assertEqual(response.json()["meta"]["duplicate_resolution"], "use_existing")
 
-    def test_quick_add_merge_existing_updates_existing_record_without_creating(self):
+    def test_quick_add_merge_existing_is_rejected(self):
         existing = LeadContact.objects.create(
             full_name="Existing Contact",
             phone="555-0100",
             project_address="12 Existing St",
             email="existing@example.com",
-            notes="Old note",
             created_by=self.user,
         )
         response = self.client.post(
@@ -195,23 +194,16 @@ class LeadContactQuickAddTests(TestCase):
                 "phone": "555-0100",
                 "project_address": "123 Main St",
                 "email": "existing@example.com",
-                "notes": "New note",
                 "duplicate_resolution": "merge_existing",
                 "duplicate_target_id": existing.id,
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(LeadContact.objects.count(), 1)
-        existing.refresh_from_db()
-        self.assertEqual(existing.full_name, "Jane Doe")
-        self.assertEqual(existing.project_address, "123 Main St")
-        self.assertIn("Old note", existing.notes)
-        self.assertIn("New note", existing.notes)
-        record = LeadContactRecord.objects.get(lead_contact_id=existing.id)
-        self.assertEqual(record.event_type, LeadContactRecord.EventType.UPDATED)
-        self.assertEqual(record.capture_source, LeadContactRecord.CaptureSource.MANUAL_UI)
+        self.assertEqual(response.status_code, 409)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "duplicate_detected")
+        self.assertNotIn("merge_existing", payload["data"]["allowed_resolutions"])
 
     def test_quick_add_rolls_back_when_record_capture_fails(self):
         with patch(
@@ -364,3 +356,30 @@ class LeadConversionTests(TestCase):
         self.assertEqual(project.customer_id, existing_customer.id)
         self.assertEqual(project.site_address, "321 Build St")
         self.assertEqual(existing_customer.billing_address, "777 Billing Blvd")
+
+    def test_convert_rejects_active_project_creation_for_archived_customer(self):
+        existing_customer = Customer.objects.create(
+            display_name="Owner Name",
+            email="owner@example.com",
+            phone="555-9999",
+            billing_address="777 Billing Blvd",
+            is_archived=True,
+            created_by=self.user,
+        )
+
+        response = self.client.post(
+            f"/api/v1/lead-contacts/{self.lead.id}/convert-to-project/",
+            data={"project_name": "Blocked Project", "project_status": "active"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "validation_error")
+        self.assertIn("status", payload["error"]["fields"])
+
+        self.lead.refresh_from_db()
+        self.assertIsNone(self.lead.converted_project_id)
+        self.assertIsNone(self.lead.converted_customer_id)
+        self.assertEqual(Project.objects.count(), 0)
+        self.assertEqual(Customer.objects.filter(id=existing_customer.id).count(), 1)

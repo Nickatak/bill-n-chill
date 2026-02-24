@@ -2,8 +2,10 @@
 
 import re
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
+from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -11,8 +13,8 @@ from rest_framework.response import Response
 
 from core.models import Customer, CustomerRecord, LeadContact, LeadContactRecord, Project
 from core.serializers import (
+    CustomerManageSerializer,
     CustomerSerializer,
-    LeadContactManageSerializer,
     LeadContactQuickAddSerializer,
     LeadConvertSerializer,
     ProjectSerializer,
@@ -79,6 +81,7 @@ def _build_customer_snapshot(customer: Customer) -> dict:
             "email": customer.email,
             "phone": customer.phone,
             "billing_address": customer.billing_address,
+            "is_archived": customer.is_archived,
             "created_by_id": customer.created_by_id,
             "created_at": customer.created_at.isoformat() if customer.created_at else None,
             "updated_at": customer.updated_at.isoformat() if customer.updated_at else None,
@@ -137,36 +140,69 @@ def _record_customer_record(
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def contacts_list_view(request):
-    """List user-owned lead contacts with optional free-text filtering."""
-    rows = LeadContact.objects.filter(created_by=request.user).order_by("-created_at")
+    """List user-owned customers with optional free-text filtering."""
+    rows = (
+        Customer.objects.filter(created_by=request.user)
+        .annotate(
+            project_count=Count(
+                "projects",
+                filter=~Q(projects__status=Project.Status.PROSPECT),
+                distinct=True,
+            ),
+            active_project_count=Count(
+                "projects",
+                filter=Q(projects__status__in=[Project.Status.ACTIVE, Project.Status.ON_HOLD]),
+                distinct=True,
+            ),
+        )
+        .order_by("-created_at")
+    )
     query = (request.query_params.get("q") or "").strip()
     if query:
         rows = rows.filter(
-            Q(full_name__icontains=query)
+            Q(display_name__icontains=query)
             | Q(phone__icontains=query)
             | Q(email__icontains=query)
-            | Q(project_address__icontains=query)
+            | Q(billing_address__icontains=query)
         )
-    return Response({"data": LeadContactManageSerializer(rows, many=True).data})
+    data = CustomerManageSerializer(rows, many=True).data
+    for row in data:
+        row["has_project"] = row["project_count"] > 0
+        row["has_active_or_on_hold_project"] = row["active_project_count"] > 0
+    return Response({"data": data})
 
 
 @api_view(["GET", "PATCH", "DELETE"])
 @permission_classes([IsAuthenticated])
 def contact_detail_view(request, contact_id: int):
-    """Fetch, update, or delete a lead contact with immutable record capture on writes.
+    """Fetch, update, or delete a customer with immutable record capture on writes.
 
     Contract:
-    - `PATCH`: appends `LeadContactRecord(updated|status_changed)` in-transaction.
-    - `DELETE`: appends `LeadContactRecord(deleted)` before delete in-transaction.
+    - `PATCH`: appends `CustomerRecord(updated)` in-transaction.
+    - `DELETE`: appends `CustomerRecord(deleted)` before delete in-transaction.
     """
-    try:
-        contact = LeadContact.objects.get(id=contact_id, created_by=request.user)
-    except LeadContact.DoesNotExist:
+    contact = (
+        Customer.objects.filter(id=contact_id, created_by=request.user)
+        .annotate(
+            project_count=Count(
+                "projects",
+                filter=~Q(projects__status=Project.Status.PROSPECT),
+                distinct=True,
+            ),
+            active_project_count=Count(
+                "projects",
+                filter=Q(projects__status__in=[Project.Status.ACTIVE, Project.Status.ON_HOLD]),
+                distinct=True,
+            ),
+        )
+        .first()
+    )
+    if contact is None:
         return Response(
             {
                 "error": {
                     "code": "not_found",
-                    "message": "Contact not found.",
+                    "message": "Customer not found.",
                     "fields": {},
                 }
             },
@@ -174,46 +210,83 @@ def contact_detail_view(request, contact_id: int):
         )
 
     if request.method == "GET":
-        return Response({"data": LeadContactManageSerializer(contact).data})
+        payload = CustomerManageSerializer(contact).data
+        payload["has_project"] = payload["project_count"] > 0
+        payload["has_active_or_on_hold_project"] = payload["active_project_count"] > 0
+        return Response({"data": payload})
 
     if request.method == "DELETE":
-        with transaction.atomic():
-            _record_lead_contact_record(
-                lead=contact,
-                event_type=LeadContactRecord.EventType.DELETED,
-                capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
-                recorded_by=request.user,
-                note="Lead contact deleted.",
+        try:
+            with transaction.atomic():
+                _record_customer_record(
+                    customer=contact,
+                    event_type=CustomerRecord.EventType.DELETED,
+                    capture_source=CustomerRecord.CaptureSource.MANUAL_UI,
+                    recorded_by=request.user,
+                    note="Customer deleted.",
+                )
+                contact.delete()
+        except ProtectedError:
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "Cannot delete customer while projects still reference it.",
+                        "fields": {"id": ["Delete or reassign linked projects first."]},
+                    }
+                },
+                status=400,
             )
-            contact.delete()
         return Response(status=204)
 
     with transaction.atomic():
         previous_is_archived = contact.is_archived
-        serializer = LeadContactManageSerializer(contact, data=request.data, partial=True)
+        serializer = CustomerManageSerializer(contact, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        if contact.is_archived != previous_is_archived:
-            _record_lead_contact_record(
-                lead=contact,
-                event_type=LeadContactRecord.EventType.STATUS_CHANGED,
-                capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
-                recorded_by=request.user,
-                note="Lead contact archive state changed.",
-                metadata={
-                    "from_is_archived": previous_is_archived,
-                    "to_is_archived": contact.is_archived,
-                },
-            )
-        else:
-            _record_lead_contact_record(
-                lead=contact,
-                event_type=LeadContactRecord.EventType.UPDATED,
-                capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
-                recorded_by=request.user,
-                note="Lead contact updated.",
-            )
-    return Response({"data": LeadContactManageSerializer(contact).data})
+        try:
+            serializer.save()
+        except DjangoValidationError as exc:
+            if hasattr(exc, "message_dict"):
+                return Response(exc.message_dict, status=400)
+            return Response({"non_field_errors": exc.messages}, status=400)
+        _record_customer_record(
+            customer=contact,
+            event_type=CustomerRecord.EventType.UPDATED,
+            capture_source=CustomerRecord.CaptureSource.MANUAL_UI,
+            recorded_by=request.user,
+            note=(
+                "Customer archive state changed."
+                if contact.is_archived != previous_is_archived
+                else "Customer updated."
+            ),
+            metadata={
+                "from_is_archived": previous_is_archived,
+                "to_is_archived": contact.is_archived,
+            }
+            if contact.is_archived != previous_is_archived
+            else {},
+        )
+
+    refreshed = (
+        Customer.objects.filter(id=contact.id, created_by=request.user)
+        .annotate(
+            project_count=Count(
+                "projects",
+                filter=~Q(projects__status=Project.Status.PROSPECT),
+                distinct=True,
+            ),
+            active_project_count=Count(
+                "projects",
+                filter=Q(projects__status__in=[Project.Status.ACTIVE, Project.Status.ON_HOLD]),
+                distinct=True,
+            ),
+        )
+        .first()
+    )
+    payload = CustomerManageSerializer(refreshed).data
+    payload["has_project"] = payload["project_count"] > 0
+    payload["has_active_or_on_hold_project"] = payload["active_project_count"] > 0
+    return Response({"data": payload})
 
 
 @api_view(["POST"])
@@ -222,8 +295,8 @@ def quick_add_lead_contact_view(request):
     """Create a lead quickly, with duplicate resolution flow and immutable capture rows.
 
     Contract:
-    - Supports duplicate resolutions: `use_existing|merge_existing|create_anyway`.
-    - Create/merge writes append immutable `LeadContactRecord` rows atomically.
+    - Supports duplicate resolutions: `use_existing|create_anyway`.
+    - Create writes append immutable `LeadContactRecord` rows atomically.
     """
     initial_contract_value = request.data.get("initial_contract_value", None)
     if initial_contract_value == "":
@@ -257,7 +330,6 @@ def quick_add_lead_contact_view(request):
 
     if duplicates and duplicate_resolution not in {
         "use_existing",
-        "merge_existing",
         "create_anyway",
     }:
         candidates = LeadContactQuickAddSerializer(duplicates, many=True).data
@@ -272,7 +344,6 @@ def quick_add_lead_contact_view(request):
                     "duplicate_candidates": candidates,
                     "allowed_resolutions": [
                         "use_existing",
-                        "merge_existing",
                         "create_anyway",
                     ],
                 },
@@ -280,7 +351,7 @@ def quick_add_lead_contact_view(request):
             status=409,
         )
 
-    if duplicates and duplicate_resolution in {"use_existing", "merge_existing"}:
+    if duplicates and duplicate_resolution == "use_existing":
         try:
             target_id = int(duplicate_target_id)
         except (TypeError, ValueError):
@@ -312,33 +383,6 @@ def quick_add_lead_contact_view(request):
             )
 
         target = next(lead for lead in duplicates if lead.id == target_id)
-
-        if duplicate_resolution == "merge_existing":
-            with transaction.atomic():
-                if payload["full_name"]:
-                    target.full_name = payload["full_name"]
-                if payload["phone"]:
-                    target.phone = payload["phone"]
-                if payload["project_address"]:
-                    target.project_address = payload["project_address"]
-                if payload["email"]:
-                    target.email = payload["email"]
-                if payload.get("initial_contract_value") is not None:
-                    target.initial_contract_value = payload["initial_contract_value"]
-                target.source = payload["source"] or target.source
-                if payload["notes"]:
-                    if target.notes:
-                        target.notes = f"{target.notes}\n{payload['notes']}"
-                    else:
-                        target.notes = payload["notes"]
-                target.save()
-                _record_lead_contact_record(
-                    lead=target,
-                    event_type=LeadContactRecord.EventType.UPDATED,
-                    capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
-                    recorded_by=request.user,
-                    note="Lead contact merged with duplicate payload.",
-                )
 
         return Response(
             {
@@ -417,80 +461,103 @@ def convert_lead_to_project_view(request, lead_id: int):
             status=400,
         )
 
-    with transaction.atomic():
-        customer = None
-        email = (lead.email or "").strip().lower()
-        if email:
-            customer = (
-                Customer.objects.filter(created_by=request.user, email__iexact=email)
-                .order_by("-created_at")
-                .first()
-            )
-        if not customer and lead.phone:
-            customer = (
-                Customer.objects.filter(created_by=request.user, phone=lead.phone)
-                .order_by("-created_at")
-                .first()
-            )
+    try:
+        with transaction.atomic():
+            customer = None
+            email = (lead.email or "").strip().lower()
+            if email:
+                customer = (
+                    Customer.objects.filter(created_by=request.user, email__iexact=email)
+                    .order_by("-created_at")
+                    .first()
+                )
+            if not customer and lead.phone:
+                customer = (
+                    Customer.objects.filter(created_by=request.user, phone=lead.phone)
+                    .order_by("-created_at")
+                    .first()
+                )
 
-        if not customer:
-            customer = Customer.objects.create(
-                display_name=lead.full_name,
-                email=lead.email,
-                phone=lead.phone,
-                billing_address=lead.project_address,
+            if not customer:
+                customer = Customer.objects.create(
+                    display_name=lead.full_name,
+                    email=lead.email,
+                    phone=lead.phone,
+                    billing_address=lead.project_address,
+                    created_by=request.user,
+                )
+                _record_customer_record(
+                    customer=customer,
+                    event_type=CustomerRecord.EventType.CREATED,
+                    capture_source=CustomerRecord.CaptureSource.MANUAL_UI,
+                    recorded_by=request.user,
+                    note="Customer created from lead conversion.",
+                )
+            elif not (customer.display_name or "").strip():
+                customer.display_name = lead.full_name
+                customer.save(update_fields=["display_name", "updated_at"])
+                _record_customer_record(
+                    customer=customer,
+                    event_type=CustomerRecord.EventType.UPDATED,
+                    capture_source=CustomerRecord.CaptureSource.MANUAL_UI,
+                    recorded_by=request.user,
+                    note="Customer display name updated from lead conversion.",
+                )
+
+            project_name = data.get("project_name") or f"{lead.full_name} Project"
+            project = Project.objects.create(
+                customer=customer,
+                name=project_name,
+                site_address=lead.project_address,
+                status=data.get("project_status", Project.Status.PROSPECT),
+                contract_value_original=lead.initial_contract_value or 0,
+                contract_value_current=lead.initial_contract_value or 0,
                 created_by=request.user,
             )
-            _record_customer_record(
-                customer=customer,
-                event_type=CustomerRecord.EventType.CREATED,
-                capture_source=CustomerRecord.CaptureSource.MANUAL_UI,
-                recorded_by=request.user,
-                note="Customer created from lead conversion.",
-            )
-        elif not (customer.display_name or "").strip():
-            customer.display_name = lead.full_name
-            customer.save(update_fields=["display_name", "updated_at"])
-            _record_customer_record(
-                customer=customer,
-                event_type=CustomerRecord.EventType.UPDATED,
-                capture_source=CustomerRecord.CaptureSource.MANUAL_UI,
-                recorded_by=request.user,
-                note="Customer display name updated from lead conversion.",
-            )
 
-        project_name = data.get("project_name") or f"{lead.full_name} Project"
-        project = Project.objects.create(
-            customer=customer,
-            name=project_name,
-            site_address=lead.project_address,
-            status=data.get("project_status", Project.Status.PROSPECT),
-            contract_value_original=lead.initial_contract_value or 0,
-            contract_value_current=lead.initial_contract_value or 0,
-            created_by=request.user,
-        )
-
-        lead.converted_customer = customer
-        lead.converted_project = project
-        lead.converted_at = timezone.now()
-        lead.save(
-            update_fields=[
-                "converted_customer",
-                "converted_project",
-                "converted_at",
-                "updated_at",
-            ]
-        )
-        _record_lead_contact_record(
-            lead=lead,
-            event_type=LeadContactRecord.EventType.CONVERTED,
-            capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
-            recorded_by=request.user,
-            note="Lead converted to customer + project.",
-            metadata={
-                "converted_customer_id": customer.id,
-                "converted_project_id": project.id,
+            lead.converted_customer = customer
+            lead.converted_project = project
+            lead.converted_at = timezone.now()
+            lead.save(
+                update_fields=[
+                    "converted_customer",
+                    "converted_project",
+                    "converted_at",
+                    "updated_at",
+                ]
+            )
+            _record_lead_contact_record(
+                lead=lead,
+                event_type=LeadContactRecord.EventType.CONVERTED,
+                capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
+                recorded_by=request.user,
+                note="Lead converted to customer + project.",
+                metadata={
+                    "converted_customer_id": customer.id,
+                    "converted_project_id": project.id,
+                },
+            )
+    except DjangoValidationError as exc:
+        if hasattr(exc, "message_dict"):
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "Project creation failed validation.",
+                        "fields": exc.message_dict,
+                    }
+                },
+                status=400,
+            )
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Project creation failed validation.",
+                    "fields": {"non_field_errors": exc.messages},
+                }
             },
+            status=400,
         )
 
     return Response(

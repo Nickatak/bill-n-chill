@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from io import StringIO
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import HttpResponse
 from django.utils import timezone as django_timezone
 from rest_framework.decorators import api_view, permission_classes
@@ -327,7 +328,30 @@ def project_detail_view(request, project_id: int):
             },
             status=400,
         )
-    serializer.save()
+    try:
+        serializer.save()
+    except DjangoValidationError as exc:
+        if hasattr(exc, "message_dict"):
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "Project update failed validation.",
+                        "fields": exc.message_dict,
+                    }
+                },
+                status=400,
+            )
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Project update failed validation.",
+                    "fields": {"non_field_errors": exc.messages},
+                }
+            },
+            status=400,
+        )
     return Response({"data": ProjectProfileSerializer(project).data})
 
 

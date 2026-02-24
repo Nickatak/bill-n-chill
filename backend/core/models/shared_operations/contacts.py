@@ -152,6 +152,7 @@ class Customer(models.Model):
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=50, blank=True)
     billing_address = models.CharField(max_length=255, blank=True)
+    is_archived = models.BooleanField(default=False)
     created_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -162,6 +163,25 @@ class Customer(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+    def clean(self):
+        errors = {}
+
+        if self.is_archived and self.pk:
+            has_blocking_project = self.projects.filter(
+                status__in=["active", "on_hold"]
+            ).exists()
+            if has_blocking_project:
+                errors.setdefault("is_archived", []).append(
+                    "Cannot archive customer while a project is active or on hold."
+                )
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return self.display_name

@@ -155,7 +155,64 @@ class LeadConvertSerializer(serializers.Serializer):
     )
 
 
+class CustomerManageSerializer(serializers.ModelSerializer):
+    project_count = serializers.IntegerField(read_only=True)
+    active_project_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Customer
+        fields = [
+            "id",
+            "display_name",
+            "email",
+            "phone",
+            "billing_address",
+            "is_archived",
+            "project_count",
+            "active_project_count",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "project_count",
+            "active_project_count",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate(self, attrs):
+        current_phone = ""
+        current_email = ""
+        if self.instance is not None:
+            current_phone = self.instance.phone or ""
+            current_email = self.instance.email or ""
+
+        phone = (attrs.get("phone", current_phone) or "").strip()
+        email = (attrs.get("email", current_email) or "").strip()
+
+        if not phone and not email:
+            raise serializers.ValidationError(
+                {
+                    "phone": ["Provide phone or email."],
+                    "email": ["Provide phone or email."],
+                }
+            )
+
+        attrs["phone"] = phone
+        attrs["email"] = email.lower() if email else ""
+        return attrs
+
+
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
-        fields = ["id", "display_name", "email", "phone", "billing_address", "created_at"]
+        fields = [
+            "id",
+            "display_name",
+            "email",
+            "phone",
+            "billing_address",
+            "is_archived",
+            "created_at",
+        ]

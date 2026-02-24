@@ -21,6 +21,7 @@ class CustomerRecord(models.Model):
     class EventType(models.TextChoices):
         CREATED = "created", "Created"
         UPDATED = "updated", "Updated"
+        DELETED = "deleted", "Deleted"
 
     class CaptureSource(models.TextChoices):
         MANUAL_UI = "manual_ui", "Manual UI"
