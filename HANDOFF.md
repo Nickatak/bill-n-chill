@@ -1,138 +1,112 @@
-# HANDOFF - 2026-02-23
+# HANDOFF - 2026-02-24
 
 ## Session State
 
 - Workspace: `/home/nick/bill_n_chill`
 - Branch: `main`
-- Current HEAD: `20b187d`
-- Worktree: dirty (intentionally; large frontend refactor/docs pass not committed yet)
-- User context: finished for the night after frontend architecture cleanup and pattern enforcement.
+- Current HEAD: `fd849aa`
+- Branch relation: `main` is ahead of `origin/main` by 1 commit
+- Worktree: clean
 
-## What Was Completed This Session
+## Milestone Delivered
 
-### 1) Frontend architecture pattern finalized and enforced
+### 1) Organization context is now first-class in frontend auth/session
 
-We standardized and documented these rules:
+- Session shape includes organization data (`id`, `displayName`, `slug`).
+- Shared auth hook exposes organization context.
+- Login/register/auth-me flows persist organization context.
+- Authenticated frontend requests now use shared auth header builder:
+  - `Authorization: Token ...`
+  - `X-Organization-Id`
+  - `X-Organization-Slug`
+- New helper module added:
+  - `frontend/src/features/session/auth-headers.ts`
 
-1. **Route Shim Policy**
-   - `src/app/**/page.tsx` should be thin route/layout shims only.
-   - No workflow orchestration or business mutation logic in route files.
+### 2) Frontend workflow/nav updated for org-oriented UX
 
-2. **Parent Controller API Policy**
-   - Feature parent component (`*Console`) consumes one `use<Feature>Controller` hook.
-   - Controller returns one explicit typed API object (`...ControllerApi`).
+- Organization badge shown in top controls when authenticated.
+- Breadcrumb hierarchy refactored:
+  - top-level root is Organization
+  - Meta routes are now under Organization, not under Projects
+  - shape now:
+    - `Organization / Projects / ...` for project workflow
+    - `Organization / Meta / ...` for ops/meta routes
+- Role checks were centralized and adopted where touched:
+  - `frontend/src/features/session/rbac.ts`
 
-3. **Function Style Convention**
-   - Top-level exported units: `function name(...) {}`
-   - Local callbacks/closures: `const name = (...) => {}`
+### 3) Backend loader/query scoping rolled out to organization-member scope
 
-### 2) Intake feature modularization completed
+Scope was updated from strict `created_by=request.user` to organization-member visibility in key routes using helper-layer org membership resolution.
 
-`frontend/src/features/intake/hooks/use-quick-add-controller.ts` was split by domain and now composes:
+Touched backend view layers include:
 
-- `frontend/src/features/intake/hooks/quick-add-controller.types.ts`
-- `frontend/src/features/intake/hooks/quick-add-validation.ts`
-- `frontend/src/features/intake/hooks/use-quick-add-auth-status.ts`
-- `frontend/src/features/intake/hooks/use-quick-add-business-workflow.ts`
-- `frontend/src/features/intake/hooks/use-quick-add-controller.ts` (parent composition)
+- `backend/core/views/helpers.py`
+- `backend/core/views/shared_operations/projects.py`
+- `backend/core/views/shared_operations/intake.py`
+- `backend/core/views/shared_operations/accounting.py`
+- `backend/core/views/shared_operations/vendors.py`
+- `backend/core/views/shared_operations/cost_codes.py`
+- `backend/core/views/estimating/estimates.py`
+- `backend/core/views/estimating/budgets.py`
+- `backend/core/views/accounts_receivable/invoices.py`
+- `backend/core/views/cash_management/payments.py`
+- `backend/core/views/change_orders/change_orders.py`
+- `backend/core/views/accounts_payable/vendor_bills.py`
 
-`QuickAddConsole` now consumes explicit `controllerApi` naming.
+### 4) CORS fix for localhost frontend/backend and custom org headers
 
-### 3) New feature extraction to enforce pattern
+Addressed cross-origin preflight failures caused by org headers.
 
-`/settings/intake` route was converted to a true route shim and moved into feature layer:
+- Backend settings now allow:
+  - `http://localhost:3000`
+  - `http://127.0.0.1:3000`
+- CORS allowed headers include:
+  - `x-organization-id`
+  - `x-organization-slug`
+- Updated:
+  - `backend/config/settings.py`
+  - `.env.example`
+  - `docker-compose.yml`
 
-- New feature: `frontend/src/features/settings-intake/`
-  - `components/intake-settings-console.tsx`
-  - `hooks/use-intake-settings-controller.ts`
-  - `hooks/intake-settings-controller.types.ts`
-  - `index.ts`
-  - `FEATURE_MAP.md`
-- Route file now just mounts the console:
-  - `frontend/src/app/settings/intake/page.tsx`
+## Test and Validation Evidence
 
-### 4) Feature maps and docs standardized
+Frontend checks:
 
-- `frontend/src/features/FEATURE_MAP_TEMPLATE.md` finalized.
-- Feature maps were added/normalized across features (including intake and settings-intake).
-- Added/updated:
-  - `frontend/ARCHITECTURE_MAP.md`
-  - `frontend/README.md`
+- `npm run lint --prefix frontend` (pass)
+- `npm run build --prefix frontend` (pass)
 
-### 5) Route/dir cleanup in `src/app`
+Backend checks:
 
-- Deleted obsolete placeholder route:
-  - `frontend/src/app/budgets-placeholder/page.tsx`
-  - `frontend/src/app/budgets-placeholder/page.module.css`
-- Updated invalid project fallback in budget analytics route to `/projects`.
-- Removed orphan route directories with no pages:
-  - `frontend/src/app/budgets/`
-  - `frontend/src/app/estimates/[estimateId]/`
-  - `frontend/src/app/project-snapshot/[publicRef]/` and parent
-- Moved orphan stylesheet to actual route:
-  - `frontend/src/app/budgets/page.module.css`
-  - -> `frontend/src/app/projects/[projectId]/budgets/analytics/page.module.css`
+- `backend/.venv/bin/python backend/manage.py test core.tests.test_contacts_management.ContactsManagementTests core.tests.test_projects_cost_codes.ProjectProfileTests --keepdb --noinput` (pass)
+- `backend/.venv/bin/python backend/manage.py test core.tests.test_projects_cost_codes.CostCodeTests core.tests.test_vendors --keepdb --noinput` (pass)
+- `backend/.venv/bin/python backend/manage.py test core.tests.test_contacts_management core.tests.test_projects_cost_codes.ProjectProfileTests core.tests.test_estimates core.tests.test_invoices core.tests.test_payments core.tests.test_change_orders core.tests.test_budgets core.tests.test_vendor_bills core.tests.test_accounting_sync core.tests.test_vendors --keepdb --noinput` (pass, 165 tests)
+- `backend/.venv/bin/python -m compileall backend/core/views` (pass)
 
-### 6) VS Code workspace ergonomics
+## Commit Checkpoint
 
-- Set `explorer.compactFolders` to `false` in `.vscode/settings.json` to show full route segment folder chains.
-- User enabled built-in TS/JS language features extension; Go To Definition now works.
+- Commit created:
+  - `fd849aa feat: roll out organization-scoped workflow across app`
+- Scope:
+  - frontend org session + headers + nav/breadcrumb changes
+  - backend org-scoped loader/query rollout
+  - associated tests and docs updates
 
-## Validation Performed
+## Resume Point
 
-All checks passed after latest frontend changes:
+If resuming from a fresh context, start here:
 
-- `npm run lint --prefix frontend`
-- `npm run build --prefix frontend`
-
-(Executed multiple times through the refactor; final run also passed after route/dir cleanup.)
-
-## Template Repo Status (separate repo)
-
-Repo: `/home/nick/template`
-
-- Branch: `chore/cicd-shakedown`
-- Latest pushed commit: `8ba86e4`
-- Template worktree: clean
-
-Template includes:
-
-- Demo route-shim feature (`app/demo-feature` + `features/demo-feature/*`)
-- Controller API pattern + function-style policy documented
-- Demo feature map aligned to the same structure
-
-## Current Uncommitted Changes in `bill_n_chill`
-
-Major pending frontend files include:
-
-- `frontend/README.md`
-- `frontend/ARCHITECTURE_MAP.md` (new)
-- `frontend/src/features/FEATURE_MAP_TEMPLATE.md` (new)
-- all feature `FEATURE_MAP.md` files (new)
-- intake refactor files (console/form/hooks split)
-- settings-intake new feature files
-- route cleanup changes in `src/app`
-- `.vscode/settings.json`
-
-(See `git status --short` for exact list.)
-
-## Resume Point (next session)
-
-User ended while stepping through intake modularized hooks and was focused on:
-
-- `frontend/src/features/intake/hooks/use-quick-add-business-workflow.ts`
-
-Suggested first actions next session:
-
-1. Continue file-by-file review from `use-quick-add-business-workflow.ts`.
-2. Optionally do aggressive route cleanup of redirect-helper legacy routes (`/estimates`, `/vendor-bills`, `/expenses`) only if user confirms removal strategy.
-3. Batch commit/push the pending frontend work in `bill_n_chill` once user approves.
+1. Confirm local state:
+   - `git status -sb`
+   - `git log -1 --oneline`
+2. If desired, push milestone:
+   - `git push origin main`
+3. Smoke-test in browser:
+   - login/register on `localhost:3000`
+   - verify no CORS rejection against `localhost:8000`
+   - verify org root breadcrumb and org/meta breadcrumb hierarchy
+   - verify cross-user same-org visibility on projects/customers workflows
 
 ## Notes
 
 - No destructive git operations were used.
-- Template repo is already committed/pushed; only `bill_n_chill` remains uncommitted.
-- Temporary accepted tradeoff in intake auth flow:
-  - `/` home auth gate verifies `GET /auth/me/` before mounting authenticated intake.
-  - `QuickAddConsole` performs its own `GET /auth/me/` verification for standalone `/intake/quick-add` correctness.
-  - Duplicate verification overhead is intentionally accepted for now; defer shared-auth-context refactor until later.
+- Current state is intentionally commit-stable and clean for context cycling.
