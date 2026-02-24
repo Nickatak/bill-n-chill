@@ -23,7 +23,7 @@ class LeadContactQuickAddTests(TestCase):
         )
         self.assertEqual(response.status_code, 401)
 
-    def test_quick_add_creates_lead_contact_with_required_fields(self):
+    def test_quick_add_creates_customer_and_lead_provenance_with_required_fields(self):
         response = self.client.post(
             "/api/v1/lead-contacts/quick-add/",
             data={
@@ -37,12 +37,18 @@ class LeadContactQuickAddTests(TestCase):
         )
         self.assertEqual(response.status_code, 201)
         self.assertEqual(LeadContact.objects.count(), 1)
+        self.assertEqual(Customer.objects.count(), 1)
         lead = LeadContact.objects.first()
+        customer = Customer.objects.first()
         self.assertEqual(lead.created_by_id, self.user.id)
         self.assertEqual(lead.full_name, "Jane Doe")
+        self.assertEqual(customer.display_name, "Jane Doe")
+        self.assertEqual(customer.phone, "555-0100")
         record = LeadContactRecord.objects.get(lead_contact_id=lead.id)
         self.assertEqual(record.event_type, LeadContactRecord.EventType.CREATED)
         self.assertEqual(record.capture_source, LeadContactRecord.CaptureSource.MANUAL_UI)
+        customer_record = CustomerRecord.objects.get(customer_id=customer.id)
+        self.assertEqual(customer_record.event_type, CustomerRecord.EventType.CREATED)
 
     def test_quick_add_accepts_optional_initial_contract_value(self):
         response = self.client.post(
@@ -57,7 +63,7 @@ class LeadContactQuickAddTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 201)
-        lead = LeadContact.objects.get(id=response.json()["data"]["id"])
+        lead = LeadContact.objects.get(id=response.json()["data"]["lead_contact"]["id"])
         self.assertEqual(str(lead.initial_contract_value), "25000.00")
 
     def test_quick_add_allows_email_in_phone_field(self):
@@ -72,9 +78,12 @@ class LeadContactQuickAddTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 201)
-        lead = LeadContact.objects.get(id=response.json()["data"]["id"])
+        lead = LeadContact.objects.get(id=response.json()["data"]["lead_contact"]["id"])
+        customer = Customer.objects.get(id=response.json()["data"]["customer"]["id"])
         self.assertEqual(lead.phone, "")
         self.assertEqual(lead.email, "email-only@example.com")
+        self.assertEqual(customer.phone, "")
+        self.assertEqual(customer.email, "email-only@example.com")
 
     def test_quick_add_rejects_when_phone_and_email_are_missing(self):
         response = self.client.post(
@@ -106,10 +115,10 @@ class LeadContactQuickAddTests(TestCase):
         self.assertIn("phone", payload)
 
     def test_quick_add_returns_duplicate_candidates_without_resolution(self):
-        existing = LeadContact.objects.create(
-            full_name="Existing Contact",
+        existing = Customer.objects.create(
+            display_name="Existing Contact",
             phone="555-0100",
-            project_address="12 Existing St",
+            billing_address="12 Existing St",
             email="existing@example.com",
             created_by=self.user,
         )
@@ -129,11 +138,11 @@ class LeadContactQuickAddTests(TestCase):
         self.assertEqual(payload["error"]["code"], "duplicate_detected")
         self.assertEqual(payload["data"]["duplicate_candidates"][0]["id"], existing.id)
 
-    def test_quick_add_create_anyway_allows_duplicate_creation(self):
-        LeadContact.objects.create(
-            full_name="Existing Contact",
+    def test_quick_add_create_anyway_allows_duplicate_customer_creation(self):
+        Customer.objects.create(
+            display_name="Existing Contact",
             phone="555-0100",
-            project_address="12 Existing St",
+            billing_address="12 Existing St",
             email="existing@example.com",
             created_by=self.user,
         )
@@ -150,14 +159,15 @@ class LeadContactQuickAddTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(LeadContact.objects.count(), 2)
+        self.assertEqual(LeadContact.objects.count(), 1)
+        self.assertEqual(Customer.objects.count(), 2)
         self.assertEqual(response.json()["meta"]["duplicate_resolution"], "create_anyway")
 
-    def test_quick_add_use_existing_returns_existing_record_without_creating(self):
-        existing = LeadContact.objects.create(
-            full_name="Existing Contact",
+    def test_quick_add_use_existing_reuses_customer_and_still_records_intake_lead(self):
+        existing = Customer.objects.create(
+            display_name="Existing Contact",
             phone="555-0100",
-            project_address="12 Existing St",
+            billing_address="12 Existing St",
             email="existing@example.com",
             created_by=self.user,
         )
@@ -174,16 +184,18 @@ class LeadContactQuickAddTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 201)
         self.assertEqual(LeadContact.objects.count(), 1)
-        self.assertEqual(response.json()["data"]["id"], existing.id)
+        self.assertEqual(Customer.objects.count(), 1)
+        self.assertEqual(response.json()["data"]["customer"]["id"], existing.id)
         self.assertEqual(response.json()["meta"]["duplicate_resolution"], "use_existing")
+        self.assertEqual(response.json()["meta"]["customer_created"], False)
 
     def test_quick_add_merge_existing_is_rejected(self):
-        existing = LeadContact.objects.create(
-            full_name="Existing Contact",
+        existing = Customer.objects.create(
+            display_name="Existing Contact",
             phone="555-0100",
-            project_address="12 Existing St",
+            billing_address="12 Existing St",
             email="existing@example.com",
             created_by=self.user,
         )
@@ -205,6 +217,32 @@ class LeadContactQuickAddTests(TestCase):
         self.assertEqual(payload["error"]["code"], "duplicate_detected")
         self.assertNotIn("merge_existing", payload["data"]["allowed_resolutions"])
 
+    def test_quick_add_can_create_project_in_same_request(self):
+        response = self.client.post(
+            "/api/v1/lead-contacts/quick-add/",
+            data={
+                "full_name": "Jane Doe",
+                "phone": "555-0100",
+                "project_address": "123 Main St",
+                "create_project": True,
+                "project_name": "Kitchen Remodel",
+                "project_status": "active",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Customer.objects.count(), 1)
+        self.assertEqual(Project.objects.count(), 1)
+        payload = response.json()
+        self.assertEqual(payload["meta"]["conversion_status"], "converted")
+        self.assertIsNotNone(payload["data"]["project"])
+
+        lead = LeadContact.objects.get(id=payload["data"]["lead_contact"]["id"])
+        project = Project.objects.get(id=payload["data"]["project"]["id"])
+        self.assertEqual(lead.converted_project_id, project.id)
+        self.assertIsNotNone(lead.converted_customer_id)
+
     def test_quick_add_rolls_back_when_record_capture_fails(self):
         with patch(
             "core.views.shared_operations.intake._record_lead_contact_record",
@@ -223,6 +261,7 @@ class LeadContactQuickAddTests(TestCase):
                 )
 
         self.assertFalse(LeadContact.objects.filter(full_name="Rollback Lead").exists())
+        self.assertFalse(Customer.objects.filter(display_name="Rollback Lead").exists())
 
 
 class LeadConversionTests(TestCase):

@@ -2,12 +2,12 @@
 
 import { KeyboardEvent } from "react";
 
-import { LeadContactCandidate, LeadPayload } from "../types";
+import { DuplicateCustomerCandidate, LeadPayload } from "../types";
 import { DuplicateResolution, SubmitIntent } from "../hooks/quick-add-controller.types";
 import styles from "./quick-add-console.module.css";
 
 type DuplicateResolutionPanelProps = {
-  duplicateCandidates: LeadContactCandidate[];
+  duplicateCandidates: DuplicateCustomerCandidate[];
   selectedDuplicateId: string;
   duplicateMatchPayload: LeadPayload | null;
   duplicateResolutionIntent: SubmitIntent | null;
@@ -27,7 +27,7 @@ function normalized(value: string | null | undefined) {
   return (value ?? "").trim().toLowerCase();
 }
 
-function matchedFields(candidate: LeadContactCandidate, payload: LeadPayload | null) {
+function matchedFields(candidate: DuplicateCustomerCandidate, payload: LeadPayload | null) {
   if (!payload) {
     return [];
   }
@@ -39,12 +39,15 @@ function matchedFields(candidate: LeadContactCandidate, payload: LeadPayload | n
   if (normalized(payload.email) && normalized(candidate.email) === normalized(payload.email)) {
     matches.push("email");
   }
-  if (normalized(payload.full_name) && normalized(candidate.full_name) === normalized(payload.full_name)) {
+  if (
+    normalized(payload.full_name) &&
+    normalized(candidate.display_name) === normalized(payload.full_name)
+  ) {
     matches.push("name");
   }
   if (
     normalized(payload.project_address) &&
-    normalized(candidate.project_address) === normalized(payload.project_address)
+    normalized(candidate.billing_address) === normalized(payload.project_address)
   ) {
     matches.push("address");
   }
@@ -67,13 +70,13 @@ export function DuplicateResolutionPanel({
   const isProjectFlow = duplicateResolutionIntent === "contact_and_project";
   const resolveActionLabel = isProjectFlow
     ? "Use Existing Customer + Create Project"
-    : "Use Existing Contact";
+    : "Use Existing Customer";
   const createAnywayLabel = isProjectFlow
-    ? "Create New Contact + Project Anyway"
-    : "Create New Contact Anyway";
+    ? "Create New Customer + Project Anyway"
+    : "Create New Customer Anyway";
   const helperText = isProjectFlow
-    ? "Pick an existing customer for project creation, or create a new contact + project."
-    : "Pick an existing contact, or create a new contact anyway.";
+    ? "Pick an existing customer for project creation, or create a new customer + project."
+    : "Pick an existing customer, or create a new customer anyway.";
 
   return (
     <section className={styles.duplicatePanel} aria-label="Duplicate resolution">
@@ -109,7 +112,9 @@ export function DuplicateResolutionPanel({
             >
               <div className={styles.duplicateCardTopRow}>
                 <span className={styles.duplicateCardTitleWrap}>
-                  <span className={styles.duplicateCardTitle}>#{candidate.id}</span>
+                  <span className={styles.duplicateCardTitle}>
+                    #{candidate.id} {candidate.display_name}
+                  </span>
                 </span>
                 <button
                   type="button"
@@ -129,7 +134,7 @@ export function DuplicateResolutionPanel({
                   }`}
                 >
                   <span className={styles.duplicateFieldLabel}>Name</span>
-                  <span className={styles.duplicateCardMeta}>{candidate.full_name}</span>
+                  <span className={styles.duplicateCardMeta}>{candidate.display_name}</span>
                 </span>
                 <span
                   className={`${styles.duplicateFieldRow} ${
@@ -158,7 +163,7 @@ export function DuplicateResolutionPanel({
                 >
                   <span className={styles.duplicateFieldLabel}>Address</span>
                   <span className={styles.duplicateCardMeta}>
-                    {candidate.project_address || "No address captured"}
+                    {candidate.billing_address || "No address captured"}
                   </span>
                 </span>
                 <span className={styles.duplicateFieldRow}>

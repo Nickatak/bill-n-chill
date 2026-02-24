@@ -2,13 +2,14 @@
 
 import { FormEvent, RefObject, useState } from "react";
 
-import { postConvertLeadToProject, postQuickAddLead } from "../api";
+import { postQuickAddLead } from "../api";
 import {
   ApiResponse,
   DuplicateData,
-  LeadContactCandidate,
-  LeadConvertResult,
+  DuplicateCustomerCandidate,
+  LeadContactRecord,
   LeadPayload,
+  QuickAddResult,
 } from "../types";
 import {
   DuplicateResolution,
@@ -61,11 +62,11 @@ export function useQuickAddBusinessWorkflow({
   const [conversionMessage, setConversionMessage] = useState("");
   const [conversionMessageTone, setConversionMessageTone] = useState<QuickAddMessageTone>("neutral");
 
-  const [duplicateCandidates, setDuplicateCandidates] = useState<LeadContactCandidate[]>([]);
+  const [duplicateCandidates, setDuplicateCandidates] = useState<DuplicateCustomerCandidate[]>([]);
   const [selectedDuplicateId, setSelectedDuplicateId] = useState<string>("");
   const [pendingSubmission, setPendingSubmission] = useState<PendingSubmission | null>(null);
 
-  const [lastLead, setLastLead] = useState<LeadContactCandidate | null>(null);
+  const [lastLead, setLastLead] = useState<LeadContactRecord | null>(null);
   const [lastSubmissionIntent, setLastSubmissionIntent] = useState<SubmitIntent | null>(null);
   const [lastDuplicateResolution, setLastDuplicateResolution] = useState("none");
   const [lastConvertedCustomerId, setLastConvertedCustomerId] = useState<number | null>(null);
@@ -79,48 +80,6 @@ export function useQuickAddBusinessWorkflow({
     setLastConvertedProjectId(null);
   }
 
-  async function convertLeadToProject(leadId: number, name: string, status: string): Promise<{
-    ok: boolean;
-    customerId: number | null;
-    projectId: number | null;
-  }> {
-    setConversionMessage("Converting lead to customer + project...");
-    setConversionMessageTone("info");
-
-    const response = await postConvertLeadToProject({
-      baseUrl: normalizedBaseUrl,
-      token,
-      leadId,
-      projectName: name,
-      projectStatus: status,
-    });
-
-    const payload: ApiResponse = await response.json();
-    if (!response.ok) {
-      setConversionMessage(payload.error?.message ?? "Lead conversion failed.");
-      setConversionMessageTone("error");
-      return { ok: false, customerId: null, projectId: null };
-    }
-
-    const result = payload.data as LeadConvertResult;
-    const resultStatus = payload.meta?.conversion_status ?? "converted";
-    const customerId = typeof result.customer?.id === "number" ? result.customer.id : null;
-    const projectId = typeof result.project?.id === "number" ? result.project.id : null;
-    const successStatus = resultStatus === "converted" || resultStatus === "already_converted";
-
-    if (successStatus) {
-      setConversionMessage("");
-      setConversionMessageTone("neutral");
-      return { ok: true, customerId, projectId };
-    }
-
-    setConversionMessage(
-      `Conversion status: ${resultStatus.replaceAll("_", " ")}.`,
-    );
-    setConversionMessageTone("info");
-    return { ok: true, customerId, projectId };
-  }
-
   async function submitQuickAdd(
     body: LeadPayload,
     submission: PendingSubmission,
@@ -131,6 +90,9 @@ export function useQuickAddBusinessWorkflow({
       token,
       body: {
         ...body,
+        create_project: submission.intent === "contact_and_project",
+        project_name: submission.projectName,
+        project_status: submission.projectStatus,
         ...options,
       },
     });
@@ -153,44 +115,54 @@ export function useQuickAddBusinessWorkflow({
       return;
     }
 
-    const result = payload.data as LeadContactCandidate;
+    const result = payload.data as QuickAddResult;
     const resolution = payload.meta?.duplicate_resolution ?? "none";
+    const lead = result.lead_contact;
+    const customerId = typeof result.customer?.id === "number" ? result.customer.id : null;
+    const projectId = typeof result.project?.id === "number" ? result.project.id : null;
+
     setLeadMessage("");
     setDuplicateCandidates([]);
     setSelectedDuplicateId("");
     setPendingSubmission(null);
-    setLastLead(result);
+    setLastLead(lead);
     setLastSubmissionIntent(submission.intent);
     setLastDuplicateResolution(resolution);
+    setLastConvertedCustomerId(customerId);
+    setLastConvertedProjectId(projectId);
+    setConversionMessage("");
+    setConversionMessageTone("neutral");
 
-    let conversionSucceeded = true;
     if (submission.intent === "contact_and_project") {
-      const outcome = await convertLeadToProject(
-        result.id,
-        submission.projectName,
-        submission.projectStatus,
-      );
-      setLastConvertedCustomerId(outcome.customerId);
-      setLastConvertedProjectId(outcome.projectId);
-      conversionSucceeded = outcome.ok;
-      if (outcome.ok) {
-        setLeadMessage("Contact + project created.");
+      if (customerId !== null && projectId !== null) {
+        setLeadMessage("Customer + project created.");
         setLeadMessageTone("success");
       } else {
-        setLeadMessage("Contact saved, but project conversion failed.");
+        setLeadMessage("Customer was captured, but project creation did not complete.");
         setLeadMessageTone("error");
       }
     } else {
-      setConversionMessage("");
-      setConversionMessageTone("neutral");
-      setLastConvertedCustomerId(null);
-      setLastConvertedProjectId(null);
-      setLeadMessage("Contact created.");
-      setLeadMessageTone("success");
+      if (customerId !== null) {
+        setLeadMessage("Customer created.");
+        setLeadMessageTone("success");
+      } else {
+        setLeadMessage("Intake record saved, but customer creation did not complete.");
+        setLeadMessageTone("error");
+      }
     }
 
-    // Keep entered values when contact was created but conversion failed so the user can adjust and retry.
-    if (conversionSucceeded) {
+    const saveSucceeded = customerId !== null && (submission.intent === "contact_only" || projectId !== null);
+    if (!saveSucceeded) {
+      setConversionMessage(
+        submission.intent === "contact_and_project"
+          ? "Check project-required fields and try again."
+          : "Check required fields and try again.",
+      );
+      setConversionMessageTone("error");
+    }
+
+    // Keep entered values when persistence failed so the user can adjust and retry.
+    if (saveSucceeded) {
       setFullName("");
       setPhone("");
       setProjectAddress("");
@@ -212,7 +184,9 @@ export function useQuickAddBusinessWorkflow({
 
     clearLastSuccessState();
     setLeadMessage(
-      intent === "contact_only" ? "Submitting lead contact..." : "Creating contact + project...",
+      intent === "contact_only"
+        ? "Creating customer..."
+        : "Creating customer + project...",
     );
     setLeadMessageTone("info");
     setConversionMessage("");
@@ -252,7 +226,7 @@ export function useQuickAddBusinessWorkflow({
     try {
       await submitQuickAdd(payload, submission);
     } catch {
-      setLeadMessage("Lead submission failed due to an unexpected UI error.");
+      setLeadMessage("Quick add failed due to an unexpected UI error.");
       setLeadMessageTone("error");
     }
   }

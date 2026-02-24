@@ -1,6 +1,6 @@
 import { FormEvent, RefObject } from "react";
 
-import { LeadContactCandidate, LeadPayload } from "../types";
+import { DuplicateCustomerCandidate, LeadContactRecord, LeadPayload } from "../types";
 
 export type LeadFieldErrors = {
   full_name?: string;
@@ -52,12 +52,12 @@ export type QuickAddControllerApi = {
   projectStatus: string;
   setProjectStatus: (value: string) => void;
   fieldErrors: LeadFieldErrors;
-  duplicateCandidates: LeadContactCandidate[];
+  duplicateCandidates: DuplicateCustomerCandidate[];
   duplicateMatchPayload: LeadPayload | null;
   duplicateResolutionIntent: SubmitIntent | null;
   selectedDuplicateId: string;
   setSelectedDuplicateId: (value: string) => void;
-  lastLead: LeadContactCandidate | null;
+  lastLead: LeadContactRecord | null;
   handleQuickAdd: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   resolveDuplicate: (resolution: DuplicateResolution, targetId?: number) => Promise<void>;
 };

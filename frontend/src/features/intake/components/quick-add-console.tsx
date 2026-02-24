@@ -45,8 +45,7 @@ export function QuickAddConsole() {
     <section className={styles.section}>
       <h2>Intake: Quick Add</h2>
       <p>
-        Use this page to quickly log a new customer conversation and optionally create a project in
-        one step.
+        Use this page to quickly create a customer and optionally create a project in one step.
       </p>
       <p>
         If we detect a possible duplicate, pick how to resolve it so we do not create overlapping
@@ -54,7 +53,7 @@ export function QuickAddConsole() {
       </p>
       <p>
         Choose <strong>Create Contact + Project</strong> for the normal flow, or{" "}
-        <strong>Create Contact Only</strong> if you are just capturing intake details for now.
+        <strong>Create Contact Only</strong> if you are just capturing customer details for now.
       </p>
       {controllerApi.authMessage ? <p>{controllerApi.authMessage}</p> : null}
       <div ref={statusAnchorRef} />
@@ -107,27 +106,25 @@ export function QuickAddConsole() {
         <div className={styles.summaryCard}>
           <p className={styles.summaryTitle}>
             {controllerApi.lastSubmissionIntent === "contact_and_project"
-              ? "Contact + project created."
-              : "Contact created."}
+              ? "Customer + project created."
+              : "Customer created."}
           </p>
           <p className={styles.summaryText}>
-            Lead{" "}
-            <Link className={styles.summaryLink} href={`/contacts?contact=${controllerApi.lastLead.id}`}>
-              #{controllerApi.lastLead.id}
-            </Link>{" "}
-            ({controllerApi.lastLead.full_name})
-            {controllerApi.lastSubmissionIntent === "contact_and_project" &&
-            controllerApi.lastConvertedCustomerId !== null &&
-            controllerApi.lastConvertedProjectId !== null ? (
+            Intake record #{controllerApi.lastLead.id}
+            {controllerApi.lastConvertedCustomerId !== null ? (
               <>
-                , Customer{" "}
+                {" | "}Customer{" "}
                 <Link
                   className={styles.summaryLink}
                   href={`/contacts?customer=${controllerApi.lastConvertedCustomerId}`}
                 >
                   #{controllerApi.lastConvertedCustomerId}
                 </Link>
-                , Project{" "}
+              </>
+            ) : null}
+            {controllerApi.lastConvertedProjectId !== null ? (
+              <>
+                {" | "}Project{" "}
                 <Link
                   className={styles.summaryLink}
                   href={`/projects?project=${controllerApi.lastConvertedProjectId}`}
@@ -135,6 +132,12 @@ export function QuickAddConsole() {
                   #{controllerApi.lastConvertedProjectId}
                 </Link>
               </>
+            ) : null}
+            {" | "}
+            {controllerApi.lastLead.full_name}
+            {controllerApi.lastSubmissionIntent === "contact_and_project" &&
+            controllerApi.lastConvertedProjectId === null ? (
+              <> (project creation did not complete)</>
             ) : null}
             .
           </p>

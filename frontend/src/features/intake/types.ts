@@ -4,7 +4,7 @@ export type UserData = {
   id?: number;
 };
 
-export type LeadContactCandidate = {
+export type LeadContactRecord = {
   id: number;
   full_name: string;
   phone: string;
@@ -13,6 +13,16 @@ export type LeadContactCandidate = {
   initial_contract_value?: string | null;
   notes: string;
   source: string;
+  created_at: string;
+};
+
+export type DuplicateCustomerCandidate = {
+  id: number;
+  display_name: string;
+  phone: string;
+  billing_address: string;
+  email: string;
+  is_archived?: boolean;
   created_at: string;
 };
 
@@ -26,22 +36,29 @@ export type LeadPayload = {
   source: string;
 };
 
+export type QuickAddResult = {
+  lead_contact: LeadContactRecord;
+  customer?: { id: number; display_name: string };
+  project?: { id: number; name: string; status: string } | null;
+};
+
 export type LeadConvertResult = {
-  lead_contact?: LeadContactCandidate;
+  lead_contact?: LeadContactRecord;
   customer?: { id: number; display_name: string };
   project?: { id: number; name: string; status: string };
 };
 
 export type DuplicateData = {
-  duplicate_candidates?: LeadContactCandidate[];
+  duplicate_candidates?: DuplicateCustomerCandidate[];
   allowed_resolutions?: string[];
 };
 
 export type ApiResponse = {
-  data?: UserData | LeadContactCandidate | DuplicateData | LeadConvertResult;
+  data?: UserData | LeadContactRecord | DuplicateData | LeadConvertResult | QuickAddResult;
   meta?: {
     duplicate_resolution?: string;
     conversion_status?: string;
+    customer_created?: boolean;
   };
   error?: {
     code?: string;

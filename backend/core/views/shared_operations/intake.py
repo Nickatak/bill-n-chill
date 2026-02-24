@@ -48,6 +48,41 @@ def _find_duplicate_leads(user, *, phone: str, email: str):
     return list(deduped.values())
 
 
+def _find_duplicate_customers(user, *, phone: str, email: str):
+    customers = Customer.objects.filter(created_by=user)
+    phone_norm = _normalized_phone(phone)
+    email_norm = (email or "").strip().lower()
+
+    query = Q()
+    if phone:
+        query |= Q(phone=phone)
+    if email_norm:
+        query |= Q(email__iexact=email_norm)
+    direct = list(customers.filter(query)) if query else []
+
+    # Secondary pass for normalized phone matching (for example 5550100 vs 555-0100).
+    phone_matches = []
+    if phone_norm:
+        for customer in customers:
+            if _normalized_phone(customer.phone) == phone_norm:
+                phone_matches.append(customer)
+
+    deduped = {customer.id: customer for customer in [*direct, *phone_matches]}
+    return list(deduped.values())
+
+
+def _build_customer_duplicate_candidate(customer: Customer) -> dict:
+    return {
+        "id": customer.id,
+        "display_name": customer.display_name,
+        "phone": customer.phone,
+        "billing_address": customer.billing_address,
+        "email": customer.email,
+        "is_archived": customer.is_archived,
+        "created_at": customer.created_at.isoformat() if customer.created_at else None,
+    }
+
+
 def _build_lead_contact_snapshot(lead: LeadContact) -> dict:
     return {
         "lead_contact": {
@@ -292,11 +327,13 @@ def contact_detail_view(request, contact_id: int):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def quick_add_lead_contact_view(request):
-    """Create a lead quickly, with duplicate resolution flow and immutable capture rows.
+    """Create customer-first intake rows with lead provenance and optional project creation.
 
     Contract:
     - Supports duplicate resolutions: `use_existing|create_anyway`.
-    - Create writes append immutable `LeadContactRecord` rows atomically.
+    - Duplicate detection and persistence are customer-first.
+    - `LeadContact` is retained as immutable provenance intake record.
+    - Optional project creation is performed in the same request when `create_project=true`.
     """
     initial_contract_value = request.data.get("initial_contract_value", None)
     if initial_contract_value == "":
@@ -313,6 +350,10 @@ def quick_add_lead_contact_view(request):
     }
     duplicate_resolution = request.data.get("duplicate_resolution")
     duplicate_target_id = request.data.get("duplicate_target_id")
+    create_project_raw = request.data.get("create_project", False)
+    project_name = str(request.data.get("project_name") or "").strip()
+    project_status = str(request.data.get("project_status") or Project.Status.PROSPECT).strip()
+    create_project = str(create_project_raw).strip().lower() in {"true", "1", "yes", "on"}
 
     serializer = LeadContactQuickAddSerializer(
         data=raw_payload,
@@ -321,23 +362,36 @@ def quick_add_lead_contact_view(request):
     serializer.is_valid(raise_exception=True)
     payload = serializer.validated_data
 
-    duplicates = _find_duplicate_leads(
+    valid_project_statuses = {choice for choice, _ in Project.Status.choices}
+    if create_project and project_status not in valid_project_statuses:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Invalid project status.",
+                    "fields": {"project_status": ["This value is not a valid project status."]},
+                }
+            },
+            status=400,
+        )
+
+    duplicates = _find_duplicate_customers(
         request.user,
         phone=payload.get("phone", ""),
         email=payload.get("email", ""),
     )
-    duplicate_ids = {lead.id for lead in duplicates}
+    duplicate_ids = {customer.id for customer in duplicates}
 
     if duplicates and duplicate_resolution not in {
         "use_existing",
         "create_anyway",
     }:
-        candidates = LeadContactQuickAddSerializer(duplicates, many=True).data
+        candidates = [_build_customer_duplicate_candidate(customer) for customer in duplicates]
         return Response(
             {
                 "error": {
                     "code": "duplicate_detected",
-                    "message": "Possible duplicate lead contacts found.",
+                    "message": "Possible duplicate customers found.",
                     "fields": {},
                 },
                 "data": {
@@ -351,6 +405,7 @@ def quick_add_lead_contact_view(request):
             status=409,
         )
 
+    selected_customer = None
     if duplicates and duplicate_resolution == "use_existing":
         try:
             target_id = int(duplicate_target_id)
@@ -382,33 +437,116 @@ def quick_add_lead_contact_view(request):
                 status=400,
             )
 
-        target = next(lead for lead in duplicates if lead.id == target_id)
+        selected_customer = next(customer for customer in duplicates if customer.id == target_id)
 
+    customer = None
+    customer_created = False
+    project = None
+
+    try:
+        with transaction.atomic():
+            if selected_customer is not None:
+                customer = selected_customer
+            else:
+                customer = Customer.objects.create(
+                    display_name=payload["full_name"],
+                    phone=payload["phone"],
+                    email=payload["email"],
+                    billing_address=payload["project_address"],
+                    created_by=request.user,
+                )
+                customer_created = True
+                _record_customer_record(
+                    customer=customer,
+                    event_type=CustomerRecord.EventType.CREATED,
+                    capture_source=CustomerRecord.CaptureSource.MANUAL_UI,
+                    recorded_by=request.user,
+                    note="Customer created from intake quick add.",
+                )
+
+            lead = serializer.save()
+            _record_lead_contact_record(
+                lead=lead,
+                event_type=LeadContactRecord.EventType.CREATED,
+                capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
+                recorded_by=request.user,
+                note="Intake lead captured.",
+                metadata={
+                    "customer_id": customer.id,
+                    "duplicate_resolution": duplicate_resolution or "none",
+                },
+            )
+
+            if create_project:
+                resolved_project_name = project_name or f"{payload['full_name']} Project"
+                project = Project.objects.create(
+                    customer=customer,
+                    name=resolved_project_name,
+                    site_address=payload["project_address"],
+                    status=project_status,
+                    contract_value_original=payload.get("initial_contract_value") or 0,
+                    contract_value_current=payload.get("initial_contract_value") or 0,
+                    created_by=request.user,
+                )
+
+                lead.converted_customer = customer
+                lead.converted_project = project
+                lead.converted_at = timezone.now()
+                lead.save(
+                    update_fields=[
+                        "converted_customer",
+                        "converted_project",
+                        "converted_at",
+                        "updated_at",
+                    ]
+                )
+                _record_lead_contact_record(
+                    lead=lead,
+                    event_type=LeadContactRecord.EventType.CONVERTED,
+                    capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
+                    recorded_by=request.user,
+                    note="Lead converted during quick add.",
+                    metadata={
+                        "converted_customer_id": customer.id,
+                        "converted_project_id": project.id,
+                    },
+                )
+    except DjangoValidationError as exc:
+        if hasattr(exc, "message_dict"):
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "Quick add failed validation.",
+                        "fields": exc.message_dict,
+                    }
+                },
+                status=400,
+            )
         return Response(
             {
-                "data": LeadContactQuickAddSerializer(target).data,
-                "meta": {"duplicate_resolution": duplicate_resolution},
+                "error": {
+                    "code": "validation_error",
+                    "message": "Quick add failed validation.",
+                    "fields": {"non_field_errors": exc.messages},
+                }
             },
-            status=200,
-        )
-
-    with transaction.atomic():
-        lead = serializer.save()
-        _record_lead_contact_record(
-            lead=lead,
-            event_type=LeadContactRecord.EventType.CREATED,
-            capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
-            recorded_by=request.user,
-            note="Lead contact created.",
+            status=400,
         )
 
     return Response(
         {
-            "data": LeadContactQuickAddSerializer(lead).data,
+            "data": {
+                "lead_contact": LeadContactQuickAddSerializer(lead).data,
+                "customer": CustomerSerializer(customer).data,
+                "project": ProjectSerializer(project).data if project else None,
+            },
             "meta": {
                 "duplicate_resolution": "create_anyway"
                 if duplicate_resolution == "create_anyway"
-                else "none"
+                else duplicate_resolution or "none",
+                "conversion_status": "converted" if project else "not_requested",
+                "customer_created": customer_created,
             },
         },
         status=201,
