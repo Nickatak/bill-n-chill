@@ -18,7 +18,7 @@ export async function fetchIntakeAuthMe({
   return response;
 }
 
-export async function postQuickAddLead({
+export async function postQuickAddCustomerIntake({
   baseUrl,
   token,
   body,
@@ -27,7 +27,7 @@ export async function postQuickAddLead({
   token: string;
   body: Record<string, unknown>;
 }) {
-  const response = await fetch(`${normalizeApiBaseUrl(baseUrl)}/lead-contacts/quick-add/`, {
+  const response = await fetch(`${normalizeApiBaseUrl(baseUrl)}/customers/quick-add/`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -35,35 +35,5 @@ export async function postQuickAddLead({
     },
     body: JSON.stringify(body),
   });
-  return response;
-}
-
-export async function postConvertLeadToProject({
-  baseUrl,
-  token,
-  leadId,
-  projectName,
-  projectStatus,
-}: {
-  baseUrl: string;
-  token: string;
-  leadId: number;
-  projectName: string;
-  projectStatus: string;
-}) {
-  const response = await fetch(
-    `${normalizeApiBaseUrl(baseUrl)}/lead-contacts/${leadId}/convert-to-project/`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Token ${token}`,
-      },
-      body: JSON.stringify({
-        project_name: projectName,
-        project_status: projectStatus,
-      }),
-    },
-  );
   return response;
 }

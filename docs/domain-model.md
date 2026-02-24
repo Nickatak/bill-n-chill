@@ -123,8 +123,8 @@ Policy:
 Lightweight intake record captured before full project/customer setup.
 
 Current implementation note:
-- Quick Add (`POST /lead-contacts/quick-add/`) persists immutable intake provenance rows.
-- Legacy mutable `LeadContact` rows remain only for compatibility with existing conversion endpoints and historical data.
+- Quick Add (`POST /customers/quick-add/`) persists immutable intake provenance rows.
+- Intake is stored as immutable record snapshots and does not persist a mutable pre-customer model.
 
 Key fields:
 - `id`
@@ -645,8 +645,7 @@ Policy:
 
 ## API Surface (Initial DRF Direction)
 
-- `POST /api/v1/lead-contacts/quick-add/` (legacy path naming for customer-intake create)
-- `POST /api/v1/lead-contacts/{id}/convert-to-project/` (legacy compatibility route)
+- `POST /api/v1/customers/quick-add/`
 - `GET /api/v1/customers/`
 - `PATCH /api/v1/customers/{id}/`
 - `DELETE /api/v1/customers/{id}/`

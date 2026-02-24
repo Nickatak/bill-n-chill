@@ -9,12 +9,12 @@ Capture qualified customers quickly with duplicate detection and optional immedi
 
 ## Mutation Map
 1. `CustomerIntakeRecord`
-   - create intake record (`POST /lead-contacts/quick-add/`, legacy path naming)
-   - duplicate-resolution create path (`POST /lead-contacts/quick-add/` with `duplicate_resolution` and optional `duplicate_target_id`)
+   - create intake record (`POST /customers/quick-add/`)
+   - duplicate-resolution create path (`POST /customers/quick-add/` with `duplicate_resolution` and optional `duplicate_target_id`)
 2. `Customer`
-   - create/reuse inside quick-add submit (`POST /lead-contacts/quick-add/`)
+   - create/reuse inside quick-add submit (`POST /customers/quick-add/`)
 3. `Project`
-   - optional create inside quick-add submit (`POST /lead-contacts/quick-add/`)
+   - optional create inside quick-add submit (`POST /customers/quick-add/`)
 
 ## Composition and Entry Flow
 1. Entry sources:
@@ -30,21 +30,21 @@ Capture qualified customers quickly with duplicate detection and optional immedi
 5. Default behavior:
    `QuickAddForm` is visible, duplicate panel is hidden, and console renders auth/intake/project messages.
 6. Overrides:
-   duplicate conflict (`409 duplicate_detected`) shows `DuplicateResolutionPanel`; submit intent `contact_and_project` requests customer+project creation; missing/invalid token shifts to auth-error messaging path.
+   duplicate conflict (`409 duplicate_detected`) shows `DuplicateResolutionPanel`; submit intent `customer_and_project` requests customer+project creation; missing/invalid token shifts to auth-error messaging path.
 7. Relationship flow:
    user action -> child callback -> controller mutation -> state update -> parent re-renders children with new state.
 
 ## API Surface Used
 1. `GET /auth/me/`:
    verifies shared token validity and resolves user-facing auth status messaging before submit flows.
-2. `POST /lead-contacts/quick-add/`:
+2. `POST /customers/quick-add/`:
    creates intake record + customer (and optional project), including duplicate-detection conflict response (`409 duplicate_detected`) used by resolution UI.
 
 ## Backend Contracts Used
 - Contract endpoint(s): none
 - Consumed fields: none
 - Behavior source: standard API responses from:
-  - `POST /lead-contacts/quick-add/`
+  - `POST /customers/quick-add/`
   - `GET /auth/me/`
 - Fallback policy: n/a (no contract adapter in this feature)
 
@@ -86,4 +86,4 @@ Capture qualified customers quickly with duplicate detection and optional immedi
   - backend tests in `backend/core/tests/test_intake.py`
 - TODO:
   - add frontend tests for duplicate resolution flow
-  - add frontend tests for dual-intent submit behavior (`contact_only` vs `contact_and_project`)
+  - add frontend tests for dual-intent submit behavior (`customer_only` vs `customer_and_project`)

@@ -4,7 +4,7 @@ export type UserData = {
   id?: number;
 };
 
-export type LeadContactRecord = {
+export type CustomerIntakeRecord = {
   id: number;
   full_name: string;
   phone: string;
@@ -26,7 +26,7 @@ export type DuplicateCustomerCandidate = {
   created_at: string;
 };
 
-export type LeadPayload = {
+export type CustomerIntakePayload = {
   full_name: string;
   phone: string;
   project_address: string;
@@ -37,15 +37,9 @@ export type LeadPayload = {
 };
 
 export type QuickAddResult = {
-  lead_contact: LeadContactRecord;
+  customer_intake: CustomerIntakeRecord;
   customer?: { id: number; display_name: string };
   project?: { id: number; name: string; status: string } | null;
-};
-
-export type LeadConvertResult = {
-  lead_contact?: LeadContactRecord;
-  customer?: { id: number; display_name: string };
-  project?: { id: number; name: string; status: string };
 };
 
 export type DuplicateData = {
@@ -54,7 +48,7 @@ export type DuplicateData = {
 };
 
 export type ApiResponse = {
-  data?: UserData | LeadContactRecord | DuplicateData | LeadConvertResult | QuickAddResult;
+  data?: UserData | CustomerIntakeRecord | DuplicateData | QuickAddResult;
   meta?: {
     duplicate_resolution?: string;
     conversion_status?: string;

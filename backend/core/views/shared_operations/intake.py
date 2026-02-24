@@ -1,4 +1,4 @@
-"""Shared customer-intake and conversion endpoints."""
+"""Shared customer-intake endpoints."""
 
 import re
 
@@ -11,41 +11,17 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import Customer, CustomerRecord, LeadContact, LeadContactRecord, Project
+from core.models import Customer, CustomerRecord, LeadContactRecord, Project
 from core.serializers import (
+    CustomerIntakeQuickAddSerializer,
     CustomerManageSerializer,
     CustomerSerializer,
-    LeadContactQuickAddSerializer,
-    LeadConvertSerializer,
     ProjectSerializer,
 )
 
 
 def _normalized_phone(value: str) -> str:
     return re.sub(r"\D", "", value or "")
-
-
-def _find_duplicate_leads(user, *, phone: str, email: str):
-    leads = LeadContact.objects.filter(created_by=user)
-    phone_norm = _normalized_phone(phone)
-    email_norm = (email or "").strip().lower()
-
-    query = Q()
-    if phone:
-        query |= Q(phone=phone)
-    if email_norm:
-        query |= Q(email__iexact=email_norm)
-    direct = list(leads.filter(query)) if query else []
-
-    # Secondary pass for normalized phone matching (for example 5550100 vs 555-0100).
-    phone_matches = []
-    if phone_norm:
-        for lead in leads:
-            if _normalized_phone(lead.phone) == phone_norm:
-                phone_matches.append(lead)
-
-    deduped = {lead.id: lead for lead in [*direct, *phone_matches]}
-    return list(deduped.values())
 
 
 def _find_duplicate_customers(user, *, phone: str, email: str):
@@ -80,31 +56,6 @@ def _build_customer_duplicate_candidate(customer: Customer) -> dict:
         "email": customer.email,
         "is_archived": customer.is_archived,
         "created_at": customer.created_at.isoformat() if customer.created_at else None,
-    }
-
-
-def _build_lead_contact_snapshot(lead: LeadContact) -> dict:
-    return {
-        "lead_contact": {
-            "id": lead.id,
-            "full_name": lead.full_name,
-            "phone": lead.phone,
-            "project_address": lead.project_address,
-            "email": lead.email,
-            "initial_contract_value": (
-                str(lead.initial_contract_value) if lead.initial_contract_value is not None else None
-            ),
-            "notes": lead.notes,
-            "source": lead.source,
-            "is_archived": lead.is_archived,
-            "has_project": lead.converted_project_id is not None,
-            "converted_customer_id": lead.converted_customer_id,
-            "converted_project_id": lead.converted_project_id,
-            "converted_at": lead.converted_at.isoformat() if lead.converted_at else None,
-            "created_by_id": lead.created_by_id,
-            "created_at": lead.created_at.isoformat() if lead.created_at else None,
-            "updated_at": lead.updated_at.isoformat() if lead.updated_at else None,
-        }
     }
 
 
@@ -170,7 +121,7 @@ def _record_customer_intake_record(
     converted_at=None,
 ):
     snapshot_json = {
-        "lead_contact": _build_intake_payload(
+        "customer_intake": _build_intake_payload(
             payload=payload,
             intake_record_id=intake_record_id,
             created_at=timezone.now(),
@@ -180,7 +131,7 @@ def _record_customer_intake_record(
         )
     }
     return LeadContactRecord.objects.create(
-        lead_contact=None,
+        intake_record_id=intake_record_id,
         event_type=event_type,
         capture_source=capture_source,
         source_reference=source_reference,
@@ -189,33 +140,6 @@ def _record_customer_intake_record(
         metadata_json=metadata or {},
         recorded_by=recorded_by,
     )
-
-
-def _record_lead_contact_record(
-    *,
-    lead: LeadContact,
-    event_type: str,
-    capture_source: str,
-    recorded_by,
-    from_status: str | None = None,
-    to_status: str | None = None,
-    source_reference: str = "",
-    note: str = "",
-    metadata: dict | None = None,
-):
-    LeadContactRecord.objects.create(
-        lead_contact=lead,
-        event_type=event_type,
-        capture_source=capture_source,
-        source_reference=source_reference,
-        from_status=from_status,
-        to_status=to_status,
-        note=note,
-        snapshot_json=_build_lead_contact_snapshot(lead),
-        metadata_json=metadata or {},
-        recorded_by=recorded_by,
-    )
-
 
 def _record_customer_record(
     *,
@@ -390,15 +314,9 @@ def customer_detail_view(request, customer_id: int):
     payload["has_active_or_on_hold_project"] = payload["active_project_count"] > 0
     return Response({"data": payload})
 
-
-# Backward compatibility aliases: keep legacy /contacts routes functional.
-contacts_list_view = customers_list_view
-contact_detail_view = customer_detail_view
-
-
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def quick_add_lead_contact_view(request):
+def quick_add_customer_intake_view(request):
     """Create customer-first intake rows with immutable provenance and optional project creation.
 
     Contract:
@@ -418,7 +336,7 @@ def quick_add_lead_contact_view(request):
         "email": request.data.get("email", ""),
         "initial_contract_value": initial_contract_value,
         "notes": request.data.get("notes", ""),
-        "source": request.data.get("source", LeadContact.Source.FIELD_MANUAL),
+        "source": request.data.get("source", "field_manual"),
     }
     duplicate_resolution = request.data.get("duplicate_resolution")
     duplicate_target_id = request.data.get("duplicate_target_id")
@@ -427,9 +345,8 @@ def quick_add_lead_contact_view(request):
     project_status = str(request.data.get("project_status") or Project.Status.PROSPECT).strip()
     create_project = str(create_project_raw).strip().lower() in {"true", "1", "yes", "on"}
 
-    serializer = LeadContactQuickAddSerializer(
+    serializer = CustomerIntakeQuickAddSerializer(
         data=raw_payload,
-        context={"request": request},
     )
     serializer.is_valid(raise_exception=True)
     payload = serializer.validated_data
@@ -603,7 +520,7 @@ def quick_add_lead_contact_view(request):
             status=400,
         )
 
-    lead_payload = _build_intake_payload(
+    intake_payload = _build_intake_payload(
         payload=payload,
         intake_record_id=intake_record_id,
         created_at=intake_record_created_at or timezone.now(),
@@ -615,7 +532,7 @@ def quick_add_lead_contact_view(request):
     return Response(
         {
             "data": {
-                "lead_contact": lead_payload,
+                "customer_intake": intake_payload,
                 "customer": CustomerSerializer(customer).data,
                 "project": ProjectSerializer(project).data if project else None,
             },
@@ -626,164 +543,6 @@ def quick_add_lead_contact_view(request):
                 "conversion_status": "converted" if project else "not_requested",
                 "customer_created": customer_created,
             },
-        },
-        status=201,
-    )
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def convert_lead_to_project_view(request, lead_id: int):
-    """Convert an intake record into customer + project shell with immutable provenance records."""
-    try:
-        lead = LeadContact.objects.get(id=lead_id, created_by=request.user)
-    except LeadContact.DoesNotExist:
-        return Response(
-            {
-                "error": {
-                    "code": "not_found",
-                    "message": "Intake record not found.",
-                    "fields": {},
-                }
-            },
-            status=404,
-        )
-
-    serializer = LeadConvertSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    data = serializer.validated_data
-
-    if lead.converted_customer_id and lead.converted_project_id:
-        return Response(
-            {
-                "data": {
-                    "lead_contact": LeadContactQuickAddSerializer(lead).data,
-                    "customer": CustomerSerializer(lead.converted_customer).data,
-                    "project": ProjectSerializer(lead.converted_project).data,
-                },
-                "meta": {"conversion_status": "already_converted"},
-            }
-        )
-
-    if lead.is_archived:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "Archived intake records cannot be converted to a project.",
-                    "fields": {"is_archived": ["Unarchive this intake record before conversion."]},
-                }
-            },
-            status=400,
-        )
-
-    try:
-        with transaction.atomic():
-            customer = None
-            email = (lead.email or "").strip().lower()
-            if email:
-                customer = (
-                    Customer.objects.filter(created_by=request.user, email__iexact=email)
-                    .order_by("-created_at")
-                    .first()
-                )
-            if not customer and lead.phone:
-                customer = (
-                    Customer.objects.filter(created_by=request.user, phone=lead.phone)
-                    .order_by("-created_at")
-                    .first()
-                )
-
-            if not customer:
-                customer = Customer.objects.create(
-                    display_name=lead.full_name,
-                    email=lead.email,
-                    phone=lead.phone,
-                    billing_address=lead.project_address,
-                    created_by=request.user,
-                )
-                _record_customer_record(
-                    customer=customer,
-                    event_type=CustomerRecord.EventType.CREATED,
-                    capture_source=CustomerRecord.CaptureSource.MANUAL_UI,
-                    recorded_by=request.user,
-                    note="Customer created from lead conversion.",
-                )
-            elif not (customer.display_name or "").strip():
-                customer.display_name = lead.full_name
-                customer.save(update_fields=["display_name", "updated_at"])
-                _record_customer_record(
-                    customer=customer,
-                    event_type=CustomerRecord.EventType.UPDATED,
-                    capture_source=CustomerRecord.CaptureSource.MANUAL_UI,
-                    recorded_by=request.user,
-                    note="Customer display name updated from lead conversion.",
-                )
-
-            project_name = data.get("project_name") or f"{lead.full_name} Project"
-            project = Project.objects.create(
-                customer=customer,
-                name=project_name,
-                site_address=lead.project_address,
-                status=data.get("project_status", Project.Status.PROSPECT),
-                contract_value_original=lead.initial_contract_value or 0,
-                contract_value_current=lead.initial_contract_value or 0,
-                created_by=request.user,
-            )
-
-            lead.converted_customer = customer
-            lead.converted_project = project
-            lead.converted_at = timezone.now()
-            lead.save(
-                update_fields=[
-                    "converted_customer",
-                    "converted_project",
-                    "converted_at",
-                    "updated_at",
-                ]
-            )
-            _record_lead_contact_record(
-                lead=lead,
-                event_type=LeadContactRecord.EventType.CONVERTED,
-                capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
-                recorded_by=request.user,
-                note="Lead converted to customer + project.",
-                metadata={
-                    "converted_customer_id": customer.id,
-                    "converted_project_id": project.id,
-                },
-            )
-    except DjangoValidationError as exc:
-        if hasattr(exc, "message_dict"):
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_error",
-                        "message": "Project creation failed validation.",
-                        "fields": exc.message_dict,
-                    }
-                },
-                status=400,
-            )
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "Project creation failed validation.",
-                    "fields": {"non_field_errors": exc.messages},
-                }
-            },
-            status=400,
-        )
-
-    return Response(
-        {
-            "data": {
-                "lead_contact": LeadContactQuickAddSerializer(lead).data,
-                "customer": CustomerSerializer(customer).data,
-                "project": ProjectSerializer(project).data,
-            },
-            "meta": {"conversion_status": "converted"},
         },
         status=201,
     )

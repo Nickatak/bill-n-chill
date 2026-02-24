@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
 from rest_framework import serializers
 
-from core.models import Customer, LeadContact, Project
+from core.models import Customer
 
 PHONE_ALLOWED_RE = re.compile(r"^[0-9+\-().\s]+$")
 
@@ -24,40 +24,19 @@ def _is_valid_phone(value: str) -> bool:
     return 7 <= len(digits) <= 15
 
 
-class LeadContactQuickAddSerializer(serializers.ModelSerializer):
-    has_project = serializers.BooleanField(read_only=True)
-
-    class Meta:
-        model = LeadContact
-        fields = [
-            "id",
-            "full_name",
-            "phone",
-            "project_address",
-            "email",
-            "initial_contract_value",
-            "notes",
-            "source",
-            "is_archived",
-            "has_project",
-            "converted_customer",
-            "converted_project",
-            "converted_at",
-            "created_at",
-        ]
-        read_only_fields = [
-            "id",
-            "is_archived",
-            "has_project",
-            "converted_customer",
-            "converted_project",
-            "converted_at",
-            "created_at",
-        ]
-
-    def create(self, validated_data):
-        request = self.context["request"]
-        return LeadContact.objects.create(created_by=request.user, **validated_data)
+class CustomerIntakeQuickAddSerializer(serializers.Serializer):
+    full_name = serializers.CharField(max_length=255)
+    phone = serializers.CharField(required=False, allow_blank=True, max_length=50)
+    project_address = serializers.CharField(max_length=255)
+    email = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    initial_contract_value = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        allow_null=True,
+    )
+    notes = serializers.CharField(required=False, allow_blank=True)
+    source = serializers.CharField(required=False, allow_blank=True, max_length=32)
 
     def validate(self, attrs):
         phone = (attrs.get("phone") or "").strip()
@@ -93,66 +72,6 @@ class LeadContactQuickAddSerializer(serializers.ModelSerializer):
         attrs["phone"] = phone
         attrs["email"] = email.lower() if email else ""
         return attrs
-
-
-class LeadContactManageSerializer(serializers.ModelSerializer):
-    has_project = serializers.BooleanField(read_only=True)
-
-    class Meta:
-        model = LeadContact
-        fields = [
-            "id",
-            "full_name",
-            "phone",
-            "project_address",
-            "email",
-            "initial_contract_value",
-            "notes",
-            "source",
-            "is_archived",
-            "has_project",
-            "converted_customer",
-            "converted_project",
-            "converted_at",
-            "created_at",
-            "updated_at",
-        ]
-        read_only_fields = [
-            "id",
-            "converted_customer",
-            "converted_project",
-            "converted_at",
-            "created_at",
-            "updated_at",
-        ]
-
-    def validate(self, attrs):
-        current_phone = ""
-        current_email = ""
-        if self.instance is not None:
-            current_phone = self.instance.phone or ""
-            current_email = self.instance.email or ""
-
-        phone = (attrs.get("phone", current_phone) or "").strip()
-        email = (attrs.get("email", current_email) or "").strip()
-
-        if not phone and not email:
-            raise serializers.ValidationError(
-                {
-                    "phone": ["Provide phone or email."],
-                    "email": ["Provide phone or email."],
-                }
-            )
-        return attrs
-
-
-class LeadConvertSerializer(serializers.Serializer):
-    project_name = serializers.CharField(required=False, allow_blank=True, max_length=255)
-    project_status = serializers.ChoiceField(
-        choices=Project.Status.choices,
-        required=False,
-        default=Project.Status.PROSPECT,
-    )
 
 
 class CustomerManageSerializer(serializers.ModelSerializer):

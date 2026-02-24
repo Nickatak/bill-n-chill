@@ -30,10 +30,7 @@ from core.views.estimating.estimates import (
 from core.views.shared_operations.intake import (
     customer_detail_view,
     customers_list_view,
-    contact_detail_view,
-    contacts_list_view,
-    convert_lead_to_project_view,
-    quick_add_lead_contact_view,
+    quick_add_customer_intake_view,
 )
 from core.views.accounts_receivable.invoices import (
     invoice_detail_view,
@@ -73,12 +70,9 @@ __all__ = [
     "me_view",
     "project_accounting_sync_events_view",
     "accounting_sync_event_retry_view",
-    "quick_add_lead_contact_view",
+    "quick_add_customer_intake_view",
     "customers_list_view",
     "customer_detail_view",
-    "contacts_list_view",
-    "contact_detail_view",
-    "convert_lead_to_project_view",
     "projects_list_view",
     "project_detail_view",
     "project_financial_summary_view",

@@ -55,7 +55,6 @@ This map defines how to trace behavior from route to feature code and how to com
 | `/vendor-bills` | redirects to `/projects/[projectId]/vendor-bills` when `project` query is present |
 | `/expenses` | redirects to `/projects/[projectId]/expenses` when `project` query is present |
 | `/projects/[projectId]` | redirects to `/projects?project=[projectId]` |
-| `/contacts` | redirects to `/customers` |
 
 ## Workflow Contract Features
 These features consume backend policy-contract endpoints for UI status options and transition behavior.

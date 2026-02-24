@@ -14,12 +14,12 @@ LEAD_CONTACT_STATUS_CHOICES = [
 
 
 class LeadContactRecord(models.Model):
-    """Immutable audit capture for lead-contact lifecycle and conversion events.
+    """Immutable audit capture for customer-intake lifecycle and conversion events.
 
     Business workflow:
-    - Captures append-only lead-contact events (create, update, status change, conversion, delete).
+    - Captures append-only customer-intake events (create, update, status change, conversion, delete).
     - Preserves actor/source metadata for RBAC, compliance, and incident forensics.
-    - Stores point-in-time lead snapshot payload for replay.
+    - Stores point-in-time intake snapshot payload for replay.
 
     Current policy:
     - Lifecycle control: `system-managed` append-only capture model.
@@ -41,14 +41,12 @@ class LeadContactRecord(models.Model):
 
     class LeadContactRecordQuerySet(models.QuerySet):
         def delete(self):
-            raise ValidationError("Lead contact records are immutable and cannot be deleted.")
+            raise ValidationError("Customer intake records are immutable and cannot be deleted.")
 
     objects = LeadContactRecordQuerySet.as_manager()
 
-    lead_contact = models.ForeignKey(
-        "LeadContact",
-        on_delete=models.SET_NULL,
-        related_name="records",
+    intake_record_id = models.PositiveBigIntegerField(
+        db_index=True,
         null=True,
         blank=True,
     )
@@ -90,11 +88,11 @@ class LeadContactRecord(models.Model):
 
     def save(self, *args, **kwargs):
         if self.pk is not None:
-            raise ValidationError("Lead contact records are immutable and cannot be updated.")
+            raise ValidationError("Customer intake records are immutable and cannot be updated.")
         return super().save(*args, **kwargs)
 
     def delete(self, using=None, keep_parents=False):
-        raise ValidationError("Lead contact records are immutable and cannot be deleted.")
+        raise ValidationError("Customer intake records are immutable and cannot be deleted.")
 
     def __str__(self) -> str:
-        return f"LEAD-{self.lead_contact_id or 'na'} {self.event_type}"
+        return f"INTAKE-{self.intake_record_id or 'na'} {self.event_type}"

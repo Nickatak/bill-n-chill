@@ -1,6 +1,10 @@
 import { FormEvent, RefObject } from "react";
 
-import { DuplicateCustomerCandidate, LeadContactRecord, LeadPayload } from "../types";
+import {
+  CustomerIntakePayload,
+  CustomerIntakeRecord,
+  DuplicateCustomerCandidate,
+} from "../types";
 
 export type LeadFieldErrors = {
   full_name?: string;
@@ -9,13 +13,13 @@ export type LeadFieldErrors = {
   project_name?: string;
 };
 
-export type SubmitIntent = "contact_only" | "contact_and_project";
+export type SubmitIntent = "customer_only" | "customer_and_project";
 export type QuickAddMessageTone = "neutral" | "info" | "success" | "error";
 
 export type DuplicateResolution = "use_existing" | "create_anyway";
 
 export type PendingSubmission = {
-  payload: LeadPayload;
+  payload: CustomerIntakePayload;
   intent: SubmitIntent;
   projectName: string;
   projectStatus: string;
@@ -53,11 +57,11 @@ export type QuickAddControllerApi = {
   setProjectStatus: (value: string) => void;
   fieldErrors: LeadFieldErrors;
   duplicateCandidates: DuplicateCustomerCandidate[];
-  duplicateMatchPayload: LeadPayload | null;
+  duplicateMatchPayload: CustomerIntakePayload | null;
   duplicateResolutionIntent: SubmitIntent | null;
   selectedDuplicateId: string;
   setSelectedDuplicateId: (value: string) => void;
-  lastLead: LeadContactRecord | null;
+  lastLead: CustomerIntakeRecord | null;
   handleQuickAdd: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   resolveDuplicate: (resolution: DuplicateResolution, targetId?: number) => Promise<void>;
 };

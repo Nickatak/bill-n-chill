@@ -141,10 +141,10 @@ export function QuickAddForm({
 
       <div className={styles.stickyActions}>
         <div className={styles.inlineActions}>
-          <button type="submit" value="contact_and_project">
+          <button type="submit" value="customer_and_project">
             Create Customer + Project
           </button>
-          <button type="submit" value="contact_only">
+          <button type="submit" value="customer_only">
             Create Customer Only
           </button>
         </div>

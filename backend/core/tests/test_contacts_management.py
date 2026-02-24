@@ -33,24 +33,10 @@ class ContactsManagementTests(TestCase):
             email="other@example.com",
             created_by=self.other,
         )
-        self.lead = LeadContact.objects.create(
-            full_name="Lead For Audit",
-            phone="555-0100",
-            project_address="10 Lead St",
-            email="lead@example.com",
-            created_by=self.user,
-        )
 
     def test_contacts_list_requires_authentication(self):
         response = self.client.get("/api/v1/customers/")
         self.assertEqual(response.status_code, 401)
-
-    def test_contacts_list_legacy_alias_still_works(self):
-        response = self.client.get(
-            "/api/v1/contacts/",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 200)
 
     def test_contacts_list_returns_user_scoped_rows(self):
         response = self.client.get(
@@ -233,14 +219,14 @@ class ContactsManagementTests(TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertTrue(Customer.objects.filter(id=self.other_customer.id).exists())
 
-    def test_lead_contact_and_customer_records_are_immutable(self):
+    def test_customer_intake_and_customer_records_are_immutable(self):
         lead_record = LeadContactRecord.objects.create(
-            lead_contact=self.lead,
+            intake_record_id=77,
             event_type=LeadContactRecord.EventType.UPDATED,
             capture_source=LeadContactRecord.CaptureSource.SYSTEM,
             from_status=None,
             to_status=None,
-            snapshot_json={"lead_contact": {"id": self.lead.id}},
+            snapshot_json={"customer_intake": {"id": 77}},
             metadata_json={},
             recorded_by=self.user,
         )

@@ -2,13 +2,13 @@
 
 import { FormEvent, RefObject, useState } from "react";
 
-import { postQuickAddLead } from "../api";
+import { postQuickAddCustomerIntake } from "../api";
 import {
   ApiResponse,
+  CustomerIntakeRecord,
+  CustomerIntakePayload,
   DuplicateData,
   DuplicateCustomerCandidate,
-  LeadContactRecord,
-  LeadPayload,
   QuickAddResult,
 } from "../types";
 import {
@@ -66,7 +66,7 @@ export function useQuickAddBusinessWorkflow({
   const [selectedDuplicateId, setSelectedDuplicateId] = useState<string>("");
   const [pendingSubmission, setPendingSubmission] = useState<PendingSubmission | null>(null);
 
-  const [lastLead, setLastLead] = useState<LeadContactRecord | null>(null);
+  const [lastLead, setLastLead] = useState<CustomerIntakeRecord | null>(null);
   const [lastSubmissionIntent, setLastSubmissionIntent] = useState<SubmitIntent | null>(null);
   const [lastDuplicateResolution, setLastDuplicateResolution] = useState("none");
   const [lastConvertedCustomerId, setLastConvertedCustomerId] = useState<number | null>(null);
@@ -81,16 +81,16 @@ export function useQuickAddBusinessWorkflow({
   }
 
   async function submitQuickAdd(
-    body: LeadPayload,
+    body: CustomerIntakePayload,
     submission: PendingSubmission,
     options?: { duplicate_resolution?: string; duplicate_target_id?: number },
   ) {
-    const response = await postQuickAddLead({
+    const response = await postQuickAddCustomerIntake({
       baseUrl: normalizedBaseUrl,
       token,
       body: {
         ...body,
-        create_project: submission.intent === "contact_and_project",
+        create_project: submission.intent === "customer_and_project",
         project_name: submission.projectName,
         project_status: submission.projectStatus,
         ...options,
@@ -117,7 +117,7 @@ export function useQuickAddBusinessWorkflow({
 
     const result = payload.data as QuickAddResult;
     const resolution = payload.meta?.duplicate_resolution ?? "none";
-    const lead = result.lead_contact;
+    const lead = result.customer_intake;
     const customerId = typeof result.customer?.id === "number" ? result.customer.id : null;
     const projectId = typeof result.project?.id === "number" ? result.project.id : null;
 
@@ -133,7 +133,7 @@ export function useQuickAddBusinessWorkflow({
     setConversionMessage("");
     setConversionMessageTone("neutral");
 
-    if (submission.intent === "contact_and_project") {
+    if (submission.intent === "customer_and_project") {
       if (customerId !== null && projectId !== null) {
         setLeadMessage("Customer + project created.");
         setLeadMessageTone("success");
@@ -151,10 +151,11 @@ export function useQuickAddBusinessWorkflow({
       }
     }
 
-    const saveSucceeded = customerId !== null && (submission.intent === "contact_only" || projectId !== null);
+    const saveSucceeded =
+      customerId !== null && (submission.intent === "customer_only" || projectId !== null);
     if (!saveSucceeded) {
       setConversionMessage(
-        submission.intent === "contact_and_project"
+        submission.intent === "customer_and_project"
           ? "Check project-required fields and try again."
           : "Check required fields and try again.",
       );
@@ -178,13 +179,13 @@ export function useQuickAddBusinessWorkflow({
 
     const nativeEvent = event.nativeEvent as SubmitEvent;
     const submitter = nativeEvent.submitter as HTMLButtonElement | null;
-    const submitterValue = submitter?.value ?? "contact_and_project";
+    const submitterValue = submitter?.value ?? "customer_and_project";
     const intent: SubmitIntent =
-      submitterValue === "contact_only" ? "contact_only" : "contact_and_project";
+      submitterValue === "customer_only" ? "customer_only" : "customer_and_project";
 
     clearLastSuccessState();
     setLeadMessage(
-      intent === "contact_only"
+      intent === "customer_only"
         ? "Creating customer..."
         : "Creating customer + project...",
     );
@@ -198,7 +199,7 @@ export function useQuickAddBusinessWorkflow({
       return;
     }
 
-    const payload: LeadPayload = {
+    const payload: CustomerIntakePayload = {
       full_name: fullName.trim(),
       phone: phone.trim(),
       project_address: projectAddress.trim(),

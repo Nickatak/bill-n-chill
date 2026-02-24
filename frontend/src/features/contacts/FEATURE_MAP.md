@@ -5,7 +5,6 @@ Provide operational lookup and maintenance for canonical customer records outsid
 
 ## Route Surface
 1. `/customers`
-2. `/contacts` (legacy redirect alias)
 
 ## Mutation Map
 1. `Customer`
@@ -15,7 +14,6 @@ Provide operational lookup and maintenance for canonical customer records outsid
 ## Composition and Entry Flow
 1. Entry sources:
    - direct route entry: `frontend/src/app/customers/page.tsx` renders `ContactsConsole`
-   - legacy route entry: `frontend/src/app/contacts/page.tsx` redirects to `/customers`
    - feature export entry: `frontend/src/features/contacts/index.ts` exports `ContactsConsole`
 2. Parent/Owner:
    `ContactsConsole` owns lookup filters, row rendering, project-link indexing, and modal edit/delete mutations.

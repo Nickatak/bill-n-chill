@@ -101,10 +101,9 @@ bill-n-chill currently uses DRF token authentication for API access.
 
 ## Customer Intake (INT-01)
 
-- `POST /api/v1/lead-contacts/quick-add/`
+- `POST /api/v1/customers/quick-add/`
   - Auth required: `Authorization: Token TOKEN_VALUE`
-  - Note: endpoint path is legacy-named; behavior is customer-first.
-  - Note: quick-add captures immutable intake records and does not create mutable `LeadContact` rows.
+  - Note: quick-add captures immutable intake records; no mutable pre-customer model is persisted.
   - Required fields:
     - `full_name`
     - `phone`
@@ -114,7 +113,7 @@ bill-n-chill currently uses DRF token authentication for API access.
     - `notes`
     - `source` (`field_manual`, `office_manual`, `import`, `web_form`, `referral`, `other`)
   - Success response includes:
-    - `data.lead_contact` (intake payload keyed by immutable intake-record id)
+    - `data.customer_intake` (intake payload keyed by immutable intake-record id)
     - `data.customer`
     - `data.project` (nullable)
   - Audit behavior:
@@ -130,35 +129,15 @@ If duplicates are detected and no resolution is provided:
 - response body includes:
   - `error.code = "duplicate_detected"`
   - `data.duplicate_candidates[]`
-  - `data.allowed_resolutions = ["use_existing", "merge_existing", "create_anyway"]`
+  - `data.allowed_resolutions = ["use_existing", "create_anyway"]`
 
-Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
+Resolution fields accepted by `POST /api/v1/customers/quick-add/`:
 
 - `duplicate_resolution`:
   - `use_existing`: return selected existing customer without creating a new one
-  - `merge_existing`: update selected existing customer with incoming values
   - `create_anyway`: create new customer despite duplicates
 - `duplicate_target_id`:
-  - required for `use_existing` and `merge_existing`
-
-## Intake Conversion (INT-03)
-
-- `POST /api/v1/lead-contacts/{lead_id}/convert-to-project/`
-  - Auth required: `Authorization: Token TOKEN_VALUE`
-  - Note: this route remains for compatibility; primary quick-add flow now supports direct optional project creation.
-  - Request body:
-    - `project_name` (optional; defaults to `<intake full name> Project`)
-    - `project_status` (optional; default `prospect`)
-      - allowed: `prospect`, `active`, `on_hold`, `completed`, `cancelled`
-  - Behavior:
-    - creates or reuses a matching `Customer`
-    - creates a `Project` shell (job `site_address` seeded from intake `project_address`)
-    - marks intake row as `project_created` and stores conversion links
-  - Audit behavior:
-    - appends immutable intake conversion audit capture (`event_type=converted`, `capture_source=manual_ui`)
-    - appends immutable `CustomerRecord(event_type=created|updated, capture_source=manual_ui)` when customer rows are created/updated during conversion
-  - Idempotency:
-    - If intake row is already converted, returns existing customer/project with `meta.conversion_status = "already_converted"`.
+  - required for `use_existing`
 
 ## Project Profile and Baseline (PRJ-01)
 
@@ -204,8 +183,6 @@ Resolution fields accepted by `POST /api/v1/lead-contacts/quick-add/`:
   - Deletes one customer when no protected project references remain.
   - Write behavior appends immutable `CustomerRecord(event_type=deleted, capture_source=manual_ui)` before delete.
 
-- Legacy alias compatibility:
-  - `/api/v1/contacts/` and `/api/v1/contacts/{id}/` remain available as aliases for `/customers` routes.
 
 ## Cost Code Management (EST-01)
 

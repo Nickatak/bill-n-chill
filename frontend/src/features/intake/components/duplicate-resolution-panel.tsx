@@ -2,14 +2,14 @@
 
 import { KeyboardEvent } from "react";
 
-import { DuplicateCustomerCandidate, LeadPayload } from "../types";
+import { CustomerIntakePayload, DuplicateCustomerCandidate } from "../types";
 import { DuplicateResolution, SubmitIntent } from "../hooks/quick-add-controller.types";
 import styles from "./quick-add-console.module.css";
 
 type DuplicateResolutionPanelProps = {
   duplicateCandidates: DuplicateCustomerCandidate[];
   selectedDuplicateId: string;
-  duplicateMatchPayload: LeadPayload | null;
+  duplicateMatchPayload: CustomerIntakePayload | null;
   duplicateResolutionIntent: SubmitIntent | null;
   onSelectDuplicateId: (value: string) => void;
   onResolve: (resolution: DuplicateResolution, targetId?: number) => void;
@@ -27,7 +27,7 @@ function normalized(value: string | null | undefined) {
   return (value ?? "").trim().toLowerCase();
 }
 
-function matchedFields(candidate: DuplicateCustomerCandidate, payload: LeadPayload | null) {
+function matchedFields(candidate: DuplicateCustomerCandidate, payload: CustomerIntakePayload | null) {
   if (!payload) {
     return [];
   }
@@ -67,7 +67,7 @@ export function DuplicateResolutionPanel({
     return null;
   }
 
-  const isProjectFlow = duplicateResolutionIntent === "contact_and_project";
+  const isProjectFlow = duplicateResolutionIntent === "customer_and_project";
   const resolveActionLabel = isProjectFlow
     ? "Use Existing Customer + Create Project"
     : "Use Existing Customer";

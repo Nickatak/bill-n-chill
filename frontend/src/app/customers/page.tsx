@@ -1,5 +1,5 @@
 import { ContactsConsole } from "@/features/contacts";
-import styles from "../contacts/page.module.css";
+import styles from "./page.module.css";
 
 export default function CustomersPage() {
   return (

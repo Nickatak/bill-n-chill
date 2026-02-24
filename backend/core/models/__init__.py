@@ -24,7 +24,6 @@ from core.models.shared_operations import (
     AccountingSyncEvent,
     Customer,
     CostCode,
-    LeadContact,
     Organization,
     OrganizationMembership,
     Permission,
@@ -35,7 +34,6 @@ from core.models.shared_operations import (
 )
 from core.models.cash_management import Payment, PaymentAllocation
 __all__ = [
-    "LeadContact",
     "Customer",
     "Project",
     "CostCode",

@@ -1,8 +1,8 @@
-import { LeadPayload } from "../types";
+import { CustomerIntakePayload } from "../types";
 import { LeadFieldErrors, SubmitIntent } from "./quick-add-controller.types";
 
 export function validateLeadFields(
-  payload: LeadPayload,
+  payload: CustomerIntakePayload,
   {
     intent,
     projectName,
@@ -33,7 +33,7 @@ export function validateLeadFields(
   if (!payload.project_address.trim()) {
     nextErrors.project_address = "Project address is required.";
   }
-  if (intent === "contact_and_project" && !projectName.trim()) {
+  if (intent === "customer_and_project" && !projectName.trim()) {
     nextErrors.project_name = "Project name is required when creating project + customer.";
   }
 

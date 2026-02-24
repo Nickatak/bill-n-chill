@@ -105,7 +105,7 @@ export function QuickAddConsole() {
       {controllerApi.lastLead && controllerApi.lastSubmissionIntent ? (
         <div className={styles.summaryCard}>
           <p className={styles.summaryTitle}>
-            {controllerApi.lastSubmissionIntent === "contact_and_project"
+            {controllerApi.lastSubmissionIntent === "customer_and_project"
               ? "Customer + project created."
               : "Customer created."}
           </p>
@@ -135,7 +135,7 @@ export function QuickAddConsole() {
             ) : null}
             {" | "}
             {controllerApi.lastLead.full_name}
-            {controllerApi.lastSubmissionIntent === "contact_and_project" &&
+            {controllerApi.lastSubmissionIntent === "customer_and_project" &&
             controllerApi.lastConvertedProjectId === null ? (
               <> (project creation did not complete)</>
             ) : null}
