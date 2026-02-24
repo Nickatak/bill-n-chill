@@ -110,3 +110,4 @@ If resuming from a fresh context, start here:
 
 - No destructive git operations were used.
 - Current state is intentionally commit-stable and clean for context cycling.
+- IA decision to carry forward: keep `Projects + Estimates + Change Orders` together as scope workflow, then move to `Billing` as post-approval execution.

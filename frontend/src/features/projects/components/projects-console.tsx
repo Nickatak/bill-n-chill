@@ -584,7 +584,7 @@ export function ProjectsConsole() {
           <div className={styles.overviewHeader}>
             <div>
               <h3>Project Map</h3>
-              <p>Downstream workflow map with quick financial context.</p>
+              <p>Workflow map: scope control first, then billing execution.</p>
             </div>
             <div className={styles.overviewActions}>
               <button type="button" onClick={loadFinancialSummary}>
@@ -618,7 +618,7 @@ export function ProjectsConsole() {
               </div>
               <div className={styles.treeBranches}>
                 <div className={styles.branch}>
-                  <span className={styles.branchLabel}>Scope</span>
+                  <span className={styles.branchLabel}>Scope Control</span>
                   <div className={styles.node}>
                     <Link href={`/projects/${selectedProject.id}/estimates`}>Estimates</Link>
                     <span className={styles.nodeEstimateMeta}>
@@ -634,6 +634,12 @@ export function ProjectsConsole() {
                     </span>
                   </div>
                   <div className={styles.node}>
+                    <Link href={`/projects/${selectedProject.id}/change-orders`}>Change Orders</Link>
+                    <span className={styles.nodeCount}>
+                      {summaryCounts ? summaryCounts.changeOrders : "--"}
+                    </span>
+                  </div>
+                  <div className={styles.node}>
                     <Link
                       href={`/projects/${selectedProject.id}/budgets/analytics`}
                       prefetch={false}
@@ -643,46 +649,43 @@ export function ProjectsConsole() {
                     <span className={styles.nodeCount}>Auto</span>
                   </div>
                   <div className={styles.node}>
-                    <Link href={`/projects/${selectedProject.id}/change-orders`}>Change Orders</Link>
-                    <span className={styles.nodeCount}>
-                      {summaryCounts ? summaryCounts.changeOrders : "--"}
-                    </span>
-                  </div>
-                  <div className={styles.node}>
                     <Link href={`/projects/${selectedProject.id}/activity`}>Activity Timeline</Link>
                   </div>
                 </div>
                 <div className={styles.branch}>
-                  <span className={styles.branchLabel}>Receivables</span>
-                  <div className={styles.node}>
-                    <Link href="/invoices">Invoices</Link>
-                    <span className={styles.nodeCount}>
-                      {summaryCounts ? summaryCounts.invoices : "--"}
-                    </span>
+                  <span className={styles.branchLabel}>Billing</span>
+                  <div className={styles.branchGroup}>
+                    <span className={styles.branchSubLabel}>Receivables</span>
+                    <div className={styles.node}>
+                      <Link href="/invoices">Invoices</Link>
+                      <span className={styles.nodeCount}>
+                        {summaryCounts ? summaryCounts.invoices : "--"}
+                      </span>
+                    </div>
+                    <div className={styles.node}>
+                      <Link href={`/financials-auditing?project=${selectedProject.id}`}>Payments In (AR)</Link>
+                      <span className={styles.nodeCount}>
+                        {summaryCounts ? summaryCounts.arPayments : "--"}
+                      </span>
+                    </div>
                   </div>
-                  <div className={styles.node}>
-                    <Link href={`/financials-auditing?project=${selectedProject.id}`}>Payments (AR)</Link>
-                    <span className={styles.nodeCount}>
-                      {summaryCounts ? summaryCounts.arPayments : "--"}
-                    </span>
-                  </div>
-                </div>
-                <div className={styles.branch}>
-                  <span className={styles.branchLabel}>Payables</span>
-                  <div className={styles.node}>
-                    <Link href={`/projects/${selectedProject.id}/vendor-bills`}>Vendor Bills</Link>
-                    <span className={styles.nodeCount}>
-                      {summaryCounts ? summaryCounts.vendorBills : "--"}
-                    </span>
-                  </div>
-                  <div className={styles.node}>
-                    <Link href={`/projects/${selectedProject.id}/expenses`}>Expenses</Link>
-                  </div>
-                  <div className={styles.node}>
-                    <Link href={`/financials-auditing?project=${selectedProject.id}`}>Payments (AP)</Link>
-                    <span className={styles.nodeCount}>
-                      {summaryCounts ? summaryCounts.apPayments : "--"}
-                    </span>
+                  <div className={styles.branchGroup}>
+                    <span className={styles.branchSubLabel}>Payables</span>
+                    <div className={styles.node}>
+                      <Link href={`/projects/${selectedProject.id}/vendor-bills`}>Vendor Bills</Link>
+                      <span className={styles.nodeCount}>
+                        {summaryCounts ? summaryCounts.vendorBills : "--"}
+                      </span>
+                    </div>
+                    <div className={styles.node}>
+                      <Link href={`/projects/${selectedProject.id}/expenses`}>Expenses</Link>
+                    </div>
+                    <div className={styles.node}>
+                      <Link href={`/financials-auditing?project=${selectedProject.id}`}>Payments Out (AP)</Link>
+                      <span className={styles.nodeCount}>
+                        {summaryCounts ? summaryCounts.apPayments : "--"}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

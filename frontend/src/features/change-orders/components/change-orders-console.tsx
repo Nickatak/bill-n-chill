@@ -125,6 +125,7 @@ export function ChangeOrdersConsole({
   >([]);
   const [nextLineLocalId, setNextLineLocalId] = useState(2);
   const [selectedProjectName, setSelectedProjectName] = useState("");
+  const [activeFormMode, setActiveFormMode] = useState<"create" | "edit">("create");
 
   const [newTitle, setNewTitle] = useState("Change Order");
   const [newTitleManuallyEdited, setNewTitleManuallyEdited] = useState(false);
@@ -166,6 +167,16 @@ export function ChangeOrdersConsole({
     viewerChangeOrders.find((changeOrder) => String(changeOrder.id) === selectedChangeOrderId) ??
     viewerChangeOrders[0] ??
     null;
+  const totalChangeOrderCount = changeOrders.length;
+  const approvedChangeOrderCount = changeOrders.filter(
+    (changeOrder) => changeOrder.status === "approved",
+  ).length;
+  const pendingChangeOrderCount = changeOrders.filter(
+    (changeOrder) => changeOrder.status === "pending_approval",
+  ).length;
+  const scopedProjectLabel = selectedProjectId
+    ? `Project #${selectedProjectId}${selectedProjectName ? ` · ${selectedProjectName}` : ""}`
+    : "No project selected";
   const newLineDeltaTotal = useMemo(
     () =>
       newLineItems.reduce((sum, line) => sum + toNumber(line.amountDelta), 0),
@@ -578,6 +589,7 @@ export function ChangeOrdersConsole({
   }
 
   function handleStartNewChangeOrder() {
+    setActiveFormMode("create");
     const fallbackOriginEstimateId = projectEstimates[0] ? String(projectEstimates[0].id) : "";
     const nextOriginEstimateId =
       newOriginEstimateId && projectEstimates.some((estimate) => String(estimate.id) === newOriginEstimateId)
@@ -815,8 +827,40 @@ export function ChangeOrdersConsole({
         </p>
       ) : null}
 
+      <section className={styles.consoleTop}>
+        <div className={styles.consoleIntro}>
+          <p className={styles.consoleEyebrow}>Change Governance</p>
+          <h3 className={styles.consoleHeading}>{scopedProjectLabel}</h3>
+          <p className={styles.consoleCopy}>
+            Track scope deltas, preserve revision history, and hand approved changes into billing.
+          </p>
+        </div>
+        <div className={styles.consoleStats}>
+          <article className={styles.consoleStatCard}>
+            <span className={styles.consoleStatLabel}>Approved Estimates</span>
+            <strong className={styles.consoleStatValue}>{projectEstimates.length}</strong>
+          </article>
+          <article className={styles.consoleStatCard}>
+            <span className={styles.consoleStatLabel}>Change Orders</span>
+            <strong className={styles.consoleStatValue}>{totalChangeOrderCount}</strong>
+          </article>
+          <article className={styles.consoleStatCard}>
+            <span className={styles.consoleStatLabel}>Pending Approval</span>
+            <strong className={styles.consoleStatValue}>{pendingChangeOrderCount}</strong>
+          </article>
+          <article className={styles.consoleStatCard}>
+            <span className={styles.consoleStatLabel}>Approved</span>
+            <strong className={styles.consoleStatValue}>{approvedChangeOrderCount}</strong>
+          </article>
+        </div>
+      </section>
+
       <div className={styles.primaryCreateAction}>
-        <button type="button" onClick={handleStartNewChangeOrder}>
+        <button
+          type="button"
+          className={styles.primaryCreateButton}
+          onClick={handleStartNewChangeOrder}
+        >
           Add New Change Order
         </button>
       </div>
@@ -824,7 +868,7 @@ export function ChangeOrdersConsole({
       <section className={styles.viewer}>
         <div className={styles.viewerHeader}>
           <div className={styles.viewerHeaderRow}>
-            <h3>Change Order Viewer</h3>
+            <h3>Estimate-linked Revisions</h3>
             <button
               type="button"
               className={styles.viewerToggleButton}
@@ -834,7 +878,10 @@ export function ChangeOrdersConsole({
               {isViewerExpanded ? "Hide Viewer" : "Show Viewer"}
             </button>
           </div>
-          <p>Estimate-centric view. Shows approved estimates and their linked change orders.</p>
+          <p>
+            Select an approved estimate, review its full revision family, and move statuses without
+            leaving context.
+          </p>
         </div>
         {isViewerExpanded ? (projectEstimates.length > 0 ? (
           <div className={styles.viewerGrid}>
@@ -883,7 +930,10 @@ export function ChangeOrdersConsole({
                             key={changeOrder.id}
                             type="button"
                             className={`${styles.viewerRailItem} ${active ? styles.viewerRailItemActive : ""}`}
-                            onClick={() => hydrateEditForm(changeOrder)}
+                            onClick={() => {
+                              hydrateEditForm(changeOrder);
+                              setActiveFormMode("edit");
+                            }}
                           >
                             <span className={styles.viewerRailTitle}>
                               CO-{changeOrder.number} v{changeOrder.revision_number} {changeOrder.title}
@@ -1024,7 +1074,35 @@ export function ChangeOrdersConsole({
         )}
       </section>
 
-      <form className={estimateStyles.sheet} onSubmit={handleCreateChangeOrder}>
+      <div className={styles.formModeSwitch}>
+        <button
+          type="button"
+          className={`${styles.formModeButton} ${
+            activeFormMode === "create" ? styles.formModeButtonActive : ""
+          }`}
+          aria-pressed={activeFormMode === "create"}
+          onClick={() => setActiveFormMode("create")}
+        >
+          Create Draft
+        </button>
+        <button
+          type="button"
+          className={`${styles.formModeButton} ${
+            activeFormMode === "edit" ? styles.formModeButtonActive : ""
+          }`}
+          aria-pressed={activeFormMode === "edit"}
+          onClick={() => setActiveFormMode("edit")}
+          disabled={!selectedChangeOrderId}
+        >
+          Edit Selected
+        </button>
+      </div>
+
+      {activeFormMode === "create" ? (
+        <form
+          className={`${estimateStyles.sheet} ${styles.workflowSheet} ${styles.createSheet}`}
+          onSubmit={handleCreateChangeOrder}
+        >
         <div className={estimateStyles.sheetHeader}>
           <div className={estimateStyles.fromBlock}>
             <span className={estimateStyles.blockLabel}>From</span>
@@ -1181,9 +1259,14 @@ export function ChangeOrdersConsole({
             </div>
           </div>
         </div>
-      </form>
+        </form>
+      ) : null}
 
-      <form className={estimateStyles.sheet} onSubmit={handleUpdateChangeOrder}>
+      {activeFormMode === "edit" ? (
+        <form
+          className={`${estimateStyles.sheet} ${styles.workflowSheet} ${styles.editSheet}`}
+          onSubmit={handleUpdateChangeOrder}
+        >
         <div className={estimateStyles.sheetHeader}>
           <div className={estimateStyles.fromBlock}>
             <span className={estimateStyles.blockLabel}>Edit</span>
@@ -1336,7 +1419,8 @@ export function ChangeOrdersConsole({
             </div>
           </div>
         </div>
-      </form>
+        </form>
+      ) : null}
     </section>
   );
 }

@@ -9,18 +9,16 @@ export function WorkflowNavbar() {
   const pathname = usePathname() ?? "";
   const pathProjectMatch = pathname.match(/^\/projects\/(\d+)(?:\/|$)/);
   const projectId = pathProjectMatch?.[1] ?? null;
-  const postApprovalButtonRef = useRef<HTMLButtonElement>(null);
-  const postApprovalMenuRef = useRef<HTMLDivElement>(null);
-  const [isPostApprovalOpen, setIsPostApprovalOpen] = useState(false);
-  const [postApprovalMenuPosition, setPostApprovalMenuPosition] = useState({ top: 0, left: 0 });
-  const isChangeOrdersPath =
-    pathname === "/change-orders" || /^\/projects\/\d+\/change-orders$/.test(pathname);
+  const billingButtonRef = useRef<HTMLButtonElement>(null);
+  const billingMenuRef = useRef<HTMLDivElement>(null);
+  const [isBillingOpen, setIsBillingOpen] = useState(false);
+  const [billingMenuPosition, setBillingMenuPosition] = useState({ top: 0, left: 0 });
   const isInvoicesPath = pathname === "/invoices";
   const isVendorBillsPath = /^\/projects\/\d+\/vendor-bills$/.test(pathname);
-  const isPostApprovalPath = isChangeOrdersPath || isInvoicesPath || isVendorBillsPath;
+  const isBillingPath = isInvoicesPath || isVendorBillsPath;
 
-  function updatePostApprovalMenuPosition() {
-    const button = postApprovalButtonRef.current;
+  function updateBillingMenuPosition() {
+    const button = billingButtonRef.current;
     if (!button) {
       return;
     }
@@ -31,14 +29,14 @@ export function WorkflowNavbar() {
       viewportPadding,
       Math.min(rect.left, window.innerWidth - menuWidth - viewportPadding),
     );
-    setPostApprovalMenuPosition({
+    setBillingMenuPosition({
       top: Math.round(rect.bottom + 6),
       left: Math.round(nextLeft),
     });
   }
 
   useEffect(() => {
-    setIsPostApprovalOpen(false);
+    setIsBillingOpen(false);
   }, [pathname]);
 
   useEffect(() => {
@@ -48,12 +46,12 @@ export function WorkflowNavbar() {
         return;
       }
       if (
-        postApprovalButtonRef.current?.contains(target) ||
-        postApprovalMenuRef.current?.contains(target)
+        billingButtonRef.current?.contains(target) ||
+        billingMenuRef.current?.contains(target)
       ) {
         return;
       }
-      setIsPostApprovalOpen(false);
+      setIsBillingOpen(false);
     }
 
     window.addEventListener("pointerdown", handlePointerDown);
@@ -61,13 +59,13 @@ export function WorkflowNavbar() {
   }, []);
 
   useEffect(() => {
-    if (!isPostApprovalOpen) {
+    if (!isBillingOpen) {
       return;
     }
 
-    updatePostApprovalMenuPosition();
+    updateBillingMenuPosition();
     function handleWindowChange() {
-      updatePostApprovalMenuPosition();
+      updateBillingMenuPosition();
     }
 
     window.addEventListener("resize", handleWindowChange);
@@ -76,10 +74,10 @@ export function WorkflowNavbar() {
       window.removeEventListener("resize", handleWindowChange);
       window.removeEventListener("scroll", handleWindowChange, true);
     };
-  }, [isPostApprovalOpen]);
+  }, [isBillingOpen]);
 
-  function closePostApprovalMenu() {
-    setIsPostApprovalOpen(false);
+  function closeBillingMenu() {
+    setIsBillingOpen(false);
   }
 
   return (
@@ -87,10 +85,7 @@ export function WorkflowNavbar() {
       <div className="workflowNavInner">
         <div className="workflowNavScroll">
           {workflowRoutes.map((route) => {
-            if (route.href === "/post-approval") {
-              const changeOrdersHref = projectId
-                ? `/projects/${encodeURIComponent(projectId)}/change-orders`
-                : "/change-orders";
+            if (route.href === "/billing") {
               const vendorBillsHref = projectId
                 ? `/projects/${encodeURIComponent(projectId)}/vendor-bills`
                 : "/projects";
@@ -98,40 +93,32 @@ export function WorkflowNavbar() {
                 <div key={route.href} className="workflowDropdownMenu">
                   <button
                     type="button"
-                    ref={postApprovalButtonRef}
+                    ref={billingButtonRef}
                     className={`workflowLink workflowDropdownSummary ${
-                      isPostApprovalPath ? "isActive" : ""
+                      isBillingPath ? "isActive" : ""
                     }`}
                     aria-haspopup="menu"
-                    aria-expanded={isPostApprovalOpen}
-                    onClick={() => setIsPostApprovalOpen((current) => !current)}
+                    aria-expanded={isBillingOpen}
+                    onClick={() => setIsBillingOpen((current) => !current)}
                   >
                     {route.label}
                   </button>
-                  {isPostApprovalOpen ? (
+                  {isBillingOpen ? (
                     <div
-                      ref={postApprovalMenuRef}
+                      ref={billingMenuRef}
                       className="nonWorkflowList workflowDropdownList workflowDropdownListFloating"
                       role="menu"
-                      aria-label="Changes and billing routes"
+                      aria-label="Billing routes"
                       style={{
-                        top: `${postApprovalMenuPosition.top}px`,
-                        left: `${postApprovalMenuPosition.left}px`,
+                        top: `${billingMenuPosition.top}px`,
+                        left: `${billingMenuPosition.left}px`,
                       }}
                     >
-                      <Link
-                        href={changeOrdersHref}
-                        className={`nonWorkflowItem ${isChangeOrdersPath ? "isActive" : ""}`}
-                        role="menuitem"
-                        onClick={closePostApprovalMenu}
-                      >
-                        Change Orders
-                      </Link>
                       <Link
                         href="/invoices"
                         className={`nonWorkflowItem ${isInvoicesPath ? "isActive" : ""}`}
                         role="menuitem"
-                        onClick={closePostApprovalMenu}
+                        onClick={closeBillingMenu}
                       >
                         Invoices
                       </Link>
@@ -139,7 +126,7 @@ export function WorkflowNavbar() {
                         href={vendorBillsHref}
                         className={`nonWorkflowItem ${isVendorBillsPath ? "isActive" : ""}`}
                         role="menuitem"
-                        onClick={closePostApprovalMenu}
+                        onClick={closeBillingMenu}
                       >
                         Vendor Bills
                       </Link>

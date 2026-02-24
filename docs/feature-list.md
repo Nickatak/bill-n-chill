@@ -70,6 +70,15 @@ Track implementation-complete feature slices without duplicating full API/domain
 27. `QA-01` Audit trail coverage
 28. `QA-02` Regression test baseline
 
+## Workflow IA Note
+
+Frontend workflow is intentionally split into two stages:
+
+1. `Projects` stage: project shell + scope control (`Estimates`, `Change Orders`).
+2. `Billing` stage: post-approval financial execution (`Invoices`, `Vendor Bills`, payment/accounting flows).
+
+This keeps scope decisions adjacent to projects, then moves operators into billing after scope is approved.
+
 ## Notes
 
 - This file intentionally omits endpoint-by-endpoint details to prevent documentation drift.

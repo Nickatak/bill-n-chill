@@ -24,7 +24,7 @@ type HierarchyRule = {
 
 const ROOT_CRUMB: CrumbDef = { href: "/", label: "Intake" };
 const PROJECTS_HUB_CRUMB: CrumbDef = { href: "/projects", label: "Projects" };
-const POST_APPROVAL_HUB_CRUMB: CrumbDef = { href: "/projects", label: "Changes & Billing" };
+const BILLING_HUB_CRUMB: CrumbDef = { href: "/invoices", label: "Billing" };
 const META_HUB_CRUMB: CrumbDef = { href: "/ops/meta", label: "Meta" };
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 const legacyProjectScopedPrefixes = [
@@ -71,16 +71,16 @@ const hierarchyRules: HierarchyRule[] = [
   },
   {
     when: (pathname) => pathname === "/change-orders" || /^\/projects\/\d+\/change-orders$/.test(pathname),
-    crumbs: [PROJECTS_HUB_CRUMB, POST_APPROVAL_HUB_CRUMB, { href: "/change-orders", label: "Change Orders" }],
+    crumbs: [PROJECTS_HUB_CRUMB, { href: "/change-orders", label: "Change Orders" }],
   },
   {
     when: (pathname) => pathname === "/invoices",
-    crumbs: [PROJECTS_HUB_CRUMB, POST_APPROVAL_HUB_CRUMB, { href: "/invoices", label: "Invoices" }],
+    crumbs: [PROJECTS_HUB_CRUMB, BILLING_HUB_CRUMB, { href: "/invoices", label: "Invoices" }],
   },
   {
     when: (pathname) =>
       /^\/projects\/\d+\/vendor-bills$/.test(pathname),
-    crumbs: [PROJECTS_HUB_CRUMB, POST_APPROVAL_HUB_CRUMB, { href: "/projects", label: "Vendor Bills" }],
+    crumbs: [PROJECTS_HUB_CRUMB, BILLING_HUB_CRUMB, { href: "/projects", label: "Vendor Bills" }],
   },
   {
     when: (pathname) =>
@@ -176,6 +176,9 @@ function projectScopedHref(href: string, projectId: string): string {
   }
   if (href === "/change-orders") {
     return `/projects/${encodeURIComponent(projectId)}/change-orders`;
+  }
+  if (href === "/invoices") {
+    return `/invoices?project=${encodeURIComponent(projectId)}`;
   }
   if (href === "/activity") {
     return `/projects/${encodeURIComponent(projectId)}/activity`;

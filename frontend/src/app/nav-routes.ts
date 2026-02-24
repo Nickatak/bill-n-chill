@@ -22,9 +22,9 @@ export const workflowRoutes: NavRoute[] = [
     exact: ["/projects"],
   },
   {
-    href: "/post-approval",
-    label: "4 Changes & Billing",
-    exact: ["/change-orders", "/invoices"],
+    href: "/billing",
+    label: "4 Billing",
+    exact: ["/invoices"],
   },
   {
     href: "/financials-auditing",

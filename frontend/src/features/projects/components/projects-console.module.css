@@ -570,7 +570,7 @@
 
 .treeBranches {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -586,6 +586,19 @@
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: #1e3a8a;
+  font-weight: 600;
+}
+
+.branchGroup {
+  display: grid;
+  gap: 8px;
+}
+
+.branchSubLabel {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #475569;
   font-weight: 600;
 }
 
@@ -780,6 +793,10 @@
 :global(html[data-theme="dark"]) .rootLabel,
 :global(html[data-theme="dark"]) .branchLabel {
   color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .branchSubLabel {
+  color: #94a3b8;
 }
 
 :global(html[data-theme="dark"]) .quickStatusLabel {
