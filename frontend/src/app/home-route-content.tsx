@@ -15,6 +15,7 @@ type HomeRouteContentProps = {
     ok: boolean;
     message: string;
     appRevision?: string;
+    appBuildAt?: string;
     dataResetAt?: string;
   };
 };

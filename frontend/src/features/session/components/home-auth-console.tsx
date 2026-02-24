@@ -48,6 +48,7 @@ type HomeAuthConsoleProps = {
     ok: boolean;
     message: string;
     appRevision?: string;
+    appBuildAt?: string;
     dataResetAt?: string;
   };
 };
@@ -226,6 +227,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
               time.
             </p>
             <p className={styles.warningMeta}>Last data reset: {formatTimestamp(health.dataResetAt)}</p>
+            <p className={styles.warningMeta}>Last build: {formatTimestamp(health.appBuildAt)}</p>
             <p className={styles.warningMeta}>
               Deployed commit: {health.appRevision?.slice(0, 12) || "unknown"}
             </p>

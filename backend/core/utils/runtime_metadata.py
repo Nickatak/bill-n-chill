@@ -42,3 +42,17 @@ def get_app_revision() -> str | None:
         if value:
             return value
     return None
+
+
+def get_app_build_at() -> str | None:
+    # Prefer explicit deployment build timestamp metadata values.
+    for env_name in (
+        "APP_BUILD_AT",
+        "BUILD_TIMESTAMP",
+        "RENDER_BUILD_TIMESTAMP",
+        "VERCEL_GIT_COMMIT_DATE",
+    ):
+        value = os.getenv(env_name, "").strip()
+        if value:
+            return value
+    return None
