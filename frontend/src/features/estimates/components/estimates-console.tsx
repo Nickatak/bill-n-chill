@@ -67,8 +67,9 @@ const ESTIMATE_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, EstimateStatu
 const ESTIMATE_QUICK_ACTION_BY_STATUS_FALLBACK: Record<string, "change_order" | "revision"> = {
   approved: "change_order",
   rejected: "revision",
-  archived: "revision",
+  void: "revision",
 };
+const ESTIMATE_SYSTEM_ONLY_STATUSES = new Set<EstimateStatusValue>(["archived"]);
 
 function emptyLine(localId: number, defaultCostCodeId = ""): EstimateLineInput {
   return {
@@ -167,6 +168,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const [estimateStatusFilters, setEstimateStatusFilters] = useState<EstimateStatusValue[]>(
     ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK,
   );
+  const estimateStatusFiltersRef = useRef<EstimateStatusValue[]>(
+    ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK,
+  );
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const scopedProjectId = scopedProjectIdProp;
@@ -195,7 +199,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       label: estimateStatusLabels[statusValue] ?? statusValue,
     }),
   );
-  const estimateStatusFilterValues = statusOptions.map((option) => option.value);
+  const viewerStatusOptions = statusOptions.filter(
+    (option) => !ESTIMATE_SYSTEM_ONLY_STATUSES.has(option.value),
+  );
+  const estimateStatusFilterValues = viewerStatusOptions.map((option) => option.value);
   const statusDisplayOptions = statusOptions;
   const statusLabelByValue = statusDisplayOptions.reduce<Record<string, string>>((labels, option) => {
     labels[option.value] = option.label;
@@ -205,7 +212,11 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     ? estimateAllowedStatusTransitions[selectedEstimate.status] ?? []
     : [];
   const nextStatusOptions = statusOptions
-    .filter((option) => nextStatusValues.includes(option.value))
+    .filter(
+      (option) =>
+        nextStatusValues.includes(option.value) &&
+        !ESTIMATE_SYSTEM_ONLY_STATUSES.has(option.value),
+    )
     .map((option) =>
       selectedEstimate?.status === "sent" && option.value === "sent"
         ? { ...option, label: "Re-send" }
@@ -480,6 +491,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     selectedEstimateIdRef.current = selectedEstimateId;
   }, [selectedEstimateId]);
 
+  useEffect(() => {
+    estimateStatusFiltersRef.current = estimateStatusFilters;
+  }, [estimateStatusFilters]);
+
   const clearSelectedEstimateState = useCallback(() => {
     const defaultCostCodeId = costCodes[0] ? String(costCodes[0].id) : "";
     setSelectedEstimateId("");
@@ -619,10 +634,23 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       const rows = (payload.data as EstimateRecord[]) ?? [];
       setEstimates(rows);
       if (rows[0]) {
+        const activeFilters = estimateStatusFiltersRef.current;
         const scopedEstimateMatch = scopedEstimateId
           ? rows.find((estimate) => estimate.id === scopedEstimateId)
           : null;
-        handleSelectEstimate(scopedEstimateMatch ?? rows[0]);
+        const scopedEstimateAllowed =
+          scopedEstimateMatch &&
+          activeFilters.includes(scopedEstimateMatch.status as EstimateStatusValue);
+        if (scopedEstimateAllowed) {
+          handleSelectEstimate(scopedEstimateMatch);
+          return;
+        }
+        const firstVisibleEstimate = rows.find((estimate) =>
+          activeFilters.includes(estimate.status as EstimateStatusValue),
+        );
+        if (firstVisibleEstimate) {
+          handleSelectEstimate(firstVisibleEstimate);
+        }
       }
     } catch {
       setActionMessage("Could not reach estimate endpoint.");
@@ -960,6 +988,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         setSelectedProjectId(String(duplicated.project));
       }
       handleSelectEstimate(duplicated);
+      const duplicatedFamilyTitle = (duplicated.title || "").trim() || "Untitled";
+      setOpenFamilyHistory(new Set<string>([duplicatedFamilyTitle]));
       setShowDuplicatePanel(false);
       setStatusEvents([]);
       setActionMessage("");
@@ -1120,7 +1150,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
             <div className={styles.versionFilters}>
               <span className={styles.versionFiltersLabel}>Estimate status filter</span>
               <div className={styles.versionFilterButtons}>
-                {statusOptions.map((option) => {
+                {viewerStatusOptions.map((option) => {
                   const active = estimateStatusFilters.includes(option.value);
                   return (
                     <button

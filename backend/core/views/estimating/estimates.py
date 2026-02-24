@@ -138,7 +138,18 @@ def _next_estimate_family_version(*, project, user, title):
     return (latest.version + 1) if latest else 1
 
 
+def _sync_project_contract_baseline_if_unset(*, estimate):
+    project = estimate.project
+    if project.contract_value_original != Decimal("0") or project.contract_value_current != Decimal("0"):
+        return False
+    project.contract_value_original = estimate.grand_total
+    project.contract_value_current = estimate.grand_total
+    project.save(update_fields=["contract_value_original", "contract_value_current", "updated_at"])
+    return True
+
+
 def _ensure_budget_from_approved_estimate(*, estimate, user, note: str):
+    _sync_project_contract_baseline_if_unset(estimate=estimate)
     actor_user_ids = _organization_user_ids(user)
     existing = (
         Budget.objects.filter(source_estimate=estimate, created_by_id__in=actor_user_ids)

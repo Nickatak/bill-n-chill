@@ -24,13 +24,13 @@ type HierarchyRule = {
 
 const ROOT_CRUMB: CrumbDef = { href: "/", label: "Intake" };
 const PROJECTS_HUB_CRUMB: CrumbDef = { href: "/projects", label: "Projects" };
+const POST_APPROVAL_HUB_CRUMB: CrumbDef = { href: "/projects", label: "Changes & Billing" };
 const META_HUB_CRUMB: CrumbDef = { href: "/ops/meta", label: "Meta" };
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 const legacyProjectScopedPrefixes = [
   "/estimates",
   "/change-orders",
   "/invoices",
-  "/payments",
 ];
 
 const hierarchyRules: HierarchyRule[] = [
@@ -71,25 +71,21 @@ const hierarchyRules: HierarchyRule[] = [
   },
   {
     when: (pathname) => pathname === "/change-orders" || /^\/projects\/\d+\/change-orders$/.test(pathname),
-    crumbs: [PROJECTS_HUB_CRUMB, { href: "/change-orders", label: "Change Orders" }],
+    crumbs: [PROJECTS_HUB_CRUMB, POST_APPROVAL_HUB_CRUMB, { href: "/change-orders", label: "Change Orders" }],
   },
   {
     when: (pathname) => pathname === "/invoices",
-    crumbs: [PROJECTS_HUB_CRUMB, { href: "/invoices", label: "Invoices" }],
+    crumbs: [PROJECTS_HUB_CRUMB, POST_APPROVAL_HUB_CRUMB, { href: "/invoices", label: "Invoices" }],
   },
   {
     when: (pathname) =>
       /^\/projects\/\d+\/vendor-bills$/.test(pathname),
-    crumbs: [PROJECTS_HUB_CRUMB, { href: "/projects", label: "Vendor Bills" }],
+    crumbs: [PROJECTS_HUB_CRUMB, POST_APPROVAL_HUB_CRUMB, { href: "/projects", label: "Vendor Bills" }],
   },
   {
     when: (pathname) =>
       /^\/projects\/\d+\/expenses$/.test(pathname),
     crumbs: [PROJECTS_HUB_CRUMB, { href: "/projects", label: "Expenses" }],
-  },
-  {
-    when: (pathname) => pathname === "/payments",
-    crumbs: [PROJECTS_HUB_CRUMB, { href: "/payments", label: "Payments" }],
   },
   {
     when: (pathname) => pathname === "/ops/meta",
@@ -129,8 +125,8 @@ const hierarchyRules: HierarchyRule[] = [
   {
     when: (pathname) => pathname === "/financials-auditing",
     crumbs: [
-      META_HUB_CRUMB,
-      { href: "/financials-auditing", label: "Financials & Auditing" },
+      PROJECTS_HUB_CRUMB,
+      { href: "/financials-auditing", label: "Financials & Accounting" },
     ],
   },
   {

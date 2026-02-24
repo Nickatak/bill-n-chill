@@ -661,7 +661,7 @@ export function ProjectsConsole() {
                     </span>
                   </div>
                   <div className={styles.node}>
-                    <Link href="/payments">Payments (AR)</Link>
+                    <Link href={`/financials-auditing?project=${selectedProject.id}`}>Payments (AR)</Link>
                     <span className={styles.nodeCount}>
                       {summaryCounts ? summaryCounts.arPayments : "--"}
                     </span>
@@ -679,7 +679,7 @@ export function ProjectsConsole() {
                     <Link href={`/projects/${selectedProject.id}/expenses`}>Expenses</Link>
                   </div>
                   <div className={styles.node}>
-                    <Link href="/payments">Payments (AP)</Link>
+                    <Link href={`/financials-auditing?project=${selectedProject.id}`}>Payments (AP)</Link>
                     <span className={styles.nodeCount}>
                       {summaryCounts ? summaryCounts.apPayments : "--"}
                     </span>

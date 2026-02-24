@@ -1,4 +1,5 @@
 import { FinancialsAuditingConsole } from "@/features/financials-auditing";
+import { PaymentsConsole } from "@/features/payments";
 import styles from "../vendors/page.module.css";
 
 export default function FinancialsAuditingPage() {
@@ -6,9 +7,9 @@ export default function FinancialsAuditingPage() {
     <div className={styles.page}>
       <main className={styles.main}>
         <header className={styles.header}>
-          <h1>Financials & Auditing</h1>
+          <h1>Financials & Accounting</h1>
           <p>
-            This non-workflow route centralizes finance controls: summary extraction, immutable
+            This route centralizes finance controls: summary extraction, immutable
             audit visibility, and accounting sync event operations.
           </p>
           <p>
@@ -18,6 +19,14 @@ export default function FinancialsAuditingPage() {
         </header>
         <section className={styles.card}>
           <FinancialsAuditingConsole />
+        </section>
+        <section className={styles.card}>
+          <h2>Payments</h2>
+          <p>
+            AR receipts and AP disbursements live here as part of the accounting surface for
+            allocation, reconciliation, and downstream sync.
+          </p>
+          <PaymentsConsole />
         </section>
       </main>
     </div>

@@ -28,7 +28,7 @@ export default async function ProjectActivityPage({ params }: ProjectActivityPag
           </p>
           <p>
             <Link href={`/projects?project=${projectId}`}>Back to Project Hub</Link> |{" "}
-            <Link href={`/financials-auditing`}>Next: Financials & Auditing</Link>
+            <Link href={`/financials-auditing`}>Next: Financials & Accounting</Link>
           </p>
         </header>
         <section className={styles.card}>

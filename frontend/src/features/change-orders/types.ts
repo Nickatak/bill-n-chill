@@ -67,5 +67,5 @@ export type ApiResponse = {
     | ChangeOrderRecord
     | ChangeOrderPolicyContract
     | Array<{ id: number; status: string; line_items: BudgetLineRecord[] }>;
-  error?: { code?: string; message?: string };
+  error?: { code?: string; message?: string; fields?: Record<string, string[]> };
 };

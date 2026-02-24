@@ -39,12 +39,11 @@ This map defines how to trace behavior from route to feature code and how to com
 | `/projects/[projectId]/estimates` | `frontend/src/app/projects/[projectId]/estimates/page.tsx` | `frontend/src/features/estimates/components/estimates-console.tsx` |
 | `/projects/[projectId]/change-orders` | `frontend/src/app/projects/[projectId]/change-orders/page.tsx` | `frontend/src/features/change-orders/components/change-orders-console.tsx` |
 | `/projects/[projectId]/vendor-bills` | `frontend/src/app/projects/[projectId]/vendor-bills/page.tsx` | `frontend/src/features/vendor-bills/components/vendor-bills-console.tsx` |
-| `/payments` | `frontend/src/app/payments/page.tsx` | `frontend/src/features/payments/components/payments-console.tsx` |
 | `/invoices` | `frontend/src/app/invoices/page.tsx` | `frontend/src/features/invoices/components/invoices-console.tsx` |
 | `/vendors` | `frontend/src/app/vendors/page.tsx` | `frontend/src/features/vendors/components/vendors-console.tsx` |
 | `/customers` | `frontend/src/app/customers/page.tsx` | `frontend/src/features/contacts/components/contacts-console.tsx` |
 | `/cost-codes` | `frontend/src/app/cost-codes/page.tsx` | `frontend/src/features/cost-codes/components/cost-codes-console.tsx` |
-| `/financials-auditing` | `frontend/src/app/financials-auditing/page.tsx` | `frontend/src/features/financials-auditing/components/financials-auditing-console.tsx` |
+| `/financials-auditing` | `frontend/src/app/financials-auditing/page.tsx` | `frontend/src/features/financials-auditing/components/financials-auditing-console.tsx` + `frontend/src/features/payments/components/payments-console.tsx` |
 | `/intake/quick-add` | `frontend/src/app/intake/quick-add/page.tsx` | `frontend/src/features/intake/components/quick-add-console.tsx` |
 | `/estimate/[publicRef]` | `frontend/src/app/estimate/[publicRef]/page.tsx` | `frontend/src/features/estimates/components/estimate-approval-preview.tsx` |
 

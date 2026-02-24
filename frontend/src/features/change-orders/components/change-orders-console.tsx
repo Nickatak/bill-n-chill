@@ -59,6 +59,24 @@ function formatMoney(value: number): string {
   return value.toFixed(2);
 }
 
+function readApiErrorMessage(payload: ApiResponse | undefined, fallback: string): string {
+  const topLevelMessage = payload?.error?.message?.trim();
+  if (topLevelMessage) {
+    return topLevelMessage;
+  }
+  const fieldEntries = Object.entries(payload?.error?.fields ?? {});
+  for (const [fieldName, fieldMessages] of fieldEntries) {
+    if (!Array.isArray(fieldMessages)) {
+      continue;
+    }
+    const firstFieldMessage = fieldMessages.find((message) => Boolean((message || "").trim()));
+    if (firstFieldMessage) {
+      return `${fieldName}: ${firstFieldMessage}`;
+    }
+  }
+  return fallback;
+}
+
 type ChangeOrdersConsoleProps = {
   scopedProjectId?: number | null;
   initialOriginEstimateId?: number | null;
@@ -92,8 +110,9 @@ export function ChangeOrdersConsole({
   scopedProjectId: scopedProjectIdProp = null,
   initialOriginEstimateId: initialOriginEstimateIdProp = null,
 }: ChangeOrdersConsoleProps) {
-  const { token, authMessage, role } = useSharedSessionAuth();
-  const [statusMessage, setStatusMessage] = useState("");
+  const { token, role } = useSharedSessionAuth();
+  const [actionMessage, setActionMessage] = useState("");
+  const [actionTone, setActionTone] = useState<"error" | "success" | "info">("info");
 
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [changeOrders, setChangeOrders] = useState<ChangeOrderRecord[]>([]);
@@ -177,14 +196,30 @@ export function ChangeOrdersConsole({
   const quickStatusOptions = selectedViewerChangeOrder
     ? changeOrderAllowedTransitions[selectedViewerChangeOrder.status] ?? []
     : [];
+  const editStatusOptions = useMemo(() => {
+    if (!selectedChangeOrder) {
+      return changeOrderStatuses;
+    }
+    const allowed = changeOrderAllowedTransitions[selectedChangeOrder.status] ?? [];
+    const values = [selectedChangeOrder.status, ...allowed.filter((status) => status !== selectedChangeOrder.status)];
+    return values.filter((status) => changeOrderStatuses.includes(status));
+  }, [changeOrderAllowedTransitions, changeOrderStatuses, selectedChangeOrder]);
 
   function statusLabel(status: string): string {
     const label = changeOrderStatusLabels[status];
     if (label) {
-      return label.toUpperCase();
+      return label;
     }
-    return status.replaceAll("_", " ").toUpperCase();
+    return status
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
   }
+
+  const setFeedback = useCallback((message: string, tone: "error" | "success" | "info" = "info") => {
+    setActionMessage(message);
+    setActionTone(tone);
+  }, []);
 
   function originalApprovedAmountForLine(budgetLineId: string): string {
     const line = budgetLineById.get(budgetLineId);
@@ -395,7 +430,10 @@ export function ChangeOrdersConsole({
     );
     const payload: ApiResponse = await response.json();
     if (!response.ok) {
-      return { rows: null as ChangeOrderRecord[] | null, error: "Could not load change orders." };
+      return {
+        rows: null as ChangeOrderRecord[] | null,
+        error: readApiErrorMessage(payload, "Could not load change orders."),
+      };
     }
     return { rows: (payload.data as ChangeOrderRecord[]) ?? [], error: "" };
   }, [normalizedBaseUrl, token]);
@@ -404,14 +442,14 @@ export function ChangeOrdersConsole({
     if (!token) {
       return;
     }
-    setStatusMessage("Loading projects...");
+    setFeedback("");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/`, {
         headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setStatusMessage("Could not load projects.");
+        setFeedback(readApiErrorMessage(payload, "Could not load projects."), "error");
         return;
       }
       const rows = (payload.data as Array<{ id: number; name: string }>) ?? [];
@@ -439,14 +477,12 @@ export function ChangeOrdersConsole({
         if (!changeOrderRows) {
           setChangeOrders([]);
           hydrateEditForm(undefined);
-          setStatusMessage(`${error}${scopeFallbackNote}`);
+          setFeedback(`${error}${scopeFallbackNote}`, "error");
           return;
         }
         setChangeOrders(changeOrderRows);
         hydrateEditForm(changeOrderRows[0]);
-        setStatusMessage(
-          `Loaded ${rows.length} project(s) and ${changeOrderRows.length} change order(s).${scopeFallbackNote}`,
-        );
+        setFeedback("");
       } else {
         setSelectedProjectId("");
         setSelectedProjectName("");
@@ -454,12 +490,22 @@ export function ChangeOrdersConsole({
         setProjectEstimates([]);
         setChangeOrders([]);
         hydrateEditForm(undefined);
-        setStatusMessage("No projects found.");
+        setFeedback("No projects found.", "info");
       }
     } catch {
-      setStatusMessage("Could not reach projects endpoint.");
+      setFeedback("Could not reach projects endpoint.", "error");
     }
-  }, [fetchProjectChangeOrders, hydrateEditForm, loadBudgetLines, loadProjectEstimates, newTitleManuallyEdited, normalizedBaseUrl, scopedProjectId, token]);
+  }, [
+    fetchProjectChangeOrders,
+    hydrateEditForm,
+    loadBudgetLines,
+    loadProjectEstimates,
+    newTitleManuallyEdited,
+    normalizedBaseUrl,
+    scopedProjectId,
+    setFeedback,
+    token,
+  ]);
 
   useEffect(() => {
     if (!token) {
@@ -547,22 +593,22 @@ export function ChangeOrdersConsole({
       setNewLineItems([emptyLine(1)]);
       setNextLineLocalId(2);
     }
-    setStatusMessage("Add form reset for a new change order.");
+    setFeedback("Ready for a new change order draft.", "info");
   }
 
   async function handleCreateChangeOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canMutateChangeOrders) {
-      setStatusMessage(`Role ${role} is read-only for change order mutations.`);
+      setFeedback(`Role ${role} is read-only for change order mutations.`, "error");
       return;
     }
     const projectId = Number(selectedProjectId);
     if (!projectId) {
-      setStatusMessage("Select a project first.");
+      setFeedback("Select a project first.", "error");
       return;
     }
 
-    setStatusMessage("Creating change order...");
+    setFeedback("");
     try {
       const response = await fetch(
         `${normalizedBaseUrl}/projects/${projectId}/change-orders/`,
@@ -581,7 +627,7 @@ export function ChangeOrdersConsole({
       );
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setStatusMessage(payload.error?.message ?? "Create change order failed.");
+        setFeedback(readApiErrorMessage(payload, "Create change order failed."), "error");
         return;
       }
       const created = payload.data as ChangeOrderRecord;
@@ -595,34 +641,34 @@ export function ChangeOrdersConsole({
         setChangeOrders((current) => [created, ...current]);
         hydrateEditForm(created);
       }
-      setStatusMessage(`Created change order CO-${created.number} (${created.status}).`);
+      setFeedback(`Created change order CO-${created.number} (${statusLabel(created.status)}).`, "success");
       setNewLineItems([emptyLine(1)]);
       setNextLineLocalId(2);
       setNewOriginEstimateId(projectEstimates[0] ? String(projectEstimates[0].id) : "");
       setNewTitleManuallyEdited(false);
       setNewTitle(defaultChangeOrderTitle(selectedProjectName));
     } catch {
-      setStatusMessage("Could not reach change order create endpoint.");
+      setFeedback("Could not reach change order create endpoint.", "error");
     }
   }
 
   async function handleCloneRevision() {
     if (!canMutateChangeOrders) {
-      setStatusMessage(`Role ${role} is read-only for change order mutations.`);
+      setFeedback(`Role ${role} is read-only for change order mutations.`, "error");
       return;
     }
     const changeOrderId = Number(selectedChangeOrderId);
     if (!changeOrderId) {
-      setStatusMessage("Select a change order first.");
+      setFeedback("Select a change order first.", "error");
       return;
     }
     const projectId = Number(selectedProjectId);
     if (!projectId) {
-      setStatusMessage("Select a project first.");
+      setFeedback("Select a project first.", "error");
       return;
     }
 
-    setStatusMessage("Cloning revision...");
+    setFeedback("");
     try {
       const response = await fetch(`${normalizedBaseUrl}/change-orders/${changeOrderId}/clone-revision/`, {
         method: "POST",
@@ -630,7 +676,7 @@ export function ChangeOrdersConsole({
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setStatusMessage(payload.error?.message ?? "Clone revision failed.");
+        setFeedback(readApiErrorMessage(payload, "Clone revision failed."), "error");
         return;
       }
       const created = payload.data as ChangeOrderRecord;
@@ -640,25 +686,25 @@ export function ChangeOrdersConsole({
         const persisted = rows.find((row) => row.id === created.id);
         hydrateEditForm(persisted ?? created);
       }
-      setStatusMessage(`Created CO-${created.number} v${created.revision_number} in draft.`);
+      setFeedback(`Created CO-${created.number} v${created.revision_number} in Draft.`, "success");
     } catch {
-      setStatusMessage("Could not reach clone revision endpoint.");
+      setFeedback("Could not reach clone revision endpoint.", "error");
     }
   }
 
   async function handleUpdateChangeOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canMutateChangeOrders) {
-      setStatusMessage(`Role ${role} is read-only for change order mutations.`);
+      setFeedback(`Role ${role} is read-only for change order mutations.`, "error");
       return;
     }
     const changeOrderId = Number(selectedChangeOrderId);
     if (!changeOrderId) {
-      setStatusMessage("Select a change order first.");
+      setFeedback("Select a change order first.", "error");
       return;
     }
 
-    setStatusMessage("Saving change order...");
+    setFeedback("");
     try {
       const response = await fetch(
         `${normalizedBaseUrl}/change-orders/${changeOrderId}/`,
@@ -677,7 +723,7 @@ export function ChangeOrdersConsole({
       );
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setStatusMessage(payload.error?.message ?? "Save change order failed.");
+        setFeedback(readApiErrorMessage(payload, "Save change order failed."), "error");
         return;
       }
       const updated = payload.data as ChangeOrderRecord;
@@ -687,38 +733,35 @@ export function ChangeOrdersConsole({
         setChangeOrders(rows);
         const persisted = rows.find((row) => row.id === updated.id);
         hydrateEditForm(persisted ?? updated);
-        const persistedStatus = persisted?.status ?? updated.status;
-        setStatusMessage(
-          `Saved change order CO-${updated.number}. Persisted status: ${persistedStatus}.`,
-        );
+        setFeedback(`Saved change order CO-${updated.number} (${statusLabel(updated.status)}).`, "success");
       } else {
         setChangeOrders((current) =>
           current.map((row) => (row.id === updated.id ? updated : row)),
         );
         hydrateEditForm(updated);
-        setStatusMessage(`Saved change order CO-${updated.number} (${updated.status}).`);
+        setFeedback(`Saved change order CO-${updated.number} (${statusLabel(updated.status)}).`, "success");
       }
     } catch {
-      setStatusMessage("Could not reach change order detail endpoint.");
+      setFeedback("Could not reach change order detail endpoint.", "error");
     }
   }
 
   async function handleQuickUpdateStatus() {
     if (!canMutateChangeOrders) {
-      setStatusMessage(`Role ${role} is read-only for change order mutations.`);
+      setFeedback(`Role ${role} is read-only for change order mutations.`, "error");
       return;
     }
     const projectId = Number(selectedProjectId);
     if (!selectedViewerChangeOrder || !quickStatus) {
-      setStatusMessage("Select a change order and next status first.");
+      setFeedback("Select a change order and next status first.", "error");
       return;
     }
     if (!projectId) {
-      setStatusMessage("Select a project first.");
+      setFeedback("Select a project first.", "error");
       return;
     }
 
-    setStatusMessage(`Updating CO-${selectedViewerChangeOrder.number} status...`);
+    setFeedback("");
     try {
       const response = await fetch(
         `${normalizedBaseUrl}/change-orders/${selectedViewerChangeOrder.id}/`,
@@ -730,7 +773,7 @@ export function ChangeOrdersConsole({
       );
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setStatusMessage(payload.error?.message ?? "Status update failed.");
+        setFeedback(readApiErrorMessage(payload, "Status update failed."), "error");
         return;
       }
       const updated = payload.data as ChangeOrderRecord;
@@ -745,19 +788,32 @@ export function ChangeOrdersConsole({
         );
         hydrateEditForm(updated);
       }
-      setStatusMessage(`Updated CO-${updated.number} to ${statusLabel(updated.status)}.`);
+      setFeedback(`Updated CO-${updated.number} to ${statusLabel(updated.status)}.`, "success");
     } catch {
-      setStatusMessage("Could not reach change order detail endpoint.");
+      setFeedback("Could not reach change order detail endpoint.", "error");
     }
   }
 
   return (
     <section>
-      <h2>Change Orders</h2>
-      <p>Create and route project change orders through approval states.</p>
-
-      <p>{authMessage}</p>
-      {!canMutateChangeOrders ? <p>Role `{role}` can view change orders but cannot create or update.</p> : null}
+      {actionMessage ? (
+        <p
+          className={
+            actionTone === "error"
+              ? estimateStyles.actionError
+              : actionTone === "success"
+                ? estimateStyles.actionSuccess
+                : estimateStyles.inlineHint
+          }
+        >
+          {actionMessage}
+        </p>
+      ) : null}
+      {!canMutateChangeOrders ? (
+        <p className={styles.roleReadOnlyNote}>
+          Role `{role}` can view change orders but cannot create or update.
+        </p>
+      ) : null}
 
       <div className={styles.primaryCreateAction}>
         <button type="button" onClick={handleStartNewChangeOrder}>
@@ -801,7 +857,9 @@ export function ChangeOrdersConsole({
                     <span className={styles.viewerMetaLabel}>
                       {relatedCount} {relatedCount === 1 ? "change order" : "change orders"}
                     </span>
-                    <span className={`${styles.statusBadge} ${styles.statusApproved}`}>APPROVED</span>
+                    <span className={`${styles.statusBadge} ${styles.statusApproved}`}>
+                      {statusLabel("approved")}
+                    </span>
                   </button>
                 );
               })}
@@ -1163,9 +1221,9 @@ export function ChangeOrdersConsole({
               value={editStatus}
               onChange={(event) => setEditStatus(event.target.value)}
             >
-              {changeOrderStatuses.map((status) => (
+              {editStatusOptions.map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {statusLabel(status)}
                 </option>
               ))}
             </select>
@@ -1279,8 +1337,6 @@ export function ChangeOrdersConsole({
           </div>
         </div>
       </form>
-
-      <p>{statusMessage}</p>
     </section>
   );
 }

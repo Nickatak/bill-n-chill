@@ -134,7 +134,7 @@ class EstimateTests(TestCase):
             {
                 Estimate.Status.APPROVED: "change_order",
                 Estimate.Status.REJECTED: "revision",
-                Estimate.Status.ARCHIVED: "revision",
+                Estimate.Status.VOID: "revision",
             },
         )
         self.assertTrue(str(payload["policy_version"]).startswith("2026-02-24.estimates."))
@@ -863,6 +863,9 @@ class EstimateTests(TestCase):
         )
         self.assertEqual(to_approved.status_code, 200)
         self.assertEqual(Budget.objects.filter(source_estimate_id=estimate_id).count(), 1)
+        self.project.refresh_from_db()
+        self.assertEqual(str(self.project.contract_value_original), "500.00")
+        self.assertEqual(str(self.project.contract_value_current), "500.00")
 
         convert = self.client.post(
             f"/api/v1/estimates/{estimate_id}/convert-to-budget/",
@@ -873,6 +876,53 @@ class EstimateTests(TestCase):
         self.assertEqual(convert.status_code, 200)
         self.assertEqual(convert.json()["meta"]["conversion_status"], "already_converted")
         self.assertEqual(Budget.objects.filter(source_estimate_id=estimate_id).count(), 1)
+
+    def test_estimate_approval_does_not_override_existing_project_contract_baseline(self):
+        Project.objects.filter(id=self.project.id).update(
+            contract_value_original="1000.00",
+            contract_value_current="1000.00",
+        )
+
+        create = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "No Override Estimate",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo and prep",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(create.status_code, 201)
+        estimate_id = create.json()["data"]["id"]
+
+        to_sent = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_sent.status_code, 200)
+
+        to_approved = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"status": "approved"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_approved.status_code, 200)
+
+        self.project.refresh_from_db()
+        self.assertEqual(str(self.project.contract_value_original), "1000.00")
+        self.assertEqual(str(self.project.contract_value_current), "1000.00")
 
     def test_estimate_status_transition_allows_sent_to_void(self):
         create = self.client.post(

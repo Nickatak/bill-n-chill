@@ -4,7 +4,7 @@
 Manage project cash movement (inbound and outbound), payment status lifecycle, and allocation to AR/AP targets.
 
 ## Route Surface
-1. `/payments`
+1. `/financials-auditing` (payments console embedded on financials page)
 
 ## Mutation Map
 1. `Payment`
@@ -15,7 +15,7 @@ Manage project cash movement (inbound and outbound), payment status lifecycle, a
 
 ## Composition and Entry Flow
 1. Entry sources:
-   - direct route entry: `frontend/src/app/payments/page.tsx` renders `PaymentsConsole`
+   - financials route entry: `frontend/src/app/financials-auditing/page.tsx` renders `PaymentsConsole`
    - feature export entry: `frontend/src/features/payments/index.ts` exports `PaymentsConsole`
 2. Parent/Owner:
    `PaymentsConsole` owns project scope, selected payment, policy-driven status actions, and allocation workflow.

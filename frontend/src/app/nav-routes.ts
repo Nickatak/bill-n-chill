@@ -22,14 +22,14 @@ export const workflowRoutes: NavRoute[] = [
     exact: ["/projects"],
   },
   {
-    href: "/invoices",
-    label: "4 Invoices",
-    exact: ["/invoices"],
+    href: "/post-approval",
+    label: "4 Changes & Billing",
+    exact: ["/change-orders", "/invoices"],
   },
   {
-    href: "/payments",
-    label: "5 Payments",
-    exact: ["/payments"],
+    href: "/financials-auditing",
+    label: "5 Financials & Accounting",
+    exact: ["/financials-auditing"],
   },
 ];
 
@@ -42,11 +42,6 @@ export const opsMetaWipRoutes: NavRoute[] = [
   { href: "/ops/meta", label: "Notes", exact: ["/ops/meta"] },
   { href: "/ops/organization", label: "Organization", exact: ["/ops/organization"] },
   { href: "/vendors", label: "Vendors", exact: ["/vendors"] },
-  {
-    href: "/financials-auditing",
-    label: "Financials & Auditing",
-    exact: ["/financials-auditing"],
-  },
   { href: "/settings/intake", label: "Intake Settings", exact: ["/settings/intake"] },
 ];
 

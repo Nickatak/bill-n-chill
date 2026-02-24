@@ -33,7 +33,9 @@ export default async function ProjectVendorBillsPage({ params }: ProjectVendorBi
           </p>
           <p>
             <Link href={`/projects?project=${projectId}`}>Back to Project Hub</Link> |{" "}
-            <Link href={`/payments?project=${projectId}`}>Next: Record outgoing payment</Link>
+            <Link href={`/financials-auditing?project=${projectId}`}>
+              Next: Financials & Accounting (Payments)
+            </Link>
           </p>
         </header>
         <section className={styles.card}>

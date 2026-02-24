@@ -2,6 +2,7 @@
 
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
 import { useSharedSessionAuth } from "@/features/session/use-shared-session";
@@ -20,6 +21,8 @@ import { formatDateTimeDisplay } from "@/shared/date-format";
 
 export function FinancialsAuditingConsole() {
   const { token, authMessage } = useSharedSessionAuth();
+  const searchParams = useSearchParams();
+  const requestedProjectId = searchParams.get("project");
   const [statusMessage, setStatusMessage] = useState("");
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -42,6 +45,17 @@ export function FinancialsAuditingConsole() {
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const hasSelectedProject = Boolean(selectedProjectId);
 
+  function normalizeUiRoute(route: string): string {
+    if (!route.startsWith("/payments")) {
+      return route;
+    }
+    const queryIndex = route.indexOf("?");
+    if (queryIndex === -1) {
+      return "/financials-auditing";
+    }
+    return `/financials-auditing${route.slice(queryIndex)}`;
+  }
+
   async function loadProjects() {
     if (!token) {
       return;
@@ -58,8 +72,12 @@ export function FinancialsAuditingConsole() {
       }
       const rows = (payload.data as ProjectRecord[]) ?? [];
       setProjects(rows);
+      const preferredProjectId =
+        requestedProjectId && /^\d+$/.test(requestedProjectId) ? requestedProjectId : null;
       if (rows[0]) {
-        setSelectedProjectId(String(rows[0].id));
+        const preferredProject =
+          preferredProjectId ? rows.find((row) => String(row.id) === preferredProjectId) : null;
+        setSelectedProjectId(String(preferredProject?.id ?? rows[0].id));
       } else {
         setSelectedProjectId("");
       }
@@ -75,7 +93,7 @@ export function FinancialsAuditingConsole() {
     }
     void loadProjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [requestedProjectId, token]);
 
   async function loadFinancialSummary() {
     const projectId = Number(selectedProjectId);
@@ -372,11 +390,13 @@ export function FinancialsAuditingConsole() {
             </p>
             <h4>Traceability Links (FIN-02)</h4>
             <p>
-              <Link href={summary.traceability.approved_change_orders.ui_route}>Change orders</Link> |{" "}
-              <Link href={summary.traceability.ar_invoices.ui_route}>Invoices</Link> |{" "}
-              <Link href={summary.traceability.ar_payments.ui_route}>Payments (AR)</Link> |{" "}
-              <Link href={summary.traceability.ap_vendor_bills.ui_route}>Vendor bills</Link> |{" "}
-              <Link href={summary.traceability.ap_payments.ui_route}>Payments (AP)</Link>
+              <Link href={normalizeUiRoute(summary.traceability.approved_change_orders.ui_route)}>
+                Change orders
+              </Link>{" "}
+              | <Link href={normalizeUiRoute(summary.traceability.ar_invoices.ui_route)}>Invoices</Link>{" "}
+              | <Link href={normalizeUiRoute(summary.traceability.ar_payments.ui_route)}>Payments (AR)</Link>{" "}
+              | <Link href={normalizeUiRoute(summary.traceability.ap_vendor_bills.ui_route)}>Vendor bills</Link>{" "}
+              | <Link href={normalizeUiRoute(summary.traceability.ap_payments.ui_route)}>Payments (AP)</Link>
             </p>
             <label>
               AR invoice sources
@@ -499,7 +519,7 @@ export function FinancialsAuditingConsole() {
               {attentionFeed.items.map((item, index) => (
                 <li key={`${item.kind}-${item.detail_endpoint}-${index}`}>
                   [{item.severity.toUpperCase()}] {item.label} ({item.project_name}) | {item.detail} |{" "}
-                  <Link href={item.ui_route}>Open</Link>
+                  <Link href={normalizeUiRoute(item.ui_route)}>Open</Link>
                 </li>
               ))}
             </ul>

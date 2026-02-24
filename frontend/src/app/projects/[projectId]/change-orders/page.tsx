@@ -25,13 +25,7 @@ export default async function ProjectChangeOrdersPage({
       <main className={styles.main}>
         <header className={styles.header}>
           <h1>Change Orders</h1>
-          <p>
-            Project-scoped change governance with revision history and estimate-origin traceability.
-          </p>
-          <p>
-            Approved deltas update contract current and budget aggregates; revisions preserve family
-            history without losing origin context.
-          </p>
+          <p>Manage revisions for this project and keep scope history traceable.</p>
           <p>
             <Link href={`/projects?project=${projectId}`}>Back to Project Hub</Link> |{" "}
             <Link href={`/invoices?project=${projectId}`}>Next: Invoice from approved scope</Link>

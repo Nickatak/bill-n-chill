@@ -184,12 +184,49 @@ html[data-theme="dark"] .themeControlButton.isActive {
   font-size: 0.8rem;
   color: #111827;
   background: #ffffff;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.workflowLink:hover {
+  border-color: #94a3b8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+}
+
+.workflowLink.isActive:hover {
+  transform: none;
+  box-shadow: none;
 }
 
 .workflowLink.isActive {
   border-color: #111827;
   background: #111827;
   color: #ffffff;
+}
+
+.workflowDropdownMenu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.workflowDropdownSummary {
+  appearance: none;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111827;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: inherit;
+}
+
+.workflowDropdownSummary::-webkit-details-marker {
+  display: none;
 }
 
 html[data-theme="dark"] .workflowNav {
@@ -201,6 +238,11 @@ html[data-theme="dark"] .workflowLink {
   border-color: #334155;
   color: #e5e7eb;
   background: #0f172a;
+}
+
+html[data-theme="dark"] .workflowLink:hover {
+  border-color: #64748b;
+  box-shadow: 0 6px 12px rgba(2, 6, 23, 0.45);
 }
 
 html[data-theme="dark"] .workflowLink.isActive {
@@ -338,6 +380,21 @@ html[data-theme="dark"] .workflowBreadcrumbSeparator {
   font-size: 0.82rem;
   color: #111827;
   background: #ffffff;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.nonWorkflowItem:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+  transform: translateY(-1px);
+}
+
+.nonWorkflowItem.isActive:hover {
+  transform: none;
 }
 
 .nonWorkflowItem.isActive {
@@ -402,6 +459,11 @@ html[data-theme="dark"] .nonWorkflowItem {
   background: #111827;
 }
 
+html[data-theme="dark"] .nonWorkflowItem:hover {
+  border-color: #64748b;
+  background: #0f172a;
+}
+
 html[data-theme="dark"] .nonWorkflowItem.isActive {
   border-color: #e5e7eb;
   background: #e5e7eb;
@@ -424,4 +486,18 @@ html[data-theme="dark"] .quickJumpHint {
 
 html[data-theme="dark"] .quickJumpSubLabel {
   color: #94a3b8;
+}
+
+.workflowDropdownMenu .workflowDropdownList {
+  margin-top: 0;
+  min-width: 220px;
+}
+
+.workflowDropdownList.workflowDropdownListFloating {
+  position: fixed;
+  z-index: 1250;
+  left: 0;
+  top: 0;
+  right: auto;
+  width: 240px;
 }

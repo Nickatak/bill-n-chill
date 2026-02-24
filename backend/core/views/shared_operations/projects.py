@@ -182,7 +182,7 @@ def _build_project_financial_summary_data(project: Project, user, *, actor_user_
             ],
         },
         "ar_payments": {
-            "ui_route": "/payments",
+            "ui_route": f"/financials-auditing?project={project.id}",
             "list_endpoint": f"/api/v1/projects/{project.id}/payments/",
             "total": f"{paid_to_date:.2f}",
             "records": [
@@ -212,7 +212,7 @@ def _build_project_financial_summary_data(project: Project, user, *, actor_user_
             ],
         },
         "ap_payments": {
-            "ui_route": "/payments",
+            "ui_route": f"/financials-auditing?project={project.id}",
             "list_endpoint": f"/api/v1/projects/{project.id}/payments/",
             "total": f"{ap_paid:.2f}",
             "records": [
@@ -744,7 +744,7 @@ def attention_feed_view(request):
                 "detail": f"{row.direction} {row.amount} via {row.method}",
                 "project_id": row.project_id,
                 "project_name": row.project.name,
-                "ui_route": "/payments",
+                "ui_route": f"/financials-auditing?project={row.project_id}",
                 "detail_endpoint": f"/api/v1/payments/{row.id}/",
                 "due_date": None,
             }
@@ -877,7 +877,7 @@ def quick_jump_search_view(request):
                     "sub_label": f"{row.direction} {row.status} amount {row.amount}",
                     "project_id": row.project_id,
                     "project_name": row.project.name,
-                    "ui_href": f"/payments?project={row.project_id}",
+                    "ui_href": f"/financials-auditing?project={row.project_id}",
                     "detail_endpoint": f"/api/v1/payments/{row.id}/",
                 }
             )
@@ -947,7 +947,7 @@ def project_timeline_events_view(request, project_id: int):
                 ui_route = f"/vendor-bills?project={project.id}"
                 detail_endpoint = f"/api/v1/vendor-bills/{row.object_id}/"
             elif row.object_type == "payment":
-                ui_route = f"/payments?project={project.id}"
+                ui_route = f"/financials-auditing?project={project.id}"
                 detail_endpoint = f"/api/v1/payments/{row.object_id}/"
             items.append(
                 {

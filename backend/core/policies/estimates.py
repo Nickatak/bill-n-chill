@@ -2,7 +2,7 @@
 
 from core.models import Estimate
 
-ESTIMATE_POLICY_VERSION = "2026-02-24.estimates.v2"
+ESTIMATE_POLICY_VERSION = "2026-02-24.estimates.v3"
 
 
 def _status_order() -> list[str]:
@@ -41,6 +41,6 @@ def get_estimate_policy_contract() -> dict:
         "quick_action_by_status": {
             Estimate.Status.APPROVED: "change_order",
             Estimate.Status.REJECTED: "revision",
-            Estimate.Status.ARCHIVED: "revision",
+            Estimate.Status.VOID: "revision",
         },
     }

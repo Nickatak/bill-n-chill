@@ -10,6 +10,12 @@
   display: flex;
 }
 
+.roleReadOnlyNote {
+  margin: 0 0 10px;
+  color: #92400e;
+  font-size: 0.9rem;
+}
+
 .primaryCreateAction button {
   border: 1px solid #334155;
   border-radius: 8px;
@@ -563,6 +569,10 @@
   background: #0f172a;
   border-color: #475569;
   color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .roleReadOnlyNote {
+  color: #fbbf24;
 }
 
 :global(html[data-theme="dark"]) .viewerHeader p {
