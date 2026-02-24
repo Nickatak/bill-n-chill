@@ -28,7 +28,7 @@ export type ChangeOrderLineRecord = {
 export type ChangeOrderRecord = {
   id: number;
   project: number;
-  number: number;
+  family_key: string;
   revision_number: number;
   title: string;
   status: string;
@@ -36,8 +36,8 @@ export type ChangeOrderRecord = {
   days_delta: number;
   reason: string;
   origin_estimate: number | null;
-  origin_estimate_version: number | null;
-  supersedes_change_order: number | null;
+  origin_estimate_version?: number | null;
+  previous_change_order: number | null;
   requested_by: number;
   requested_by_email: string;
   approved_by: number | null;
@@ -57,6 +57,23 @@ export type ChangeOrderPolicyContract = {
   default_create_status: string;
   allowed_status_transitions: Record<string, string[]>;
   terminal_statuses: string[];
+  revision_rules?: {
+    edit_latest_revision_only: boolean;
+    clone_requires_latest_revision: boolean;
+    revision_gt_one_requires_previous_change_order: boolean;
+    previous_change_order_must_match_project_family_and_prior_revision: boolean;
+  };
+  origin_estimate_rules?: {
+    required_on_create: boolean;
+    must_be_approved: boolean;
+    must_match_change_order_project: boolean;
+    immutable_once_set: boolean;
+  };
+  approval_metadata_rules?: {
+    approved_requires_actor_and_timestamp: boolean;
+    non_approved_statuses_must_clear_actor_and_timestamp: boolean;
+  };
+  error_rules?: Record<string, string>;
 };
 
 export type ApiResponse = {
@@ -67,5 +84,5 @@ export type ApiResponse = {
     | ChangeOrderRecord
     | ChangeOrderPolicyContract
     | Array<{ id: number; status: string; line_items: BudgetLineRecord[] }>;
-  error?: { code?: string; message?: string; fields?: Record<string, string[]> };
+  error?: { code?: string; message?: string; fields?: Record<string, string[]>; rule?: string };
 };

@@ -155,6 +155,12 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(response.status_code, 201)
         return response.json()["data"]["id"]
 
+    def _assert_validation_rule(self, response, expected_rule: str):
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "validation_error")
+        self.assertEqual(payload["error"].get("rule"), expected_rule)
+
     def test_change_order_contract_requires_authentication(self):
         response = self.client.get("/api/v1/contracts/change-orders/")
         self.assertEqual(response.status_code, 401)
@@ -183,7 +189,51 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(payload["default_create_status"], ChangeOrder.Status.DRAFT)
         self.assertEqual(payload["allowed_status_transitions"], expected_transitions)
         self.assertEqual(payload["terminal_statuses"], expected_terminal_statuses)
-        self.assertTrue(str(payload["policy_version"]).startswith("2026-02-23.change_orders."))
+        self.assertEqual(
+            payload["revision_rules"],
+            {
+                "edit_latest_revision_only": True,
+                "clone_requires_latest_revision": True,
+                "revision_gt_one_requires_previous_change_order": True,
+                "previous_change_order_must_match_project_family_and_prior_revision": True,
+            },
+        )
+        self.assertEqual(
+            payload["origin_estimate_rules"],
+            {
+                "required_on_create": True,
+                "must_be_approved": True,
+                "must_match_change_order_project": True,
+                "immutable_once_set": True,
+            },
+        )
+        self.assertEqual(
+            payload["approval_metadata_rules"],
+            {
+                "approved_requires_actor_and_timestamp": True,
+                "non_approved_statuses_must_clear_actor_and_timestamp": True,
+            },
+        )
+        self.assertEqual(
+            payload["error_rules"],
+            {
+                "co_create_missing_required_fields": "Create requires title and amount_delta.",
+                "co_budget_active_required_for_propagation": "Project must have an active budget before CO create/propagation.",
+                "co_create_origin_estimate_required": "Create requires origin_estimate.",
+                "co_origin_estimate_project_scope": "origin_estimate must belong to the same project.",
+                "co_origin_estimate_approved_required": "origin_estimate must be approved.",
+                "co_origin_estimate_immutable_once_set": "origin_estimate cannot change/clear once set.",
+                "co_line_total_must_match_amount_delta": "Sum of line_items amount_delta must match change-order amount_delta.",
+                "co_line_duplicate_budget_line": "Each budget_line can appear at most once per change order.",
+                "co_line_budget_line_invalid": "Each budget_line must exist, match project, and come from active budget.",
+                "co_edit_latest_revision_only": "Only latest revision in family can be edited.",
+                "co_clone_requires_latest_revision": "Clone revision only from latest revision in family.",
+                "co_status_transition_not_allowed": "Status transition must match allowed_status_transitions.",
+                "co_approval_metadata_invariant": "approved_by/approved_at must match approved status invariants.",
+                "co_revision_chain_invalid": "Revision chain must keep project/family/previous linkage integrity.",
+            },
+        )
+        self.assertTrue(str(payload["policy_version"]).startswith("2026-02-24.change_orders."))
 
     def test_change_order_create_requires_active_budget(self):
         estimate_id = self._create_estimate(
@@ -204,7 +254,7 @@ class ChangeOrderTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"]["code"], "validation_error")
+        self._assert_validation_rule(response, "co_budget_active_required_for_propagation")
         self.assertEqual(ChangeOrder.objects.count(), 0)
 
     def test_change_order_create_and_numbering(self):
@@ -353,8 +403,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"]["code"], "validation_error")
+        self._assert_validation_rule(response, "co_create_origin_estimate_required")
         self.assertIn("origin_estimate", response.json()["error"]["fields"])
 
     def test_change_order_create_rejects_non_approved_origin_estimate(self):
@@ -380,8 +429,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"]["code"], "validation_error")
+        self._assert_validation_rule(response, "co_origin_estimate_approved_required")
         self.assertIn("origin_estimate", response.json()["error"]["fields"])
 
     def test_change_order_create_rejects_line_total_mismatch(self):
@@ -413,8 +461,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"]["code"], "validation_error")
+        self._assert_validation_rule(response, "co_line_total_must_match_amount_delta")
 
     def test_change_order_patch_updates_line_items_scaffold(self):
         self._create_active_budget(
@@ -504,8 +551,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(blocked.status_code, 400)
-        self.assertEqual(blocked.json()["error"]["code"], "validation_error")
+        self._assert_validation_rule(blocked, "co_edit_latest_revision_only")
 
     def test_change_order_patch_rejects_origin_estimate_change_or_clear(self):
         self._create_active_budget(
@@ -522,8 +568,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(changed.status_code, 400)
-        self.assertEqual(changed.json()["error"]["code"], "validation_error")
+        self._assert_validation_rule(changed, "co_origin_estimate_immutable_once_set")
 
         cleared = self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
@@ -531,8 +576,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(cleared.status_code, 400)
-        self.assertEqual(cleared.json()["error"]["code"], "validation_error")
+        self._assert_validation_rule(cleared, "co_origin_estimate_immutable_once_set")
 
     def test_change_order_create_rejects_duplicate_line_items_for_same_budget_line(self):
         self._create_active_budget(
@@ -569,8 +613,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"]["code"], "validation_error")
+        self._assert_validation_rule(response, "co_line_duplicate_budget_line")
 
     def test_change_order_line_rejects_budget_line_from_different_project(self):
         self._create_active_budget(
@@ -610,8 +653,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(cross_project_response.status_code, 400)
-        self.assertEqual(cross_project_response.json()["error"]["code"], "validation_error")
+        self._assert_validation_rule(cross_project_response, "co_line_budget_line_invalid")
         self.assertIn("budget_line", cross_project_response.json()["error"]["fields"])
 
     def test_change_order_line_rejects_budget_line_from_non_active_budget(self):
@@ -644,8 +686,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(non_active_response.status_code, 400)
-        self.assertEqual(non_active_response.json()["error"]["code"], "validation_error")
+        self._assert_validation_rule(non_active_response, "co_line_budget_line_invalid")
         self.assertIn("budget_line", non_active_response.json()["error"]["fields"])
 
     def test_change_order_model_blocks_invalid_status_transition_on_save(self):
@@ -674,6 +715,121 @@ class ChangeOrderTests(TestCase):
         with self.assertRaises(ValidationError):
             row.save()
 
+    def test_change_order_model_requires_previous_change_order_for_revision_gt_one(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        origin_estimate_id = self.last_approved_estimate_by_project[self.project.id]
+
+        with self.assertRaises(ValidationError):
+            ChangeOrder.objects.create(
+                project=self.project,
+                family_key="99",
+                revision_number=2,
+                title="Invalid direct revision",
+                status=ChangeOrder.Status.DRAFT,
+                amount_delta="100.00",
+                days_delta=0,
+                reason="Missing previous_change_order",
+                origin_estimate_id=origin_estimate_id,
+                requested_by=self.user,
+            )
+
+    def test_change_order_model_rejects_revision_number_mismatch_with_previous_change_order(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        base_id = self._create_change_order(amount_delta="100.00")
+        base = ChangeOrder.objects.get(id=base_id)
+
+        with self.assertRaises(ValidationError):
+            ChangeOrder.objects.create(
+                project=self.project,
+                family_key=base.family_key,
+                revision_number=5,
+                title="Invalid revision chain",
+                status=ChangeOrder.Status.DRAFT,
+                amount_delta="120.00",
+                days_delta=0,
+                reason="Revision mismatch",
+                origin_estimate=base.origin_estimate,
+                previous_change_order=base,
+                requested_by=self.user,
+            )
+
+    def test_change_order_model_rejects_cross_project_origin_estimate_on_direct_save(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        self._create_active_budget(
+            project_id=self.other_project.id,
+            cost_code_id=self.other_cost_code.id,
+            token=self.other_token.key,
+        )
+        other_origin_estimate_id = self.last_approved_estimate_by_project[self.other_project.id]
+
+        with self.assertRaises(ValidationError):
+            ChangeOrder.objects.create(
+                project=self.project,
+                family_key="100",
+                revision_number=1,
+                title="Invalid origin estimate scope",
+                status=ChangeOrder.Status.DRAFT,
+                amount_delta="100.00",
+                days_delta=0,
+                reason="Cross-project origin",
+                origin_estimate_id=other_origin_estimate_id,
+                requested_by=self.user,
+            )
+
+    def test_change_order_model_rejects_cross_project_previous_change_order_on_direct_save(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        self._create_active_budget(
+            project_id=self.other_project.id,
+            cost_code_id=self.other_cost_code.id,
+            token=self.other_token.key,
+        )
+        other_change_order = self.client.post(
+            f"/api/v1/projects/{self.other_project.id}/change-orders/",
+            data={
+                "title": "Other user base CO",
+                "amount_delta": "200.00",
+                "days_delta": 1,
+                "reason": "Other project chain",
+                "origin_estimate": self.last_approved_estimate_by_project[self.other_project.id],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.other_token.key}",
+        )
+        self.assertEqual(other_change_order.status_code, 201)
+        other_change_order_id = other_change_order.json()["data"]["id"]
+        other_change_order_row = ChangeOrder.objects.get(id=other_change_order_id)
+
+        with self.assertRaises(ValidationError):
+            ChangeOrder.objects.create(
+                project=self.project,
+                family_key=other_change_order_row.family_key,
+                revision_number=2,
+                title="Invalid previous linkage",
+                status=ChangeOrder.Status.DRAFT,
+                amount_delta="250.00",
+                days_delta=1,
+                reason="Cross-project previous row",
+                origin_estimate_id=self.last_approved_estimate_by_project[self.project.id],
+                previous_change_order=other_change_order_row,
+                requested_by=self.user,
+            )
+
     def test_change_order_status_lifecycle_validation(self):
         self._create_active_budget(
             project_id=self.project.id,
@@ -688,8 +844,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(invalid.status_code, 400)
-        self.assertEqual(invalid.json()["error"]["code"], "validation_error")
+        self._assert_validation_rule(invalid, "co_status_transition_not_allowed")
 
         to_pending = self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
@@ -717,7 +872,30 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(invalid_after_approved.status_code, 400)
+        self._assert_validation_rule(invalid_after_approved, "co_status_transition_not_allowed")
+
+    def test_change_order_clone_revision_requires_latest_revision(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        base_id = self._create_change_order(amount_delta="800.00")
+        clone = self.client.post(
+            f"/api/v1/change-orders/{base_id}/clone-revision/",
+            data={},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(clone.status_code, 201)
+
+        blocked = self.client.post(
+            f"/api/v1/change-orders/{base_id}/clone-revision/",
+            data={},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self._assert_validation_rule(blocked, "co_clone_requires_latest_revision")
 
     def test_change_order_approved_status_creates_immutable_snapshot(self):
         self._create_active_budget(
@@ -981,6 +1159,10 @@ class ChangeOrderTests(TestCase):
         ).latest("id")
         self.assertEqual(void_snapshot.snapshot_json["decision_context"]["previous_status"], "approved")
         self.assertEqual(void_snapshot.snapshot_json["decision_context"]["applied_financial_delta"], "-1200.00")
+
+        change_order_row = ChangeOrder.objects.get(id=change_order_id)
+        self.assertIsNone(change_order_row.approved_by_id)
+        self.assertIsNone(change_order_row.approved_at)
 
         self.project.refresh_from_db()
         active_budget = self._active_budget()

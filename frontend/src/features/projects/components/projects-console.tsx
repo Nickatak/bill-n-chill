@@ -634,7 +634,9 @@ export function ProjectsConsole() {
                     </span>
                   </div>
                   <div className={styles.node}>
-                    <Link href={`/projects/${selectedProject.id}/change-orders`}>Change Orders</Link>
+                    <Link href={`/projects/${selectedProject.id}/change-orders`}>
+                      Change Orders (WIP)
+                    </Link>
                     <span className={styles.nodeCount}>
                       {summaryCounts ? summaryCounts.changeOrders : "--"}
                     </span>

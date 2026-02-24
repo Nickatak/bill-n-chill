@@ -59,6 +59,10 @@ function formatMoney(value: number): string {
   return value.toFixed(2);
 }
 
+function coLabel(changeOrder: Pick<ChangeOrderRecord, "family_key" | "revision_number">): string {
+  return `CO-${changeOrder.family_key} v${changeOrder.revision_number}`;
+}
+
 function readApiErrorMessage(payload: ApiResponse | undefined, fallback: string): string {
   const topLevelMessage = payload?.error?.message?.trim();
   if (topLevelMessage) {
@@ -125,12 +129,10 @@ export function ChangeOrdersConsole({
   >([]);
   const [nextLineLocalId, setNextLineLocalId] = useState(2);
   const [selectedProjectName, setSelectedProjectName] = useState("");
-  const [activeFormMode, setActiveFormMode] = useState<"create" | "edit">("create");
 
   const [newTitle, setNewTitle] = useState("Change Order");
   const [newTitleManuallyEdited, setNewTitleManuallyEdited] = useState(false);
   const [newReason, setNewReason] = useState("");
-  const [newOriginEstimateId, setNewOriginEstimateId] = useState("");
   const [newLineItems, setNewLineItems] = useState<ChangeOrderLineInput[]>([emptyLine(1)]);
 
   const [editTitle, setEditTitle] = useState("");
@@ -390,15 +392,6 @@ export function ChangeOrdersConsole({
           ? String(initialOriginEstimateId)
           : "";
       setProjectEstimates(approvedRows);
-      setNewOriginEstimateId((current) => {
-        if (preferredEstimateId) {
-          return preferredEstimateId;
-        }
-        if (current && approvedRows.some((estimate) => String(estimate.id) === current)) {
-          return current;
-        }
-        return approvedRows[0] ? String(approvedRows[0].id) : "";
-      });
       setSelectedViewerEstimateId((current) => {
         if (preferredEstimateId) {
           return preferredEstimateId;
@@ -410,7 +403,6 @@ export function ChangeOrdersConsole({
       });
     } catch {
       setProjectEstimates([]);
-      setNewOriginEstimateId("");
       setSelectedViewerEstimateId("");
     }
   }, [initialOriginEstimateId, normalizedBaseUrl, token]);
@@ -540,19 +532,15 @@ export function ChangeOrdersConsole({
 
   useEffect(() => {
     const projectId = Number(selectedProjectId);
-    if (!projectId || !newOriginEstimateId || !/^\d+$/.test(newOriginEstimateId)) {
+    if (!projectId || !selectedViewerEstimateId || !/^\d+$/.test(selectedViewerEstimateId)) {
       return;
     }
-    const sourceEstimateId = Number(newOriginEstimateId);
+    const sourceEstimateId = Number(selectedViewerEstimateId);
     void (async () => {
       const nextLines = await loadBudgetLines(projectId, sourceEstimateId);
       prefillNewLinesFromBudgetLines(nextLines);
     })();
-  }, [loadBudgetLines, newOriginEstimateId, prefillNewLinesFromBudgetLines, selectedProjectId]);
-
-  async function handleNewOriginEstimateChange(value: string) {
-    setNewOriginEstimateId(value);
-  }
+  }, [loadBudgetLines, prefillNewLinesFromBudgetLines, selectedProjectId, selectedViewerEstimateId]);
 
   function toLinePayload(lines: ChangeOrderLineInput[]) {
     return lines
@@ -589,16 +577,10 @@ export function ChangeOrdersConsole({
   }
 
   function handleStartNewChangeOrder() {
-    setActiveFormMode("create");
-    const fallbackOriginEstimateId = projectEstimates[0] ? String(projectEstimates[0].id) : "";
-    const nextOriginEstimateId =
-      newOriginEstimateId && projectEstimates.some((estimate) => String(estimate.id) === newOriginEstimateId)
-        ? newOriginEstimateId
-        : fallbackOriginEstimateId;
+    hydrateEditForm(undefined);
     setNewTitleManuallyEdited(false);
     setNewTitle(defaultChangeOrderTitle(selectedProjectName));
     setNewReason("");
-    setNewOriginEstimateId(nextOriginEstimateId);
     if (budgetLines.length > 0) {
       prefillNewLinesFromBudgetLines(budgetLines);
     } else {
@@ -632,7 +614,7 @@ export function ChangeOrdersConsole({
             amount_delta: formatMoney(newLineDeltaTotal),
             days_delta: newLineDaysTotal,
             reason: newReason,
-            origin_estimate: newOriginEstimateId ? Number(newOriginEstimateId) : null,
+            origin_estimate: selectedViewerEstimateId ? Number(selectedViewerEstimateId) : null,
             line_items: toLinePayload(newLineItems),
           }),
         },
@@ -653,10 +635,9 @@ export function ChangeOrdersConsole({
         setChangeOrders((current) => [created, ...current]);
         hydrateEditForm(created);
       }
-      setFeedback(`Created change order CO-${created.number} (${statusLabel(created.status)}).`, "success");
+      setFeedback(`Created change order ${coLabel(created)} (${statusLabel(created.status)}).`, "success");
       setNewLineItems([emptyLine(1)]);
       setNextLineLocalId(2);
-      setNewOriginEstimateId(projectEstimates[0] ? String(projectEstimates[0].id) : "");
       setNewTitleManuallyEdited(false);
       setNewTitle(defaultChangeOrderTitle(selectedProjectName));
     } catch {
@@ -698,7 +679,7 @@ export function ChangeOrdersConsole({
         const persisted = rows.find((row) => row.id === created.id);
         hydrateEditForm(persisted ?? created);
       }
-      setFeedback(`Created CO-${created.number} v${created.revision_number} in Draft.`, "success");
+      setFeedback(`Created ${coLabel(created)} in Draft.`, "success");
     } catch {
       setFeedback("Could not reach clone revision endpoint.", "error");
     }
@@ -745,13 +726,13 @@ export function ChangeOrdersConsole({
         setChangeOrders(rows);
         const persisted = rows.find((row) => row.id === updated.id);
         hydrateEditForm(persisted ?? updated);
-        setFeedback(`Saved change order CO-${updated.number} (${statusLabel(updated.status)}).`, "success");
+        setFeedback(`Saved change order ${coLabel(updated)} (${statusLabel(updated.status)}).`, "success");
       } else {
         setChangeOrders((current) =>
           current.map((row) => (row.id === updated.id ? updated : row)),
         );
         hydrateEditForm(updated);
-        setFeedback(`Saved change order CO-${updated.number} (${statusLabel(updated.status)}).`, "success");
+        setFeedback(`Saved change order ${coLabel(updated)} (${statusLabel(updated.status)}).`, "success");
       }
     } catch {
       setFeedback("Could not reach change order detail endpoint.", "error");
@@ -800,7 +781,7 @@ export function ChangeOrdersConsole({
         );
         hydrateEditForm(updated);
       }
-      setFeedback(`Updated CO-${updated.number} to ${statusLabel(updated.status)}.`, "success");
+      setFeedback(`Updated ${coLabel(updated)} to ${statusLabel(updated.status)}.`, "success");
     } catch {
       setFeedback("Could not reach change order detail endpoint.", "error");
     }
@@ -829,41 +810,32 @@ export function ChangeOrdersConsole({
 
       <section className={styles.consoleTop}>
         <div className={styles.consoleIntro}>
-          <p className={styles.consoleEyebrow}>Change Governance</p>
+          <p className={styles.consoleEyebrow}>Change Orders</p>
           <h3 className={styles.consoleHeading}>{scopedProjectLabel}</h3>
           <p className={styles.consoleCopy}>
-            Track scope deltas, preserve revision history, and hand approved changes into billing.
+            Track project scope deltas, preserve revision history, and carry approved CO values into
+            billing.
           </p>
         </div>
         <div className={styles.consoleStats}>
           <article className={styles.consoleStatCard}>
-            <span className={styles.consoleStatLabel}>Approved Estimates</span>
+            <span className={styles.consoleStatLabel}>Approved Estimates (Origin)</span>
             <strong className={styles.consoleStatValue}>{projectEstimates.length}</strong>
           </article>
           <article className={styles.consoleStatCard}>
-            <span className={styles.consoleStatLabel}>Change Orders</span>
+            <span className={styles.consoleStatLabel}>Total Change Orders</span>
             <strong className={styles.consoleStatValue}>{totalChangeOrderCount}</strong>
           </article>
           <article className={styles.consoleStatCard}>
-            <span className={styles.consoleStatLabel}>Pending Approval</span>
+            <span className={styles.consoleStatLabel}>Change Orders Pending Approval</span>
             <strong className={styles.consoleStatValue}>{pendingChangeOrderCount}</strong>
           </article>
           <article className={styles.consoleStatCard}>
-            <span className={styles.consoleStatLabel}>Approved</span>
+            <span className={styles.consoleStatLabel}>Approved Change Orders</span>
             <strong className={styles.consoleStatValue}>{approvedChangeOrderCount}</strong>
           </article>
         </div>
       </section>
-
-      <div className={styles.primaryCreateAction}>
-        <button
-          type="button"
-          className={styles.primaryCreateButton}
-          onClick={handleStartNewChangeOrder}
-        >
-          Add New Change Order
-        </button>
-      </div>
 
       <section className={styles.viewer}>
         <div className={styles.viewerHeader}>
@@ -896,7 +868,23 @@ export function ChangeOrdersConsole({
                     key={estimate.id}
                     type="button"
                     className={`${styles.viewerRailItem} ${active ? styles.viewerRailItemActive : ""}`}
-                    onClick={() => setSelectedViewerEstimateId(String(estimate.id))}
+                    onClick={() => {
+                      const nextEstimateId = String(estimate.id);
+                      setSelectedViewerEstimateId(nextEstimateId);
+                      const related = changeOrders.filter(
+                        (changeOrder) => String(changeOrder.origin_estimate) === nextEstimateId,
+                      );
+                      if (!related.length) {
+                        hydrateEditForm(undefined);
+                        return;
+                      }
+                      const selectedStillValid = related.some(
+                        (changeOrder) => String(changeOrder.id) === selectedChangeOrderId,
+                      );
+                      if (!selectedStillValid) {
+                        hydrateEditForm(related[0]);
+                      }
+                    }}
                   >
                     <span className={styles.viewerRailTitle}>
                       #{estimate.id} v{estimate.version} {estimate.title}
@@ -904,8 +892,8 @@ export function ChangeOrdersConsole({
                     <span className={styles.viewerMetaLabel}>
                       {relatedCount} {relatedCount === 1 ? "change order" : "change orders"}
                     </span>
-                    <span className={`${styles.statusBadge} ${styles.statusApproved}`}>
-                      {statusLabel("approved")}
+                    <span className={styles.estimateOriginBadge}>
+                      Origin estimate
                     </span>
                   </button>
                 );
@@ -914,7 +902,7 @@ export function ChangeOrdersConsole({
             {selectedViewerEstimate ? (
               <div className={styles.viewerDetail}>
                 <div className={styles.viewerMetaRow}>
-                  <span className={styles.viewerMetaLabel}>Approved estimate</span>
+                  <span className={styles.viewerMetaLabel}>Approved origin estimate</span>
                   <strong>
                     #{selectedViewerEstimate.id} v{selectedViewerEstimate.version}{" "}
                     {selectedViewerEstimate.title}
@@ -932,11 +920,10 @@ export function ChangeOrdersConsole({
                             className={`${styles.viewerRailItem} ${active ? styles.viewerRailItemActive : ""}`}
                             onClick={() => {
                               hydrateEditForm(changeOrder);
-                              setActiveFormMode("edit");
                             }}
                           >
                             <span className={styles.viewerRailTitle}>
-                              CO-{changeOrder.number} v{changeOrder.revision_number} {changeOrder.title}
+                              {coLabel(changeOrder)} {changeOrder.title}
                             </span>
                             <span className={`${styles.statusBadge} ${statusBadgeClass(changeOrder.status)}`}>
                               {statusLabel(changeOrder.status)}
@@ -950,14 +937,14 @@ export function ChangeOrdersConsole({
                         <div className={styles.viewerMetaRow}>
                           <span className={styles.viewerMetaLabel}>Selected CO</span>
                           <strong>
-                            CO-{selectedViewerChangeOrder.number} v{selectedViewerChangeOrder.revision_number}
+                            {coLabel(selectedViewerChangeOrder)}
                           </strong>
                         </div>
                         <div className={styles.viewerMetaRow}>
                           <span className={styles.viewerMetaLabel}>Supersedes</span>
                           <strong>
-                            {selectedViewerChangeOrder.supersedes_change_order
-                              ? `CO record #${selectedViewerChangeOrder.supersedes_change_order}`
+                            {selectedViewerChangeOrder.previous_change_order
+                              ? `CO record #${selectedViewerChangeOrder.previous_change_order}`
                               : "Family root"}
                           </strong>
                         </div>
@@ -1060,7 +1047,9 @@ export function ChangeOrdersConsole({
                     ) : null}
                   </>
                 ) : (
-                  <p className={styles.viewerHint}>No change orders yet for this approved estimate.</p>
+                  <p className={styles.viewerHint}>
+                    No change orders have been created yet for this approved origin estimate.
+                  </p>
                 )}
               </div>
             ) : (
@@ -1074,31 +1063,30 @@ export function ChangeOrdersConsole({
         )}
       </section>
 
-      <div className={styles.formModeSwitch}>
+      <div className={styles.formToolbar}>
+        <div className={styles.formContext}>
+          {selectedChangeOrder ? (
+            <>
+              <span className={styles.formContextLabel}>Editing</span>
+              <strong>{coLabel(selectedChangeOrder)}</strong>
+            </>
+          ) : (
+            <>
+              <span className={styles.formContextLabel}>Creating</span>
+              <strong>New Change Order Draft</strong>
+            </>
+          )}
+        </div>
         <button
           type="button"
-          className={`${styles.formModeButton} ${
-            activeFormMode === "create" ? styles.formModeButtonActive : ""
-          }`}
-          aria-pressed={activeFormMode === "create"}
-          onClick={() => setActiveFormMode("create")}
+          className={styles.primaryCreateButton}
+          onClick={handleStartNewChangeOrder}
         >
-          Create Draft
-        </button>
-        <button
-          type="button"
-          className={`${styles.formModeButton} ${
-            activeFormMode === "edit" ? styles.formModeButtonActive : ""
-          }`}
-          aria-pressed={activeFormMode === "edit"}
-          onClick={() => setActiveFormMode("edit")}
-          disabled={!selectedChangeOrderId}
-        >
-          Edit Selected
+          Add New Change Order
         </button>
       </div>
 
-      {activeFormMode === "create" ? (
+      {!selectedChangeOrder ? (
         <form
           className={`${estimateStyles.sheet} ${styles.workflowSheet} ${styles.createSheet}`}
           onSubmit={handleCreateChangeOrder}
@@ -1107,7 +1095,7 @@ export function ChangeOrdersConsole({
           <div className={estimateStyles.fromBlock}>
             <span className={estimateStyles.blockLabel}>From</span>
             <p className={estimateStyles.blockText}>Your Company</p>
-            <p className={estimateStyles.blockMuted}>Prepared for Change Governance</p>
+            <p className={estimateStyles.blockMuted}>Prepared for approved estimate scope changes</p>
           </div>
           <div className={estimateStyles.headerRight}>
             <div className={estimateStyles.sheetTitle}>Change Order</div>
@@ -1129,22 +1117,12 @@ export function ChangeOrdersConsole({
             />
           </label>
           <label className={`${estimateStyles.inlineField} ${styles.coMetaField}`}>
-            Origin estimate
-            <select
-              className={`${estimateStyles.fieldInput} ${styles.coMetaInput}`}
-              value={newOriginEstimateId}
-              onChange={(event) => void handleNewOriginEstimateChange(event.target.value)}
-              required
-            >
-              {!projectEstimates.length ? (
-                <option value="">No approved estimates available</option>
-              ) : null}
-              {projectEstimates.map((estimate) => (
-                <option key={estimate.id} value={estimate.id}>
-                  #{estimate.id} v{estimate.version} {estimate.title}
-                </option>
-              ))}
-            </select>
+            Origin estimate (from selector)
+            <span className={estimateStyles.staticFieldValue}>
+              {selectedViewerEstimate
+                ? `#${selectedViewerEstimate.id} v${selectedViewerEstimate.version} ${selectedViewerEstimate.title}`
+                : "No approved origin estimate selected"}
+            </span>
           </label>
           <label className={`${estimateStyles.inlineField} ${styles.coMetaField} ${styles.coFieldWide}`}>
             Reason
@@ -1228,15 +1206,16 @@ export function ChangeOrdersConsole({
             Add Line Item
           </button>
           <div className={styles.coSheetFooterActions}>
-            {!newOriginEstimateId ? (
+            {!selectedViewerEstimateId ? (
               <p className={`${estimateStyles.inlineHint} ${styles.coFooterHint}`}>
-                No approved estimates available. Approve an estimate before creating a change order.
+                Select an approved origin estimate from the history selector before creating a change
+                order.
               </p>
             ) : null}
             <button
               type="submit"
               className={`${estimateStyles.primaryButton} ${styles.coFooterPrimaryButton}`}
-              disabled={!canMutateChangeOrders || !selectedProjectId || !newOriginEstimateId}
+              disabled={!canMutateChangeOrders || !selectedProjectId || !selectedViewerEstimateId}
             >
               Create Change Order
             </button>
@@ -1262,7 +1241,7 @@ export function ChangeOrdersConsole({
         </form>
       ) : null}
 
-      {activeFormMode === "edit" ? (
+      {selectedChangeOrder ? (
         <form
           className={`${estimateStyles.sheet} ${styles.workflowSheet} ${styles.editSheet}`}
           onSubmit={handleUpdateChangeOrder}
@@ -1272,7 +1251,7 @@ export function ChangeOrdersConsole({
             <span className={estimateStyles.blockLabel}>Edit</span>
             <p className={estimateStyles.blockText}>
               {selectedChangeOrder
-                ? `CO-${selectedChangeOrder.number} v${selectedChangeOrder.revision_number}`
+                ? coLabel(selectedChangeOrder)
                 : "No change order selected"}
             </p>
             <p className={estimateStyles.blockMuted}>

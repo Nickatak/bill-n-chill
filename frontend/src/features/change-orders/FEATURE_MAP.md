@@ -54,6 +54,10 @@ Manage project-scoped contract deltas with explicit lifecycle transitions and re
   - `status_labels`
   - `default_create_status`
   - `allowed_status_transitions`
+  - `revision_rules`
+  - `origin_estimate_rules`
+  - `approval_metadata_rules`
+  - `error_rules`
 - Behavior source: contract-backed status/transition rendering with endpoint responses for create/update/clone workflows
 - Fallback policy: use static local status/transition map when contract fetch fails
 

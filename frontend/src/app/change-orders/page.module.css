@@ -17,33 +17,14 @@
   width: min(1200px, 100%);
   margin: 0 auto;
   display: grid;
-  gap: 14px;
-}
-
-.header {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 16px;
-  background:
-    radial-gradient(circle at top right, rgba(29, 78, 216, 0.08), transparent 40%),
-    var(--foreground);
-}
-
-.header h1 {
-  margin: 0;
-  color: var(--text-primary);
-}
-
-.header p {
-  margin: 8px 0 0;
-  color: var(--text-secondary);
+  gap: 0;
 }
 
 .card {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 18px;
-  background: var(--foreground);
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
 }
 
 @media (max-width: 640px) {
@@ -51,10 +32,9 @@
     padding: 12px;
   }
 
-  .header,
   .card {
-    border-radius: 12px;
-    padding: 14px;
+    border-radius: 0;
+    padding: 0;
   }
 }
 

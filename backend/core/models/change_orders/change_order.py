@@ -126,6 +126,8 @@ class ChangeOrder(models.Model):
         return next_status in cls.ALLOWED_STATUS_TRANSITIONS.get(current_status, set())
 
     def clean(self):
+        from core.models.estimating.estimate import Estimate
+
         errors = {}
 
         if self.status == self.Status.APPROVED:
@@ -137,6 +139,58 @@ class ChangeOrder(models.Model):
                 errors.setdefault("approved_at", []).append(
                     "approved_at is required when status is approved."
                 )
+        else:
+            if self.approved_by_id is not None:
+                errors.setdefault("approved_by", []).append(
+                    "approved_by must be empty unless status is approved."
+                )
+            if self.approved_at is not None:
+                errors.setdefault("approved_at", []).append(
+                    "approved_at must be empty unless status is approved."
+                )
+
+        if self.origin_estimate_id is not None:
+            origin_project_id = (
+                Estimate.objects.filter(id=self.origin_estimate_id).values_list("project_id", flat=True).first()
+            )
+            if origin_project_id is None:
+                errors.setdefault("origin_estimate", []).append(
+                    "origin_estimate does not exist."
+                )
+            elif self.project_id and origin_project_id != self.project_id:
+                errors.setdefault("origin_estimate", []).append(
+                    "origin_estimate must belong to the same project."
+                )
+
+        if self.revision_number > 1 and self.previous_change_order_id is None:
+            errors.setdefault("previous_change_order", []).append(
+                "previous_change_order is required when revision_number is greater than 1."
+            )
+        if self.previous_change_order_id is not None:
+            previous_row = (
+                type(self)
+                .objects.filter(id=self.previous_change_order_id)
+                .values("project_id", "family_key", "revision_number")
+                .first()
+            )
+            if previous_row is None:
+                errors.setdefault("previous_change_order", []).append(
+                    "previous_change_order does not exist."
+                )
+            else:
+                if self.project_id and previous_row["project_id"] != self.project_id:
+                    errors.setdefault("previous_change_order", []).append(
+                        "previous_change_order must belong to the same project."
+                    )
+                if self.family_key and previous_row["family_key"] != self.family_key:
+                    errors.setdefault("family_key", []).append(
+                        "family_key must match previous_change_order family."
+                    )
+                expected_revision = previous_row["revision_number"] + 1
+                if self.revision_number != expected_revision:
+                    errors.setdefault("revision_number", []).append(
+                        f"revision_number must be {expected_revision} for this previous_change_order."
+                    )
 
         if self.pk:
             previous_status = (

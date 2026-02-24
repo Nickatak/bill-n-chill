@@ -1,5 +1,4 @@
 import { ChangeOrdersConsole } from "@/features/change-orders";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import styles from "../../../change-orders/page.module.css";
 
@@ -23,14 +22,6 @@ export default async function ProjectChangeOrdersPage({
   return (
     <div className={styles.page}>
       <main className={styles.main}>
-        <header className={styles.header}>
-          <h1>Change Orders (WIP)</h1>
-          <p>Manage revisions for this project and keep scope history traceable.</p>
-          <p>
-            <Link href={`/projects?project=${projectId}`}>Back to Project Hub</Link> |{" "}
-            <Link href={`/invoices?project=${projectId}`}>Next: Invoice from approved scope</Link>
-          </p>
-        </header>
         <section className={styles.card}>
           <ChangeOrdersConsole
             scopedProjectId={Number(projectId)}

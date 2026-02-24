@@ -4,110 +4,103 @@
 
 - Workspace: `/home/nick/bill_n_chill`
 - Branch: `main`
-- Current HEAD: `fd849aa`
-- Branch relation: `main` is ahead of `origin/main` by 1 commit
-- Worktree: clean
+- HEAD: `21e4571 feat(frontend): align workflow navigation and WIP route labeling`
+- Branch relation: `main...origin/main` (no ahead/behind marker in status)
+- Worktree: **dirty** (12 modified files, listed below)
 
-## Milestone Delivered
+## Current Modified Files (not committed)
 
-### 1) Organization context is now first-class in frontend auth/session
-
-- Session shape includes organization data (`id`, `displayName`, `slug`).
-- Shared auth hook exposes organization context.
-- Login/register/auth-me flows persist organization context.
-- Authenticated frontend requests now use shared auth header builder:
-  - `Authorization: Token ...`
-  - `X-Organization-Id`
-  - `X-Organization-Slug`
-- New helper module added:
-  - `frontend/src/features/session/auth-headers.ts`
-
-### 2) Frontend workflow/nav updated for org-oriented UX
-
-- Organization badge shown in top controls when authenticated.
-- Breadcrumb hierarchy refactored:
-  - top-level root is Organization
-  - Meta routes are now under Organization, not under Projects
-  - shape now:
-    - `Organization / Projects / ...` for project workflow
-    - `Organization / Meta / ...` for ops/meta routes
-- Role checks were centralized and adopted where touched:
-  - `frontend/src/features/session/rbac.ts`
-
-### 3) Backend loader/query scoping rolled out to organization-member scope
-
-Scope was updated from strict `created_by=request.user` to organization-member visibility in key routes using helper-layer org membership resolution.
-
-Touched backend view layers include:
-
-- `backend/core/views/helpers.py`
-- `backend/core/views/shared_operations/projects.py`
-- `backend/core/views/shared_operations/intake.py`
-- `backend/core/views/shared_operations/accounting.py`
-- `backend/core/views/shared_operations/vendors.py`
-- `backend/core/views/shared_operations/cost_codes.py`
-- `backend/core/views/estimating/estimates.py`
-- `backend/core/views/estimating/budgets.py`
-- `backend/core/views/accounts_receivable/invoices.py`
-- `backend/core/views/cash_management/payments.py`
+- `backend/core/models/change_orders/change_order.py`
+- `backend/core/policies/change_orders.py`
+- `backend/core/tests/test_change_orders.py`
 - `backend/core/views/change_orders/change_orders.py`
-- `backend/core/views/accounts_payable/vendor_bills.py`
+- `frontend/src/app/change-orders/page.module.css`
+- `frontend/src/app/change-orders/page.tsx`
+- `frontend/src/app/projects/[projectId]/change-orders/page.tsx`
+- `frontend/src/features/change-orders/FEATURE_MAP.md`
+- `frontend/src/features/change-orders/components/change-orders-console.module.css`
+- `frontend/src/features/change-orders/components/change-orders-console.tsx`
+- `frontend/src/features/change-orders/types.ts`
+- `frontend/src/features/projects/components/projects-console.tsx`
 
-### 4) CORS fix for localhost frontend/backend and custom org headers
+## What Is Done (CO backend + frontend behavior)
 
-Addressed cross-origin preflight failures caused by org headers.
+### 1) CO backend contract + enforcement tightened
 
-- Backend settings now allow:
-  - `http://localhost:3000`
-  - `http://127.0.0.1:3000`
-- CORS allowed headers include:
-  - `x-organization-id`
-  - `x-organization-slug`
-- Updated:
-  - `backend/config/settings.py`
-  - `.env.example`
-  - `docker-compose.yml`
+- Model invariants enforced in `ChangeOrder.clean()`:
+  - approval metadata required iff `status=approved`
+  - approval metadata cleared for non-approved statuses
+  - `origin_estimate` must belong to same project
+  - revision chain integrity for `previous_change_order` + `revision_number`
+- Policy contract expanded and version bumped to `2026-02-24.change_orders.v4`:
+  - includes `revision_rules`, `origin_estimate_rules`, `approval_metadata_rules`, `error_rules`
+- View-level validation now returns stable rule keys via `error.rule` (create/edit/clone/line validations)
+- Tests updated to assert policy contract and representative `error.rule` responses
 
-## Test and Validation Evidence
+### 2) CO frontend aligned to canonical model fields
 
-Frontend checks:
+- Uses `family_key` and `previous_change_order` (legacy `number` / `supersedes_change_order` removed)
+- UI CO label normalized to `CO-{family_key} v{revision_number}`
+- CO feature map updated to include new contract fields (`error_rules` included)
 
-- `npm run lint --prefix frontend` (pass)
-- `npm run build --prefix frontend` (pass)
+### 3) CO page UX cleanup completed
 
-Backend checks:
+- Removed top route blurb/WIP/back-next header sections from `/change-orders` and project-scoped CO route
+- Removed wrapper border/card artifacts causing HR-like separator look
+- Clarified summary stat copy:
+  - `Approved Estimates (Origin)`
+  - `Change Orders Pending Approval`
+  - `Approved Change Orders`
+- Estimate card no longer uses misleading big `APPROVED` status badge; now uses neutral origin context text
+- History copy clarified:
+  - `No change orders have been created yet for this approved origin estimate.`
 
-- `backend/.venv/bin/python backend/manage.py test core.tests.test_contacts_management.ContactsManagementTests core.tests.test_projects_cost_codes.ProjectProfileTests --keepdb --noinput` (pass)
-- `backend/.venv/bin/python backend/manage.py test core.tests.test_projects_cost_codes.CostCodeTests core.tests.test_vendors --keepdb --noinput` (pass)
-- `backend/.venv/bin/python backend/manage.py test core.tests.test_contacts_management core.tests.test_projects_cost_codes.ProjectProfileTests core.tests.test_estimates core.tests.test_invoices core.tests.test_payments core.tests.test_change_orders core.tests.test_budgets core.tests.test_vendor_bills core.tests.test_accounting_sync core.tests.test_vendors --keepdb --noinput` (pass, 165 tests)
-- `backend/.venv/bin/python -m compileall backend/core/views` (pass)
+### 4) CO form interaction model now matches Estimates pattern
 
-## Commit Checkpoint
+- Removed create/edit toggle buttons
+- Single control surface now:
+  - history selector (choose origin estimate / existing CO context)
+  - `Add New Change Order` button
+- Form mode is selection-driven:
+  - selected CO -> edit form
+  - no selected CO -> create form
+- Origin estimate on create form is now selector-controlled (not user-editable in form)
+  - displayed as read-only `Origin estimate (from selector)`
+  - create submit disabled unless an approved origin estimate is selected in history selector
 
-- Commit created:
-  - `fd849aa feat: roll out organization-scoped workflow across app`
-- Scope:
-  - frontend org session + headers + nav/breadcrumb changes
-  - backend org-scoped loader/query rollout
-  - associated tests and docs updates
+## Remaining Work (user explicitly parked here)
 
-## Resume Point
+Focus area: **CO form detail pass**
 
-If resuming from a fresh context, start here:
+- line-item UX and field polish (copy, spacing, affordance clarity)
+- decide final field ordering and labels for create/edit parity
+- evaluate if line table should get quick validation hints inline (before submit)
+- visual hierarchy pass for summary block vs line-item table actions
 
-1. Confirm local state:
-   - `git status -sb`
-   - `git log -1 --oneline`
-2. If desired, push milestone:
-   - `git push origin main`
-3. Smoke-test in browser:
-   - login/register on `localhost:3000`
-   - verify no CORS rejection against `localhost:8000`
-   - verify org root breadcrumb and org/meta breadcrumb hierarchy
-   - verify cross-user same-org visibility on projects/customers workflows
+## Validation Run During This Session
+
+Backend:
+
+- `cd backend && source .venv/bin/activate && python manage.py test core.tests.test_change_orders --keepdb --noinput -v 2` (pass, 33 tests)
+- `cd backend && source .venv/bin/activate && python manage.py test core.tests.test_mvp_regression --keepdb --noinput -v 2` (pass)
+
+Frontend:
+
+- `cd frontend && npx tsc --noEmit` (pass)
+
+## Resume Checklist
+
+1. `git status -sb` and confirm same modified file list.
+2. Open CO page and verify selector-driven behavior:
+   - choose origin estimate with no COs -> create form visible
+   - choose existing CO -> edit form visible
+   - click `Add New Change Order` -> create context reset
+3. Continue only the CO form detail pass (line items/fields/copy/layout).
+4. Re-run:
+   - `cd frontend && npx tsc --noEmit`
+   - `cd backend && source .venv/bin/activate && python manage.py test core.tests.test_change_orders --keepdb --noinput`
 
 ## Notes
 
 - No destructive git operations were used.
-- Current state is intentionally commit-stable and clean for context cycling.
-- IA decision to carry forward: keep `Projects + Estimates + Change Orders` together as scope workflow, then move to `Billing` as post-approval execution.
+- This checkpoint is intentionally left uncommitted so CO form iteration can continue before squashing into a single coherent commit.
