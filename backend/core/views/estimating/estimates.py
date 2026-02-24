@@ -263,6 +263,8 @@ def project_estimates_view(request, project_id: int):
             continue
         if candidate.status != data.get("status", Estimate.Status.DRAFT):
             continue
+        if candidate.valid_through != data.get("valid_through"):
+            continue
         if candidate.tax_percent != data.get("tax_percent", Decimal("0")):
             continue
         if _estimate_signature(candidate) == input_signature:
@@ -283,6 +285,7 @@ def project_estimates_view(request, project_id: int):
         version=next_version,
         status=data.get("status", Estimate.Status.DRAFT),
         title=data.get("title", ""),
+        valid_through=data.get("valid_through"),
         tax_percent=data.get("tax_percent", Decimal("0")),
     )
 
@@ -367,7 +370,7 @@ def estimate_detail_view(request, estimate_id: int):
             status=400,
         )
     is_locked = estimate.status != Estimate.Status.DRAFT
-    mutating_fields = {"title", "tax_percent", "line_items"}
+    mutating_fields = {"title", "valid_through", "tax_percent", "line_items"}
     if is_locked and any(field in data for field in mutating_fields):
         return Response(
             {
@@ -376,6 +379,7 @@ def estimate_detail_view(request, estimate_id: int):
                     "message": "Estimate values are locked after being sent.",
                     "fields": {
                         "title": ["Cannot edit non-draft estimate values."],
+                        "valid_through": ["Cannot edit non-draft estimate values."],
                         "tax_percent": ["Cannot edit non-draft estimate values."],
                         "line_items": ["Cannot edit non-draft estimate values."],
                     },
@@ -414,6 +418,9 @@ def estimate_detail_view(request, estimate_id: int):
     if "title" in data:
         estimate.title = data["title"]
         update_fields.append("title")
+    if "valid_through" in data:
+        estimate.valid_through = data["valid_through"]
+        update_fields.append("valid_through")
     if "status" in data:
         estimate.status = data["status"]
         update_fields.append("status")
@@ -551,6 +558,7 @@ def estimate_clone_version_view(request, estimate_id: int):
         version=next_version,
         status=Estimate.Status.DRAFT,
         title=estimate.title,
+        valid_through=estimate.valid_through,
         tax_percent=estimate.tax_percent,
     )
 
@@ -666,6 +674,7 @@ def estimate_duplicate_view(request, estimate_id: int):
         version=next_version,
         status=Estimate.Status.DRAFT,
         title=target_title,
+        valid_through=estimate.valid_through,
         tax_percent=estimate.tax_percent,
     )
 

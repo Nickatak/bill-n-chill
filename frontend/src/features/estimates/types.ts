@@ -16,6 +16,7 @@ export type EstimateRecord = {
   version: number;
   status: string;
   title: string;
+  valid_through: string | null;
   subtotal: string;
   tax_percent: string;
   grand_total: string;

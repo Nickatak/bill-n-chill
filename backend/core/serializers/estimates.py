@@ -43,6 +43,7 @@ class EstimateSerializer(serializers.ModelSerializer):
             "version",
             "status",
             "title",
+            "valid_through",
             "subtotal",
             "markup_total",
             "tax_percent",
@@ -100,6 +101,7 @@ class EstimateWriteSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=255, required=True, allow_blank=False)
     status = serializers.ChoiceField(choices=Estimate.Status.choices, required=False)
     status_note = serializers.CharField(max_length=5000, required=False, allow_blank=True, default="")
+    valid_through = serializers.DateField(required=False, allow_null=True)
     tax_percent = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, default=0)
     line_items = EstimateLineItemInputSerializer(many=True, required=False)
 

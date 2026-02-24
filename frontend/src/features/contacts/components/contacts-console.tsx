@@ -17,7 +17,7 @@ import styles from "./contacts-console.module.css";
 
 type ActivityFilter = "all" | "active";
 type ProjectFilter = "all" | "with_project";
-type ProjectStatusValue = "prospect" | "active" | "on_hold" | "completed" | "cancelled";
+type ProjectStatusValue = "prospect" | "active";
 
 type ProjectCreateApiResponse = {
   data?: {

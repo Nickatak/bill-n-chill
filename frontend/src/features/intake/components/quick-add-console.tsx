@@ -13,17 +13,84 @@ export function QuickAddConsole() {
   // Composition owner: bridges shared-session auth into the controller before child workflows run.
   const { token, authMessage: baseAuthMessage } = useSharedSessionAuth();
   const controllerApi = useQuickAddController({ token, baseAuthMessage });
-  const duplicateResolutionLabel =
-    controllerApi.lastDuplicateResolution === "none"
-      ? ""
-      : controllerApi.lastDuplicateResolution.replaceAll("_", " ");
   const statusMessage = controllerApi.conversionMessage || controllerApi.leadMessage;
   const statusTone = controllerApi.conversionMessage
     ? controllerApi.conversionMessageTone
     : controllerApi.leadMessageTone;
   const statusLiveMode = statusTone === "error" ? "assertive" : "polite";
+  const hasCustomerLink = controllerApi.lastConvertedCustomerId !== null;
+  const hasProjectLink = controllerApi.lastConvertedProjectId !== null;
   const statusAnchorRef = useRef<HTMLDivElement | null>(null);
   const lastScrollKeyRef = useRef("");
+
+  function renderStatusMessageContent() {
+    if (statusTone !== "success") {
+      return statusMessage;
+    }
+
+    if (hasCustomerLink && hasProjectLink) {
+      return (
+        <>
+          <Link
+            className={styles.formStatusLink}
+            href={`/customers?customer=${controllerApi.lastConvertedCustomerId}`}
+          >
+            Customer #{controllerApi.lastConvertedCustomerId}
+            {controllerApi.lastConvertedCustomerName
+              ? ` (${controllerApi.lastConvertedCustomerName})`
+              : ""}
+          </Link>
+          {" and "}
+          <Link
+            className={styles.formStatusLink}
+            href={`/projects?project=${controllerApi.lastConvertedProjectId}`}
+          >
+            Project #{controllerApi.lastConvertedProjectId}
+            {controllerApi.lastConvertedProjectName
+              ? ` (${controllerApi.lastConvertedProjectName})`
+              : ""}
+          </Link>
+          {" created."}
+        </>
+      );
+    }
+
+    if (hasCustomerLink) {
+      return (
+        <>
+          <Link
+            className={styles.formStatusLink}
+            href={`/customers?customer=${controllerApi.lastConvertedCustomerId}`}
+          >
+            Customer #{controllerApi.lastConvertedCustomerId}
+            {controllerApi.lastConvertedCustomerName
+              ? ` (${controllerApi.lastConvertedCustomerName})`
+              : ""}
+          </Link>
+          {" created."}
+        </>
+      );
+    }
+
+    if (hasProjectLink) {
+      return (
+        <>
+          <Link
+            className={styles.formStatusLink}
+            href={`/projects?project=${controllerApi.lastConvertedProjectId}`}
+          >
+            Project #{controllerApi.lastConvertedProjectId}
+            {controllerApi.lastConvertedProjectName
+              ? ` (${controllerApi.lastConvertedProjectName})`
+              : ""}
+          </Link>
+          {" created."}
+        </>
+      );
+    }
+
+    return statusMessage;
+  }
 
   useEffect(() => {
     const duplicateCount = controllerApi.duplicateCandidates.length;
@@ -66,7 +133,7 @@ export function QuickAddConsole() {
                 : styles.formStatusInfo
           }`}
         >
-          {statusMessage}
+          {renderStatusMessageContent()}
         </p>
       ) : null}
 
@@ -98,51 +165,6 @@ export function QuickAddConsole() {
         fieldErrors={controllerApi.fieldErrors}
         onSubmit={controllerApi.handleQuickAdd}
       />
-
-      {controllerApi.lastLead && controllerApi.lastSubmissionIntent ? (
-        <div className={styles.summaryCard}>
-          <p className={styles.summaryTitle}>
-            {controllerApi.lastSubmissionIntent === "customer_and_project"
-              ? "Customer + project created."
-              : "Customer created."}
-          </p>
-          <p className={styles.summaryText}>
-            Intake record #{controllerApi.lastLead.id}
-            {controllerApi.lastConvertedCustomerId !== null ? (
-              <>
-                {" | "}Customer{" "}
-                <Link
-                  className={styles.summaryLink}
-                  href={`/customers?customer=${controllerApi.lastConvertedCustomerId}`}
-                >
-                  #{controllerApi.lastConvertedCustomerId}
-                </Link>
-              </>
-            ) : null}
-            {controllerApi.lastConvertedProjectId !== null ? (
-              <>
-                {" | "}Project{" "}
-                <Link
-                  className={styles.summaryLink}
-                  href={`/projects?project=${controllerApi.lastConvertedProjectId}`}
-                >
-                  #{controllerApi.lastConvertedProjectId}
-                </Link>
-              </>
-            ) : null}
-            {" | "}
-            {controllerApi.lastLead.full_name}
-            {controllerApi.lastSubmissionIntent === "customer_and_project" &&
-            controllerApi.lastConvertedProjectId === null ? (
-              <> (project creation did not complete)</>
-            ) : null}
-            .
-          </p>
-          {duplicateResolutionLabel ? (
-            <p className={styles.summaryText}>Duplicate resolution: {duplicateResolutionLabel}.</p>
-          ) : null}
-        </div>
-      ) : null}
     </section>
   );
 }

@@ -1,6 +1,7 @@
 from core.tests.common import *
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
+from core.policies.cost_codes import STARTER_COST_CODE_ROWS
 
 class HealthEndpointTests(TestCase):
     def test_health_endpoint_returns_ok_payload(self):
@@ -47,6 +48,10 @@ class AuthEndpointTests(TestCase):
         membership = OrganizationMembership.objects.get(user=self.user)
         self.assertEqual(membership.role, OrganizationMembership.Role.OWNER)
         self.assertEqual(membership.status, OrganizationMembership.Status.ACTIVE)
+        self.assertEqual(
+            CostCode.objects.filter(organization_id=membership.organization_id).count(),
+            len(STARTER_COST_CODE_ROWS),
+        )
 
     def test_register_creates_account_and_returns_token(self):
         register_response = self.client.post(
@@ -71,6 +76,10 @@ class AuthEndpointTests(TestCase):
         membership = OrganizationMembership.objects.get(user=new_user)
         self.assertEqual(membership.role, OrganizationMembership.Role.OWNER)
         self.assertEqual(membership.status, OrganizationMembership.Status.ACTIVE)
+        self.assertEqual(
+            CostCode.objects.filter(organization_id=membership.organization_id).count(),
+            len(STARTER_COST_CODE_ROWS),
+        )
 
     def test_register_rejects_duplicate_email(self):
         response = self.client.post(

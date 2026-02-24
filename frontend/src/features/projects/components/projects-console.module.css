@@ -410,39 +410,6 @@
   gap: 12px;
 }
 
-.mobileQuickActions {
-  border: 1px dashed var(--border);
-  border-radius: 12px;
-  padding: 10px 12px;
-  background: #f8fafc;
-}
-
-.mobileQuickActions h3 {
-  margin: 0 0 4px;
-}
-
-.mobileQuickActions p {
-  margin: 6px 0;
-}
-
-.commandCenterAttention {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  background: #ffffff;
-}
-
-.commandCenterAttention h3 {
-  margin: 0 0 8px;
-}
-
-.commandCenterAttention ul {
-  margin: 0;
-  padding-left: 18px;
-  display: grid;
-  gap: 6px;
-}
-
 .overviewHeader {
   display: flex;
   align-items: flex-start;
@@ -950,14 +917,4 @@
 :global(html[data-theme="dark"]) .metricsPanel {
   background: #0f172a;
   border-color: #1f2937;
-}
-
-:global(html[data-theme="dark"]) .mobileQuickActions {
-  background: #0f172a;
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .commandCenterAttention {
-  background: #0f172a;
-  border-color: #334155;
 }

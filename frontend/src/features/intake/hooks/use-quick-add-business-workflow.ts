@@ -70,14 +70,18 @@ export function useQuickAddBusinessWorkflow({
   const [lastSubmissionIntent, setLastSubmissionIntent] = useState<SubmitIntent | null>(null);
   const [lastDuplicateResolution, setLastDuplicateResolution] = useState("none");
   const [lastConvertedCustomerId, setLastConvertedCustomerId] = useState<number | null>(null);
+  const [lastConvertedCustomerName, setLastConvertedCustomerName] = useState("");
   const [lastConvertedProjectId, setLastConvertedProjectId] = useState<number | null>(null);
+  const [lastConvertedProjectName, setLastConvertedProjectName] = useState("");
 
   function clearLastSuccessState() {
     setLastLead(null);
     setLastSubmissionIntent(null);
     setLastDuplicateResolution("none");
     setLastConvertedCustomerId(null);
+    setLastConvertedCustomerName("");
     setLastConvertedProjectId(null);
+    setLastConvertedProjectName("");
   }
 
   async function submitQuickAdd(
@@ -119,7 +123,10 @@ export function useQuickAddBusinessWorkflow({
     const resolution = payload.meta?.duplicate_resolution ?? "none";
     const lead = result.customer_intake;
     const customerId = typeof result.customer?.id === "number" ? result.customer.id : null;
+    const customerName = typeof result.customer?.display_name === "string" ? result.customer.display_name : "";
     const projectId = typeof result.project?.id === "number" ? result.project.id : null;
+    const projectNameFromResult =
+      typeof result.project?.name === "string" ? result.project.name : "";
 
     setLeadMessage("");
     setDuplicateCandidates([]);
@@ -129,7 +136,9 @@ export function useQuickAddBusinessWorkflow({
     setLastSubmissionIntent(submission.intent);
     setLastDuplicateResolution(resolution);
     setLastConvertedCustomerId(customerId);
+    setLastConvertedCustomerName(customerName);
     setLastConvertedProjectId(projectId);
+    setLastConvertedProjectName(projectNameFromResult);
     setConversionMessage("");
     setConversionMessageTone("neutral");
 
@@ -272,7 +281,9 @@ export function useQuickAddBusinessWorkflow({
     lastSubmissionIntent,
     lastDuplicateResolution,
     lastConvertedCustomerId,
+    lastConvertedCustomerName,
     lastConvertedProjectId,
+    lastConvertedProjectName,
     duplicateCandidates,
     duplicateMatchPayload: pendingSubmission?.payload ?? null,
     duplicateResolutionIntent: pendingSubmission?.intent ?? null,

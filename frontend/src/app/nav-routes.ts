@@ -12,18 +12,23 @@ export const workflowRoutes: NavRoute[] = [
     exact: ["/", "/intake/quick-add"],
   },
   {
+    href: "/customers",
+    label: "2 Customers",
+    exact: ["/customers"],
+  },
+  {
     href: "/projects",
-    label: "2 Projects",
+    label: "3 Projects",
     exact: ["/projects"],
   },
   {
     href: "/invoices",
-    label: "3 Invoices",
+    label: "4 Invoices",
     exact: ["/invoices"],
   },
   {
     href: "/payments",
-    label: "4 Payments",
+    label: "5 Payments",
     exact: ["/payments"],
   },
 ];

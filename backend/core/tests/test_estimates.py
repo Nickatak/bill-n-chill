@@ -166,6 +166,33 @@ class EstimateTests(TestCase):
         self.assertEqual(str(estimate.subtotal), "1000.00")
         self.assertEqual(str(estimate.markup_total), "100.00")
 
+    def test_project_estimates_create_persists_valid_through(self):
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Estimate With Valid Through",
+                "valid_through": "2026-06-30",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo and prep",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["data"]
+        self.assertEqual(payload["valid_through"], "2026-06-30")
+
+        estimate = Estimate.objects.get(id=payload["id"])
+        self.assertEqual(str(estimate.valid_through), "2026-06-30")
+
     def test_project_estimates_create_rounds_tax_half_up_to_cents(self):
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/estimates/",
@@ -1049,6 +1076,14 @@ class EstimateTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(locked.status_code, 400)
+
+        locked_valid_through = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"valid_through": "2026-07-31"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(locked_valid_through.status_code, 400)
 
         approved = self.client.patch(
             f"/api/v1/estimates/{estimate_id}/",

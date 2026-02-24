@@ -4,7 +4,7 @@ import { FormEventHandler } from "react";
 
 import styles from "./contacts-console.module.css";
 
-type ProjectStatusValue = "prospect" | "active" | "on_hold" | "completed" | "cancelled";
+type ProjectStatusValue = "prospect" | "active";
 
 type CustomerProjectCreateFormProps = {
   customerName: string;
@@ -58,9 +58,6 @@ export function CustomerProjectCreateForm({
         >
           <option value="prospect">Prospect</option>
           <option value="active">Active</option>
-          <option value="on_hold">On Hold</option>
-          <option value="completed">Completed</option>
-          <option value="cancelled">Cancelled</option>
         </select>
       </label>
 

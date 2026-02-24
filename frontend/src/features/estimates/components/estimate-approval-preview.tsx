@@ -11,10 +11,6 @@ type EstimateApprovalPreviewProps = {
   publicToken: string;
 };
 
-function formatDateInput(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
 function mapLineItemsToInputs(estimate: EstimateRecord | null): EstimateLineInput[] {
   const items = estimate?.line_items ?? [];
   if (!items.length) {
@@ -58,17 +54,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
   const lineItems = useMemo(() => mapLineItemsToInputs(estimate), [estimate]);
   const costCodes = useMemo(() => mapLineCostCodes(estimate), [estimate]);
   const estimateDate = formatDateInputFromIso(estimate?.created_at);
-  const dueDate = useMemo(() => {
-    if (!estimateDate) {
-      return "";
-    }
-    const parsed = new Date(estimateDate);
-    if (Number.isNaN(parsed.getTime())) {
-      return "";
-    }
-    parsed.setDate(parsed.getDate() + 14);
-    return formatDateInput(parsed);
-  }, [estimateDate]);
+  const validThrough = estimate?.valid_through ?? "";
 
   const lineTotals = useMemo(
     () =>
@@ -120,7 +106,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
             estimateId={String(estimate.id)}
             estimateTitle={estimate.title || "Untitled"}
             estimateDate={estimateDate}
-            dueDate={dueDate}
+            validThrough={validThrough}
             taxPercent={taxPercent}
             lineItems={lineItems}
             lineTotals={lineTotals}
@@ -139,7 +125,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
             lineSortKey={null}
             lineSortDirection="asc"
             onTitleChange={() => undefined}
-            onDueDateChange={() => undefined}
+            onValidThroughChange={() => undefined}
             onTaxPercentChange={() => undefined}
             onLineItemChange={() => undefined}
             onAddLineItem={() => undefined}

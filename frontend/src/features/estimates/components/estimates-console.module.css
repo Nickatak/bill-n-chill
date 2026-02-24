@@ -34,35 +34,6 @@
   font-size: 0.9rem;
 }
 
-.estimateSelector {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  background: var(--foreground);
-}
-
-.scopeLabel {
-  margin: 0;
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #1d4ed8;
-  font-weight: 600;
-}
-
-.scopeProjectName {
-  margin: 6px 0 2px;
-  color: var(--text-primary);
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.scopeProjectMeta {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.88rem;
-}
-
 .projectTableWrap {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -289,6 +260,19 @@
   color: #b91c1c;
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+.actionSuccess {
+  margin: 0;
+  color: #15803d;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.actionSuccess a {
+  color: #166534;
+  font-weight: 700;
+  text-decoration: underline;
 }
 
 .metaBlock {
@@ -550,8 +534,9 @@
 .finalizeActions {
   max-width: 320px;
   margin-left: auto;
-  display: flex;
-  justify-content: flex-end;
+  display: grid;
+  justify-items: end;
+  gap: 8px;
   margin-top: 8px;
 }
 
@@ -644,19 +629,6 @@
   background: var(--foreground);
   display: grid;
   gap: 12px;
-}
-
-.primaryCreateAction {
-  display: flex;
-}
-
-.primaryCreateAction button {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #111827;
-  color: #f9fafb;
-  padding: 8px 12px;
-  cursor: pointer;
 }
 
 .lifecycle h3 {
@@ -1323,6 +1295,14 @@
   color: #fca5a5;
 }
 
+:global(html[data-theme="dark"]) .actionSuccess {
+  color: #86efac;
+}
+
+:global(html[data-theme="dark"]) .actionSuccess a {
+  color: #bbf7d0;
+}
+
 :global(html[data-theme="dark"]) .logoBox {
   border-color: #334155;
   color: #94a3b8;
@@ -1398,10 +1378,6 @@
 :global(html[data-theme="dark"]) .projectTableWrap {
   background: #0f172a;
   border-color: #1f2937;
-}
-
-:global(html[data-theme="dark"]) .scopeLabel {
-  color: #93c5fd;
 }
 
 :global(html[data-theme="dark"]) .projectTable thead th {

@@ -119,13 +119,32 @@ export function QuickAddForm({
           </label>
           <label className={styles.field}>
             Project status
-            <select value={projectStatus} onChange={(event) => onProjectStatusChange(event.target.value)}>
-              <option value="prospect">prospect</option>
-              <option value="active">active</option>
-              <option value="on_hold">on_hold</option>
-              <option value="completed">completed</option>
-              <option value="cancelled">cancelled</option>
-            </select>
+            <div className={styles.projectStatusPills} role="group" aria-label="Project status">
+              <button
+                type="button"
+                className={`${styles.projectStatusPill} ${
+                  projectStatus === "prospect"
+                    ? `${styles.projectStatusPillActive} ${styles.projectStatusProspect}`
+                    : styles.projectStatusPillInactive
+                }`}
+                aria-pressed={projectStatus === "prospect"}
+                onClick={() => onProjectStatusChange("prospect")}
+              >
+                Prospect
+              </button>
+              <button
+                type="button"
+                className={`${styles.projectStatusPill} ${
+                  projectStatus === "active"
+                    ? `${styles.projectStatusPillActive} ${styles.projectStatusActive}`
+                    : styles.projectStatusPillInactive
+                }`}
+                aria-pressed={projectStatus === "active"}
+                onClick={() => onProjectStatusChange("active")}
+              >
+                Active
+              </button>
+            </div>
           </label>
           <label className={styles.field}>
             Notes

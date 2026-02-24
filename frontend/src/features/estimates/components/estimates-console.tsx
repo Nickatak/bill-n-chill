@@ -102,6 +102,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const searchParams = useSearchParams();
   const [token, setToken] = useState("");
   const [, setStatusMessage] = useState("");
+  const [formErrorMessage, setFormErrorMessage] = useState("");
+  const [formSuccessMessage, setFormSuccessMessage] = useState("");
+  const [formSuccessHref, setFormSuccessHref] = useState("");
   const [actionMessage, setActionMessage] = useState("");
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -133,7 +136,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const [lineSortDirection, setLineSortDirection] = useState<"asc" | "desc">("asc");
   const [nextLineId, setNextLineId] = useState(2);
   const [estimateDate, setEstimateDate] = useState("");
-  const [dueDate, setDueDate] = useState("");
+  const [validThrough, setValidThrough] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submitGuard = useRef(false);
   const [openFamilyHistory, setOpenFamilyHistory] = useState<Set<string>>(() => new Set());
@@ -425,13 +428,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     return `/estimate/${publicRef}`;
   }
 
-  function formatDateInput(date: Date): string {
-    return date.toISOString().slice(0, 10);
-  }
-
   const loadEstimateIntoForm = useCallback((estimate: EstimateRecord) => {
     setEstimateTitle(estimate.title || "Untitled");
     setTaxPercent(String(estimate.tax_percent ?? "0"));
+    setValidThrough(estimate.valid_through ?? "");
     const mapped = mapEstimateLineItemsToInputs(estimate.line_items ?? []);
     setLineItems(mapped);
     setNextLineId(mapped.length + 1);
@@ -452,6 +452,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     }
     setLineSortKey(null);
     setLineSortDirection("asc");
+    setFormErrorMessage("");
+    setFormSuccessMessage("");
+    setFormSuccessHref("");
     loadEstimateIntoForm(estimate);
     setDuplicateTitle(`${estimate.title || "Estimate"} Copy`);
   }, [estimateAllowedStatusTransitions, loadEstimateIntoForm, selectedEstimateId]);
@@ -470,9 +473,12 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setLineSortDirection("asc");
     setNextLineId(2);
     setEstimateDate("");
-    setDueDate("");
+    setValidThrough("");
     setShowDuplicatePanel(false);
     setActionMessage("");
+    setFormErrorMessage("");
+    setFormSuccessMessage("");
+    setFormSuccessHref("");
   }
 
   function handleSelectFamilyLatest(title: string, latest: EstimateRecord) {
@@ -508,11 +514,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     if (estimateDate) {
       return;
     }
-    const today = new Date();
-    const due = new Date();
-    due.setDate(due.getDate() + 14);
-    setEstimateDate(formatDateInput(today));
-    setDueDate(formatDateInput(due));
+    setEstimateDate(new Date().toISOString().slice(0, 10));
   }, [estimateDate]);
 
   const loadDependencies = useCallback(async () => {
@@ -708,6 +710,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     key: keyof Omit<EstimateLineInput, "localId">,
     value: string,
   ) {
+    setFormErrorMessage("");
+    setFormSuccessMessage("");
+    setFormSuccessHref("");
     setLineItems((current) =>
       current.map((line) => (line.localId === localId ? { ...line, [key]: value } : line)),
     );
@@ -766,27 +771,34 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
   async function handleCreateEstimate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setFormErrorMessage("");
+    setFormSuccessMessage("");
+    setFormSuccessHref("");
     if (submitGuard.current) {
       return;
     }
     if (isReadOnly) {
+      setFormErrorMessage("This estimate is read-only. Clone or add a new draft to edit.");
       setStatusMessage("This estimate is read-only. Clone or add a new draft to edit.");
       return;
     }
     const projectId = Number(selectedProjectId);
     if (!projectId) {
+      setFormErrorMessage("Select a project first.");
       setStatusMessage("Select a project first.");
       return;
     }
 
     const trimmedTitle = estimateTitle.trim();
     if (!trimmedTitle) {
+      setFormErrorMessage("Estimate title is required.");
       setStatusMessage("Estimate title is required.");
       return;
     }
 
     const hasMissingCostCode = lineItems.some((line) => !line.costCodeId);
     if (hasMissingCostCode) {
+      setFormErrorMessage("Every line item must have a cost code.");
       setStatusMessage("Every line item must have a cost code.");
       return;
     }
@@ -801,6 +813,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
           headers: buildAuthHeaders(token, { contentType: "application/json" }),
           body: JSON.stringify({
             title: trimmedTitle,
+            valid_through: validThrough || null,
             tax_percent: taxPercent,
             line_items: lineItems.map((line) => ({
               cost_code: Number(line.costCodeId),
@@ -814,6 +827,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         });
         const payload: ApiResponse = await response.json();
         if (!response.ok) {
+          setFormErrorMessage("Save draft failed. Check values and try again.");
           setStatusMessage("Save draft failed.");
           return;
         }
@@ -822,8 +836,12 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
           current.map((estimate) => (estimate.id === updated.id ? updated : estimate)),
         );
         loadEstimateIntoForm(updated);
+        setFormErrorMessage("");
+        setFormSuccessMessage(`Saved draft estimate #${updated.id}.`);
+        setFormSuccessHref(updated.public_ref ? publicEstimateHref(updated.public_ref) : "");
         setStatusMessage(`Saved draft estimate #${updated.id}.`);
       } catch {
+        setFormErrorMessage("Could not reach estimate update endpoint.");
         setStatusMessage("Could not reach estimate update endpoint.");
       } finally {
         submitGuard.current = false;
@@ -841,6 +859,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
           title: trimmedTitle,
+          valid_through: validThrough || null,
           tax_percent: taxPercent,
           line_items: lineItems.map((line) => ({
             cost_code: Number(line.costCodeId),
@@ -854,6 +873,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
+        setFormErrorMessage("Create estimate failed. Check values and try again.");
         setStatusMessage("Create estimate failed.");
         return;
       }
@@ -862,9 +882,13 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setIsViewerExpanded(true);
       handleSelectEstimate(created);
       setStatusEvents([]);
+      setFormErrorMessage("");
+      setFormSuccessMessage(`Created estimate #${created.id} v${created.version}.`);
+      setFormSuccessHref(created.public_ref ? publicEstimateHref(created.public_ref) : "");
       setStatusMessage(`Created estimate #${created.id} v${created.version}.`);
       loadEstimateIntoForm(created);
     } catch {
+      setFormErrorMessage("Could not reach estimate create endpoint.");
       setStatusMessage("Could not reach estimate create endpoint.");
     } finally {
       submitGuard.current = false;
@@ -1000,37 +1024,13 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
   return (
     <section className={styles.console}>
-      <div className={styles.estimateSelector}>
-        {selectedProject ? (
-          <>
-            <p className={styles.scopeLabel}>Project Context</p>
-            <p className={styles.scopeProjectName}>
-              #{selectedProject.id} {selectedProject.name}
-            </p>
-            <p className={styles.scopeProjectMeta}>
-              {selectedProject.customer_display_name} · {selectedProject.status}
-            </p>
-          </>
-        ) : projects.length === 0 ? (
-          <p className={styles.inlineHint}>
-            No projects yet. Create one from Intake so we can bill against it.
-          </p>
-        ) : (
-          <p className={styles.inlineHint}>
-            No project selected. Open estimates from <code>/projects</code>.
-          </p>
-        )}
-      </div>
-
-      <div className={styles.primaryCreateAction}>
-        <button type="button" onClick={startNewEstimate}>
-          Add New Estimate
-        </button>
-      </div>
-
       <section className={styles.lifecycle}>
         <div className={styles.lifecycleHeader}>
-          <h3>Estimate Versions & Status</h3>
+          <h3>
+            {selectedProject
+              ? `Estimates for #${selectedProject.id} ${selectedProject.name}`
+              : "Estimates"}
+          </h3>
           <button
             type="button"
             className={styles.lifecycleToggleButton}
@@ -1044,6 +1044,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         {isViewerExpanded ? (
           <>
             <div className={styles.lifecycleActions}>
+              <button type="button" onClick={startNewEstimate}>
+                Add New Estimate
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -1297,54 +1300,57 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
               )}
             </div>
 
-            <div className={styles.lifecycleGrid}>
-              <div className={styles.statusPicker}>
-                <span className={styles.lifecycleFieldLabel}>Next status</span>
-                <div className={styles.statusPills}>
-                  {nextStatusOptions.map((option) => {
-                    const isSelected = selectedStatus === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={`${styles.statusPill} ${
-                          isSelected ? statusClasses[option.value] ?? "" : styles.statusPillInactive
-                        } ${isSelected ? styles.statusPillActive : ""}`}
-                        onClick={() => setSelectedStatus(option.value)}
-                        aria-pressed={isSelected}
-                        disabled={!selectedEstimateId}
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })}
+            {selectedEstimateId ? (
+              <>
+                <div className={styles.lifecycleGrid}>
+                  <div className={styles.statusPicker}>
+                    <span className={styles.lifecycleFieldLabel}>Next status</span>
+                    <div className={styles.statusPills}>
+                      {nextStatusOptions.map((option) => {
+                        const isSelected = selectedStatus === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className={`${styles.statusPill} ${
+                              isSelected ? statusClasses[option.value] ?? "" : styles.statusPillInactive
+                            } ${isSelected ? styles.statusPillActive : ""}`}
+                            onClick={() => setSelectedStatus(option.value)}
+                            aria-pressed={isSelected}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {nextStatusOptions.length === 0 ? (
+                      <p className={styles.inlineHint}>No next statuses available for this estimate.</p>
+                    ) : null}
+                  </div>
+                  <label className={styles.lifecycleField}>
+                    Status note
+                    <textarea
+                      className={styles.statusNote}
+                      value={statusNote}
+                      onChange={(event) => setStatusNote(event.target.value)}
+                      placeholder="Optional note for this transition"
+                      rows={3}
+                    />
+                  </label>
                 </div>
-                {selectedEstimateId && nextStatusOptions.length === 0 ? (
-                  <p className={styles.inlineHint}>No next statuses available for this estimate.</p>
-                ) : null}
-              </div>
-              <label className={styles.lifecycleField}>
-                Status note
-                <textarea
-                  className={styles.statusNote}
-                  value={statusNote}
-                  onChange={(event) => setStatusNote(event.target.value)}
-                  placeholder="Optional note for this transition"
-                  rows={3}
-                />
-              </label>
-            </div>
-            <div className={styles.lifecycleActions}>
-              <button
-                type="button"
-                onClick={handleUpdateEstimateStatus}
-                disabled={!selectedEstimateId || nextStatusOptions.length === 0}
-              >
-                Update Selected Estimate Status
-              </button>
-            </div>
+                <div className={styles.lifecycleActions}>
+                  <button
+                    type="button"
+                    onClick={handleUpdateEstimateStatus}
+                    disabled={nextStatusOptions.length === 0}
+                  >
+                    Update Selected Estimate Status
+                  </button>
+                </div>
+              </>
+            ) : null}
 
-            {statusEvents.length > 0 ? (
+            {selectedEstimateId && statusEvents.length > 0 ? (
               <div className={styles.statusEvents}>
                 <h4>Status Events</h4>
                 <div className={styles.statusEventsTableWrap}>
@@ -1389,7 +1395,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         estimateId={selectedEstimateId}
         estimateTitle={estimateTitle}
         estimateDate={estimateDate}
-        dueDate={dueDate}
+        validThrough={validThrough}
         taxPercent={taxPercent}
         lineItems={lineItems}
         lineTotals={lineTotals}
@@ -1401,10 +1407,13 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         isSubmitting={isSubmitting}
         isEditingDraft={isEditingDraft}
         readOnly={isReadOnly}
+        formErrorMessage={formErrorMessage}
+        formSuccessMessage={formSuccessMessage}
+        formSuccessHref={formSuccessHref}
         lineSortKey={lineSortKey}
         lineSortDirection={lineSortDirection}
         onTitleChange={setEstimateTitle}
-        onDueDateChange={setDueDate}
+        onValidThroughChange={setValidThrough}
         onTaxPercentChange={setTaxPercent}
         onLineItemChange={updateLineItem}
         onAddLineItem={addLineItem}

@@ -1,0 +1,174 @@
+.combobox {
+  position: relative;
+  width: 100%;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.inputWrap {
+  position: relative;
+}
+
+.input {
+  border: 1px solid #cbd5f5;
+  border-radius: 8px;
+  padding: 6px 8px;
+  padding-right: 24px;
+  background: #ffffff;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+.inputDisabled {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #dbe3f0;
+  cursor: default;
+}
+
+.menu {
+  position: fixed;
+  z-index: 1200;
+  border: 1px solid #cbd5f5;
+  border-radius: 8px;
+  background: #ffffff;
+  max-height: 180px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.option {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid #e2e8f0;
+  background: transparent;
+  color: var(--text-primary);
+  padding: 7px 9px;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+}
+
+.inputWrap .clearButton {
+  all: unset;
+  box-sizing: border-box;
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.inputWrap .clearButton:hover {
+  color: #1e3a8a;
+}
+
+.inputWrap .clearButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.option:first-child {
+  border-top: 0;
+}
+
+.optionActive {
+  background: #dbeafe;
+}
+
+.optionCode {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.optionName {
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+
+.noResults {
+  border-top: 1px solid #e2e8f0;
+  padding: 8px 9px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.noResults:first-child {
+  border-top: 0;
+}
+
+.manageCodesLink {
+  color: #1d4ed8;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.manageCodesLink:hover {
+  text-decoration: underline;
+}
+
+:global(html[data-theme="dark"]) .input {
+  background: #0b1220;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .inputDisabled {
+  background: #0a1324;
+  border-color: #2b3b52;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .menu {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .inputWrap .clearButton {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .inputWrap .clearButton:hover {
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .option {
+  border-top-color: #1f2937;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .optionActive {
+  background: #1e3a8a;
+}
+
+:global(html[data-theme="dark"]) .optionCode {
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .optionName {
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .noResults {
+  border-top-color: #1f2937;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .manageCodesLink {
+  color: #93c5fd;
+}

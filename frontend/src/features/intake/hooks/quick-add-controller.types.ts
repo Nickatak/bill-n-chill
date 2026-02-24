@@ -40,7 +40,9 @@ export type QuickAddControllerApi = {
   lastSubmissionIntent: SubmitIntent | null;
   lastDuplicateResolution: string;
   lastConvertedCustomerId: number | null;
+  lastConvertedCustomerName: string;
   lastConvertedProjectId: number | null;
+  lastConvertedProjectName: string;
   fullName: string;
   setFullName: (value: string) => void;
   phone: string;

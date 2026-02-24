@@ -239,17 +239,41 @@ class CostCodeTests(TestCase):
             password="secret123",
         )
         self.token, _ = Token.objects.get_or_create(user=self.user)
+        self.user_org = Organization.objects.create(
+            display_name="Cost Code Test Org A",
+            slug="cost-code-test-org-a",
+            created_by=self.user,
+        )
+        self.other_org = Organization.objects.create(
+            display_name="Cost Code Test Org B",
+            slug="cost-code-test-org-b",
+            created_by=self.other_user,
+        )
+        OrganizationMembership.objects.create(
+            organization=self.user_org,
+            user=self.user,
+            role=OrganizationMembership.Role.OWNER,
+            status=OrganizationMembership.Status.ACTIVE,
+        )
+        OrganizationMembership.objects.create(
+            organization=self.other_org,
+            user=self.other_user,
+            role=OrganizationMembership.Role.OWNER,
+            status=OrganizationMembership.Status.ACTIVE,
+        )
 
         self.code = CostCode.objects.create(
             code="01-100",
             name="General Conditions",
             is_active=True,
+            organization=self.user_org,
             created_by=self.user,
         )
         CostCode.objects.create(
             code="02-200",
             name="Other User Code",
             is_active=True,
+            organization=self.other_org,
             created_by=self.other_user,
         )
 

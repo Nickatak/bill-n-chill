@@ -200,12 +200,10 @@ export function ProjectsConsole() {
           return;
         }
         if (scopedCustomerId) {
-          setNeutralStatusMessage(
-            `Loaded ${scopedItems.length} project(s) for customer #${scopedCustomerId}.`,
-          );
+          setStatusMessage("");
           return;
         }
-        setNeutralStatusMessage(`Loaded ${items.length} project(s).`);
+        setStatusMessage("");
       } else if (scopedCustomerId) {
         setSelectedProjectId("");
         setSummary(null);
@@ -230,8 +228,6 @@ export function ProjectsConsole() {
       setErrorStatusMessage("Select a project first.");
       return;
     }
-
-    setNeutralStatusMessage("Loading financial summary...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/financial-summary/`, {
         headers: buildAuthHeaders(token),
@@ -243,7 +239,6 @@ export function ProjectsConsole() {
       }
 
       setSummary(payload.data as ProjectFinancialSummary);
-      setNeutralStatusMessage("Financial summary loaded.");
     } catch {
       setErrorStatusMessage("Could not reach financial summary endpoint.");
     }
@@ -422,27 +417,18 @@ export function ProjectsConsole() {
 
   return (
     <section>
-      <h2>Project Profile Editor</h2>
-      <p>Load project shells and update baseline profile fields.</p>
-      {scopedCustomerId ? (
-        <p>
-          Viewing projects for customer #{scopedCustomerId}. <Link href="/projects">Show all projects</Link>.
-        </p>
-      ) : null}
-
-      <p>{authMessage}</p>
+      {authMessage.startsWith("No shared session") ? <p>{authMessage}</p> : null}
 
       {projects.length === 0 ? (
         <p>
-          No projects yet. Go to <code>/intake/quick-add</code>, create a lead, and convert it to
-          a project shell.
+          No projects yet. Create one from <code>/customers</code> or <code>/intake/quick-add</code>.
         </p>
       ) : null}
 
       {projects.length > 0 ? (
         <section>
           <h3>Project List</h3>
-          <p>Quick scan of loaded project shells.</p>
+          <p>Select a project to open its map, financial snapshot, and downstream actions.</p>
           <label className={styles.searchField}>
             Search projects
             <input
@@ -568,26 +554,6 @@ export function ProjectsConsole() {
           {statusFilteredProjects.length === 0 ? (
             <p className={styles.searchEmpty}>No projects match your search/filter.</p>
           ) : null}
-        </section>
-      ) : null}
-
-      {selectedProject ? (
-        <p>
-          Active project: #{selectedProject.id} {selectedProject.name}
-        </p>
-      ) : null}
-
-      {selectedProject ? (
-        <section className={styles.mobileQuickActions}>
-          <h3>Mobile Quick Actions</h3>
-          <p>One-tap shortcuts for in-field updates.</p>
-          <p>
-            <Link href="/intake/quick-add">Quick Add Customer</Link> |{" "}
-            <Link href={`/projects/${selectedProject.id}/change-orders`}>Quick CO</Link> |{" "}
-            <Link href={`/invoices?project=${selectedProject.id}`}>Quick Invoice</Link> |{" "}
-            <Link href={`/projects/${selectedProject.id}/vendor-bills`}>Quick Vendor Bill</Link> |{" "}
-            <Link href={`/payments?project=${selectedProject.id}`}>Quick Payment</Link>
-          </p>
         </section>
       ) : null}
 
@@ -739,42 +705,6 @@ export function ProjectsConsole() {
               </p>
             </div>
           </div>
-        </section>
-      ) : null}
-
-      {selectedProject ? (
-        <section className={styles.commandCenterAttention}>
-          <h3>What Needs Attention</h3>
-          <ul>
-            {summary && Number(summary.ar_outstanding) > 0 ? (
-              <li>
-                AR outstanding is {summary.ar_outstanding}. <Link href={`/invoices?project=${selectedProject.id}`}>Open Invoices</Link>
-              </li>
-            ) : null}
-            {summary && Number(summary.ap_outstanding) > 0 ? (
-              <li>
-                AP outstanding is {summary.ap_outstanding}.{" "}
-                <Link href={`/projects/${selectedProject.id}/vendor-bills`}>Open Vendor Bills</Link>
-              </li>
-            ) : null}
-            {estimateStatusCounts && estimateStatusCounts.sent > 0 ? (
-              <li>
-                {estimateStatusCounts.sent} estimate(s) are still sent and pending outcome.{" "}
-                <Link href={`/projects/${selectedProject.id}/estimates`}>Open Estimates</Link>
-              </li>
-            ) : null}
-            {summaryCounts && summaryCounts.changeOrders > 0 ? (
-              <li>
-                {summaryCounts.changeOrders} approved CO source record(s) linked.{" "}
-                <Link href={`/projects/${selectedProject.id}/change-orders`}>Open Change Orders</Link>
-              </li>
-            ) : null}
-            {!summary ? (
-              <li>
-                Load summary first to populate contract/AR/AP attention details.
-              </li>
-            ) : null}
-          </ul>
         </section>
       ) : null}
 

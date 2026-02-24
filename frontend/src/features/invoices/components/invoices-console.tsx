@@ -7,6 +7,7 @@ import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { hasAnyRole } from "../../session/rbac";
 import { ApiResponse, CostCode, InvoiceLineInput, InvoiceRecord, ProjectRecord } from "../types";
+import { CostCodeCombobox } from "@/shared/components/cost-code-combobox";
 
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
@@ -374,17 +375,15 @@ export function InvoicesConsole() {
             <p>Line {index + 1}</p>
             <label>
               Cost code
-              <select
+              <CostCodeCombobox
+                costCodes={costCodes}
                 value={line.costCodeId}
-                onChange={(event) => updateLineItem(line.localId, "costCodeId", event.target.value)}
-              >
-                <option value="">No cost code</option>
-                {costCodes.map((code) => (
-                  <option key={code.id} value={code.id}>
-                    {code.code} - {code.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(nextValue) => updateLineItem(line.localId, "costCodeId", nextValue)}
+                ariaLabel="Cost code"
+                allowEmptySelection
+                emptySelectionLabel="No cost code"
+                placeholder="Search cost code"
+              />
             </label>
             <label>
               Description

@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { FormEvent } from "react";
 
 import styles from "./estimates-console.module.css";
 import { CostCode, EstimateLineInput, ProjectRecord } from "../types";
+import { CostCodeCombobox } from "@/shared/components/cost-code-combobox";
 
 type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amount";
 
@@ -10,7 +12,7 @@ type EstimateSheetProps = {
   estimateId: string;
   estimateTitle: string;
   estimateDate: string;
-  dueDate: string;
+  validThrough: string;
   taxPercent: string;
   lineItems: EstimateLineInput[];
   lineTotals: number[];
@@ -23,13 +25,16 @@ type EstimateSheetProps = {
   isEditingDraft: boolean;
   readOnly: boolean;
   showReadOnlyHint?: boolean;
+  formErrorMessage?: string;
+  formSuccessMessage?: string;
+  formSuccessHref?: string;
   readOnlyPresentation?: "inputs" | "text";
   showMarkupColumn?: boolean;
   titlePresentation?: "field" | "header";
   lineSortKey: LineSortKey | null;
   lineSortDirection: "asc" | "desc";
   onTitleChange: (value: string) => void;
-  onDueDateChange: (value: string) => void;
+  onValidThroughChange: (value: string) => void;
   onTaxPercentChange: (value: string) => void;
   onLineItemChange: (
     localId: number,
@@ -53,7 +58,7 @@ export function EstimateSheet({
   estimateId,
   estimateTitle,
   estimateDate,
-  dueDate,
+  validThrough,
   taxPercent,
   lineItems,
   lineTotals,
@@ -66,13 +71,16 @@ export function EstimateSheet({
   isEditingDraft,
   readOnly,
   showReadOnlyHint = true,
+  formErrorMessage = "",
+  formSuccessMessage = "",
+  formSuccessHref = "",
   readOnlyPresentation = "inputs",
   showMarkupColumn = true,
   titlePresentation = "field",
   lineSortKey,
   lineSortDirection,
   onTitleChange,
-  onDueDateChange,
+  onValidThroughChange,
   onTaxPercentChange,
   onLineItemChange,
   onAddLineItem,
@@ -209,15 +217,15 @@ export function EstimateSheet({
             )}
           </div>
           <div className={styles.metaLine}>
-            <span>Due date</span>
+            <span>Valid through</span>
             {showReadOnlyText ? (
-              <span className={styles.staticMetaValue}>{formatDisplayDate(dueDate)}</span>
+              <span className={styles.staticMetaValue}>{formatDisplayDate(validThrough)}</span>
             ) : (
               <input
                 className={styles.fieldInput}
                 type="date"
-                value={dueDate}
-                onChange={(event) => onDueDateChange(event.target.value)}
+                value={validThrough}
+                onChange={(event) => onValidThroughChange(event.target.value)}
                 disabled={readOnly}
                 aria-disabled={readOnly}
               />
@@ -303,23 +311,14 @@ export function EstimateSheet({
               {showReadOnlyText ? (
                 <span className={styles.staticCellValue}>{findCostCodeLabel(line.costCodeId)}</span>
               ) : (
-                <select
-                  className={styles.lineSelect}
-                  aria-label="Cost code"
+                <CostCodeCombobox
+                  costCodes={costCodes}
                   value={line.costCodeId}
-                  onChange={(event) =>
-                    onLineItemChange(line.localId, "costCodeId", event.target.value)
-                  }
+                  onChange={(nextValue) => onLineItemChange(line.localId, "costCodeId", nextValue)}
+                  ariaLabel="Cost code"
                   disabled={readOnly}
-                  required
-                >
-                  <option value="">Select</option>
-                  {costCodes.map((code) => (
-                    <option key={code.id} value={code.id}>
-                      {code.code} - {code.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Search cost code"
+                />
               )}
             </div>
             <div className={styles.lineCell}>
@@ -480,6 +479,17 @@ export function EstimateSheet({
       </div>
       {!readOnly ? (
         <div className={styles.finalizeActions}>
+          {formErrorMessage ? <p className={styles.actionError}>{formErrorMessage}</p> : null}
+          {!formErrorMessage && formSuccessMessage ? (
+            <p className={styles.actionSuccess}>
+              {formSuccessMessage}{" "}
+              {formSuccessHref ? (
+                <Link href={formSuccessHref} target="_blank" rel="noopener noreferrer">
+                  Open client-facing estimate
+                </Link>
+              ) : null}
+            </p>
+          ) : null}
           <button
             type="submit"
             className={styles.primaryButton}

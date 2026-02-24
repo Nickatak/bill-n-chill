@@ -28,6 +28,7 @@ from core.models import (
     OrganizationRecord,
     VendorBill,
 )
+from core.policies.cost_codes import STARTER_COST_CODE_ROWS
 from core.utils.money import MONEY_ZERO, quantize_money
 
 BILLABLE_INVOICE_STATUSES = {
@@ -209,6 +210,23 @@ def _record_organization_membership_record(
     )
 
 
+def _bootstrap_starter_cost_codes_for_organization(*, organization, created_by) -> int:
+    created_count = 0
+    for code, name in STARTER_COST_CODE_ROWS:
+        _row, created = CostCode.objects.get_or_create(
+            organization=organization,
+            code=code,
+            defaults={
+                "name": name,
+                "is_active": True,
+                "created_by": created_by,
+            },
+        )
+        if created:
+            created_count += 1
+    return created_count
+
+
 def _ensure_primary_membership(user):
     membership = (
         OrganizationMembership.objects.select_related("organization")
@@ -253,6 +271,10 @@ def _ensure_primary_membership(user):
             to_role=membership.role,
             note="Organization membership bootstrap created during auth self-heal.",
             metadata={"bootstrap_reason": "missing_active_membership"},
+        )
+        _bootstrap_starter_cost_codes_for_organization(
+            organization=organization,
+            created_by=user,
         )
         return membership
 
