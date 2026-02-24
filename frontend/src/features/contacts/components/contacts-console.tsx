@@ -3,9 +3,11 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
+import type { ProjectRecord } from "@/features/projects/types";
+
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
-import { ApiResponse, ContactRecord } from "../types";
+import { ApiResponse, CustomerRow } from "../types";
 import { ContactEditorForm } from "./contact-editor-form";
 import { ContactsFilters } from "./contacts-filters";
 import { ContactsList } from "./contacts-list";
@@ -19,18 +21,18 @@ export function ContactsConsole() {
   const searchParams = useSearchParams();
 
   const [query, setQuery] = useState("");
-  const [rows, setRows] = useState<ContactRecord[]>([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [rows, setRows] = useState<CustomerRow[]>([]);
+  const [projectsByCustomer, setProjectsByCustomer] = useState<Record<number, ProjectRecord[]>>({});
+  const [editingId, setEditingId] = useState("");
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [projectFilter, setProjectFilter] = useState<ProjectFilter>("all");
 
-  const [fullName, setFullName] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState("");
-  const [projectAddress, setProjectAddress] = useState("");
+  const [billingAddress, setBillingAddress] = useState("");
   const [email, setEmail] = useState("");
-  const [notes, setNotes] = useState("");
-  const [source, setSource] = useState("field_manual");
   const [isArchived, setIsArchived] = useState(false);
 
   const normalizedBaseUrl = useMemo(() => normalizeApiBaseUrl(defaultApiBaseUrl), []);
@@ -40,10 +42,11 @@ export function ContactsConsole() {
     scopedContactIdParam && /^\d+$/.test(scopedContactIdParam) ? Number(scopedContactIdParam) : null;
   const scopedCustomerId =
     scopedCustomerIdParam && /^\d+$/.test(scopedCustomerIdParam) ? Number(scopedCustomerIdParam) : null;
+
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
       const inactive = Boolean(row.is_archived);
-      const hasProject = row.has_project ?? Boolean(row.converted_project);
+      const hasProject = row.has_project ?? (row.project_count ?? 0) > 0;
 
       const activityMatch =
         activityFilter === "all" ||
@@ -58,26 +61,14 @@ export function ContactsConsole() {
       return activityMatch && projectMatch;
     });
   }, [activityFilter, projectFilter, rows]);
-  const selectedContact = rows.find((entry) => String(entry.id) === selectedId) ?? null;
+  const editingCustomer = rows.find((entry) => String(entry.id) === editingId) ?? null;
 
-  function hydrate(contact: ContactRecord) {
-    setFullName(contact.full_name ?? "");
-    setPhone(contact.phone ?? "");
-    setProjectAddress(contact.project_address ?? "");
-    setEmail(contact.email ?? "");
-    setNotes(contact.notes ?? "");
-    setSource(contact.source ?? "field_manual");
-    setIsArchived(Boolean(contact.is_archived));
-  }
-
-  function clearForm() {
-    setFullName("");
-    setPhone("");
-    setProjectAddress("");
-    setEmail("");
-    setNotes("");
-    setSource("field_manual");
-    setIsArchived(false);
+  function hydrate(customer: CustomerRow) {
+    setDisplayName(customer.display_name ?? "");
+    setPhone(customer.phone ?? "");
+    setBillingAddress(customer.billing_address ?? "");
+    setEmail(customer.email ?? "");
+    setIsArchived(Boolean(customer.is_archived));
   }
 
   async function loadContacts(searchQuery: string) {
@@ -97,32 +88,47 @@ export function ContactsConsole() {
         return;
       }
 
-      const items = (payload.data as ContactRecord[]) ?? [];
+      const items = (payload.data as CustomerRow[]) ?? [];
       setRows(items);
-      const activeId = selectedId ? Number(selectedId) : null;
-      const scopedContact = scopedContactId
-        ? items.find((entry) => entry.id === scopedContactId)
-        : null;
-      const scopedCustomer = scopedCustomerId
-        ? items.find((entry) => entry.converted_customer === scopedCustomerId)
-        : null;
-      const selected =
-        scopedContact ??
-        scopedCustomer ??
-        (activeId ? items.find((entry) => entry.id === activeId) : null);
-      if (selected) {
-        setSelectedId(String(selected.id));
-        hydrate(selected);
-      } else if (items[0]) {
-        setSelectedId(String(items[0].id));
-        hydrate(items[0]);
-      } else {
-        setSelectedId("");
-        clearForm();
+      const scopedId = scopedCustomerId ?? scopedContactId;
+      const scopedCustomer = scopedId ? items.find((entry) => entry.id === scopedId) : null;
+      if (scopedCustomer) {
+        setEditingId(String(scopedCustomer.id));
+        hydrate(scopedCustomer);
       }
       setStatusMessage(`Loaded ${items.length} customer(s).`);
     } catch {
       setStatusMessage("Could not reach customers endpoint.");
+    }
+  }
+
+  async function loadProjectsIndex() {
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/projects/`, {
+        headers: { Authorization: `Token ${token}` },
+      });
+      const payload: { data?: ProjectRecord[] } = await response.json();
+      if (!response.ok) {
+        return;
+      }
+
+      const rows = payload.data ?? [];
+      const nextMap: Record<number, ProjectRecord[]> = {};
+      for (const project of rows) {
+        if (project.status === "prospect") {
+          continue;
+        }
+        if (!nextMap[project.customer]) {
+          nextMap[project.customer] = [];
+        }
+        nextMap[project.customer].push(project);
+      }
+      for (const key of Object.keys(nextMap)) {
+        nextMap[Number(key)].sort((a, b) => b.id - a.id);
+      }
+      setProjectsByCustomer(nextMap);
+    } catch {
+      // best-effort for lookup UX; primary page still works without this index
     }
   }
 
@@ -134,22 +140,35 @@ export function ContactsConsole() {
       void loadContacts(query);
     }, 250);
     return () => window.clearTimeout(timer);
-    // Intentionally excludes selectedId to avoid reload loops when selecting.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, query, normalizedBaseUrl, scopedContactId, scopedCustomerId]);
 
-  function handleSelect(id: string) {
-    setSelectedId(id);
-    const row = rows.find((entry) => String(entry.id) === id);
-    if (row) {
-      hydrate(row);
+  useEffect(() => {
+    if (!token) {
+      return;
     }
+    void loadProjectsIndex();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, normalizedBaseUrl]);
+
+  function openEditor(id: string) {
+    const row = rows.find((entry) => String(entry.id) === id);
+    if (!row) {
+      return;
+    }
+    setEditingId(id);
+    hydrate(row);
+    setIsEditorOpen(true);
+  }
+
+  function closeEditor() {
+    setIsEditorOpen(false);
   }
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const contactId = Number(selectedId);
-    if (!contactId) {
+    const customerId = Number(editingId);
+    if (!customerId) {
       setStatusMessage("Select a customer first.");
       return;
     }
@@ -157,19 +176,17 @@ export function ContactsConsole() {
     setStatusMessage("Saving customer...");
 
     try {
-      const response = await fetch(`${normalizedBaseUrl}/contacts/${contactId}/`, {
+      const response = await fetch(`${normalizedBaseUrl}/contacts/${customerId}/`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Token ${token}`,
         },
         body: JSON.stringify({
-          full_name: fullName,
+          display_name: displayName,
           phone,
-          project_address: projectAddress,
+          billing_address: billingAddress,
           email,
-          notes,
-          source,
           is_archived: isArchived,
         }),
       });
@@ -179,9 +196,10 @@ export function ContactsConsole() {
         return;
       }
 
-      const updated = payload.data as ContactRecord;
+      const updated = payload.data as CustomerRow;
       setRows((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
       hydrate(updated);
+      setIsEditorOpen(false);
       setStatusMessage(`Saved customer #${updated.id}.`);
     } catch {
       setStatusMessage("Could not reach customer detail endpoint.");
@@ -189,20 +207,20 @@ export function ContactsConsole() {
   }
 
   async function handleDelete() {
-    const contactId = Number(selectedId);
-    if (!contactId) {
+    const customerId = Number(editingId);
+    if (!customerId) {
       setStatusMessage("Select a customer first.");
       return;
     }
 
-    const confirmed = window.confirm(`Delete customer #${contactId}? This cannot be undone.`);
+    const confirmed = window.confirm(`Delete customer #${customerId}? This cannot be undone.`);
     if (!confirmed) {
       return;
     }
 
     setStatusMessage("Deleting customer...");
     try {
-      const response = await fetch(`${normalizedBaseUrl}/contacts/${contactId}/`, {
+      const response = await fetch(`${normalizedBaseUrl}/contacts/${customerId}/`, {
         method: "DELETE",
         headers: { Authorization: `Token ${token}` },
       });
@@ -219,19 +237,15 @@ export function ContactsConsole() {
         return;
       }
 
-      setRows((current) => {
-        const nextRows = current.filter((entry) => entry.id !== contactId);
-        const nextSelected = nextRows[0];
-        if (nextSelected) {
-          setSelectedId(String(nextSelected.id));
-          hydrate(nextSelected);
-        } else {
-          setSelectedId("");
-          clearForm();
-        }
-        return nextRows;
+      setRows((current) => current.filter((entry) => entry.id !== customerId));
+      setProjectsByCustomer((current) => {
+        const next = { ...current };
+        delete next[customerId];
+        return next;
       });
-      setStatusMessage(`Deleted customer #${contactId}.`);
+      setIsEditorOpen(false);
+      setEditingId("");
+      setStatusMessage(`Deleted customer #${customerId}.`);
     } catch {
       setStatusMessage("Could not reach customer detail endpoint.");
     }
@@ -241,7 +255,7 @@ export function ContactsConsole() {
     <section className={styles.section}>
       <header className={styles.intro}>
         <h2>Customers</h2>
-        <p>Search, review, and update canonical customer records outside core money workflows.</p>
+        <p>Find customers quickly and jump directly to their project workspaces.</p>
         <p className={styles.authMessage}>{authMessage}</p>
       </header>
 
@@ -256,36 +270,49 @@ export function ContactsConsole() {
 
       {statusMessage ? <p className={styles.statusMessage}>{statusMessage}</p> : null}
 
-      <div className={styles.layout}>
-        <ContactsList
-          rows={rows}
-          filteredRows={filteredRows}
-          selectedId={selectedId}
-          query={query}
-          onSelect={handleSelect}
-        />
-        <ContactEditorForm
-          selectedId={selectedId}
-          selectedContactName={selectedContact?.full_name ?? ""}
-          fullName={fullName}
-          onFullNameChange={setFullName}
-          phone={phone}
-          onPhoneChange={setPhone}
-          email={email}
-          onEmailChange={setEmail}
-          projectAddress={projectAddress}
-          onProjectAddressChange={setProjectAddress}
-          source={source}
-          onSourceChange={setSource}
-          isArchived={isArchived}
-          onIsArchivedChange={setIsArchived}
-          hasProject={selectedContact?.has_project ?? Boolean(selectedContact?.converted_project)}
-          notes={notes}
-          onNotesChange={setNotes}
-          onSubmit={handleSave}
-          onDelete={handleDelete}
-        />
-      </div>
+      <ContactsList
+        rows={rows}
+        filteredRows={filteredRows}
+        query={query}
+        projectsByCustomer={projectsByCustomer}
+        onEdit={openEditor}
+      />
+
+      {isEditorOpen && editingCustomer ? (
+        <div
+          className={styles.modalOverlay}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeEditor();
+            }
+          }}
+        >
+          <section className={styles.modalCard} role="dialog" aria-modal="true" aria-label="Edit customer">
+            <button type="button" className={styles.modalClose} onClick={closeEditor}>
+              Close
+            </button>
+            <ContactEditorForm
+              selectedId={editingId}
+              selectedCustomerName={editingCustomer.display_name ?? ""}
+              displayName={displayName}
+              onDisplayNameChange={setDisplayName}
+              phone={phone}
+              onPhoneChange={setPhone}
+              email={email}
+              onEmailChange={setEmail}
+              billingAddress={billingAddress}
+              onBillingAddressChange={setBillingAddress}
+              isArchived={isArchived}
+              onIsArchivedChange={setIsArchived}
+              projectCount={editingCustomer.project_count ?? 0}
+              activeProjectCount={editingCustomer.active_project_count ?? 0}
+              hasActiveOrOnHoldProject={Boolean(editingCustomer.has_active_or_on_hold_project)}
+              onSubmit={handleSave}
+              onDelete={handleDelete}
+            />
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }

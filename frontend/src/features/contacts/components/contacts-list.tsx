@@ -1,76 +1,116 @@
 "use client";
 
-import { ContactRecord } from "../types";
+import Link from "next/link";
+
+import type { ProjectRecord } from "@/features/projects/types";
+
+import { CustomerRow } from "../types";
 import styles from "./contacts-console.module.css";
 
 type ContactsListProps = {
-  rows: ContactRecord[];
-  filteredRows: ContactRecord[];
-  selectedId: string;
+  rows: CustomerRow[];
+  filteredRows: CustomerRow[];
   query: string;
-  onSelect: (id: string) => void;
+  projectsByCustomer: Record<number, ProjectRecord[]>;
+  onEdit: (id: string) => void;
 };
+
+function projectStatusLabel(status: string): string {
+  return status.replaceAll("_", " ");
+}
 
 export function ContactsList({
   rows,
   filteredRows,
-  selectedId,
   query,
-  onSelect,
+  projectsByCustomer,
+  onEdit,
 }: ContactsListProps) {
   return (
-    <aside className={styles.panel}>
-      <header className={styles.panelHeader}>
-        <h3 className={styles.panelTitle}>Customers</h3>
-        <p className={styles.panelSubtle}>Select a record to review and edit.</p>
-      </header>
-
-      {filteredRows.length > 0 ? (
-        <ul className={styles.list}>
+    <section className={styles.tableWrap}>
+      <table className={styles.table}>
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Contact</th>
+            <th>Projects</th>
+            <th>State</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
           {filteredRows.map((row) => {
-            const isActive = selectedId === String(row.id);
+            const projects = projectsByCustomer[row.id] ?? [];
+            const firstProject = projects[0] ?? null;
             const isInactive = Boolean(row.is_archived);
-            const hasProject = row.has_project ?? Boolean(row.converted_project);
             return (
-              <li key={row.id}>
-                <button
-                  type="button"
-                  onClick={() => onSelect(String(row.id))}
-                  className={`${styles.listButton} ${isActive ? styles.listButtonActive : ""}`}
-                >
-                  <p className={styles.rowPrimary}>
-                    #{row.id} - {row.full_name}
-                  </p>
-                  <p className={styles.rowSecondary}>{row.phone || row.email || "no contact"}</p>
-                  <p className={styles.rowSecondary}>
-                    <span
-                      className={`${styles.statusBadge} ${
-                        isInactive ? styles.statusBadgeInactive : ""
-                      }`}
+              <tr key={row.id} className={isInactive ? styles.tableRowInactive : ""}>
+                <td>
+                  <p className={styles.rowPrimary}>#{row.id} - {row.display_name}</p>
+                  <p className={styles.rowSecondary}>{row.billing_address || "no billing address"}</p>
+                </td>
+                <td>
+                  <p className={styles.rowPrimary}>{row.phone || row.email || "no contact method"}</p>
+                  {row.phone && row.email ? <p className={styles.rowSecondary}>{row.email}</p> : null}
+                </td>
+                <td>
+                  {projects.length > 0 ? (
+                    <div className={styles.projectLinks}>
+                      {projects.slice(0, 4).map((project) => (
+                        <Link
+                          key={project.id}
+                          href={`/projects?project=${project.id}`}
+                          className={styles.projectLink}
+                        >
+                          #{project.id} {project.name} ({projectStatusLabel(project.status)})
+                        </Link>
+                      ))}
+                      {projects.length > 4 ? (
+                        <span className={styles.rowSecondary}>+{projects.length - 4} more</span>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <span className={styles.rowSecondary}>No non-prospect projects</span>
+                  )}
+                </td>
+                <td>
+                  <span
+                    className={`${styles.stateChip} ${
+                      isInactive ? styles.stateChipInactive : styles.stateChipActive
+                    }`}
+                  >
+                    {isInactive ? "inactive" : "active"}
+                  </span>
+                </td>
+                <td>
+                  <div className={styles.actionsInline}>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => onEdit(String(row.id))}
                     >
-                      {isInactive ? "inactive" : "active"}
-                    </span>
-                    {" "}
-                    <span
-                      className={`${styles.projectBadge} ${
-                        hasProject ? styles.projectBadgeYes : ""
-                      }`}
-                    >
-                      {hasProject ? "project linked" : "no project"}
-                    </span>
-                  </p>
-                </button>
-              </li>
+                      Edit
+                    </button>
+                    <Link href={firstProject ? `/projects?project=${firstProject.id}` : "/projects"}>
+                      Open Projects
+                    </Link>
+                  </div>
+                </td>
+              </tr>
             );
           })}
-        </ul>
-      ) : rows.length > 0 ? (
-        <p className={styles.emptyState}>No customers match the selected activity filter.</p>
-      ) : query ? (
-        <p className={styles.emptyState}>No customers matched your search.</p>
-      ) : (
-        <p className={styles.emptyState}>No customers yet.</p>
-      )}
-    </aside>
+        </tbody>
+      </table>
+
+      {filteredRows.length === 0 ? (
+        <p className={styles.emptyState}>
+          {rows.length > 0
+            ? "No customers match the current filters."
+            : query
+              ? "No customers matched your search."
+              : "No customers yet."}
+        </p>
+      ) : null}
+    </section>
   );
 }

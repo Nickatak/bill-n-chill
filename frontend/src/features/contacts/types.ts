@@ -1,22 +1,20 @@
-export type ContactRecord = {
+export type CustomerRow = {
   id: number;
-  full_name: string;
+  display_name: string;
   phone: string;
-  project_address: string;
   email: string;
-  notes: string;
-  source: string;
-  is_archived?: boolean;
+  billing_address: string;
+  is_archived: boolean;
+  project_count?: number;
+  active_project_count?: number;
   has_project?: boolean;
-  converted_customer?: number | null;
-  converted_project?: number | null;
-  converted_at?: string | null;
+  has_active_or_on_hold_project?: boolean;
   created_at: string;
   updated_at?: string;
 };
 
 export type ApiResponse = {
-  data?: ContactRecord | ContactRecord[];
+  data?: CustomerRow | CustomerRow[];
   error?: {
     code?: string;
     message?: string;

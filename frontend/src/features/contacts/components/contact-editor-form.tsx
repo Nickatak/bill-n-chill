@@ -6,145 +6,121 @@ import styles from "./contacts-console.module.css";
 
 type ContactEditorFormProps = {
   selectedId: string;
-  selectedContactName: string;
-  fullName: string;
-  onFullNameChange: (value: string) => void;
+  selectedCustomerName: string;
+  displayName: string;
+  onDisplayNameChange: (value: string) => void;
   phone: string;
   onPhoneChange: (value: string) => void;
   email: string;
   onEmailChange: (value: string) => void;
-  projectAddress: string;
-  onProjectAddressChange: (value: string) => void;
-  source: string;
-  onSourceChange: (value: string) => void;
+  billingAddress: string;
+  onBillingAddressChange: (value: string) => void;
   isArchived: boolean;
   onIsArchivedChange: (value: boolean) => void;
-  hasProject: boolean;
-  notes: string;
-  onNotesChange: (value: string) => void;
+  projectCount: number;
+  activeProjectCount: number;
+  hasActiveOrOnHoldProject: boolean;
   onSubmit: FormEventHandler<HTMLFormElement>;
   onDelete: () => void;
 };
 
 export function ContactEditorForm({
   selectedId,
-  selectedContactName,
-  fullName,
-  onFullNameChange,
+  selectedCustomerName,
+  displayName,
+  onDisplayNameChange,
   phone,
   onPhoneChange,
   email,
   onEmailChange,
-  projectAddress,
-  onProjectAddressChange,
-  source,
-  onSourceChange,
+  billingAddress,
+  onBillingAddressChange,
   isArchived,
   onIsArchivedChange,
-  hasProject,
-  notes,
-  onNotesChange,
+  projectCount,
+  activeProjectCount,
+  hasActiveOrOnHoldProject,
   onSubmit,
   onDelete,
 }: ContactEditorFormProps) {
+  const archiveToggleBlocked = hasActiveOrOnHoldProject && !isArchived;
+
   return (
-    <section className={styles.panel}>
+    <form className={styles.editorForm} onSubmit={onSubmit}>
       <header className={styles.panelHeader}>
         <h3 className={styles.panelTitle}>Edit Customer</h3>
         <p className={styles.panelSubtle}>
           {selectedId
-            ? `Editing #${selectedId}${selectedContactName ? ` (${selectedContactName})` : ""}.`
+            ? `Editing #${selectedId}${selectedCustomerName ? ` (${selectedCustomerName})` : ""}.`
             : "Select a customer record to start editing."}
         </p>
       </header>
 
-      <form className={styles.editorForm} onSubmit={onSubmit}>
-        <label className={styles.field}>
-          Full name
+      <label className={styles.field}>
+        Display name
+        <input
+          value={displayName}
+          onChange={(event) => onDisplayNameChange(event.target.value)}
+          required
+          disabled={!selectedId}
+        />
+      </label>
+      <label className={styles.field}>
+        Phone
+        <input
+          value={phone}
+          onChange={(event) => onPhoneChange(event.target.value)}
+          disabled={!selectedId}
+        />
+      </label>
+      <label className={styles.field}>
+        Email
+        <input
+          type="email"
+          value={email}
+          onChange={(event) => onEmailChange(event.target.value)}
+          disabled={!selectedId}
+        />
+      </label>
+      <label className={styles.field}>
+        Billing address
+        <input
+          value={billingAddress}
+          onChange={(event) => onBillingAddressChange(event.target.value)}
+          disabled={!selectedId}
+        />
+      </label>
+      <label className={styles.toggleField}>
+        Archive
+        <span className={styles.switchRow}>
           <input
-            value={fullName}
-            onChange={(event) => onFullNameChange(event.target.value)}
-            required
-            disabled={!selectedId}
+            className={styles.switchInput}
+            type="checkbox"
+            checked={isArchived}
+            onChange={(event) => onIsArchivedChange(event.target.checked)}
+            disabled={!selectedId || archiveToggleBlocked}
           />
-        </label>
-        <label className={styles.field}>
-          Phone
-          <input
-            value={phone}
-            onChange={(event) => onPhoneChange(event.target.value)}
-            disabled={!selectedId}
-          />
-        </label>
-        <label className={styles.field}>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => onEmailChange(event.target.value)}
-            disabled={!selectedId}
-          />
-        </label>
-        <label className={styles.field}>
-          Project address
-          <input
-            value={projectAddress}
-            onChange={(event) => onProjectAddressChange(event.target.value)}
-            required
-            disabled={!selectedId}
-          />
-        </label>
-        <label className={styles.field}>
-          Source
-          <select
-            value={source}
-            onChange={(event) => onSourceChange(event.target.value)}
-            disabled={!selectedId}
-          >
-            <option value="field_manual">field_manual</option>
-            <option value="office_manual">office_manual</option>
-            <option value="import">import</option>
-            <option value="web_form">web_form</option>
-            <option value="referral">referral</option>
-            <option value="other">other</option>
-          </select>
-        </label>
-        <label className={styles.toggleField}>
-          Archive
-          <span className={styles.switchRow}>
-            <input
-              className={styles.switchInput}
-              type="checkbox"
-              checked={isArchived}
-              onChange={(event) => onIsArchivedChange(event.target.checked)}
-              disabled={!selectedId}
-            />
-            <span className={styles.switchLabel}>{isArchived ? "Inactive" : "Active"}</span>
-          </span>
-        </label>
-        <label className={styles.field}>
-          Project link
-          <input value={hasProject ? "Linked to a project" : "No project linked"} readOnly />
-        </label>
-        <label className={styles.field}>
-          Notes
-          <textarea
-            rows={3}
-            value={notes}
-            onChange={(event) => onNotesChange(event.target.value)}
-            disabled={!selectedId}
-          />
-        </label>
+          <span className={styles.switchLabel}>{isArchived ? "Archived" : "Active"}</span>
+        </span>
+      </label>
+      <label className={styles.field}>
+        Project coverage
+        <input value={`${projectCount} total, ${activeProjectCount} active/on hold`} readOnly />
+      </label>
+      {archiveToggleBlocked ? (
+        <p className={styles.inlineWarning}>
+          Archive is blocked while this customer has active or on-hold projects.
+        </p>
+      ) : null}
 
-        <div className={styles.actionRow}>
-          <button className={styles.primaryButton} type="submit" disabled={!selectedId}>
-            Save Customer
-          </button>
-          <button className={styles.dangerButton} type="button" disabled={!selectedId} onClick={onDelete}>
-            Delete Customer
-          </button>
-        </div>
-      </form>
-    </section>
+      <div className={styles.actionRow}>
+        <button className={styles.primaryButton} type="submit" disabled={!selectedId}>
+          Save Customer
+        </button>
+        <button className={styles.dangerButton} type="button" disabled={!selectedId} onClick={onDelete}>
+          Delete Customer
+        </button>
+      </div>
+    </form>
   );
 }
