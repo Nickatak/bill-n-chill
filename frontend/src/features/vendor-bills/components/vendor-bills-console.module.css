@@ -119,6 +119,41 @@
   gap: 6px;
 }
 
+.viewerStatusPanel {
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 10px 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.viewerStatusHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.viewerStatusHeader h3 {
+  margin: 0;
+}
+
+.viewerStatusBadge {
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.78rem;
+  color: #475569;
+  background: #ffffff;
+}
+
+.viewerStatusActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .statusFiltersLabel {
   color: #374151;
   font-size: 0.85rem;
@@ -478,6 +513,17 @@
 }
 
 :global(html[data-theme="dark"]) .statusFiltersLabel {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .viewerStatusPanel {
+  border-color: #334155;
+  background: #111827;
+}
+
+:global(html[data-theme="dark"]) .viewerStatusBadge {
+  border-color: #334155;
+  background: #0f172a;
   color: #cbd5e1;
 }
 

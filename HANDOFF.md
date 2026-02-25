@@ -1,77 +1,54 @@
-# HANDOFF - 2026-02-25
+# HANDOFF - 2026-02-26
 
 ## Session State
 
 - Workspace: `/home/nick/bill_n_chill`
 - Branch: `main`
-- HEAD (pre-commit): `3c73ec9`
 - Upstream: `origin/main`
-- Worktree at handoff capture: dirty (frontend/docs updates listed below)
+- Active direction: Billing UX hardening (Invoices + Vendor Bills)
 
-## Files Updated In This Checkpoint
+## What Is Stable Right Now
 
-- `frontend/src/features/change-orders/components/change-orders-console.tsx`
-- `frontend/src/features/change-orders/components/change-orders-console.module.css`
-- `frontend/src/features/projects/components/projects-console.tsx`
-- `docs/mvp-v1.md`
+### Invoices
 
-## What Changed
+- Invoices route no longer uses the old `Invoice Workspace (WIP)` wrapper.
+- Project selector remains in place (dashboard/list style), and composer is now full-width.
+- Invoice create uses shared `DocumentComposer` with an estimate-style visual structure:
+  - from/to + logo/title header
+  - invoice details block
+  - full-width line table
+  - add-line action + totals footer
+  - create action anchored in the sheet footer
+- Viewer now owns invoice lifecycle actions:
+  - `Invoice Status & Send` panel in viewer section
+  - estimate-style status-pill selector
+  - `Duplicate as New Invoice` (no family/revision behavior)
+- Sales tax input is retained in totals (explicitly kept configurable).
 
-### 1) CO viewer and form UX were substantially refined
+### Vendor Bills
 
-- Clarified the left rail as `Origin Estimates` with step-based guidance.
-- Origin estimate card content now reads as:
-  - estimate title + estimate number
-  - version + approved-on date + approver email
-  - CO history count
-- Removed redundant/ambiguous quick-view metadata (`Selected CO`, `Supersedes`, `Header delta`, reconcile status copy).
-- Added explicit history ordering hint and enforced chronological ordering in viewer sort:
-  - oldest at top, most recent at bottom.
-- Strengthened highlighting for currently-selected CO row (dedicated history-active treatment in light/dark themes).
-- Moved `Line delta total` to the detail-bottom area near line items.
-- Relocated `Clone as New Revision` out of the quick-status block into the top toolbar area.
+- Added viewer-side lifecycle/recreate panel:
+  - `Bill Status & Recreate`
+  - next-status pill selector
+  - `Save Status`
+  - `Recreate as New Planned`
+- Removed duplicate/competing status controls from the edit form so lifecycle actions are centralized in viewer.
+- Added corresponding CSS for new viewer status panel with dark-theme treatment.
 
-### 2) CO quick status controls now align better with Estimates UX
+## Files Updated In This Checkpoint Window
 
-- Kept quick status controls in viewer for fast lifecycle changes.
-- Shortened action label to `Update CO Status`.
-- Fixed status button styling conflict by decoupling quick-status tone classes from status badge classes.
-- Quick status buttons now render as rectangular controls (not pills).
+- `frontend/src/features/invoices/components/invoices-console.tsx`
+- `frontend/src/features/invoices/components/invoices-console.module.css`
+- `frontend/src/features/vendor-bills/components/vendor-bills-console.tsx`
+- `frontend/src/features/vendor-bills/components/vendor-bills-console.module.css`
 
-### 3) CO edit/create form cleanup and line-item clarity
+## Validation
 
-- Removed status dropdown from CO edit form; status changes happen in viewer quick actions.
-- Removed header-level delta fields from form summaries.
-- Clarified budget context language in line table:
-  - `Original approved line item amount ($)`
-  - clarified CO delta units (USD flat amount) and schedule delta units (calendar days).
-- Moved `Add Line Item` into the line-items section and kept primary save action at bottom-right.
-- Added line-item validation support for duplicate budget-line selection and numeric/day constraints.
+- Frontend typecheck: `cd frontend && npx tsc --noEmit`.
 
-### 4) Project page now shows CO mini-status pills
+## Recommended Next Focus (Billing)
 
-- Added change-order status preview pills on project map node (mirrors estimate helper pattern):
-  - `D` (draft), `S` (sent/pending approval), `A` (accepted/approved)
-- Counts are loaded from `/projects/{id}/change-orders/`.
-
-### 5) Docs update
-
-- Added post-MVP concept note in `docs/mvp-v1.md`:
-  - e-sign agreement layer + shared-secret (PSK) verification layer for external approval assurance.
-
-## Validation Run During This Session
-
-Frontend:
-
-- `cd frontend && npx tsc --noEmit` (pass)
-
-Not run in this checkpoint:
-
-- backend test suite
-- end-to-end/manual browser QA pass
-
-## Recommended Resume Focus
-
-1. Decide canonical policy for open COs per family (single open vs multi-open).
-2. If single-open is desired, enforce in backend policy + API error rule + UI affordance.
-3. Run backend tests after any policy enforcement changes.
+1. Continue in Vendor Bills first (agreed path): spacing/alignment parity pass and interaction polish.
+2. Decide whether Vendor Bills should adopt shared `DocumentComposer` now or after lifecycle UX settles.
+3. Add/confirm guardrails for duplicate naming/id constraints where applicable in billing flows.
+4. Run manual UX pass for both billing surfaces (desktop/mobile, light/dark) after each small CSS batch.

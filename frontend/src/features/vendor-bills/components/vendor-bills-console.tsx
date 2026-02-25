@@ -132,6 +132,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     { budget_line: 0, amount: "", note: "" },
   ]);
   const [status, setStatus] = useState<string>("planned");
+  const [viewerNextStatus, setViewerNextStatus] = useState<string>("");
 
   const [duplicateCandidates, setDuplicateCandidates] = useState<VendorBillRecord[]>([]);
   const activeVendors = vendors.filter((vendor) => vendor.is_active);
@@ -207,60 +208,12 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const formSuggestedTotal = isEditingMode ? editSuggestedTotal : createSuggestedTotal;
   const formStatus: VendorBillStatus = isEditingMode ? status : newStatus;
   const canEditScheduledFor = formStatus === "approved" || formStatus === "scheduled";
-  const persistedStatus = selectedVendorBill?.status ?? status;
-  const hasPendingStatusChange = isEditingMode && status !== persistedStatus;
-  const formRequiresFullAllocation =
-    isEditingMode && hasPendingStatusChange && (status === "approved" || status === "paid");
-  const formRequiresScheduledFor = isEditingMode && status === "scheduled";
+  const formRequiresFullAllocation = false;
+  const formRequiresScheduledFor = false;
   const hasAllocationMismatch = Math.abs(formUnallocated) > allocationEpsilon;
-  const allowedEditStatuses = isEditingMode
-    ? [persistedStatus, ...(allowedStatusTransitions[persistedStatus] ?? [])]
-        .filter((value, index, source) => source.indexOf(value) === index)
-        .filter((value) => value !== "planned")
-    : [];
   const quickStatusOptions = selectedVendorBill
     ? allowedStatusTransitions[selectedVendorBill.status] ?? []
     : [];
-  const hasUnsavedChanges = useMemo(() => {
-    if (!isEditingMode || !selectedVendorBill) {
-      return false;
-    }
-
-    const persistedAllocations = (selectedVendorBill.allocations ?? []).map((row) => ({
-      budget_line: Number(row.budget_line || 0),
-      amount: row.amount ?? "",
-      note: row.note ?? "",
-    }));
-    const formAllocationsNormalized = allocations.map((row) => ({
-      budget_line: Number(row.budget_line || 0),
-      amount: row.amount ?? "",
-      note: row.note ?? "",
-    }));
-
-    return (
-      String(vendorId || "") !== String(selectedVendorBill.vendor || "") ||
-      billNumber !== (selectedVendorBill.bill_number ?? "") ||
-      issueDate !== (selectedVendorBill.issue_date ?? "") ||
-      dueDate !== (selectedVendorBill.due_date ?? "") ||
-      (scheduledFor || "") !== (selectedVendorBill.scheduled_for ?? "") ||
-      total !== (selectedVendorBill.total ?? "") ||
-      notes !== (selectedVendorBill.notes ?? "") ||
-      status !== selectedVendorBill.status ||
-      JSON.stringify(formAllocationsNormalized) !== JSON.stringify(persistedAllocations)
-    );
-  }, [
-    allocations,
-    billNumber,
-    dueDate,
-    isEditingMode,
-    issueDate,
-    notes,
-    scheduledFor,
-    selectedVendorBill,
-    status,
-    total,
-    vendorId,
-  ]);
 
   function setFormVendorId(value: string) {
     if (isEditingMode) {
@@ -301,9 +254,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
         return;
       }
       setScheduledFor(value);
-      if (value && status !== "scheduled") {
-        setStatus("scheduled");
-      }
     } else {
       setNewScheduledFor(value);
     }
@@ -834,6 +784,14 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
   }
 
+  async function handleUpdateVendorBillStatus() {
+    if (!viewerNextStatus) {
+      setStatusMessage("Select a next status first.");
+      return;
+    }
+    await handleQuickVendorBillStatus(viewerNextStatus);
+  }
+
   function handleRecreateAsNewDraftTemplate() {
     if (!selectedVendorBillId) {
       setStatusMessage("Select a vendor bill first.");
@@ -902,6 +860,15 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   useEffect(() => {
     setCurrentBillPage(1);
   }, [billStatusFilters, dueFilter, selectedProjectId]);
+
+  useEffect(() => {
+    if (!selectedVendorBill) {
+      setViewerNextStatus("");
+      return;
+    }
+    const nextStatuses = allowedStatusTransitions[selectedVendorBill.status] ?? [];
+    setViewerNextStatus((current) => (nextStatuses.includes(current) ? current : (nextStatuses[0] ?? "")));
+  }, [allowedStatusTransitions, selectedVendorBill]);
 
   return (
     <section className={styles.console}>
@@ -1023,6 +990,65 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
           ) : (
             <p>No vendor bills match the selected status/due filters.</p>
           )}
+
+          <section className={styles.viewerStatusPanel}>
+            <div className={styles.viewerStatusHeader}>
+              <h3>Bill Status & Recreate</h3>
+              <span className={styles.viewerStatusBadge}>
+                {selectedVendorBill ? `#${selectedVendorBill.id}` : "No selection"}
+              </span>
+            </div>
+
+            {selectedVendorBill ? (
+              <>
+                <p className={styles.hintText}>
+                  {selectedVendorBill.vendor_name} / {selectedVendorBill.bill_number} ({statusDisplayLabel(selectedVendorBill.status)})
+                </p>
+                <div className={styles.statusPicker}>
+                  <span className={styles.statusPickerLabel}>Next status</span>
+                  <div className={styles.statusPills}>
+                    {quickStatusOptions.map((statusOption) => {
+                      const active = statusOption === viewerNextStatus;
+                      return (
+                        <button
+                          key={`viewer-status-${statusOption}`}
+                          type="button"
+                          className={`${styles.statusPill} ${
+                            active ? statusPillClass(statusOption) : styles.statusPillInactive
+                          } ${active ? styles.statusPillActive : ""}`}
+                          aria-pressed={active}
+                          onClick={() => setViewerNextStatus(statusOption)}
+                        >
+                          {statusDisplayLabel(statusOption)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                {quickStatusOptions.length === 0 ? (
+                  <p className={styles.hintText}>No next statuses available for this bill.</p>
+                ) : null}
+                <div className={styles.viewerStatusActions}>
+                  <button
+                    type="button"
+                    onClick={() => void handleUpdateVendorBillStatus()}
+                    disabled={!selectedVendorBillId || !viewerNextStatus || !canMutateVendorBills}
+                  >
+                    Save Status
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRecreateAsNewDraftTemplate}
+                    disabled={!selectedVendorBillId}
+                  >
+                    Recreate as New Planned
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className={styles.hintText}>Select a vendor bill to manage status or recreate it as new.</p>
+            )}
+          </section>
         </>
       ) : null}
 
@@ -1271,37 +1297,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
           </div>
         ) : null}
         {!isEditingMode && createErrorMessage ? <p className={styles.errorText}>{createErrorMessage}</p> : null}
-        {isEditingMode ? (
-          <div className={styles.statusPicker}>
-            <span className={styles.statusPickerLabel}>Status</span>
-            <div className={styles.statusPills}>
-              {allowedEditStatuses.map((statusOption) => {
-                const active = statusOption === status;
-                return (
-                  <button
-                    key={statusOption}
-                    type="button"
-                    className={`${styles.statusPill} ${
-                      active ? statusPillClass(statusOption) : styles.statusPillInactive
-                    } ${active ? styles.statusPillActive : ""}`}
-                    aria-pressed={active}
-                    onClick={() => setStatus(statusOption)}
-                  >
-                    {statusDisplayLabel(statusOption)}
-                  </button>
-                );
-              })}
-            </div>
-            {hasPendingStatusChange ? (
-              <p className={styles.hintText}>
-                Save this bill to confirm the status change before the next transition.
-              </p>
-            ) : null}
-            {hasUnsavedChanges ? (
-              <p className={styles.unsavedNotice}>You have unsaved changes.</p>
-            ) : null}
-          </div>
-        ) : null}
         <button
           type="submit"
           disabled={
@@ -1315,26 +1310,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
         >
           {isEditingMode ? "Save Vendor Bill" : "Create Vendor Bill"}
         </button>
-        {isEditingMode ? (
-          <p>
-            Mobile quick actions:
-            {quickStatusOptions.map((nextStatus) => (
-              <button
-                key={`quick-status-${nextStatus}`}
-                type="button"
-                onClick={() => handleQuickVendorBillStatus(nextStatus)}
-                disabled={!selectedVendorBillId || !canMutateVendorBills}
-              >
-                {statusDisplayLabel(nextStatus)}
-              </button>
-            ))}
-          </p>
-        ) : null}
-        {isEditingMode ? (
-          <button type="button" onClick={handleRecreateAsNewDraftTemplate}>
-            Recreate as New Planned
-          </button>
-        ) : null}
       </form>
 
       {duplicateCandidates.length > 0 ? (

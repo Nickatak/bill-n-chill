@@ -18,6 +18,12 @@ import {
 } from "../types";
 import styles from "./change-orders-console.module.css";
 import estimateStyles from "../../estimates/components/estimates-console.module.css";
+import { DocumentComposer } from "@/shared/document-composer";
+import {
+  createChangeOrderDocumentAdapter,
+  ChangeOrderFormState,
+  toChangeOrderStatusPolicy,
+} from "../document-adapter";
 
 type ChangeOrderLineInput = {
   localId: number;
@@ -186,6 +192,7 @@ const CHANGE_ORDER_STATUS_LABELS_FALLBACK: Record<string, string> = {
   rejected: "Rejected",
   void: "Void",
 };
+const CHANGE_ORDER_STATUSES_FALLBACK = ["draft", "pending_approval", "approved", "rejected", "void"];
 
 const CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
   draft: ["pending_approval", "void"],
@@ -342,6 +349,48 @@ export function ChangeOrdersConsole({
     !selectedChangeOrderId ||
     !selectedChangeOrder?.is_latest_revision ||
     editLineValidation.issues.length > 0;
+  const currentAcceptedTotal = selectedViewerEstimate
+    ? currentApprovedBudgetTotalForEstimate(selectedViewerEstimate.id)
+    : null;
+  const originalEstimateTotal = selectedViewerEstimate
+    ? originalBudgetTotalForEstimate(selectedViewerEstimate.id)
+    : null;
+  const changeOrderComposerStatusPolicy = useMemo(
+    () =>
+      toChangeOrderStatusPolicy({
+        policy_version: "ui-fallback",
+        status_labels: changeOrderStatusLabels,
+        statuses: CHANGE_ORDER_STATUSES_FALLBACK,
+        default_create_status: "draft",
+        allowed_status_transitions: changeOrderAllowedTransitions,
+        terminal_statuses: ["approved", "void"],
+      }),
+    [changeOrderAllowedTransitions, changeOrderStatusLabels],
+  );
+  const createChangeOrderComposerFormState: ChangeOrderFormState = useMemo(
+    () => ({
+      title: newTitle,
+      reason: newReason,
+      amountDelta: formatMoney(newLineDeltaTotal),
+      daysDelta: String(newLineDaysTotal),
+      lineItems: newLineItems,
+    }),
+    [newLineDaysTotal, newLineDeltaTotal, newLineItems, newReason, newTitle],
+  );
+  const editChangeOrderComposerFormState: ChangeOrderFormState = useMemo(
+    () => ({
+      title: editTitle,
+      reason: editReason,
+      amountDelta: formatMoney(editLineDeltaTotal),
+      daysDelta: String(editLineDaysTotal),
+      lineItems: editLineItems,
+    }),
+    [editLineDaysTotal, editLineDeltaTotal, editLineItems, editReason, editTitle],
+  );
+  const changeOrderComposerAdapter = useMemo(
+    () => createChangeOrderDocumentAdapter(changeOrderComposerStatusPolicy, []),
+    [changeOrderComposerStatusPolicy],
+  );
   const selectedChangeOrderStatusEvents = useMemo(() => {
     if (!selectedViewerChangeOrder) {
       return [] as AuditEventRecord[];
@@ -1637,390 +1686,416 @@ export function ChangeOrdersConsole({
       </div>
 
       {!selectedChangeOrder ? (
-        <form
+        <DocumentComposer
+          adapter={changeOrderComposerAdapter}
+          document={null}
+          formState={createChangeOrderComposerFormState}
           className={`${estimateStyles.sheet} ${styles.workflowSheet} ${styles.createSheet}`}
+          sectionClassName={styles.changeOrderComposerSection}
           onSubmit={handleCreateChangeOrder}
-        >
-        <div className={estimateStyles.sheetHeader}>
-          <div className={estimateStyles.fromBlock}>
-            <span className={estimateStyles.blockLabel}>From</span>
-            <p className={estimateStyles.blockText}>Your Company</p>
-            <p className={estimateStyles.blockMuted}>Prepared for approved estimate scope changes</p>
-          </div>
-          <div className={estimateStyles.headerRight}>
-            <div className={estimateStyles.sheetTitle}>Change Order</div>
-            <div className={estimateStyles.blockMuted}>Project #{selectedProjectId || "—"}</div>
-          </div>
-        </div>
+          sections={[{ slot: "context" }]}
+          renderers={{
+            context: () => (
+              <>
+                <div className={estimateStyles.sheetHeader}>
+                  <div className={estimateStyles.fromBlock}>
+                    <span className={estimateStyles.blockLabel}>From</span>
+                    <p className={estimateStyles.blockText}>Your Company</p>
+                    <p className={estimateStyles.blockMuted}>Prepared for approved estimate scope changes</p>
+                  </div>
+                  <div className={estimateStyles.headerRight}>
+                    <div className={estimateStyles.sheetTitle}>Change Order</div>
+                    <div className={estimateStyles.blockMuted}>Project #{selectedProjectId || "—"}</div>
+                  </div>
+                </div>
 
-        <div className={estimateStyles.partyGrid}>
-          <label className={`${estimateStyles.inlineField} ${styles.coMetaField}`}>
-            Title
-            <input
-              className={`${estimateStyles.fieldInput} ${styles.coMetaInput}`}
-              value={newTitle}
-              onChange={(event) => {
-                setNewTitle(event.target.value);
-                setNewTitleManuallyEdited(true);
-              }}
-              required
-            />
-          </label>
-          <label className={`${estimateStyles.inlineField} ${styles.coMetaField}`}>
-            Origin estimate (from selector)
-            <span className={estimateStyles.staticFieldValue}>
-              {selectedViewerEstimate
-                ? `#${selectedViewerEstimate.id} v${selectedViewerEstimate.version} ${selectedViewerEstimate.title}`
-                : "No approved origin estimate selected"}
-            </span>
-          </label>
-          <label className={`${estimateStyles.inlineField} ${styles.coMetaField} ${styles.coFieldWide}`}>
-            Reason
-            <textarea
-              className={`${estimateStyles.fieldInput} ${styles.coMetaInput}`}
-              value={newReason}
-              onChange={(event) => setNewReason(event.target.value)}
-              rows={3}
-            />
-          </label>
-        </div>
+                <div className={estimateStyles.partyGrid}>
+                  <label className={`${estimateStyles.inlineField} ${styles.coMetaField}`}>
+                    Title
+                    <input
+                      className={`${estimateStyles.fieldInput} ${styles.coMetaInput}`}
+                      value={newTitle}
+                      onChange={(event) => {
+                        setNewTitle(event.target.value);
+                        setNewTitleManuallyEdited(true);
+                      }}
+                      required
+                    />
+                  </label>
+                  <label className={`${estimateStyles.inlineField} ${styles.coMetaField}`}>
+                    Origin estimate (from selector)
+                    <span className={estimateStyles.staticFieldValue}>
+                      {selectedViewerEstimate
+                        ? `#${selectedViewerEstimate.id} v${selectedViewerEstimate.version} ${selectedViewerEstimate.title}`
+                        : "No approved origin estimate selected"}
+                    </span>
+                  </label>
+                  <label className={`${estimateStyles.inlineField} ${styles.coMetaField} ${styles.coFieldWide}`}>
+                    Reason
+                    <textarea
+                      className={`${estimateStyles.fieldInput} ${styles.coMetaInput}`}
+                      value={newReason}
+                      onChange={(event) => setNewReason(event.target.value)}
+                      rows={3}
+                    />
+                  </label>
+                </div>
 
-        <div className={styles.coLineSectionIntro}>
-          <h3>Line Items</h3>
-          <p>
-            {selectedViewerEstimate
-              ? `Starter rows come from active budget lines linked to origin estimate #${selectedViewerEstimate.id} v${selectedViewerEstimate.version}.`
-              : "Starter rows come from active project budget lines once an origin estimate is selected."}
-          </p>
-          <p className={styles.coLineLegend}>
-            Original approved line item amount is the approved baseline for the line before
-            approved CO deltas. CO Delta is a flat USD change (not a percent). Schedule Delta is
-            calendar days.
-          </p>
-        </div>
+                <div className={styles.coLineSectionIntro}>
+                  <h3>Line Items</h3>
+                  <p>
+                    {selectedViewerEstimate
+                      ? `Starter rows come from active budget lines linked to origin estimate #${selectedViewerEstimate.id} v${selectedViewerEstimate.version}.`
+                      : "Starter rows come from active project budget lines once an origin estimate is selected."}
+                  </p>
+                  <p className={styles.coLineLegend}>
+                    Original approved line item amount is the approved baseline for the line before
+                    approved CO deltas. CO Delta is a flat USD change (not a percent). Schedule Delta is
+                    calendar days.
+                  </p>
+                </div>
 
-        <div className={estimateStyles.lineTable}>
-          <div className={styles.coLineHeader}>
-            <span>Budget line</span>
-            <span>CO line note</span>
-            <span>Original approved line item amount ($)</span>
-            <span>CO delta ($)</span>
-            <span>Schedule delta (days)</span>
-            <span>Actions</span>
-          </div>
-          {newLineItems.map((line, index) => {
-            const rowIssues = newLineValidation.issuesByLocalId.get(line.localId) ?? [];
-            return (
-              <div key={line.localId} className={styles.coLineRowGroup}>
-                <div
-                  className={`${styles.coLineRow} ${index % 2 === 1 ? styles.coLineRowAlt : ""} ${
-                    rowIssues.length ? styles.coLineRowInvalid : ""
-                  }`}
-                >
-                  <select
-                    className={estimateStyles.lineSelect}
-                    value={line.budgetLineId}
-                    onChange={(event) =>
-                      updateLine(setNewLineItems, line.localId, { budgetLineId: event.target.value })
-                    }
-                  >
-                    <option value="">Select budget line</option>
-                    {budgetLines.map((budgetLine) => (
-                      <option key={budgetLine.id} value={budgetLine.id}>
-                        #{budgetLine.id} {budgetLine.cost_code_code} - {budgetLine.description}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    className={estimateStyles.lineInput}
-                    value={line.description}
-                    placeholder="Optional CO scope note"
-                    onChange={(event) =>
-                      updateLine(setNewLineItems, line.localId, { description: event.target.value })
-                    }
-                  />
-                  <span className={styles.coReadValue}>${originalApprovedAmountForLine(line.budgetLineId)}</span>
-                  <input
-                    className={estimateStyles.lineInput}
-                    value={line.amountDelta}
-                    placeholder="0.00 (USD)"
-                    onChange={(event) =>
-                      updateLine(setNewLineItems, line.localId, { amountDelta: event.target.value })
-                    }
-                    inputMode="decimal"
-                  />
-                  <input
-                    className={estimateStyles.lineInput}
-                    value={line.daysDelta}
-                    placeholder="0 days"
-                    onChange={(event) =>
-                      updateLine(setNewLineItems, line.localId, { daysDelta: event.target.value })
-                    }
-                    inputMode="numeric"
-                  />
+                <div className={estimateStyles.lineTable}>
+                  <div className={styles.coLineHeader}>
+                    <span>Budget line</span>
+                    <span>CO line note</span>
+                    <span>Original approved line item amount ($)</span>
+                    <span>CO delta ($)</span>
+                    <span>Schedule delta (days)</span>
+                    <span>Actions</span>
+                  </div>
+                  {newLineItems.map((line, index) => {
+                    const rowIssues = newLineValidation.issuesByLocalId.get(line.localId) ?? [];
+                    return (
+                      <div key={line.localId} className={styles.coLineRowGroup}>
+                        <div
+                          className={`${styles.coLineRow} ${index % 2 === 1 ? styles.coLineRowAlt : ""} ${
+                            rowIssues.length ? styles.coLineRowInvalid : ""
+                          }`}
+                        >
+                          <select
+                            className={estimateStyles.lineSelect}
+                            value={line.budgetLineId}
+                            onChange={(event) =>
+                              updateLine(setNewLineItems, line.localId, { budgetLineId: event.target.value })
+                            }
+                          >
+                            <option value="">Select budget line</option>
+                            {budgetLines.map((budgetLine) => (
+                              <option key={budgetLine.id} value={budgetLine.id}>
+                                #{budgetLine.id} {budgetLine.cost_code_code} - {budgetLine.description}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            className={estimateStyles.lineInput}
+                            value={line.description}
+                            placeholder="Optional CO scope note"
+                            onChange={(event) =>
+                              updateLine(setNewLineItems, line.localId, { description: event.target.value })
+                            }
+                          />
+                          <span className={styles.coReadValue}>${originalApprovedAmountForLine(line.budgetLineId)}</span>
+                          <input
+                            className={estimateStyles.lineInput}
+                            value={line.amountDelta}
+                            placeholder="0.00 (USD)"
+                            onChange={(event) =>
+                              updateLine(setNewLineItems, line.localId, { amountDelta: event.target.value })
+                            }
+                            inputMode="decimal"
+                          />
+                          <input
+                            className={estimateStyles.lineInput}
+                            value={line.daysDelta}
+                            placeholder="0 days"
+                            onChange={(event) =>
+                              updateLine(setNewLineItems, line.localId, { daysDelta: event.target.value })
+                            }
+                            inputMode="numeric"
+                          />
+                          <button
+                            type="button"
+                            className={estimateStyles.smallButton}
+                            onClick={() => removeLine(setNewLineItems, line.localId)}
+                            disabled={newLineItems.length <= 1}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                        {rowIssues.length ? (
+                          <p className={styles.coLineIssue}>
+                            Row {index + 1}: {rowIssues.join(" ")}
+                          </p>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className={styles.coLineActions}>
                   <button
                     type="button"
-                    className={estimateStyles.smallButton}
-                    onClick={() => removeLine(setNewLineItems, line.localId)}
-                    disabled={newLineItems.length <= 1}
+                    className={`${estimateStyles.secondaryButton} ${styles.coLineAddButton}`}
+                    onClick={() => addLine(setNewLineItems)}
                   >
-                    Remove
+                    Add Line Item
                   </button>
                 </div>
-                {rowIssues.length ? (
-                  <p className={styles.coLineIssue}>
-                    Row {index + 1}: {rowIssues.join(" ")}
-                  </p>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-        <div className={styles.coLineActions}>
-          <button
-            type="button"
-            className={`${estimateStyles.secondaryButton} ${styles.coLineAddButton}`}
-            onClick={() => addLine(setNewLineItems)}
-          >
-            Add Line Item
-          </button>
-        </div>
 
-        <div className={styles.coSheetFooter}>
-          <div className={`${estimateStyles.summary} ${styles.coSummaryCard}`}>
-            <div className={estimateStyles.summaryRow}>
-              <span>Line delta total</span>
-              <strong>{formatMoney(newLineDeltaTotal)}</strong>
-            </div>
-            <div className={estimateStyles.summaryRow}>
-              <span>Schedule delta total (days)</span>
-              <strong>{newLineDaysTotal}</strong>
-            </div>
-            <p
-              className={`${styles.reconcilePill} ${
-                newLineValidation.issues.length ? styles.reconcileBad : styles.reconcileGood
-              }`}
-            >
-              {newLineValidation.issues.length
-                ? `Resolve ${newLineValidation.issues.length} validation issue(s) before submit.`
-                : "Totals are derived from line items."}
-            </p>
-          </div>
-          <div className={styles.coSheetFooterActions}>
-            <div className={styles.coActionButtonRow}>
-              <button
-                type="submit"
-                className={`${estimateStyles.primaryButton} ${styles.coFooterPrimaryButton}`}
-                disabled={isCreateSubmitDisabled}
-              >
-                Create Change Order
-              </button>
-            </div>
-            {!selectedViewerEstimateId ? (
-              <p className={`${estimateStyles.inlineHint} ${styles.coFooterHint}`}>
-                Select an approved origin estimate from the history selector before creating a change
-                order.
-              </p>
-            ) : null}
-            {selectedViewerEstimateId && newLineValidation.issues.length ? (
-              <p className={`${estimateStyles.inlineHint} ${styles.coFooterHint} ${styles.coFooterErrorHint}`}>
-                Line-level issues are highlighted inline. Fix them before creating this draft.
-              </p>
-            ) : null}
-          </div>
-        </div>
-        </form>
+                <div className={styles.coSheetFooter}>
+                  <div className={`${estimateStyles.summary} ${styles.coSummaryCard}`}>
+                    <div className={estimateStyles.summaryRow}>
+                      <span>Original total</span>
+                      <span className={styles.coSummarySecondaryValue}>
+                        {originalEstimateTotal ? `$${originalEstimateTotal}` : "—"}
+                      </span>
+                    </div>
+                    <div className={estimateStyles.summaryRow}>
+                      <span>Current total (accepted)</span>
+                      <span className={styles.coSummarySecondaryValue}>
+                        {currentAcceptedTotal ? `$${currentAcceptedTotal}` : "—"}
+                      </span>
+                    </div>
+                    <div className={estimateStyles.summaryRow}>
+                      <span className={styles.coSummaryPrimaryLabel}>Cost delta ($)</span>
+                      <strong>{formatMoney(newLineDeltaTotal)}</strong>
+                    </div>
+                    <div className={estimateStyles.summaryRow}>
+                      <span className={styles.coSummaryPrimaryLabel}>Time delta (days)</span>
+                      <strong>{newLineDaysTotal}</strong>
+                    </div>
+                  </div>
+                  <div className={styles.coSheetFooterActions}>
+                    {!selectedViewerEstimateId ? (
+                      <p className={`${estimateStyles.inlineHint} ${styles.coFooterHint}`}>
+                        Select an approved origin estimate from the history selector before creating a change
+                        order.
+                      </p>
+                    ) : null}
+                    {selectedViewerEstimateId && newLineValidation.issues.length ? (
+                      <p className={`${estimateStyles.inlineHint} ${styles.coFooterHint} ${styles.coFooterErrorHint}`}>
+                        Line-level issues are highlighted inline. Fix them before creating this draft.
+                      </p>
+                    ) : null}
+                    <div className={styles.coActionButtonRow}>
+                      <button
+                        type="submit"
+                        className={`${estimateStyles.primaryButton} ${styles.coFooterPrimaryButton}`}
+                        disabled={isCreateSubmitDisabled}
+                      >
+                        Create Change Order
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ),
+          }}
+        />
       ) : null}
 
       {selectedChangeOrder ? (
-        <form
+        <DocumentComposer
+          adapter={changeOrderComposerAdapter}
+          document={selectedChangeOrder}
+          formState={editChangeOrderComposerFormState}
           className={`${estimateStyles.sheet} ${styles.workflowSheet} ${styles.editSheet}`}
+          sectionClassName={styles.changeOrderComposerSection}
           onSubmit={handleUpdateChangeOrder}
-        >
-        <div className={estimateStyles.sheetHeader}>
-          <div className={estimateStyles.fromBlock}>
-            <span className={estimateStyles.blockLabel}>Edit</span>
-            <p className={estimateStyles.blockText}>
-              {selectedChangeOrder
-                ? coLabel(selectedChangeOrder)
-                : "No change order selected"}
-            </p>
-            <p className={estimateStyles.blockMuted}>
-              {selectedChangeOrder ? `Project #${selectedProjectId}` : "Select from viewer above"}
-            </p>
-          </div>
-          <div className={estimateStyles.headerRight}>
-            <div className={estimateStyles.sheetTitle}>Change Order Revision</div>
-            <div className={estimateStyles.blockMuted}>
-              {selectedChangeOrder ? statusLabel(selectedChangeOrder.status) : "Draft"}
-            </div>
-          </div>
-        </div>
+          sections={[{ slot: "context" }]}
+          renderers={{
+            context: () => (
+              <>
+                <div className={estimateStyles.sheetHeader}>
+                  <div className={estimateStyles.fromBlock}>
+                    <span className={estimateStyles.blockLabel}>Edit</span>
+                    <p className={estimateStyles.blockText}>
+                      {selectedChangeOrder
+                        ? coLabel(selectedChangeOrder)
+                        : "No change order selected"}
+                    </p>
+                    <p className={estimateStyles.blockMuted}>
+                      {selectedChangeOrder ? `Project #${selectedProjectId}` : "Select from viewer above"}
+                    </p>
+                  </div>
+                  <div className={estimateStyles.headerRight}>
+                    <div className={estimateStyles.sheetTitle}>Change Order Revision</div>
+                    <div className={estimateStyles.blockMuted}>
+                      {selectedChangeOrder ? statusLabel(selectedChangeOrder.status) : "Draft"}
+                    </div>
+                  </div>
+                </div>
 
-        <div className={estimateStyles.partyGrid}>
-          <label className={`${estimateStyles.inlineField} ${styles.coMetaField}`}>
-            Title
-            <input
-              className={`${estimateStyles.fieldInput} ${styles.coMetaInput}`}
-              value={editTitle}
-              onChange={(event) => setEditTitle(event.target.value)}
-              required
-            />
-          </label>
-          <label className={`${estimateStyles.inlineField} ${styles.coMetaField} ${styles.coFieldWide}`}>
-            Reason
-            <textarea
-              className={`${estimateStyles.fieldInput} ${styles.coMetaInput}`}
-              value={editReason}
-              onChange={(event) => setEditReason(event.target.value)}
-              rows={3}
-            />
-          </label>
-        </div>
+                <div className={estimateStyles.partyGrid}>
+                  <label className={`${estimateStyles.inlineField} ${styles.coMetaField}`}>
+                    Title
+                    <input
+                      className={`${estimateStyles.fieldInput} ${styles.coMetaInput}`}
+                      value={editTitle}
+                      onChange={(event) => setEditTitle(event.target.value)}
+                      required
+                    />
+                  </label>
+                  <label className={`${estimateStyles.inlineField} ${styles.coMetaField} ${styles.coFieldWide}`}>
+                    Reason
+                    <textarea
+                      className={`${estimateStyles.fieldInput} ${styles.coMetaInput}`}
+                      value={editReason}
+                      onChange={(event) => setEditReason(event.target.value)}
+                      rows={3}
+                    />
+                  </label>
+                </div>
 
-        <div className={styles.coLineSectionIntro}>
-          <h3>Line Items</h3>
-          <p>
-            These rows are budget-line anchored. Update flat USD deltas and schedule days for this
-            revision.
-          </p>
-          <p className={styles.coLineLegend}>
-            Original approved line item amount is the approved baseline for the line before
-            approved CO deltas. CO Delta is a flat USD change (not a percent). Schedule Delta is
-            calendar days.
-          </p>
-        </div>
+                <div className={styles.coLineSectionIntro}>
+                  <h3>Line Items</h3>
+                  <p>
+                    These rows are budget-line anchored. Update flat USD deltas and schedule days for this
+                    revision.
+                  </p>
+                  <p className={styles.coLineLegend}>
+                    Original approved line item amount is the approved baseline for the line before
+                    approved CO deltas. CO Delta is a flat USD change (not a percent). Schedule Delta is
+                    calendar days.
+                  </p>
+                </div>
 
-        <div className={estimateStyles.lineTable}>
-          <div className={styles.coLineHeader}>
-            <span>Budget line</span>
-            <span>CO line note</span>
-            <span>Original approved line item amount ($)</span>
-            <span>CO delta ($)</span>
-            <span>Schedule delta (days)</span>
-            <span>Actions</span>
-          </div>
-          {editLineItems.map((line, index) => {
-            const rowIssues = editLineValidation.issuesByLocalId.get(line.localId) ?? [];
-            return (
-              <div key={line.localId} className={styles.coLineRowGroup}>
-                <div
-                  className={`${styles.coLineRow} ${index % 2 === 1 ? styles.coLineRowAlt : ""} ${
-                    rowIssues.length ? styles.coLineRowInvalid : ""
-                  }`}
-                >
-                  <select
-                    className={estimateStyles.lineSelect}
-                    value={line.budgetLineId}
-                    onChange={(event) =>
-                      updateLine(setEditLineItems, line.localId, { budgetLineId: event.target.value })
-                    }
-                  >
-                    <option value="">Select budget line</option>
-                    {budgetLines.map((budgetLine) => (
-                      <option key={budgetLine.id} value={budgetLine.id}>
-                        #{budgetLine.id} {budgetLine.cost_code_code} - {budgetLine.description}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    className={estimateStyles.lineInput}
-                    value={line.description}
-                    placeholder="Optional CO scope note"
-                    onChange={(event) =>
-                      updateLine(setEditLineItems, line.localId, { description: event.target.value })
-                    }
-                  />
-                  <span className={styles.coReadValue}>${originalApprovedAmountForLine(line.budgetLineId)}</span>
-                  <input
-                    className={estimateStyles.lineInput}
-                    value={line.amountDelta}
-                    placeholder="0.00 (USD)"
-                    onChange={(event) =>
-                      updateLine(setEditLineItems, line.localId, { amountDelta: event.target.value })
-                    }
-                    inputMode="decimal"
-                  />
-                  <input
-                    className={estimateStyles.lineInput}
-                    value={line.daysDelta}
-                    placeholder="0 days"
-                    onChange={(event) =>
-                      updateLine(setEditLineItems, line.localId, { daysDelta: event.target.value })
-                    }
-                    inputMode="numeric"
-                  />
+                <div className={estimateStyles.lineTable}>
+                  <div className={styles.coLineHeader}>
+                    <span>Budget line</span>
+                    <span>CO line note</span>
+                    <span>Original approved line item amount ($)</span>
+                    <span>CO delta ($)</span>
+                    <span>Schedule delta (days)</span>
+                    <span>Actions</span>
+                  </div>
+                  {editLineItems.map((line, index) => {
+                    const rowIssues = editLineValidation.issuesByLocalId.get(line.localId) ?? [];
+                    return (
+                      <div key={line.localId} className={styles.coLineRowGroup}>
+                        <div
+                          className={`${styles.coLineRow} ${index % 2 === 1 ? styles.coLineRowAlt : ""} ${
+                            rowIssues.length ? styles.coLineRowInvalid : ""
+                          }`}
+                        >
+                          <select
+                            className={estimateStyles.lineSelect}
+                            value={line.budgetLineId}
+                            onChange={(event) =>
+                              updateLine(setEditLineItems, line.localId, { budgetLineId: event.target.value })
+                            }
+                          >
+                            <option value="">Select budget line</option>
+                            {budgetLines.map((budgetLine) => (
+                              <option key={budgetLine.id} value={budgetLine.id}>
+                                #{budgetLine.id} {budgetLine.cost_code_code} - {budgetLine.description}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            className={estimateStyles.lineInput}
+                            value={line.description}
+                            placeholder="Optional CO scope note"
+                            onChange={(event) =>
+                              updateLine(setEditLineItems, line.localId, { description: event.target.value })
+                            }
+                          />
+                          <span className={styles.coReadValue}>${originalApprovedAmountForLine(line.budgetLineId)}</span>
+                          <input
+                            className={estimateStyles.lineInput}
+                            value={line.amountDelta}
+                            placeholder="0.00 (USD)"
+                            onChange={(event) =>
+                              updateLine(setEditLineItems, line.localId, { amountDelta: event.target.value })
+                            }
+                            inputMode="decimal"
+                          />
+                          <input
+                            className={estimateStyles.lineInput}
+                            value={line.daysDelta}
+                            placeholder="0 days"
+                            onChange={(event) =>
+                              updateLine(setEditLineItems, line.localId, { daysDelta: event.target.value })
+                            }
+                            inputMode="numeric"
+                          />
+                          <button
+                            type="button"
+                            className={estimateStyles.smallButton}
+                            onClick={() => removeLine(setEditLineItems, line.localId)}
+                            disabled={editLineItems.length <= 1}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                        {rowIssues.length ? (
+                          <p className={styles.coLineIssue}>
+                            Row {index + 1}: {rowIssues.join(" ")}
+                          </p>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className={styles.coLineActions}>
                   <button
                     type="button"
-                    className={estimateStyles.smallButton}
-                    onClick={() => removeLine(setEditLineItems, line.localId)}
-                    disabled={editLineItems.length <= 1}
+                    className={`${estimateStyles.secondaryButton} ${styles.coLineAddButton}`}
+                    onClick={() => addLine(setEditLineItems)}
                   >
-                    Remove
+                    Add Line Item
                   </button>
                 </div>
-                {rowIssues.length ? (
-                  <p className={styles.coLineIssue}>
-                    Row {index + 1}: {rowIssues.join(" ")}
-                  </p>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-        <div className={styles.coLineActions}>
-          <button
-            type="button"
-            className={`${estimateStyles.secondaryButton} ${styles.coLineAddButton}`}
-            onClick={() => addLine(setEditLineItems)}
-          >
-            Add Line Item
-          </button>
-        </div>
 
-        <div className={styles.coSheetFooter}>
-          <div className={`${estimateStyles.summary} ${styles.coSummaryCard}`}>
-            <div className={estimateStyles.summaryRow}>
-              <span>Line delta total</span>
-              <strong>{formatMoney(editLineDeltaTotal)}</strong>
-            </div>
-            <div className={estimateStyles.summaryRow}>
-              <span>Schedule delta total (days)</span>
-              <strong>{editLineDaysTotal}</strong>
-            </div>
-            <p
-              className={`${styles.reconcilePill} ${
-                editLineValidation.issues.length ? styles.reconcileBad : styles.reconcileGood
-              }`}
-            >
-              {editLineValidation.issues.length
-                ? `Resolve ${editLineValidation.issues.length} validation issue(s) before save.`
-                : "Totals are derived from line items."}
-            </p>
-          </div>
-          <div className={styles.coSheetFooterActions}>
-            <div className={styles.coActionButtonRow}>
-              <button
-                type="submit"
-                className={`${estimateStyles.primaryButton} ${styles.coFooterPrimaryButton}`}
-                disabled={isEditSubmitDisabled}
-              >
-                Save Change Order
-              </button>
-            </div>
-            {editLineValidation.issues.length ? (
-              <p className={`${estimateStyles.inlineHint} ${styles.coFooterHint} ${styles.coFooterErrorHint}`}>
-                Line-level issues are highlighted inline. Fix them before saving this revision.
-              </p>
-            ) : null}
-            {selectedChangeOrder && !selectedChangeOrder.is_latest_revision ? (
-              <p className={`${estimateStyles.inlineHint} ${styles.coFooterHint} ${styles.coFooterErrorHint}`}>
-                This revision is historical and read-only. Save/update actions are available on the latest revision only.
-              </p>
-            ) : null}
-          </div>
-        </div>
-        </form>
+                <div className={styles.coSheetFooter}>
+                  <div className={`${estimateStyles.summary} ${styles.coSummaryCard}`}>
+                    <div className={estimateStyles.summaryRow}>
+                      <span>Original total</span>
+                      <span className={styles.coSummarySecondaryValue}>
+                        {originalEstimateTotal ? `$${originalEstimateTotal}` : "—"}
+                      </span>
+                    </div>
+                    <div className={estimateStyles.summaryRow}>
+                      <span>Current total (accepted)</span>
+                      <span className={styles.coSummarySecondaryValue}>
+                        {currentAcceptedTotal ? `$${currentAcceptedTotal}` : "—"}
+                      </span>
+                    </div>
+                    <div className={estimateStyles.summaryRow}>
+                      <span className={styles.coSummaryPrimaryLabel}>Cost delta ($)</span>
+                      <strong>{formatMoney(editLineDeltaTotal)}</strong>
+                    </div>
+                    <div className={estimateStyles.summaryRow}>
+                      <span className={styles.coSummaryPrimaryLabel}>Time delta (days)</span>
+                      <strong>{editLineDaysTotal}</strong>
+                    </div>
+                  </div>
+                  <div className={styles.coSheetFooterActions}>
+                    {editLineValidation.issues.length ? (
+                      <p className={`${estimateStyles.inlineHint} ${styles.coFooterHint} ${styles.coFooterErrorHint}`}>
+                        Line-level issues are highlighted inline. Fix them before saving this revision.
+                      </p>
+                    ) : null}
+                    {selectedChangeOrder && !selectedChangeOrder.is_latest_revision ? (
+                      <p className={`${estimateStyles.inlineHint} ${styles.coFooterHint} ${styles.coFooterErrorHint}`}>
+                        This revision is historical and read-only. Save/update actions are available on the latest revision only.
+                      </p>
+                    ) : null}
+                    <div className={styles.coActionButtonRow}>
+                      <button
+                        type="submit"
+                        className={`${estimateStyles.primaryButton} ${styles.coFooterPrimaryButton}`}
+                        disabled={isEditSubmitDisabled}
+                      >
+                        Save Change Order
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ),
+          }}
+        />
       ) : null}
     </section>
   );

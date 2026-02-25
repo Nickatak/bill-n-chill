@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.models import FinancialAuditEvent, Invoice, InvoiceStatusEvent
+from core.policies import get_invoice_policy_contract
 from core.serializers import (
     InvoiceScopeOverrideSerializer,
     InvoiceSerializer,
@@ -17,6 +18,10 @@ from core.serializers import (
     InvoiceWriteSerializer,
 )
 from core.utils.money import quantize_money
+from core.views.accounts_receivable.invoice_ingress import (
+    build_invoice_create_ingress,
+    build_invoice_patch_ingress,
+)
 from core.views.helpers import (
     _apply_invoice_lines_and_totals,
     _calculate_invoice_line_totals,
@@ -76,6 +81,13 @@ def _invoice_line_apply_error_response(apply_error):
         },
         400,
     )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def invoice_contract_view(_request):
+    """Return canonical invoice workflow policy for frontend UX guards."""
+    return Response({"data": get_invoice_policy_contract()})
 
 
 @api_view(["GET", "POST"])
@@ -177,8 +189,12 @@ def project_invoices_view(request, project_id: int):
 
     serializer = InvoiceWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
-    data = serializer.validated_data
-    line_items = data.get("line_items", [])
+    ingress = build_invoice_create_ingress(
+        serializer.validated_data,
+        default_issue_date=timezone.localdate(),
+        default_due_date=timezone.localdate() + timedelta(days=30),
+    )
+    line_items = ingress.line_items
     if not line_items:
         return Response(
             {
@@ -191,8 +207,8 @@ def project_invoices_view(request, project_id: int):
             status=400,
         )
 
-    issue_date = data.get("issue_date") or timezone.localdate()
-    due_date = data.get("due_date") or (issue_date + timedelta(days=30))
+    issue_date = ingress.issue_date
+    due_date = ingress.due_date
     if due_date < issue_date:
         return Response(
             {
@@ -213,14 +229,14 @@ def project_invoices_view(request, project_id: int):
             status=Invoice.Status.DRAFT,
             issue_date=issue_date,
             due_date=due_date,
-            tax_percent=data.get("tax_percent", Decimal("0")),
+            tax_percent=ingress.tax_percent,
             created_by=request.user,
         )
 
         apply_error = _apply_invoice_lines_and_totals(
             invoice=invoice,
             line_items_data=line_items,
-            tax_percent=data.get("tax_percent", Decimal("0")),
+            tax_percent=ingress.tax_percent,
             user=request.user,
         )
         if apply_error:
@@ -347,13 +363,13 @@ def invoice_detail_view(request, invoice_id: int):
 
     serializer = InvoiceWriteSerializer(data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
-    data = serializer.validated_data
-    scope_override = data.get("scope_override", False)
-    scope_override_note = data.get("scope_override_note", "")
+    ingress = build_invoice_patch_ingress(serializer.validated_data)
+    scope_override = ingress.scope_override
+    scope_override_note = ingress.scope_override_note
 
-    status_changing = "status" in data
+    status_changing = ingress.has_status
     previous_status = invoice.status
-    next_status = data.get("status", invoice.status)
+    next_status = ingress.status if ingress.has_status else invoice.status
     if status_changing and not Invoice.is_transition_allowed(
         current_status=invoice.status,
         next_status=next_status,
@@ -369,8 +385,8 @@ def invoice_detail_view(request, invoice_id: int):
             status=400,
         )
 
-    next_issue_date = data.get("issue_date", invoice.issue_date)
-    next_due_date = data.get("due_date", invoice.due_date)
+    next_issue_date = ingress.issue_date if ingress.has_issue_date else invoice.issue_date
+    next_due_date = ingress.due_date if ingress.has_due_date else invoice.due_date
     if next_due_date < next_issue_date:
         return Response(
             {
@@ -383,10 +399,10 @@ def invoice_detail_view(request, invoice_id: int):
             status=400,
         )
 
-    totals_changing = "line_items" in data or "tax_percent" in data
+    totals_changing = ingress.has_line_items or ingress.has_tax_percent
     candidate_total = invoice.total
-    if "line_items" in data:
-        line_items = data["line_items"]
+    if ingress.has_line_items:
+        line_items = ingress.line_items
         if not line_items:
             return Response(
                 {
@@ -429,7 +445,9 @@ def invoice_detail_view(request, invoice_id: int):
 
     if totals_changing:
         _, candidate_subtotal = _calculate_invoice_line_totals(line_items_for_preview)
-        candidate_tax_percent = Decimal(str(data.get("tax_percent", invoice.tax_percent)))
+        candidate_tax_percent = Decimal(
+            str(ingress.tax_percent if ingress.has_tax_percent else invoice.tax_percent)
+        )
         candidate_tax_total = quantize_money(candidate_subtotal * (candidate_tax_percent / Decimal("100")))
         candidate_total = quantize_money(candidate_subtotal + candidate_tax_total)
 
@@ -441,6 +459,7 @@ def invoice_detail_view(request, invoice_id: int):
     )
 
     with transaction.atomic():
+        scope_error = None
         if scope_guard_required:
             scope_error = _enforce_invoice_scope_guard(
                 invoice=invoice,
@@ -451,37 +470,37 @@ def invoice_detail_view(request, invoice_id: int):
                 scope_override=scope_override,
                 scope_override_note=scope_override_note,
             )
-            if scope_error:
-                return Response(scope_error, status=400)
+        if scope_error:
+            return Response(scope_error, status=400)
 
         update_fields = ["updated_at"]
-        if "issue_date" in data:
-            invoice.issue_date = data["issue_date"]
+        if ingress.has_issue_date:
+            invoice.issue_date = ingress.issue_date
             update_fields.append("issue_date")
-        if "due_date" in data:
-            invoice.due_date = data["due_date"]
+        if ingress.has_due_date:
+            invoice.due_date = ingress.due_date
             update_fields.append("due_date")
-        if "status" in data:
-            invoice.status = data["status"]
+        if ingress.has_status:
+            invoice.status = ingress.status
             update_fields.append("status")
-        if "tax_percent" in data:
-            invoice.tax_percent = data["tax_percent"]
+        if ingress.has_tax_percent:
+            invoice.tax_percent = ingress.tax_percent
             update_fields.append("tax_percent")
         if len(update_fields) > 1:
             invoice.save(update_fields=update_fields)
 
-        if "line_items" in data:
+        if ingress.has_line_items:
             apply_error = _apply_invoice_lines_and_totals(
                 invoice=invoice,
-                line_items_data=data["line_items"],
-                tax_percent=data.get("tax_percent", invoice.tax_percent),
+                line_items_data=ingress.line_items,
+                tax_percent=ingress.tax_percent if ingress.has_tax_percent else invoice.tax_percent,
                 user=request.user,
             )
             if apply_error:
                 transaction.set_rollback(True)
                 payload, status_code = _invoice_line_apply_error_response(apply_error)
                 return Response(payload, status=status_code)
-        elif "tax_percent" in data:
+        elif ingress.has_tax_percent:
             existing_lines = [
                 {
                     "line_type": line.line_type,

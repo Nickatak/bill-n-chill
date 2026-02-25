@@ -22,9 +22,9 @@ type HierarchyRule = {
   crumbs: CrumbDef[];
 };
 
-const ROOT_CRUMB: CrumbDef = { href: "/", label: "Intake" };
+const INTAKE_CRUMB: CrumbDef = { href: "/intake/quick-add", label: "Intake" };
 const PROJECTS_HUB_CRUMB: CrumbDef = { href: "/projects", label: "Projects" };
-const BILLING_HUB_CRUMB: CrumbDef = { href: "/invoices", label: "Billing (WIP)" };
+const BILLING_HUB_CRUMB: CrumbDef = { href: "/invoices", label: "Billing" };
 const META_HUB_CRUMB: CrumbDef = { href: "/customers", label: "Ops / Meta" };
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 const legacyProjectScopedPrefixes = [
@@ -35,7 +35,7 @@ const legacyProjectScopedPrefixes = [
 const hierarchyRules: HierarchyRule[] = [
   {
     when: (pathname) => pathname === "/" || pathname === "/intake/quick-add",
-    crumbs: [ROOT_CRUMB, { href: "/intake/quick-add", label: "Quick Add" }],
+    crumbs: [INTAKE_CRUMB],
   },
   {
     when: (pathname) => pathname === "/projects",
@@ -64,12 +64,12 @@ const hierarchyRules: HierarchyRule[] = [
   },
   {
     when: (pathname) => pathname === "/invoices",
-    crumbs: [PROJECTS_HUB_CRUMB, BILLING_HUB_CRUMB, { href: "/invoices", label: "Invoices (WIP)" }],
+    crumbs: [BILLING_HUB_CRUMB, { href: "/invoices", label: "Invoices" }],
   },
   {
     when: (pathname) =>
       /^\/projects\/\d+\/vendor-bills$/.test(pathname),
-    crumbs: [PROJECTS_HUB_CRUMB, BILLING_HUB_CRUMB, { href: "/projects", label: "Vendor Bills (WIP)" }],
+    crumbs: [BILLING_HUB_CRUMB, { href: "/vendor-bills", label: "Vendor Bills" }],
   },
   {
     when: (pathname) =>
@@ -85,10 +85,7 @@ const hierarchyRules: HierarchyRule[] = [
   },
   {
     when: (pathname) => pathname === "/customers",
-    crumbs: [
-      META_HUB_CRUMB,
-      { href: "/customers", label: "Customers" },
-    ],
+    crumbs: [{ href: "/customers", label: "Customers" }],
   },
   {
     when: (pathname) => pathname === "/vendors",
@@ -153,6 +150,10 @@ function isLegacyProjectScopedRoute(pathname: string): boolean {
   );
 }
 
+function isBillingRoute(pathname: string): boolean {
+  return pathname === "/invoices" || /^\/projects\/\d+\/vendor-bills$/.test(pathname);
+}
+
 function projectScopedHref(href: string, projectId: string): string {
   if (href === "/projects") {
     return `/projects?project=${encodeURIComponent(projectId)}`;
@@ -168,6 +169,9 @@ function projectScopedHref(href: string, projectId: string): string {
   }
   if (href === "/invoices") {
     return `/invoices?project=${encodeURIComponent(projectId)}`;
+  }
+  if (href === "/vendor-bills") {
+    return `/projects/${encodeURIComponent(projectId)}/vendor-bills`;
   }
   if (href === "/activity") {
     return `/projects/${encodeURIComponent(projectId)}/activity`;
@@ -193,7 +197,7 @@ export function WorkflowBreadcrumbs() {
     projectId &&
       /^\d+$/.test(projectId) &&
       (Boolean(pathProjectId) || isLegacyProjectScopedRoute(pathnameValue)),
-  );
+  ) && !isBillingRoute(pathnameValue);
 
   useEffect(() => {
     let cancelled = false;
@@ -239,18 +243,16 @@ export function WorkflowBreadcrumbs() {
           label: `Project: ${projectTitle || `Project #${projectId}`}`,
           isCurrent: false,
         };
-        const projectsIndex = baseCrumbs.findIndex((crumb) => crumb.href === "/projects");
+        const projectsIndex = baseCrumbs.findIndex(
+          (crumb, index) => index > 0 && crumb.href === "/projects" && crumb.label === PROJECTS_HUB_CRUMB.label,
+        );
+        const nextCrumbs = [...baseCrumbs];
         if (projectsIndex >= 0) {
-          return [
-            ...baseCrumbs.slice(0, projectsIndex),
-            projectHubCrumb,
-            ...baseCrumbs.slice(projectsIndex + 1),
-          ].map((crumb, index, source) => ({
-            ...crumb,
-            isCurrent: index === source.length - 1,
-          }));
+          nextCrumbs.splice(projectsIndex, 1, projectHubCrumb);
+        } else {
+          nextCrumbs.splice(1, 0, projectHubCrumb);
         }
-        return [projectHubCrumb, ...baseCrumbs].map((crumb, index, source) => ({
+        return nextCrumbs.map((crumb, index, source) => ({
           ...crumb,
           isCurrent: index === source.length - 1,
         }));

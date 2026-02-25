@@ -20,6 +20,7 @@ from core.views import (
     public_estimate_detail_view,
     health_view,
     invoice_detail_view,
+    invoice_contract_view,
     invoice_send_view,
     invoice_status_events_view,
     login_view,
@@ -128,6 +129,11 @@ urlpatterns = [
         "projects/<int:project_id>/invoices/",
         project_invoices_view,
         name="project-invoices",
+    ),
+    path(
+        "contracts/invoices/",
+        invoice_contract_view,
+        name="contracts-invoices",
     ),
     path(
         "projects/<int:project_id>/vendor-bills/",

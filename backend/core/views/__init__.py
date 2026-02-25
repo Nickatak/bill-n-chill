@@ -34,6 +34,7 @@ from core.views.shared_operations.intake import (
     quick_add_customer_intake_view,
 )
 from core.views.accounts_receivable.invoices import (
+    invoice_contract_view,
     invoice_detail_view,
     invoice_send_view,
     invoice_status_events_view,
@@ -103,6 +104,7 @@ __all__ = [
     "change_order_detail_view",
     "change_order_clone_revision_view",
     "project_invoices_view",
+    "invoice_contract_view",
     "invoice_detail_view",
     "invoice_send_view",
     "invoice_status_events_view",

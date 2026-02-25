@@ -1,0 +1,10 @@
+:where(.composerForm) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+:where(.composerSection) {
+  min-width: 0;
+  width: 100%;
+}

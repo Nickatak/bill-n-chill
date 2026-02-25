@@ -18,37 +18,18 @@
   color: var(--text-primary);
 }
 
-.hero {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 14px;
-  background:
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 42%),
-    linear-gradient(180deg, #f8fbff 0%, #f2f6fc 100%);
+.quickView {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
-.eyebrow {
+.quickViewTitle {
   margin: 0;
-  font-size: 0.68rem;
-  letter-spacing: 0.14em;
+  font-size: 0.76rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: 700;
-  color: #1d4ed8;
-}
-
-.heading {
-  margin: 0;
-  font-size: 1.2rem;
-  color: #0f172a;
-}
-
-.copy {
-  margin: 6px 0 0;
-  color: #475569;
-  font-size: 0.92rem;
-  max-width: 68ch;
+  color: var(--text-secondary);
 }
 
 .statsGrid {
@@ -58,12 +39,14 @@
 }
 
 .statCard {
-  border: 1px solid #d7e2f0;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: #ffffff;
-  padding: 10px;
+  background: var(--surface-elevated);
+  padding: 10px 12px;
   display: grid;
-  gap: 4px;
+  gap: 6px;
+  align-content: start;
+  min-height: 74px;
 }
 
 .statCard span {
@@ -75,9 +58,10 @@
 }
 
 .statCard strong {
-  font-size: 1rem;
+  font-size: 1.08rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  color: #0f172a;
 }
 
 .authNotice,
@@ -111,6 +95,7 @@
 
 .controlBar {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -118,37 +103,261 @@
   background: var(--surface);
 }
 
-.controlField {
+.projectSelector {
   display: grid;
-  gap: 6px;
-  font-size: 0.82rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  font-weight: 700;
+  gap: 10px;
 }
 
-.controlField select {
+.searchField {
+  display: grid;
+  gap: 6px;
+}
+
+.searchField span {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.searchField input {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 10px;
   background: var(--surface-elevated);
   color: var(--text-primary);
   font-size: 0.92rem;
-  text-transform: none;
-  letter-spacing: normal;
-  font-weight: 500;
 }
 
-.controlActions {
+.projectFilters {
+  display: grid;
+  gap: 8px;
+}
+
+.projectFiltersLabel {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.projectFilterButtons {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
+.projectFilterButton {
+  border: 1px solid #cbd5f5;
+  border-radius: 999px;
+  padding: 6px 12px;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.projectFilterButtonInactive {
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+}
+
+.projectFilterButtonActive {
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+}
+
+.projectFilterButtonActive.projectStatusProspect {
+  background: #2563eb;
+  border-color: #1d4ed8;
+  color: #eff6ff;
+}
+
+.projectFilterButtonActive.projectStatusActive {
+  background: #16a34a;
+  border-color: #15803d;
+  color: #f0fdf4;
+}
+
+.projectFilterButtonActive.projectStatusOnHold {
+  background: #eab308;
+  border-color: #ca8a04;
+  color: #422006;
+}
+
+.projectFilterButtonActive.projectStatusCompleted {
+  background: #6b7280;
+  border-color: #4b5563;
+  color: #f9fafb;
+}
+
+.projectFilterButtonActive.projectStatusCancelled {
+  background: #dc2626;
+  border-color: #b91c1c;
+  color: #fee2e2;
+}
+
+.projectFilterActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.projectFilterActionButton {
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 0.64rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  line-height: 1.1;
+  min-height: 0;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.projectFilterActionButton:hover {
+  border-color: #64748b;
+  background: #e2e8f0;
+  color: #1f2937;
+}
+
+.projectFilterActionButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.projectTableWrap {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-elevated);
+}
+
+.projectTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.projectTable thead th {
+  text-align: left;
+  padding: 10px 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  background: #eef2ff;
+  color: #1e3a8a;
+}
+
+.projectTable tbody td {
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.projectRow {
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.projectRow:hover {
+  background: #e0e7ff;
+}
+
+.projectRow.projectRowActive {
+  background: #c7d2fe;
+}
+
+.projectCellTitle strong {
+  font-weight: 700;
+}
+
+.projectStatus {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  background: #e0e7ff;
+  color: #1e3a8a;
+}
+
+.projectStatusProspect {
+  background: #e0e7ff;
+  color: #1e3a8a;
+}
+
+.projectStatusActive {
+  background: #22c55e;
+  color: #052e16;
+}
+
+.projectStatusOnHold {
+  background: #fef08a;
+  color: #713f12;
+}
+
+.projectStatusCompleted {
+  background: #e5e7eb;
+  color: #4b5563;
+}
+
+.projectStatusCancelled {
+  background: #fecaca;
+  color: #991b1b;
+}
+
+.projectEmptyCell {
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.projectPagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.projectPagination span {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.controlActions {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
 .layout {
   display: grid;
   gap: 12px;
+}
+
+.viewerPanel {
+  width: 100%;
+}
+
+.viewerStatusPanel {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.viewerStatusActions {
+  display: grid;
+  gap: 6px;
 }
 
 .panel {
@@ -158,6 +367,7 @@
   background: var(--surface);
   display: grid;
   gap: 10px;
+  align-content: start;
 }
 
 .panelHeader {
@@ -187,11 +397,49 @@
   font-size: 0.86rem;
 }
 
+.statusFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.statusFilterPill {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  min-height: 30px;
+  padding: 4px 11px;
+  line-height: 1.1;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.statusFilterPillInactive {
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+}
+
+.statusFilterPillActive {
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.14);
+  border-color: transparent;
+}
+
 .invoiceRail {
   display: grid;
   gap: 8px;
   max-height: 610px;
   overflow: auto;
+  align-content: start;
 }
 
 .invoiceCard {
@@ -231,7 +479,115 @@
 
 .workspace {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
+}
+
+.invoiceComposerSheet {
+  border: 1px solid #cbd5e1;
+  border-radius: 18px;
+  padding: 24px;
+  background: #ffffff;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-flow: row;
+  gap: 20px;
+}
+
+.invoiceComposerSection {
+  display: grid;
+  gap: 20px;
+  grid-column: 1 / -1;
+  min-width: 0;
+  width: 100%;
+}
+
+.invoicePartyStack {
+  display: grid;
+  gap: 20px;
+  align-content: start;
+}
+
+.invoiceMetaLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.46fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.invoiceMetaSpacer {
+  min-height: 1px;
+}
+
+.invoiceMetaStrong {
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.invoiceLineSectionIntro h3 {
+  margin: 0;
+}
+
+.invoiceLineHeader {
+  display: grid;
+  grid-template-columns: 80px 1.45fr 240px 90px 130px 130px 96px;
+  gap: 8px;
+  align-items: center;
+  padding: 11px 12px;
+  background: #eef2ff;
+  color: #1e3a8a;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  min-width: 980px;
+}
+
+.invoiceLineRow {
+  display: grid;
+  grid-template-columns: 80px 1.45fr 240px 90px 130px 130px 96px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-top: 1px solid #e2e8f0;
+  background: #ffffff;
+  min-width: 980px;
+}
+
+.invoiceLineRowAlt {
+  background: #f4f7fc;
+}
+
+.invoiceLineCostCodeCell {
+  min-width: 0;
+}
+
+.invoiceLineActionsCell {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.invoiceLineActions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+
+.invoiceSheetFooter {
+  display: grid;
+  gap: 12px;
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+  justify-items: end;
+}
+
+.invoiceCreateActions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .formGrid {
@@ -271,7 +627,7 @@
 
 .lineSection {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .lineHeaderRow {
@@ -287,7 +643,7 @@
 
 .lineList {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .lineCard {
@@ -330,8 +686,8 @@
   padding: 9px 10px;
   background: var(--surface-elevated);
   display: grid;
-  gap: 4px;
-  min-width: 210px;
+  gap: 6px;
+  min-width: 220px;
 }
 
 .summaryCard div {
@@ -352,6 +708,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  justify-content: flex-end;
 }
 
 .primaryButton,
@@ -416,6 +773,46 @@
   font-size: 0.9rem;
 }
 
+.lifecycleFieldLabel {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.statusPicker {
+  display: grid;
+  gap: 8px;
+}
+
+.statusPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.statusPill {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid #cbd5f5;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.statusPillInactive {
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+}
+
+.statusPillActive {
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
+  transform: translateY(-1px);
+}
+
 .quickStatusRow {
   display: flex;
   flex-wrap: wrap;
@@ -423,13 +820,54 @@
 }
 
 .quickStatusButton {
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
   background: var(--surface-elevated);
   color: var(--text-primary);
 }
 
+.quickStatusButtonInactive {
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+}
+
 .quickStatusButtonActive {
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.24);
+}
+
+.statusToneDraft {
+  background: #dbeafe;
+  color: #1e40af;
+  border-color: #93c5fd;
+}
+
+.statusToneSent {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fcd34d;
+}
+
+.statusTonePartial {
+  background: #ede9fe;
+  color: #5b21b6;
+  border-color: #c4b5fd;
+}
+
+.statusTonePaid {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #86efac;
+}
+
+.statusToneOverdue {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+
+.statusToneVoid {
+  background: #e2e8f0;
+  color: #334155;
+  border-color: #cbd5e1;
 }
 
 .statusBadge {
@@ -485,29 +923,29 @@
   padding: 12px;
   margin: 0;
   color: var(--text-secondary);
+  align-self: start;
 }
 
 @media (min-width: 980px) {
-  .hero {
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-    align-items: start;
-  }
-
-  .controlBar {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: end;
-  }
-
-  .layout {
-    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  }
-
   .formGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
+@media (max-width: 980px) {
+  .invoiceMetaLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .invoiceMetaSpacer {
+    display: none;
+  }
+}
+
 @media (max-width: 640px) {
+  .statusFilters,
+  .projectFilterButtons,
+  .projectFilterActions,
   .controlActions,
   .buttonRow,
   .quickStatusRow {
@@ -546,18 +984,100 @@
   --error-text: #fecaca;
 }
 
-:global(html[data-theme="dark"]) .hero {
-  background:
-    radial-gradient(circle at top right, rgba(96, 165, 250, 0.2), transparent 42%),
-    #0f172a;
+:global(html[data-theme="dark"]) .projectFilterButton {
+  border-color: #334155;
 }
 
-:global(html[data-theme="dark"]) .heading {
-  color: #f8fafc;
+:global(html[data-theme="dark"]) .projectFilterButtonInactive {
+  background: #0b152a;
+  color: #94a3b8;
 }
 
-:global(html[data-theme="dark"]) .eyebrow {
-  color: #93c5fd;
+:global(html[data-theme="dark"]) .projectFilterActionButton {
+  border-color: #334155;
+  background: #0f172a;
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .projectFilterActionButton:hover {
+  border-color: #475569;
+  background: #17233a;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .projectTableWrap {
+  background: #0b152a;
+}
+
+:global(html[data-theme="dark"]) .projectTable thead th {
+  background: #172554;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .projectRow:hover {
+  background: #1e3a8a;
+}
+
+:global(html[data-theme="dark"]) .projectRow.projectRowActive {
+  background: #1d4ed8;
+}
+
+:global(html[data-theme="dark"]) .statCard {
+  border-color: #334155;
+  background: #0b1220;
+}
+
+:global(html[data-theme="dark"]) .invoiceComposerSheet {
+  border-color: #334155;
+  background: #0f172a;
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.45);
+}
+
+:global(html[data-theme="dark"]) .viewerStatusPanel {
+  border-top-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .statusPill {
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .statusPillInactive {
+  background: #0b1220;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .statusPillActive {
+  box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.28);
+}
+
+:global(html[data-theme="dark"]) .invoiceMetaStrong {
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .invoiceLineHeader {
+  background: #1e293b;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .invoiceLineRow {
+  border-top-color: #1f2937;
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .invoiceLineRowAlt {
+  background: #131d31;
+}
+
+:global(html[data-theme="dark"]) .invoiceSheetFooter {
+  border-top-color: #1f2937;
+}
+
+:global(html[data-theme="dark"]) .statCard span {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .quickViewTitle {
+  color: #94a3b8;
 }
 
 :global(html[data-theme="dark"]) .readOnlyNotice {
@@ -580,4 +1100,58 @@
 
 :global(html[data-theme="dark"]) .quickStatusButtonActive {
   box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.3);
+}
+
+:global(html[data-theme="dark"]) .statCard strong {
+  color: #f8fafc;
+}
+
+:global(html[data-theme="dark"]) .statusFilterPillInactive {
+  background: #0b1220;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .statusFilterPillActive {
+  box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.28);
+}
+
+:global(html[data-theme="dark"]) .quickStatusButtonInactive {
+  background: #0b1220;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .statusToneDraft {
+  background: #1e3a8a;
+  color: #dbeafe;
+  border-color: #3b82f6;
+}
+
+:global(html[data-theme="dark"]) .statusToneSent {
+  background: #a16207;
+  color: #fef3c7;
+  border-color: #f59e0b;
+}
+
+:global(html[data-theme="dark"]) .statusTonePartial {
+  background: #4c1d95;
+  color: #ddd6fe;
+  border-color: #8b5cf6;
+}
+
+:global(html[data-theme="dark"]) .statusTonePaid {
+  background: #14532d;
+  color: #bbf7d0;
+  border-color: #22c55e;
+}
+
+:global(html[data-theme="dark"]) .statusToneOverdue {
+  background: #7f1d1d;
+  color: #fecaca;
+  border-color: #ef4444;
+}
+
+:global(html[data-theme="dark"]) .statusToneVoid {
+  background: #1f2937;
+  color: #e2e8f0;
+  border-color: #64748b;
 }

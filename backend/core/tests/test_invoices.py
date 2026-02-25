@@ -78,6 +78,32 @@ class InvoiceTests(TestCase):
         self.assertEqual(response.status_code, 201)
         return response.json()["data"]["id"]
 
+    def test_invoice_contract_requires_authentication(self):
+        response = self.client.get("/api/v1/contracts/invoices/")
+        self.assertEqual(response.status_code, 401)
+
+    def test_invoice_contract_matches_model_transition_policy(self):
+        response = self.client.get(
+            "/api/v1/contracts/invoices/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+
+        expected_statuses = [status for status, _label in Invoice.Status.choices]
+        expected_labels = {status: label for status, label in Invoice.Status.choices}
+        expected_transitions = {}
+        for status in expected_statuses:
+            next_statuses = list(Invoice.ALLOWED_STATUS_TRANSITIONS.get(status, set()))
+            next_statuses.sort(key=lambda value: expected_statuses.index(value))
+            expected_transitions[status] = next_statuses
+
+        self.assertEqual(payload["statuses"], expected_statuses)
+        self.assertEqual(payload["status_labels"], expected_labels)
+        self.assertEqual(payload["allowed_status_transitions"], expected_transitions)
+        self.assertEqual(payload["default_create_status"], Invoice.Status.DRAFT)
+        self.assertTrue(str(payload["policy_version"]).startswith("2026-02-25.invoices."))
+
     def test_invoice_create_calculates_totals_and_lines(self):
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/invoices/",
