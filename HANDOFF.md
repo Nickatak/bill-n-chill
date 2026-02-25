@@ -1,106 +1,77 @@
-# HANDOFF - 2026-02-24
+# HANDOFF - 2026-02-25
 
 ## Session State
 
 - Workspace: `/home/nick/bill_n_chill`
 - Branch: `main`
-- HEAD: `21e4571 feat(frontend): align workflow navigation and WIP route labeling`
-- Branch relation: `main...origin/main` (no ahead/behind marker in status)
-- Worktree: **dirty** (12 modified files, listed below)
+- HEAD (pre-commit): `3c73ec9`
+- Upstream: `origin/main`
+- Worktree at handoff capture: dirty (frontend/docs updates listed below)
 
-## Current Modified Files (not committed)
+## Files Updated In This Checkpoint
 
-- `backend/core/models/change_orders/change_order.py`
-- `backend/core/policies/change_orders.py`
-- `backend/core/tests/test_change_orders.py`
-- `backend/core/views/change_orders/change_orders.py`
-- `frontend/src/app/change-orders/page.module.css`
-- `frontend/src/app/change-orders/page.tsx`
-- `frontend/src/app/projects/[projectId]/change-orders/page.tsx`
-- `frontend/src/features/change-orders/FEATURE_MAP.md`
-- `frontend/src/features/change-orders/components/change-orders-console.module.css`
 - `frontend/src/features/change-orders/components/change-orders-console.tsx`
-- `frontend/src/features/change-orders/types.ts`
+- `frontend/src/features/change-orders/components/change-orders-console.module.css`
 - `frontend/src/features/projects/components/projects-console.tsx`
+- `docs/mvp-v1.md`
 
-## What Is Done (CO backend + frontend behavior)
+## What Changed
 
-### 1) CO backend contract + enforcement tightened
+### 1) CO viewer and form UX were substantially refined
 
-- Model invariants enforced in `ChangeOrder.clean()`:
-  - approval metadata required iff `status=approved`
-  - approval metadata cleared for non-approved statuses
-  - `origin_estimate` must belong to same project
-  - revision chain integrity for `previous_change_order` + `revision_number`
-- Policy contract expanded and version bumped to `2026-02-24.change_orders.v4`:
-  - includes `revision_rules`, `origin_estimate_rules`, `approval_metadata_rules`, `error_rules`
-- View-level validation now returns stable rule keys via `error.rule` (create/edit/clone/line validations)
-- Tests updated to assert policy contract and representative `error.rule` responses
+- Clarified the left rail as `Origin Estimates` with step-based guidance.
+- Origin estimate card content now reads as:
+  - estimate title + estimate number
+  - version + approved-on date + approver email
+  - CO history count
+- Removed redundant/ambiguous quick-view metadata (`Selected CO`, `Supersedes`, `Header delta`, reconcile status copy).
+- Added explicit history ordering hint and enforced chronological ordering in viewer sort:
+  - oldest at top, most recent at bottom.
+- Strengthened highlighting for currently-selected CO row (dedicated history-active treatment in light/dark themes).
+- Moved `Line delta total` to the detail-bottom area near line items.
+- Relocated `Clone as New Revision` out of the quick-status block into the top toolbar area.
 
-### 2) CO frontend aligned to canonical model fields
+### 2) CO quick status controls now align better with Estimates UX
 
-- Uses `family_key` and `previous_change_order` (legacy `number` / `supersedes_change_order` removed)
-- UI CO label normalized to `CO-{family_key} v{revision_number}`
-- CO feature map updated to include new contract fields (`error_rules` included)
+- Kept quick status controls in viewer for fast lifecycle changes.
+- Shortened action label to `Update CO Status`.
+- Fixed status button styling conflict by decoupling quick-status tone classes from status badge classes.
+- Quick status buttons now render as rectangular controls (not pills).
 
-### 3) CO page UX cleanup completed
+### 3) CO edit/create form cleanup and line-item clarity
 
-- Removed top route blurb/WIP/back-next header sections from `/change-orders` and project-scoped CO route
-- Removed wrapper border/card artifacts causing HR-like separator look
-- Clarified summary stat copy:
-  - `Approved Estimates (Origin)`
-  - `Change Orders Pending Approval`
-  - `Approved Change Orders`
-- Estimate card no longer uses misleading big `APPROVED` status badge; now uses neutral origin context text
-- History copy clarified:
-  - `No change orders have been created yet for this approved origin estimate.`
+- Removed status dropdown from CO edit form; status changes happen in viewer quick actions.
+- Removed header-level delta fields from form summaries.
+- Clarified budget context language in line table:
+  - `Original approved line item amount ($)`
+  - clarified CO delta units (USD flat amount) and schedule delta units (calendar days).
+- Moved `Add Line Item` into the line-items section and kept primary save action at bottom-right.
+- Added line-item validation support for duplicate budget-line selection and numeric/day constraints.
 
-### 4) CO form interaction model now matches Estimates pattern
+### 4) Project page now shows CO mini-status pills
 
-- Removed create/edit toggle buttons
-- Single control surface now:
-  - history selector (choose origin estimate / existing CO context)
-  - `Add New Change Order` button
-- Form mode is selection-driven:
-  - selected CO -> edit form
-  - no selected CO -> create form
-- Origin estimate on create form is now selector-controlled (not user-editable in form)
-  - displayed as read-only `Origin estimate (from selector)`
-  - create submit disabled unless an approved origin estimate is selected in history selector
+- Added change-order status preview pills on project map node (mirrors estimate helper pattern):
+  - `D` (draft), `S` (sent/pending approval), `A` (accepted/approved)
+- Counts are loaded from `/projects/{id}/change-orders/`.
 
-## Remaining Work (user explicitly parked here)
+### 5) Docs update
 
-Focus area: **CO form detail pass**
-
-- line-item UX and field polish (copy, spacing, affordance clarity)
-- decide final field ordering and labels for create/edit parity
-- evaluate if line table should get quick validation hints inline (before submit)
-- visual hierarchy pass for summary block vs line-item table actions
+- Added post-MVP concept note in `docs/mvp-v1.md`:
+  - e-sign agreement layer + shared-secret (PSK) verification layer for external approval assurance.
 
 ## Validation Run During This Session
-
-Backend:
-
-- `cd backend && source .venv/bin/activate && python manage.py test core.tests.test_change_orders --keepdb --noinput -v 2` (pass, 33 tests)
-- `cd backend && source .venv/bin/activate && python manage.py test core.tests.test_mvp_regression --keepdb --noinput -v 2` (pass)
 
 Frontend:
 
 - `cd frontend && npx tsc --noEmit` (pass)
 
-## Resume Checklist
+Not run in this checkpoint:
 
-1. `git status -sb` and confirm same modified file list.
-2. Open CO page and verify selector-driven behavior:
-   - choose origin estimate with no COs -> create form visible
-   - choose existing CO -> edit form visible
-   - click `Add New Change Order` -> create context reset
-3. Continue only the CO form detail pass (line items/fields/copy/layout).
-4. Re-run:
-   - `cd frontend && npx tsc --noEmit`
-   - `cd backend && source .venv/bin/activate && python manage.py test core.tests.test_change_orders --keepdb --noinput`
+- backend test suite
+- end-to-end/manual browser QA pass
 
-## Notes
+## Recommended Resume Focus
 
-- No destructive git operations were used.
-- This checkpoint is intentionally left uncommitted so CO form iteration can continue before squashing into a single coherent commit.
+1. Decide canonical policy for open COs per family (single open vs multi-open).
+2. If single-open is desired, enforce in backend policy + API error rule + UI affordance.
+3. Run backend tests after any policy enforcement changes.

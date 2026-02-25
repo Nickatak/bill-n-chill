@@ -41,6 +41,11 @@ export function ProjectsConsole() {
     sent: number;
     approved: number;
   } | null>(null);
+  const [changeOrderStatusCounts, setChangeOrderStatusCounts] = useState<{
+    draft: number;
+    sent: number;
+    accepted: number;
+  } | null>(null);
   const [isProjectProfileOpen, setIsProjectProfileOpen] = useState(false);
 
   const [projectName, setProjectName] = useState("");
@@ -101,7 +106,6 @@ export function ProjectsConsole() {
   );
   const summaryCounts = summary
     ? {
-        changeOrders: summary.traceability.approved_change_orders.records.length,
         invoices: summary.traceability.ar_invoices.records.length,
         arPayments: summary.traceability.ar_payments.records.length,
         vendorBills: summary.traceability.ap_vendor_bills.records.length,
@@ -214,11 +218,13 @@ export function ProjectsConsole() {
         setSelectedProjectId("");
         setSummary(null);
         setEstimateStatusCounts(null);
+        setChangeOrderStatusCounts(null);
         setNeutralStatusMessage(`No projects found for customer #${scopedCustomerId}.`);
       } else {
         setSelectedProjectId("");
         setSummary(null);
         setEstimateStatusCounts(null);
+        setChangeOrderStatusCounts(null);
         setNeutralStatusMessage(
           "No projects found for this user. Create one from Intake -> Convert Lead to Project.",
         );
@@ -279,6 +285,35 @@ export function ProjectsConsole() {
     }
   }
 
+  async function loadChangeOrderStatusCounts(projectId: number) {
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/change-orders/`, {
+        headers: buildAuthHeaders(token),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setChangeOrderStatusCounts(null);
+        return;
+      }
+      const rows = (payload.data as Array<{ status?: string }>) ?? [];
+      let draft = 0;
+      let sent = 0;
+      let accepted = 0;
+      for (const changeOrder of rows) {
+        if (changeOrder.status === "draft") {
+          draft += 1;
+        } else if (changeOrder.status === "pending_approval" || changeOrder.status === "sent") {
+          sent += 1;
+        } else if (changeOrder.status === "accepted" || changeOrder.status === "approved") {
+          accepted += 1;
+        }
+      }
+      setChangeOrderStatusCounts({ draft, sent, accepted });
+    } catch {
+      setChangeOrderStatusCounts(null);
+    }
+  }
+
   useEffect(() => {
     const session = loadClientSession();
     if (!session?.token) {
@@ -308,6 +343,7 @@ export function ProjectsConsole() {
     }
     void loadFinancialSummary();
     void loadEstimateStatusCounts(projectId);
+    void loadChangeOrderStatusCounts(projectId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProjectId, token]);
 
@@ -330,6 +366,7 @@ export function ProjectsConsole() {
     hydrateForm(fallbackProject);
     setSummary(null);
     setEstimateStatusCounts(null);
+    setChangeOrderStatusCounts(null);
   }, [selectedProjectId, statusFilteredProjects]);
 
   useEffect(() => {
@@ -356,6 +393,7 @@ export function ProjectsConsole() {
     setIsProjectProfileOpen(false);
     setSummary(null);
     setEstimateStatusCounts(null);
+    setChangeOrderStatusCounts(null);
     hydrateForm(project);
   }
 
@@ -637,8 +675,16 @@ export function ProjectsConsole() {
                     <Link href={`/projects/${selectedProject.id}/change-orders`}>
                       Change Orders (WIP)
                     </Link>
-                    <span className={styles.nodeCount}>
-                      {summaryCounts ? summaryCounts.changeOrders : "--"}
+                    <span className={styles.nodeEstimateMeta}>
+                      <span className={`${styles.estimateCountPill} ${styles.estimateCountDraft}`}>
+                        D{changeOrderStatusCounts ? changeOrderStatusCounts.draft : "--"}
+                      </span>
+                      <span className={`${styles.estimateCountPill} ${styles.estimateCountSent}`}>
+                        S{changeOrderStatusCounts ? changeOrderStatusCounts.sent : "--"}
+                      </span>
+                      <span className={`${styles.estimateCountPill} ${styles.estimateCountApproved}`}>
+                        A{changeOrderStatusCounts ? changeOrderStatusCounts.accepted : "--"}
+                      </span>
                     </span>
                   </div>
                   <div className={styles.node}>

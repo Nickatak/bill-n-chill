@@ -80,6 +80,24 @@ bill-n-chill is the operational and financial thread that keeps project scope ch
 - Deep retainage and AIA edge-case automation beyond core fields.
 - Native payroll and workforce management.
 
+## Post-MVP Priority: External Approval Assurance
+
+Goal: strengthen legal enforceability and signer verification for estimate/change-order approvals shared by public link.
+
+1. Agreement layer (e-sign)
+- Capture explicit signer assent against a specific document version/hash.
+- Store reproducible signed-record artifacts and consent metadata.
+- Preserve immutable audit trail (timestamp, signer identity inputs, IP/user agent, document hash/version).
+
+2. Verification layer (shared-secret)
+- Require a second factor in addition to the approval link: a one-time PSK delivered out-of-band.
+- Validate `link token + PSK` before allowing approve/reject actions.
+- Use short-lived, single-use approval tokens with attempt/rate limits and replay protection.
+
+3. Notes
+- This is intentionally deferred until after MVP.
+- TOTP enrollment is optional future exploration; baseline post-MVP plan is e-sign ceremony + PSK.
+
 ## UX Principles for v1
 
 - Money state must be explainable in one screen per project.

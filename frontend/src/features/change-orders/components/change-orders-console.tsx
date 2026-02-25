@@ -32,6 +32,77 @@ type LineSetter = (
     | ((current: ChangeOrderLineInput[]) => ChangeOrderLineInput[]),
 ) => void;
 
+type LineValidationIssue = {
+  localId: number;
+  rowNumber: number;
+  message: string;
+};
+
+type LineValidationResult = {
+  issues: LineValidationIssue[];
+  issuesByLocalId: Map<number, string[]>;
+};
+
+function isFiniteNumericInput(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return false;
+  }
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed);
+}
+
+function validateLineItems(lines: ChangeOrderLineInput[]): LineValidationResult {
+  const budgetLineCounts = new Map<string, number>();
+  for (const line of lines) {
+    const budgetLineId = line.budgetLineId.trim();
+    if (!budgetLineId) {
+      continue;
+    }
+    budgetLineCounts.set(budgetLineId, (budgetLineCounts.get(budgetLineId) ?? 0) + 1);
+  }
+
+  const issues: LineValidationIssue[] = [];
+  const issuesByLocalId = new Map<number, string[]>();
+  lines.forEach((line, index) => {
+    const rowNumber = index + 1;
+    const rowIssues: string[] = [];
+    const budgetLineId = line.budgetLineId.trim();
+
+    if (!budgetLineId) {
+      rowIssues.push("Select a budget line.");
+    } else if ((budgetLineCounts.get(budgetLineId) ?? 0) > 1) {
+      rowIssues.push("Budget line is duplicated in this change order.");
+    }
+
+    if (!isFiniteNumericInput(line.amountDelta)) {
+      rowIssues.push("Amount delta must be a number.");
+    }
+
+    if (!isFiniteNumericInput(line.daysDelta) || !Number.isInteger(Number(line.daysDelta))) {
+      rowIssues.push("Days delta must be a whole number.");
+    }
+
+    if (!rowIssues.length) {
+      return;
+    }
+
+    issuesByLocalId.set(line.localId, rowIssues);
+    for (const message of rowIssues) {
+      issues.push({
+        localId: line.localId,
+        rowNumber,
+        message,
+      });
+    }
+  });
+
+  return {
+    issues,
+    issuesByLocalId,
+  };
+}
+
 function emptyLine(localId: number): ChangeOrderLineInput {
   return {
     localId,
@@ -86,13 +157,13 @@ type ChangeOrdersConsoleProps = {
   initialOriginEstimateId?: number | null;
 };
 
-const CHANGE_ORDER_STATUS_FALLBACK = [
-  "draft",
-  "pending_approval",
-  "approved",
-  "rejected",
-  "void",
-];
+type OriginEstimateRecord = {
+  id: number;
+  title: string;
+  version: number;
+  approved_at: string | null;
+  approved_by_email: string | null;
+};
 
 const CHANGE_ORDER_STATUS_LABELS_FALLBACK: Record<string, string> = {
   draft: "Draft",
@@ -124,9 +195,7 @@ export function ChangeOrdersConsole({
   const [selectedViewerEstimateId, setSelectedViewerEstimateId] = useState("");
   const [isViewerExpanded, setIsViewerExpanded] = useState(true);
   const [budgetLines, setBudgetLines] = useState<BudgetLineRecord[]>([]);
-  const [projectEstimates, setProjectEstimates] = useState<
-    Array<{ id: number; title: string; version: number }>
-  >([]);
+  const [projectEstimates, setProjectEstimates] = useState<OriginEstimateRecord[]>([]);
   const [nextLineLocalId, setNextLineLocalId] = useState(2);
   const [selectedProjectName, setSelectedProjectName] = useState("");
 
@@ -137,12 +206,8 @@ export function ChangeOrdersConsole({
 
   const [editTitle, setEditTitle] = useState("");
   const [editReason, setEditReason] = useState("");
-  const [editStatus, setEditStatus] = useState("draft");
   const [editLineItems, setEditLineItems] = useState<ChangeOrderLineInput[]>([emptyLine(1)]);
   const [quickStatus, setQuickStatus] = useState("pending_approval");
-  const [changeOrderStatuses, setChangeOrderStatuses] = useState<string[]>(
-    CHANGE_ORDER_STATUS_FALLBACK,
-  );
   const [changeOrderStatusLabels, setChangeOrderStatusLabels] = useState<
     Record<string, string>
   >(CHANGE_ORDER_STATUS_LABELS_FALLBACK);
@@ -158,20 +223,43 @@ export function ChangeOrdersConsole({
     changeOrders.find((row) => String(row.id) === selectedChangeOrderId) ?? null;
   const selectedViewerEstimate =
     projectEstimates.find((estimate) => String(estimate.id) === selectedViewerEstimateId) ?? null;
+  const sortChangeOrdersForViewer = useCallback((rows: ChangeOrderRecord[]) => {
+    return [...rows].sort((left, right) => {
+      const leftCreatedAt = Date.parse(left.created_at);
+      const rightCreatedAt = Date.parse(right.created_at);
+      if (Number.isFinite(leftCreatedAt) && Number.isFinite(rightCreatedAt)) {
+        const createdAtDelta = leftCreatedAt - rightCreatedAt;
+        if (createdAtDelta !== 0) {
+          return createdAtDelta;
+        }
+      }
+      const familyDelta = Number(left.family_key) - Number(right.family_key);
+      if (familyDelta !== 0) {
+        return familyDelta;
+      }
+      const revisionDelta = Number(left.revision_number) - Number(right.revision_number);
+      if (revisionDelta !== 0) {
+        return revisionDelta;
+      }
+      return left.id - right.id;
+    });
+  }, []);
   const viewerChangeOrders = useMemo(() => {
     if (!selectedViewerEstimateId) {
       return [] as ChangeOrderRecord[];
     }
     const originEstimateId = Number(selectedViewerEstimateId);
-    return changeOrders.filter((changeOrder) => changeOrder.origin_estimate === originEstimateId);
-  }, [changeOrders, selectedViewerEstimateId]);
+    return sortChangeOrdersForViewer(
+      changeOrders.filter((changeOrder) => changeOrder.origin_estimate === originEstimateId),
+    );
+  }, [changeOrders, selectedViewerEstimateId, sortChangeOrdersForViewer]);
   const selectedViewerChangeOrder =
     viewerChangeOrders.find((changeOrder) => String(changeOrder.id) === selectedChangeOrderId) ??
     viewerChangeOrders[0] ??
     null;
   const totalChangeOrderCount = changeOrders.length;
-  const approvedChangeOrderCount = changeOrders.filter(
-    (changeOrder) => changeOrder.status === "approved",
+  const draftChangeOrderCount = changeOrders.filter(
+    (changeOrder) => changeOrder.status === "draft",
   ).length;
   const pendingChangeOrderCount = changeOrders.filter(
     (changeOrder) => changeOrder.status === "pending_approval",
@@ -184,17 +272,17 @@ export function ChangeOrdersConsole({
       newLineItems.reduce((sum, line) => sum + toNumber(line.amountDelta), 0),
     [newLineItems],
   );
+  const newLineValidation = useMemo(() => validateLineItems(newLineItems), [newLineItems]);
   const editLineDeltaTotal = useMemo(
     () =>
       editLineItems.reduce((sum, line) => sum + toNumber(line.amountDelta), 0),
     [editLineItems],
   );
-  const newHeaderDelta = newLineDeltaTotal;
+  const editLineValidation = useMemo(() => validateLineItems(editLineItems), [editLineItems]);
   const newLineDaysTotal = useMemo(
     () => newLineItems.reduce((sum, line) => sum + Math.trunc(toNumber(line.daysDelta)), 0),
     [newLineItems],
   );
-  const editHeaderDelta = editLineDeltaTotal;
   const editLineDaysTotal = useMemo(
     () => editLineItems.reduce((sum, line) => sum + Math.trunc(toNumber(line.daysDelta)), 0),
     [editLineItems],
@@ -209,14 +297,15 @@ export function ChangeOrdersConsole({
   const quickStatusOptions = selectedViewerChangeOrder
     ? changeOrderAllowedTransitions[selectedViewerChangeOrder.status] ?? []
     : [];
-  const editStatusOptions = useMemo(() => {
-    if (!selectedChangeOrder) {
-      return changeOrderStatuses;
-    }
-    const allowed = changeOrderAllowedTransitions[selectedChangeOrder.status] ?? [];
-    const values = [selectedChangeOrder.status, ...allowed.filter((status) => status !== selectedChangeOrder.status)];
-    return values.filter((status) => changeOrderStatuses.includes(status));
-  }, [changeOrderAllowedTransitions, changeOrderStatuses, selectedChangeOrder]);
+  const isCreateSubmitDisabled =
+    !canMutateChangeOrders ||
+    !selectedProjectId ||
+    !selectedViewerEstimateId ||
+    newLineValidation.issues.length > 0;
+  const isEditSubmitDisabled =
+    !canMutateChangeOrders ||
+    !selectedChangeOrderId ||
+    editLineValidation.issues.length > 0;
 
   function statusLabel(status: string): string {
     const label = changeOrderStatusLabels[status];
@@ -265,12 +354,62 @@ export function ChangeOrdersConsole({
       .join("")}`;
     return styles[key] ?? "";
   }
+
+  function quickStatusToneClass(status: string): string {
+    const key = `quickStatus${status
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join("")}`;
+    return styles[key] ?? "";
+  }
+
+  function quickStatusControlLabel(status: string): string {
+    if (status === "pending_approval" || status === "sent") {
+      return "Sent";
+    }
+    if (status === "void") {
+      return "Void";
+    }
+    if (status === "approved" || status === "accepted") {
+      return "Approved";
+    }
+    if (status === "rejected") {
+      return "Rejected";
+    }
+    if (status === "draft") {
+      return "Draft";
+    }
+    return statusLabel(status);
+  }
+
+  function formatApprovedDate(dateValue: string | null): string {
+    if (!dateValue) {
+      return "unknown date";
+    }
+    const parsed = new Date(dateValue);
+    if (Number.isNaN(parsed.getTime())) {
+      return "unknown date";
+    }
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(parsed);
+  }
+
+  function approvalMeta(estimate: OriginEstimateRecord): string {
+    const dateLabel = formatApprovedDate(estimate.approved_at);
+    if (estimate.approved_by_email) {
+      return `v${estimate.version}, approved on ${dateLabel} by ${estimate.approved_by_email}`;
+    }
+    return `v${estimate.version}, approved on ${dateLabel}`;
+  }
+
   const hydrateEditForm = useCallback((changeOrder: ChangeOrderRecord | undefined) => {
     if (!changeOrder) {
       setSelectedChangeOrderId("");
       setEditTitle("");
       setEditReason("");
-      setEditStatus("draft");
       setEditLineItems([emptyLine(1)]);
       setNextLineLocalId(2);
       setQuickStatus(changeOrderAllowedTransitions.draft?.[0] ?? "pending_approval");
@@ -280,7 +419,6 @@ export function ChangeOrdersConsole({
     setSelectedChangeOrderId(String(changeOrder.id));
     setEditTitle(changeOrder.title);
     setEditReason(changeOrder.reason);
-    setEditStatus(changeOrder.status);
     const hydratedLines =
       changeOrder.line_items.length > 0
         ? changeOrder.line_items.map((line, index) => ({
@@ -327,17 +465,11 @@ export function ChangeOrdersConsole({
         },
         {},
       );
-      setChangeOrderStatuses(contract.statuses);
       setChangeOrderStatusLabels({
         ...CHANGE_ORDER_STATUS_LABELS_FALLBACK,
         ...(contract.status_labels || {}),
       });
       setChangeOrderAllowedTransitions(normalizedTransitions);
-      setEditStatus((current) =>
-        contract.statuses.includes(current)
-          ? current
-          : contract.default_create_status || contract.statuses[0] || "draft",
-      );
     } catch {
       // Policy contract fetch is best-effort; fallback map remains active.
     }
@@ -387,19 +519,60 @@ export function ChangeOrdersConsole({
       const rows =
         (payload.data as Array<{ id: number; title: string; version: number; status?: string }>) ?? [];
       const approvedRows = rows.filter((estimate) => estimate.status === "approved");
+      const approvedRowsWithMeta = await Promise.all(
+        approvedRows.map(async (estimate) => {
+          try {
+            const response = await fetch(
+              `${normalizedBaseUrl}/estimates/${estimate.id}/status-events/`,
+              {
+                headers: buildAuthHeaders(token),
+              },
+            );
+            const payload: ApiResponse = await response.json();
+            if (!response.ok) {
+              return {
+                ...estimate,
+                approved_at: null,
+                approved_by_email: null,
+              };
+            }
+            const events =
+              (payload.data as Array<{
+                to_status?: string;
+                changed_at?: string;
+                changed_by_email?: string;
+              }>) ?? [];
+            const approvedEvent = [...events]
+              .reverse()
+              .find((event) => event.to_status === "approved");
+            return {
+              ...estimate,
+              approved_at: approvedEvent?.changed_at ?? null,
+              approved_by_email: approvedEvent?.changed_by_email ?? null,
+            };
+          } catch {
+            return {
+              ...estimate,
+              approved_at: null,
+              approved_by_email: null,
+            };
+          }
+        }),
+      );
       const preferredEstimateId =
-        initialOriginEstimateId && approvedRows.some((estimate) => estimate.id === initialOriginEstimateId)
+        initialOriginEstimateId &&
+        approvedRowsWithMeta.some((estimate) => estimate.id === initialOriginEstimateId)
           ? String(initialOriginEstimateId)
           : "";
-      setProjectEstimates(approvedRows);
+      setProjectEstimates(approvedRowsWithMeta);
       setSelectedViewerEstimateId((current) => {
         if (preferredEstimateId) {
           return preferredEstimateId;
         }
-        if (current && approvedRows.some((estimate) => String(estimate.id) === current)) {
+        if (current && approvedRowsWithMeta.some((estimate) => String(estimate.id) === current)) {
           return current;
         }
-        return approvedRows[0] ? String(approvedRows[0].id) : "";
+        return approvedRowsWithMeta[0] ? String(approvedRowsWithMeta[0].id) : "";
       });
     } catch {
       setProjectEstimates([]);
@@ -469,9 +642,6 @@ export function ChangeOrdersConsole({
             : "";
         setSelectedProjectId(String(nextProject.id));
         setSelectedProjectName(nextProject.name || "");
-        if (!newTitleManuallyEdited) {
-          setNewTitle(defaultChangeOrderTitle(nextProject.name || ""));
-        }
         await Promise.all([
           loadBudgetLines(nextProject.id),
           loadProjectEstimates(nextProject.id),
@@ -503,7 +673,6 @@ export function ChangeOrdersConsole({
     hydrateEditForm,
     loadBudgetLines,
     loadProjectEstimates,
-    newTitleManuallyEdited,
     normalizedBaseUrl,
     scopedProjectId,
     setFeedback,
@@ -529,6 +698,13 @@ export function ChangeOrdersConsole({
     }, 0);
     return () => window.clearTimeout(run);
   }, [loadProjects, token]);
+
+  useEffect(() => {
+    if (newTitleManuallyEdited) {
+      return;
+    }
+    setNewTitle(defaultChangeOrderTitle(selectedProjectName));
+  }, [newTitleManuallyEdited, selectedProjectName]);
 
   useEffect(() => {
     const projectId = Number(selectedProjectId);
@@ -696,6 +872,10 @@ export function ChangeOrdersConsole({
       setFeedback("Select a change order first.", "error");
       return;
     }
+    if (!selectedChangeOrder) {
+      setFeedback("Selected change order could not be resolved.", "error");
+      return;
+    }
 
     setFeedback("");
     try {
@@ -709,7 +889,7 @@ export function ChangeOrdersConsole({
             amount_delta: formatMoney(editLineDeltaTotal),
             days_delta: editLineDaysTotal,
             reason: editReason,
-            status: editStatus,
+            status: selectedChangeOrder.status,
             line_items: toLinePayload(editLineItems),
           }),
         },
@@ -823,16 +1003,16 @@ export function ChangeOrdersConsole({
             <strong className={styles.consoleStatValue}>{projectEstimates.length}</strong>
           </article>
           <article className={styles.consoleStatCard}>
-            <span className={styles.consoleStatLabel}>Total Change Orders</span>
-            <strong className={styles.consoleStatValue}>{totalChangeOrderCount}</strong>
+            <span className={styles.consoleStatLabel}>Draft Change Orders</span>
+            <strong className={styles.consoleStatValue}>{draftChangeOrderCount}</strong>
           </article>
           <article className={styles.consoleStatCard}>
-            <span className={styles.consoleStatLabel}>Change Orders Pending Approval</span>
+            <span className={styles.consoleStatLabel}>Sent for Approval</span>
             <strong className={styles.consoleStatValue}>{pendingChangeOrderCount}</strong>
           </article>
           <article className={styles.consoleStatCard}>
-            <span className={styles.consoleStatLabel}>Approved Change Orders</span>
-            <strong className={styles.consoleStatValue}>{approvedChangeOrderCount}</strong>
+            <span className={styles.consoleStatLabel}>Total Change Orders</span>
+            <strong className={styles.consoleStatValue}>{totalChangeOrderCount}</strong>
           </article>
         </div>
       </section>
@@ -851,13 +1031,19 @@ export function ChangeOrdersConsole({
             </button>
           </div>
           <p>
-            Select an approved estimate, review its full revision family, and move statuses without
-            leaving context.
+            Select an approved origin estimate on the left. Change-order families are grouped by
+            that origin anchor.
           </p>
         </div>
         {isViewerExpanded ? (projectEstimates.length > 0 ? (
           <div className={styles.viewerGrid}>
             <div className={styles.viewerRail}>
+              <div className={styles.viewerRailHeader}>
+                <span className={styles.viewerRailHeading}>Origin Estimates</span>
+                <span className={styles.viewerRailSubheading}>
+                  1) Select an approved origin estimate to scope the history.
+                </span>
+              </div>
               {projectEstimates.map((estimate) => {
                 const active = String(estimate.id) === selectedViewerEstimateId;
                 const relatedCount = changeOrders.filter(
@@ -871,8 +1057,10 @@ export function ChangeOrdersConsole({
                     onClick={() => {
                       const nextEstimateId = String(estimate.id);
                       setSelectedViewerEstimateId(nextEstimateId);
-                      const related = changeOrders.filter(
-                        (changeOrder) => String(changeOrder.origin_estimate) === nextEstimateId,
+                      const related = sortChangeOrdersForViewer(
+                        changeOrders.filter(
+                          (changeOrder) => String(changeOrder.origin_estimate) === nextEstimateId,
+                        ),
                       );
                       if (!related.length) {
                         hydrateEditForm(undefined);
@@ -887,13 +1075,14 @@ export function ChangeOrdersConsole({
                     }}
                   >
                     <span className={styles.viewerRailTitle}>
-                      #{estimate.id} v{estimate.version} {estimate.title}
+                      {estimate.title}
+                      <span className={styles.viewerRailVersion}>Estimate #{estimate.id}</span>
+                    </span>
+                    <span className={styles.viewerRailSubtext}>
+                      {approvalMeta(estimate)}
                     </span>
                     <span className={styles.viewerMetaLabel}>
-                      {relatedCount} {relatedCount === 1 ? "change order" : "change orders"}
-                    </span>
-                    <span className={styles.estimateOriginBadge}>
-                      Origin estimate
+                      {relatedCount} CO history
                     </span>
                   </button>
                 );
@@ -901,23 +1090,20 @@ export function ChangeOrdersConsole({
             </div>
             {selectedViewerEstimate ? (
               <div className={styles.viewerDetail}>
-                <div className={styles.viewerMetaRow}>
-                  <span className={styles.viewerMetaLabel}>Approved origin estimate</span>
-                  <strong>
-                    #{selectedViewerEstimate.id} v{selectedViewerEstimate.version}{" "}
-                    {selectedViewerEstimate.title}
-                  </strong>
-                </div>
                 {viewerChangeOrders.length > 0 ? (
                   <>
-                    <div className={styles.viewerRail}>
+                    <h4 className={styles.viewerSectionHeading}>2) Linked Change Order History</h4>
+                    <p className={styles.viewerHint}>Oldest at top. Most recent is the bottom item.</p>
+                    <div className={`${styles.viewerRail} ${styles.viewerHistoryRail}`}>
                       {viewerChangeOrders.map((changeOrder) => {
                         const active = String(changeOrder.id) === selectedChangeOrderId;
                         return (
                           <button
                             key={changeOrder.id}
                             type="button"
-                            className={`${styles.viewerRailItem} ${active ? styles.viewerRailItemActive : ""}`}
+                            className={`${styles.viewerRailItem} ${styles.viewerHistoryItem} ${
+                              active ? `${styles.viewerRailItemActive} ${styles.viewerHistoryItemActive}` : ""
+                            }`}
                             onClick={() => {
                               hydrateEditForm(changeOrder);
                             }}
@@ -934,30 +1120,8 @@ export function ChangeOrdersConsole({
                     </div>
                     {selectedViewerChangeOrder ? (
                       <>
-                        <div className={styles.viewerMetaRow}>
-                          <span className={styles.viewerMetaLabel}>Selected CO</span>
-                          <strong>
-                            {coLabel(selectedViewerChangeOrder)}
-                          </strong>
-                        </div>
-                        <div className={styles.viewerMetaRow}>
-                          <span className={styles.viewerMetaLabel}>Supersedes</span>
-                          <strong>
-                            {selectedViewerChangeOrder.previous_change_order
-                              ? `CO record #${selectedViewerChangeOrder.previous_change_order}`
-                              : "Family root"}
-                          </strong>
-                        </div>
-                        <div className={styles.viewerMetaRow}>
-                          <span className={styles.viewerMetaLabel}>Header delta</span>
-                          <strong>{selectedViewerChangeOrder.amount_delta}</strong>
-                        </div>
-                        <div className={styles.viewerMetaRow}>
-                          <span className={styles.viewerMetaLabel}>Line delta total</span>
-                          <strong>{selectedViewerChangeOrder.line_total_delta}</strong>
-                        </div>
                         <div className={styles.quickStatusPanel}>
-                          <span className={styles.viewerMetaLabel}>Quick status update</span>
+                          <span className={estimateStyles.lifecycleFieldLabel}>Next status</span>
                           <div className={styles.quickStatusPills}>
                             {quickStatusOptions.length > 0 ? (
                               quickStatusOptions.map((status) => {
@@ -967,14 +1131,14 @@ export function ChangeOrdersConsole({
                                     key={status}
                                     type="button"
                                     className={`${styles.quickStatusButton} ${
-                                      isSelected ? styles.quickStatusButtonActive : ""
-                                    } ${
-                                      statusBadgeClass(status)
+                                      isSelected
+                                        ? `${styles.quickStatusButtonActive} ${quickStatusToneClass(status)}`
+                                        : styles.quickStatusButtonInactive
                                     }`}
                                     onClick={() => setQuickStatus(status)}
                                     aria-pressed={isSelected}
                                   >
-                                    {statusLabel(status)}
+                                    {quickStatusControlLabel(status)}
                                   </button>
                                 );
                               })
@@ -982,45 +1146,32 @@ export function ChangeOrdersConsole({
                               <p className={styles.viewerHint}>No next statuses available.</p>
                             )}
                           </div>
-                          <button
-                            type="button"
-                            className={styles.quickStatusSubmit}
-                            onClick={handleQuickUpdateStatus}
-                            disabled={!canMutateChangeOrders || !quickStatusOptions.length}
-                          >
-                            Update CO Status
-                          </button>
+                          <div className={estimateStyles.lifecycleActions}>
+                            <button
+                              type="button"
+                              onClick={handleQuickUpdateStatus}
+                              disabled={!canMutateChangeOrders || !quickStatusOptions.length}
+                            >
+                              Update CO Status
+                            </button>
+                          </div>
                         </div>
-                        <p
-                          className={`${styles.reconcilePill} ${
-                            selectedViewerChangeOrder.amount_delta !== selectedViewerChangeOrder.line_total_delta
-                              ? styles.reconcileBad
-                              : styles.reconcileGood
-                          }`}
-                        >
-                          {selectedViewerChangeOrder.amount_delta !== selectedViewerChangeOrder.line_total_delta
-                            ? "Line totals do not match header amount."
-                            : "Line totals reconcile with header amount."}
-                        </p>
-                        {selectedViewerChangeOrder.is_latest_revision ? (
-                          <button type="button" onClick={handleCloneRevision} disabled={!canMutateChangeOrders}>
-                            Clone Revision
-                          </button>
-                        ) : (
-                          <p className={styles.viewerHint}>Only latest revision can be cloned.</p>
-                        )}
                         {selectedViewerChangeOrder.line_items.length > 0 ? (
                           <div className={styles.lineTableWrap}>
                             <table className={styles.lineTable}>
+                              <caption className={styles.lineTableCaption}>
+                                Budget-line context for this revision. Money columns are USD flat amounts;
+                                schedule delta is calendar days.
+                              </caption>
                               <thead>
                                 <tr>
                                   <th>Budget line</th>
-                                  <th>Description</th>
-                                  <th>Line delta</th>
-                                  <th>Base line amount</th>
-                                  <th>Approved CO delta</th>
-                                  <th>Current working</th>
-                                  <th>Days</th>
+                                  <th>CO line note</th>
+                                  <th>CO line delta ($)</th>
+                                  <th>Original approved line item amount ($)</th>
+                                  <th>Approved CO delta ($)</th>
+                                  <th>Current working budget ($)</th>
+                                  <th>Schedule delta (days)</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -1030,10 +1181,10 @@ export function ChangeOrdersConsole({
                                       #{line.budget_line} {line.budget_line_cost_code}
                                     </td>
                                     <td>{line.description || line.budget_line_description}</td>
-                                    <td>{line.amount_delta}</td>
-                                    <td>{originalApprovedAmountForLine(String(line.budget_line))}</td>
-                                    <td>{approvedChangeOrderDeltaForLine(String(line.budget_line))}</td>
-                                    <td>{currentWorkingAmountForLine(String(line.budget_line))}</td>
+                                    <td>${line.amount_delta}</td>
+                                    <td>${originalApprovedAmountForLine(String(line.budget_line))}</td>
+                                    <td>${approvedChangeOrderDeltaForLine(String(line.budget_line))}</td>
+                                    <td>${currentWorkingAmountForLine(String(line.budget_line))}</td>
                                     <td>{line.days_delta}</td>
                                   </tr>
                                 ))}
@@ -1043,6 +1194,10 @@ export function ChangeOrdersConsole({
                         ) : (
                           <p>No line items yet on this change order.</p>
                         )}
+                        <div className={styles.viewerMetaRow}>
+                          <span className={styles.viewerMetaLabel}>Line delta total</span>
+                          <strong>${selectedViewerChangeOrder.line_total_delta}</strong>
+                        </div>
                       </>
                     ) : null}
                   </>
@@ -1077,13 +1232,25 @@ export function ChangeOrdersConsole({
             </>
           )}
         </div>
-        <button
-          type="button"
-          className={styles.primaryCreateButton}
-          onClick={handleStartNewChangeOrder}
-        >
-          Add New Change Order
-        </button>
+        <div className={styles.formToolbarActions}>
+          {selectedViewerChangeOrder?.is_latest_revision ? (
+            <button
+              type="button"
+              className={styles.cloneRevisionButton}
+              onClick={handleCloneRevision}
+              disabled={!canMutateChangeOrders}
+            >
+              Clone as New Revision
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className={styles.primaryCreateButton}
+            onClick={handleStartNewChangeOrder}
+          >
+            Add New Change Order
+          </button>
+        </div>
       </div>
 
       {!selectedChangeOrder ? (
@@ -1135,107 +1302,148 @@ export function ChangeOrdersConsole({
           </label>
         </div>
 
+        <div className={styles.coLineSectionIntro}>
+          <h3>Line Items</h3>
+          <p>
+            {selectedViewerEstimate
+              ? `Starter rows come from active budget lines linked to origin estimate #${selectedViewerEstimate.id} v${selectedViewerEstimate.version}.`
+              : "Starter rows come from active project budget lines once an origin estimate is selected."}
+          </p>
+          <p className={styles.coLineLegend}>
+            Original approved line item amount is the approved baseline for the line before
+            approved CO deltas. CO Delta is a flat USD change (not a percent). Schedule Delta is
+            calendar days.
+          </p>
+        </div>
+
         <div className={estimateStyles.lineTable}>
           <div className={styles.coLineHeader}>
             <span>Budget line</span>
-            <span>Description</span>
-            <span>Approved amount</span>
-            <span>Amount delta</span>
-            <span>Days delta</span>
+            <span>CO line note</span>
+            <span>Original approved line item amount ($)</span>
+            <span>CO delta ($)</span>
+            <span>Schedule delta (days)</span>
             <span>Actions</span>
           </div>
-          {newLineItems.map((line) => (
-            <div key={line.localId} className={styles.coLineRow}>
-              <select
-                className={estimateStyles.lineSelect}
-                value={line.budgetLineId}
-                onChange={(event) =>
-                  updateLine(setNewLineItems, line.localId, { budgetLineId: event.target.value })
-                }
-              >
-                <option value="">Select budget line</option>
-                {budgetLines.map((budgetLine) => (
-                  <option key={budgetLine.id} value={budgetLine.id}>
-                    #{budgetLine.id} {budgetLine.cost_code_code} - {budgetLine.description}
-                  </option>
-                ))}
-              </select>
-              <input
-                className={estimateStyles.lineInput}
-                value={line.description}
-                onChange={(event) =>
-                  updateLine(setNewLineItems, line.localId, { description: event.target.value })
-                }
-              />
-              <span className={styles.coReadValue}>
-                ${originalApprovedAmountForLine(line.budgetLineId)}
-              </span>
-              <input
-                className={estimateStyles.lineInput}
-                value={line.amountDelta}
-                onChange={(event) =>
-                  updateLine(setNewLineItems, line.localId, { amountDelta: event.target.value })
-                }
-                inputMode="decimal"
-              />
-              <input
-                className={estimateStyles.lineInput}
-                value={line.daysDelta}
-                onChange={(event) =>
-                  updateLine(setNewLineItems, line.localId, { daysDelta: event.target.value })
-                }
-                inputMode="numeric"
-              />
-              <button
-                type="button"
-                className={estimateStyles.smallButton}
-                onClick={() => removeLine(setNewLineItems, line.localId)}
-              >
-                Remove
-              </button>
-            </div>
-          ))}
+          {newLineItems.map((line, index) => {
+            const rowIssues = newLineValidation.issuesByLocalId.get(line.localId) ?? [];
+            return (
+              <div key={line.localId} className={styles.coLineRowGroup}>
+                <div
+                  className={`${styles.coLineRow} ${index % 2 === 1 ? styles.coLineRowAlt : ""} ${
+                    rowIssues.length ? styles.coLineRowInvalid : ""
+                  }`}
+                >
+                  <select
+                    className={estimateStyles.lineSelect}
+                    value={line.budgetLineId}
+                    onChange={(event) =>
+                      updateLine(setNewLineItems, line.localId, { budgetLineId: event.target.value })
+                    }
+                  >
+                    <option value="">Select budget line</option>
+                    {budgetLines.map((budgetLine) => (
+                      <option key={budgetLine.id} value={budgetLine.id}>
+                        #{budgetLine.id} {budgetLine.cost_code_code} - {budgetLine.description}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    className={estimateStyles.lineInput}
+                    value={line.description}
+                    placeholder="Optional CO scope note"
+                    onChange={(event) =>
+                      updateLine(setNewLineItems, line.localId, { description: event.target.value })
+                    }
+                  />
+                  <span className={styles.coReadValue}>${originalApprovedAmountForLine(line.budgetLineId)}</span>
+                  <input
+                    className={estimateStyles.lineInput}
+                    value={line.amountDelta}
+                    placeholder="0.00 (USD)"
+                    onChange={(event) =>
+                      updateLine(setNewLineItems, line.localId, { amountDelta: event.target.value })
+                    }
+                    inputMode="decimal"
+                  />
+                  <input
+                    className={estimateStyles.lineInput}
+                    value={line.daysDelta}
+                    placeholder="0 days"
+                    onChange={(event) =>
+                      updateLine(setNewLineItems, line.localId, { daysDelta: event.target.value })
+                    }
+                    inputMode="numeric"
+                  />
+                  <button
+                    type="button"
+                    className={estimateStyles.smallButton}
+                    onClick={() => removeLine(setNewLineItems, line.localId)}
+                    disabled={newLineItems.length <= 1}
+                  >
+                    Remove
+                  </button>
+                </div>
+                {rowIssues.length ? (
+                  <p className={styles.coLineIssue}>
+                    Row {index + 1}: {rowIssues.join(" ")}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
-
-        <div className={styles.coSheetFooter}>
+        <div className={styles.coLineActions}>
           <button
             type="button"
-            className={`${estimateStyles.secondaryButton} ${styles.coFooterSecondaryButton}`}
+            className={`${estimateStyles.secondaryButton} ${styles.coLineAddButton}`}
             onClick={() => addLine(setNewLineItems)}
           >
             Add Line Item
           </button>
+        </div>
+
+        <div className={styles.coSheetFooter}>
+          <div className={`${estimateStyles.summary} ${styles.coSummaryCard}`}>
+            <div className={estimateStyles.summaryRow}>
+              <span>Line delta total</span>
+              <strong>{formatMoney(newLineDeltaTotal)}</strong>
+            </div>
+            <div className={estimateStyles.summaryRow}>
+              <span>Schedule delta total (days)</span>
+              <strong>{newLineDaysTotal}</strong>
+            </div>
+            <p
+              className={`${styles.reconcilePill} ${
+                newLineValidation.issues.length ? styles.reconcileBad : styles.reconcileGood
+              }`}
+            >
+              {newLineValidation.issues.length
+                ? `Resolve ${newLineValidation.issues.length} validation issue(s) before submit.`
+                : "Totals are derived from line items."}
+            </p>
+          </div>
           <div className={styles.coSheetFooterActions}>
+            <div className={styles.coActionButtonRow}>
+              <button
+                type="submit"
+                className={`${estimateStyles.primaryButton} ${styles.coFooterPrimaryButton}`}
+                disabled={isCreateSubmitDisabled}
+              >
+                Create Change Order
+              </button>
+            </div>
             {!selectedViewerEstimateId ? (
               <p className={`${estimateStyles.inlineHint} ${styles.coFooterHint}`}>
                 Select an approved origin estimate from the history selector before creating a change
                 order.
               </p>
             ) : null}
-            <button
-              type="submit"
-              className={`${estimateStyles.primaryButton} ${styles.coFooterPrimaryButton}`}
-              disabled={!canMutateChangeOrders || !selectedProjectId || !selectedViewerEstimateId}
-            >
-              Create Change Order
-            </button>
-            <div className={estimateStyles.summary}>
-              <div className={estimateStyles.summaryRow}>
-                <span>Header delta</span>
-                <strong>{formatMoney(newHeaderDelta)}</strong>
-              </div>
-              <div className={estimateStyles.summaryRow}>
-                <span>Line delta total</span>
-                <strong>{formatMoney(newLineDeltaTotal)}</strong>
-              </div>
-              <div className={estimateStyles.summaryRow}>
-                <span>Header days delta</span>
-                <strong>{newLineDaysTotal}</strong>
-              </div>
-              <p className={`${styles.reconcilePill} ${styles.reconcileGood}`}>
-                Header totals are derived from line items.
+            {selectedViewerEstimateId && newLineValidation.issues.length ? (
+              <p className={`${estimateStyles.inlineHint} ${styles.coFooterHint} ${styles.coFooterErrorHint}`}>
+                Line-level issues are highlighted inline. Fix them before creating this draft.
               </p>
-            </div>
+            ) : null}
           </div>
         </div>
         </form>
@@ -1277,18 +1485,16 @@ export function ChangeOrdersConsole({
             />
           </label>
           <label className={`${estimateStyles.inlineField} ${styles.coMetaField}`}>
-            Status
-            <select
-              className={`${estimateStyles.fieldInput} ${styles.coMetaInput}`}
-              value={editStatus}
-              onChange={(event) => setEditStatus(event.target.value)}
-            >
-              {editStatusOptions.map((status) => (
-                <option key={status} value={status}>
-                  {statusLabel(status)}
-                </option>
-              ))}
-            </select>
+            Origin estimate
+            <span className={estimateStyles.staticFieldValue}>
+              {selectedChangeOrder?.origin_estimate
+                ? `#${selectedChangeOrder.origin_estimate}${
+                    selectedChangeOrder.origin_estimate_version
+                      ? ` v${selectedChangeOrder.origin_estimate_version}`
+                      : ""
+                  }`
+                : "No origin estimate linked"}
+            </span>
           </label>
           <label className={`${estimateStyles.inlineField} ${styles.coMetaField} ${styles.coFieldWide}`}>
             Reason
@@ -1301,101 +1507,141 @@ export function ChangeOrdersConsole({
           </label>
         </div>
 
+        <div className={styles.coLineSectionIntro}>
+          <h3>Line Items</h3>
+          <p>
+            These rows are budget-line anchored. Update flat USD deltas and schedule days for this
+            revision.
+          </p>
+          <p className={styles.coLineLegend}>
+            Original approved line item amount is the approved baseline for the line before
+            approved CO deltas. CO Delta is a flat USD change (not a percent). Schedule Delta is
+            calendar days.
+          </p>
+        </div>
+
         <div className={estimateStyles.lineTable}>
           <div className={styles.coLineHeader}>
             <span>Budget line</span>
-            <span>Description</span>
-            <span>Approved amount</span>
-            <span>Amount delta</span>
-            <span>Days delta</span>
+            <span>CO line note</span>
+            <span>Original approved line item amount ($)</span>
+            <span>CO delta ($)</span>
+            <span>Schedule delta (days)</span>
             <span>Actions</span>
           </div>
-          {editLineItems.map((line) => (
-            <div key={line.localId} className={styles.coLineRow}>
-              <select
-                className={estimateStyles.lineSelect}
-                value={line.budgetLineId}
-                onChange={(event) =>
-                  updateLine(setEditLineItems, line.localId, { budgetLineId: event.target.value })
-                }
-              >
-                <option value="">Select budget line</option>
-                {budgetLines.map((budgetLine) => (
-                  <option key={budgetLine.id} value={budgetLine.id}>
-                    #{budgetLine.id} {budgetLine.cost_code_code} - {budgetLine.description}
-                  </option>
-                ))}
-              </select>
-              <input
-                className={estimateStyles.lineInput}
-                value={line.description}
-                onChange={(event) =>
-                  updateLine(setEditLineItems, line.localId, { description: event.target.value })
-                }
-              />
-              <span className={styles.coReadValue}>
-                ${originalApprovedAmountForLine(line.budgetLineId)}
-              </span>
-              <input
-                className={estimateStyles.lineInput}
-                value={line.amountDelta}
-                onChange={(event) =>
-                  updateLine(setEditLineItems, line.localId, { amountDelta: event.target.value })
-                }
-                inputMode="decimal"
-              />
-              <input
-                className={estimateStyles.lineInput}
-                value={line.daysDelta}
-                onChange={(event) =>
-                  updateLine(setEditLineItems, line.localId, { daysDelta: event.target.value })
-                }
-                inputMode="numeric"
-              />
-              <button
-                type="button"
-                className={estimateStyles.smallButton}
-                onClick={() => removeLine(setEditLineItems, line.localId)}
-              >
-                Remove
-              </button>
-            </div>
-          ))}
+          {editLineItems.map((line, index) => {
+            const rowIssues = editLineValidation.issuesByLocalId.get(line.localId) ?? [];
+            return (
+              <div key={line.localId} className={styles.coLineRowGroup}>
+                <div
+                  className={`${styles.coLineRow} ${index % 2 === 1 ? styles.coLineRowAlt : ""} ${
+                    rowIssues.length ? styles.coLineRowInvalid : ""
+                  }`}
+                >
+                  <select
+                    className={estimateStyles.lineSelect}
+                    value={line.budgetLineId}
+                    onChange={(event) =>
+                      updateLine(setEditLineItems, line.localId, { budgetLineId: event.target.value })
+                    }
+                  >
+                    <option value="">Select budget line</option>
+                    {budgetLines.map((budgetLine) => (
+                      <option key={budgetLine.id} value={budgetLine.id}>
+                        #{budgetLine.id} {budgetLine.cost_code_code} - {budgetLine.description}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    className={estimateStyles.lineInput}
+                    value={line.description}
+                    placeholder="Optional CO scope note"
+                    onChange={(event) =>
+                      updateLine(setEditLineItems, line.localId, { description: event.target.value })
+                    }
+                  />
+                  <span className={styles.coReadValue}>${originalApprovedAmountForLine(line.budgetLineId)}</span>
+                  <input
+                    className={estimateStyles.lineInput}
+                    value={line.amountDelta}
+                    placeholder="0.00 (USD)"
+                    onChange={(event) =>
+                      updateLine(setEditLineItems, line.localId, { amountDelta: event.target.value })
+                    }
+                    inputMode="decimal"
+                  />
+                  <input
+                    className={estimateStyles.lineInput}
+                    value={line.daysDelta}
+                    placeholder="0 days"
+                    onChange={(event) =>
+                      updateLine(setEditLineItems, line.localId, { daysDelta: event.target.value })
+                    }
+                    inputMode="numeric"
+                  />
+                  <button
+                    type="button"
+                    className={estimateStyles.smallButton}
+                    onClick={() => removeLine(setEditLineItems, line.localId)}
+                    disabled={editLineItems.length <= 1}
+                  >
+                    Remove
+                  </button>
+                </div>
+                {rowIssues.length ? (
+                  <p className={styles.coLineIssue}>
+                    Row {index + 1}: {rowIssues.join(" ")}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
-
-        <div className={styles.coSheetFooter}>
+        <div className={styles.coLineActions}>
           <button
             type="button"
-            className={`${estimateStyles.secondaryButton} ${styles.coFooterSecondaryButton}`}
+            className={`${estimateStyles.secondaryButton} ${styles.coLineAddButton}`}
             onClick={() => addLine(setEditLineItems)}
           >
             Add Line Item
           </button>
-          <div className={styles.coSheetFooterActions}>
-            <button
-              type="submit"
-              className={`${estimateStyles.primaryButton} ${styles.coFooterPrimaryButton}`}
-              disabled={!canMutateChangeOrders || !selectedChangeOrderId}
-            >
-              Save Change Order
-            </button>
-            <div className={estimateStyles.summary}>
-              <div className={estimateStyles.summaryRow}>
-                <span>Header delta</span>
-                <strong>{formatMoney(editHeaderDelta)}</strong>
-              </div>
-              <div className={estimateStyles.summaryRow}>
-                <span>Line delta total</span>
-                <strong>{formatMoney(editLineDeltaTotal)}</strong>
-              </div>
-              <div className={estimateStyles.summaryRow}>
-                <span>Header days delta</span>
-                <strong>{editLineDaysTotal}</strong>
-              </div>
-              <p className={`${styles.reconcilePill} ${styles.reconcileGood}`}>
-                Header totals are derived from line items.
-              </p>
+        </div>
+
+        <div className={styles.coSheetFooter}>
+          <div className={`${estimateStyles.summary} ${styles.coSummaryCard}`}>
+            <div className={estimateStyles.summaryRow}>
+              <span>Line delta total</span>
+              <strong>{formatMoney(editLineDeltaTotal)}</strong>
             </div>
+            <div className={estimateStyles.summaryRow}>
+              <span>Schedule delta total (days)</span>
+              <strong>{editLineDaysTotal}</strong>
+            </div>
+            <p
+              className={`${styles.reconcilePill} ${
+                editLineValidation.issues.length ? styles.reconcileBad : styles.reconcileGood
+              }`}
+            >
+              {editLineValidation.issues.length
+                ? `Resolve ${editLineValidation.issues.length} validation issue(s) before save.`
+                : "Totals are derived from line items."}
+            </p>
+          </div>
+          <div className={styles.coSheetFooterActions}>
+            <div className={styles.coActionButtonRow}>
+              <button
+                type="submit"
+                className={`${estimateStyles.primaryButton} ${styles.coFooterPrimaryButton}`}
+                disabled={isEditSubmitDisabled}
+              >
+                Save Change Order
+              </button>
+            </div>
+            {editLineValidation.issues.length ? (
+              <p className={`${estimateStyles.inlineHint} ${styles.coFooterHint} ${styles.coFooterErrorHint}`}>
+                Line-level issues are highlighted inline. Fix them before saving this revision.
+              </p>
+            ) : null}
           </div>
         </div>
         </form>

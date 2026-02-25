@@ -94,6 +94,14 @@
   margin: 2px 0 10px;
 }
 
+.formToolbarActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .formContext {
   display: grid;
   gap: 2px;
@@ -159,11 +167,34 @@
 .viewerGrid {
   display: grid;
   gap: 12px;
+  align-items: start;
 }
 
 .viewerRail {
   display: grid;
   gap: 8px;
+  align-content: start;
+  grid-auto-rows: min-content;
+}
+
+.viewerRailHeader {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 2px;
+}
+
+.viewerRailHeading {
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.viewerRailSubheading {
+  font-size: 0.78rem;
+  color: #475569;
+  line-height: 1.35;
 }
 
 .viewerRailItem {
@@ -174,6 +205,7 @@
   text-align: left;
   display: grid;
   gap: 6px;
+  align-content: start;
   cursor: pointer;
   transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
 }
@@ -196,6 +228,19 @@
   line-height: 1.25;
 }
 
+.viewerRailVersion {
+  margin-left: 6px;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.viewerRailSubtext {
+  font-size: 0.8rem;
+  color: #475569;
+  line-height: 1.35;
+}
+
 .viewerDetail {
   border: 1px solid #c9d8ec;
   border-radius: 12px;
@@ -203,6 +248,16 @@
   padding: 12px;
   display: grid;
   gap: 9px;
+  align-content: start;
+}
+
+.viewerSectionHeading {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #1e3a8a;
+  font-weight: 700;
 }
 
 .viewerMetaRow {
@@ -226,19 +281,30 @@
   color: #64748b;
 }
 
-.estimateOriginBadge {
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #1e3a8a;
-  font-weight: 700;
+.viewerHistoryRail {
+  padding: 8px;
+  border: 1px solid #d6e1ef;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.viewerHistoryItem {
+  border-color: #d5dce8;
+  background: #ffffff;
+}
+
+.viewerHistoryItemActive {
+  border-color: #1d4ed8;
+  background:
+    linear-gradient(180deg, rgba(219, 234, 254, 0.82), rgba(219, 234, 254, 0.45)),
+    #ffffff;
+  box-shadow:
+    0 0 0 2px rgba(37, 99, 235, 0.22),
+    inset 3px 0 0 #2563eb;
 }
 
 .quickStatusPanel {
-  border: 1px solid #d5deeb;
-  border-radius: 10px;
-  padding: 10px;
-  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  margin-top: 2px;
   display: grid;
   gap: 8px;
 }
@@ -246,39 +312,79 @@
 .quickStatusPills {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
 }
 
 .quickStatusButton {
-  border: 1px solid #cbd5e1;
-  border-radius: 999px;
-  background: #ffffff;
-  color: #334155;
-  padding: 5px 10px;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid #cbd5f5;
+  border-radius: 8px;
+  min-width: 120px;
+  padding: 10px 14px;
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: 700;
   cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  text-align: center;
+}
+
+.quickStatusButtonInactive {
+  background: #1e293b;
+  border-color: #334155;
+  color: #bfdbfe;
 }
 
 .quickStatusButtonActive {
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.28);
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.14);
+  transform: translateY(-1px);
 }
 
-.quickStatusSubmit {
+.quickStatusButtonActive.quickStatusDraft {
+  background: #2563eb;
+  border-color: #1d4ed8;
+  color: #eff6ff;
+}
+
+.quickStatusButtonActive.quickStatusPendingApproval {
+  background: #d97706;
+  border-color: #b45309;
+  color: #fffbeb;
+}
+
+.quickStatusButtonActive.quickStatusApproved {
+  background: #16a34a;
+  border-color: #15803d;
+  color: #f0fdf4;
+}
+
+.quickStatusButtonActive.quickStatusRejected {
+  background: #dc2626;
+  border-color: #b91c1c;
+  color: #fee2e2;
+}
+
+.quickStatusButtonActive.quickStatusVoid {
+  background: #6b7280;
+  border-color: #4b5563;
+  color: #f9fafb;
+}
+
+.cloneRevisionButton {
   width: fit-content;
   border: 1px solid #1d4ed8;
   border-radius: 10px;
-  background: #1d4ed8;
-  color: #ffffff;
+  background: #eff6ff;
+  color: #1e40af;
   padding: 7px 11px;
   font-size: 0.84rem;
   font-weight: 700;
   cursor: pointer;
 }
 
-.quickStatusSubmit:disabled {
+.cloneRevisionButton:disabled {
   opacity: 0.6;
   cursor: default;
 }
@@ -318,36 +424,6 @@
   color: #374151;
 }
 
-.quickStatusButton.statusDraft {
-  background: #dbeafe;
-  border-color: #93c5fd;
-  color: #1e40af;
-}
-
-.quickStatusButton.statusPendingApproval {
-  background: #fef3c7;
-  border-color: #fcd34d;
-  color: #92400e;
-}
-
-.quickStatusButton.statusApproved {
-  background: #dcfce7;
-  border-color: #86efac;
-  color: #166534;
-}
-
-.quickStatusButton.statusRejected {
-  background: #fecaca;
-  border-color: #fca5a5;
-  color: #991b1b;
-}
-
-.quickStatusButton.statusVoid {
-  background: #e5e7eb;
-  border-color: #cbd5e1;
-  color: #374151;
-}
-
 .reconcilePill {
   margin: 4px 0 0;
   font-size: 0.78rem;
@@ -376,6 +452,14 @@
   width: 100%;
   border-collapse: collapse;
   min-width: 580px;
+}
+
+.lineTableCaption {
+  caption-side: top;
+  text-align: left;
+  padding: 8px;
+  font-size: 0.8rem;
+  color: #475569;
 }
 
 .lineTable th {
@@ -424,6 +508,29 @@
   grid-column: 1 / -1;
 }
 
+.coLineSectionIntro {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0 6px;
+}
+
+.coLineSectionIntro h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+.coLineSectionIntro p {
+  margin: 0;
+  font-size: 0.83rem;
+  color: #475569;
+}
+
+.coLineLegend {
+  font-size: 0.79rem;
+  color: #334155;
+}
+
 .coLineHeader {
   display: grid;
   grid-template-columns: minmax(190px, 1.2fr) minmax(220px, 1.4fr) 150px 140px 120px 90px;
@@ -445,13 +552,29 @@
   gap: 8px;
   align-items: center;
   padding: 9px 10px;
-  border-top: 1px solid #dbe5f3;
   background: #ffffff;
   min-width: 920px;
 }
 
-.coLineRow:nth-child(even) {
+.coLineRowGroup {
+  border-top: 1px solid #dbe5f3;
+}
+
+.coLineRowAlt {
   background: #f7faff;
+}
+
+.coLineRowInvalid {
+  border-left: 3px solid #dc2626;
+}
+
+.coLineIssue {
+  margin: 0;
+  padding: 0 10px 9px;
+  color: #991b1b;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  background: #fff7f7;
 }
 
 .coReadValue {
@@ -467,35 +590,72 @@
   font-variant-numeric: tabular-nums;
 }
 
-.coSheetFooter {
+.coLineActions {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-start;
+  margin-top: 8px;
+}
+
+.coLineAddButton {
+  border-radius: 10px;
+}
+
+.coSheetFooter {
+  display: grid;
+  grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
+  grid-template-areas: "summary actions";
+  align-items: end;
+  gap: 14px;
+  border-top: 1px solid #dbe5f3;
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+.coSummaryCard {
+  grid-area: summary;
+  height: 100%;
+  width: 100%;
 }
 
 .coSheetFooterActions {
+  grid-area: actions;
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: flex-end;
-  flex-wrap: wrap;
+  min-width: 0;
   gap: 12px;
 }
 
+.coActionButtonRow {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .coFooterHint {
-  flex-basis: 100%;
   margin: 0;
-  text-align: right;
+  text-align: left;
+}
+
+.coFooterErrorHint {
+  color: #991b1b;
 }
 
 .coSheetFooter button.coFooterSecondaryButton,
 .coSheetFooter button.coFooterPrimaryButton {
   width: fit-content;
+  min-width: 150px;
   min-height: 0;
   padding: 8px 12px;
   font-size: 0.9rem;
   font-weight: 700;
   line-height: 1.2;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .coSheetFooter button.coFooterSecondaryButton {
@@ -518,13 +678,21 @@
 
 @media (max-width: 900px) {
   .coSheetFooter {
+    grid-template-areas:
+      "summary"
+      "actions";
     align-items: stretch;
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
 
   .coSheetFooterActions {
     align-items: stretch;
     justify-content: flex-start;
+  }
+
+  .coActionButtonRow {
+    justify-content: stretch;
+    flex-direction: column;
   }
 
   .coSheetFooter button.coFooterPrimaryButton,
@@ -553,6 +721,16 @@
   .formToolbar {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .formToolbarActions {
+    justify-content: stretch;
+    flex-direction: column;
+  }
+
+  .formToolbarActions .primaryCreateButton,
+  .formToolbarActions .cloneRevisionButton {
+    width: 100%;
   }
 
   .primaryCreateButton {
@@ -647,6 +825,10 @@
   border-color: #334155;
 }
 
+:global(html[data-theme="dark"]) .viewerSectionHeading {
+  color: #93c5fd;
+}
+
 :global(html[data-theme="dark"]) .viewerRailItem:hover {
   border-color: #3b82f6;
   box-shadow: 0 8px 16px rgba(2, 6, 23, 0.5);
@@ -662,6 +844,41 @@
   color: #f8fafc;
 }
 
+:global(html[data-theme="dark"]) .viewerRailHeading {
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .viewerRailSubheading {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .viewerRailVersion {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .viewerRailSubtext {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .viewerHistoryRail {
+  background: #0b1220;
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .viewerHistoryItem {
+  border-color: #475569;
+}
+
+:global(html[data-theme="dark"]) .viewerHistoryItemActive {
+  border-color: #60a5fa;
+  background:
+    linear-gradient(180deg, rgba(30, 58, 138, 0.38), rgba(30, 58, 138, 0.14)),
+    #0b1220;
+  box-shadow:
+    0 0 0 2px rgba(96, 165, 250, 0.26),
+    inset 3px 0 0 #60a5fa;
+}
+
 :global(html[data-theme="dark"]) .viewerMetaLabel {
   color: #cbd5e1;
 }
@@ -670,53 +887,65 @@
   color: #94a3b8;
 }
 
-:global(html[data-theme="dark"]) .estimateOriginBadge {
-  color: #93c5fd;
+:global(html[data-theme="dark"]) .coLineSectionIntro h3 {
+  color: #f8fafc;
 }
 
-:global(html[data-theme="dark"]) .quickStatusPanel {
-  background: linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .quickStatusButton {
-  background: #111827;
-  border-color: #334155;
+:global(html[data-theme="dark"]) .coLineSectionIntro p {
   color: #cbd5e1;
 }
 
-:global(html[data-theme="dark"]) .quickStatusButton.statusDraft {
-  background: #1e3a8a;
+:global(html[data-theme="dark"]) .coLineLegend {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .quickStatusPanel {
+  margin-top: 2px;
+}
+
+:global(html[data-theme="dark"]) .quickStatusButton {
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .quickStatusButtonInactive {
+  background: #0b1220;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .quickStatusButtonActive.quickStatusDraft {
+  background: #1d4ed8;
   border-color: #3b82f6;
   color: #dbeafe;
 }
 
-:global(html[data-theme="dark"]) .quickStatusButton.statusPendingApproval {
-  background: #78350f;
-  border-color: #d97706;
-  color: #fde68a;
+:global(html[data-theme="dark"]) .quickStatusButtonActive.quickStatusPendingApproval {
+  background: #b45309;
+  border-color: #f59e0b;
+  color: #fef3c7;
 }
 
-:global(html[data-theme="dark"]) .quickStatusButton.statusApproved {
-  background: #14532d;
+:global(html[data-theme="dark"]) .quickStatusButtonActive.quickStatusApproved {
+  background: #15803d;
   border-color: #22c55e;
-  color: #bbf7d0;
+  color: #dcfce7;
 }
 
-:global(html[data-theme="dark"]) .quickStatusButton.statusRejected {
-  background: #7f1d1d;
+:global(html[data-theme="dark"]) .quickStatusButtonActive.quickStatusRejected {
+  background: #991b1b;
   border-color: #ef4444;
-  color: #fecaca;
+  color: #fee2e2;
 }
 
-:global(html[data-theme="dark"]) .quickStatusButton.statusVoid {
-  background: #374151;
-  border-color: #6b7280;
-  color: #e5e7eb;
+:global(html[data-theme="dark"]) .quickStatusButtonActive.quickStatusVoid {
+  background: #4b5563;
+  border-color: #9ca3af;
+  color: #f3f4f6;
 }
 
-:global(html[data-theme="dark"]) .quickStatusButtonActive {
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.32);
+:global(html[data-theme="dark"]) .cloneRevisionButton {
+  border-color: #3b82f6;
+  background: #0b1220;
+  color: #bfdbfe;
 }
 
 :global(html[data-theme="dark"]) .lineTableWrap {
@@ -733,10 +962,35 @@
   border-top-color: #334155;
 }
 
+:global(html[data-theme="dark"]) .lineTableCaption {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .coLineRowGroup {
+  border-top-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .coLineRowAlt {
+  background: #1a2334;
+}
+
+:global(html[data-theme="dark"]) .coLineRowInvalid {
+  border-left-color: #f87171;
+}
+
+:global(html[data-theme="dark"]) .coLineIssue {
+  background: #2a1216;
+  color: #fecaca;
+}
+
 :global(html[data-theme="dark"]) .createSheet,
 :global(html[data-theme="dark"]) .editSheet {
   border-color: #334155;
   box-shadow: 0 14px 26px rgba(2, 6, 23, 0.35);
+}
+
+:global(html[data-theme="dark"]) .coFooterErrorHint {
+  color: #fecaca;
 }
 
 :global(html[data-theme="dark"]) .coLineHeader {
@@ -745,11 +999,10 @@
 }
 
 :global(html[data-theme="dark"]) .coLineRow {
-  border-top-color: #334155;
   background: #0f172a;
 }
 
-:global(html[data-theme="dark"]) .coLineRow:nth-child(even) {
+:global(html[data-theme="dark"]) .coLineRowAlt {
   background: #131d31;
 }
 
