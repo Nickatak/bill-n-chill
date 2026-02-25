@@ -698,13 +698,15 @@ export function ProjectsConsole() {
                   <div className={styles.branchGroup}>
                     <span className={styles.branchSubLabel}>Receivables</span>
                     <div className={styles.node}>
-                      <Link href="/invoices">Invoices</Link>
+                      <Link href="/invoices">Invoices (WIP)</Link>
                       <span className={styles.nodeCount}>
                         {summaryCounts ? summaryCounts.invoices : "--"}
                       </span>
                     </div>
                     <div className={styles.node}>
-                      <Link href={`/financials-auditing?project=${selectedProject.id}`}>Payments In (AR)</Link>
+                      <Link href={`/financials-auditing?project=${selectedProject.id}`}>
+                        Payments In (AR) (WIP)
+                      </Link>
                       <span className={styles.nodeCount}>
                         {summaryCounts ? summaryCounts.arPayments : "--"}
                       </span>
@@ -713,16 +715,18 @@ export function ProjectsConsole() {
                   <div className={styles.branchGroup}>
                     <span className={styles.branchSubLabel}>Payables</span>
                     <div className={styles.node}>
-                      <Link href={`/projects/${selectedProject.id}/vendor-bills`}>Vendor Bills</Link>
+                      <Link href={`/projects/${selectedProject.id}/vendor-bills`}>Vendor Bills (WIP)</Link>
                       <span className={styles.nodeCount}>
                         {summaryCounts ? summaryCounts.vendorBills : "--"}
                       </span>
                     </div>
                     <div className={styles.node}>
-                      <Link href={`/projects/${selectedProject.id}/expenses`}>Expenses</Link>
+                      <Link href={`/projects/${selectedProject.id}/expenses`}>Expenses (WIP)</Link>
                     </div>
                     <div className={styles.node}>
-                      <Link href={`/financials-auditing?project=${selectedProject.id}`}>Payments Out (AP)</Link>
+                      <Link href={`/financials-auditing?project=${selectedProject.id}`}>
+                        Payments Out (AP) (WIP)
+                      </Link>
                       <span className={styles.nodeCount}>
                         {summaryCounts ? summaryCounts.apPayments : "--"}
                       </span>
