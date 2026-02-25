@@ -21,7 +21,6 @@ import {
   EstimateLineInput,
   EstimateLineItemRecord,
   EstimatePolicyContract,
-  EstimateRelatedChangeOrderRecord,
   EstimateRecord,
   EstimateStatusEventRecord,
   ProjectRecord,
@@ -145,8 +144,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const [selectedStatus, setSelectedStatus] = useState<EstimateStatusValue>("draft");
   const [statusNote, setStatusNote] = useState("");
   const [statusEvents, setStatusEvents] = useState<EstimateStatusEventRecord[]>([]);
-  const [projectChangeOrders, setProjectChangeOrders] = useState<EstimateRelatedChangeOrderRecord[]>([]);
-
   const [estimateTitle, setEstimateTitle] = useState("Initial Estimate");
   const [taxPercent, setTaxPercent] = useState("0");
   const [lineItems, setLineItems] = useState<EstimateLineInput[]>([emptyLine(1)]);
@@ -265,10 +262,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   function quickActionTitleForStatus(status: string): string {
     const kind = quickActionKindForStatus(status);
     if (kind === "change_order") {
-      return "Start change-order workflow from this estimate";
+      return "Open linked change orders for this estimate";
     }
     if (kind === "revision") {
-      return "Create revision from this estimate";
+      return "Duplicate this estimate as a new revision";
     }
     return "";
   }
@@ -653,27 +650,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     token,
   ]);
 
-  const loadProjectChangeOrders = useCallback(async () => {
-    const projectId = Number(selectedProjectId);
-    if (!projectId) {
-      setProjectChangeOrders([]);
-      return;
-    }
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/change-orders/`, {
-        headers: buildAuthHeaders(token),
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setProjectChangeOrders([]);
-        return;
-      }
-      setProjectChangeOrders((payload.data as EstimateRelatedChangeOrderRecord[]) ?? []);
-    } catch {
-      setProjectChangeOrders([]);
-    }
-  }, [normalizedBaseUrl, selectedProjectId, token]);
-
   useEffect(() => {
     if (!token) {
       return;
@@ -694,13 +670,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     }
     void loadEstimates();
   }, [loadEstimates, selectedProjectId, token]);
-
-  useEffect(() => {
-    if (!token || !selectedProjectId) {
-      return;
-    }
-    void loadProjectChangeOrders();
-  }, [loadProjectChangeOrders, selectedProjectId, token]);
 
   useEffect(() => {
     if (!projects.length || !scopedProjectId) {
@@ -1178,12 +1147,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                     selectedInFamily && String(selectedInFamily.id) !== String(latest.id);
                   const isLatestSelected = String(latest.id) === selectedEstimateId;
                   const isHistoryOpen = openFamilyHistory.has(family.title);
-                  const relationEstimateId = selectedInFamily?.id ?? latest.id;
                   const quickActionKind = quickActionKindForStatus(latest.status);
                   const quickActionTitle = quickActionTitleForStatus(latest.status);
-                  const relatedChangeOrders = projectChangeOrders.filter(
-                    (changeOrder) => changeOrder.origin_estimate === relationEstimateId,
-                  );
                   const latestTotal = formatMoney(toNumber(latest.grand_total || "0"));
                   return (
                     <div
@@ -1194,15 +1159,25 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                     >
                       <div className={styles.familyRow}>
                         <div className={styles.versionCardWrap}>
-                          {quickActionKind ? (
+                          {quickActionKind === "change_order" && selectedProjectId ? (
+                            <Link
+                              href={`/projects/${selectedProjectId}/change-orders?origin_estimate=${latest.id}`}
+                              className={styles.familyActionLink}
+                              aria-label={`${quickActionTitle} (estimate #${latest.id})`}
+                              title={quickActionTitle}
+                            >
+                              To CO&apos;s <span aria-hidden="true">↗</span>
+                            </Link>
+                          ) : null}
+                          {quickActionKind === "revision" ? (
                             <button
                               type="button"
-                              className={styles.coStartIconLink}
+                              className={styles.familyActionButton}
                               aria-label={`${quickActionTitle} (estimate #${latest.id})`}
                               title={quickActionTitle}
                               onClick={() => void handleFamilyCardQuickAction(latest)}
                             >
-                              +
+                              Duplicate
                             </button>
                           ) : null}
                           {latest.public_ref ? (
@@ -1298,23 +1273,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                         {isViewingHistory ? (
                           <span className={styles.historyNotice}>
                             Viewing v{selectedInFamily?.version}
-                          </span>
-                        ) : null}
-                        {relatedChangeOrders.length > 0 ? (
-                          <span className={styles.relatedChangeOrders}>
-                            CO refs:{" "}
-                            {relatedChangeOrders.slice(0, 3).map((changeOrder, index) => (
-                              <span key={changeOrder.id}>
-                                {index > 0 ? ", " : ""}
-                                <Link
-                                  href={`/projects/${selectedProjectId}/change-orders?origin_estimate=${relationEstimateId}`}
-                                  className={styles.relatedChangeOrdersLink}
-                                >
-                                  CO-{changeOrder.number} v{changeOrder.revision_number}
-                                </Link>
-                              </span>
-                            ))}
-                            {relatedChangeOrders.length > 3 ? ` +${relatedChangeOrders.length - 3} more` : ""}
                           </span>
                         ) : null}
                       </div>

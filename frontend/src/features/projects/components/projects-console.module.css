@@ -691,6 +691,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+.metricsDivider {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid #e2e8f0;
+  margin: 2px 0;
+}
+
 .metricHint {
   margin: 0;
   font-size: 0.8rem;
@@ -934,4 +941,8 @@
 :global(html[data-theme="dark"]) .metricsPanel {
   background: #0f172a;
   border-color: #1f2937;
+}
+
+:global(html[data-theme="dark"]) .metricsDivider {
+  border-top-color: #334155;
 }

@@ -46,6 +46,8 @@ export function ProjectsConsole() {
     sent: number;
     accepted: number;
   } | null>(null);
+  const [acceptedEstimateTotal, setAcceptedEstimateTotal] = useState("--");
+  const [acceptedChangeOrderDeltaTotal, setAcceptedChangeOrderDeltaTotal] = useState("--");
   const [isProjectProfileOpen, setIsProjectProfileOpen] = useState(false);
 
   const [projectName, setProjectName] = useState("");
@@ -114,14 +116,33 @@ export function ProjectsConsole() {
     : null;
   const contractOriginalDisplay =
     summary?.contract_value_original ?? selectedProject?.contract_value_original ?? "--";
-  const contractCurrentDisplay =
-    summary?.contract_value_current ?? selectedProject?.contract_value_current ?? "--";
   const arOutstandingDisplay = summary?.ar_outstanding ?? "--";
   const apOutstandingDisplay = summary?.ap_outstanding ?? "--";
   const invoicedDisplay = summary?.invoiced_to_date ?? "--";
   const paidDisplay = summary?.paid_to_date ?? "--";
   const inboundCreditDisplay = summary?.inbound_unapplied_credit ?? "--";
   const outboundCreditDisplay = summary?.outbound_unapplied_credit ?? "--";
+
+  function parseMoneyValue(value: unknown): number {
+    if (typeof value === "number") {
+      return Number.isFinite(value) ? value : 0;
+    }
+    if (typeof value !== "string") {
+      return 0;
+    }
+    const normalized = value.replace(/[^0-9.-]/g, "");
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function formatMoneyValue(value: number): string {
+    return value.toLocaleString("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
 
   function formatCustomerName(project: ProjectRecord): string {
     return project.customer_display_name || `Customer #${project.customer}`;
@@ -266,10 +287,11 @@ export function ProjectsConsole() {
         setEstimateStatusCounts(null);
         return;
       }
-      const rows = (payload.data as Array<{ status?: string }>) ?? [];
+      const rows = (payload.data as Array<{ status?: string; grand_total?: string | number }>) ?? [];
       let draft = 0;
       let sent = 0;
       let approved = 0;
+      let acceptedTotal = 0;
       for (const estimate of rows) {
         if (estimate.status === "draft") {
           draft += 1;
@@ -277,11 +299,14 @@ export function ProjectsConsole() {
           sent += 1;
         } else if (estimate.status === "approved" || estimate.status === "accepted") {
           approved += 1;
+          acceptedTotal += parseMoneyValue(estimate.grand_total);
         }
       }
       setEstimateStatusCounts({ draft, sent, approved });
+      setAcceptedEstimateTotal(formatMoneyValue(acceptedTotal));
     } catch {
       setEstimateStatusCounts(null);
+      setAcceptedEstimateTotal("--");
     }
   }
 
@@ -295,10 +320,11 @@ export function ProjectsConsole() {
         setChangeOrderStatusCounts(null);
         return;
       }
-      const rows = (payload.data as Array<{ status?: string }>) ?? [];
+      const rows = (payload.data as Array<{ status?: string; amount_delta?: string | number }>) ?? [];
       let draft = 0;
       let sent = 0;
       let accepted = 0;
+      let acceptedDelta = 0;
       for (const changeOrder of rows) {
         if (changeOrder.status === "draft") {
           draft += 1;
@@ -306,11 +332,14 @@ export function ProjectsConsole() {
           sent += 1;
         } else if (changeOrder.status === "accepted" || changeOrder.status === "approved") {
           accepted += 1;
+          acceptedDelta += parseMoneyValue(changeOrder.amount_delta);
         }
       }
       setChangeOrderStatusCounts({ draft, sent, accepted });
+      setAcceptedChangeOrderDeltaTotal(formatMoneyValue(acceptedDelta));
     } catch {
       setChangeOrderStatusCounts(null);
+      setAcceptedChangeOrderDeltaTotal("--");
     }
   }
 
@@ -367,6 +396,8 @@ export function ProjectsConsole() {
     setSummary(null);
     setEstimateStatusCounts(null);
     setChangeOrderStatusCounts(null);
+    setAcceptedEstimateTotal("--");
+    setAcceptedChangeOrderDeltaTotal("--");
   }, [selectedProjectId, statusFilteredProjects]);
 
   useEffect(() => {
@@ -394,6 +425,8 @@ export function ProjectsConsole() {
     setSummary(null);
     setEstimateStatusCounts(null);
     setChangeOrderStatusCounts(null);
+    setAcceptedEstimateTotal("--");
+    setAcceptedChangeOrderDeltaTotal("--");
     hydrateForm(project);
   }
 
@@ -437,41 +470,6 @@ export function ProjectsConsole() {
       setSuccessStatusMessage(`Project #${updated.id} saved.`);
     } catch {
       setErrorStatusMessage("Could not reach project detail endpoint.");
-    }
-  }
-
-  async function downloadAccountingExport() {
-    const projectId = Number(selectedProjectId);
-    if (!projectId) {
-      setErrorStatusMessage("Select a project first.");
-      return;
-    }
-
-    setNeutralStatusMessage("Downloading accounting export...");
-    try {
-      const response = await fetch(
-        `${normalizedBaseUrl}/projects/${projectId}/accounting-export/?export_format=csv`,
-        {
-          headers: buildAuthHeaders(token),
-        },
-      );
-      if (!response.ok) {
-        setErrorStatusMessage("Could not download accounting export.");
-        return;
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `project-${projectId}-accounting-export.csv`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      window.URL.revokeObjectURL(url);
-      setSuccessStatusMessage("Accounting export downloaded.");
-    } catch {
-      setErrorStatusMessage("Could not reach accounting export endpoint.");
     }
   }
 
@@ -625,12 +623,9 @@ export function ProjectsConsole() {
               <p>Workflow map: scope control first, then billing execution.</p>
             </div>
             <div className={styles.overviewActions}>
-              <button type="button" onClick={loadFinancialSummary}>
-                {summary ? "Refresh Summary" : "Load Summary"}
-              </button>
-              <button type="button" onClick={downloadAccountingExport}>
-                Download Accounting Export
-              </button>
+              <Link href="/financials-auditing" className={styles.projectActionLink}>
+                Open Financials & Accounting
+              </Link>
             </div>
           </div>
           <div className={styles.overviewGrid}>
@@ -672,9 +667,7 @@ export function ProjectsConsole() {
                     </span>
                   </div>
                   <div className={styles.node}>
-                    <Link href={`/projects/${selectedProject.id}/change-orders`}>
-                      Change Orders (WIP)
-                    </Link>
+                    <Link href={`/projects/${selectedProject.id}/change-orders`}>Change Orders</Link>
                     <span className={styles.nodeEstimateMeta}>
                       <span className={`${styles.estimateCountPill} ${styles.estimateCountDraft}`}>
                         D{changeOrderStatusCounts ? changeOrderStatusCounts.draft : "--"}
@@ -745,8 +738,14 @@ export function ProjectsConsole() {
               </div>
               <div className={styles.metricRow}>
                 <span>Accepted Contract Total</span>
-                <strong>{contractCurrentDisplay}</strong>
+                <strong>{acceptedEstimateTotal}</strong>
               </div>
+              <div className={styles.metricRow}>
+                <span>Accepted CO Delta</span>
+                <strong>{acceptedChangeOrderDeltaTotal}</strong>
+              </div>
+              <hr className={styles.metricsDivider} />
+              <p className={styles.metricHint}>Developer note: lower metrics are staged for iteration.</p>
               <div className={styles.metricRow}>
                 <span>Invoiced to date</span>
                 <strong>{invoicedDisplay}</strong>

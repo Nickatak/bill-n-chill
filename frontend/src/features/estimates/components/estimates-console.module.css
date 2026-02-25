@@ -962,48 +962,45 @@
   font-weight: 600;
 }
 
-.relatedChangeOrders {
-  font-size: 0.78rem;
-  color: #475569;
-  font-weight: 500;
-}
-
-.relatedChangeOrdersLink {
-  color: #1d4ed8;
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.relatedChangeOrdersLink:hover {
-  text-decoration: underline;
-}
-
-.coStartIconLink {
+.familyActionLink,
+.familyActionButton {
   position: absolute;
   right: 8px;
   bottom: 8px;
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 6px;
   border: 1px solid #93c5fd;
   background: #dbeafe;
-  color: #1d4ed8;
+  color: #1e40af;
   text-decoration: none;
-  font-size: 1.1rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   font-weight: 700;
   line-height: 1;
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   justify-content: center;
   cursor: pointer;
   appearance: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
-.coStartIconLink:hover,
-.coStartIconLink:focus-visible {
+.familyActionButton {
+  font-family: inherit;
+}
+
+.familyActionLink:hover,
+.familyActionLink:focus-visible,
+.familyActionButton:hover,
+.familyActionButton:focus-visible {
   background: #bfdbfe;
   border-color: #60a5fa;
   box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.35);
+  transform: translateY(-1px);
+  outline: none;
 }
 
 .historyRow {
@@ -1117,7 +1114,7 @@
 }
 
 .versionCardWrap .familyMain {
-  padding-right: 38px;
+  padding-right: 112px;
 }
 
 .versionCardWrap .historyCard {
@@ -1533,22 +1530,17 @@
   color: #93c5fd;
 }
 
-:global(html[data-theme="dark"]) .relatedChangeOrders {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .relatedChangeOrdersLink {
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .coStartIconLink {
+:global(html[data-theme="dark"]) .familyActionLink,
+:global(html[data-theme="dark"]) .familyActionButton {
   border-color: #1d4ed8;
   background: #1e3a8a;
   color: #dbeafe;
 }
 
-:global(html[data-theme="dark"]) .coStartIconLink:hover,
-:global(html[data-theme="dark"]) .coStartIconLink:focus-visible {
+:global(html[data-theme="dark"]) .familyActionLink:hover,
+:global(html[data-theme="dark"]) .familyActionLink:focus-visible,
+:global(html[data-theme="dark"]) .familyActionButton:hover,
+:global(html[data-theme="dark"]) .familyActionButton:focus-visible {
   background: #1d4ed8;
   border-color: #3b82f6;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.45);

@@ -874,6 +874,39 @@ class ChangeOrderTests(TestCase):
         )
         self._assert_validation_rule(invalid_after_approved, "co_status_transition_not_allowed")
 
+    def test_pending_approval_resend_records_audit_event(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        change_order_id = self._create_change_order(amount_delta="900.00")
+
+        to_pending = self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "pending_approval"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_pending.status_code, 200)
+
+        resend = self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "pending_approval"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(resend.status_code, 200)
+        self.assertEqual(resend.json()["data"]["status"], "pending_approval")
+
+        resend_event = FinancialAuditEvent.objects.filter(
+            object_type="change_order",
+            object_id=change_order_id,
+            from_status=ChangeOrder.Status.PENDING_APPROVAL,
+            to_status=ChangeOrder.Status.PENDING_APPROVAL,
+        ).latest("id")
+        self.assertEqual(resend_event.note, "Change order re-sent for approval.")
+
     def test_change_order_clone_revision_requires_latest_revision(self):
         self._create_active_budget(
             project_id=self.project.id,
@@ -896,6 +929,51 @@ class ChangeOrderTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self._assert_validation_rule(blocked, "co_clone_requires_latest_revision")
+
+    def test_change_order_clone_from_open_revision_auto_voids_source_revision(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        base_id = self._create_change_order(amount_delta="800.00")
+        to_pending = self.client.patch(
+            f"/api/v1/change-orders/{base_id}/",
+            data={"status": "pending_approval"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_pending.status_code, 200)
+
+        clone = self.client.post(
+            f"/api/v1/change-orders/{base_id}/clone-revision/",
+            data={},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(clone.status_code, 201)
+        cloned_id = clone.json()["data"]["id"]
+
+        source = ChangeOrder.objects.get(id=base_id)
+        self.assertEqual(source.status, ChangeOrder.Status.VOID)
+
+        snapshot = ChangeOrderSnapshot.objects.filter(
+            change_order_id=base_id,
+            decision_status=ChangeOrderSnapshot.DecisionStatus.VOID,
+        ).latest("id")
+        self.assertEqual(snapshot.snapshot_json["decision_context"]["previous_status"], "pending_approval")
+        self.assertEqual(snapshot.snapshot_json["decision_context"]["applied_financial_delta"], "0.00")
+
+        supersede_event = FinancialAuditEvent.objects.filter(
+            object_type="change_order",
+            object_id=base_id,
+            to_status=ChangeOrder.Status.VOID,
+        ).latest("id")
+        self.assertIn("Superseded by", supersede_event.note)
+        self.assertEqual(
+            supersede_event.metadata_json.get("superseded_by_change_order_id"),
+            cloned_id,
+        )
 
     def test_change_order_approved_status_creates_immutable_snapshot(self):
         self._create_active_budget(

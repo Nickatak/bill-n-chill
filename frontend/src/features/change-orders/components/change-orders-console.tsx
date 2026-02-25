@@ -2,6 +2,7 @@
 
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   defaultApiBaseUrl,
   fetchChangeOrderPolicyContract,
@@ -165,6 +166,19 @@ type OriginEstimateRecord = {
   approved_by_email: string | null;
 };
 
+type AuditEventRecord = {
+  id: number;
+  event_type: string;
+  object_type: string;
+  object_id: number;
+  from_status: string;
+  to_status: string;
+  note: string;
+  created_by: number;
+  created_by_email: string | null;
+  created_at: string;
+};
+
 const CHANGE_ORDER_STATUS_LABELS_FALLBACK: Record<string, string> = {
   draft: "Draft",
   pending_approval: "Pending Approval",
@@ -194,8 +208,13 @@ export function ChangeOrdersConsole({
   const [selectedChangeOrderId, setSelectedChangeOrderId] = useState("");
   const [selectedViewerEstimateId, setSelectedViewerEstimateId] = useState("");
   const [isViewerExpanded, setIsViewerExpanded] = useState(true);
+  const [hideVoidedHistory, setHideVoidedHistory] = useState(true);
   const [budgetLines, setBudgetLines] = useState<BudgetLineRecord[]>([]);
+  const [originEstimateOriginalTotals, setOriginEstimateOriginalTotals] = useState<
+    Record<number, number>
+  >({});
   const [projectEstimates, setProjectEstimates] = useState<OriginEstimateRecord[]>([]);
+  const [projectAuditEvents, setProjectAuditEvents] = useState<AuditEventRecord[]>([]);
   const [nextLineLocalId, setNextLineLocalId] = useState(2);
   const [selectedProjectName, setSelectedProjectName] = useState("");
 
@@ -253,9 +272,16 @@ export function ChangeOrdersConsole({
       changeOrders.filter((changeOrder) => changeOrder.origin_estimate === originEstimateId),
     );
   }, [changeOrders, selectedViewerEstimateId, sortChangeOrdersForViewer]);
+  const viewerVisibleChangeOrders = useMemo(
+    () =>
+      hideVoidedHistory
+        ? viewerChangeOrders.filter((changeOrder) => changeOrder.status !== "void")
+        : viewerChangeOrders,
+    [hideVoidedHistory, viewerChangeOrders],
+  );
   const selectedViewerChangeOrder =
-    viewerChangeOrders.find((changeOrder) => String(changeOrder.id) === selectedChangeOrderId) ??
-    viewerChangeOrders[0] ??
+    viewerVisibleChangeOrders.find((changeOrder) => String(changeOrder.id) === selectedChangeOrderId) ??
+    viewerVisibleChangeOrders[0] ??
     null;
   const totalChangeOrderCount = changeOrders.length;
   const draftChangeOrderCount = changeOrders.filter(
@@ -294,9 +320,18 @@ export function ChangeOrdersConsole({
     }
     return map;
   }, [budgetLines]);
-  const quickStatusOptions = selectedViewerChangeOrder
-    ? changeOrderAllowedTransitions[selectedViewerChangeOrder.status] ?? []
-    : [];
+  const quickStatusOptions = useMemo(() => {
+    if (!selectedViewerChangeOrder) {
+      return [] as string[];
+    }
+    const base = [...(changeOrderAllowedTransitions[selectedViewerChangeOrder.status] ?? [])];
+    const allowResend = selectedViewerChangeOrder.status === "pending_approval";
+    if (allowResend && !base.includes(selectedViewerChangeOrder.status)) {
+      base.unshift(selectedViewerChangeOrder.status);
+    }
+    return base;
+  }, [changeOrderAllowedTransitions, selectedViewerChangeOrder]);
+  const isSelectedViewerLatestRevision = selectedViewerChangeOrder?.is_latest_revision ?? false;
   const isCreateSubmitDisabled =
     !canMutateChangeOrders ||
     !selectedProjectId ||
@@ -305,7 +340,55 @@ export function ChangeOrdersConsole({
   const isEditSubmitDisabled =
     !canMutateChangeOrders ||
     !selectedChangeOrderId ||
+    !selectedChangeOrder?.is_latest_revision ||
     editLineValidation.issues.length > 0;
+  const selectedChangeOrderStatusEvents = useMemo(() => {
+    if (!selectedViewerChangeOrder) {
+      return [] as AuditEventRecord[];
+    }
+    return projectAuditEvents
+      .filter((event) =>
+        event.event_type === "change_order_updated" &&
+        event.object_type === "change_order" &&
+        event.object_id === selectedViewerChangeOrder.id &&
+        (Boolean(event.from_status) || Boolean(event.to_status)))
+      .sort((left, right) => {
+        const leftTime = Date.parse(left.created_at);
+        const rightTime = Date.parse(right.created_at);
+        if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) {
+          return rightTime - leftTime;
+        }
+        return right.id - left.id;
+      });
+  }, [projectAuditEvents, selectedViewerChangeOrder]);
+  const selectedViewerWorkingTotals = useMemo(() => {
+    if (!selectedViewerEstimate || !selectedViewerChangeOrder) {
+      return { preApproval: "0.00", postApproval: "0.00" };
+    }
+    const approvedRollingDelta = changeOrders.reduce((sum, changeOrder) => {
+      if (
+        changeOrder.origin_estimate !== selectedViewerEstimate.id ||
+        !["approved", "accepted"].includes(changeOrder.status)
+      ) {
+        return sum;
+      }
+      return sum + toNumber(changeOrder.amount_delta);
+    }, 0);
+    const originalBudgetTotal = originEstimateOriginalTotals[selectedViewerEstimate.id] ?? 0;
+    const currentApprovedWorkingTotal = originalBudgetTotal + approvedRollingDelta;
+    const selectedLineDelta = toNumber(
+      selectedViewerChangeOrder.line_total_delta || selectedViewerChangeOrder.amount_delta,
+    );
+    const isSelectedApproved = ["approved", "accepted"].includes(selectedViewerChangeOrder.status);
+    const preApprovalTotal = isSelectedApproved
+      ? currentApprovedWorkingTotal - selectedLineDelta
+      : currentApprovedWorkingTotal;
+    const postApprovalTotal = preApprovalTotal + selectedLineDelta;
+    return {
+      preApproval: formatMoney(preApprovalTotal),
+      postApproval: formatMoney(postApprovalTotal),
+    };
+  }, [changeOrders, originEstimateOriginalTotals, selectedViewerChangeOrder, selectedViewerEstimate]);
 
   function statusLabel(status: string): string {
     const label = changeOrderStatusLabels[status];
@@ -347,14 +430,6 @@ export function ChangeOrdersConsole({
     return line.current_working_amount ?? line.budget_amount;
   }
 
-  function statusBadgeClass(status: string): string {
-    const key = `status${status
-      .split("_")
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join("")}`;
-    return styles[key] ?? "";
-  }
-
   function quickStatusToneClass(status: string): string {
     const key = `quickStatus${status
       .split("_")
@@ -382,6 +457,141 @@ export function ChangeOrdersConsole({
     return statusLabel(status);
   }
 
+  function formatEventDateTime(dateValue: string): string {
+    const parsed = new Date(dateValue);
+    if (Number.isNaN(parsed.getTime())) {
+      return "unknown";
+    }
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(parsed);
+  }
+
+  function eventActorLabel(event: AuditEventRecord): string {
+    const actorEmail = (event.created_by_email || "").trim();
+    if (actorEmail) {
+      return actorEmail;
+    }
+    if (Number.isFinite(event.created_by)) {
+      return `user #${event.created_by}`;
+    }
+    return "unknown user";
+  }
+
+  function approvedRollingDeltaForEstimate(estimateId: number): string {
+    const total = changeOrders.reduce((sum, changeOrder) => {
+      if (
+        changeOrder.origin_estimate !== estimateId ||
+        !["approved", "accepted"].includes(changeOrder.status)
+      ) {
+        return sum;
+      }
+      return sum + toNumber(changeOrder.amount_delta);
+    }, 0);
+    return formatMoney(total);
+  }
+
+  function originalBudgetTotalForEstimate(estimateId: number): string {
+    return formatMoney(originEstimateOriginalTotals[estimateId] ?? 0);
+  }
+
+  function currentApprovedBudgetTotalForEstimate(estimateId: number): string {
+    return formatMoney(
+      toNumber(originalBudgetTotalForEstimate(estimateId)) + toNumber(approvedRollingDeltaForEstimate(estimateId)),
+    );
+  }
+
+  function statusEventLabel(status: string): string {
+    if (!status) {
+      return "Unset";
+    }
+    return statusLabel(status);
+  }
+
+  function statusEventActionLabel(event: AuditEventRecord): string {
+    const fromStatus = event.from_status || "";
+    const toStatus = event.to_status || "";
+    if (!fromStatus && toStatus === "draft") {
+      return "Created";
+    }
+    if (fromStatus === "pending_approval" && toStatus === "pending_approval") {
+      return "Re-sent";
+    }
+    if (fromStatus === "draft" && toStatus === "pending_approval") {
+      return "Sent";
+    }
+    if (toStatus === "approved" || toStatus === "accepted") {
+      return "Approved";
+    }
+    if (toStatus === "rejected") {
+      return "Rejected";
+    }
+    if (toStatus === "void") {
+      return "Voided";
+    }
+    if (toStatus === "draft" && fromStatus) {
+      return "Returned to Draft";
+    }
+    return `${statusEventLabel(fromStatus)} -> ${statusEventLabel(toStatus)}`;
+  }
+
+  function statusEventActionClass(event: AuditEventRecord): string {
+    const toStatus = event.to_status || "";
+    const fromStatus = event.from_status || "";
+    if (!fromStatus && toStatus === "draft") {
+      return styles.statusEventCreated;
+    }
+    if (fromStatus === "pending_approval" && toStatus === "pending_approval") {
+      return styles.statusEventResent;
+    }
+    if (fromStatus === "draft" && toStatus === "pending_approval") {
+      return styles.statusEventSent;
+    }
+    if (toStatus === "approved" || toStatus === "accepted") {
+      return styles.statusEventApproved;
+    }
+    if (toStatus === "rejected") {
+      return styles.statusEventRejected;
+    }
+    if (toStatus === "void") {
+      return styles.statusEventVoid;
+    }
+    if (toStatus === "draft" && fromStatus) {
+      return styles.statusEventReturnedDraft;
+    }
+    return styles.statusEventNeutral;
+  }
+
+  function viewerHistoryStatusClass(status: string): string {
+    const key = `viewerHistory${status
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join("")}`;
+    return styles[key] ?? "";
+  }
+
+  function lastStatusEventForChangeOrder(changeOrderId: number): AuditEventRecord | null {
+    const events = projectAuditEvents
+      .filter((event) =>
+        event.event_type === "change_order_updated" &&
+        event.object_type === "change_order" &&
+        event.object_id === changeOrderId &&
+        (Boolean(event.from_status) || Boolean(event.to_status)))
+      .sort((left, right) => {
+        const leftTime = Date.parse(left.created_at);
+        const rightTime = Date.parse(right.created_at);
+        if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) {
+          return rightTime - leftTime;
+        }
+        return right.id - left.id;
+      });
+    return events[0] ?? null;
+  }
+
   function formatApprovedDate(dateValue: string | null): string {
     if (!dateValue) {
       return "unknown date";
@@ -400,9 +610,9 @@ export function ChangeOrdersConsole({
   function approvalMeta(estimate: OriginEstimateRecord): string {
     const dateLabel = formatApprovedDate(estimate.approved_at);
     if (estimate.approved_by_email) {
-      return `v${estimate.version}, approved on ${dateLabel} by ${estimate.approved_by_email}`;
+      return `approved on ${dateLabel} by ${estimate.approved_by_email}`;
     }
-    return `v${estimate.version}, approved on ${dateLabel}`;
+    return `approved on ${dateLabel}`;
   }
 
   const hydrateEditForm = useCallback((changeOrder: ChangeOrderRecord | undefined) => {
@@ -436,7 +646,11 @@ export function ChangeOrdersConsole({
       setSelectedViewerEstimateId(String(changeOrder.origin_estimate));
     }
     const nextQuickStatuses = changeOrderAllowedTransitions[changeOrder.status] ?? [];
-    setQuickStatus(nextQuickStatuses[0] ?? changeOrder.status);
+    if (changeOrder.status === "pending_approval") {
+      setQuickStatus("pending_approval");
+    } else {
+      setQuickStatus(nextQuickStatuses[0] ?? changeOrder.status);
+    }
   }, [changeOrderAllowedTransitions]);
 
   const loadChangeOrderPolicy = useCallback(async () => {
@@ -491,6 +705,18 @@ export function ChangeOrdersConsole({
           source_estimate?: number | null;
           line_items: BudgetLineRecord[];
         }>) ?? [];
+      const nextTotals: Record<number, number> = {};
+      for (const budget of budgets) {
+        const sourceEstimateId = Number(budget.source_estimate);
+        if (!Number.isFinite(sourceEstimateId) || sourceEstimateId <= 0) {
+          continue;
+        }
+        nextTotals[sourceEstimateId] = budget.line_items.reduce(
+          (sum, line) => sum + toNumber(line.budget_amount),
+          0,
+        );
+      }
+      setOriginEstimateOriginalTotals(nextTotals);
       const byOriginEstimate =
         sourceEstimateId != null
           ? budgets.find((budget) => Number(budget.source_estimate) === sourceEstimateId)
@@ -502,6 +728,7 @@ export function ChangeOrdersConsole({
       return nextLines;
     } catch {
       setBudgetLines([]);
+      setOriginEstimateOriginalTotals({});
       return [] as BudgetLineRecord[];
     }
   }, [normalizedBaseUrl, token]);
@@ -580,6 +807,35 @@ export function ChangeOrdersConsole({
     }
   }, [initialOriginEstimateId, normalizedBaseUrl, token]);
 
+  const loadProjectAuditEvents = useCallback(async (projectId: number) => {
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/audit-events/`, {
+        headers: buildAuthHeaders(token),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setProjectAuditEvents([]);
+        return;
+      }
+      const rows =
+        (payload.data as Array<{
+          id: number;
+          event_type: string;
+          object_type: string;
+          object_id: number;
+          from_status: string;
+          to_status: string;
+          note: string;
+          created_by: number;
+          created_by_email: string | null;
+          created_at: string;
+        }>) ?? [];
+      setProjectAuditEvents(rows);
+    } catch {
+      setProjectAuditEvents([]);
+    }
+  }, [normalizedBaseUrl, token]);
+
   const prefillNewLinesFromBudgetLines = useCallback((lines: BudgetLineRecord[]) => {
     if (!lines.length) {
       setNewLineItems([emptyLine(1)]);
@@ -645,6 +901,7 @@ export function ChangeOrdersConsole({
         await Promise.all([
           loadBudgetLines(nextProject.id),
           loadProjectEstimates(nextProject.id),
+          loadProjectAuditEvents(nextProject.id),
         ]);
         const { rows: changeOrderRows, error } = await fetchProjectChangeOrders(nextProject.id);
         if (!changeOrderRows) {
@@ -660,7 +917,9 @@ export function ChangeOrdersConsole({
         setSelectedProjectId("");
         setSelectedProjectName("");
         setBudgetLines([]);
+        setOriginEstimateOriginalTotals({});
         setProjectEstimates([]);
+        setProjectAuditEvents([]);
         setChangeOrders([]);
         hydrateEditForm(undefined);
         setFeedback("No projects found.", "info");
@@ -672,6 +931,7 @@ export function ChangeOrdersConsole({
     fetchProjectChangeOrders,
     hydrateEditForm,
     loadBudgetLines,
+    loadProjectAuditEvents,
     loadProjectEstimates,
     normalizedBaseUrl,
     scopedProjectId,
@@ -705,6 +965,18 @@ export function ChangeOrdersConsole({
     }
     setNewTitle(defaultChangeOrderTitle(selectedProjectName));
   }, [newTitleManuallyEdited, selectedProjectName]);
+
+  useEffect(() => {
+    if (!viewerVisibleChangeOrders.length) {
+      return;
+    }
+    const selectedStillVisible = viewerVisibleChangeOrders.some(
+      (changeOrder) => String(changeOrder.id) === selectedChangeOrderId,
+    );
+    if (!selectedStillVisible) {
+      hydrateEditForm(viewerVisibleChangeOrders[0]);
+    }
+  }, [hydrateEditForm, selectedChangeOrderId, viewerVisibleChangeOrders]);
 
   useEffect(() => {
     const projectId = Number(selectedProjectId);
@@ -807,9 +1079,11 @@ export function ChangeOrdersConsole({
         setChangeOrders(rows);
         const persisted = rows.find((row) => row.id === created.id);
         hydrateEditForm(persisted ?? created);
+        await loadProjectAuditEvents(projectId);
       } else {
         setChangeOrders((current) => [created, ...current]);
         hydrateEditForm(created);
+        await loadProjectAuditEvents(projectId);
       }
       setFeedback(`Created change order ${coLabel(created)} (${statusLabel(created.status)}).`, "success");
       setNewLineItems([emptyLine(1)]);
@@ -854,6 +1128,7 @@ export function ChangeOrdersConsole({
         setChangeOrders(rows);
         const persisted = rows.find((row) => row.id === created.id);
         hydrateEditForm(persisted ?? created);
+        await loadProjectAuditEvents(projectId);
       }
       setFeedback(`Created ${coLabel(created)} in Draft.`, "success");
     } catch {
@@ -906,12 +1181,14 @@ export function ChangeOrdersConsole({
         setChangeOrders(rows);
         const persisted = rows.find((row) => row.id === updated.id);
         hydrateEditForm(persisted ?? updated);
+        await loadProjectAuditEvents(projectId);
         setFeedback(`Saved change order ${coLabel(updated)} (${statusLabel(updated.status)}).`, "success");
       } else {
         setChangeOrders((current) =>
           current.map((row) => (row.id === updated.id ? updated : row)),
         );
         hydrateEditForm(updated);
+        await loadProjectAuditEvents(projectId);
         setFeedback(`Saved change order ${coLabel(updated)} (${statusLabel(updated.status)}).`, "success");
       }
     } catch {
@@ -933,7 +1210,13 @@ export function ChangeOrdersConsole({
       setFeedback("Select a project first.", "error");
       return;
     }
+    if (!selectedViewerChangeOrder.is_latest_revision) {
+      setFeedback("Only the latest revision can receive status updates.", "error");
+      return;
+    }
 
+    const isResend =
+      selectedViewerChangeOrder.status === quickStatus && quickStatus === "pending_approval";
     setFeedback("");
     try {
       const response = await fetch(
@@ -955,13 +1238,19 @@ export function ChangeOrdersConsole({
         setChangeOrders(rows);
         const persisted = rows.find((row) => row.id === updated.id);
         hydrateEditForm(persisted ?? updated);
+        await loadProjectAuditEvents(projectId);
       } else {
         setChangeOrders((current) =>
           current.map((row) => (row.id === updated.id ? updated : row)),
         );
         hydrateEditForm(updated);
+        await loadProjectAuditEvents(projectId);
       }
-      setFeedback(`Updated ${coLabel(updated)} to ${statusLabel(updated.status)}.`, "success");
+      if (isResend) {
+        setFeedback(`Re-sent ${coLabel(updated)} for approval.`, "success");
+      } else {
+        setFeedback(`Updated ${coLabel(updated)} to ${statusLabel(updated.status)}.`, "success");
+      }
     } catch {
       setFeedback("Could not reach change order detail endpoint.", "error");
     }
@@ -969,14 +1258,12 @@ export function ChangeOrdersConsole({
 
   return (
     <section>
-      {actionMessage ? (
+      {actionMessage && actionTone !== "success" ? (
         <p
           className={
             actionTone === "error"
               ? estimateStyles.actionError
-              : actionTone === "success"
-                ? estimateStyles.actionSuccess
-                : estimateStyles.inlineHint
+              : estimateStyles.inlineHint
           }
         >
           {actionMessage}
@@ -1050,41 +1337,65 @@ export function ChangeOrdersConsole({
                   (changeOrder) => changeOrder.origin_estimate === estimate.id,
                 ).length;
                 return (
-                  <button
-                    key={estimate.id}
-                    type="button"
-                    className={`${styles.viewerRailItem} ${active ? styles.viewerRailItemActive : ""}`}
-                    onClick={() => {
-                      const nextEstimateId = String(estimate.id);
-                      setSelectedViewerEstimateId(nextEstimateId);
-                      const related = sortChangeOrdersForViewer(
-                        changeOrders.filter(
-                          (changeOrder) => String(changeOrder.origin_estimate) === nextEstimateId,
-                        ),
-                      );
-                      if (!related.length) {
-                        hydrateEditForm(undefined);
-                        return;
-                      }
-                      const selectedStillValid = related.some(
-                        (changeOrder) => String(changeOrder.id) === selectedChangeOrderId,
-                      );
-                      if (!selectedStillValid) {
-                        hydrateEditForm(related[0]);
-                      }
-                    }}
-                  >
-                    <span className={styles.viewerRailTitle}>
-                      {estimate.title}
-                      <span className={styles.viewerRailVersion}>Estimate #{estimate.id}</span>
-                    </span>
-                    <span className={styles.viewerRailSubtext}>
-                      {approvalMeta(estimate)}
-                    </span>
-                    <span className={styles.viewerMetaLabel}>
-                      {relatedCount} CO history
-                    </span>
-                  </button>
+                  <div key={estimate.id} className={styles.viewerRailEntry}>
+                    <button
+                      type="button"
+                      className={`${styles.viewerRailItem} ${active ? styles.viewerRailItemActive : ""}`}
+                      onClick={() => {
+                        const nextEstimateId = String(estimate.id);
+                        setSelectedViewerEstimateId(nextEstimateId);
+                        const related = sortChangeOrdersForViewer(
+                          changeOrders.filter(
+                            (changeOrder) => String(changeOrder.origin_estimate) === nextEstimateId,
+                          ),
+                        );
+                        const visibleRelated = hideVoidedHistory
+                          ? related.filter((changeOrder) => changeOrder.status !== "void")
+                          : related;
+                        if (!visibleRelated.length) {
+                          hydrateEditForm(undefined);
+                          return;
+                        }
+                        const selectedStillValid = visibleRelated.some(
+                          (changeOrder) => String(changeOrder.id) === selectedChangeOrderId,
+                        );
+                        if (!selectedStillValid) {
+                          hydrateEditForm(visibleRelated[0]);
+                        }
+                      }}
+                    >
+                      <span className={styles.viewerRailTitle}>
+                        {estimate.title}
+                        <span className={styles.viewerRailVersion}>
+                          Estimate #{estimate.id} · v{estimate.version} · History: {relatedCount} COs
+                        </span>
+                      </span>
+                      <span className={styles.viewerRailSubtext}>
+                        {approvalMeta(estimate)}
+                      </span>
+                      <span className={styles.viewerRailMetrics}>
+                        <span className={styles.viewerMetricCurrent}>
+                          Current ${currentApprovedBudgetTotalForEstimate(estimate.id)}
+                        </span>
+                        {" · "}
+                        <span className={styles.viewerMetricOriginal}>
+                          Original ${originalBudgetTotalForEstimate(estimate.id)}
+                        </span>
+                        {" · "}
+                        <span className={styles.viewerMetricDelta}>
+                          CO Delta ${approvedRollingDeltaForEstimate(estimate.id)}
+                        </span>
+                      </span>
+                    </button>
+                    {selectedProjectId ? (
+                      <Link
+                        href={`/projects/${selectedProjectId}/estimates?estimate=${estimate.id}`}
+                        className={styles.viewerCardLink}
+                      >
+                        Open Original Estimate <span aria-hidden="true">↗</span>
+                      </Link>
+                    ) : null}
+                  </div>
                 );
               })}
             </div>
@@ -1094,14 +1405,23 @@ export function ChangeOrdersConsole({
                   <>
                     <h4 className={styles.viewerSectionHeading}>2) Linked Change Order History</h4>
                     <p className={styles.viewerHint}>Oldest at top. Most recent is the bottom item.</p>
+                    <label className={styles.viewerToggleRow}>
+                      <input
+                        type="checkbox"
+                        checked={hideVoidedHistory}
+                        onChange={(event) => setHideVoidedHistory(event.target.checked)}
+                      />
+                      Hide voided revisions
+                    </label>
                     <div className={`${styles.viewerRail} ${styles.viewerHistoryRail}`}>
-                      {viewerChangeOrders.map((changeOrder) => {
+                      {viewerVisibleChangeOrders.map((changeOrder) => {
                         const active = String(changeOrder.id) === selectedChangeOrderId;
+                        const lastStatusEvent = lastStatusEventForChangeOrder(changeOrder.id);
                         return (
                           <button
                             key={changeOrder.id}
                             type="button"
-                            className={`${styles.viewerRailItem} ${styles.viewerHistoryItem} ${
+                            className={`${styles.viewerRailItem} ${styles.viewerHistoryItem} ${viewerHistoryStatusClass(changeOrder.status)} ${
                               active ? `${styles.viewerRailItemActive} ${styles.viewerHistoryItemActive}` : ""
                             }`}
                             onClick={() => {
@@ -1111,50 +1431,108 @@ export function ChangeOrdersConsole({
                             <span className={styles.viewerRailTitle}>
                               {coLabel(changeOrder)} {changeOrder.title}
                             </span>
-                            <span className={`${styles.statusBadge} ${statusBadgeClass(changeOrder.status)}`}>
-                              {statusLabel(changeOrder.status)}
+                            <span className={styles.viewerHistoryStatusText}>{statusLabel(changeOrder.status)}</span>
+                            <span
+                              className={`${styles.viewerHistoryMetaText} ${styles.viewerHistoryLineDelta} ${
+                                ["approved", "accepted"].includes(changeOrder.status)
+                                  ? styles.viewerHistoryLineDeltaApproved
+                                  : ""
+                              }`}
+                            >
+                              Line delta: ${changeOrder.line_total_delta}
                             </span>
+                            {lastStatusEvent ? (
+                              <span className={styles.viewerHistoryMetaText}>
+                                Last action: {statusEventActionLabel(lastStatusEvent)} on{" "}
+                                {formatEventDateTime(lastStatusEvent.created_at)} by {eventActorLabel(lastStatusEvent)}
+                              </span>
+                            ) : (
+                              <span className={styles.viewerHistoryMetaText}>No status events yet.</span>
+                            )}
                           </button>
                         );
                       })}
                     </div>
+                    {!viewerVisibleChangeOrders.length ? (
+                      <p className={styles.viewerHint}>No visible revisions. Turn off the void filter to view voided revisions.</p>
+                    ) : null}
                     {selectedViewerChangeOrder ? (
                       <>
-                        <div className={styles.quickStatusPanel}>
-                          <span className={estimateStyles.lifecycleFieldLabel}>Next status</span>
-                          <div className={styles.quickStatusPills}>
-                            {quickStatusOptions.length > 0 ? (
-                              quickStatusOptions.map((status) => {
-                                const isSelected = quickStatus === status;
-                                return (
-                                  <button
-                                    key={status}
-                                    type="button"
-                                    className={`${styles.quickStatusButton} ${
-                                      isSelected
-                                        ? `${styles.quickStatusButtonActive} ${quickStatusToneClass(status)}`
-                                        : styles.quickStatusButtonInactive
-                                    }`}
-                                    onClick={() => setQuickStatus(status)}
-                                    aria-pressed={isSelected}
-                                  >
-                                    {quickStatusControlLabel(status)}
-                                  </button>
-                                );
-                              })
-                            ) : (
-                              <p className={styles.viewerHint}>No next statuses available.</p>
-                            )}
+                        <div className={styles.viewerMetaRow}>
+                          <span className={styles.viewerMetaLabel}>Working total pre-approval (this CO)</span>
+                          <strong>${selectedViewerWorkingTotals.preApproval}</strong>
+                        </div>
+                        <div className={styles.viewerMetaRow}>
+                          <span className={styles.viewerMetaLabel}>Working total post-approval (this CO)</span>
+                          <strong>${selectedViewerWorkingTotals.postApproval}</strong>
+                        </div>
+                        <p className={styles.viewerHint}>
+                          Post-approval total = pre-approval total + this CO line delta.
+                        </p>
+                        {isSelectedViewerLatestRevision ? (
+                          <div className={styles.quickStatusPanel}>
+                            <span className={estimateStyles.lifecycleFieldLabel}>Next status</span>
+                            <div className={styles.quickStatusPills}>
+                              {quickStatusOptions.length > 0 ? (
+                                quickStatusOptions.map((status) => {
+                                  const isSelected = quickStatus === status;
+                                  return (
+                                    <button
+                                      key={status}
+                                      type="button"
+                                      className={`${styles.quickStatusButton} ${
+                                        isSelected
+                                          ? `${styles.quickStatusButtonActive} ${quickStatusToneClass(status)}`
+                                          : styles.quickStatusButtonInactive
+                                      }`}
+                                      onClick={() => setQuickStatus(status)}
+                                      aria-pressed={isSelected}
+                                    >
+                                      {quickStatusControlLabel(status)}
+                                    </button>
+                                  );
+                                })
+                              ) : (
+                                <p className={styles.viewerHint}>No next statuses available.</p>
+                              )}
+                            </div>
+                            <div className={estimateStyles.lifecycleActions}>
+                              <button
+                                type="button"
+                                onClick={handleQuickUpdateStatus}
+                                disabled={!canMutateChangeOrders || !quickStatusOptions.length}
+                              >
+                                Update CO Status
+                              </button>
+                            </div>
                           </div>
-                          <div className={estimateStyles.lifecycleActions}>
-                            <button
-                              type="button"
-                              onClick={handleQuickUpdateStatus}
-                              disabled={!canMutateChangeOrders || !quickStatusOptions.length}
-                            >
-                              Update CO Status
-                            </button>
-                          </div>
+                        ) : (
+                          <p className={`${styles.viewerHint} ${styles.viewerWarningHint}`}>
+                            Status updates are only available on the latest revision.
+                          </p>
+                        )}
+                        <div className={styles.viewerEventPanel}>
+                          <span className={styles.viewerMetaLabel}>Status events</span>
+                          <p className={styles.viewerHint}>Newest first.</p>
+                          {selectedChangeOrderStatusEvents.length > 0 ? (
+                            <ul className={styles.viewerEventList}>
+                              {selectedChangeOrderStatusEvents.slice(0, 6).map((event) => (
+                                <li key={event.id} className={styles.viewerEventItem}>
+                                  <span className={`${styles.viewerEventAction} ${statusEventActionClass(event)}`}>
+                                    {statusEventActionLabel(event)}
+                                  </span>
+                                  <span className={styles.viewerEventMeta}>
+                                    {formatEventDateTime(event.created_at)} by {eventActorLabel(event)}
+                                  </span>
+                                  {event.note ? (
+                                    <span className={styles.viewerEventNote}>{event.note}</span>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className={styles.viewerHint}>No status events recorded for this change order yet.</p>
+                          )}
                         </div>
                         {selectedViewerChangeOrder.line_items.length > 0 ? (
                           <div className={styles.lineTableWrap}>
@@ -1250,6 +1628,11 @@ export function ChangeOrdersConsole({
           >
             Add New Change Order
           </button>
+          {actionMessage && actionTone === "success" ? (
+            <p className={`${estimateStyles.actionSuccess} ${styles.toolbarFeedbackMessage}`}>
+              {actionMessage}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -1484,18 +1867,6 @@ export function ChangeOrdersConsole({
               required
             />
           </label>
-          <label className={`${estimateStyles.inlineField} ${styles.coMetaField}`}>
-            Origin estimate
-            <span className={estimateStyles.staticFieldValue}>
-              {selectedChangeOrder?.origin_estimate
-                ? `#${selectedChangeOrder.origin_estimate}${
-                    selectedChangeOrder.origin_estimate_version
-                      ? ` v${selectedChangeOrder.origin_estimate_version}`
-                      : ""
-                  }`
-                : "No origin estimate linked"}
-            </span>
-          </label>
           <label className={`${estimateStyles.inlineField} ${styles.coMetaField} ${styles.coFieldWide}`}>
             Reason
             <textarea
@@ -1640,6 +2011,11 @@ export function ChangeOrdersConsole({
             {editLineValidation.issues.length ? (
               <p className={`${estimateStyles.inlineHint} ${styles.coFooterHint} ${styles.coFooterErrorHint}`}>
                 Line-level issues are highlighted inline. Fix them before saving this revision.
+              </p>
+            ) : null}
+            {selectedChangeOrder && !selectedChangeOrder.is_latest_revision ? (
+              <p className={`${estimateStyles.inlineHint} ${styles.coFooterHint} ${styles.coFooterErrorHint}`}>
+                This revision is historical and read-only. Save/update actions are available on the latest revision only.
               </p>
             ) : null}
           </div>

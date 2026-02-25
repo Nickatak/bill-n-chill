@@ -60,7 +60,7 @@ const hierarchyRules: HierarchyRule[] = [
   },
   {
     when: (pathname) => pathname === "/change-orders" || /^\/projects\/\d+\/change-orders$/.test(pathname),
-    crumbs: [PROJECTS_HUB_CRUMB, { href: "/change-orders", label: "Change Orders (WIP)" }],
+    crumbs: [{ href: "/change-orders", label: "Change Orders" }],
   },
   {
     when: (pathname) => pathname === "/invoices",

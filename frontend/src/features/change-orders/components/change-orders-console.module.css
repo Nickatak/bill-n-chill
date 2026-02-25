@@ -102,6 +102,12 @@
   gap: 8px;
 }
 
+.toolbarFeedbackMessage {
+  margin: 0;
+  width: 100%;
+  text-align: right;
+}
+
 .formContext {
   display: grid;
   gap: 2px;
@@ -177,6 +183,12 @@
   grid-auto-rows: min-content;
 }
 
+.viewerRailEntry {
+  display: grid;
+  gap: 4px;
+  position: relative;
+}
+
 .viewerRailHeader {
   display: grid;
   gap: 2px;
@@ -201,7 +213,7 @@
   border: 1px solid #c8d7eb;
   border-radius: 12px;
   background: #ffffff;
-  padding: 9px 10px;
+  padding: 9px 10px 34px;
   text-align: left;
   display: grid;
   gap: 6px;
@@ -239,6 +251,55 @@
   font-size: 0.8rem;
   color: #475569;
   line-height: 1.35;
+}
+
+.viewerRailMetrics {
+  font-size: 0.76rem;
+  color: #334155;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.viewerMetricCurrent {
+  color: #166534;
+}
+
+.viewerMetricOriginal {
+  color: #1e40af;
+}
+
+.viewerMetricDelta {
+  color: #92400e;
+}
+
+.viewerCardLink {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid #93c5fd;
+  border-radius: 6px;
+  background: #dbeafe;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #1e40af;
+  text-decoration: none;
+  z-index: 2;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.viewerCardLink:hover,
+.viewerCardLink:focus-visible {
+  transform: translateY(-1px);
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.24);
+  outline: none;
 }
 
 .viewerDetail {
@@ -281,6 +342,19 @@
   color: #64748b;
 }
 
+.viewerToggleRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #475569;
+  font-size: 0.79rem;
+  font-weight: 600;
+}
+
+.viewerWarningHint {
+  color: #92400e;
+}
+
 .viewerHistoryRail {
   padding: 8px;
   border: 1px solid #d6e1ef;
@@ -291,6 +365,65 @@
 .viewerHistoryItem {
   border-color: #d5dce8;
   background: #ffffff;
+}
+
+.viewerHistoryDraft {
+  border-color: #93c5fd;
+  background: linear-gradient(180deg, rgba(219, 234, 254, 0.5), #ffffff);
+}
+
+.viewerHistoryPendingApproval {
+  border-color: #fcd34d;
+  background: linear-gradient(180deg, rgba(254, 243, 199, 0.52), #ffffff);
+}
+
+.viewerHistoryApproved {
+  border-color: #86efac;
+  background: linear-gradient(180deg, rgba(220, 252, 231, 0.56), #ffffff);
+}
+
+.viewerHistoryRejected {
+  border-color: #fca5a5;
+  background: linear-gradient(180deg, rgba(254, 226, 226, 0.56), #ffffff);
+}
+
+.viewerHistoryVoid {
+  border-color: #cbd5e1;
+  background: linear-gradient(180deg, rgba(226, 232, 240, 0.56), #ffffff);
+}
+
+.viewerHistoryStatusText {
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #334155;
+}
+
+.viewerHistoryMetaText {
+  font-size: 0.76rem;
+  color: #475569;
+}
+
+.viewerHistoryLineDelta {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 7px;
+  padding: 2px 8px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  font-weight: 700;
+  color: #334155;
+}
+
+.viewerHistoryLineDeltaApproved {
+  font-size: 0.96rem;
+  letter-spacing: 0.02em;
+  border-color: #16a34a;
+  background: #dcfce7;
+  color: #166534;
+  box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.25);
 }
 
 .viewerHistoryItemActive {
@@ -310,8 +443,8 @@
 }
 
 .quickStatusPills {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 10px;
 }
 
@@ -319,11 +452,12 @@
   appearance: none;
   -webkit-appearance: none;
   border: 1px solid #cbd5f5;
-  border-radius: 8px;
-  min-width: 120px;
-  padding: 10px 14px;
+  border-radius: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 12px;
   font-size: 0.74rem;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   font-weight: 700;
   cursor: pointer;
@@ -337,9 +471,15 @@
   color: #bfdbfe;
 }
 
+.quickStatusButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+  transform: none;
+}
+
 .quickStatusButtonActive {
   box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.14);
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .quickStatusButtonActive.quickStatusDraft {
@@ -387,41 +527,6 @@
 .cloneRevisionButton:disabled {
   opacity: 0.6;
   cursor: default;
-}
-
-.statusBadge {
-  font-size: 0.67rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  font-weight: 700;
-  border-radius: 999px;
-  padding: 3px 8px;
-  width: fit-content;
-}
-
-.statusDraft {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.statusPendingApproval {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.statusApproved {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.statusRejected {
-  background: #fecaca;
-  color: #991b1b;
-}
-
-.statusVoid {
-  background: #e5e7eb;
-  color: #374151;
 }
 
 .reconcilePill {
@@ -477,6 +582,94 @@
   border-top: 1px solid #e2e8f0;
   color: #0f172a;
   font-size: 0.86rem;
+}
+
+.viewerEventPanel {
+  display: grid;
+  gap: 6px;
+}
+
+.viewerEventList {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid #d7e2f1;
+  border-radius: 10px;
+  background: #f8fafc;
+  display: grid;
+  gap: 8px;
+}
+
+.viewerEventItem {
+  display: grid;
+  gap: 2px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.viewerEventItem:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.viewerEventAction {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.statusEventCreated {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.statusEventResent {
+  background: #fde68a;
+  color: #78350f;
+}
+
+.statusEventSent {
+  background: #fde68a;
+  color: #78350f;
+}
+
+.statusEventApproved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.statusEventRejected {
+  background: #fecaca;
+  color: #991b1b;
+}
+
+.statusEventVoid {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.statusEventReturnedDraft {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.statusEventNeutral {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.viewerEventMeta {
+  font-size: 0.76rem;
+  color: #64748b;
+}
+
+.viewerEventNote {
+  font-size: 0.76rem;
+  color: #475569;
 }
 
 .workflowSheet {
@@ -733,6 +926,10 @@
     width: 100%;
   }
 
+  .toolbarFeedbackMessage {
+    text-align: left;
+  }
+
   .primaryCreateButton {
     width: 100%;
   }
@@ -748,6 +945,26 @@
 
   .viewerToggleButton {
     width: 100%;
+  }
+
+  .quickStatusPills {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .quickStatusButton {
+    min-height: 46px;
+    font-size: 0.7rem;
+  }
+
+  .viewerHistoryMetaText {
+    font-size: 0.74rem;
+    line-height: 1.35;
+  }
+
+  .viewerEventMeta,
+  .viewerEventNote {
+    font-size: 0.72rem;
   }
 }
 
@@ -860,6 +1077,34 @@
   color: #cbd5e1;
 }
 
+:global(html[data-theme="dark"]) .viewerRailMetrics {
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .viewerMetricCurrent {
+  color: #86efac;
+}
+
+:global(html[data-theme="dark"]) .viewerMetricOriginal {
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .viewerMetricDelta {
+  color: #fcd34d;
+}
+
+:global(html[data-theme="dark"]) .viewerCardLink {
+  border-color: #1d4ed8;
+  background: #1e3a8a;
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .viewerCardLink:hover,
+:global(html[data-theme="dark"]) .viewerCardLink:focus-visible {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.42);
+}
+
 :global(html[data-theme="dark"]) .viewerHistoryRail {
   background: #0b1220;
   border-color: #334155;
@@ -885,6 +1130,97 @@
 
 :global(html[data-theme="dark"]) .viewerHint {
   color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .viewerToggleRow {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .viewerWarningHint {
+  color: #fbbf24;
+}
+
+:global(html[data-theme="dark"]) .viewerHistoryDraft {
+  border-color: #3b82f6;
+  background: linear-gradient(180deg, rgba(29, 78, 216, 0.24), #0b1220);
+}
+
+:global(html[data-theme="dark"]) .viewerHistoryPendingApproval {
+  border-color: #f59e0b;
+  background: linear-gradient(180deg, rgba(180, 83, 9, 0.24), #0b1220);
+}
+
+:global(html[data-theme="dark"]) .viewerHistoryApproved {
+  border-color: #22c55e;
+  background: linear-gradient(180deg, rgba(21, 128, 61, 0.24), #0b1220);
+}
+
+:global(html[data-theme="dark"]) .viewerHistoryRejected {
+  border-color: #ef4444;
+  background: linear-gradient(180deg, rgba(153, 27, 27, 0.24), #0b1220);
+}
+
+:global(html[data-theme="dark"]) .viewerHistoryVoid {
+  border-color: #64748b;
+  background: linear-gradient(180deg, rgba(51, 65, 85, 0.3), #0b1220);
+}
+
+:global(html[data-theme="dark"]) .viewerHistoryStatusText {
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .viewerHistoryMetaText {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .viewerHistoryLineDelta {
+  border-color: #334155;
+  background: #111827;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .viewerHistoryLineDeltaApproved {
+  border-color: #22c55e;
+  background: #14532d;
+  color: #dcfce7;
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.32);
+}
+
+:global(html[data-theme="dark"]) .viewerEventList {
+  border-color: #334155;
+  background: #0b1220;
+}
+
+:global(html[data-theme="dark"]) .viewerEventItem {
+  border-bottom-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .viewerEventMeta {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .viewerEventNote {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .statusEventNeutral {
+  background: #334155;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .statusEventSent {
+  background: #a16207;
+  color: #fef3c7;
+}
+
+:global(html[data-theme="dark"]) .statusEventResent {
+  background: #a16207;
+  color: #fef3c7;
+}
+
+:global(html[data-theme="dark"]) .statusEventRejected {
+  background: #7f1d1d;
+  color: #fecaca;
 }
 
 :global(html[data-theme="dark"]) .coLineSectionIntro h3 {

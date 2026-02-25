@@ -377,6 +377,12 @@ def change_order_detail_view(request, change_order_id: int):
         change_order.status = data["status"]
         update_fields.append("status")
 
+    is_pending_resend = (
+        status_changing
+        and previous_status == ChangeOrder.Status.PENDING_APPROVAL
+        and next_status == ChangeOrder.Status.PENDING_APPROVAL
+    )
+
     if status_changing and previous_status != next_status and next_status == ChangeOrder.Status.APPROVED:
         change_order.approved_by = request.user
         change_order.approved_at = timezone.now()
@@ -409,8 +415,16 @@ def change_order_detail_view(request, change_order_id: int):
                 Budget.objects.filter(id=active_budget.id).update(
                     approved_change_order_total=F("approved_change_order_total") + financial_delta,
                 )
-            if previous_status != next_status or financial_delta != MONEY_ZERO:
-                event_note = "Change order status updated."
+            should_record_audit_event = (
+                previous_status != next_status
+                or financial_delta != MONEY_ZERO
+                or is_pending_resend
+            )
+            if should_record_audit_event:
+                if is_pending_resend:
+                    event_note = "Change order re-sent for approval."
+                else:
+                    event_note = "Change order status updated."
                 if financial_delta != MONEY_ZERO:
                     event_note = f"{event_note} Financial delta applied: {financial_delta}."
                 _record_financial_audit_event(
@@ -544,6 +558,32 @@ def change_order_clone_revision_view(request, change_order_id: int):
                 "previous_change_order_id": change_order.id,
             },
         )
+        if change_order.status in {ChangeOrder.Status.DRAFT, ChangeOrder.Status.PENDING_APPROVAL}:
+            previous_status = change_order.status
+            change_order.status = ChangeOrder.Status.VOID
+            change_order.save(update_fields=["status", "updated_at"])
+            _record_financial_audit_event(
+                project=change_order.project,
+                event_type=FinancialAuditEvent.EventType.CHANGE_ORDER_UPDATED,
+                object_type="change_order",
+                object_id=change_order.id,
+                from_status=previous_status,
+                to_status=change_order.status,
+                amount=change_order.amount_delta,
+                note=f"Superseded by CO-{clone.family_key} v{clone.revision_number}.",
+                created_by=request.user,
+                metadata={
+                    "family_key": change_order.family_key,
+                    "superseded_by_change_order_id": clone.id,
+                },
+            )
+            _record_change_order_decision_snapshot(
+                change_order=change_order,
+                decision_status=ChangeOrder.Status.VOID,
+                previous_status=previous_status,
+                applied_financial_delta=MONEY_ZERO,
+                decided_by=request.user,
+            )
 
     created = (
         ChangeOrder.objects.filter(id=clone.id)
