@@ -18,6 +18,7 @@ import {
   ProjectRecord,
 } from "@/features/projects/types";
 import { formatDateTimeDisplay } from "@/shared/date-format";
+import styles from "./financials-auditing-console.module.css";
 
 export function FinancialsAuditingConsole() {
   const { token, authMessage } = useSharedSessionAuth();
@@ -346,8 +347,8 @@ export function FinancialsAuditingConsole() {
   }
 
   return (
-    <section>
-      <p>{authMessage}</p>
+    <section className={styles.console}>
+      <p className={styles.authMessage}>{authMessage}</p>
       <label>
         Project
         <select value={selectedProjectId} onChange={(event) => setSelectedProjectId(event.target.value)}>
@@ -639,7 +640,7 @@ export function FinancialsAuditingConsole() {
         ) : null}
       </section>
 
-      <p>{statusMessage}</p>
+      {statusMessage ? <p className={styles.statusMessage}>{statusMessage}</p> : null}
     </section>
   );
 }

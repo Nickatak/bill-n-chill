@@ -513,8 +513,8 @@ export function InvoicesConsole() {
     <section className={styles.console}>
       <header className={styles.hero}>
         <div>
-          <p className={styles.eyebrow}>Changes & Billing (WIP)</p>
-          <h2 className={styles.heading}>Invoice Workspace (WIP)</h2>
+          <p className={styles.eyebrow}>Billing</p>
+          <h2 className={styles.heading}>Invoice Workspace</h2>
           <p className={styles.copy}>
             Draft invoice scope, send AR requests, and keep payment readiness visible per project.
           </p>

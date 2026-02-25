@@ -258,31 +258,36 @@ export function VendorsConsole() {
   }, [activityFilter]);
 
   return (
-    <section>
-      <h2>Vendor Directory</h2>
-      <p>Create, search, and update reusable vendors for AP and commitments.</p>
+    <section className={styles.console}>
+      <h2 className={styles.heading}>Vendor Directory</h2>
+      <p className={styles.copy}>Create, search, and update reusable vendors for AP commitments.</p>
 
-      <label>
-        Search query
-        <input
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="name, email, phone, or tax id"
-        />
-      </label>
-      <label>
-        Activity
-        <select
-          value={activityFilter}
-          onChange={(event) =>
-            setActivityFilter(event.target.value as "all" | "active" | "inactive")
-          }
-        >
-          <option value="all">all</option>
-          <option value="active">active</option>
-          <option value="inactive">inactive</option>
-        </select>
-      </label>
+      <div className={styles.controls}>
+        <label className={styles.controlField}>
+          Search query
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="name, email, phone, or tax id"
+          />
+        </label>
+        <label className={styles.controlField}>
+          Activity
+          <select
+            value={activityFilter}
+            onChange={(event) =>
+              setActivityFilter(event.target.value as "all" | "active" | "inactive")
+            }
+          >
+            <option value="all">all</option>
+            <option value="active">active</option>
+            <option value="inactive">inactive</option>
+          </select>
+        </label>
+        <button type="button" onClick={() => void loadVendors()}>
+          Run Search
+        </button>
+      </div>
 
       {filteredRows.length > 0 ? (
         <div className={styles.tableWrap}>
@@ -357,9 +362,9 @@ export function VendorsConsole() {
       )}
 
       {duplicateCandidates.length > 0 ? (
-        <>
+        <section className={styles.duplicateCard}>
           <p>Duplicate candidates:</p>
-          <ul>
+          <ul className={styles.duplicateList}>
             {duplicateCandidates.map((candidate) => (
               <li key={candidate.id}>
                 #{candidate.id} {candidate.name} ({candidate.email || "no-email"})
@@ -371,7 +376,7 @@ export function VendorsConsole() {
               Create Anyway
             </button>
           ) : null}
-        </>
+        </section>
       ) : null}
 
       <form onSubmit={handleCreate}>
@@ -474,7 +479,7 @@ export function VendorsConsole() {
         </button>
       </form>
 
-      <section>
+      <section className={styles.importCard}>
         <h3>CSV Import</h3>
         <p>Headers: name,vendor_type,email,phone,tax_id_last4,notes,is_active.</p>
         <label>
@@ -507,7 +512,7 @@ export function VendorsConsole() {
         ) : null}
       </section>
 
-      <p>{statusMessage}</p>
+      {statusMessage ? <p className={styles.statusMessage}>{statusMessage}</p> : null}
     </section>
   );
 }

@@ -1,22 +1,26 @@
 import { VendorsConsole } from "@/features/vendors";
-import styles from "./page.module.css";
+import shell from "@/app/wip-shell.module.css";
 
 export default function VendorsPage() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <header className={styles.header}>
-          <h1>Vendors (WIP)</h1>
-          <p>
-            This route gives users a canonical vendor directory with duplicate safeguards so AP
-            records are attached to stable payee entities.
-          </p>
-          <p>
-            Vendors are a non-workflow reference list used by Vendor Bills and outbound AP payment
-            flows.
-          </p>
+    <div className={shell.page}>
+      <main className={`${shell.main} ${shell.mainNarrow}`}>
+        <header className={shell.hero}>
+          <div className={shell.heroTop}>
+            <p className={shell.eyebrow}>Ops / Meta</p>
+            <h1 className={shell.title}>Vendors (WIP)</h1>
+            <p className={shell.copy}>
+              Maintain canonical payees for AP workflows. This directory feeds Vendor Bills and
+              outbound payment allocation.
+            </p>
+          </div>
+          <div className={shell.heroMetaRow}>
+            <span className={shell.metaPill}>Duplicate guarded</span>
+            <span className={shell.metaPill}>Reusable vendor records</span>
+            <span className={shell.metaPill}>AP-first shape</span>
+          </div>
         </header>
-        <section className={styles.card}>
+        <section className={shell.card}>
           <VendorsConsole />
         </section>
       </main>

@@ -39,6 +39,7 @@ export const opsMetaRoutes: NavRoute[] = [
   { href: "/ops/organization", label: "Organization (WIP)", exact: ["/ops/organization"] },
   { href: "/vendors", label: "Vendors (WIP)", exact: ["/vendors"] },
   { href: "/settings/intake", label: "Settings (WIP)", exact: ["/settings/intake"] },
+  { href: "/ops/meta/help", label: "Help (WIP)", exact: ["/ops/meta/help"] },
 ];
 
 export function isRouteActive(pathname: string, route: NavRoute): boolean {

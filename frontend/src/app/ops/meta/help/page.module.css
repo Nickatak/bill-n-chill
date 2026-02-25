@@ -1,0 +1,108 @@
+.stepList {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.stepItem {
+  border: 1px solid #c7d6ea;
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.stepTitle {
+  margin: 0;
+  font-size: 0.96rem;
+  color: #0f172a;
+}
+
+.stepBody {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #334155;
+}
+
+.roleGrid {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.roleCard {
+  border: 1px solid #c7d6ea;
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.roleCard h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+.roleCard p {
+  margin: 0;
+  font-size: 0.86rem;
+  color: #334155;
+  line-height: 1.45;
+}
+
+.faqList {
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.faqItem {
+  border: 1px solid #c7d6ea;
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 10px 12px;
+}
+
+.faqItem summary {
+  cursor: pointer;
+  color: #0f172a;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.faqItem p {
+  margin: 8px 0 0;
+  color: #334155;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+:global(html[data-theme="dark"]) .stepItem,
+:global(html[data-theme="dark"]) .faqItem {
+  border-color: #334155;
+  background: #0f1a2d;
+}
+
+:global(html[data-theme="dark"]) .stepTitle,
+:global(html[data-theme="dark"]) .faqItem summary,
+:global(html[data-theme="dark"]) .roleCard h3 {
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .stepBody,
+:global(html[data-theme="dark"]) .faqItem p,
+:global(html[data-theme="dark"]) .roleCard p {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .roleCard {
+  border-color: #334155;
+  background: #111827;
+}

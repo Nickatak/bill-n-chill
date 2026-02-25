@@ -1,7 +1,7 @@
 import { ProjectActivityConsole } from "@/features/projects/components/project-activity-console";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import styles from "../../../vendors/page.module.css";
+import shell from "@/app/wip-shell.module.css";
 
 type ProjectActivityPageProps = {
   params: Promise<{ projectId: string }>;
@@ -14,24 +14,27 @@ export default async function ProjectActivityPage({ params }: ProjectActivityPag
   }
 
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <header className={styles.header}>
-          <h1>Project Activity (WIP)</h1>
-          <p>
-            Read-only timeline for cross-domain activity. It merges financial audit events with
-            workflow status history for this project.
-          </p>
-          <p>
-            Use category filters to focus on finance-only events or workflow-only events while
-            keeping drill-down links available.
-          </p>
-          <p>
-            <Link href={`/projects?project=${projectId}`}>Back to Project Hub</Link> |{" "}
-            <Link href={`/financials-auditing`}>Next: Financials & Accounting</Link>
-          </p>
+    <div className={shell.page}>
+      <main className={shell.main}>
+        <header className={shell.hero}>
+          <div className={shell.heroTop}>
+            <p className={shell.eyebrow}>Projects</p>
+            <h1 className={shell.title}>Project Activity (WIP)</h1>
+            <p className={shell.copy}>
+              Read-only activity timeline that combines workflow transitions and finance-linked
+              audit events for a single project.
+            </p>
+          </div>
+          <div className={shell.linkRow}>
+            <Link className={shell.linkButton} href={`/projects?project=${projectId}`}>
+              Back to Project Hub
+            </Link>
+            <Link className={shell.linkButton} href="/financials-auditing">
+              Next: Financials & Accounting
+            </Link>
+          </div>
         </header>
-        <section className={styles.card}>
+        <section className={shell.card}>
           <ProjectActivityConsole projectId={Number(projectId)} />
         </section>
       </main>

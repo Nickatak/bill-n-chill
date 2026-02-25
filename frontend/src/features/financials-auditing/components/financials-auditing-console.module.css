@@ -1,0 +1,125 @@
+.console {
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border: #cbd5e1;
+  --surface: #f8fafc;
+  --surface-elevated: #ffffff;
+  --accent: #1d4ed8;
+
+  display: grid;
+  gap: 10px;
+  color: var(--text-primary);
+}
+
+.authMessage,
+.statusMessage {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  padding: 8px 10px;
+  font-size: 0.84rem;
+}
+
+.console > section {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.console h3,
+.console h4 {
+  margin: 0;
+}
+
+.console p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+.console label {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.console input,
+.console select,
+.console textarea {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  padding: 8px 10px;
+  font-size: 0.88rem;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+}
+
+.console textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.console button {
+  border: 1px solid #93c5fd;
+  border-radius: 8px;
+  background: #dbeafe;
+  color: #1e3a8a;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  width: fit-content;
+}
+
+.console button + button {
+  margin-left: 8px;
+}
+
+.console ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.console li {
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+}
+
+.console a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.console a:hover {
+  text-decoration: underline;
+}
+
+:global(html[data-theme="dark"]) .console {
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --border: #334155;
+  --surface: #0f172a;
+  --surface-elevated: #111827;
+  --accent: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .console button {
+  border-color: #3b82f6;
+  background: #1e3a8a;
+  color: #dbeafe;
+}

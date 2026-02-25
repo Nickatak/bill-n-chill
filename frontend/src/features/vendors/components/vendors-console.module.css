@@ -1,8 +1,82 @@
+.console {
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border: #cbd5e1;
+  --surface: #f8fafc;
+  --surface-elevated: #ffffff;
+
+  display: grid;
+  gap: 12px;
+  color: var(--text-primary);
+}
+
+.heading {
+  margin: 0;
+  font-size: 1.08rem;
+}
+
+.copy {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.controls {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 240px) auto;
+  align-items: end;
+}
+
+.controlField {
+  display: grid;
+  gap: 6px;
+  font-size: 0.76rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.controlField input,
+.controlField select {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+}
+
+.console button {
+  border: 1px solid #93c5fd;
+  border-radius: 8px;
+  background: #dbeafe;
+  color: #1e3a8a;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  width: fit-content;
+}
+
+.console button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .tableWrap {
-  border: 1px solid #d1d5db;
-  border-radius: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
   overflow-x: auto;
-  margin: 10px 0;
+  margin: 0;
 }
 
 .table {
@@ -15,27 +89,28 @@
 .table td {
   text-align: left;
   padding: 8px 10px;
-  border-bottom: 1px solid #e5e7eb;
-  color: #111827;
+  border-bottom: 1px solid #dbe4f1;
+  color: var(--text-primary);
 }
 
 .table tbody tr {
-  background: #ffffff;
+  background: var(--surface-elevated);
 }
 
 .table tbody tr:nth-child(even) {
-  background: #f8fafc;
+  background: #f1f6fd;
 }
 
 .table th {
-  background: #f3f4f6;
+  background: #eaf2ff;
   font-size: 0.75rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+  color: #1e3a8a;
 }
 
 .rowSelected {
-  background: #e0e7ff;
+  background: #dbeafe !important;
 }
 
 .pagination {
@@ -44,27 +119,112 @@
   justify-content: flex-end;
   gap: 8px;
   padding: 8px 10px;
-  border-top: 1px solid #e5e7eb;
-  background: #f9fafb;
+  border-top: 1px solid #dbe4f1;
+  background: #f2f7ff;
 }
 
 .pagination span {
-  color: #374151;
+  color: var(--text-secondary);
   font-size: 0.85rem;
 }
 
-:global(html[data-theme="dark"]) .tableWrap {
-  border-color: #334155;
+.duplicateCard,
+.importCard,
+.console form {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.console h3 {
+  margin: 0;
+}
+
+.console p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+.console form label,
+.importCard label {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.console form input,
+.console form textarea,
+.console form select,
+.importCard textarea {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+}
+
+.console form textarea,
+.importCard textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.duplicateList {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.duplicateList li {
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+}
+
+.statusMessage {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  padding: 8px 10px;
+  font-size: 0.84rem;
+}
+
+@media (max-width: 760px) {
+  .controls {
+    grid-template-columns: 1fr;
+  }
+}
+
+:global(html[data-theme="dark"]) .console {
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --border: #334155;
+  --surface: #0f172a;
+  --surface-elevated: #111827;
 }
 
 :global(html[data-theme="dark"]) .table th,
 :global(html[data-theme="dark"]) .table td {
   border-bottom-color: #334155;
-  color: #f3f4f6;
 }
 
 :global(html[data-theme="dark"]) .table th {
-  background: #0f172a;
+  background: #111827;
+  color: #93c5fd;
 }
 
 :global(html[data-theme="dark"]) .table tbody tr {
@@ -76,14 +236,11 @@
 }
 
 :global(html[data-theme="dark"]) .rowSelected {
-  background: #1e293b;
+  background: #1e3a8a !important;
 }
 
-:global(html[data-theme="dark"]) .pagination {
-  border-top-color: #334155;
-  background: #0f172a;
-}
-
-:global(html[data-theme="dark"]) .pagination span {
-  color: #cbd5e1;
+:global(html[data-theme="dark"]) .console button {
+  border-color: #3b82f6;
+  background: #1e3a8a;
+  color: #dbeafe;
 }

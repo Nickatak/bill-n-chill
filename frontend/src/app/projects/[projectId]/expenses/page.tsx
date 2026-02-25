@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import styles from "../../../expenses/page.module.css";
+import shell from "@/app/wip-shell.module.css";
 
 type ProjectExpensesPageProps = {
   params: Promise<{ projectId: string }>;
@@ -13,38 +13,43 @@ export default async function ProjectExpensesPage({ params }: ProjectExpensesPag
   }
 
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <header className={styles.header}>
-          <h1>Expenses (WIP)</h1>
-          <p>
-            Quick-add intake version of Vendor Bills for field purchases, retail receipts, and
-            other on-the-fly spend that still needs budget-line attribution.
-          </p>
-          <p>
-            This route is project-scoped by design so expense intake maps directly to one job’s
-            budget and reporting context.
-          </p>
-          <p>
-            <Link href={`/projects?project=${projectId}`}>Back to Project Hub</Link> |{" "}
-            <Link href={`/projects/${projectId}/vendor-bills`}>Next: Vendor Bills</Link>
-          </p>
+    <div className={shell.page}>
+      <main className={`${shell.main} ${shell.mainNarrow}`}>
+        <header className={shell.hero}>
+          <div className={shell.heroTop}>
+            <p className={shell.eyebrow}>Projects</p>
+            <h1 className={shell.title}>Expenses (WIP)</h1>
+            <p className={shell.copy}>
+              Project-scoped quick-capture spend for field purchases and receipts that still need
+              budget attribution.
+            </p>
+          </div>
+          <div className={shell.linkRow}>
+            <Link className={shell.linkButton} href={`/projects?project=${projectId}`}>
+              Back to Project Hub
+            </Link>
+            <Link className={shell.linkButton} href={`/projects/${projectId}/vendor-bills`}>
+              Next: Vendor Bills
+            </Link>
+          </div>
         </header>
-        <section className={styles.card}>
-          <h2>Expense Entry</h2>
-          <p>Expense quick-add workflow is now scaffolded and ready for implementation.</p>
-          <p>
+        <section className={shell.card}>
+          <h2 className={shell.sectionTitle}>Expense Entry</h2>
+          <p className={shell.sectionCopy}>
+            Expense quick-add workflow is scaffolded and ready for implementation.
+          </p>
+          <p className={shell.sectionCopy}>
             Next step will add lightweight receipt intake with budget-line splits, optimized for
             same-day field purchases, with room to layer in receipt scanning later.
           </p>
         </section>
-        <section className={styles.card}>
-          <h2>Workflow Context</h2>
-          <p>
+        <section className={`${shell.card} ${shell.cardMuted}`}>
+          <h2 className={shell.sectionTitle}>Workflow Context</h2>
+          <p className={shell.sectionCopy}>
             Expenses are project-scoped quick-capture spend records for field/retail purchases
             that still require budget attribution and downstream AP traceability.
           </p>
-          <p>
+          <p className={shell.sectionCopy}>
             This route complements Vendor Bills by covering ad hoc spend rather than formal vendor
             contract billing.
           </p>

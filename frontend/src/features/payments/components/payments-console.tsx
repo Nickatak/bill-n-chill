@@ -24,6 +24,7 @@ import {
   ProjectRecord,
   VendorBillRecord,
 } from "../types";
+import styles from "./payments-console.module.css";
 
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
@@ -532,12 +533,18 @@ export function PaymentsConsole() {
   }, [token]);
 
   return (
-    <section>
-      <h2>Payment Recording</h2>
-      <p>Record inbound and outbound money movement with method, status, and reference tracking.</p>
+    <section className={styles.console}>
+      <h2 className={styles.heading}>Payment Recording</h2>
+      <p className={styles.copy}>
+        Record inbound and outbound money movement with method, status, and reference tracking.
+      </p>
 
-      <p>{authMessage}</p>
-      {!canMutatePayments ? <p>Role `{role}` can view payments but cannot create, edit, or allocate.</p> : null}
+      <p className={styles.authMessage}>{authMessage}</p>
+      {!canMutatePayments ? (
+        <p className={styles.readOnlyNotice}>
+          Role `{role}` can view payments but cannot create, edit, or allocate.
+        </p>
+      ) : null}
 
       <button type="button" onClick={loadProjects}>
         Load Projects
@@ -810,7 +817,7 @@ export function PaymentsConsole() {
         ) : null}
       </section>
 
-      <p>{statusMessage}</p>
+      {statusMessage ? <p className={styles.statusMessage}>{statusMessage}</p> : null}
     </section>
   );
 }

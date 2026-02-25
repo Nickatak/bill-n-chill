@@ -1,0 +1,99 @@
+.console {
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border: #cbd5e1;
+  --surface: #f8fafc;
+  --surface-elevated: #ffffff;
+  --accent: #1d4ed8;
+
+  display: grid;
+  gap: 12px;
+  color: var(--text-primary);
+}
+
+.header {
+  display: grid;
+  gap: 6px;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.header p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.form {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 12px;
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-elevated);
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.toggleRow input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.toggleRow span {
+  font-size: 0.9rem;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.actions button {
+  border: 1px solid #93c5fd;
+  border-radius: 8px;
+  background: #dbeafe;
+  color: #1e3a8a;
+  font-size: 0.84rem;
+  font-weight: 700;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.statusMessage {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  padding: 8px 10px;
+}
+
+:global(html[data-theme="dark"]) .console {
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --border: #334155;
+  --surface: #0f172a;
+  --surface-elevated: #111827;
+  --accent: #60a5fa;
+}
+
+:global(html[data-theme="dark"]) .actions button {
+  border-color: #3b82f6;
+  background: #1e3a8a;
+  color: #dbeafe;
+}

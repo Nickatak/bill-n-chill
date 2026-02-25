@@ -1,6 +1,6 @@
 import { EstimateApprovalPreview } from "@/features/estimates/components/estimate-approval-preview";
 import { notFound } from "next/navigation";
-import styles from "./page.module.css";
+import shell from "@/app/wip-shell.module.css";
 
 type EstimateReviewPageProps = {
   params: Promise<{ publicRef: string }>;
@@ -19,13 +19,19 @@ export default async function EstimateReviewPage({ params }: EstimateReviewPageP
   }
 
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <header className={styles.header}>
-          <h1>Estimate Review (WIP)</h1>
-          <p>Customer-facing preview while approval/denial UX and language are being finalized.</p>
+    <div className={shell.page}>
+      <main className={shell.main}>
+        <header className={shell.hero}>
+          <div className={shell.heroTop}>
+            <p className={shell.eyebrow}>Client Facing</p>
+            <h1 className={shell.title}>Estimate Review (WIP)</h1>
+            <p className={shell.copy}>
+              Customer-facing estimate preview while final approval/denial language and response
+              handling are finalized.
+            </p>
+          </div>
         </header>
-        <section className={styles.card}>
+        <section className={shell.card}>
           <EstimateApprovalPreview publicToken={publicToken} />
         </section>
       </main>
