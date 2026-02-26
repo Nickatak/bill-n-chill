@@ -495,7 +495,16 @@ def project_audit_events_view(request, project_id: int):
     rows = FinancialAuditEvent.objects.filter(
         project=project,
         created_by_id__in=actor_user_ids,
-    ).order_by("-created_at", "-id")
+    )
+    object_type_filters = [value.strip() for value in request.query_params.getlist("object_type") if value.strip()]
+    if len(object_type_filters) == 1 and "," in object_type_filters[0]:
+        object_type_filters = [
+            value.strip() for value in object_type_filters[0].split(",") if value.strip()
+        ]
+    if object_type_filters:
+        rows = rows.filter(object_type__in=object_type_filters)
+
+    rows = rows.order_by("-created_at", "-id")
     return Response({"data": FinancialAuditEventSerializer(rows, many=True).data})
 
 
