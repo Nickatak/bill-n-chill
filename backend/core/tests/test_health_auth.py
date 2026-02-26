@@ -97,6 +97,7 @@ class AuthEndpointTests(TestCase):
         self.assertEqual(organization.invoice_sender_name, organization.display_name)
         self.assertEqual(organization.invoice_sender_email, "defaults@example.com")
         self.assertEqual(organization.invoice_default_due_days, 30)
+        self.assertEqual(organization.estimate_validation_delta_days, 30)
         self.assertEqual(
             organization.invoice_default_terms,
             "Payment due within 30 days of invoice date.",

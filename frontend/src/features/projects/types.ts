@@ -11,6 +11,7 @@ export type ProjectRecord = {
   status: string;
   contract_value_original: string;
   contract_value_current: string;
+  accepted_contract_total: string;
   start_date_planned: string | null;
   end_date_planned: string | null;
 };
@@ -19,6 +20,7 @@ export type ProjectFinancialSummary = {
   project_id: number;
   contract_value_original: string;
   contract_value_current: string;
+  accepted_contract_total: string;
   approved_change_orders_total: string;
   invoiced_to_date: string;
   paid_to_date: string;

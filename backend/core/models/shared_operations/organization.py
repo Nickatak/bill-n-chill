@@ -30,6 +30,7 @@ class Organization(models.Model):
     invoice_sender_email = models.EmailField(blank=True, default="")
     invoice_sender_address = models.TextField(blank=True, default="")
     invoice_default_due_days = models.PositiveSmallIntegerField(default=30)
+    estimate_validation_delta_days = models.PositiveSmallIntegerField(default=30)
     invoice_default_terms = models.TextField(blank=True, default="")
     estimate_default_terms = models.TextField(blank=True, default="")
     change_order_default_reason = models.TextField(blank=True, default="")

@@ -160,6 +160,7 @@ def _build_organization_snapshot(organization: Organization) -> dict:
             "invoice_sender_email": organization.invoice_sender_email,
             "invoice_sender_address": organization.invoice_sender_address,
             "invoice_default_due_days": organization.invoice_default_due_days,
+            "estimate_validation_delta_days": organization.estimate_validation_delta_days,
             "invoice_default_terms": organization.invoice_default_terms,
             "estimate_default_terms": organization.estimate_default_terms,
             "change_order_default_reason": organization.change_order_default_reason,
@@ -281,6 +282,9 @@ def _ensure_primary_membership(user):
             invoice_sender_name=bootstrap_invoice_defaults["invoice_sender_name"],
             invoice_sender_email=bootstrap_invoice_defaults["invoice_sender_email"],
             invoice_default_due_days=bootstrap_invoice_defaults["invoice_default_due_days"],
+            estimate_validation_delta_days=bootstrap_invoice_defaults[
+                "estimate_validation_delta_days"
+            ],
             invoice_default_terms=bootstrap_invoice_defaults["invoice_default_terms"],
             estimate_default_terms=bootstrap_invoice_defaults["estimate_default_terms"],
             change_order_default_reason=bootstrap_invoice_defaults["change_order_default_reason"],

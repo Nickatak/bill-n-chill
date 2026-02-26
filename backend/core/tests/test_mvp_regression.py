@@ -267,6 +267,7 @@ class MvpRegressionMoneyLoopTests(TestCase):
         summary = summary_response.json()["data"]
         self.assertEqual(summary["contract_value_original"], "1000.00")
         self.assertEqual(summary["contract_value_current"], "1200.00")
+        self.assertEqual(summary["accepted_contract_total"], "1200.00")
         self.assertEqual(summary["approved_change_orders_total"], "200.00")
         self.assertEqual(summary["invoiced_to_date"], "1200.00")
         self.assertEqual(summary["paid_to_date"], "1200.00")

@@ -18,6 +18,7 @@ class OrganizationProfileSerializer(serializers.ModelSerializer):
             "invoice_sender_email",
             "invoice_sender_address",
             "invoice_default_due_days",
+            "estimate_validation_delta_days",
             "invoice_default_terms",
             "estimate_default_terms",
             "change_order_default_reason",
@@ -84,6 +85,9 @@ class OrganizationProfileUpdateSerializer(serializers.Serializer):
     invoice_sender_email = serializers.EmailField(required=False, allow_blank=True, default="")
     invoice_sender_address = serializers.CharField(max_length=5000, required=False, allow_blank=True, default="")
     invoice_default_due_days = serializers.IntegerField(required=False, min_value=1, max_value=365)
+    estimate_validation_delta_days = serializers.IntegerField(
+        required=False, min_value=1, max_value=365
+    )
     invoice_default_terms = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
     estimate_default_terms = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
     change_order_default_reason = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")

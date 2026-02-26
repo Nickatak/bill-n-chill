@@ -137,6 +137,7 @@ class OrganizationManagementTests(TestCase):
                 "invoice_sender_email": "billing@example.com",
                 "invoice_sender_address": "123 Main St\nAustin, TX 78701",
                 "invoice_default_due_days": 21,
+                "estimate_validation_delta_days": 45,
                 "invoice_default_terms": "Net 21",
                 "estimate_default_terms": "Estimate terms and assumptions.",
                 "change_order_default_reason": "Default CO reason text.",
@@ -153,6 +154,7 @@ class OrganizationManagementTests(TestCase):
         self.assertEqual(self.organization.invoice_sender_email, "billing@example.com")
         self.assertEqual(self.organization.invoice_sender_address, "123 Main St\nAustin, TX 78701")
         self.assertEqual(self.organization.invoice_default_due_days, 21)
+        self.assertEqual(self.organization.estimate_validation_delta_days, 45)
         self.assertEqual(self.organization.invoice_default_terms, "Net 21")
         self.assertEqual(self.organization.estimate_default_terms, "Estimate terms and assumptions.")
         self.assertEqual(self.organization.change_order_default_reason, "Default CO reason text.")
@@ -171,6 +173,15 @@ class OrganizationManagementTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("invoice_default_due_days", response.json())
+
+        estimate_delta_response = self.client.patch(
+            "/api/v1/organization/",
+            data={"estimate_validation_delta_days": 0},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.owner_token.key}",
+        )
+        self.assertEqual(estimate_delta_response.status_code, 400)
+        self.assertIn("estimate_validation_delta_days", estimate_delta_response.json())
 
     def test_organization_memberships_list_is_scoped_to_active_org(self):
         response = self.client.get(

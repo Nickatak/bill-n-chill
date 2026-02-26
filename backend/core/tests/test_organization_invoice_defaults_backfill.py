@@ -16,6 +16,7 @@ class OrganizationInvoiceDefaultsBackfillCommandTests(TestCase):
             created_by=owner,
             invoice_sender_name="",
             invoice_sender_email="",
+            estimate_validation_delta_days=0,
             invoice_default_terms="",
             estimate_default_terms="",
             change_order_default_reason="",
@@ -28,6 +29,7 @@ class OrganizationInvoiceDefaultsBackfillCommandTests(TestCase):
             created_by=owner,
             invoice_sender_name="Custom Sender",
             invoice_sender_email="billing@custom.org",
+            estimate_validation_delta_days=60,
             invoice_default_terms="Custom terms",
             estimate_default_terms="Custom estimate terms",
             change_order_default_reason="Custom CO reason",
@@ -43,6 +45,7 @@ class OrganizationInvoiceDefaultsBackfillCommandTests(TestCase):
             missing_defaults_org.invoice_sender_email,
             "backfill-owner@example.com",
         )
+        self.assertEqual(missing_defaults_org.estimate_validation_delta_days, 30)
         self.assertEqual(
             missing_defaults_org.invoice_default_terms,
             "Payment due within 30 days of invoice date.",
@@ -67,6 +70,7 @@ class OrganizationInvoiceDefaultsBackfillCommandTests(TestCase):
         custom_org.refresh_from_db()
         self.assertEqual(custom_org.invoice_sender_name, "Custom Sender")
         self.assertEqual(custom_org.invoice_sender_email, "billing@custom.org")
+        self.assertEqual(custom_org.estimate_validation_delta_days, 60)
         self.assertEqual(custom_org.invoice_default_terms, "Custom terms")
         self.assertEqual(custom_org.estimate_default_terms, "Custom estimate terms")
         self.assertEqual(custom_org.change_order_default_reason, "Custom CO reason")

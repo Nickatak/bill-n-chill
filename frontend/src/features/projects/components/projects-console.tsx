@@ -116,6 +116,8 @@ export function ProjectsConsole() {
     : null;
   const contractOriginalDisplay =
     summary?.contract_value_original ?? selectedProject?.contract_value_original ?? "--";
+  const acceptedContractDisplay =
+    summary?.accepted_contract_total ?? selectedProject?.accepted_contract_total ?? acceptedEstimateTotal;
   const arOutstandingDisplay = summary?.ar_outstanding ?? "--";
   const apOutstandingDisplay = summary?.ap_outstanding ?? "--";
   const invoicedDisplay = summary?.invoiced_to_date ?? "--";
@@ -581,7 +583,7 @@ export function ProjectsConsole() {
                           Open Estimates
                         </Link>
                       </td>
-                      <td>{project.contract_value_current}</td>
+                      <td>{project.accepted_contract_total}</td>
                       <td>{startLabel}</td>
                       <td>{endLabel}</td>
                     </tr>
@@ -742,7 +744,7 @@ export function ProjectsConsole() {
               </div>
               <div className={styles.metricRow}>
                 <span>Accepted Contract Total</span>
-                <strong>{acceptedEstimateTotal}</strong>
+                <strong>{acceptedContractDisplay}</strong>
               </div>
               <div className={styles.metricRow}>
                 <span>Accepted CO Delta</span>

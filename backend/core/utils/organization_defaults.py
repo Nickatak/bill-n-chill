@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 DEFAULT_INVOICE_DUE_DAYS = 30
+DEFAULT_ESTIMATE_VALIDATION_DELTA_DAYS = 30
 DEFAULT_INVOICE_TERMS = "Payment due within 30 days of invoice date."
 DEFAULT_ESTIMATE_TERMS = (
     "Estimate is valid for 30 days. Scope and pricing are based on visible conditions only; "
@@ -26,6 +27,7 @@ def build_invoice_profile_defaults(*, display_name: str, owner_email: str = "") 
         "invoice_sender_name": resolved_display_name,
         "invoice_sender_email": resolved_email,
         "invoice_default_due_days": DEFAULT_INVOICE_DUE_DAYS,
+        "estimate_validation_delta_days": DEFAULT_ESTIMATE_VALIDATION_DELTA_DAYS,
         "invoice_default_terms": DEFAULT_INVOICE_TERMS,
         "estimate_default_terms": DEFAULT_ESTIMATE_TERMS,
         "change_order_default_reason": DEFAULT_CHANGE_ORDER_REASON,
@@ -59,6 +61,10 @@ def apply_missing_invoice_profile_defaults(*, organization, owner_email: str = "
     if int(organization.invoice_default_due_days or 0) < 1:
         organization.invoice_default_due_days = DEFAULT_INVOICE_DUE_DAYS
         changed_fields.append("invoice_default_due_days")
+
+    if int(organization.estimate_validation_delta_days or 0) < 1:
+        organization.estimate_validation_delta_days = DEFAULT_ESTIMATE_VALIDATION_DELTA_DAYS
+        changed_fields.append("estimate_validation_delta_days")
 
     current_terms = (organization.invoice_default_terms or "").strip()
     if not current_terms:

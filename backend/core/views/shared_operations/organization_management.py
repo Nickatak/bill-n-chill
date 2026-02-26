@@ -142,6 +142,13 @@ def organization_profile_view(request):
             changed_fields.append("invoice_default_due_days")
             update_fields.append("invoice_default_due_days")
 
+    if "estimate_validation_delta_days" in incoming:
+        validation_delta_days = int(incoming.get("estimate_validation_delta_days") or 30)
+        if validation_delta_days != organization.estimate_validation_delta_days:
+            organization.estimate_validation_delta_days = validation_delta_days
+            changed_fields.append("estimate_validation_delta_days")
+            update_fields.append("estimate_validation_delta_days")
+
     if "invoice_default_terms" in incoming:
         default_terms = str(incoming.get("invoice_default_terms") or "").strip()
         if default_terms != organization.invoice_default_terms:

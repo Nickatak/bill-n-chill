@@ -98,6 +98,7 @@ export function OrganizationConsole() {
   const [invoiceSenderEmailDraft, setInvoiceSenderEmailDraft] = useState("");
   const [invoiceSenderAddressDraft, setInvoiceSenderAddressDraft] = useState("");
   const [invoiceDefaultDueDaysDraft, setInvoiceDefaultDueDaysDraft] = useState("30");
+  const [estimateValidationDeltaDaysDraft, setEstimateValidationDeltaDaysDraft] = useState("30");
   const [invoiceDefaultTermsDraft, setInvoiceDefaultTermsDraft] = useState("");
   const [estimateDefaultTermsDraft, setEstimateDefaultTermsDraft] = useState("");
   const [changeOrderDefaultReasonDraft, setChangeOrderDefaultReasonDraft] = useState("");
@@ -127,6 +128,8 @@ export function OrganizationConsole() {
       invoiceSenderAddressDraft.trim() !== (organizationProfile.invoice_sender_address || "") ||
       String(Number(invoiceDefaultDueDaysDraft || "30")) !==
         String(organizationProfile.invoice_default_due_days || 30) ||
+      String(Number(estimateValidationDeltaDaysDraft || "30")) !==
+        String(organizationProfile.estimate_validation_delta_days || 30) ||
       invoiceDefaultTermsDraft.trim() !== (organizationProfile.invoice_default_terms || "") ||
       estimateDefaultTermsDraft.trim() !== (organizationProfile.estimate_default_terms || "") ||
       changeOrderDefaultReasonDraft.trim() !==
@@ -205,6 +208,9 @@ export function OrganizationConsole() {
         setInvoiceSenderEmailDraft(nextProfile.invoice_sender_email ?? "");
         setInvoiceSenderAddressDraft(nextProfile.invoice_sender_address ?? "");
         setInvoiceDefaultDueDaysDraft(String(nextProfile.invoice_default_due_days ?? 30));
+        setEstimateValidationDeltaDaysDraft(
+          String(nextProfile.estimate_validation_delta_days ?? 30),
+        );
         setInvoiceDefaultTermsDraft(nextProfile.invoice_default_terms ?? "");
         setEstimateDefaultTermsDraft(nextProfile.estimate_default_terms ?? "");
         setChangeOrderDefaultReasonDraft(nextProfile.change_order_default_reason ?? "");
@@ -246,6 +252,10 @@ export function OrganizationConsole() {
     const sanitizedDueDays = Number.isFinite(parsedDueDays)
       ? Math.max(1, Math.min(365, Math.round(parsedDueDays)))
       : 30;
+    const parsedEstimateDeltaDays = Number(estimateValidationDeltaDaysDraft);
+    const sanitizedEstimateDeltaDays = Number.isFinite(parsedEstimateDeltaDays)
+      ? Math.max(1, Math.min(365, Math.round(parsedEstimateDeltaDays)))
+      : 30;
     const payload = {
       display_name: displayNameDraft.trim(),
       slug: slugDraft.trim() || null,
@@ -254,6 +264,7 @@ export function OrganizationConsole() {
       invoice_sender_email: invoiceSenderEmailDraft.trim(),
       invoice_sender_address: invoiceSenderAddressDraft.trim(),
       invoice_default_due_days: sanitizedDueDays,
+      estimate_validation_delta_days: sanitizedEstimateDeltaDays,
       invoice_default_terms: invoiceDefaultTermsDraft.trim(),
       estimate_default_terms: estimateDefaultTermsDraft.trim(),
       change_order_default_reason: changeOrderDefaultReasonDraft.trim(),
@@ -287,6 +298,9 @@ export function OrganizationConsole() {
         setInvoiceSenderEmailDraft(data.organization.invoice_sender_email ?? "");
         setInvoiceSenderAddressDraft(data.organization.invoice_sender_address ?? "");
         setInvoiceDefaultDueDaysDraft(String(data.organization.invoice_default_due_days ?? 30));
+        setEstimateValidationDeltaDaysDraft(
+          String(data.organization.estimate_validation_delta_days ?? 30),
+        );
         setInvoiceDefaultTermsDraft(data.organization.invoice_default_terms ?? "");
         setEstimateDefaultTermsDraft(data.organization.estimate_default_terms ?? "");
         setChangeOrderDefaultReasonDraft(data.organization.change_order_default_reason ?? "");
@@ -548,16 +562,29 @@ export function OrganizationConsole() {
             ) : null}
 
             {documentSettingsView === "estimate" ? (
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>Estimate Terms & Conditions</span>
-                <textarea
-                  value={estimateDefaultTermsDraft}
-                  onChange={(event) => setEstimateDefaultTermsDraft(event.target.value)}
-                  rows={4}
-                  placeholder="Default terms and conditions shown on estimates"
-                  disabled={!canEditProfile || isSavingProfile || !organizationProfile}
-                />
-              </label>
+              <>
+                <label className={styles.field}>
+                  <span className={styles.fieldLabel}>Estimate Validation Delta (Days)</span>
+                  <input
+                    value={estimateValidationDeltaDaysDraft}
+                    onChange={(event) => setEstimateValidationDeltaDaysDraft(event.target.value)}
+                    type="number"
+                    min={1}
+                    max={365}
+                    disabled={!canEditProfile || isSavingProfile || !organizationProfile}
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span className={styles.fieldLabel}>Estimate Terms & Conditions</span>
+                  <textarea
+                    value={estimateDefaultTermsDraft}
+                    onChange={(event) => setEstimateDefaultTermsDraft(event.target.value)}
+                    rows={4}
+                    placeholder="Default terms and conditions shown on estimates"
+                    disabled={!canEditProfile || isSavingProfile || !organizationProfile}
+                  />
+                </label>
+              </>
             ) : null}
 
             {documentSettingsView === "change_order" ? (

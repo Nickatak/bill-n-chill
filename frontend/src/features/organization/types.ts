@@ -11,6 +11,7 @@ export type OrganizationProfile = {
   invoice_sender_email: string;
   invoice_sender_address: string;
   invoice_default_due_days: number;
+  estimate_validation_delta_days: number;
   invoice_default_terms: string;
   estimate_default_terms: string;
   change_order_default_reason: string;

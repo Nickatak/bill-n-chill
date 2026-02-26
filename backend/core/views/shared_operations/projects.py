@@ -13,6 +13,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.models import (
+    Budget,
     ChangeOrder,
     Estimate,
     EstimateStatusEvent,
@@ -62,9 +63,39 @@ def _date_filter_from_query(request):
     return date_from, date_to, None
 
 
+def _project_accepted_contract_totals_map(*, project_ids, actor_user_ids):
+    if not project_ids:
+        return {}
+
+    active_budgets = (
+        Budget.objects.filter(
+            project_id__in=project_ids,
+            created_by_id__in=actor_user_ids,
+            status=Budget.Status.ACTIVE,
+        )
+        .select_related("source_estimate")
+        .order_by("project_id", "-created_at", "-id")
+    )
+
+    totals: dict[int, Decimal] = {}
+    for budget in active_budgets:
+        if budget.project_id in totals:
+            continue
+        if not budget.source_estimate_id:
+            totals[budget.project_id] = Decimal("0")
+            continue
+        totals[budget.project_id] = budget.source_estimate.grand_total + budget.approved_change_order_total
+    return totals
+
+
 def _build_project_financial_summary_data(project: Project, user, *, actor_user_ids=None):
     if actor_user_ids is None:
         actor_user_ids = _organization_user_ids(user)
+
+    accepted_contract_total = _project_accepted_contract_totals_map(
+        project_ids=[project.id],
+        actor_user_ids=actor_user_ids,
+    ).get(project.id, Decimal("0"))
 
     approved_co_rows = list(
         ChangeOrder.objects.filter(
@@ -232,6 +263,7 @@ def _build_project_financial_summary_data(project: Project, user, *, actor_user_
         "project_id": project.id,
         "contract_value_original": project.contract_value_original,
         "contract_value_current": project.contract_value_current,
+        "accepted_contract_total": accepted_contract_total,
         "approved_change_orders_total": approved_change_orders_total,
         "invoiced_to_date": invoiced_to_date,
         "paid_to_date": paid_to_date,
@@ -250,8 +282,19 @@ def _build_project_financial_summary_data(project: Project, user, *, actor_user_
 def projects_list_view(request):
     """List projects visible to the authenticated owner context."""
     actor_user_ids = _organization_user_ids(request.user)
-    rows = Project.objects.filter(created_by_id__in=actor_user_ids).select_related("customer")
-    return Response({"data": ProjectSerializer(rows, many=True).data})
+    rows = list(
+        Project.objects.filter(created_by_id__in=actor_user_ids).select_related("customer")
+    )
+    accepted_totals_by_project = _project_accepted_contract_totals_map(
+        project_ids=[row.id for row in rows],
+        actor_user_ids=actor_user_ids,
+    )
+    serialized_rows = ProjectSerializer(rows, many=True).data
+    for row in serialized_rows:
+        project_id = int(row.get("id"))
+        accepted_total = accepted_totals_by_project.get(project_id, Decimal("0"))
+        row["accepted_contract_total"] = f"{accepted_total:.2f}"
+    return Response({"data": serialized_rows})
 
 
 @api_view(["GET", "PATCH"])
@@ -271,7 +314,13 @@ def project_detail_view(request, project_id: int):
         )
 
     if request.method == "GET":
-        return Response({"data": ProjectProfileSerializer(project).data})
+        accepted_total = _project_accepted_contract_totals_map(
+            project_ids=[project.id],
+            actor_user_ids=actor_user_ids,
+        ).get(project.id, Decimal("0"))
+        payload = ProjectProfileSerializer(project).data
+        payload["accepted_contract_total"] = f"{accepted_total:.2f}"
+        return Response({"data": payload})
 
     if project.status in {Project.Status.COMPLETED, Project.Status.CANCELLED}:
         return Response(
@@ -361,7 +410,13 @@ def project_detail_view(request, project_id: int):
             },
             status=400,
         )
-    return Response({"data": ProjectProfileSerializer(project).data})
+    accepted_total = _project_accepted_contract_totals_map(
+        project_ids=[project.id],
+        actor_user_ids=actor_user_ids,
+    ).get(project.id, Decimal("0"))
+    payload = ProjectProfileSerializer(project).data
+    payload["accepted_contract_total"] = f"{accepted_total:.2f}"
+    return Response({"data": payload})
 
 
 @api_view(["GET"])
@@ -443,6 +498,7 @@ def project_accounting_export_view(request, project_id: int):
     summary_metrics = [
         "contract_value_original",
         "contract_value_current",
+        "accepted_contract_total",
         "approved_change_orders_total",
         "invoiced_to_date",
         "paid_to_date",

@@ -18,6 +18,7 @@ type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amo
 
 type OrganizationDocumentDefaults = OrganizationBrandingDefaults & {
   estimate_default_terms: string;
+  estimate_validation_delta_days: number;
 };
 
 type EstimateSheetProps = {
