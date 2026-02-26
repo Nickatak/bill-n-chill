@@ -61,6 +61,7 @@ class ProjectProfileTests(TestCase):
         self.assertEqual(len(projects), 1)
         self.assertEqual(projects[0]["name"], "Basement Remodel")
         self.assertIn("site_address", projects[0])
+        self.assertEqual(projects[0]["accepted_contract_total"], "0.00")
 
     def test_projects_list_includes_rows_created_by_other_user_in_same_org(self):
         shared_org = Organization.objects.create(
@@ -362,14 +363,27 @@ class CostCodeTests(TestCase):
         )[0]
         response = self.client.post(
             "/api/v1/cost-codes/",
-            data={"code": "03-300", "name": "Site Work", "is_active": True},
+            data={"code": "03-300", "name": "Site Work"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 201)
         created_code = CostCode.objects.get(id=response.json()["data"]["id"])
         self.assertEqual(created_code.organization_id, membership.organization_id)
+        self.assertTrue(created_code.is_active)
         self.assertEqual(CostCode.objects.filter(created_by=self.user).count(), 2)
+
+    def test_cost_code_create_rejects_inactive(self):
+        response = self.client.post(
+            "/api/v1/cost-codes/",
+            data={"code": "03-300", "name": "Site Work", "is_active": False},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertIn("is_active", payload)
+        self.assertFalse(CostCode.objects.filter(organization=self.user_org, code="03-300").exists())
 
     def test_cost_code_create_rejects_duplicate_code_in_same_org(self):
         response = self.client.post(
@@ -426,7 +440,7 @@ class CostCodeTests(TestCase):
             "/api/v1/cost-codes/import-csv/",
             data={
                 "dry_run": True,
-                "csv_text": "code,name,is_active\n01-100,General Conditions Updated,false\n03-300,Site Work,true\n",
+                "csv_text": "code,name\n01-100,General Conditions Updated\n03-300,Site Work\n",
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -441,7 +455,7 @@ class CostCodeTests(TestCase):
             "/api/v1/cost-codes/import-csv/",
             data={
                 "dry_run": False,
-                "csv_text": "code,name,is_active\n01-100,General Conditions Updated,false\n03-300,Site Work,true\n",
+                "csv_text": "code,name\n01-100,General Conditions Updated\n03-300,Site Work\n",
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -453,14 +467,22 @@ class CostCodeTests(TestCase):
         self.assertEqual(CostCode.objects.filter(created_by=self.user).count(), 2)
         self.code.refresh_from_db()
         self.assertEqual(self.code.name, "General Conditions Updated")
-        self.assertFalse(self.code.is_active)
+        self.assertTrue(self.code.is_active)
+        self.assertTrue(
+            CostCode.objects.filter(
+                created_by=self.user,
+                code="03-300",
+                name="Site Work",
+                is_active=True,
+            ).exists()
+        )
 
     def test_cost_code_csv_import_applies_when_dry_run_string_false(self):
         response = self.client.post(
             "/api/v1/cost-codes/import-csv/",
             data={
                 "dry_run": "false",
-                "csv_text": "code,name,is_active\n03-300,Site Work,true\n",
+                "csv_text": "code,name\n03-300,Site Work\n",
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -472,6 +494,21 @@ class CostCodeTests(TestCase):
         self.assertTrue(
             CostCode.objects.filter(created_by=self.user, code="03-300", name="Site Work").exists()
         )
+
+    def test_cost_code_csv_import_rejects_is_active_header(self):
+        response = self.client.post(
+            "/api/v1/cost-codes/import-csv/",
+            data={
+                "dry_run": True,
+                "csv_text": "code,name,is_active\n03-300,Site Work,true\n",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "validation_error")
+        self.assertIn("headers", payload["error"]["fields"])
 
 
 class ProjectFinancialSummaryTests(TestCase):
@@ -626,6 +663,7 @@ class ProjectFinancialSummaryTests(TestCase):
         data = response.json()["data"]
         self.assertEqual(data["contract_value_original"], "100000.00")
         self.assertEqual(data["contract_value_current"], "103000.00")
+        self.assertEqual(data["accepted_contract_total"], "0.00")
         self.assertEqual(data["approved_change_orders_total"], "2000.00")
         self.assertEqual(data["invoiced_to_date"], "1200.00")
         self.assertEqual(data["paid_to_date"], "800.00")
@@ -657,6 +695,17 @@ class ProjectFinancialSummaryTests(TestCase):
         self.assertEqual(len(data["traceability"]["ar_payments"]["records"]), 1)
         self.assertEqual(len(data["traceability"]["ap_vendor_bills"]["records"]), 1)
         self.assertEqual(len(data["traceability"]["ap_payments"]["records"]), 1)
+
+    def test_project_financial_summary_accepted_contract_total_is_zero_without_active_budget(self):
+        response = self.client.get(
+            f"/api/v1/projects/{self.project.id}/financial-summary/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data["contract_value_original"], "100000.00")
+        self.assertEqual(data["contract_value_current"], "103000.00")
+        self.assertEqual(data["accepted_contract_total"], "0.00")
 
     def test_project_accounting_export_json_and_csv_match_summary_totals(self):
         self._seed_financial_records()

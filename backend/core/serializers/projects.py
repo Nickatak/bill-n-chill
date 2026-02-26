@@ -55,6 +55,13 @@ class ProjectProfileSerializer(serializers.ModelSerializer):
 
 
 class CostCodeSerializer(serializers.ModelSerializer):
+    def validate(self, attrs):
+        if self.instance is None and attrs.get("is_active") is False:
+            raise serializers.ValidationError(
+                {"is_active": ["New cost codes must be active on creation."]}
+            )
+        return attrs
+
     class Meta:
         model = CostCode
         fields = ["id", "code", "name", "is_active", "created_at", "updated_at"]
@@ -64,6 +71,7 @@ class ProjectFinancialSummarySerializer(serializers.Serializer):
     project_id = serializers.IntegerField()
     contract_value_original = serializers.DecimalField(max_digits=12, decimal_places=2)
     contract_value_current = serializers.DecimalField(max_digits=12, decimal_places=2)
+    accepted_contract_total = serializers.DecimalField(max_digits=12, decimal_places=2)
     approved_change_orders_total = serializers.DecimalField(max_digits=12, decimal_places=2)
     invoiced_to_date = serializers.DecimalField(max_digits=12, decimal_places=2)
     paid_to_date = serializers.DecimalField(max_digits=12, decimal_places=2)
