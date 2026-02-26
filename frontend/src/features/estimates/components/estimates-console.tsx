@@ -1412,6 +1412,34 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
             </div>
 
             <div className={styles.versionTree}>
+              {activeFinancialEstimate ? (
+                <div className={styles.versionBaselineBanner}>
+                  <div className={styles.versionBaselineCopy}>
+                    <span className={styles.versionBaselineLabel}>Active Financial Baseline</span>
+                    <span className={styles.versionBaselineValue}>
+                      Estimate #{activeFinancialEstimate.id} · v{activeFinancialEstimate.version} ·{" "}
+                      {activeFinancialEstimate.title || "Untitled"}
+                    </span>
+                  </div>
+                  <div className={styles.versionBaselineActions}>
+                    {String(activeFinancialEstimate.id) === selectedEstimateId ? (
+                      <span className={styles.versionBaselineSelected}>Viewing baseline</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className={styles.versionBaselineJumpButton}
+                        onClick={() => handleSelectEstimate(activeFinancialEstimate)}
+                      >
+                        Jump to Baseline
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className={`${styles.inlineHint} ${styles.versionBaselineEmpty}`}>
+                  No active financial baseline is set for this project yet.
+                </p>
+              )}
               {visibleEstimateFamilies.length > 0 ? (
                 visibleEstimateFamilies.map((family) => {
                   const latest = family.items[family.items.length - 1];

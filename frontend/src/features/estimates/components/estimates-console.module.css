@@ -871,6 +871,76 @@
   background: #f8fafc;
 }
 
+.versionBaselineBanner {
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+  padding: 9px 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.versionBaselineCopy {
+  display: grid;
+  gap: 2px;
+}
+
+.versionBaselineLabel {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #1e3a8a;
+  font-weight: 700;
+}
+
+.versionBaselineValue {
+  font-size: 0.82rem;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.versionBaselineActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.versionBaselineSelected {
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #166534;
+}
+
+.versionBaselineJumpButton {
+  border: 1px solid #93c5fd;
+  border-radius: 8px;
+  background: #dbeafe;
+  color: #1e40af;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+
+.versionBaselineJumpButton:hover,
+.versionBaselineJumpButton:focus-visible {
+  background: #bfdbfe;
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+  outline: none;
+}
+
+.versionBaselineEmpty {
+  margin: 0;
+}
+
 .versionFilters {
   display: grid;
   gap: 8px;
@@ -1588,6 +1658,36 @@
 :global(html[data-theme="dark"]) .versionTree {
   background: #0f172a;
   border-color: #1f2937;
+}
+
+:global(html[data-theme="dark"]) .versionBaselineBanner {
+  background: #172554;
+  border-color: #1d4ed8;
+}
+
+:global(html[data-theme="dark"]) .versionBaselineLabel {
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .versionBaselineValue {
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .versionBaselineSelected {
+  color: #86efac;
+}
+
+:global(html[data-theme="dark"]) .versionBaselineJumpButton {
+  background: #1e3a8a;
+  border-color: #2563eb;
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .versionBaselineJumpButton:hover,
+:global(html[data-theme="dark"]) .versionBaselineJumpButton:focus-visible {
+  background: #1d4ed8;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.42);
 }
 
 :global(html[data-theme="dark"]) .familyGroup {

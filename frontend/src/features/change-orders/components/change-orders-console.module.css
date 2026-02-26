@@ -221,6 +221,13 @@
   font-size: 0.88rem;
 }
 
+.viewerBaselineSummary {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #1e3a8a;
+  font-weight: 600;
+}
+
 .viewerGrid {
   display: grid;
   gap: 12px;
@@ -302,6 +309,31 @@
   font-size: 0.8rem;
   color: #475569;
   line-height: 1.35;
+}
+
+.viewerBaselineBadge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 2px 8px;
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.viewerBaselineBadgeActive {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.viewerBaselineBadgeSuperseded {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
 }
 
 .viewerRailMetrics {
@@ -391,6 +423,28 @@
   margin: 0;
   font-size: 0.8rem;
   color: #64748b;
+}
+
+.viewerBaselineHint {
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 7px 9px;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.viewerBaselineHintActive {
+  background: #ecfdf5;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.viewerBaselineHintWarning {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
 }
 
 .viewerToggleRow {
@@ -1145,6 +1199,10 @@
   color: #cbd5e1;
 }
 
+:global(html[data-theme="dark"]) .viewerBaselineSummary {
+  color: #93c5fd;
+}
+
 :global(html[data-theme="dark"]) .viewerToggleButton {
   background: #111827;
   border-color: #334155;
@@ -1189,6 +1247,18 @@
 }
 
 :global(html[data-theme="dark"]) .viewerRailSubtext {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .viewerBaselineBadgeActive {
+  background: #14532d;
+  border-color: #22c55e;
+  color: #bbf7d0;
+}
+
+:global(html[data-theme="dark"]) .viewerBaselineBadgeSuperseded {
+  background: #1e293b;
+  border-color: #334155;
   color: #cbd5e1;
 }
 
@@ -1245,6 +1315,18 @@
 
 :global(html[data-theme="dark"]) .viewerHint {
   color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .viewerBaselineHintActive {
+  background: #14532d;
+  border-color: #22c55e;
+  color: #dcfce7;
+}
+
+:global(html[data-theme="dark"]) .viewerBaselineHintWarning {
+  background: #451a03;
+  border-color: #92400e;
+  color: #fcd34d;
 }
 
 :global(html[data-theme="dark"]) .viewerToggleRow {

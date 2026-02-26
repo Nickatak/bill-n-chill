@@ -182,7 +182,11 @@ type OriginEstimateRecord = {
   version: number;
   approved_at: string | null;
   approved_by_email: string | null;
+  financial_baseline_status?: "none" | "active" | "superseded";
+  is_active_financial_baseline?: boolean;
 };
+
+type FinancialBaselineStatusValue = "none" | "active" | "superseded";
 
 type AuditEventRecord = {
   id: number;
@@ -270,6 +274,12 @@ export function ChangeOrdersConsole({
     changeOrders.find((row) => String(row.id) === selectedChangeOrderId) ?? null;
   const selectedViewerEstimate =
     projectEstimates.find((estimate) => String(estimate.id) === selectedViewerEstimateId) ?? null;
+  const activeFinancialBaselineEstimate =
+    projectEstimates.find(
+      (estimate) => estimateFinancialBaselineStatus(estimate) === "active",
+    ) ?? null;
+  const selectedViewerEstimateBaselineStatus = estimateFinancialBaselineStatus(selectedViewerEstimate);
+  const selectedViewerEstimateIsActiveBaseline = selectedViewerEstimateBaselineStatus === "active";
   const sortChangeOrdersForViewer = useCallback((rows: ChangeOrderRecord[]) => {
     return [...rows].sort((left, right) => {
       const leftCreatedAt = Date.parse(left.created_at);
@@ -723,6 +733,31 @@ export function ChangeOrdersConsole({
     return `approved on ${dateLabel}`;
   }
 
+  function estimateFinancialBaselineStatus(
+    estimate?: OriginEstimateRecord | null,
+  ): FinancialBaselineStatusValue {
+    if (!estimate) {
+      return "none";
+    }
+    if (estimate.is_active_financial_baseline) {
+      return "active";
+    }
+    if (estimate.financial_baseline_status === "active" || estimate.financial_baseline_status === "superseded") {
+      return estimate.financial_baseline_status;
+    }
+    return "none";
+  }
+
+  function financialBaselineLabel(status: FinancialBaselineStatusValue): string {
+    if (status === "active") {
+      return "Financial Baseline";
+    }
+    if (status === "superseded") {
+      return "Superseded Baseline";
+    }
+    return "";
+  }
+
   const hydrateEditForm = useCallback((changeOrder: ChangeOrderRecord | undefined) => {
     if (!changeOrder) {
       setSelectedChangeOrderId("");
@@ -858,7 +893,14 @@ export function ChangeOrdersConsole({
         return;
       }
       const rows =
-        (payload.data as Array<{ id: number; title: string; version: number; status?: string }>) ?? [];
+        (payload.data as Array<{
+          id: number;
+          title: string;
+          version: number;
+          status?: string;
+          financial_baseline_status?: "none" | "active" | "superseded";
+          is_active_financial_baseline?: boolean;
+        }>) ?? [];
       const approvedRows = rows.filter((estimate) => estimate.status === "approved");
       const approvedRowsWithMeta = await Promise.all(
         approvedRows.map(async (estimate) => {
@@ -1507,6 +1549,14 @@ export function ChangeOrdersConsole({
         </div>
         <div className={styles.consoleStats}>
           <article className={styles.consoleStatCard}>
+            <span className={styles.consoleStatLabel}>Active Financial Baseline</span>
+            <strong className={styles.consoleStatValue}>
+              {activeFinancialBaselineEstimate
+                ? `#${activeFinancialBaselineEstimate.id} v${activeFinancialBaselineEstimate.version}`
+                : "None"}
+            </strong>
+          </article>
+          <article className={styles.consoleStatCard}>
             <span className={styles.consoleStatLabel}>Approved Estimates (Origin)</span>
             <strong className={styles.consoleStatValue}>{projectEstimates.length}</strong>
           </article>
@@ -1542,6 +1592,11 @@ export function ChangeOrdersConsole({
             Select an approved origin estimate on the left. Change-order families are grouped by
             that origin anchor.
           </p>
+          <p className={styles.viewerBaselineSummary}>
+            {activeFinancialBaselineEstimate
+              ? `Current project baseline: estimate #${activeFinancialBaselineEstimate.id} v${activeFinancialBaselineEstimate.version}.`
+              : "No active financial baseline is set for this project yet."}
+          </p>
         </div>
         {isViewerExpanded ? (projectEstimates.length > 0 ? (
           <div className={styles.viewerGrid}>
@@ -1554,6 +1609,7 @@ export function ChangeOrdersConsole({
               </div>
               {projectEstimates.map((estimate) => {
                 const active = String(estimate.id) === selectedViewerEstimateId;
+                const baselineStatus = estimateFinancialBaselineStatus(estimate);
                 const relatedCount = changeOrders.filter(
                   (changeOrder) => changeOrder.origin_estimate === estimate.id,
                 ).length;
@@ -1591,6 +1647,17 @@ export function ChangeOrdersConsole({
                           Estimate #{estimate.id} · v{estimate.version} · History: {relatedCount} COs
                         </span>
                       </span>
+                      {baselineStatus !== "none" ? (
+                        <span
+                          className={`${styles.viewerBaselineBadge} ${
+                            baselineStatus === "active"
+                              ? styles.viewerBaselineBadgeActive
+                              : styles.viewerBaselineBadgeSuperseded
+                          }`}
+                        >
+                          {financialBaselineLabel(baselineStatus)}
+                        </span>
+                      ) : null}
                       <span className={styles.viewerRailSubtext}>
                         {approvalMeta(estimate)}
                       </span>
@@ -1622,6 +1689,19 @@ export function ChangeOrdersConsole({
             </div>
             {selectedViewerEstimate ? (
               <div className={styles.viewerDetail}>
+                <p
+                  className={`${styles.viewerBaselineHint} ${
+                    selectedViewerEstimateIsActiveBaseline
+                      ? styles.viewerBaselineHintActive
+                      : styles.viewerBaselineHintWarning
+                  }`}
+                >
+                  {selectedViewerEstimateIsActiveBaseline
+                    ? `This origin estimate (#${selectedViewerEstimate.id} v${selectedViewerEstimate.version}) is the active project financial baseline.`
+                    : activeFinancialBaselineEstimate
+                      ? `This origin estimate is not the active baseline. Current baseline is estimate #${activeFinancialBaselineEstimate.id} v${activeFinancialBaselineEstimate.version}.`
+                      : "This project currently has no active financial baseline."}
+                </p>
                 {viewerChangeOrders.length > 0 ? (
                   <>
                     <h4 className={styles.viewerSectionHeading}>2) Linked Change Order History</h4>
@@ -1965,6 +2045,18 @@ export function ChangeOrdersConsole({
                         ? `#${selectedViewerEstimate.id} v${selectedViewerEstimate.version} ${selectedViewerEstimate.title}`
                         : "No approved origin estimate selected"}
                     </span>
+                    {selectedViewerEstimate &&
+                    estimateFinancialBaselineStatus(selectedViewerEstimate) !== "none" ? (
+                      <span
+                        className={`${styles.viewerBaselineBadge} ${
+                          estimateFinancialBaselineStatus(selectedViewerEstimate) === "active"
+                            ? styles.viewerBaselineBadgeActive
+                            : styles.viewerBaselineBadgeSuperseded
+                        }`}
+                      >
+                        {financialBaselineLabel(estimateFinancialBaselineStatus(selectedViewerEstimate))}
+                      </span>
+                    ) : null}
                   </label>
                   <label className={`${estimateStyles.inlineField} ${styles.coMetaField} ${styles.coFieldWide}`}>
                     Reason
