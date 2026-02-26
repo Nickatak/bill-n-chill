@@ -230,7 +230,17 @@ export function CostCodesConsole() {
   return (
     <section className={styles.console}>
       <div className={styles.headerRow}>
-        <h2 className={styles.headerTitle}>Cost Codes</h2>
+        <div className={styles.headerCopy}>
+          <h2 className={styles.headerTitle}>Cost Codes</h2>
+          <p className={styles.headerSubtitle}>
+            Manage coding standards for estimates, budgets, and downstream reporting.
+          </p>
+        </div>
+        <div className={styles.headerStats}>
+          <span className={styles.headerStatPill}>Total {rows.length}</span>
+          <span className={styles.headerStatPill}>Active {activeRowCount}</span>
+          <span className={styles.headerStatPill}>Archived {archivedRowCount}</span>
+        </div>
       </div>
 
       {!token ? <p className={styles.authNotice}>{authMessage}</p> : null}
@@ -253,39 +263,45 @@ export function CostCodesConsole() {
         <div className={styles.layout}>
           <section className={`${styles.panel} ${styles.existingPanel}`}>
             <div className={styles.panelHeader}>
-              <h3>Existing Codes</h3>
+              <h3 className={styles.panelTitle}>Existing Codes</h3>
               <span className={styles.countBadge}>{rows.length}</span>
             </div>
+            <p className={styles.panelIntro}>
+              Search and select a code to edit details or adjust active status.
+            </p>
 
             <div className={styles.filterSwitchCard}>
               <div className={styles.filterSwitchHeader}>
                 <span className={styles.filterSwitchTitle}>Visibility</span>
               </div>
-              <label className={styles.filterSwitchRow}>
-                <span
-                  className={`${styles.filterSwitchState} ${
-                    !includeArchived ? styles.filterSwitchStateSelected : ""
+              <div
+                className={styles.filterSegmentRow}
+                role="group"
+                aria-label="Cost code visibility filter"
+              >
+                <button
+                  type="button"
+                  className={`${styles.filterSegmentButton} ${
+                    !includeArchived ? styles.filterSegmentButtonActive : ""
                   }`}
+                  onClick={() => setVisibilityFilter("active")}
+                  aria-pressed={!includeArchived}
                 >
-                  Active only
-                </span>
-                <input
-                  className={styles.switchInput}
-                  type="checkbox"
-                  checked={includeArchived}
-                  onChange={(event) =>
-                    setVisibilityFilter(event.target.checked ? "all" : "active")
-                  }
-                  aria-label="Toggle cost code visibility between active-only and including archived codes"
-                />
-                <span
-                  className={`${styles.filterSwitchState} ${
-                    includeArchived ? styles.filterSwitchStateSelected : ""
+                  Active
+                  <span className={styles.filterSegmentCount}>{activeRowCount}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.filterSegmentButton} ${
+                    includeArchived ? styles.filterSegmentButtonActive : ""
                   }`}
+                  onClick={() => setVisibilityFilter("all")}
+                  aria-pressed={includeArchived}
                 >
-                  Include archived
-                </span>
-              </label>
+                  All
+                  <span className={styles.filterSegmentCount}>{rows.length}</span>
+                </button>
+              </div>
               <p className={styles.filterSwitchSummary}>
                 {includeArchived
                   ? `${activeRowCount} active, ${archivedRowCount} archived`
@@ -317,6 +333,13 @@ export function CostCodesConsole() {
                   >
                     <span className={styles.itemTop}>
                       <span className={styles.itemCode}>{row.code}</span>
+                      <span
+                        className={`${styles.itemStatusBadge} ${
+                          row.is_active ? styles.itemStatusActive : styles.itemStatusArchived
+                        }`}
+                      >
+                        {row.is_active ? "Active" : "Archived"}
+                      </span>
                     </span>
                     <p className={styles.itemName}>{row.name}</p>
                   </button>
@@ -329,7 +352,10 @@ export function CostCodesConsole() {
 
           <div className={styles.layoutRight}>
             <section className={styles.panel}>
-              <h3>Create Cost Code</h3>
+              <h3 className={styles.panelTitle}>Create Cost Code</h3>
+              <p className={styles.panelIntro}>
+                Add a new code with a human-readable name for estimating and billing workflows.
+              </p>
               <form className={styles.form} onSubmit={handleCreate}>
                 <label className={styles.field}>
                   Code
@@ -375,7 +401,10 @@ export function CostCodesConsole() {
             </section>
 
             <section className={styles.panel}>
-              <h3>Edit Cost Code</h3>
+              <h3 className={styles.panelTitle}>Edit Cost Code</h3>
+              <p className={styles.panelIntro}>
+                Update naming and active status while keeping original code values stable.
+              </p>
               {selectedCostCode ? (
                 <form className={styles.form} onSubmit={handleSave}>
                   <label className={styles.field}>
@@ -417,7 +446,7 @@ export function CostCodesConsole() {
             </section>
 
             <section className={styles.panel}>
-              <h3>CSV Import</h3>
+              <h3 className={styles.panelTitle}>CSV Import</h3>
               <p className={styles.importSummary}>
                 Headers: code,name,is_active. Existing code updates; unknown code creates.
               </p>

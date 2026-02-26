@@ -1,26 +1,40 @@
 .page {
-  --background: #f5f7fa;
-  --foreground: #ffffff;
-  --text-primary: #111827;
-  --text-secondary: #4b5563;
-  --border: #d1d5db;
+  --background: #eef4f8;
+  --foreground: #f7fbff;
+  --border: #b6c9d8;
 
   min-height: 100dvh;
-  padding: 18px;
-  background: var(--background);
+  padding: 22px;
+  background:
+    radial-gradient(circle at 10% 10%, #d0e4f4 0%, transparent 38%),
+    radial-gradient(circle at 90% 15%, #cce3d7 0%, transparent 35%),
+    linear-gradient(170deg, #f2f7fb 0%, var(--background) 55%, #e8f0f6 100%);
   font-family: var(--font-geist-sans);
 }
 
 .main {
-  width: min(1200px, 100%);
+  width: min(1280px, 100%);
   margin: 0 auto;
 }
 
 .card {
+  position: relative;
+  overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 18px;
+  border-radius: 22px;
+  padding: 20px;
   background: var(--foreground);
+  box-shadow:
+    0 24px 48px rgba(15, 23, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, #0f766e 0%, #0ea5e9 50%, #0891b2 100%);
 }
 
 @media (max-width: 640px) {
@@ -29,14 +43,23 @@
   }
 
   .card {
+    border-radius: 16px;
     padding: 14px;
   }
 }
 
 :global(html[data-theme="dark"]) .page {
-  --background: #0b1220;
-  --foreground: #111827;
-  --text-primary: #f3f4f6;
-  --text-secondary: #cbd5e1;
-  --border: #334155;
+  --background: #050c16;
+  --foreground: #0a1626;
+  --border: #29405a;
+  background:
+    radial-gradient(circle at 8% 8%, #0e2b45 0%, transparent 40%),
+    radial-gradient(circle at 88% 14%, #0f3d36 0%, transparent 36%),
+    linear-gradient(170deg, #081120 0%, #050c16 52%, #091427 100%);
+}
+
+:global(html[data-theme="dark"]) .card {
+  box-shadow:
+    0 24px 50px rgba(2, 6, 23, 0.6),
+    inset 0 1px 0 rgba(148, 163, 184, 0.18);
 }
