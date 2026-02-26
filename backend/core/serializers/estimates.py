@@ -71,6 +71,21 @@ class EstimateSerializer(serializers.ModelSerializer):
 
 class EstimateStatusEventSerializer(serializers.ModelSerializer):
     changed_by_email = serializers.CharField(source="changed_by.email", read_only=True)
+    action_type = serializers.SerializerMethodField()
+
+    def get_action_type(self, obj: EstimateStatusEvent) -> str:
+        from_status = obj.from_status or ""
+        to_status = obj.to_status or ""
+        note = (obj.note or "").strip()
+        if not from_status:
+            return "create"
+        if from_status != to_status:
+            return "transition"
+        if to_status == Estimate.Status.SENT and note.lower() in {"", "estimate re-sent."}:
+            return "resend"
+        if note:
+            return "notate"
+        return "unchanged"
 
     class Meta:
         model = EstimateStatusEvent
@@ -83,6 +98,7 @@ class EstimateStatusEventSerializer(serializers.ModelSerializer):
             "changed_by",
             "changed_by_email",
             "changed_at",
+            "action_type",
         ]
         read_only_fields = fields
 

@@ -45,6 +45,7 @@ export type EstimateStatusEventRecord = {
   from_status: string | null;
   to_status: string;
   note: string;
+  action_type?: "create" | "transition" | "resend" | "notate" | "unchanged";
   changed_by_email: string;
   changed_at: string;
 };

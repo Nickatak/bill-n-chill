@@ -220,6 +220,13 @@ def project_estimates_view(request, project_id: int):
     serializer = EstimateWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
+    resolved_valid_through = data.get("valid_through")
+    if resolved_valid_through is None:
+        validation_delta_days = max(
+            1,
+            min(365, int(organization.estimate_validation_delta_days or 30)),
+        )
+        resolved_valid_through = timezone.localdate() + timedelta(days=validation_delta_days)
     if "terms_text" in data:
         return Response(
             {
@@ -292,7 +299,7 @@ def project_estimates_view(request, project_id: int):
             continue
         if candidate.status != data.get("status", Estimate.Status.DRAFT):
             continue
-        if candidate.valid_through != data.get("valid_through"):
+        if candidate.valid_through != resolved_valid_through:
             continue
         candidate_terms_text = (candidate.terms_text or "").strip()
         incoming_terms_text = (organization.estimate_default_terms or "").strip()
@@ -319,7 +326,7 @@ def project_estimates_view(request, project_id: int):
         version=next_version,
         status=data.get("status", Estimate.Status.DRAFT),
         title=data.get("title", ""),
-        valid_through=data.get("valid_through"),
+        valid_through=resolved_valid_through,
         terms_text=terms_text,
         tax_percent=data.get("tax_percent", Decimal("0")),
     )
@@ -437,11 +444,18 @@ def estimate_detail_view(request, estimate_id: int):
             },
             status=400,
         )
-    status_note = data.get("status_note", "")
+    status_note = (data.get("status_note", "") or "").strip()
+    status_note_requested = status_note != ""
     status_changing = "status" in data
     next_status = data.get("status", estimate.status)
+    is_sent_resend = (
+        status_changing
+        and estimate.status == Estimate.Status.SENT
+        and next_status == Estimate.Status.SENT
+    )
+    same_status_note_request = status_changing and next_status == estimate.status and status_note_requested
 
-    if status_changing and not Estimate.is_transition_allowed(
+    if status_changing and not (is_sent_resend or same_status_note_request) and not Estimate.is_transition_allowed(
         current_status=estimate.status,
         next_status=next_status,
     ):
@@ -531,9 +545,13 @@ def estimate_detail_view(request, estimate_id: int):
 
     should_record_status_event = status_changing and (
         previous_status != estimate.status
+        or (previous_status == Estimate.Status.SENT and estimate.status == Estimate.Status.SENT)
+    )
+    should_record_status_event = (
+        should_record_status_event
         or (
-            previous_status == Estimate.Status.SENT
-            and estimate.status == Estimate.Status.SENT
+            previous_status == estimate.status
+            and status_note_requested
         )
     )
     if should_record_status_event:

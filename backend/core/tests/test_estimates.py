@@ -1,5 +1,9 @@
-from core.tests.common import *
+from datetime import timedelta
+
+from django.utils import timezone
+
 from core.serializers import EstimateWriteSerializer
+from core.tests.common import *
 
 class EstimateTests(TestCase):
     def setUp(self):
@@ -201,6 +205,37 @@ class EstimateTests(TestCase):
 
         estimate = Estimate.objects.get(id=payload["id"])
         self.assertEqual(str(estimate.valid_through), "2026-06-30")
+
+    def test_project_estimates_create_uses_organization_validation_delta_when_valid_through_omitted(self):
+        membership = self._bootstrap_primary_membership()
+        membership.organization.estimate_validation_delta_days = 14
+        membership.organization.save(update_fields=["estimate_validation_delta_days", "updated_at"])
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Estimate Uses Validation Delta",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo and prep",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["data"]
+        expected_valid_through = timezone.localdate() + timedelta(days=14)
+        self.assertEqual(payload["valid_through"], expected_valid_through.isoformat())
+
+        estimate = Estimate.objects.get(id=payload["id"])
+        self.assertEqual(estimate.valid_through, expected_valid_through)
 
     def test_project_estimates_create_uses_organization_default_terms_when_omitted(self):
         membership = self._bootstrap_primary_membership()
@@ -1222,6 +1257,102 @@ class EstimateTests(TestCase):
         self.assertEqual(latest.from_status, Estimate.Status.SENT)
         self.assertEqual(latest.to_status, Estimate.Status.SENT)
         self.assertEqual(latest.note, "Re-sent after follow-up call.")
+
+    def test_estimate_terminal_status_note_records_same_status_event(self):
+        approved_create = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Approved Note Event Estimate",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo and prep",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        approved_estimate_id = approved_create.json()["data"]["id"]
+        self.client.patch(
+            f"/api/v1/estimates/{approved_estimate_id}/",
+            data={"status": "sent", "status_note": "Sent for approval."},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.client.patch(
+            f"/api/v1/estimates/{approved_estimate_id}/",
+            data={"status": "approved", "status_note": "Approved by owner."},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+
+        approved_note = self.client.patch(
+            f"/api/v1/estimates/{approved_estimate_id}/",
+            data={"status": "approved", "status_note": "Final approved terms acknowledged."},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(approved_note.status_code, 200)
+        approved_events = EstimateStatusEvent.objects.filter(estimate_id=approved_estimate_id)
+        approved_latest = approved_events.first()
+        self.assertEqual(approved_latest.from_status, Estimate.Status.APPROVED)
+        self.assertEqual(approved_latest.to_status, Estimate.Status.APPROVED)
+        self.assertEqual(approved_latest.note, "Final approved terms acknowledged.")
+        approved_history = self.client.get(
+            f"/api/v1/estimates/{approved_estimate_id}/status-events/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(approved_history.status_code, 200)
+        self.assertEqual(approved_history.json()["data"][0]["action_type"], "notate")
+
+        void_create = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Void Note Event Estimate",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo and prep",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        void_estimate_id = void_create.json()["data"]["id"]
+        self.client.patch(
+            f"/api/v1/estimates/{void_estimate_id}/",
+            data={"status": "sent", "status_note": "Sent to owner."},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.client.patch(
+            f"/api/v1/estimates/{void_estimate_id}/",
+            data={"status": "void", "status_note": "Voided after owner cancellation."},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        void_note = self.client.patch(
+            f"/api/v1/estimates/{void_estimate_id}/",
+            data={"status": "void", "status_note": "Closed and archived for records."},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(void_note.status_code, 200)
+        void_events = EstimateStatusEvent.objects.filter(estimate_id=void_estimate_id)
+        void_latest = void_events.first()
+        self.assertEqual(void_latest.from_status, Estimate.Status.VOID)
+        self.assertEqual(void_latest.to_status, Estimate.Status.VOID)
+        self.assertEqual(void_latest.note, "Closed and archived for records.")
 
     def test_estimate_values_locked_after_send(self):
         create = self.client.post(

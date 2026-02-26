@@ -69,6 +69,37 @@ const ESTIMATE_QUICK_ACTION_BY_STATUS_FALLBACK: Record<string, "change_order" | 
   void: "revision",
 };
 const ESTIMATE_SYSTEM_ONLY_STATUSES = new Set<EstimateStatusValue>(["archived"]);
+const ESTIMATE_VALIDATION_DELTA_DAYS_FALLBACK = 30;
+
+function todayDateInputValue(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function resolveEstimateValidationDeltaDays(
+  defaults?: OrganizationDocumentDefaults | null,
+): number {
+  const parsed = Number(defaults?.estimate_validation_delta_days);
+  if (!Number.isFinite(parsed)) {
+    return ESTIMATE_VALIDATION_DELTA_DAYS_FALLBACK;
+  }
+  return Math.max(1, Math.min(365, Math.round(parsed)));
+}
+
+function addDaysToDateInput(baseDateInput: string, daysToAdd: number): string {
+  const matched = /^(\d{4})-(\d{2})-(\d{2})$/.exec(baseDateInput);
+  if (!matched) {
+    return "";
+  }
+  const year = Number(matched[1]);
+  const month = Number(matched[2]);
+  const day = Number(matched[3]);
+  const normalized = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(normalized.getTime())) {
+    return "";
+  }
+  normalized.setUTCDate(normalized.getUTCDate() + daysToAdd);
+  return normalized.toISOString().slice(0, 10);
+}
 
 function emptyLine(localId: number, defaultCostCodeId = ""): EstimateLineInput {
   return {
@@ -222,6 +253,16 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         ? { ...option, label: "Re-send" }
         : option,
     );
+  const isTerminalEstimateStatus = Boolean(
+    selectedEstimate &&
+      (selectedEstimate.status === "approved" || selectedEstimate.status === "void"),
+  );
+  const canSubmitStatusUpdate = selectedEstimate
+    ? !isTerminalEstimateStatus && nextStatusOptions.length > 0
+    : false;
+  const canSubmitStatusNote = selectedEstimate
+    ? Boolean(statusNote.trim())
+    : false;
 
   function formatEstimateStatus(status?: string): string {
     if (!status) {
@@ -231,8 +272,17 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   }
 
   function formatStatusAction(event: EstimateStatusEventRecord): string {
-    if (event.from_status === "sent" && event.to_status === "sent") {
+    if (event.action_type === "notate") {
+      return "Notated";
+    }
+    if (event.action_type === "resend") {
       return "Re-sent";
+    }
+    if (event.from_status === "sent" && event.to_status === "sent" && !(event.note || "").trim()) {
+      return "Re-sent";
+    }
+    if (event.from_status === event.to_status && (event.note || "").trim()) {
+      return "Notated";
     }
     const actionByStatus: Record<string, string> = {
       draft: "Created as Draft",
@@ -488,6 +538,11 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
   const clearSelectedEstimateState = useCallback(() => {
     const defaultCostCodeId = costCodes[0] ? String(costCodes[0].id) : "";
+    const nextEstimateDate = todayDateInputValue();
+    const nextValidThrough = addDaysToDateInput(
+      nextEstimateDate,
+      resolveEstimateValidationDeltaDays(organizationDefaults),
+    );
     setSelectedEstimateId("");
     selectedEstimateIdRef.current = "";
     setSelectedStatus(defaultCreateStatus);
@@ -500,10 +555,14 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setLineSortKey(null);
     setLineSortDirection("asc");
     setNextLineId(2);
-    setEstimateDate(new Date().toISOString().slice(0, 10));
-    setValidThrough("");
+    setEstimateDate(nextEstimateDate);
+    setValidThrough(nextValidThrough);
     setShowDuplicatePanel(false);
-  }, [costCodes, defaultCreateStatus, organizationDefaults?.estimate_default_terms]);
+  }, [
+    costCodes,
+    defaultCreateStatus,
+    organizationDefaults,
+  ]);
 
   function startNewEstimate() {
     setIsViewerExpanded(false);
@@ -547,8 +606,17 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     if (estimateDate) {
       return;
     }
-    setEstimateDate(new Date().toISOString().slice(0, 10));
-  }, [estimateDate]);
+    const nextEstimateDate = todayDateInputValue();
+    setEstimateDate(nextEstimateDate);
+    if (!selectedEstimateIdRef.current && !validThrough) {
+      setValidThrough(
+        addDaysToDateInput(
+          nextEstimateDate,
+          resolveEstimateValidationDeltaDays(organizationDefaults),
+        ),
+      );
+    }
+  }, [estimateDate, organizationDefaults, validThrough]);
 
   const loadDependencies = useCallback(async () => {
     setActionMessage("");
@@ -588,6 +656,16 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       if (organizationRes.ok && organizationData) {
         setOrganizationDefaults(organizationData);
         setTermsText((current) => current || organizationData.estimate_default_terms || "");
+        setValidThrough((current) => {
+          if (selectedEstimateIdRef.current || current) {
+            return current;
+          }
+          const estimateDateSeed = todayDateInputValue();
+          return addDaysToDateInput(
+            estimateDateSeed,
+            resolveEstimateValidationDeltaDays(organizationData),
+          );
+        });
       }
 
       if (projectRows[0]) {
@@ -1006,6 +1084,43 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     }
   }
 
+  async function handleAddEstimateStatusNote() {
+    const estimateId = Number(selectedEstimateId);
+    if (!estimateId) {
+      setActionMessage("Select an estimate first.");
+      return;
+    }
+    if (!statusNote.trim()) {
+      setActionMessage("Enter a status note first.");
+      return;
+    }
+
+    setActionMessage("");
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/estimates/${estimateId}/`, {
+        method: "PATCH",
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        body: JSON.stringify({ status_note: statusNote }),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setActionMessage(readApiErrorMessage(payload, "Status note update failed."));
+        return;
+      }
+      const updated = payload.data as EstimateRecord;
+      setEstimates((current) =>
+        current.map((estimate) => (estimate.id === updated.id ? updated : estimate)),
+      );
+      const updatedNextStatuses = estimateAllowedStatusTransitions[updated.status] ?? [];
+      setSelectedStatus(updatedNextStatuses[0] ?? updated.status);
+      setStatusNote("");
+      await loadStatusEvents({ estimateId: updated.id, quiet: true });
+      setActionMessage("");
+    } catch {
+      setActionMessage("Could not reach estimate status note endpoint.");
+    }
+  }
+
   const loadStatusEvents = useCallback(
     async (options?: { estimateId?: number; quiet?: boolean }) => {
       const estimateId = options?.estimateId ?? Number(selectedEstimateId);
@@ -1306,48 +1421,63 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
             {selectedEstimateId ? (
               <>
                 <div className={styles.lifecycleGrid}>
-                  <div className={styles.statusPicker}>
-                    <span className={styles.lifecycleFieldLabel}>Next status</span>
-                    <div className={styles.statusPills}>
-                      {nextStatusOptions.map((option) => {
-                        const isSelected = selectedStatus === option.value;
-                        return (
-                          <button
-                            key={option.value}
-                            type="button"
-                            className={`${styles.statusPill} ${
-                              isSelected ? statusClasses[option.value] ?? "" : styles.statusPillInactive
-                            } ${isSelected ? styles.statusPillActive : ""}`}
-                            onClick={() => setSelectedStatus(option.value)}
-                            aria-pressed={isSelected}
-                          >
-                            {option.label}
-                          </button>
-                        );
-                      })}
+                  {!isTerminalEstimateStatus ? (
+                    <div className={styles.statusPicker}>
+                      <span className={styles.lifecycleFieldLabel}>Next status</span>
+                      <div className={styles.statusPills}>
+                        {nextStatusOptions.map((option) => {
+                          const isSelected = selectedStatus === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              className={`${styles.statusPill} ${
+                                isSelected ? statusClasses[option.value] ?? "" : styles.statusPillInactive
+                              } ${isSelected ? styles.statusPillActive : ""}`}
+                              onClick={() => setSelectedStatus(option.value)}
+                              aria-pressed={isSelected}
+                            >
+                              {option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {nextStatusOptions.length === 0 ? (
+                        <p className={styles.inlineHint}>No next statuses available for this estimate.</p>
+                      ) : null}
                     </div>
-                    {nextStatusOptions.length === 0 ? (
-                      <p className={styles.inlineHint}>No next statuses available for this estimate.</p>
-                    ) : null}
-                  </div>
+                  ) : null}
                   <label className={styles.lifecycleField}>
                     Status note
                     <textarea
                       className={styles.statusNote}
                       value={statusNote}
                       onChange={(event) => setStatusNote(event.target.value)}
-                      placeholder="Optional note for this transition"
+                      placeholder={
+                        isTerminalEstimateStatus
+                          ? "Add note for this terminal estimate status"
+                          : "Optional note for this transition"
+                      }
                       rows={3}
                     />
                   </label>
                 </div>
                 <div className={styles.lifecycleActions}>
+                  {canSubmitStatusUpdate ? (
+                    <button
+                      type="button"
+                      onClick={handleUpdateEstimateStatus}
+                      disabled={!canSubmitStatusUpdate}
+                    >
+                      Update Selected Estimate Status
+                    </button>
+                  ) : null}
                   <button
                     type="button"
-                    onClick={handleUpdateEstimateStatus}
-                    disabled={nextStatusOptions.length === 0}
+                    onClick={handleAddEstimateStatusNote}
+                    disabled={!canSubmitStatusNote}
                   >
-                    Update Selected Estimate Status
+                    Add Estimate Status Note
                   </button>
                 </div>
               </>

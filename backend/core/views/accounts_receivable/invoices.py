@@ -411,11 +411,23 @@ def invoice_detail_view(request, invoice_id: int):
     ingress = build_invoice_patch_ingress(serializer.validated_data)
     scope_override = ingress.scope_override
     scope_override_note = ingress.scope_override_note
+    status_note = ingress.status_note
 
     status_changing = ingress.has_status
+    status_note_requested = ingress.has_status_note and bool(status_note.strip())
     previous_status = invoice.status
     next_status = ingress.status if ingress.has_status else invoice.status
-    if status_changing and not Invoice.is_transition_allowed(
+    is_resend = (
+        status_changing
+        and previous_status == Invoice.Status.SENT
+        and next_status == Invoice.Status.SENT
+    )
+    same_status_note_request = (
+        status_changing
+        and previous_status == next_status
+        and status_note_requested
+    )
+    if status_changing and not (is_resend or same_status_note_request) and not Invoice.is_transition_allowed(
         current_status=invoice.status,
         next_status=next_status,
     ):
@@ -606,13 +618,17 @@ def invoice_detail_view(request, invoice_id: int):
             )
             invoice.save(update_fields=["balance_due", "updated_at"])
 
-        if previous_status != next_status or totals_changing or template_changing:
-            if previous_status != next_status:
+        should_record_status_event = previous_status != next_status or is_resend or status_note_requested
+        if previous_status != next_status or totals_changing or template_changing or should_record_status_event:
+            if should_record_status_event:
+                status_event_note = status_note.strip()
+                if not status_event_note:
+                    status_event_note = "Invoice re-sent." if is_resend else "Invoice status updated."
                 _record_invoice_status_event(
                     invoice=invoice,
                     from_status=previous_status,
                     to_status=next_status,
-                    note="Invoice status updated.",
+                    note=status_event_note,
                     changed_by=request.user,
                 )
             _record_financial_audit_event(
@@ -629,6 +645,7 @@ def invoice_detail_view(request, invoice_id: int):
                     "invoice_number": invoice.invoice_number,
                     "totals_changed": totals_changing,
                     "status_changed": previous_status != next_status,
+                    "status_note_logged": status_note_requested,
                     "template_changed": template_changing,
                 },
             )

@@ -498,6 +498,39 @@ class InvoiceTests(TestCase):
         self.assertEqual(rows[1]["from_status"], None)
         self.assertEqual(rows[1]["to_status"], Invoice.Status.DRAFT)
 
+    def test_invoice_status_note_without_transition_records_same_status_event(self):
+        invoice_id = self._create_invoice()
+        to_sent = self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_sent.status_code, 200)
+
+        note_only = self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status_note": "Awaiting signed PO from owner."},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(note_only.status_code, 200)
+        self.assertEqual(note_only.json()["data"]["status"], Invoice.Status.SENT)
+
+        latest_event = InvoiceStatusEvent.objects.filter(invoice_id=invoice_id).first()
+        self.assertIsNotNone(latest_event)
+        self.assertEqual(latest_event.from_status, Invoice.Status.SENT)
+        self.assertEqual(latest_event.to_status, Invoice.Status.SENT)
+        self.assertEqual(latest_event.note, "Awaiting signed PO from owner.")
+
+        events_response = self.client.get(
+            f"/api/v1/invoices/{invoice_id}/status-events/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(events_response.status_code, 200)
+        rows = events_response.json()["data"]
+        self.assertEqual(rows[0]["action_type"], "notate")
+
     def test_invoice_patch_line_items_recalculates_totals(self):
         invoice_id = self._create_invoice()
 

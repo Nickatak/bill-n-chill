@@ -1206,6 +1206,33 @@ class ChangeOrderTests(TestCase):
         ).latest("id")
         self.assertEqual(resend_event.note, "Change order re-sent for approval.")
 
+    def test_change_order_status_note_without_transition_records_audit_event(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        change_order_id = self._create_change_order(amount_delta="900.00")
+
+        note_only = self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status_note": "Internal note: owner requested billing split."},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(note_only.status_code, 200)
+        self.assertEqual(note_only.json()["data"]["status"], ChangeOrder.Status.DRAFT)
+
+        note_event = FinancialAuditEvent.objects.filter(
+            object_type="change_order",
+            object_id=change_order_id,
+            from_status=ChangeOrder.Status.DRAFT,
+            to_status=ChangeOrder.Status.DRAFT,
+            note="Internal note: owner requested billing split.",
+        ).first()
+        self.assertIsNotNone(note_event)
+        self.assertEqual(note_event.metadata_json.get("status_action"), "notate")
+
     def test_pending_approval_cannot_transition_back_to_draft(self):
         self._create_active_budget(
             project_id=self.project.id,

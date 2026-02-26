@@ -75,6 +75,8 @@ def build_invoice_create_ingress(
 class InvoicePatchIngress:
     has_status: bool
     status: str | None
+    has_status_note: bool
+    status_note: str
     has_issue_date: bool
     issue_date: date | None
     has_due_date: bool
@@ -111,6 +113,8 @@ def build_invoice_patch_ingress(validated_data: dict[str, Any]) -> InvoicePatchI
     return InvoicePatchIngress(
         has_status="status" in validated_data,
         status=validated_data.get("status"),
+        has_status_note="status_note" in validated_data,
+        status_note=(validated_data.get("status_note") or "").strip(),
         has_issue_date="issue_date" in validated_data,
         issue_date=validated_data.get("issue_date"),
         has_due_date="due_date" in validated_data,

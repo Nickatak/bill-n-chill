@@ -113,6 +113,7 @@ class ChangeOrderLineInputSerializer(serializers.Serializer):
 class ChangeOrderWriteSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=255, required=False, allow_blank=False)
     status = serializers.ChoiceField(choices=ChangeOrder.Status.choices, required=False)
+    status_note = serializers.CharField(max_length=5000, required=False, allow_blank=True)
     amount_delta = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
     days_delta = serializers.IntegerField(required=False)
     reason = serializers.CharField(max_length=5000, required=False, allow_blank=True)

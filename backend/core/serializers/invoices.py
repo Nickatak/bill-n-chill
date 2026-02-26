@@ -124,6 +124,7 @@ class InvoiceLineItemInputSerializer(serializers.Serializer):
 
 class InvoiceWriteSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=Invoice.Status.choices, required=False)
+    status_note = serializers.CharField(max_length=5000, required=False, allow_blank=True)
     issue_date = serializers.DateField(required=False)
     due_date = serializers.DateField(required=False)
     sender_name = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
@@ -156,6 +157,21 @@ class InvoiceScopeOverrideSerializer(serializers.Serializer):
 
 class InvoiceStatusEventSerializer(serializers.ModelSerializer):
     changed_by_email = serializers.CharField(source="changed_by.email", read_only=True)
+    action_type = serializers.SerializerMethodField()
+
+    def get_action_type(self, obj: InvoiceStatusEvent) -> str:
+        from_status = obj.from_status or ""
+        to_status = obj.to_status or ""
+        note = (obj.note or "").strip()
+        if not from_status:
+            return "create"
+        if from_status != to_status:
+            return "transition"
+        if to_status == Invoice.Status.SENT and note.lower() in {"", "invoice re-sent."}:
+            return "resend"
+        if note:
+            return "notate"
+        return "unchanged"
 
     class Meta:
         model = InvoiceStatusEvent
@@ -168,5 +184,6 @@ class InvoiceStatusEventSerializer(serializers.ModelSerializer):
             "changed_by",
             "changed_by_email",
             "changed_at",
+            "action_type",
         ]
         read_only_fields = fields

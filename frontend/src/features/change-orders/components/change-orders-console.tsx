@@ -192,6 +192,7 @@ type AuditEventRecord = {
   from_status: string;
   to_status: string;
   note: string;
+  metadata_json?: Record<string, unknown> | null;
   created_by: number;
   created_by_email: string | null;
   created_at: string;
@@ -253,6 +254,7 @@ export function ChangeOrdersConsole({
   const [editReason, setEditReason] = useState("");
   const [editLineItems, setEditLineItems] = useState<ChangeOrderLineInput[]>([emptyLine(1)]);
   const [quickStatus, setQuickStatus] = useState("pending_approval");
+  const [quickStatusNote, setQuickStatusNote] = useState("");
   const [changeOrderStatusLabels, setChangeOrderStatusLabels] = useState<
     Record<string, string>
   >(CHANGE_ORDER_STATUS_LABELS_FALLBACK);
@@ -604,8 +606,18 @@ export function ChangeOrdersConsole({
   function statusEventActionLabel(event: AuditEventRecord): string {
     const fromStatus = event.from_status || "";
     const toStatus = event.to_status || "";
+    const statusAction = String(event.metadata_json?.status_action || "").toLowerCase();
+    if (statusAction === "notate") {
+      return "Notated";
+    }
+    if (statusAction === "resend") {
+      return "Re-sent";
+    }
     if (!fromStatus && toStatus === "draft") {
       return "Created";
+    }
+    if (fromStatus === toStatus && (event.note || "").trim()) {
+      return "Notated";
     }
     if (fromStatus === "pending_approval" && toStatus === "pending_approval") {
       return "Re-sent";
@@ -631,8 +643,15 @@ export function ChangeOrdersConsole({
   function statusEventActionClass(event: AuditEventRecord): string {
     const toStatus = event.to_status || "";
     const fromStatus = event.from_status || "";
+    const statusAction = String(event.metadata_json?.status_action || "").toLowerCase();
+    if (statusAction === "notate") {
+      return styles.statusEventNeutral;
+    }
     if (!fromStatus && toStatus === "draft") {
       return styles.statusEventCreated;
+    }
+    if (fromStatus === toStatus && (event.note || "").trim()) {
+      return styles.statusEventNeutral;
     }
     if (fromStatus === "pending_approval" && toStatus === "pending_approval") {
       return styles.statusEventResent;
@@ -712,6 +731,7 @@ export function ChangeOrdersConsole({
       setEditLineItems([emptyLine(1)]);
       setNextLineLocalId(2);
       setQuickStatus(changeOrderAllowedTransitions.draft?.[0] ?? "pending_approval");
+      setQuickStatusNote("");
       return;
     }
 
@@ -744,6 +764,7 @@ export function ChangeOrdersConsole({
     } else {
       setQuickStatus(nextQuickStatuses[0] ?? changeOrder.status);
     }
+    setQuickStatusNote("");
   }, [changeOrderAllowedTransitions]);
 
   const loadChangeOrderPolicy = useCallback(async () => {
@@ -919,6 +940,7 @@ export function ChangeOrdersConsole({
           from_status: string;
           to_status: string;
           note: string;
+          metadata_json?: Record<string, unknown> | null;
           created_by: number;
           created_by_email: string | null;
           created_at: string;
@@ -1367,7 +1389,7 @@ export function ChangeOrdersConsole({
         {
           method: "PATCH",
           headers: buildAuthHeaders(token, { contentType: "application/json" }),
-          body: JSON.stringify({ status: quickStatus }),
+          body: JSON.stringify({ status: quickStatus, status_note: quickStatusNote }),
         },
       );
       const payload: ApiResponse = await response.json();
@@ -1394,6 +1416,62 @@ export function ChangeOrdersConsole({
       } else {
         setFeedback(`Updated ${coLabel(updated)} to ${statusLabel(updated.status)}.`, "success");
       }
+      setQuickStatusNote("");
+    } catch {
+      setFeedback("Could not reach change order detail endpoint.", "error");
+    }
+  }
+
+  async function handleAddChangeOrderStatusNote() {
+    if (!canMutateChangeOrders) {
+      setFeedback(`Role ${role} is read-only for change order mutations.`, "error");
+      return;
+    }
+    const projectId = Number(selectedProjectId);
+    if (!selectedViewerChangeOrder) {
+      setFeedback("Select a change order first.", "error");
+      return;
+    }
+    if (!projectId) {
+      setFeedback("Select a project first.", "error");
+      return;
+    }
+    if (!quickStatusNote.trim()) {
+      setFeedback("Enter a status note first.", "error");
+      return;
+    }
+
+    setFeedback("");
+    try {
+      const response = await fetch(
+        `${normalizedBaseUrl}/change-orders/${selectedViewerChangeOrder.id}/`,
+        {
+          method: "PATCH",
+          headers: buildAuthHeaders(token, { contentType: "application/json" }),
+          body: JSON.stringify({ status_note: quickStatusNote }),
+        },
+      );
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setFeedback(readApiErrorMessage(payload, "Status note update failed."), "error");
+        return;
+      }
+      const updated = payload.data as ChangeOrderRecord;
+      const { rows } = await fetchProjectChangeOrders(projectId);
+      if (rows) {
+        setChangeOrders(rows);
+        const persisted = rows.find((row) => row.id === updated.id);
+        hydrateEditForm(persisted ?? updated);
+        await loadProjectAuditEvents(projectId);
+      } else {
+        setChangeOrders((current) =>
+          current.map((row) => (row.id === updated.id ? updated : row)),
+        );
+        hydrateEditForm(updated);
+        await loadProjectAuditEvents(projectId);
+      }
+      setQuickStatusNote("");
+      setFeedback(`Added status note on ${coLabel(updated)}.`, "success");
     } catch {
       setFeedback("Could not reach change order detail endpoint.", "error");
     }
@@ -1643,9 +1721,48 @@ export function ChangeOrdersConsole({
                               >
                                 Update CO Status
                               </button>
+                              <button
+                                type="button"
+                                onClick={handleAddChangeOrderStatusNote}
+                                disabled={!canMutateChangeOrders || !quickStatusNote.trim()}
+                              >
+                                Add CO Status Note
+                              </button>
+                            </div>
+                            <label className={estimateStyles.lifecycleField}>
+                              Status note
+                              <textarea
+                                className={estimateStyles.statusNote}
+                                value={quickStatusNote}
+                                onChange={(event) => setQuickStatusNote(event.target.value)}
+                                placeholder="Optional note for this status action or history-only note."
+                                rows={3}
+                              />
+                            </label>
+                          </div>
+                        ) : (
+                          <div className={styles.quickStatusPanel}>
+                            <label className={estimateStyles.lifecycleField}>
+                              Status note
+                              <textarea
+                                className={estimateStyles.statusNote}
+                                value={quickStatusNote}
+                                onChange={(event) => setQuickStatusNote(event.target.value)}
+                                placeholder="Add a note without changing status."
+                                rows={3}
+                              />
+                            </label>
+                            <div className={estimateStyles.lifecycleActions}>
+                              <button
+                                type="button"
+                                onClick={handleAddChangeOrderStatusNote}
+                                disabled={!canMutateChangeOrders || !quickStatusNote.trim()}
+                              >
+                                Add CO Status Note
+                              </button>
                             </div>
                           </div>
-                        ) : null}
+                        )}
                         <div className={styles.viewerEventPanel}>
                           <span className={styles.viewerMetaLabel}>Status events</span>
                           <p className={styles.viewerHint}>Newest first.</p>

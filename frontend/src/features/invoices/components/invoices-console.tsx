@@ -196,6 +196,31 @@ function invoiceStatusToneClass(status: string): string {
   return "";
 }
 
+function invoiceStatusEventActionLabel(
+  event: InvoiceStatusEventRecord,
+  statusLabel: (status: string) => string,
+): string {
+  if (event.action_type === "notate") {
+    return "Notated";
+  }
+  if (event.action_type === "resend") {
+    return "Re-sent";
+  }
+  if (event.action_type === "create") {
+    return "Created";
+  }
+  if (event.from_status === event.to_status && (event.note || "").trim()) {
+    return "Notated";
+  }
+  if (event.from_status === "sent" && event.to_status === "sent") {
+    return "Re-sent";
+  }
+  if (!event.from_status) {
+    return `Created as ${statusLabel(event.to_status)}`;
+  }
+  return `${statusLabel(event.from_status)} to ${statusLabel(event.to_status)}`;
+}
+
 function readApiError(payload: ApiResponse | undefined, fallback: string): string {
   const message = payload?.error?.message?.trim();
   return message || fallback;
@@ -256,6 +281,7 @@ export function InvoicesConsole() {
   );
   const [scopeOverride, setScopeOverride] = useState(false);
   const [scopeOverrideNote, setScopeOverrideNote] = useState("");
+  const [statusNote, setStatusNote] = useState("");
   const [organizationInvoiceDefaults, setOrganizationInvoiceDefaults] = useState<OrganizationInvoiceDefaults | null>(null);
 
   const [issueDate, setIssueDate] = useState(todayIsoDate());
@@ -651,12 +677,14 @@ export function InvoicesConsole() {
   useEffect(() => {
     if (!selectedInvoice) {
       setSelectedStatus("draft");
+      setStatusNote("");
       return;
     }
     const preferredStatus = nextStatusOptions[0] ?? selectedInvoice.status;
     setSelectedStatus((current) =>
       nextStatusOptions.includes(current) ? current : preferredStatus,
     );
+    setStatusNote("");
   }, [nextStatusOptions, selectedInvoice]);
 
   useEffect(() => {
@@ -836,6 +864,7 @@ export function InvoicesConsole() {
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
           status: selectedStatus,
+          status_note: statusNote,
           scope_override: scopeOverride,
           scope_override_note: scopeOverrideNote,
         }),
@@ -852,10 +881,53 @@ export function InvoicesConsole() {
         current.map((invoice) => (invoice.id === updated.id ? updated : invoice)),
       );
       setSelectedStatus(updated.status);
+      setStatusNote("");
       await loadInvoiceStatusEvents(updated.id);
       setSuccessStatus(`Updated ${updated.invoice_number} to ${statusLabel(updated.status)}.`);
     } catch {
       setErrorStatus("Could not reach invoice status endpoint.");
+    }
+  }
+
+  async function handleAddInvoiceStatusNote() {
+    if (!canMutateInvoices) {
+      setErrorStatus(`Role ${role} is read-only for invoice mutations.`);
+      return;
+    }
+    const invoiceId = Number(selectedInvoiceId);
+    if (!invoiceId) {
+      setErrorStatus("Select an invoice first.");
+      return;
+    }
+    if (!statusNote.trim()) {
+      setErrorStatus("Enter a status note first.");
+      return;
+    }
+
+    setNeutralStatus("Adding invoice status note...");
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/invoices/${invoiceId}/`, {
+        method: "PATCH",
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        body: JSON.stringify({
+          status_note: statusNote,
+        }),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setErrorStatus(readApiError(payload, "Status note update failed."));
+        return;
+      }
+      const updated = payload.data as InvoiceRecord;
+      setInvoices((current) =>
+        current.map((invoice) => (invoice.id === updated.id ? updated : invoice)),
+      );
+      setSelectedStatus(updated.status);
+      setStatusNote("");
+      await loadInvoiceStatusEvents(updated.id);
+      setSuccessStatus(`Added status note on ${updated.invoice_number}.`);
+    } catch {
+      setErrorStatus("Could not reach invoice status note endpoint.");
     }
   }
 
@@ -1322,7 +1394,7 @@ export function InvoicesConsole() {
                             <thead>
                               <tr>
                                 <th>When</th>
-                                <th>Transition</th>
+                                <th>Action</th>
                                 <th>By</th>
                                 <th>Note</th>
                               </tr>
@@ -1331,10 +1403,7 @@ export function InvoicesConsole() {
                               {selectedInvoiceStatusEvents.map((event) => (
                                 <tr key={event.id}>
                                   <td>{formatDateTimeDisplay(event.changed_at, "--")}</td>
-                                  <td>
-                                    {event.from_status ? statusLabel(event.from_status) : "—"} to{" "}
-                                    {statusLabel(event.to_status)}
-                                  </td>
+                                  <td>{invoiceStatusEventActionLabel(event, statusLabel)}</td>
                                   <td>{event.changed_by_email || `User #${event.changed_by}`}</td>
                                   <td>{event.note || "--"}</td>
                                 </tr>
@@ -1379,6 +1448,15 @@ export function InvoicesConsole() {
                         {!nextStatusOptions.length ? (
                           <p className={styles.inlineHint}>No next statuses available for this invoice.</p>
                         ) : null}
+                        <label className={styles.field}>
+                          <span>Status note</span>
+                          <textarea
+                            value={statusNote}
+                            onChange={(event) => setStatusNote(event.target.value)}
+                            placeholder="Optional note for this status action or history-only note."
+                            className={styles.invoiceLockableControl}
+                          />
+                        </label>
 
                         <label className={styles.toggleRow}>
                           <input
@@ -1412,6 +1490,14 @@ export function InvoicesConsole() {
                               Save Status
                             </button>
                           ) : null}
+                          <button
+                            type="button"
+                            className={styles.secondaryButton}
+                            onClick={handleAddInvoiceStatusNote}
+                            disabled={!statusNote.trim()}
+                          >
+                            Add Status Note
+                          </button>
                           <button
                             type="button"
                             className={styles.primaryButton}

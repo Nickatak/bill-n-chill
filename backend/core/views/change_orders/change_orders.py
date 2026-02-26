@@ -281,9 +281,17 @@ def change_order_detail_view(request, change_order_id: int):
     previous_status = change_order.status
     current_amount_delta = quantize_money(change_order.amount_delta)
     next_amount_delta = quantize_money(data.get("amount_delta", current_amount_delta))
+    status_note = (data.get("status_note", "") or "").strip()
+    status_note_requested = status_note != ""
     status_changing = "status" in data
     next_status = data.get("status", previous_status)
-    if status_changing and not ChangeOrder.is_transition_allowed(
+    is_pending_resend = (
+        status_changing
+        and previous_status == ChangeOrder.Status.PENDING_APPROVAL
+        and next_status == ChangeOrder.Status.PENDING_APPROVAL
+    )
+    same_status_note_request = status_changing and previous_status == next_status and status_note_requested
+    if status_changing and not (is_pending_resend or same_status_note_request) and not ChangeOrder.is_transition_allowed(
         current_status=previous_status,
         next_status=next_status,
     ):
@@ -398,12 +406,6 @@ def change_order_detail_view(request, change_order_id: int):
         change_order.status = data["status"]
         update_fields.append("status")
 
-    is_pending_resend = (
-        status_changing
-        and previous_status == ChangeOrder.Status.PENDING_APPROVAL
-        and next_status == ChangeOrder.Status.PENDING_APPROVAL
-    )
-
     if status_changing and previous_status != next_status and next_status == ChangeOrder.Status.APPROVED:
         change_order.approved_by = request.user
         change_order.approved_at = timezone.now()
@@ -440,9 +442,19 @@ def change_order_detail_view(request, change_order_id: int):
                 previous_status != next_status
                 or financial_delta != MONEY_ZERO
                 or is_pending_resend
+                or status_note_requested
             )
             if should_record_audit_event:
-                if is_pending_resend:
+                status_action = "update"
+                if status_note_requested and previous_status == next_status:
+                    status_action = "notate"
+                elif is_pending_resend:
+                    status_action = "resend"
+                elif previous_status != next_status:
+                    status_action = "transition"
+                if status_note_requested:
+                    event_note = status_note
+                elif is_pending_resend:
                     event_note = "Change order re-sent for approval."
                 else:
                     event_note = "Change order status updated."
@@ -461,6 +473,8 @@ def change_order_detail_view(request, change_order_id: int):
                     metadata={
                         "family_key": change_order.family_key,
                         "financial_delta": str(financial_delta),
+                        "status_note_logged": status_note_requested,
+                        "status_action": status_action,
                     },
                 )
             if (
