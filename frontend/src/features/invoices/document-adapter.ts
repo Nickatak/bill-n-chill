@@ -23,13 +23,6 @@ type InvoiceStatusEvent = {
 type InvoiceFormState = {
   issueDate: string;
   dueDate: string;
-  senderName: string;
-  senderEmail: string;
-  senderAddress: string;
-  senderLogoUrl: string;
-  termsText: string;
-  footerText: string;
-  notesText: string;
   taxPercent: string;
   subtotal: number;
   taxAmount: number;
@@ -93,13 +86,6 @@ export function createInvoiceDocumentAdapter(
     toCreatePayload: (form) => ({
       issue_date: form.issueDate,
       due_date: form.dueDate,
-      sender_name: form.senderName,
-      sender_email: form.senderEmail,
-      sender_address: form.senderAddress,
-      sender_logo_url: form.senderLogoUrl,
-      terms_text: form.termsText,
-      footer_text: form.footerText,
-      notes_text: form.notesText,
       tax_percent: form.taxPercent,
       line_items: form.lineItems.map((line) => ({
         line_type: line.lineType,
@@ -115,13 +101,6 @@ export function createInvoiceDocumentAdapter(
     toUpdatePayload: (form) => ({
       issue_date: form.issueDate,
       due_date: form.dueDate,
-      sender_name: form.senderName,
-      sender_email: form.senderEmail,
-      sender_address: form.senderAddress,
-      sender_logo_url: form.senderLogoUrl,
-      terms_text: form.termsText,
-      footer_text: form.footerText,
-      notes_text: form.notesText,
       tax_percent: form.taxPercent,
       line_items: form.lineItems.map((line) => ({
         line_type: line.lineType,

@@ -23,7 +23,6 @@ import {
 import { DocumentComposer } from "@/shared/document-composer";
 import {
   resolveOrganizationBranding,
-  toAddressLines,
 } from "@/shared/document-composer";
 import {
   createInvoiceDocumentAdapter,
@@ -286,13 +285,6 @@ export function InvoicesConsole() {
 
   const [issueDate, setIssueDate] = useState(todayIsoDate());
   const [dueDate, setDueDate] = useState(dueDateIsoDate());
-  const [senderName, setSenderName] = useState("");
-  const [senderEmail, setSenderEmail] = useState("");
-  const [senderAddress, setSenderAddress] = useState("");
-  const [senderLogoUrl, setSenderLogoUrl] = useState("");
-  const [termsText, setTermsText] = useState("");
-  const [footerText, setFooterText] = useState("");
-  const [notesText, setNotesText] = useState("");
   const [taxPercent, setTaxPercent] = useState("0");
   const [lineItems, setLineItems] = useState<InvoiceLineInput[]>([emptyLine(1)]);
   const [nextLineId, setNextLineId] = useState(2);
@@ -427,15 +419,7 @@ export function InvoicesConsole() {
 
         setProjects(projectRows);
         if (orgRes.ok && organizationData) {
-          const organizationBranding = resolveOrganizationBranding(organizationData);
           setOrganizationInvoiceDefaults(organizationData);
-          setSenderName(organizationBranding.senderName);
-          setSenderEmail(organizationBranding.senderEmail);
-          setSenderAddress(organizationBranding.senderAddress);
-          setSenderLogoUrl(organizationBranding.logoUrl);
-          setTermsText(organizationData.invoice_default_terms || "");
-          setFooterText(organizationData.invoice_default_footer || "");
-          setNotesText(organizationData.invoice_default_notes || "");
           setDueDate(dueDateFromIssueDate(issueDate, organizationData.invoice_default_due_days || 30));
         }
 
@@ -779,16 +763,8 @@ export function InvoicesConsole() {
     const defaultBudgetLineId = budgetLineOptions[0] ? String(budgetLineOptions[0].id) : "";
     const nextIssueDate = todayIsoDate();
     const dueDays = organizationInvoiceDefaults?.invoice_default_due_days ?? 30;
-    const organizationBranding = resolveOrganizationBranding(organizationInvoiceDefaults);
     setIssueDate(nextIssueDate);
     setDueDate(dueDateFromIssueDate(nextIssueDate, dueDays));
-    setSenderName(organizationBranding.senderName);
-    setSenderEmail(organizationBranding.senderEmail);
-    setSenderAddress(organizationBranding.senderAddress);
-    setSenderLogoUrl(organizationBranding.logoUrl);
-    setTermsText(organizationInvoiceDefaults?.invoice_default_terms || "");
-    setFooterText(organizationInvoiceDefaults?.invoice_default_footer || "");
-    setNotesText(organizationInvoiceDefaults?.invoice_default_notes || "");
     setTaxPercent("0");
     setLineItems([emptyLine(1, defaultBudgetLineId)]);
     setNextLineId(2);
@@ -1006,32 +982,11 @@ export function InvoicesConsole() {
       : [emptyLine(1, fallbackBudgetLineId)];
 
     const nextIssueDate = todayIsoDate();
-    const organizationBranding = resolveOrganizationBranding(organizationInvoiceDefaults);
     setIssueDate(nextIssueDate);
-    setDueDate(
-      selectedInvoice.due_date ||
-        dueDateFromIssueDate(
-          nextIssueDate,
-          organizationInvoiceDefaults?.invoice_default_due_days ?? 30,
-        ),
-    );
-    setSenderName(
-      selectedInvoice.sender_name ||
-        organizationBranding.senderName ||
-        "",
-    );
-    setSenderEmail(
-      selectedInvoice.sender_email || organizationBranding.senderEmail || "",
-    );
-    setSenderAddress(
-      selectedInvoice.sender_address || organizationBranding.senderAddress || "",
-    );
-    setSenderLogoUrl(selectedInvoice.sender_logo_url || organizationBranding.logoUrl || "");
-    setTermsText(selectedInvoice.terms_text || organizationInvoiceDefaults?.invoice_default_terms || "");
-    setFooterText(
-      selectedInvoice.footer_text || organizationInvoiceDefaults?.invoice_default_footer || "",
-    );
-    setNotesText(selectedInvoice.notes_text || organizationInvoiceDefaults?.invoice_default_notes || "");
+    setDueDate(dueDateFromIssueDate(
+      nextIssueDate,
+      organizationInvoiceDefaults?.invoice_default_due_days ?? 30,
+    ));
     setTaxPercent(selectedInvoice.tax_percent || "0");
     setLineItems(nextDraftLines);
     setNextLineId(nextDraftLines.length + 1);
@@ -1039,12 +994,19 @@ export function InvoicesConsole() {
   }
 
   const selectedProject = projects.find((project) => String(project.id) === selectedProjectId) ?? null;
-  const senderDisplayName = (
-    senderName ||
-    organizationInvoiceDefaults?.display_name ||
-    "Your Company"
-  ).trim();
-  const senderAddressLines = useMemo(() => toAddressLines(senderAddress), [senderAddress]);
+  const organizationBranding = useMemo(
+    () => resolveOrganizationBranding(organizationInvoiceDefaults),
+    [organizationInvoiceDefaults],
+  );
+  const senderDisplayName = organizationBranding.senderDisplayName;
+  const senderName = organizationBranding.senderName;
+  const senderEmail = organizationBranding.senderEmail;
+  const senderAddressLines = organizationBranding.senderAddressLines;
+  const senderLogoUrl = organizationBranding.logoUrl;
+  const templateDueDays = organizationInvoiceDefaults?.invoice_default_due_days ?? 30;
+  const termsText = organizationInvoiceDefaults?.invoice_default_terms || "";
+  const footerText = organizationInvoiceDefaults?.invoice_default_footer || "";
+  const notesText = organizationInvoiceDefaults?.invoice_default_notes || "";
   const invoiceComposerStatusPolicy = useMemo(
     () =>
       toInvoiceStatusPolicy({
@@ -1064,13 +1026,6 @@ export function InvoicesConsole() {
     () => ({
       issueDate,
       dueDate,
-      senderName,
-      senderEmail,
-      senderAddress,
-      senderLogoUrl,
-      termsText,
-      footerText,
-      notesText,
       taxPercent,
       subtotal: draftLineSubtotal,
       taxAmount: draftTaxTotal,
@@ -1082,16 +1037,9 @@ export function InvoicesConsole() {
       draftTaxTotal,
       draftTotal,
       dueDate,
-      footerText,
       issueDate,
       lineItems,
-      notesText,
-      senderAddress,
-      senderEmail,
-      senderLogoUrl,
-      senderName,
       taxPercent,
-      termsText,
     ],
   );
   const invoiceComposerAdapter = useMemo(
@@ -1637,89 +1585,38 @@ export function InvoicesConsole() {
                               </span>
                             </div>
                           </div>
-                          <div className={styles.organizationFieldGrid}>
-                            <label className={styles.organizationField}>
+                          <div className={styles.organizationTemplateMetaGrid}>
+                            <div className={styles.organizationTemplateMetaRow}>
                               <span>Sender name</span>
-                              <input
-                                className={`${estimateStyles.fieldInput} ${styles.invoiceLockableControl}`}
-                                value={senderName}
-                                onChange={(event) => setSenderName(event.target.value)}
-                                placeholder="Your company name"
-                                disabled={!canEditInvoiceWorkspace}
-                              />
-                            </label>
-                            <label className={styles.organizationField}>
+                              <strong>{senderName || "Not set"}</strong>
+                            </div>
+                            <div className={styles.organizationTemplateMetaRow}>
                               <span>Sender email</span>
-                              <input
-                                className={`${estimateStyles.fieldInput} ${styles.invoiceLockableControl}`}
-                                type="email"
-                                value={senderEmail}
-                                onChange={(event) => setSenderEmail(event.target.value)}
-                                placeholder="billing@example.com"
-                                disabled={!canEditInvoiceWorkspace}
-                              />
-                            </label>
-                            <label className={`${styles.organizationField} ${styles.organizationFieldWide}`}>
-                              <span>Sender address</span>
-                              <textarea
-                                className={`${styles.organizationFieldTextarea} ${styles.invoiceLockableControl}`}
-                                value={senderAddress}
-                                onChange={(event) => setSenderAddress(event.target.value)}
-                                rows={3}
-                                placeholder="Street, city, state, ZIP"
-                                disabled={!canEditInvoiceWorkspace}
-                              />
-                            </label>
-                            <label className={styles.organizationField}>
-                              <span>Logo URL</span>
-                              <input
-                                className={`${estimateStyles.fieldInput} ${styles.invoiceLockableControl}`}
-                                value={senderLogoUrl}
-                                onChange={(event) => setSenderLogoUrl(event.target.value)}
-                                placeholder="https://example.com/logo.png"
-                                disabled={!canEditInvoiceWorkspace}
-                              />
-                            </label>
+                              <strong>{senderEmail || "Not set"}</strong>
+                            </div>
+                            <div className={styles.organizationTemplateMetaRow}>
+                              <span>Template due days</span>
+                              <strong>{templateDueDays} days</strong>
+                            </div>
                           </div>
                           <div className={styles.organizationTemplateGrid}>
-                            <label className={styles.organizationField}>
-                              <span>Default notes</span>
-                              <textarea
-                                className={`${styles.organizationFieldTextarea} ${styles.invoiceLockableControl}`}
-                                value={notesText}
-                                onChange={(event) => setNotesText(event.target.value)}
-                                rows={3}
-                                placeholder="Optional billing notes shown on invoice"
-                                disabled={!canEditInvoiceWorkspace}
-                              />
-                            </label>
-                            <label className={styles.organizationField}>
-                              <span>Terms</span>
-                              <textarea
-                                className={`${styles.organizationFieldTextarea} ${styles.invoiceLockableControl}`}
-                                value={termsText}
-                                onChange={(event) => setTermsText(event.target.value)}
-                                rows={3}
-                                placeholder="Payment terms"
-                                disabled={!canEditInvoiceWorkspace}
-                              />
-                            </label>
-                            <label className={`${styles.organizationField} ${styles.organizationFieldWide}`}>
-                              <span>Footer</span>
-                              <textarea
-                                className={`${styles.organizationFieldTextarea} ${styles.invoiceLockableControl}`}
-                                value={footerText}
-                                onChange={(event) => setFooterText(event.target.value)}
-                                rows={3}
-                                placeholder="Footer message"
-                                disabled={!canEditInvoiceWorkspace}
-                              />
-                            </label>
+                            <div className={styles.organizationTemplateBlock}>
+                              <span>Terms Template</span>
+                              <p>{termsText || "No default terms configured."}</p>
+                            </div>
+                            <div className={styles.organizationTemplateBlock}>
+                              <span>Footer Template</span>
+                              <p>{footerText || "No default footer configured."}</p>
+                            </div>
+                            <div className={`${styles.organizationTemplateBlock} ${styles.organizationTemplateBlockWide}`}>
+                              <span>Notes Template</span>
+                              <p>{notesText || "No default notes configured."}</p>
+                            </div>
                           </div>
                         </div>
                       </div>
                       <p className={estimateStyles.inlineHint}>
-                        Sender fields are prefilled from Organization settings and can be overridden per invoice.
+                        Billing template settings are managed in Organization and automatically applied to invoices.
                       </p>
 
                       <div className={styles.invoiceLineSectionIntro}>

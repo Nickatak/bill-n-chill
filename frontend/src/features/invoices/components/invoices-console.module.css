@@ -657,10 +657,10 @@
   line-height: 1.35;
 }
 
-.organizationFieldGrid {
+.organizationTemplateMetaGrid {
   display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .organizationTemplateGrid {
@@ -669,36 +669,56 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.organizationField {
+.organizationTemplateMetaRow {
   display: grid;
-  gap: 6px;
+  gap: 3px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 8px 10px;
 }
 
-.organizationFieldWide {
-  grid-column: 1 / -1;
-}
-
-.organizationField span {
-  color: var(--text-secondary);
-  font-size: 0.72rem;
+.organizationTemplateMetaRow span {
+  color: #64748b;
+  font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.organizationField input,
-.organizationFieldTextarea {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: var(--surface-elevated);
-  color: var(--text-primary);
-  font-size: 0.88rem;
+.organizationTemplateMetaRow strong {
+  color: #0f172a;
+  font-size: 0.84rem;
+  font-weight: 700;
 }
 
-.organizationFieldTextarea {
-  min-height: 88px;
-  resize: vertical;
+.organizationTemplateBlock {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.organizationTemplateBlockWide {
+  grid-column: 1 / -1;
+}
+
+.organizationTemplateBlock span {
+  color: #64748b;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.organizationTemplateBlock p {
+  margin: 0;
+  white-space: pre-wrap;
+  color: #334155;
+  font-size: 0.84rem;
+  line-height: 1.45;
 }
 
 .invoiceMetaStrong {
@@ -1185,7 +1205,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .organizationFieldGrid,
+  .organizationTemplateMetaGrid,
   .organizationTemplateGrid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1399,10 +1419,30 @@
   color: #cbd5e1;
 }
 
-:global(html[data-theme="dark"]) .organizationFieldTextarea {
-  background: #0b1220;
-  border-color: #334155;
+:global(html[data-theme="dark"]) .organizationTemplateMetaRow {
+  border-color: #1d4ed8;
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .organizationTemplateMetaRow span {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .organizationTemplateMetaRow strong {
   color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .organizationTemplateBlock {
+  border-color: #1d4ed8;
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .organizationTemplateBlock span {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .organizationTemplateBlock p {
+  color: #cbd5e1;
 }
 
 :global(html[data-theme="dark"]) .invoiceLineHeader {
