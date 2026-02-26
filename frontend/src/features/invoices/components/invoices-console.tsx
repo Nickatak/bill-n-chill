@@ -1575,9 +1575,8 @@ export function InvoicesConsole() {
                       </div>
 
                       <div className={styles.invoiceMetaLayout}>
-                        <div className={styles.invoiceMetaSpacer} />
-                        <div className={estimateStyles.metaBlock}>
-                          <span className={estimateStyles.metaTitle}>Invoice details</span>
+                        <div className={styles.invoiceDetailCard}>
+                          <span className={styles.invoiceMetaCardLabel}>Invoice Details</span>
                           <div className={estimateStyles.metaLine}>
                             <span>Invoice #</span>
                             <strong className={styles.invoiceMetaStrong}>Auto on create</strong>
@@ -1604,85 +1603,120 @@ export function InvoicesConsole() {
                               disabled={!canEditInvoiceWorkspace}
                             />
                           </label>
-                          <label className={estimateStyles.inlineField}>
-                            Organization sender name
-                            <input
-                              className={`${estimateStyles.fieldInput} ${styles.invoiceLockableControl}`}
-                              value={senderName}
-                              onChange={(event) => setSenderName(event.target.value)}
-                              placeholder="Your company name"
-                              disabled={!canEditInvoiceWorkspace}
-                            />
-                          </label>
-                          <label className={estimateStyles.inlineField}>
-                            Organization sender email
-                            <input
-                              className={`${estimateStyles.fieldInput} ${styles.invoiceLockableControl}`}
-                              type="email"
-                              value={senderEmail}
-                              onChange={(event) => setSenderEmail(event.target.value)}
-                              placeholder="billing@example.com"
-                              disabled={!canEditInvoiceWorkspace}
-                            />
-                          </label>
                         </div>
-                      </div>
-
-                      <div className={styles.invoiceTemplateGrid}>
-                        <label className={styles.invoiceTemplateField}>
-                          <span>Organization sender address</span>
-                          <textarea
-                            className={styles.invoiceLockableControl}
-                            value={senderAddress}
-                            onChange={(event) => setSenderAddress(event.target.value)}
-                            rows={3}
-                            placeholder="Street, city, state, ZIP"
-                            disabled={!canEditInvoiceWorkspace}
-                          />
-                        </label>
-                        <label className={styles.invoiceTemplateField}>
-                          <span>Organization logo URL</span>
-                          <input
-                            className={styles.invoiceLockableControl}
-                            value={senderLogoUrl}
-                            onChange={(event) => setSenderLogoUrl(event.target.value)}
-                            placeholder="https://example.com/logo.png"
-                            disabled={!canEditInvoiceWorkspace}
-                          />
-                        </label>
-                        <label className={styles.invoiceTemplateField}>
-                          <span>Default notes</span>
-                          <textarea
-                            className={styles.invoiceLockableControl}
-                            value={notesText}
-                            onChange={(event) => setNotesText(event.target.value)}
-                            rows={3}
-                            placeholder="Optional billing notes shown on invoice"
-                            disabled={!canEditInvoiceWorkspace}
-                          />
-                        </label>
-                        <label className={styles.invoiceTemplateField}>
-                          <span>Terms</span>
-                          <textarea
-                            className={styles.invoiceLockableControl}
-                            value={termsText}
-                            onChange={(event) => setTermsText(event.target.value)}
-                            rows={3}
-                            placeholder="Payment terms"
-                            disabled={!canEditInvoiceWorkspace}
-                          />
-                        </label>
-                        <label className={styles.invoiceTemplateField}>
-                          <span>Footer</span>
-                          <textarea
-                            className={styles.invoiceLockableControl}
-                            value={footerText}
-                            onChange={(event) => setFooterText(event.target.value)}
-                            rows={3}
-                            placeholder="Footer message"
-                            disabled={!canEditInvoiceWorkspace}
-                          />
-                        </label>
+                        <div className={styles.organizationProfileCard}>
+                          <div className={styles.organizationProfileHeader}>
+                            <div className={styles.organizationProfileHeading}>
+                              <span className={styles.organizationProfileEyebrow}>
+                                Organization Billing Profile
+                              </span>
+                              <strong className={styles.organizationProfileName}>
+                                {senderDisplayName || "Sender identity"}
+                              </strong>
+                            </div>
+                            <a href="/organization" className={styles.organizationSettingsLink}>
+                              Manage Defaults <span aria-hidden="true">↗</span>
+                            </a>
+                          </div>
+                          <div className={styles.organizationProfilePreview}>
+                            <div className={styles.organizationLogoPreview}>
+                              {senderLogoUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={senderLogoUrl} alt="Organization logo preview" className={styles.invoiceLogoImage} />
+                              ) : (
+                                <span>No logo</span>
+                              )}
+                            </div>
+                            <div className={styles.organizationProfileMeta}>
+                              <span>{senderDisplayName || "Sender name not set"}</span>
+                              <span>{senderEmail || "Sender email not set"}</span>
+                              <span>
+                                {senderAddressLines.length
+                                  ? senderAddressLines.join(" · ")
+                                  : "Sender address not set"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className={styles.organizationFieldGrid}>
+                            <label className={styles.organizationField}>
+                              <span>Sender name</span>
+                              <input
+                                className={`${estimateStyles.fieldInput} ${styles.invoiceLockableControl}`}
+                                value={senderName}
+                                onChange={(event) => setSenderName(event.target.value)}
+                                placeholder="Your company name"
+                                disabled={!canEditInvoiceWorkspace}
+                              />
+                            </label>
+                            <label className={styles.organizationField}>
+                              <span>Sender email</span>
+                              <input
+                                className={`${estimateStyles.fieldInput} ${styles.invoiceLockableControl}`}
+                                type="email"
+                                value={senderEmail}
+                                onChange={(event) => setSenderEmail(event.target.value)}
+                                placeholder="billing@example.com"
+                                disabled={!canEditInvoiceWorkspace}
+                              />
+                            </label>
+                            <label className={`${styles.organizationField} ${styles.organizationFieldWide}`}>
+                              <span>Sender address</span>
+                              <textarea
+                                className={`${styles.organizationFieldTextarea} ${styles.invoiceLockableControl}`}
+                                value={senderAddress}
+                                onChange={(event) => setSenderAddress(event.target.value)}
+                                rows={3}
+                                placeholder="Street, city, state, ZIP"
+                                disabled={!canEditInvoiceWorkspace}
+                              />
+                            </label>
+                            <label className={styles.organizationField}>
+                              <span>Logo URL</span>
+                              <input
+                                className={`${estimateStyles.fieldInput} ${styles.invoiceLockableControl}`}
+                                value={senderLogoUrl}
+                                onChange={(event) => setSenderLogoUrl(event.target.value)}
+                                placeholder="https://example.com/logo.png"
+                                disabled={!canEditInvoiceWorkspace}
+                              />
+                            </label>
+                          </div>
+                          <div className={styles.organizationTemplateGrid}>
+                            <label className={styles.organizationField}>
+                              <span>Default notes</span>
+                              <textarea
+                                className={`${styles.organizationFieldTextarea} ${styles.invoiceLockableControl}`}
+                                value={notesText}
+                                onChange={(event) => setNotesText(event.target.value)}
+                                rows={3}
+                                placeholder="Optional billing notes shown on invoice"
+                                disabled={!canEditInvoiceWorkspace}
+                              />
+                            </label>
+                            <label className={styles.organizationField}>
+                              <span>Terms</span>
+                              <textarea
+                                className={`${styles.organizationFieldTextarea} ${styles.invoiceLockableControl}`}
+                                value={termsText}
+                                onChange={(event) => setTermsText(event.target.value)}
+                                rows={3}
+                                placeholder="Payment terms"
+                                disabled={!canEditInvoiceWorkspace}
+                              />
+                            </label>
+                            <label className={`${styles.organizationField} ${styles.organizationFieldWide}`}>
+                              <span>Footer</span>
+                              <textarea
+                                className={`${styles.organizationFieldTextarea} ${styles.invoiceLockableControl}`}
+                                value={footerText}
+                                onChange={(event) => setFooterText(event.target.value)}
+                                rows={3}
+                                placeholder="Footer message"
+                                disabled={!canEditInvoiceWorkspace}
+                              />
+                            </label>
+                          </div>
+                        </div>
                       </div>
                       <p className={estimateStyles.inlineHint}>
                         Sender fields are prefilled from Organization settings and can be overridden per invoice.
