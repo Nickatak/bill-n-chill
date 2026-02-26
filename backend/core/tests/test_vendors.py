@@ -71,6 +71,24 @@ class VendorTests(TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["name"], "Owner Vendor")
 
+    def test_vendor_list_includes_global_canonical_vendors(self):
+        canonical = Vendor.objects.create(
+            name="Global Canonical Vendor",
+            email="canonical@vendor.example.com",
+            created_by=self.other_user,
+            is_canonical=True,
+            organization=None,
+        )
+
+        response = self.client.get(
+            "/api/v1/vendors/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        rows = response.json()["data"]
+        returned_ids = {row["id"] for row in rows}
+        self.assertIn(canonical.id, returned_ids)
+
     def test_vendor_list_includes_rows_created_by_other_user_in_same_org(self):
         shared_org = Organization.objects.create(
             display_name="Shared Vendor Org",

@@ -21,7 +21,7 @@ from core.views.helpers import (
 def _vendor_scope_filter(user):
     membership = _ensure_primary_membership(user)
     actor_user_ids = _organization_user_ids(user)
-    return Q(organization_id=membership.organization_id) | Q(
+    return Q(organization__isnull=True, is_canonical=True) | Q(organization_id=membership.organization_id) | Q(
         organization__isnull=True,
         created_by_id__in=actor_user_ids,
     )

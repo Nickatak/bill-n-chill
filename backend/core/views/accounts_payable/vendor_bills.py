@@ -4,6 +4,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import Q
 from django.db.models import Sum
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
@@ -22,11 +23,34 @@ from core.policies import get_vendor_bill_policy_contract
 from core.serializers import VendorBillSerializer, VendorBillWriteSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
+    _ensure_primary_membership,
     _organization_user_ids,
     _record_financial_audit_event,
     _role_gate_error_payload,
     _validate_project_for_user,
 )
+
+CREATE_ALLOWED_STATUSES = {
+    VendorBill.Status.PLANNED,
+    VendorBill.Status.RECEIVED,
+}
+RECEIVED_PLUS_STATUSES = {
+    VendorBill.Status.RECEIVED,
+    VendorBill.Status.APPROVED,
+    VendorBill.Status.SCHEDULED,
+    VendorBill.Status.PAID,
+}
+
+
+def _vendor_scope_filter(user):
+    membership = _ensure_primary_membership(user)
+    actor_user_ids = _organization_user_ids(user)
+    return Q(organization__isnull=True, is_canonical=True) | Q(
+        organization_id=membership.organization_id
+    ) | Q(
+        organization__isnull=True,
+        created_by_id__in=actor_user_ids,
+    )
 
 
 def _find_duplicate_vendor_bills(
@@ -216,12 +240,13 @@ def project_vendor_bills_view(request, project_id: int):
       - `_comment_*` keys in this example are documentation-only (not accepted API fields).
       - JSON map:
         {
-          "_comment_required": "vendor, bill_number, and total are required",
+          "_comment_required": "vendor, bill_number, status, and total are required",
           "vendor": "integer (required)",
           "bill_number": "string (required)",
+          "status": "planned|received (required)",
           "total": "decimal (required)",
-          "issue_date": "YYYY-MM-DD (optional, default=today)",
-          "due_date": "YYYY-MM-DD (optional, must be >= issue_date, default=issue_date+30d)",
+          "issue_date": "YYYY-MM-DD (required when status=received; optional for planned, default=today)",
+          "due_date": "YYYY-MM-DD (required when status=received; optional for planned, must be >= issue_date, default=issue_date+30d)",
           "scheduled_for": "YYYY-MM-DD (optional)",
           "notes": "string (optional)",
           "allocations": [
@@ -273,6 +298,8 @@ def project_vendor_bills_view(request, project_id: int):
         fields["vendor"] = ["This field is required."]
     if "bill_number" not in data:
         fields["bill_number"] = ["This field is required."]
+    if "status" not in data:
+        fields["status"] = ["This field is required."]
     if "total" not in data:
         fields["total"] = ["This field is required."]
     if fields:
@@ -287,7 +314,21 @@ def project_vendor_bills_view(request, project_id: int):
             status=400,
         )
 
-    vendor = Vendor.objects.filter(id=data["vendor"], created_by_id__in=actor_user_ids).first()
+    requested_status = data["status"]
+    if requested_status not in CREATE_ALLOWED_STATUSES:
+        allowed = ", ".join(sorted(CREATE_ALLOWED_STATUSES))
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": f"status must be one of: {allowed}.",
+                    "fields": {"status": [f"Choose one of: {allowed}."]},
+                }
+            },
+            status=400,
+        )
+
+    vendor = Vendor.objects.filter(_vendor_scope_filter(request.user), id=data["vendor"]).first()
     if not vendor:
         return Response(
             {
@@ -300,8 +341,30 @@ def project_vendor_bills_view(request, project_id: int):
             status=400,
         )
 
-    issue_date = data.get("issue_date") or timezone.localdate()
-    due_date = data.get("due_date") or (issue_date + timedelta(days=30))
+    issue_date = data.get("issue_date")
+    due_date = data.get("due_date")
+    required_status_date_fields = {}
+    if requested_status in RECEIVED_PLUS_STATUSES:
+        if issue_date is None:
+            required_status_date_fields["issue_date"] = [
+                "Issue/received date is required for received-or-later bills."
+            ]
+        if due_date is None:
+            required_status_date_fields["due_date"] = ["Due date is required for received-or-later bills."]
+    if required_status_date_fields:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Missing required date fields for the selected initial status.",
+                    "fields": required_status_date_fields,
+                }
+            },
+            status=400,
+        )
+
+    issue_date = issue_date or timezone.localdate()
+    due_date = due_date or (issue_date + timedelta(days=30))
     if due_date < issue_date:
         return Response(
             {
@@ -375,7 +438,7 @@ def project_vendor_bills_view(request, project_id: int):
             project=project,
             vendor=vendor,
             bill_number=data["bill_number"],
-            status=VendorBill.Status.PLANNED,
+            status=requested_status,
             issue_date=issue_date,
             due_date=due_date,
             scheduled_for=scheduled_for,
@@ -392,7 +455,7 @@ def project_vendor_bills_view(request, project_id: int):
             object_type="vendor_bill",
             object_id=vendor_bill.id,
             from_status="",
-            to_status=VendorBill.Status.PLANNED,
+            to_status=requested_status,
             amount=vendor_bill.total,
             note="Vendor bill created.",
             created_by=request.user,
@@ -526,7 +589,7 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
             status=400,
         )
 
-    next_vendor = Vendor.objects.filter(id=next_vendor_id, created_by_id__in=actor_user_ids).first()
+    next_vendor = Vendor.objects.filter(_vendor_scope_filter(request.user), id=next_vendor_id).first()
     if not next_vendor:
         return Response(
             {
@@ -585,6 +648,23 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
     next_issue_date = data.get("issue_date", vendor_bill.issue_date)
     next_due_date = data.get("due_date", vendor_bill.due_date)
     next_scheduled_for = data.get("scheduled_for", vendor_bill.scheduled_for)
+    if next_status in RECEIVED_PLUS_STATUSES:
+        fields = {}
+        if next_issue_date is None:
+            fields["issue_date"] = ["Issue/received date is required for received-or-later bills."]
+        if next_due_date is None:
+            fields["due_date"] = ["Due date is required for received-or-later bills."]
+        if fields:
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "Missing required date fields for the selected status.",
+                        "fields": fields,
+                    }
+                },
+                status=400,
+            )
     if next_due_date < next_issue_date:
         return Response(
             {

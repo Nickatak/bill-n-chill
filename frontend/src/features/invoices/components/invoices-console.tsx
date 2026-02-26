@@ -17,6 +17,7 @@ import {
   InvoiceLineInput,
   InvoicePolicyContract,
   InvoiceRecord,
+  OrganizationInvoiceDefaults,
   ProjectRecord,
 } from "../types";
 import { CostCodeCombobox } from "@/shared/components/cost-code-combobox";
@@ -64,6 +65,13 @@ function dueDateIsoDate(daysFromNow = 30) {
   const current = new Date();
   current.setDate(current.getDate() + daysFromNow);
   return current.toISOString().slice(0, 10);
+}
+
+function dueDateFromIssueDate(issueDate: string, dueDays: number) {
+  const base = issueDate ? new Date(`${issueDate}T00:00:00`) : new Date();
+  const safeDueDays = Number.isFinite(dueDays) ? Math.max(1, Math.min(365, Math.round(dueDays))) : 30;
+  base.setDate(base.getDate() + safeDueDays);
+  return base.toISOString().slice(0, 10);
 }
 
 function parseAmount(value: string): number {
@@ -211,9 +219,17 @@ export function InvoicesConsole() {
   );
   const [scopeOverride, setScopeOverride] = useState(false);
   const [scopeOverrideNote, setScopeOverrideNote] = useState("");
+  const [organizationInvoiceDefaults, setOrganizationInvoiceDefaults] = useState<OrganizationInvoiceDefaults | null>(null);
 
   const [issueDate, setIssueDate] = useState(todayIsoDate());
   const [dueDate, setDueDate] = useState(dueDateIsoDate());
+  const [senderName, setSenderName] = useState("");
+  const [senderEmail, setSenderEmail] = useState("");
+  const [senderAddress, setSenderAddress] = useState("");
+  const [senderLogoUrl, setSenderLogoUrl] = useState("");
+  const [termsText, setTermsText] = useState("");
+  const [footerText, setFooterText] = useState("");
+  const [notesText, setNotesText] = useState("");
   const [taxPercent, setTaxPercent] = useState("0");
   const [lineItems, setLineItems] = useState<InvoiceLineInput[]>([emptyLine(1)]);
   const [nextLineId, setNextLineId] = useState(2);
@@ -318,12 +334,14 @@ export function InvoicesConsole() {
 
       setNeutralStatus("Loading projects and cost codes...");
       try {
-        const [projectsRes, codesRes] = await Promise.all([
+        const [projectsRes, codesRes, orgRes] = await Promise.all([
           fetch(`${normalizedBaseUrl}/projects/`, { headers: buildAuthHeaders(token) }),
           fetch(`${normalizedBaseUrl}/cost-codes/`, { headers: buildAuthHeaders(token) }),
+          fetch(`${normalizedBaseUrl}/organization/`, { headers: buildAuthHeaders(token) }),
         ]);
         const projectsPayload: ApiResponse = await projectsRes.json();
         const codesPayload: ApiResponse = await codesRes.json();
+        const orgPayload: ApiResponse = await orgRes.json();
 
         if (!projectsRes.ok || !codesRes.ok) {
           setErrorStatus("Failed loading dependencies.");
@@ -332,9 +350,23 @@ export function InvoicesConsole() {
 
         const projectRows = (projectsPayload.data as ProjectRecord[]) ?? [];
         const codeRows = (codesPayload.data as CostCode[]) ?? [];
+        const organizationData = (
+          orgPayload.data as { organization?: OrganizationInvoiceDefaults } | undefined
+        )?.organization;
 
         setProjects(projectRows);
         setCostCodes(codeRows);
+        if (orgRes.ok && organizationData) {
+          setOrganizationInvoiceDefaults(organizationData);
+          setSenderName(organizationData.invoice_sender_name || organizationData.display_name || "");
+          setSenderEmail(organizationData.invoice_sender_email || "");
+          setSenderAddress(organizationData.invoice_sender_address || "");
+          setSenderLogoUrl(organizationData.logo_url || "");
+          setTermsText(organizationData.invoice_default_terms || "");
+          setFooterText(organizationData.invoice_default_footer || "");
+          setNotesText(organizationData.invoice_default_notes || "");
+          setDueDate(dueDateFromIssueDate(issueDate, organizationData.invoice_default_due_days || 30));
+        }
 
         setSelectedProjectId((current) => {
           if (current && projectRows.some((row) => String(row.id) === current)) {
@@ -361,7 +393,7 @@ export function InvoicesConsole() {
         setErrorStatus("Could not reach dependency endpoints.");
       }
     },
-    [normalizedBaseUrl, scopedProjectId, setErrorStatus, setNeutralStatus, token],
+    [issueDate, normalizedBaseUrl, scopedProjectId, setErrorStatus, setNeutralStatus, token],
   );
 
   const loadInvoicePolicy = useCallback(async () => {
@@ -576,8 +608,21 @@ export function InvoicesConsole() {
 
   function resetCreateDraft() {
     const defaultCostCodeId = costCodes[0] ? String(costCodes[0].id) : "";
-    setIssueDate(todayIsoDate());
-    setDueDate(dueDateIsoDate());
+    const nextIssueDate = todayIsoDate();
+    const dueDays = organizationInvoiceDefaults?.invoice_default_due_days ?? 30;
+    setIssueDate(nextIssueDate);
+    setDueDate(dueDateFromIssueDate(nextIssueDate, dueDays));
+    setSenderName(
+      organizationInvoiceDefaults?.invoice_sender_name ||
+        organizationInvoiceDefaults?.display_name ||
+        "",
+    );
+    setSenderEmail(organizationInvoiceDefaults?.invoice_sender_email || "");
+    setSenderAddress(organizationInvoiceDefaults?.invoice_sender_address || "");
+    setSenderLogoUrl(organizationInvoiceDefaults?.logo_url || "");
+    setTermsText(organizationInvoiceDefaults?.invoice_default_terms || "");
+    setFooterText(organizationInvoiceDefaults?.invoice_default_footer || "");
+    setNotesText(organizationInvoiceDefaults?.invoice_default_notes || "");
     setTaxPercent("0");
     setLineItems([emptyLine(1, defaultCostCodeId)]);
     setNextLineId(2);
@@ -598,21 +643,11 @@ export function InvoicesConsole() {
 
     setNeutralStatus("Creating invoice...");
     try {
+      const createPayload = invoiceComposerAdapter.toCreatePayload(invoiceDraftFormState);
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/invoices/`, {
         method: "POST",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
-        body: JSON.stringify({
-          issue_date: issueDate,
-          due_date: dueDate,
-          tax_percent: taxPercent,
-          line_items: lineItems.map((line) => ({
-            cost_code: line.costCodeId ? Number(line.costCodeId) : null,
-            description: line.description,
-            quantity: line.quantity,
-            unit: line.unit,
-            unit_price: line.unitPrice,
-          })),
-        }),
+        body: JSON.stringify(createPayload),
       });
       const payload: ApiResponse = await response.json();
 
@@ -732,8 +767,33 @@ export function InvoicesConsole() {
         }))
       : [emptyLine(1, fallbackCostCodeId)];
 
-    setIssueDate(todayIsoDate());
-    setDueDate(dueDateIsoDate());
+    const nextIssueDate = todayIsoDate();
+    setIssueDate(nextIssueDate);
+    setDueDate(
+      selectedInvoice.due_date ||
+        dueDateFromIssueDate(
+          nextIssueDate,
+          organizationInvoiceDefaults?.invoice_default_due_days ?? 30,
+        ),
+    );
+    setSenderName(
+      selectedInvoice.sender_name ||
+        organizationInvoiceDefaults?.invoice_sender_name ||
+        organizationInvoiceDefaults?.display_name ||
+        "",
+    );
+    setSenderEmail(
+      selectedInvoice.sender_email || organizationInvoiceDefaults?.invoice_sender_email || "",
+    );
+    setSenderAddress(
+      selectedInvoice.sender_address || organizationInvoiceDefaults?.invoice_sender_address || "",
+    );
+    setSenderLogoUrl(selectedInvoice.sender_logo_url || organizationInvoiceDefaults?.logo_url || "");
+    setTermsText(selectedInvoice.terms_text || organizationInvoiceDefaults?.invoice_default_terms || "");
+    setFooterText(
+      selectedInvoice.footer_text || organizationInvoiceDefaults?.invoice_default_footer || "",
+    );
+    setNotesText(selectedInvoice.notes_text || organizationInvoiceDefaults?.invoice_default_notes || "");
     setTaxPercent(selectedInvoice.tax_percent || "0");
     setLineItems(nextDraftLines);
     setNextLineId(nextDraftLines.length + 1);
@@ -760,13 +820,35 @@ export function InvoicesConsole() {
     () => ({
       issueDate,
       dueDate,
+      senderName,
+      senderEmail,
+      senderAddress,
+      senderLogoUrl,
+      termsText,
+      footerText,
+      notesText,
       taxPercent,
       subtotal: draftLineSubtotal,
       taxAmount: draftTaxTotal,
       totalAmount: draftTotal,
       lineItems,
     }),
-    [draftLineSubtotal, draftTaxTotal, draftTotal, dueDate, issueDate, lineItems, taxPercent],
+    [
+      draftLineSubtotal,
+      draftTaxTotal,
+      draftTotal,
+      dueDate,
+      footerText,
+      issueDate,
+      lineItems,
+      notesText,
+      senderAddress,
+      senderEmail,
+      senderLogoUrl,
+      senderName,
+      taxPercent,
+      termsText,
+    ],
   );
   const invoiceComposerAdapter = useMemo(
     () => createInvoiceDocumentAdapter(invoiceComposerStatusPolicy, []),
@@ -1000,8 +1082,8 @@ export function InvoicesConsole() {
                         <div className={styles.invoiceMetaGrid}>
                           <span>Total ${invoice.total}</span>
                           <span>Due ${invoice.balance_due}</span>
-                          <span>Issue {invoice.issue_date}</span>
-                          <span>Due {invoice.due_date}</span>
+                          <span>Issue {formatDateDisplay(invoice.issue_date)}</span>
+                          <span>Due {formatDateDisplay(invoice.due_date)}</span>
                         </div>
                       </button>
                     );
@@ -1136,9 +1218,21 @@ export function InvoicesConsole() {
                         <div className={styles.invoicePartyStack}>
                           <div className={estimateStyles.fromBlock}>
                             <span className={estimateStyles.blockLabel}>From</span>
-                            <p className={estimateStyles.blockText}>Your Company</p>
-                            <p className={estimateStyles.blockMuted}>Your Address 1234</p>
-                            <p className={estimateStyles.blockMuted}>City, ST 12345</p>
+                            <p className={estimateStyles.blockText}>
+                              {senderName || organizationInvoiceDefaults?.display_name || "Your Company"}
+                            </p>
+                            {senderEmail ? (
+                              <p className={estimateStyles.blockMuted}>{senderEmail}</p>
+                            ) : null}
+                            {senderAddress
+                              ? senderAddress.split("\n").map((line, index) => (
+                                  <p key={`${line}-${index}`} className={estimateStyles.blockMuted}>
+                                    {line}
+                                  </p>
+                                ))
+                              : (
+                                <p className={estimateStyles.blockMuted}>Set sender address in Org settings</p>
+                              )}
                           </div>
                           <div className={estimateStyles.toBlock}>
                             <span className={estimateStyles.blockLabel}>To</span>
@@ -1153,7 +1247,14 @@ export function InvoicesConsole() {
                           </div>
                         </div>
                         <div className={estimateStyles.headerRight}>
-                          <div className={estimateStyles.logoBox}>Upload Logo</div>
+                          <div className={estimateStyles.logoBox}>
+                            {senderLogoUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={senderLogoUrl} alt="Organization logo" className={styles.invoiceLogoImage} />
+                            ) : (
+                              "Logo"
+                            )}
+                          </div>
                           <div className={estimateStyles.sheetTitle}>Invoice</div>
                         </div>
                       </div>
@@ -1188,7 +1289,80 @@ export function InvoicesConsole() {
                               disabled={!canMutateInvoices}
                             />
                           </label>
+                          <label className={estimateStyles.inlineField}>
+                            Sender name
+                            <input
+                              className={estimateStyles.fieldInput}
+                              value={senderName}
+                              onChange={(event) => setSenderName(event.target.value)}
+                              placeholder="Your company name"
+                              disabled={!canMutateInvoices}
+                            />
+                          </label>
+                          <label className={estimateStyles.inlineField}>
+                            Sender email
+                            <input
+                              className={estimateStyles.fieldInput}
+                              type="email"
+                              value={senderEmail}
+                              onChange={(event) => setSenderEmail(event.target.value)}
+                              placeholder="billing@example.com"
+                              disabled={!canMutateInvoices}
+                            />
+                          </label>
                         </div>
+                      </div>
+
+                      <div className={styles.invoiceTemplateGrid}>
+                        <label className={styles.invoiceTemplateField}>
+                          <span>Sender address</span>
+                          <textarea
+                            value={senderAddress}
+                            onChange={(event) => setSenderAddress(event.target.value)}
+                            rows={3}
+                            placeholder="Street, city, state, ZIP"
+                            disabled={!canMutateInvoices}
+                          />
+                        </label>
+                        <label className={styles.invoiceTemplateField}>
+                          <span>Logo URL</span>
+                          <input
+                            value={senderLogoUrl}
+                            onChange={(event) => setSenderLogoUrl(event.target.value)}
+                            placeholder="https://example.com/logo.png"
+                            disabled={!canMutateInvoices}
+                          />
+                        </label>
+                        <label className={styles.invoiceTemplateField}>
+                          <span>Default notes</span>
+                          <textarea
+                            value={notesText}
+                            onChange={(event) => setNotesText(event.target.value)}
+                            rows={3}
+                            placeholder="Optional billing notes shown on invoice"
+                            disabled={!canMutateInvoices}
+                          />
+                        </label>
+                        <label className={styles.invoiceTemplateField}>
+                          <span>Terms</span>
+                          <textarea
+                            value={termsText}
+                            onChange={(event) => setTermsText(event.target.value)}
+                            rows={3}
+                            placeholder="Payment terms"
+                            disabled={!canMutateInvoices}
+                          />
+                        </label>
+                        <label className={styles.invoiceTemplateField}>
+                          <span>Footer</span>
+                          <textarea
+                            value={footerText}
+                            onChange={(event) => setFooterText(event.target.value)}
+                            rows={3}
+                            placeholder="Footer message"
+                            disabled={!canMutateInvoices}
+                          />
+                        </label>
                       </div>
 
                       <div className={styles.invoiceLineSectionIntro}>

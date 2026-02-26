@@ -89,10 +89,16 @@
 
 .table tbody tr {
   background: #ffffff;
+  cursor: pointer;
+  transition: background-color 120ms ease;
 }
 
 .table tbody tr:nth-child(even) {
   background: #f8fafc;
+}
+
+.table tbody tr:hover {
+  background: #eef2ff;
 }
 
 .rowSelected {
@@ -365,19 +371,146 @@
   color: #6b7280;
 }
 
-.allocationFieldset {
+.billForm {
+  display: grid;
+  gap: 14px;
+}
+
+.formTitle {
+  margin: 0;
+}
+
+.billForm label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: #475569;
+}
+
+.billForm label > input,
+.billForm label > select,
+.billForm label > textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #0f172a;
+  padding: 10px 12px;
+  font-size: 0.94rem;
+}
+
+.billForm label > textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.billForm label > input:disabled,
+.billForm label > select:disabled,
+.billForm label > textarea:disabled {
+  background: #eef2f7;
+  border-color: #cbd5e1;
+  color: #64748b;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.formSection {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f8fbff 0%, #f6f9fc 100%);
+  padding: 14px;
+}
+
+.formSectionHeader {
+  display: grid;
+  gap: 4px;
+}
+
+.formSectionTitle {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.formSectionHint {
+  margin: 0;
+  font-size: 0.86rem;
+  color: #475569;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.fieldSpan2 {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 860px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .submitRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .submitRow button {
+    margin-left: 0;
+  }
+}
+
+.formInlineHint {
+  margin: 0;
+  color: #475569;
+  font-size: 0.84rem;
+}
+
+.allocationsBlock {
   display: grid;
   gap: 8px;
 }
 
+.allocationFieldset {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  overflow-x: auto;
+  background: #ffffff;
+}
+
+.allocationFieldset legend {
+  padding: 0 10px;
+  font-size: 0.78rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 600;
+}
+
 .allocationHeader {
   display: grid;
-  grid-template-columns: 2fr 1fr 2fr auto;
+  grid-template-columns: 2fr 1.5fr 1fr 2fr auto;
   gap: 8px;
-  font-size: 0.75rem;
-  letter-spacing: 0.03em;
+  align-items: center;
+  padding: 10px 12px;
+  background: #eef2ff;
+  color: #1e3a8a;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #6b7280;
+  min-width: 980px;
 }
 
 .allocationRowWrap {
@@ -385,21 +518,53 @@
   gap: 4px;
 }
 
+.allocationRows {
+  display: grid;
+}
+
 .allocationRow {
   display: grid;
-  grid-template-columns: 2fr 1fr 2fr auto;
+  grid-template-columns: 2fr 1.5fr 1fr 2fr auto;
   gap: 8px;
   align-items: center;
+  padding: 8px 12px;
+  border-top: 1px solid #e2e8f0;
+  background: #ffffff;
+  min-width: 980px;
+}
+
+.allocationRows .allocationRowWrap:nth-child(even) .allocationRow {
+  background: #f4f7fc;
+}
+
+.allocationRow select,
+.allocationRow input {
+  border: 1px solid #cbd5f5;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+.allocationRow select:disabled,
+.allocationRow input:disabled {
+  background: #eef2f7;
+  border-color: #cbd5e1;
+  color: #64748b;
+  cursor: not-allowed;
+  opacity: 1;
 }
 
 .allocationMeta {
-  margin: 0;
+  margin: 0 12px 8px;
   font-size: 0.82rem;
   color: #475569;
 }
 
 .allocationTotals {
-  margin: 0;
+  margin: 10px 12px 0;
   color: #374151;
 }
 
@@ -413,11 +578,85 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  margin: 8px 12px 12px;
 }
 
 .suggestedTotalRow span {
   color: #1f2937;
   font-size: 0.85rem;
+}
+
+.formActionsRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.formSecondaryButton,
+.formDangerButton,
+.formPrimaryButton {
+  border-radius: 9px;
+  padding: 8px 12px;
+  min-height: 38px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease,
+    transform 120ms ease;
+}
+
+.formSecondaryButton {
+  border: 1px solid #93c5fd;
+  background: #eaf2ff;
+  color: #1e40af;
+}
+
+.formSecondaryButton:hover:not(:disabled) {
+  border-color: #60a5fa;
+  background: #dbeafe;
+  transform: translateY(-1px);
+}
+
+.formDangerButton {
+  border: 1px solid #fca5a5;
+  background: #fff1f2;
+  color: #b91c1c;
+}
+
+.formDangerButton:hover:not(:disabled) {
+  border-color: #f87171;
+  background: #ffe4e6;
+  transform: translateY(-1px);
+}
+
+.formPrimaryButton {
+  border: 1px solid #1d4ed8;
+  background: #2563eb;
+  color: #eff6ff;
+}
+
+.formPrimaryButton:hover:not(:disabled) {
+  border-color: #1e40af;
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.formSecondaryButton:disabled,
+.formDangerButton:disabled,
+.formPrimaryButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.submitRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.submitRow button {
+  margin-left: auto;
 }
 
 .readOnlyField {
@@ -433,7 +672,7 @@
 
 .hintText {
   color: #1f2937;
-  margin: 0;
+  margin: 10px 12px;
 }
 
 .unsavedNotice {
@@ -445,6 +684,121 @@
 :global(html[data-theme="dark"]) .impactCard {
   border-color: #334155;
   background: #111827;
+}
+
+:global(html[data-theme="dark"]) .formTitle {
+  color: #f1f5f9;
+}
+
+:global(html[data-theme="dark"]) .formSection {
+  border-color: #334155;
+  background: linear-gradient(180deg, #0f172a 0%, #0b1220 100%);
+}
+
+:global(html[data-theme="dark"]) .formSectionTitle {
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .formSectionHint {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .billForm label {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .billForm label > input,
+:global(html[data-theme="dark"]) .billForm label > select,
+:global(html[data-theme="dark"]) .billForm label > textarea {
+  border-color: #334155;
+  background: #0b1220;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .billForm label > input:disabled,
+:global(html[data-theme="dark"]) .billForm label > select:disabled,
+:global(html[data-theme="dark"]) .billForm label > textarea:disabled {
+  border-color: #334155;
+  background: #111827;
+  color: #94a3b8;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+:global(html[data-theme="dark"]) .formInlineHint {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .allocationFieldset {
+  border-color: #1f2937;
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .allocationFieldset legend {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .allocationHeader {
+  background: #1e293b;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .allocationRow {
+  border-color: #1f2937;
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .allocationRows .allocationRowWrap:nth-child(even) .allocationRow {
+  background: #131d31;
+}
+
+:global(html[data-theme="dark"]) .allocationRow select,
+:global(html[data-theme="dark"]) .allocationRow input {
+  border-color: #334155;
+  background: #0b1220;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .allocationRow select:disabled,
+:global(html[data-theme="dark"]) .allocationRow input:disabled {
+  border-color: #334155;
+  background: #111827;
+  color: #94a3b8;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+:global(html[data-theme="dark"]) .formSecondaryButton {
+  border-color: #1d4ed8;
+  background: #102548;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .formSecondaryButton:hover:not(:disabled) {
+  border-color: #2563eb;
+  background: #163263;
+}
+
+:global(html[data-theme="dark"]) .formDangerButton {
+  border-color: #7f1d1d;
+  background: #341213;
+  color: #fecaca;
+}
+
+:global(html[data-theme="dark"]) .formDangerButton:hover:not(:disabled) {
+  border-color: #b91c1c;
+  background: #4a1619;
+}
+
+:global(html[data-theme="dark"]) .formPrimaryButton {
+  border-color: #2563eb;
+  background: #1d4ed8;
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .formPrimaryButton:hover:not(:disabled) {
+  border-color: #3b82f6;
+  background: #1e40af;
 }
 
 :global(html[data-theme="dark"]) .tableWrap {
@@ -499,8 +853,12 @@
   background: #111827;
 }
 
+:global(html[data-theme="dark"]) .table tbody tr:hover {
+  background: #172036;
+}
+
 :global(html[data-theme="dark"]) .rowSelected {
-  background: #1e293b !important;
+  background: #1e3a8a !important;
 }
 
 :global(html[data-theme="dark"]) .pagination {

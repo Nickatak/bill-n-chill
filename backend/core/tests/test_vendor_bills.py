@@ -93,6 +93,7 @@ class VendorBillTests(TestCase):
             data={
                 "vendor": self.vendor.id,
                 "bill_number": bill_number,
+                "status": "planned",
                 "issue_date": "2026-02-13",
                 "due_date": "2026-03-15",
                 "total": total,
@@ -144,6 +145,7 @@ class VendorBillTests(TestCase):
             data={
                 "vendor": self.vendor.id,
                 "bill_number": "B-2001",
+                "status": "planned",
                 "issue_date": "2026-02-13",
                 "due_date": "2026-03-15",
                 "total": "1250.00",
@@ -169,6 +171,61 @@ class VendorBillTests(TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["project"], self.project.id)
 
+    def test_vendor_bill_create_requires_initial_status(self):
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/vendor-bills/",
+            data={
+                "vendor": self.vendor.id,
+                "bill_number": "B-2002",
+                "total": "1250.00",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()["error"]
+        self.assertEqual(payload["code"], "validation_error")
+        self.assertEqual(payload["fields"]["status"], ["This field is required."])
+
+    def test_vendor_bill_create_received_requires_issue_and_due_date(self):
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/vendor-bills/",
+            data={
+                "vendor": self.vendor.id,
+                "bill_number": "B-2003",
+                "status": "received",
+                "total": "1250.00",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()["error"]
+        self.assertEqual(payload["code"], "validation_error")
+        self.assertIn("issue_date", payload["fields"])
+        self.assertIn("due_date", payload["fields"])
+
+    def test_vendor_bill_create_allows_received_when_dates_present(self):
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/vendor-bills/",
+            data={
+                "vendor": self.vendor.id,
+                "bill_number": "B-2004",
+                "status": "received",
+                "issue_date": "2026-02-13",
+                "due_date": "2026-03-15",
+                "total": "1250.00",
+                "notes": "Received bill path.",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["data"]
+        self.assertEqual(payload["status"], "received")
+        self.assertEqual(payload["issue_date"], "2026-02-13")
+        self.assertEqual(payload["due_date"], "2026-03-15")
+
     def test_vendor_bill_create_rolls_back_when_audit_write_fails(self):
         with patch(
             "core.views.accounts_payable.vendor_bills._record_financial_audit_event",
@@ -180,6 +237,7 @@ class VendorBillTests(TestCase):
                     data={
                         "vendor": self.vendor.id,
                         "bill_number": "B-ROLLBACK",
+                        "status": "planned",
                         "issue_date": "2026-02-13",
                         "due_date": "2026-03-15",
                         "total": "1250.00",
@@ -237,6 +295,7 @@ class VendorBillTests(TestCase):
             data={
                 "vendor": self.vendor.id,
                 "bill_number": "b-3100",
+                "status": "planned",
                 "total": "500.00",
             },
             content_type="application/json",
@@ -266,6 +325,7 @@ class VendorBillTests(TestCase):
             data={
                 "vendor": self.vendor.id,
                 "bill_number": "B-3100",
+                "status": "planned",
                 "total": "500.00",
             },
             content_type="application/json",
@@ -399,6 +459,32 @@ class VendorBillTests(TestCase):
         )
         self.assertEqual(invalid_due.status_code, 400)
         self.assertEqual(invalid_due.json()["error"]["code"], "validation_error")
+
+    def test_vendor_bill_create_allows_global_canonical_vendor(self):
+        canonical_vendor = Vendor.objects.create(
+            name="Global Canonical Vendor",
+            email="canonical@vendor.example.com",
+            created_by=self.other_user,
+            organization=None,
+            is_canonical=True,
+            is_active=True,
+        )
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/vendor-bills/",
+            data={
+                "vendor": canonical_vendor.id,
+                "bill_number": "B-CANON-1",
+                "status": "planned",
+                "issue_date": "2026-02-13",
+                "due_date": "2026-03-15",
+                "total": "1250.00",
+                "notes": "Canonical vendor intake path.",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["data"]["vendor"], canonical_vendor.id)
 
     def test_vendor_bill_patch_rejects_allocation_total_exceeding_bill_total(self):
         vendor_bill_id = self._create_vendor_bill(total="100.00")
