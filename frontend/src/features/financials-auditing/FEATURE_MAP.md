@@ -1,7 +1,7 @@
 # Feature Map: Financials Auditing
 
 ## Purpose
-Centralize financial reporting, immutable audit visibility, accounting export, and sync-event operations.
+Centralize financial reporting, one-screen immutable chronological audit working-tree graph/history, accounting export, and sync-event operations.
 
 ## Route Surface
 1. `/financials-auditing`
@@ -14,6 +14,8 @@ Centralize financial reporting, immutable audit visibility, accounting export, a
    - generate/download project export (`GET /projects/{id}/accounting-export/?export_format=csv`)
 3. `ReportDatasets`
    - refresh portfolio/change-impact/attention-feed views (`GET /reports/portfolio/`, `GET /reports/change-impact/`, `GET /reports/attention-feed/`)
+4. `AuditTrailExport`
+   - download full audit trail as JSON/CSV from loaded project audit events.
 
 ## Composition and Entry Flow
 1. Entry sources:
@@ -24,9 +26,9 @@ Centralize financial reporting, immutable audit visibility, accounting export, a
 3. Controller/Hook:
    console-level state/effects handle selected project, report filters, and sync create/retry sequencing.
 4. Children:
-   project selector, FIN-01 summary panel, audit/sync event tables, report widgets.
+   project selector, FIN-01 summary panel, one-screen chronological audit graph (project main branch + per-object child branches), sync-event controls, report widgets.
 5. Default behavior:
-   selecting a project loads summary, audit events, sync events, and report panels.
+   selecting a project auto-loads immutable audit events and re-renders the graph with chronological left-to-right branch lanes.
 6. Overrides:
    sync create/retry and report date-filter changes trigger targeted data refresh.
 7. Relationship flow:
@@ -38,7 +40,7 @@ Centralize financial reporting, immutable audit visibility, accounting export, a
 2. `GET /projects/{id}/financial-summary/`:
    hydrates project-level financial summary panel.
 3. `GET /projects/{id}/audit-events/`:
-   loads immutable project audit timeline.
+   loads immutable project audit timeline; optional `object_type` query params apply OR-filtering server-side.
 4. `GET /projects/{id}/accounting-sync-events/`:
    loads sync-event history and retry candidates.
 5. `POST /projects/{id}/accounting-sync-events/`:
@@ -70,6 +72,8 @@ Centralize financial reporting, immutable audit visibility, accounting export, a
     - report datasets
   - Local UI State:
     - selected project
+    - audit object/event filters
+    - selected audit event node (graph inspector)
     - sync-event form fields
     - retry target
     - report date filters
@@ -86,6 +90,7 @@ Centralize financial reporting, immutable audit visibility, accounting export, a
 - Empty states:
   - no project selected
   - no audit events for selected project
+  - no audit events matching selected filters
   - no sync events for selected project
   - no rows for selected report filters
 
