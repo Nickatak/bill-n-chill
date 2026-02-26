@@ -105,6 +105,66 @@ class EstimateTests(TestCase):
         response = self.client.get("/api/v1/public/estimates/notarealtoken/")
         self.assertEqual(response.status_code, 404)
 
+    def test_public_estimate_decision_view_approves_sent_estimate(self):
+        estimate = Estimate.objects.create(
+            project=self.project,
+            version=1,
+            title="Public Estimate Approval",
+            created_by=self.user,
+            status=Estimate.Status.SENT,
+        )
+        EstimateLineItem.objects.create(
+            estimate=estimate,
+            cost_code=self.cost_code,
+            description="Demo and prep",
+            quantity="2",
+            unit="day",
+            unit_cost="500",
+            markup_percent="10",
+            line_total="1100",
+        )
+
+        response = self.client.post(
+            f"/api/v1/public/estimates/{estimate.public_token}/decision/",
+            data={"decision": "approve", "decider_name": "Owner", "note": "Looks good."},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        self.assertEqual(payload["status"], Estimate.Status.APPROVED)
+
+        estimate.refresh_from_db()
+        self.assertEqual(estimate.status, Estimate.Status.APPROVED)
+        latest_event = EstimateStatusEvent.objects.filter(estimate=estimate).first()
+        self.assertIsNotNone(latest_event)
+        self.assertEqual(latest_event.from_status, Estimate.Status.SENT)
+        self.assertEqual(latest_event.to_status, Estimate.Status.APPROVED)
+        self.assertIn("Approved via public link", latest_event.note)
+
+    def test_public_estimate_decision_view_rejects_sent_estimate(self):
+        estimate = Estimate.objects.create(
+            project=self.project,
+            version=1,
+            title="Public Estimate Rejection",
+            created_by=self.user,
+            status=Estimate.Status.SENT,
+        )
+
+        response = self.client.post(
+            f"/api/v1/public/estimates/{estimate.public_token}/decision/",
+            data={"decision": "reject", "decider_email": "owner@example.com"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["status"], Estimate.Status.REJECTED)
+
+        estimate.refresh_from_db()
+        self.assertEqual(estimate.status, Estimate.Status.REJECTED)
+        latest_event = EstimateStatusEvent.objects.filter(estimate=estimate).first()
+        self.assertIsNotNone(latest_event)
+        self.assertEqual(latest_event.from_status, Estimate.Status.SENT)
+        self.assertEqual(latest_event.to_status, Estimate.Status.REJECTED)
+
     def test_estimate_contract_requires_authentication(self):
         response = self.client.get("/api/v1/contracts/estimates/")
         self.assertEqual(response.status_code, 401)

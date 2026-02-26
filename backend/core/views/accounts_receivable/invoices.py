@@ -94,6 +94,21 @@ def _invoice_line_apply_error_response(apply_error):
     )
 
 
+def _build_public_invoice_decision_note(
+    *,
+    action_label: str,
+    note: str,
+    decider_name: str,
+    decider_email: str,
+) -> str:
+    actor_parts = [part for part in [decider_name.strip(), decider_email.strip()] if part]
+    actor_label = " / ".join(actor_parts) if actor_parts else "anonymous customer"
+    note_value = note.strip()
+    if note_value:
+        return f"{action_label} via public link by {actor_label}. {note_value}"
+    return f"{action_label} via public link by {actor_label}."
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def public_invoice_detail_view(request, public_token: str):
@@ -125,6 +140,162 @@ def public_invoice_detail_view(request, public_token: str):
         "customer_billing_address": invoice.project.customer.billing_address,
     }
     return Response({"data": serialized})
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def public_invoice_decision_view(request, public_token: str):
+    """Apply customer approval/dispute decision to a public invoice share link."""
+    try:
+        invoice = (
+            Invoice.objects.select_related("project", "project__customer", "created_by")
+            .prefetch_related(
+                "line_items",
+                "line_items__budget_line",
+                "line_items__budget_line__cost_code",
+                "line_items__cost_code",
+                "line_items__scope_item",
+            )
+            .get(public_token=public_token)
+        )
+    except Invoice.DoesNotExist:
+        return Response(
+            {"error": {"code": "not_found", "message": "Invoice not found.", "fields": {}}},
+            status=404,
+        )
+
+    current_status = invoice.status
+    if current_status not in {
+        Invoice.Status.SENT,
+        Invoice.Status.PARTIALLY_PAID,
+        Invoice.Status.OVERDUE,
+    }:
+        return Response(
+            {
+                "error": {
+                    "code": "conflict",
+                    "message": "This invoice is not awaiting customer decision.",
+                    "fields": {"status": [f"Current status is '{current_status}'."]},
+                }
+            },
+            status=409,
+        )
+
+    decision = str(request.data.get("decision", "")).strip().lower()
+    decision_type = None
+    if decision in {"approve", "approved", "pay", "paid"}:
+        decision_type = "approve"
+    elif decision in {"dispute", "disputed", "reject", "rejected"}:
+        decision_type = "dispute"
+
+    if not decision_type:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Invalid public decision for invoice.",
+                    "fields": {"decision": ["Use 'approve'/'pay' or 'dispute'."]},
+                }
+            },
+            status=400,
+        )
+
+    decider_name = str(request.data.get("decider_name", "") or "")
+    decider_email = str(request.data.get("decider_email", "") or "")
+    public_note = _build_public_invoice_decision_note(
+        action_label="Approved for payment" if decision_type == "approve" else "Disputed",
+        note=str(request.data.get("note", "") or ""),
+        decider_name=decider_name,
+        decider_email=decider_email,
+    )
+
+    with transaction.atomic():
+        previous_status = invoice.status
+        if decision_type == "approve":
+            if not Invoice.is_transition_allowed(previous_status, Invoice.Status.PAID):
+                return Response(
+                    {
+                        "error": {
+                            "code": "validation_error",
+                            "message": f"Invalid invoice status transition: {previous_status} -> paid.",
+                            "fields": {"status": ["This transition is not allowed."]},
+                        }
+                    },
+                    status=400,
+                )
+            invoice.status = Invoice.Status.PAID
+            invoice.save(update_fields=["status", "updated_at"])
+            _record_invoice_status_event(
+                invoice=invoice,
+                from_status=previous_status,
+                to_status=invoice.status,
+                note=public_note,
+                changed_by=invoice.created_by,
+            )
+            _record_financial_audit_event(
+                project=invoice.project,
+                event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
+                object_type="invoice",
+                object_id=invoice.id,
+                from_status=previous_status,
+                to_status=invoice.status,
+                amount=invoice.total,
+                note=public_note,
+                created_by=invoice.created_by,
+                metadata={
+                    "invoice_number": invoice.invoice_number,
+                    "public_decision": True,
+                    "public_decision_value": decision,
+                    "status_action": "transition",
+                },
+            )
+        else:
+            _record_invoice_status_event(
+                invoice=invoice,
+                from_status=previous_status,
+                to_status=previous_status,
+                note=public_note,
+                changed_by=invoice.created_by,
+            )
+            _record_financial_audit_event(
+                project=invoice.project,
+                event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
+                object_type="invoice",
+                object_id=invoice.id,
+                from_status=previous_status,
+                to_status=previous_status,
+                amount=invoice.total,
+                note=public_note,
+                created_by=invoice.created_by,
+                metadata={
+                    "invoice_number": invoice.invoice_number,
+                    "public_decision": True,
+                    "public_decision_value": decision,
+                    "status_action": "notate",
+                },
+            )
+
+    refreshed = (
+        Invoice.objects.filter(id=invoice.id)
+        .select_related("project__customer")
+        .prefetch_related(
+            "line_items",
+            "line_items__budget_line",
+            "line_items__budget_line__cost_code",
+            "line_items__cost_code",
+            "line_items__scope_item",
+        )
+        .get()
+    )
+    serialized = InvoiceSerializer(refreshed).data
+    serialized["project_context"] = {
+        "id": refreshed.project.id,
+        "name": refreshed.project.name,
+        "status": refreshed.project.status,
+        "customer_display_name": refreshed.project.customer.display_name,
+        "customer_billing_address": refreshed.project.customer.billing_address,
+    }
+    return Response({"data": serialized, "meta": {"public_decision_applied": decision_type}})
 
 
 @api_view(["GET"])

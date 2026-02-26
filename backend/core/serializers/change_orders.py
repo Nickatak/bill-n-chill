@@ -32,6 +32,7 @@ class ChangeOrderLineSerializer(serializers.ModelSerializer):
 class ChangeOrderSerializer(serializers.ModelSerializer):
     requested_by_email = serializers.EmailField(source="requested_by.email", read_only=True)
     approved_by_email = serializers.EmailField(source="approved_by.email", read_only=True)
+    public_ref = serializers.CharField(read_only=True)
     line_items = ChangeOrderLineSerializer(many=True, read_only=True)
     line_total_delta = serializers.SerializerMethodField()
     is_latest_revision = serializers.SerializerMethodField()
@@ -57,6 +58,7 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
             "revision_number",
             "title",
             "status",
+            "public_ref",
             "amount_delta",
             "days_delta",
             "reason",

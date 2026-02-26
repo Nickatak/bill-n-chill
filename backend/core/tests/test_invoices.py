@@ -159,6 +159,56 @@ class InvoiceTests(TestCase):
         response = self.client.get("/api/v1/public/invoices/notarealtoken/")
         self.assertEqual(response.status_code, 404)
 
+    def test_public_invoice_decision_view_approves_sent_invoice_as_paid(self):
+        invoice_id = self._create_invoice()
+        sent = self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(sent.status_code, 200)
+        invoice = Invoice.objects.get(id=invoice_id)
+
+        response = self.client.post(
+            f"/api/v1/public/invoices/{invoice.public_token}/decision/",
+            data={"decision": "approve", "decider_name": "Owner", "note": "Payment approved."},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        self.assertEqual(payload["status"], Invoice.Status.PAID)
+        self.assertEqual(payload["balance_due"], "0.00")
+
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, Invoice.Status.PAID)
+        self.assertEqual(str(invoice.balance_due), "0.00")
+
+    def test_public_invoice_decision_view_dispute_adds_status_note_event(self):
+        invoice_id = self._create_invoice()
+        sent = self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(sent.status_code, 200)
+        invoice = Invoice.objects.get(id=invoice_id)
+
+        response = self.client.post(
+            f"/api/v1/public/invoices/{invoice.public_token}/decision/",
+            data={"decision": "dispute", "note": "Need itemized backup."},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["status"], Invoice.Status.SENT)
+
+        latest_event = InvoiceStatusEvent.objects.filter(invoice_id=invoice_id).first()
+        self.assertIsNotNone(latest_event)
+        self.assertEqual(latest_event.from_status, Invoice.Status.SENT)
+        self.assertEqual(latest_event.to_status, Invoice.Status.SENT)
+        self.assertIn("Disputed via public link", latest_event.note)
+
     def test_invoice_contract_requires_authentication(self):
         response = self.client.get("/api/v1/contracts/invoices/")
         self.assertEqual(response.status_code, 401)

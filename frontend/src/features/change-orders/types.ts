@@ -35,6 +35,7 @@ export type ChangeOrderRecord = {
   revision_number: number;
   title: string;
   status: string;
+  public_ref?: string;
   amount_delta: string;
   days_delta: number;
   reason: string;
@@ -51,6 +52,18 @@ export type ChangeOrderRecord = {
   is_latest_revision: boolean;
   created_at: string;
   updated_at: string;
+  project_context?: {
+    id: number;
+    name: string;
+    status: string;
+    customer_display_name: string;
+    customer_billing_address?: string | null;
+  };
+  origin_estimate_context?: {
+    id: number;
+    title: string;
+    version: number;
+  };
 };
 
 export type ChangeOrderPolicyContract = {

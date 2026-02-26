@@ -56,6 +56,11 @@ function invoiceStatusClass(status?: string): string {
 export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps) {
   const [statusMessage, setStatusMessage] = useState("Loading invoice...");
   const [invoice, setInvoice] = useState<InvoiceRecord | null>(null);
+  const [decisionNote, setDecisionNote] = useState("");
+  const [deciderName, setDeciderName] = useState("");
+  const [deciderEmail, setDeciderEmail] = useState("");
+  const [decisionMessage, setDecisionMessage] = useState("");
+  const [decisionSubmitting, setDecisionSubmitting] = useState(false);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const senderAddressLines = useMemo(() => toAddressLines(invoice?.sender_address || ""), [invoice?.sender_address]);
@@ -63,6 +68,8 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
     () => toAddressLines(invoice?.project_context?.customer_billing_address || ""),
     [invoice?.project_context?.customer_billing_address],
   );
+  const canDecide =
+    invoice?.status === "sent" || invoice?.status === "partially_paid" || invoice?.status === "overdue";
 
   useEffect(() => {
     async function loadInvoice() {
@@ -82,6 +89,41 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
 
     void loadInvoice();
   }, [normalizedBaseUrl, publicToken]);
+
+  async function applyDecision(decision: "approve" | "dispute") {
+    if (!invoice || !canDecide || decisionSubmitting) {
+      return;
+    }
+    setDecisionSubmitting(true);
+    setDecisionMessage("");
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/public/invoices/${publicToken}/decision/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          decision,
+          note: decisionNote,
+          decider_name: deciderName,
+          decider_email: deciderEmail,
+        }),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok || !payload.data || Array.isArray(payload.data)) {
+        setDecisionMessage(payload.error?.message || "Could not apply invoice decision.");
+        return;
+      }
+      setInvoice(payload.data as InvoiceRecord);
+      setDecisionMessage(
+        decision === "approve"
+          ? "Invoice approved and marked paid."
+          : "Invoice disputed. The team has been notified.",
+      );
+    } catch {
+      setDecisionMessage("Could not reach invoice decision endpoint.");
+    } finally {
+      setDecisionSubmitting(false);
+    }
+  }
 
   return (
     <div className={styles.preview}>
@@ -198,6 +240,63 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
                 <strong>${formatMoney(invoice.total)}</strong>
               </div>
             </article>
+          </section>
+
+          <section className={styles.decisionCard}>
+            <h4>Decision</h4>
+            {decisionMessage ? <p className={styles.decisionMessage}>{decisionMessage}</p> : null}
+            {!canDecide ? (
+              <p className={styles.decisionMessage}>
+                This invoice is currently <strong>{invoiceStatusLabel(invoice.status)}</strong> and no longer awaiting
+                decision.
+              </p>
+            ) : null}
+            <label className={styles.decisionField}>
+              Your name (optional)
+              <input
+                value={deciderName}
+                onChange={(event) => setDeciderName(event.target.value)}
+                placeholder="Homeowner name"
+                disabled={decisionSubmitting || !canDecide}
+              />
+            </label>
+            <label className={styles.decisionField}>
+              Your email (optional)
+              <input
+                value={deciderEmail}
+                onChange={(event) => setDeciderEmail(event.target.value)}
+                placeholder="owner@example.com"
+                disabled={decisionSubmitting || !canDecide}
+              />
+            </label>
+            <label className={styles.decisionField}>
+              Note (optional)
+              <textarea
+                value={decisionNote}
+                onChange={(event) => setDecisionNote(event.target.value)}
+                rows={3}
+                placeholder="Optional invoice decision note."
+                disabled={decisionSubmitting || !canDecide}
+              />
+            </label>
+            <div className={styles.decisionActions}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={() => void applyDecision("approve")}
+                disabled={decisionSubmitting || !canDecide}
+              >
+                Approve Invoice
+              </button>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => void applyDecision("dispute")}
+                disabled={decisionSubmitting || !canDecide}
+              >
+                Dispute Invoice
+              </button>
+            </div>
           </section>
         </>
       ) : null}

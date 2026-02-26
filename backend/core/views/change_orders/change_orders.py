@@ -8,7 +8,7 @@ from django.db.models import F
 from django.db.models import Sum
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from core.models import (
@@ -34,6 +34,202 @@ from core.views.helpers import (
     _role_gate_error_payload,
     _validate_project_for_user,
 )
+
+def _build_public_decision_note(
+    *,
+    action_label: str,
+    note: str,
+    decider_name: str,
+    decider_email: str,
+) -> str:
+    actor_parts = [part for part in [decider_name.strip(), decider_email.strip()] if part]
+    actor_label = " / ".join(actor_parts) if actor_parts else "anonymous customer"
+    note_value = note.strip()
+    if note_value:
+        return f"{action_label} via public link by {actor_label}. {note_value}"
+    return f"{action_label} via public link by {actor_label}."
+
+
+def _serialize_public_change_order(change_order: ChangeOrder) -> dict:
+    serialized = ChangeOrderSerializer(change_order).data
+    serialized["project_context"] = {
+        "id": change_order.project.id,
+        "name": change_order.project.name,
+        "status": change_order.project.status,
+        "customer_display_name": change_order.project.customer.display_name,
+        "customer_billing_address": change_order.project.customer.billing_address,
+    }
+    if change_order.origin_estimate_id:
+        serialized["origin_estimate_context"] = {
+            "id": change_order.origin_estimate_id,
+            "title": change_order.origin_estimate.title,
+            "version": change_order.origin_estimate.version,
+        }
+    return serialized
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def public_change_order_detail_view(request, public_token: str):
+    """Return public change-order detail for share links."""
+    try:
+        change_order = (
+            ChangeOrder.objects.select_related(
+                "project__customer",
+                "origin_estimate",
+                "requested_by",
+                "approved_by",
+            )
+            .prefetch_related(
+                "line_items",
+                "line_items__budget_line",
+                "line_items__budget_line__cost_code",
+            )
+            .get(public_token=public_token)
+        )
+    except ChangeOrder.DoesNotExist:
+        return Response(
+            {"error": {"code": "not_found", "message": "Change order not found.", "fields": {}}},
+            status=404,
+        )
+
+    return Response({"data": _serialize_public_change_order(change_order)})
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def public_change_order_decision_view(request, public_token: str):
+    """Apply a customer decision to a public change-order share link."""
+    try:
+        change_order = (
+            ChangeOrder.objects.select_related(
+                "project",
+                "project__customer",
+                "origin_estimate",
+                "requested_by",
+            )
+            .prefetch_related(
+                "line_items",
+                "line_items__budget_line",
+                "line_items__budget_line__cost_code",
+            )
+            .get(public_token=public_token)
+        )
+    except ChangeOrder.DoesNotExist:
+        return Response(
+            {"error": {"code": "not_found", "message": "Change order not found.", "fields": {}}},
+            status=404,
+        )
+
+    decision = str(request.data.get("decision", "")).strip().lower()
+    decision_to_status = {
+        "approve": ChangeOrder.Status.APPROVED,
+        "approved": ChangeOrder.Status.APPROVED,
+        "reject": ChangeOrder.Status.REJECTED,
+        "rejected": ChangeOrder.Status.REJECTED,
+    }
+    next_status = decision_to_status.get(decision)
+    if not next_status:
+        return _validation_error_response(
+            message="Invalid public decision for change order.",
+            fields={"decision": ["Use 'approve' or 'reject'."]},
+            rule="co_public_decision_invalid",
+        )
+
+    if change_order.status != ChangeOrder.Status.PENDING_APPROVAL:
+        return Response(
+            {
+                "error": {
+                    "code": "conflict",
+                    "message": "This change order is not awaiting customer approval.",
+                    "fields": {
+                        "status": [f"Current status is '{change_order.status}'."],
+                    },
+                }
+            },
+            status=409,
+        )
+
+    decision_note = _build_public_decision_note(
+        action_label="Approved" if next_status == ChangeOrder.Status.APPROVED else "Rejected",
+        note=str(request.data.get("note", "") or ""),
+        decider_name=str(request.data.get("decider_name", "") or ""),
+        decider_email=str(request.data.get("decider_email", "") or ""),
+    )
+
+    previous_status = change_order.status
+    financial_delta = MONEY_ZERO
+    active_budget = None
+    update_fields = ["status", "updated_at"]
+    if next_status == ChangeOrder.Status.APPROVED:
+        active_budget = _get_active_budget_for_project(
+            project=change_order.project,
+            user=change_order.requested_by,
+        )
+        if not active_budget:
+            return Response(
+                {
+                    "error": {
+                        "code": "conflict",
+                        "message": "Project must have an active budget before approving this change order.",
+                        "fields": {"project": ["No active budget found."]},
+                    }
+                },
+                status=409,
+            )
+        financial_delta = quantize_money(change_order.amount_delta)
+        change_order.approved_by = change_order.requested_by
+        change_order.approved_at = timezone.now()
+        update_fields.extend(["approved_by", "approved_at"])
+
+    with transaction.atomic():
+        change_order.status = next_status
+        change_order.save(update_fields=update_fields)
+        if financial_delta != MONEY_ZERO and active_budget is not None:
+            Project.objects.filter(id=change_order.project_id).update(
+                contract_value_current=F("contract_value_current") + financial_delta,
+            )
+            Budget.objects.filter(id=active_budget.id).update(
+                approved_change_order_total=F("approved_change_order_total") + financial_delta,
+            )
+        _record_financial_audit_event(
+            project=change_order.project,
+            event_type=FinancialAuditEvent.EventType.CHANGE_ORDER_UPDATED,
+            object_type="change_order",
+            object_id=change_order.id,
+            from_status=previous_status,
+            to_status=next_status,
+            amount=change_order.amount_delta,
+            note=decision_note,
+            created_by=change_order.requested_by,
+            metadata={
+                "family_key": change_order.family_key,
+                "public_decision": True,
+                "public_decision_value": decision,
+                "status_action": "transition",
+                "financial_delta": str(financial_delta),
+            },
+        )
+        _record_change_order_decision_snapshot(
+            change_order=change_order,
+            decision_status=next_status,
+            previous_status=previous_status,
+            applied_financial_delta=financial_delta,
+            decided_by=change_order.requested_by,
+        )
+
+    refreshed = (
+        ChangeOrder.objects.filter(id=change_order.id)
+        .select_related("project__customer", "origin_estimate", "requested_by", "approved_by")
+        .prefetch_related("line_items", "line_items__budget_line", "line_items__budget_line__cost_code")
+        .get()
+    )
+    return Response(
+        {
+            "data": _serialize_public_change_order(refreshed),
+            "meta": {"applied_financial_delta": str(financial_delta)},
+        }
+    )
 
 
 @api_view(["GET"])

@@ -187,6 +187,81 @@ class ChangeOrderTests(TestCase):
         response = self.client.get("/api/v1/contracts/change-orders/")
         self.assertEqual(response.status_code, 401)
 
+    def test_public_change_order_detail_view_allows_unauthenticated_access(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        change_order_id = self._create_change_order()
+        change_order = ChangeOrder.objects.get(id=change_order_id)
+
+        response = self.client.get(f"/api/v1/public/change-orders/{change_order.public_token}/")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        self.assertEqual(payload["id"], change_order.id)
+        self.assertTrue(payload["public_ref"].endswith(f"--{change_order.public_token}"))
+        self.assertEqual(payload["project_context"]["id"], self.project.id)
+        self.assertEqual(payload["project_context"]["customer_display_name"], self.customer.display_name)
+
+    def test_public_change_order_decision_view_approves_pending_approval(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        change_order_id = self._create_change_order(amount_delta="1500.00")
+
+        to_pending = self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "pending_approval"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_pending.status_code, 200)
+
+        response = self.client.post(
+            f"/api/v1/public/change-orders/{ChangeOrder.objects.get(id=change_order_id).public_token}/decision/",
+            data={"decision": "approve", "decider_name": "Owner", "note": "Approved publicly."},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        self.assertEqual(payload["status"], ChangeOrder.Status.APPROVED)
+
+        change_order = ChangeOrder.objects.get(id=change_order_id)
+        self.assertEqual(change_order.status, ChangeOrder.Status.APPROVED)
+        self.assertIsNotNone(change_order.approved_by_id)
+        self.assertIsNotNone(change_order.approved_at)
+        self.project.refresh_from_db()
+        self.assertEqual(str(self.project.contract_value_current), "101500.00")
+
+    def test_public_change_order_decision_view_rejects_pending_approval(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        change_order_id = self._create_change_order()
+
+        to_pending = self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "pending_approval"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_pending.status_code, 200)
+
+        response = self.client.post(
+            f"/api/v1/public/change-orders/{ChangeOrder.objects.get(id=change_order_id).public_token}/decision/",
+            data={"decision": "reject", "decider_email": "owner@example.com"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["status"], ChangeOrder.Status.REJECTED)
+        change_order = ChangeOrder.objects.get(id=change_order_id)
+        self.assertEqual(change_order.status, ChangeOrder.Status.REJECTED)
+
     def test_change_order_contract_matches_model_transition_policy(self):
         response = self.client.get(
             "/api/v1/contracts/change-orders/",

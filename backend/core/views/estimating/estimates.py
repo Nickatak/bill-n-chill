@@ -3,6 +3,7 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from django.db import transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -60,6 +61,117 @@ def public_estimate_detail_view(request, public_token: str):
         "customer_billing_address": estimate.project.customer.billing_address,
     }
     return Response({"data": serialized})
+
+
+def _build_public_estimate_decision_note(
+    *,
+    action_label: str,
+    note: str,
+    decider_name: str,
+    decider_email: str,
+) -> str:
+    actor_parts = [part for part in [decider_name.strip(), decider_email.strip()] if part]
+    actor_label = " / ".join(actor_parts) if actor_parts else "anonymous customer"
+    note_value = note.strip()
+    if note_value:
+        return f"{action_label} via public link by {actor_label}. {note_value}"
+    return f"{action_label} via public link by {actor_label}."
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def public_estimate_decision_view(request, public_token: str):
+    """Apply customer approve/reject decisions through public estimate share links."""
+    try:
+        estimate = (
+            Estimate.objects.select_related("project__customer", "created_by")
+            .prefetch_related("line_items", "line_items__cost_code")
+            .get(public_token=public_token)
+        )
+    except Estimate.DoesNotExist:
+        return Response(
+            {"error": {"code": "not_found", "message": "Estimate not found.", "fields": {}}},
+            status=404,
+        )
+
+    decision = str(request.data.get("decision", "")).strip().lower()
+    decision_to_status = {
+        "approve": Estimate.Status.APPROVED,
+        "approved": Estimate.Status.APPROVED,
+        "reject": Estimate.Status.REJECTED,
+        "rejected": Estimate.Status.REJECTED,
+    }
+    next_status = decision_to_status.get(decision)
+    if not next_status:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Invalid public decision for estimate.",
+                    "fields": {"decision": ["Use 'approve' or 'reject'."]},
+                }
+            },
+            status=400,
+        )
+
+    if estimate.status != Estimate.Status.SENT:
+        return Response(
+            {
+                "error": {
+                    "code": "conflict",
+                    "message": "This estimate is not awaiting customer approval.",
+                    "fields": {"status": [f"Current status is '{estimate.status}'."]},
+                }
+            },
+            status=409,
+        )
+
+    decision_note = _build_public_estimate_decision_note(
+        action_label="Approved" if next_status == Estimate.Status.APPROVED else "Rejected",
+        note=str(request.data.get("note", "") or ""),
+        decider_name=str(request.data.get("decider_name", "") or ""),
+        decider_email=str(request.data.get("decider_email", "") or ""),
+    )
+
+    previous_status = estimate.status
+    budget_conversion_meta = {}
+    with transaction.atomic():
+        estimate.status = next_status
+        estimate.save(update_fields=["status", "updated_at"])
+        _record_estimate_status_event(
+            estimate=estimate,
+            from_status=previous_status,
+            to_status=estimate.status,
+            note=decision_note,
+            changed_by=estimate.created_by,
+        )
+        if estimate.status == Estimate.Status.APPROVED:
+            budget_row, conversion_status = _ensure_budget_from_approved_estimate(
+                estimate=estimate,
+                user=estimate.created_by,
+                note=f"Budget auto-converted from publicly approved estimate #{estimate.id}.",
+                allow_supersede=False,
+            )
+            budget_conversion_meta["budget_conversion_status"] = conversion_status
+            if conversion_status == "requires_supersede":
+                budget_conversion_meta["active_financial_estimate_id"] = (
+                    budget_row.source_estimate_id if budget_row else None
+                )
+                budget_conversion_meta["activation_required"] = True
+
+    actor_user_ids = _organization_user_ids(estimate.created_by)
+    serialized = _serialize_estimate(estimate=estimate, actor_user_ids=actor_user_ids)
+    serialized["project_context"] = {
+        "id": estimate.project.id,
+        "name": estimate.project.name,
+        "status": estimate.project.status,
+        "customer_display_name": estimate.project.customer.display_name,
+        "customer_billing_address": estimate.project.customer.billing_address,
+    }
+    response_payload = {"data": serialized}
+    if budget_conversion_meta:
+        response_payload["meta"] = budget_conversion_meta
+    return Response(response_payload)
 
 
 @api_view(["GET"])

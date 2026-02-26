@@ -49,6 +49,11 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
   const [statusMessage, setStatusMessage] = useState("Loading estimate...");
   const [estimate, setEstimate] = useState<EstimateRecord | null>(null);
   const [project, setProject] = useState<ProjectRecord | null>(null);
+  const [decisionNote, setDecisionNote] = useState("");
+  const [deciderName, setDeciderName] = useState("");
+  const [deciderEmail, setDeciderEmail] = useState("");
+  const [decisionMessage, setDecisionMessage] = useState("");
+  const [decisionSubmitting, setDecisionSubmitting] = useState(false);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const lineItems = useMemo(() => mapLineItemsToInputs(estimate), [estimate]);
@@ -71,6 +76,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
   const taxPercent = String(estimate?.tax_percent ?? "0");
   const taxAmount = subtotal * (Number(taxPercent) / 100);
   const totalAmount = subtotal + taxAmount;
+  const canDecide = estimate?.status === "sent";
 
   useEffect(() => {
     async function loadEstimateContext() {
@@ -94,6 +100,43 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
 
     void loadEstimateContext();
   }, [normalizedBaseUrl, publicToken]);
+
+  async function applyDecision(decision: "approve" | "reject") {
+    if (!estimate || !canDecide || decisionSubmitting) {
+      return;
+    }
+    setDecisionSubmitting(true);
+    setDecisionMessage("");
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/public/estimates/${publicToken}/decision/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          decision,
+          note: decisionNote,
+          decider_name: deciderName,
+          decider_email: deciderEmail,
+        }),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok || !payload.data || Array.isArray(payload.data)) {
+        setDecisionMessage(payload.error?.message || "Could not apply decision.");
+        return;
+      }
+      const nextEstimate = payload.data as EstimateRecord;
+      setEstimate(nextEstimate);
+      setProject(nextEstimate.project_context ?? null);
+      setDecisionMessage(
+        decision === "approve"
+          ? "Estimate approved. Thank you."
+          : "Estimate rejected. The team has been notified.",
+      );
+    } catch {
+      setDecisionMessage("Could not reach estimate decision endpoint.");
+    } finally {
+      setDecisionSubmitting(false);
+    }
+  }
 
   return (
     <div className={styles.console}>
@@ -119,7 +162,6 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
             isSubmitting={false}
             isEditingDraft={false}
             readOnly
-            showReadOnlyHint={false}
             readOnlyPresentation="text"
             showMarkupColumn={false}
             titlePresentation="header"
@@ -128,7 +170,6 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
             onTitleChange={() => undefined}
             onValidThroughChange={() => undefined}
             onTaxPercentChange={() => undefined}
-            onTermsTextChange={() => undefined}
             onLineItemChange={() => undefined}
             onAddLineItem={() => undefined}
             onMoveLineItem={() => undefined}
@@ -139,16 +180,60 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
           />
           <div className={styles.lifecycle}>
             <h3>Decision</h3>
-            <p className={styles.inlineHint}>
-              Approval/decline is not wired yet. These buttons are preview-only and will remain
-              inactive for now.
-            </p>
+            <p className={styles.inlineHint}>Approve or reject this estimate. Actions are logged for audit history.</p>
+            {decisionMessage ? <p className={styles.inlineHint}>{decisionMessage}</p> : null}
+            {!canDecide ? (
+              <p className={styles.inlineHint}>
+                This estimate is currently <strong>{estimate.status}</strong> and no longer awaiting decision.
+              </p>
+            ) : null}
+            <label className={estimateStyles.lifecycleField}>
+              Your name (optional)
+              <input
+                className={estimateStyles.fieldInput}
+                value={deciderName}
+                onChange={(event) => setDeciderName(event.target.value)}
+                placeholder="Homeowner name"
+                disabled={decisionSubmitting || !canDecide}
+              />
+            </label>
+            <label className={estimateStyles.lifecycleField}>
+              Your email (optional)
+              <input
+                className={estimateStyles.fieldInput}
+                value={deciderEmail}
+                onChange={(event) => setDeciderEmail(event.target.value)}
+                placeholder="owner@example.com"
+                disabled={decisionSubmitting || !canDecide}
+              />
+            </label>
+            <label className={estimateStyles.lifecycleField}>
+              Note (optional)
+              <textarea
+                className={estimateStyles.statusNote}
+                value={decisionNote}
+                onChange={(event) => setDecisionNote(event.target.value)}
+                placeholder="Optional decision note."
+                rows={3}
+                disabled={decisionSubmitting || !canDecide}
+              />
+            </label>
             <div className={styles.lifecycleActions}>
-              <button type="button" className={styles.primaryButton}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={() => void applyDecision("approve")}
+                disabled={decisionSubmitting || !canDecide}
+              >
                 Approve Estimate
               </button>
-              <button type="button" className={styles.secondaryButton}>
-                Decline Estimate
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => void applyDecision("reject")}
+                disabled={decisionSubmitting || !canDecide}
+              >
+                Reject Estimate
               </button>
             </div>
           </div>

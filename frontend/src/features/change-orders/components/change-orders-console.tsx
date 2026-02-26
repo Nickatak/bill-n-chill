@@ -153,6 +153,13 @@ function coLabel(changeOrder: Pick<ChangeOrderRecord, "family_key" | "revision_n
   return `CO-${changeOrder.family_key} v${changeOrder.revision_number}`;
 }
 
+function publicChangeOrderHref(publicRef?: string): string {
+  if (!publicRef) {
+    return "";
+  }
+  return `/change-order/${publicRef}`;
+}
+
 function readApiErrorMessage(payload: ApiResponse | undefined, fallback: string): string {
   const topLevelMessage = payload?.error?.message?.trim();
   if (topLevelMessage) {
@@ -1770,6 +1777,16 @@ export function ChangeOrdersConsole({
                         <p className={styles.viewerHint}>
                           Post-approval total = pre-approval total + this CO line delta.
                         </p>
+                        {selectedViewerChangeOrder.public_ref ? (
+                          <Link
+                            href={publicChangeOrderHref(selectedViewerChangeOrder.public_ref)}
+                            className={styles.viewerCardLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Open Public CO <span aria-hidden="true">↗</span>
+                          </Link>
+                        ) : null}
                         {quickStatusOptions.length > 0 ? (
                           <div className={styles.quickStatusPanel}>
                             <span className={estimateStyles.lifecycleFieldLabel}>Next status</span>

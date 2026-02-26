@@ -42,7 +42,7 @@
 
 .title {
   margin: 4px 0;
-  font-size: 1.4rem;
+  font-size: 1.3rem;
 }
 
 .subhead {
@@ -73,25 +73,19 @@
   color: #1e40af;
 }
 
-.statusSent {
+.statusPending {
   background: #fef3c7;
   border-color: #fcd34d;
   color: #92400e;
 }
 
-.statusPartial {
-  background: #ede9fe;
-  border-color: #c4b5fd;
-  color: #5b21b6;
-}
-
-.statusPaid {
+.statusApproved {
   background: #dcfce7;
   border-color: #86efac;
   color: #166534;
 }
 
-.statusOverdue {
+.statusRejected {
   background: #fee2e2;
   border-color: #fca5a5;
   color: #991b1b;
@@ -103,55 +97,22 @@
   color: #334155;
 }
 
-.total {
-  font-size: 1.5rem;
+.totalDelta {
+  font-size: 1.3rem;
 }
 
-.balance {
+.deltaMeta {
   color: var(--text-secondary);
   font-size: 0.85rem;
 }
 
-.metaGrid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.metaCard {
+.contextRow {
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  background: var(--surface);
-  display: grid;
-  gap: 4px;
-}
-
-.metaCard h3 {
-  margin: 0 0 4px;
-  font-size: 0.74rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  border-radius: 10px;
+  background: var(--surface-muted);
+  padding: 10px 12px;
   color: var(--text-secondary);
-}
-
-.primaryText {
-  margin: 0;
-  font-weight: 700;
-}
-
-.secondaryText {
-  margin: 0;
-  color: var(--text-secondary);
-  line-height: 1.35;
-}
-
-.dateGrid {
-  margin-top: 8px;
-  display: grid;
-  gap: 4px;
-  color: var(--text-secondary);
-  font-size: 0.86rem;
+  font-size: 0.9rem;
 }
 
 .lineSection {
@@ -165,7 +126,7 @@
 
 .lineSection h3 {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.86rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-secondary);
@@ -179,7 +140,7 @@
 
 .table {
   width: 100%;
-  min-width: 600px;
+  min-width: 700px;
   border-collapse: collapse;
 }
 
@@ -199,82 +160,33 @@
   background: var(--surface-muted);
 }
 
-.footerGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.footerCard {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  background: var(--surface);
-}
-
-.footerCard h4 {
-  margin: 0 0 6px;
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.footerCard p {
-  margin: 0;
-  white-space: pre-wrap;
-  color: var(--text-primary);
-}
-
-.footerCardWide {
-  grid-column: 1 / -1;
-}
-
-.totalsCard {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  background: var(--surface-muted);
-  display: grid;
-  gap: 8px;
-}
-
-.totalsCard div {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  color: var(--text-secondary);
-}
-
-.totalsCard strong {
-  color: var(--text-primary);
-}
-
-.totalRow {
-  padding-top: 6px;
-  border-top: 1px solid var(--border);
-}
-
-.emptyHint {
-  margin: 0;
-  color: var(--text-secondary);
-}
-
+.reasonCard,
 .decisionCard {
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 12px;
   background: var(--surface);
+  padding: 12px;
   display: grid;
   gap: 8px;
 }
 
-.decisionCard h4 {
+.reasonCard h4,
+.decisionCard h3 {
   margin: 0;
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
+  font-size: 0.8rem;
   text-transform: uppercase;
+  letter-spacing: 0.08em;
   color: var(--text-secondary);
+}
+
+.reasonCard p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.updatedText {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
 }
 
 .decisionMessage {
@@ -282,15 +194,15 @@
   color: var(--text-secondary);
 }
 
-.decisionField {
+.field {
   display: grid;
   gap: 6px;
-  font-size: 0.88rem;
   color: var(--text-secondary);
+  font-size: 0.88rem;
 }
 
-.decisionField input,
-.decisionField textarea {
+.field input,
+.field textarea {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 10px;
@@ -330,12 +242,12 @@
   cursor: default;
 }
 
-@media (max-width: 820px) {
-  .metaGrid,
-  .footerGrid {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.emptyHint {
+  margin: 0;
+  color: var(--text-secondary);
+}
 
+@media (max-width: 820px) {
   .decisionActions {
     display: grid;
     grid-template-columns: 1fr;

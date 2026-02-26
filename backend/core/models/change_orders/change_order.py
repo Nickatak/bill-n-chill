@@ -1,7 +1,11 @@
+import secrets
+import string
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
+from django.utils.text import slugify
 
 User = get_user_model()
 
@@ -62,6 +66,7 @@ class ChangeOrder(models.Model):
         choices=Status.choices,
         default=Status.DRAFT,
     )
+    public_token = models.CharField(max_length=24, unique=True, null=True, blank=True)
     amount_delta = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     days_delta = models.IntegerField(default=0)
     reason = models.TextField(blank=True)
@@ -114,6 +119,22 @@ class ChangeOrder(models.Model):
 
     def __str__(self) -> str:
         return f"{self.project.name} CO-{self.family_key} v{self.revision_number}"
+
+    @staticmethod
+    def _generate_public_token(length: int = 12) -> str:
+        alphabet = string.ascii_letters + string.digits
+        return "".join(secrets.choice(alphabet) for _ in range(length))
+
+    @property
+    def public_slug(self) -> str:
+        normalized = slugify(f"co-{self.family_key}-v{self.revision_number}")
+        return normalized or "change-order"
+
+    @property
+    def public_ref(self) -> str:
+        if not self.public_token:
+            return ""
+        return f"{self.public_slug}--{self.public_token}"
 
     @classmethod
     def is_transition_allowed(cls, current_status: str, next_status: str) -> bool:
@@ -201,5 +222,16 @@ class ChangeOrder(models.Model):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        if not self.public_token:
+            while True:
+                candidate = self._generate_public_token()
+                if not type(self).objects.filter(public_token=candidate).exists():
+                    self.public_token = candidate
+                    break
+            if update_fields is not None:
+                update_fields_set = set(update_fields)
+                update_fields_set.add("public_token")
+                kwargs["update_fields"] = list(update_fields_set)
         self.full_clean()
         return super().save(*args, **kwargs)

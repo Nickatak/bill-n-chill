@@ -15,6 +15,8 @@ from core.views.change_orders.change_orders import (
     change_order_contract_view,
     change_order_clone_revision_view,
     change_order_detail_view,
+    public_change_order_decision_view,
+    public_change_order_detail_view,
     project_change_orders_view,
 )
 from core.views.shared_operations.cost_codes import (
@@ -29,6 +31,7 @@ from core.views.estimating.estimates import (
     estimate_detail_view,
     estimate_duplicate_view,
     estimate_status_events_view,
+    public_estimate_decision_view,
     public_estimate_detail_view,
     project_estimates_view,
 )
@@ -41,6 +44,7 @@ from core.views.shared_operations.intake import (
 from core.views.accounts_receivable.invoices import (
     invoice_contract_view,
     invoice_detail_view,
+    public_invoice_decision_view,
     invoice_send_view,
     invoice_status_events_view,
     public_invoice_detail_view,
@@ -101,6 +105,7 @@ __all__ = [
     "project_estimates_view",
     "estimate_contract_view",
     "public_estimate_detail_view",
+    "public_estimate_decision_view",
     "estimate_detail_view",
     "estimate_clone_version_view",
     "estimate_duplicate_view",
@@ -112,9 +117,12 @@ __all__ = [
     "change_order_contract_view",
     "change_order_detail_view",
     "change_order_clone_revision_view",
+    "public_change_order_detail_view",
+    "public_change_order_decision_view",
     "project_invoices_view",
     "invoice_contract_view",
     "public_invoice_detail_view",
+    "public_invoice_decision_view",
     "invoice_detail_view",
     "invoice_send_view",
     "invoice_status_events_view",
