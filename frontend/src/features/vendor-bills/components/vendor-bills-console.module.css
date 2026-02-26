@@ -659,6 +659,26 @@
   margin-left: auto;
 }
 
+.submitRow .submitErrorText {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  background: #fff1f2;
+  color: #b91c1c;
+  padding: 8px 10px;
+}
+
+.viewerErrorText {
+  margin: 6px 0 0;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  background: #fff1f2;
+  color: #b91c1c;
+  padding: 8px 10px;
+}
+
 .readOnlyField {
   background: #f3f4f6;
   color: #4b5563;
@@ -1085,6 +1105,18 @@
 
 :global(html[data-theme="dark"]) .errorText {
   color: #fca5a5;
+}
+
+:global(html[data-theme="dark"]) .submitRow .submitErrorText {
+  border-color: #7f1d1d;
+  background: rgba(127, 29, 29, 0.22);
+  color: #fecaca;
+}
+
+:global(html[data-theme="dark"]) .viewerErrorText {
+  border-color: #7f1d1d;
+  background: rgba(127, 29, 29, 0.22);
+  color: #fecaca;
 }
 
 :global(html[data-theme="dark"]) .unsavedNotice {

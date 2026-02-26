@@ -125,6 +125,24 @@ function projectStatusLabel(statusValue: string): string {
   return statusValue.replace("_", " ");
 }
 
+function readApiErrorMessage(payload: ApiResponse | undefined, fallback: string): string {
+  const topLevelMessage = payload?.error?.message?.trim();
+  if (topLevelMessage) {
+    return topLevelMessage;
+  }
+  const fieldEntries = Object.entries((payload?.error as { fields?: Record<string, string[]> } | undefined)?.fields ?? {});
+  for (const [fieldName, fieldMessages] of fieldEntries) {
+    if (!Array.isArray(fieldMessages)) {
+      continue;
+    }
+    const firstFieldMessage = fieldMessages.find((message) => Boolean((message || "").trim()));
+    if (firstFieldMessage) {
+      return `${fieldName}: ${firstFieldMessage}`;
+    }
+  }
+  return fallback;
+}
+
 export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null }: VendorBillsConsoleProps) {
   const searchParams = useSearchParams();
   const queryProjectParam = searchParams.get("project");
@@ -138,6 +156,8 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const dueSoonWindowDays = 7;
   const [statusMessage, setStatusMessage] = useState("");
   const [createErrorMessage, setCreateErrorMessage] = useState("");
+  const [editErrorMessage, setEditErrorMessage] = useState("");
+  const [viewerErrorMessage, setViewerErrorMessage] = useState("");
   const [projectSearch, setProjectSearch] = useState("");
   const [projectStatusFilters, setProjectStatusFilters] = useState<ProjectStatusValue[]>(
     DEFAULT_PROJECT_STATUS_FILTERS,
@@ -844,6 +864,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   function handleSelectVendorBill(id: string) {
     setSelectedVendorBillId(id);
+    setViewerErrorMessage("");
     const selected = vendorBills.find((row) => String(row.id) === id);
     if (!selected) return;
 
@@ -855,6 +876,8 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     const due = dueDateIsoDate();
     setSelectedVendorBillId("");
     setCreateErrorMessage("");
+    setEditErrorMessage("");
+    setViewerErrorMessage("");
     setDuplicateCandidates([]);
     setNewBillNumber("");
     setNewReceivedDate(today);
@@ -877,18 +900,25 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   async function handleSaveVendorBill(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setEditErrorMessage("");
     const vendorBillId = Number(selectedVendorBillId);
     const vendor = Number(vendorId);
     if (!vendorBillId) {
-      setStatusMessage("Select a vendor bill first.");
+      const message = "Select a vendor bill first.";
+      setEditErrorMessage(message);
+      setStatusMessage(message);
       return;
     }
     if (!vendor) {
-      setStatusMessage("Select a vendor first.");
+      const message = "Select a vendor first.";
+      setEditErrorMessage(message);
+      setStatusMessage(message);
       return;
     }
     if (scheduledFor && scheduledFor < todayIsoDate()) {
-      setStatusMessage("Scheduled for date cannot be in the past.");
+      const message = "Scheduled for date cannot be in the past.";
+      setEditErrorMessage(message);
+      setStatusMessage(message);
       return;
     }
 
@@ -919,11 +949,15 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       if (response.status === 409 && payload.error?.code === "duplicate_detected") {
         const duplicateData = payload.data as { duplicate_candidates?: VendorBillRecord[] };
         setDuplicateCandidates(duplicateData.duplicate_candidates ?? []);
-        setStatusMessage("Duplicate blocked: void existing matching bill(s) before reusing this bill number.");
+        const message = "Duplicate blocked: void existing matching bill(s) before reusing this bill number.";
+        setEditErrorMessage(message);
+        setStatusMessage(message);
         return;
       }
       if (!response.ok) {
-        setStatusMessage(payload.error?.message ?? "Save vendor bill failed.");
+        const message = readApiErrorMessage(payload, "Save vendor bill failed.");
+        setEditErrorMessage(message);
+        setStatusMessage(message);
         return;
       }
 
@@ -932,22 +966,30 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
         current.map((vendorBill) => (vendorBill.id === updated.id ? updated : vendorBill)),
       );
       setDuplicateCandidates([]);
+      setEditErrorMessage("");
       setStatusMessage(`Saved vendor bill #${updated.id}.`);
     } catch {
-      setStatusMessage("Could not reach vendor bill detail endpoint.");
+      const message = "Could not reach vendor bill detail endpoint.";
+      setEditErrorMessage(message);
+      setStatusMessage(message);
     }
   }
 
   async function handleQuickVendorBillStatus(nextStatus: VendorBillStatus) {
     if (!canMutateVendorBills) {
-      setStatusMessage(`Role ${role} is read-only for vendor bill mutations.`);
+      const message = `Role ${role} is read-only for vendor bill mutations.`;
+      setViewerErrorMessage(message);
+      setStatusMessage(message);
       return;
     }
     const vendorBillId = Number(selectedVendorBillId);
     if (!vendorBillId) {
-      setStatusMessage("Select a vendor bill first.");
+      const message = "Select a vendor bill first.";
+      setViewerErrorMessage(message);
+      setStatusMessage(message);
       return;
     }
+    setViewerErrorMessage("");
     setStatusMessage(`Updating vendor bill status to ${nextStatus}...`);
     try {
       const response = await fetch(`${normalizedBaseUrl}/vendor-bills/${vendorBillId}/`, {
@@ -957,21 +999,28 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setStatusMessage(payload.error?.message ?? "Quick status update failed.");
+        const message = readApiErrorMessage(payload, "Quick status update failed.");
+        setViewerErrorMessage(message);
+        setStatusMessage(message);
         return;
       }
       const updated = payload.data as VendorBillRecord;
       setVendorBills((current) => current.map((item) => (item.id === updated.id ? updated : item)));
       hydrate(updated);
+      setViewerErrorMessage("");
       setStatusMessage(`Updated vendor bill #${updated.id} to ${updated.status}.`);
     } catch {
-      setStatusMessage("Could not reach vendor bill quick status endpoint.");
+      const message = "Could not reach vendor bill quick status endpoint.";
+      setViewerErrorMessage(message);
+      setStatusMessage(message);
     }
   }
 
   async function handleUpdateVendorBillStatus() {
     if (!viewerNextStatus) {
-      setStatusMessage("Select a next status first.");
+      const message = "Select a next status first.";
+      setViewerErrorMessage(message);
+      setStatusMessage(message);
       return;
     }
     await handleQuickVendorBillStatus(viewerNextStatus);
@@ -1427,6 +1476,11 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                   Recreate as New Planned
                 </button>
               </div>
+              {viewerErrorMessage ? (
+                <p className={styles.viewerErrorText} role="alert" aria-live="polite">
+                  {viewerErrorMessage}
+                </p>
+              ) : null}
             </>
           ) : (
             <p className={invoiceStyles.emptyState}>Select a vendor bill to manage status or recreate it as new.</p>
@@ -1836,7 +1890,16 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
             ) : null}
 
             <div className={`${styles.submitRow} ${styles.fieldSpan2}`}>
-              {!isEditingMode && createErrorMessage ? <p className={styles.errorText}>{createErrorMessage}</p> : null}
+              {isEditingMode && editErrorMessage ? (
+                <p className={styles.submitErrorText} role="alert" aria-live="polite">
+                  {editErrorMessage}
+                </p>
+              ) : null}
+              {!isEditingMode && createErrorMessage ? (
+                <p className={styles.submitErrorText} role="alert" aria-live="polite">
+                  {createErrorMessage}
+                </p>
+              ) : null}
               <button
                 type="submit"
                 className={styles.formPrimaryButton}
