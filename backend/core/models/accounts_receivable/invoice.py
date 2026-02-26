@@ -1,7 +1,11 @@
+import secrets
+import string
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, Q
+from django.utils.text import slugify
 
 User = get_user_model()
 
@@ -82,6 +86,7 @@ class Invoice(models.Model):
     terms_text = models.TextField(blank=True, default="")
     footer_text = models.TextField(blank=True, default="")
     notes_text = models.TextField(blank=True, default="")
+    public_token = models.CharField(max_length=24, unique=True, null=True, blank=True)
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     tax_percent = models.DecimalField(max_digits=6, decimal_places=2, default=0)
     tax_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -115,6 +120,22 @@ class Invoice(models.Model):
 
     def __str__(self) -> str:
         return f"{self.project.name} {self.invoice_number}"
+
+    @staticmethod
+    def _generate_public_token(length: int = 12) -> str:
+        alphabet = string.ascii_letters + string.digits
+        return "".join(secrets.choice(alphabet) for _ in range(length))
+
+    @property
+    def public_slug(self) -> str:
+        normalized = slugify((self.invoice_number or "").strip())
+        return normalized or "invoice"
+
+    @property
+    def public_ref(self) -> str:
+        if not self.public_token:
+            return ""
+        return f"{self.public_slug}--{self.public_token}"
 
     @classmethod
     def is_transition_allowed(cls, current_status: str, next_status: str) -> bool:
@@ -150,6 +171,17 @@ class Invoice(models.Model):
 
     def save(self, *args, **kwargs):
         update_fields = kwargs.get("update_fields")
+        if not self.public_token:
+            while True:
+                candidate = self._generate_public_token()
+                if not type(self).objects.filter(public_token=candidate).exists():
+                    self.public_token = candidate
+                    break
+            if update_fields is not None:
+                update_fields_set = set(update_fields)
+                update_fields_set.add("public_token")
+                kwargs["update_fields"] = list(update_fields_set)
+                update_fields = kwargs["update_fields"]
         if self.status == self.Status.PAID:
             self.balance_due = 0
             if update_fields is not None:

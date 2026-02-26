@@ -5,7 +5,7 @@ from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from core.models import FinancialAuditEvent, Invoice, InvoiceStatusEvent
@@ -92,6 +92,39 @@ def _invoice_line_apply_error_response(apply_error):
         },
         400,
     )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def public_invoice_detail_view(request, public_token: str):
+    """Return public invoice detail for share links, including lightweight project context."""
+    try:
+        invoice = (
+            Invoice.objects.select_related("project__customer")
+            .prefetch_related(
+                "line_items",
+                "line_items__budget_line",
+                "line_items__budget_line__cost_code",
+                "line_items__cost_code",
+                "line_items__scope_item",
+            )
+            .get(public_token=public_token)
+        )
+    except Invoice.DoesNotExist:
+        return Response(
+            {"error": {"code": "not_found", "message": "Invoice not found.", "fields": {}}},
+            status=404,
+        )
+
+    serialized = InvoiceSerializer(invoice).data
+    serialized["project_context"] = {
+        "id": invoice.project.id,
+        "name": invoice.project.name,
+        "status": invoice.project.status,
+        "customer_display_name": invoice.project.customer.display_name,
+        "customer_billing_address": invoice.project.customer.billing_address,
+    }
+    return Response({"data": serialized})
 
 
 @api_view(["GET"])

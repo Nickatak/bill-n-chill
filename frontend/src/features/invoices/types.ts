@@ -19,6 +19,7 @@ export type InvoiceRecord = {
   customer: number;
   customer_display_name: string;
   invoice_number: string;
+  public_ref?: string;
   status: string;
   issue_date: string;
   due_date: string;
@@ -50,6 +51,13 @@ export type InvoiceRecord = {
     unit_price: string;
     line_total: string;
   }>;
+  project_context?: {
+    id: number;
+    name: string;
+    status: string;
+    customer_display_name: string;
+    customer_billing_address?: string | null;
+  };
 };
 
 export type InvoiceStatusEventRecord = {

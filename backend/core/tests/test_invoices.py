@@ -138,6 +138,27 @@ class InvoiceTests(TestCase):
         self.assertEqual(response.status_code, 201)
         return response.json()["data"]["id"]
 
+    def test_public_invoice_detail_view_allows_unauthenticated_access(self):
+        invoice_id = self._create_invoice()
+        invoice = Invoice.objects.get(id=invoice_id)
+
+        response = self.client.get(f"/api/v1/public/invoices/{invoice.public_token}/")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        self.assertEqual(payload["id"], invoice.id)
+        self.assertEqual(payload["invoice_number"], invoice.invoice_number)
+        self.assertTrue(payload["public_ref"].endswith(f"--{invoice.public_token}"))
+        self.assertEqual(payload["project_context"]["id"], self.project.id)
+        self.assertEqual(
+            payload["project_context"]["customer_display_name"],
+            self.customer.display_name,
+        )
+        self.assertEqual(len(payload["line_items"]), 1)
+
+    def test_public_invoice_detail_view_not_found(self):
+        response = self.client.get("/api/v1/public/invoices/notarealtoken/")
+        self.assertEqual(response.status_code, 404)
+
     def test_invoice_contract_requires_authentication(self):
         response = self.client.get("/api/v1/contracts/invoices/")
         self.assertEqual(response.status_code, 401)

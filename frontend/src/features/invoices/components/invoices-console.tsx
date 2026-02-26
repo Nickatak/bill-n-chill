@@ -129,6 +129,13 @@ function invoiceStatusLabel(status: string): string {
   return INVOICE_STATUS_LABELS_FALLBACK[status] ?? status;
 }
 
+function publicInvoiceHref(publicRef?: string): string {
+  if (!publicRef) {
+    return "";
+  }
+  return `/invoice/${publicRef}`;
+}
+
 function invoiceNextActionHint(status: string): string {
   if (status === "draft") {
     return "Next: send the invoice to move it into billable AR tracking.";
@@ -1323,6 +1330,16 @@ export function InvoicesConsole() {
                         {statusLabel(selectedInvoice.status)}
                       </span>
                       <p>{invoiceNextActionHint(selectedInvoice.status)}</p>
+                      {selectedInvoice.public_ref ? (
+                        <a
+                          href={publicInvoiceHref(selectedInvoice.public_ref)}
+                          className={styles.publicInvoiceLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Open Public Invoice <span aria-hidden="true">↗</span>
+                        </a>
+                      ) : null}
                     </div>
 
                     <section className={styles.statusHistoryBlock}>

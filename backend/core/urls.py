@@ -23,6 +23,7 @@ from core.views import (
     invoice_contract_view,
     invoice_send_view,
     invoice_status_events_view,
+    public_invoice_detail_view,
     login_view,
     me_view,
     register_view,
@@ -174,6 +175,11 @@ urlpatterns = [
         "public/estimates/<str:public_token>/",
         public_estimate_detail_view,
         name="public-estimate-detail",
+    ),
+    path(
+        "public/invoices/<str:public_token>/",
+        public_invoice_detail_view,
+        name="public-invoice-detail",
     ),
     path(
         "estimates/<int:estimate_id>/status-events/",

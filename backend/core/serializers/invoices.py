@@ -51,6 +51,7 @@ class InvoiceLineSerializer(serializers.ModelSerializer):
 class InvoiceSerializer(serializers.ModelSerializer):
     customer_display_name = serializers.CharField(source="customer.display_name", read_only=True)
     line_items = InvoiceLineSerializer(many=True, read_only=True)
+    public_ref = serializers.CharField(read_only=True)
 
     class Meta:
         model = Invoice
@@ -60,6 +61,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "customer",
             "customer_display_name",
             "invoice_number",
+            "public_ref",
             "status",
             "issue_date",
             "due_date",

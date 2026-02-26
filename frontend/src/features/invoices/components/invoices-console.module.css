@@ -1027,6 +1027,30 @@
   font-size: 0.86rem;
 }
 
+.publicInvoiceLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  border: 1px solid #93c5fd;
+  border-radius: 999px;
+  padding: 4px 10px;
+  text-decoration: none;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.publicInvoiceLink:hover,
+.publicInvoiceLink:focus-visible {
+  border-color: #60a5fa;
+  background: #dbeafe;
+  outline: none;
+}
+
 .statusHistoryBlock {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -1411,6 +1435,18 @@
 
 :global(html[data-theme="dark"]) .statusHistoryTable tbody tr:nth-child(even) {
   background: #111827;
+}
+
+:global(html[data-theme="dark"]) .publicInvoiceLink {
+  border-color: #2563eb;
+  background: #1e3a8a;
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .publicInvoiceLink:hover,
+:global(html[data-theme="dark"]) .publicInvoiceLink:focus-visible {
+  border-color: #3b82f6;
+  background: #1d4ed8;
 }
 
 :global(html[data-theme="dark"]) .statusPill {
