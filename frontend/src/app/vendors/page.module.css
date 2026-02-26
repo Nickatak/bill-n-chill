@@ -1,122 +1,65 @@
 .page {
-  --background: #f5f7fa;
-  --foreground: #ffffff;
-  --text-primary: #111827;
-  --text-secondary: #4b5563;
-  --border: #d1d5db;
+  --background: #edf3f8;
+  --foreground: #f8fbff;
+  --border: #b8cada;
 
   min-height: 100dvh;
-  padding: 20px;
-  background: var(--background);
+  padding: 22px;
+  background:
+    radial-gradient(circle at 8% 8%, #d2e2f2 0%, transparent 36%),
+    radial-gradient(circle at 88% 12%, #d2e7dc 0%, transparent 34%),
+    linear-gradient(168deg, #f2f7fb 0%, var(--background) 52%, #e9f0f6 100%);
   font-family: var(--font-geist-sans);
 }
 
 .main {
-  width: min(760px, 100%);
+  width: min(1280px, 100%);
   margin: 0 auto;
-  display: grid;
-  gap: 12px;
-}
-
-.header {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 16px;
-  background: var(--foreground);
-}
-
-.header h1 {
-  margin: 0;
-  color: var(--text-primary);
-}
-
-.header p {
-  margin: 8px 0 12px;
-  color: var(--text-secondary);
 }
 
 .card {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 16px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #abc3d7;
+  border-radius: 22px;
+  padding: 20px;
   background: var(--foreground);
+  box-shadow:
+    0 24px 48px rgba(15, 23, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
 }
 
-.card h2,
-.card h3 {
-  margin: 0 0 8px;
-  color: var(--text-primary);
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, #0f766e 0%, #0ea5e9 50%, #14b8a6 100%);
 }
 
-.card p {
-  margin: 8px 0 12px;
-  color: var(--text-secondary);
-}
+@media (max-width: 640px) {
+  .page {
+    padding: 12px;
+  }
 
-.linkButton {
-  display: inline-flex;
-  margin-top: 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 12px;
-  background: #111827;
-  color: #f9fafb;
-  text-decoration: none;
-}
-
-.card form {
-  display: grid;
-  gap: 10px;
-  margin: 12px 0;
-}
-
-.card label {
-  display: grid;
-  gap: 4px;
-  color: var(--text-primary);
-  font-size: 0.9rem;
-}
-
-.card input,
-.card textarea,
-.card select {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: var(--foreground);
-  color: var(--text-primary);
-}
-
-.card input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border-radius: 4px;
-  accent-color: #111827;
-}
-
-.card button {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #111827;
-  color: #f9fafb;
-  padding: 8px 12px;
-  cursor: pointer;
-  width: fit-content;
+  .card {
+    border-radius: 16px;
+    padding: 14px;
+  }
 }
 
 :global(html[data-theme="dark"]) .page {
-  --background: #0b1220;
-  --foreground: #111827;
-  --text-primary: #f3f4f6;
-  --text-secondary: #cbd5e1;
-  --border: #334155;
+  --background: #050d16;
+  --foreground: #0a1727;
+  --border: #28425a;
+  background:
+    radial-gradient(circle at 10% 8%, #0f2a45 0%, transparent 38%),
+    radial-gradient(circle at 90% 14%, #0f3d35 0%, transparent 34%),
+    linear-gradient(168deg, #081220 0%, var(--background) 55%, #091427 100%);
 }
 
-:global(html[data-theme="dark"]) .card button {
-  background: #1f2937;
-}
-
-:global(html[data-theme="dark"]) .linkButton {
-  background: #1f2937;
+:global(html[data-theme="dark"]) .card {
+  box-shadow:
+    0 24px 52px rgba(2, 6, 23, 0.62),
+    inset 0 1px 0 rgba(148, 163, 184, 0.16);
 }

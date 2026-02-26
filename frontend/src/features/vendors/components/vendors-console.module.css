@@ -1,96 +1,242 @@
 .console {
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --border: #cbd5e1;
-  --surface: #f8fafc;
+  --text-primary: #0e2235;
+  --text-secondary: #466279;
+  --border: #bfd1df;
+  --surface: #f5fafe;
   --surface-elevated: #ffffff;
+  --accent: #0f766e;
+  --accent-strong: #0a5f59;
+  --focus-ring: rgba(15, 118, 110, 0.24);
+  --success-bg: #defae9;
+  --success-border: #35b67b;
+  --success-text: #0f5133;
+  --error-bg: #ffe8e8;
+  --error-border: #ea6f6f;
+  --error-text: #7f1d1d;
 
   display: grid;
-  gap: 12px;
+  gap: 14px;
   color: var(--text-primary);
 }
 
-.heading {
-  margin: 0;
-  font-size: 1.08rem;
+.headerRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: linear-gradient(140deg, #f7fdff 0%, #eff8ff 62%, #edf9f6 100%);
 }
 
-.copy {
+.headerCopy {
+  display: grid;
+  gap: 4px;
+}
+
+.headerTitle {
   margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-family: var(--font-geist-mono);
+}
+
+.headerSubtitle {
+  margin: 0;
+  max-width: 68ch;
   color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
-.controls {
+.headerStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.headerStatPill {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.authNotice {
+  margin: 0;
+  border: 1px solid var(--error-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--error-bg);
+  color: var(--error-text);
+}
+
+.statusBanner {
+  margin: 0;
   border: 1px solid var(--border);
   border-radius: 12px;
+  padding: 10px 12px;
   background: var(--surface);
-  padding: 10px;
+  color: var(--text-secondary);
+}
+
+.statusSuccess {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.statusError {
+  border-color: var(--error-border);
+  background: var(--error-bg);
+  color: var(--error-text);
+}
+
+.layout {
   display: grid;
+  gap: 14px;
+}
+
+.layoutRight {
+  display: grid;
+  gap: 14px;
+}
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+  background: linear-gradient(160deg, var(--surface-elevated) 0%, #f7fcff 100%);
+  box-shadow: 0 12px 30px rgba(14, 34, 53, 0.07);
+  display: grid;
+  gap: 10px;
+}
+
+.existingPanel {
+  gap: 14px;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  grid-template-columns: minmax(0, 1fr) minmax(160px, 240px) auto;
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-family: var(--font-geist-mono);
+}
+
+.panelIntro {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.countBadge {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  background: var(--surface-elevated);
+}
+
+.filters {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(170px, 220px) auto;
   align-items: end;
 }
 
-.controlField {
+.field {
   display: grid;
   gap: 6px;
-  font-size: 0.76rem;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  font-weight: 700;
 }
 
-.controlField input,
-.controlField select {
+.field span {
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.field input,
+.field select,
+.field textarea {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
+  border-radius: 10px;
+  padding: 9px 11px;
   background: var(--surface-elevated);
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
+}
+
+.field textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.field code {
+  font-size: 0.75rem;
   text-transform: none;
   letter-spacing: normal;
-  font-weight: 500;
 }
 
-.console button {
-  border: 1px solid #93c5fd;
-  border-radius: 8px;
-  background: #dbeafe;
-  color: #1e3a8a;
-  padding: 8px 10px;
-  font-size: 0.82rem;
-  font-weight: 700;
-  cursor: pointer;
-  width: fit-content;
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
-.console button:disabled {
-  opacity: 0.55;
-  cursor: default;
+.filterActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .tableWrap {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   overflow-x: auto;
-  margin: 0;
 }
 
 .table {
   width: 100%;
+  min-width: 780px;
   border-collapse: collapse;
-  min-width: 760px;
 }
 
 .table th,
 .table td {
+  padding: 10px 11px;
+  border-bottom: 1px solid #dbe6f1;
   text-align: left;
-  padding: 8px 10px;
-  border-bottom: 1px solid #dbe4f1;
-  color: var(--text-primary);
+  vertical-align: top;
+}
+
+.table th {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: #ecf5ff;
 }
 
 .table tbody tr {
@@ -98,19 +244,56 @@
 }
 
 .table tbody tr:nth-child(even) {
-  background: #f1f6fd;
-}
-
-.table th {
-  background: #eaf2ff;
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #1e3a8a;
+  background: #f4f9ff;
 }
 
 .rowSelected {
-  background: #dbeafe !important;
+  background: #dcf2ef !important;
+}
+
+.rowPrimary {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.rowSecondary {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.inlinePill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  background: #f0f7ff;
+  margin-right: 6px;
+  margin-bottom: 4px;
+}
+
+.inlinePillCanonical {
+  background: #eefcf6;
+  border-color: #9ad4b2;
+  color: #166534;
+}
+
+.inlinePillActive {
+  background: #eafcf4;
+  border-color: #9ed8b7;
+  color: #166534;
+}
+
+.inlinePillInactive {
+  background: #fff2f2;
+  border-color: #f2b0b0;
+  color: #9f1239;
 }
 
 .pagination {
@@ -118,129 +301,211 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  padding: 8px 10px;
-  border-top: 1px solid #dbe4f1;
-  background: #f2f7ff;
 }
 
 .pagination span {
   color: var(--text-secondary);
-  font-size: 0.85rem;
+  font-size: 0.84rem;
 }
 
-.duplicateCard,
-.importCard,
-.console form {
-  border: 1px solid var(--border);
+.emptyState {
+  margin: 0;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--text-secondary);
+  font-size: 0.87rem;
+}
+
+.duplicateCard {
+  border: 1px solid #f2b0b0;
   border-radius: 12px;
-  background: var(--surface);
-  padding: 10px;
+  background: #fff4f4;
+  padding: 10px 12px;
   display: grid;
   gap: 8px;
 }
 
-.console h3 {
+.duplicateTitle {
   margin: 0;
-}
-
-.console p {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.88rem;
-}
-
-.console form label,
-.importCard label {
-  display: grid;
-  gap: 6px;
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  color: #9f1239;
   font-weight: 700;
-}
-
-.console form input,
-.console form textarea,
-.console form select,
-.importCard textarea {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: var(--surface-elevated);
-  color: var(--text-primary);
-  font-size: 0.88rem;
-  text-transform: none;
-  letter-spacing: normal;
-  font-weight: 500;
-}
-
-.console form textarea,
-.importCard textarea {
-  min-height: 90px;
-  resize: vertical;
 }
 
 .duplicateList {
   margin: 0;
-  padding-left: 18px;
+  padding-left: 16px;
   display: grid;
-  gap: 4px;
+  gap: 3px;
 }
 
 .duplicateList li {
+  color: #7f1d1d;
+  font-size: 0.84rem;
+}
+
+.formActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.checkboxField {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkboxField input {
+  width: 16px;
+  height: 16px;
+  accent-color: #0f766e;
+}
+
+.checkboxField span {
   color: var(--text-secondary);
   font-size: 0.84rem;
 }
 
-.statusMessage {
-  margin: 0;
+.primaryButton,
+.secondaryButton,
+.ghostButton,
+.rowSelectButton {
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--surface);
-  color: var(--text-secondary);
-  padding: 8px 10px;
-  font-size: 0.84rem;
+  padding: 7px 11px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
 }
 
-@media (max-width: 760px) {
-  .controls {
+.primaryButton {
+  border-color: #5eb7ac;
+  background: linear-gradient(180deg, #0f766e 0%, #0b5f59 100%);
+  color: #ecfdf5;
+}
+
+.secondaryButton {
+  border-color: #8fbad6;
+  background: #e2f0fb;
+  color: #1d4f73;
+}
+
+.ghostButton {
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+}
+
+.rowSelectButton {
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.ghostButton:disabled,
+.rowSelectButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.primaryButton:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.secondaryButton:hover:not(:disabled),
+.ghostButton:hover:not(:disabled),
+.rowSelectButton:hover:not(:disabled) {
+  border-color: #95b9d1;
+}
+
+@media (min-width: 1080px) {
+  .layout {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+@media (max-width: 820px) {
+  .filters {
     grid-template-columns: 1fr;
   }
 }
 
 :global(html[data-theme="dark"]) .console {
   --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --border: #334155;
-  --surface: #0f172a;
-  --surface-elevated: #111827;
+  --text-secondary: #9fb2c7;
+  --border: #334d66;
+  --surface: #0f1b2a;
+  --surface-elevated: #0a1625;
+  --success-bg: #0f2a1e;
+  --success-border: #1f8d60;
+  --success-text: #b5f3cf;
+  --error-bg: #311617;
+  --error-border: #a53c3f;
+  --error-text: #ffcdd2;
+}
+
+:global(html[data-theme="dark"]) .headerRow {
+  background: linear-gradient(140deg, #0c2237 0%, #0e2232 58%, #11302c 100%);
+}
+
+:global(html[data-theme="dark"]) .headerStatPill,
+:global(html[data-theme="dark"]) .countBadge,
+:global(html[data-theme="dark"]) .inlinePill,
+:global(html[data-theme="dark"]) .ghostButton,
+:global(html[data-theme="dark"]) .rowSelectButton {
+  background: #0a1625;
+}
+
+:global(html[data-theme="dark"]) .panel {
+  background: linear-gradient(160deg, #091523 0%, #0b1929 100%);
+  box-shadow: 0 14px 32px rgba(2, 6, 23, 0.52);
 }
 
 :global(html[data-theme="dark"]) .table th,
 :global(html[data-theme="dark"]) .table td {
-  border-bottom-color: #334155;
+  border-bottom-color: #2a3f54;
 }
 
 :global(html[data-theme="dark"]) .table th {
-  background: #111827;
-  color: #93c5fd;
+  background: #0d2537;
 }
 
 :global(html[data-theme="dark"]) .table tbody tr {
-  background: #0b1220;
+  background: #0a1625;
 }
 
 :global(html[data-theme="dark"]) .table tbody tr:nth-child(even) {
-  background: #111827;
+  background: #0d1e2f;
 }
 
 :global(html[data-theme="dark"]) .rowSelected {
-  background: #1e3a8a !important;
+  background: #10342f !important;
 }
 
-:global(html[data-theme="dark"]) .console button {
-  border-color: #3b82f6;
-  background: #1e3a8a;
-  color: #dbeafe;
+:global(html[data-theme="dark"]) .inlinePillCanonical,
+:global(html[data-theme="dark"]) .inlinePillActive {
+  background: #103125;
+  border-color: #1f8d60;
+  color: #b5f3cf;
+}
+
+:global(html[data-theme="dark"]) .inlinePillInactive,
+:global(html[data-theme="dark"]) .duplicateCard {
+  background: #2f1719;
+  border-color: #a53c3f;
+  color: #ffcdd2;
+}
+
+:global(html[data-theme="dark"]) .secondaryButton {
+  background: #12314a;
+  border-color: #3f89bb;
+  color: #b5ddfb;
+}
+
+:global(html[data-theme="dark"]) .primaryButton {
+  background: linear-gradient(180deg, #12796e 0%, #0c5f56 100%);
+  border-color: #2da69b;
 }
