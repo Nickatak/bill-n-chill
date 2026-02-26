@@ -1,12 +1,9 @@
 "use client";
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
-import { ReactNode, useEffect, useState } from "react";
+import { isPublicAuthRoute } from "@/features/session/public-routes";
+import { useSessionAuthorization } from "@/features/session/session-authorization";
+import { ReactNode, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-
-import { clearClientSession, loadClientSession } from "@/features/session/client-session";
-
-const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
 type AuthGateProps = {
   children: ReactNode;
@@ -15,69 +12,15 @@ type AuthGateProps = {
 export function AuthGate({ children }: AuthGateProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true);
-  const [isAuthorized, setIsAuthorized] = useState(false);
-
-  const isPublicRoute =
-    pathname === "/" ||
-    pathname === "/register" ||
-    Boolean(pathname && /^\/estimate\/[^/]+\/?$/.test(pathname));
+  const { isAuthorized, isChecking } = useSessionAuthorization();
+  const isPublicRoute = isPublicAuthRoute(pathname);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function verify() {
-      if (isPublicRoute) {
-        if (!cancelled) {
-          setIsAuthorized(true);
-          setIsChecking(false);
-        }
-        return;
-      }
-
-      const session = loadClientSession();
-      if (!session?.token) {
-        if (!cancelled) {
-          setIsAuthorized(false);
-          setIsChecking(false);
-          router.replace("/");
-        }
-        return;
-      }
-
-      try {
-        const response = await fetch(`${defaultApiBaseUrl}/auth/me/`, {
-          headers: buildAuthHeaders(session.token),
-        });
-        await response.json();
-        if (!response.ok) {
-          clearClientSession();
-          if (!cancelled) {
-            setIsAuthorized(false);
-            setIsChecking(false);
-            router.replace("/");
-          }
-          return;
-        }
-        if (!cancelled) {
-          setIsAuthorized(true);
-          setIsChecking(false);
-        }
-      } catch {
-        if (!cancelled) {
-          setIsAuthorized(false);
-          setIsChecking(false);
-          router.replace("/");
-        }
-      }
+    if (isPublicRoute || isChecking || isAuthorized) {
+      return;
     }
-
-    void verify();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isPublicRoute, pathname, router]);
+    router.replace("/");
+  }, [isAuthorized, isChecking, isPublicRoute, router]);
 
   if (isPublicRoute) {
     return <>{children}</>;

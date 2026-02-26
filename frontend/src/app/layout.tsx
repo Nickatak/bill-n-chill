@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { SessionAuthorizationProvider } from "@/features/session/session-authorization";
 import "./globals.css";
 import { AuthGate } from "./auth-gate";
 import { ThemeToggle } from "./theme-toggle";
@@ -52,9 +53,11 @@ export default function RootLayout({
         />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <ThemeToggle />
-        <WorkflowShell />
-        <AuthGate>{children}</AuthGate>
+        <SessionAuthorizationProvider>
+          <ThemeToggle />
+          <WorkflowShell />
+          <AuthGate>{children}</AuthGate>
+        </SessionAuthorizationProvider>
       </body>
     </html>
   );

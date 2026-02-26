@@ -1,6 +1,5 @@
 "use client";
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 
@@ -28,18 +27,6 @@ type LoginResponse = {
   };
   error?: {
     message?: string;
-  };
-};
-
-type MeResponse = {
-  data?: {
-    email?: string;
-    role?: SessionRole;
-    organization?: {
-      id?: number;
-      display_name?: string;
-      slug?: string;
-    };
   };
 };
 
@@ -89,7 +76,6 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
   const [messageTone, setMessageTone] = useState<"neutral" | "error">("neutral");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [token, setToken] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [message, setMessage] = useState("Sign in to open your dashboard.");
@@ -102,74 +88,15 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
     return message ?? "Invalid username/password combination.";
   }
 
-  async function verifySession(
-    activeToken: string,
-    fallbackEmail: string,
-    fallbackRole: SessionRole = "owner",
-    fallbackOrganization?: SessionOrganization,
-  ) {
-    try {
-      const response = await fetch(`${defaultApiBaseUrl}/auth/me/`, {
-        headers: buildAuthHeaders(activeToken),
-      });
-      const payload: MeResponse = await response.json();
-      if (!response.ok) {
-        clearClientSession();
-        setToken("");
-        setIsAuthenticated(false);
-        setMessage("Session expired. Sign in again.");
-        setMessageTone("error");
-        return;
-      }
-      const nextEmail = payload.data?.email ?? fallbackEmail;
-      const nextRole = payload.data?.role ?? fallbackRole;
-      const nextOrganization = toSessionOrganization(payload.data?.organization) ?? fallbackOrganization;
-      if (nextEmail && nextEmail !== email) {
-        setEmail(nextEmail);
-      }
-      saveClientSession({
-        token: activeToken,
-        email: nextEmail,
-        role: nextRole,
-        organization: nextOrganization,
-      });
-      setIsAuthenticated(true);
-      setMessage(
-        `Using shared session for ${nextEmail || "user"} (${nextRole})${
-          nextOrganization ? ` in ${nextOrganization.displayName}` : ""
-        }.`,
-      );
-      setMessageTone("neutral");
-    } catch {
-      setIsAuthenticated(false);
-      setMessage("Could not reach auth/me endpoint.");
-      setMessageTone("error");
-    }
-  }
-
   useEffect(() => {
-    async function init() {
+    function init() {
       const session = loadClientSession();
       if (session?.email) {
         setEmail(session.email);
       }
-      if (session?.token) {
-        setToken(session.token);
-        setMessage("Checking saved session...");
-      }
-      if (!token) {
-        setIsChecking(false);
-        return;
-      }
-      setIsChecking(true);
-      await verifySession(token, email);
-      setIsChecking(false);
     }
-
     void init();
-    // Intentionally runs once on initial load.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, []);
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -194,9 +121,20 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
         return;
       }
 
-      setToken(nextToken);
+      saveClientSession({
+        token: nextToken,
+        email: nextEmail,
+        role: nextRole,
+        organization: nextOrganization,
+      });
       setPassword("");
-      await verifySession(nextToken, nextEmail, nextRole, nextOrganization);
+      setIsAuthenticated(true);
+      setMessage(
+        `Using shared session for ${nextEmail || "user"} (${nextRole})${
+          nextOrganization ? ` in ${nextOrganization.displayName}` : ""
+        }.`,
+      );
+      setMessageTone("neutral");
     } catch {
       setMessage("Could not reach login endpoint.");
       setMessageTone("error");
@@ -207,7 +145,6 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
 
   function handleSignOut() {
     clearClientSession();
-    setToken("");
     setPassword("");
     setIsAuthenticated(false);
     setMessage("Signed out.");

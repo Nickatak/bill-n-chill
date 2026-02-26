@@ -1,65 +1,22 @@
 "use client";
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { isPublicDocumentRoute } from "@/features/session/public-routes";
+import { useSessionAuthorization } from "@/features/session/session-authorization";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-
-import { clearClientSession } from "@/features/session/client-session";
-import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import { WorkflowNavbar } from "./workflow-navbar";
 import { WorkflowBreadcrumbs } from "./workflow-breadcrumbs";
 
-const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
-
 export function WorkflowShell() {
   const pathname = usePathname();
-  const { token } = useSharedSessionAuth();
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [isChecking, setIsChecking] = useState(true);
-  const hideShell = Boolean(pathname && /^\/estimate\/[^/]+\/?$/.test(pathname));
-
-  useEffect(() => {
-    async function verify() {
-      if (hideShell) {
-        setIsAuthorized(false);
-        setIsChecking(false);
-        return;
-      }
-
-      if (!token) {
-        setIsAuthorized(false);
-        setIsChecking(false);
-        return;
-      }
-
-      try {
-        const response = await fetch(`${defaultApiBaseUrl}/auth/me/`, {
-          headers: buildAuthHeaders(token),
-        });
-        await response.json();
-        if (!response.ok) {
-          clearClientSession();
-          setIsAuthorized(false);
-          setIsChecking(false);
-          return;
-        }
-        setIsAuthorized(true);
-      } catch {
-        setIsAuthorized(false);
-      } finally {
-        setIsChecking(false);
-      }
-    }
-
-    void verify();
-  }, [hideShell, pathname, token]);
+  const { isAuthorized, isChecking } = useSessionAuthorization();
+  const hideShell = isPublicDocumentRoute(pathname);
 
   if (hideShell) {
     return null;
   }
 
-  if (isChecking) {
+  if (isChecking && !isAuthorized) {
     return (
       <>
         <div className="workflowShellSpacer" />

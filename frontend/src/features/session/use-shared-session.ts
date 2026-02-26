@@ -18,12 +18,10 @@ function subscribe(onStoreChange: () => void) {
 
   const handler = () => onStoreChange();
   window.addEventListener("storage", handler);
-  window.addEventListener("focus", handler);
   window.addEventListener(SESSION_CHANGE_EVENT, handler);
 
   return () => {
     window.removeEventListener("storage", handler);
-    window.removeEventListener("focus", handler);
     window.removeEventListener(SESSION_CHANGE_EVENT, handler);
   };
 }

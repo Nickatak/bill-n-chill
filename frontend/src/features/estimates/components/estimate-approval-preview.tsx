@@ -187,30 +187,30 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
                 This estimate is currently <strong>{estimate.status}</strong> and no longer awaiting decision.
               </p>
             ) : null}
-            <label className={estimateStyles.lifecycleField}>
+            <label className={styles.lifecycleField}>
               Your name (optional)
               <input
-                className={estimateStyles.fieldInput}
+                className={styles.fieldInput}
                 value={deciderName}
                 onChange={(event) => setDeciderName(event.target.value)}
                 placeholder="Homeowner name"
                 disabled={decisionSubmitting || !canDecide}
               />
             </label>
-            <label className={estimateStyles.lifecycleField}>
+            <label className={styles.lifecycleField}>
               Your email (optional)
               <input
-                className={estimateStyles.fieldInput}
+                className={styles.fieldInput}
                 value={deciderEmail}
                 onChange={(event) => setDeciderEmail(event.target.value)}
                 placeholder="owner@example.com"
                 disabled={decisionSubmitting || !canDecide}
               />
             </label>
-            <label className={estimateStyles.lifecycleField}>
+            <label className={styles.lifecycleField}>
               Note (optional)
               <textarea
-                className={estimateStyles.statusNote}
+                className={styles.statusNote}
                 value={decisionNote}
                 onChange={(event) => setDecisionNote(event.target.value)}
                 placeholder="Optional decision note."

@@ -7,19 +7,6 @@ export function normalizeApiBaseUrl(baseUrl: string): string {
   return baseUrl.trim().replace(/\/$/, "");
 }
 
-export async function fetchIntakeAuthMe({
-  baseUrl,
-  token,
-}: {
-  baseUrl: string;
-  token: string;
-}) {
-  const response = await fetch(`${normalizeApiBaseUrl(baseUrl)}/auth/me/`, {
-    headers: buildAuthHeaders(token),
-  });
-  return response;
-}
-
 export async function postQuickAddCustomerIntake({
   baseUrl,
   token,

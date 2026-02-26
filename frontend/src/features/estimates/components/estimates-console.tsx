@@ -7,7 +7,7 @@ import {
   fetchEstimatePolicyContract,
   normalizeApiBaseUrl,
 } from "../api";
-import { loadClientSession } from "../../session/client-session";
+import { useSharedSessionAuth } from "../../session/use-shared-session";
 import styles from "./estimates-console.module.css";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -150,7 +150,7 @@ function readApiErrorMessage(payload: ApiResponse | undefined, fallback: string)
 export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }: EstimatesConsoleProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [token, setToken] = useState("");
+  const { token } = useSharedSessionAuth();
   const [formErrorMessage, setFormErrorMessage] = useState("");
   const [formSuccessMessage, setFormSuccessMessage] = useState("");
   const [formSuccessHref, setFormSuccessHref] = useState("");
@@ -640,15 +640,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
           ),
     );
   }
-
-  useEffect(() => {
-    const session = loadClientSession();
-    if (!session?.token) {
-      setToken("");
-      return;
-    }
-    setToken(session.token);
-  }, []);
 
   useEffect(() => {
     if (estimateDate) {

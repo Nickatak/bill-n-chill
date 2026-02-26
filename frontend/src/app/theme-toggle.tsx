@@ -1,6 +1,7 @@
 "use client";
 
 import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { isPublicDocumentRoute } from "@/features/session/public-routes";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { clearClientSession } from "@/features/session/client-session";
 import { useSharedSessionAuth } from "@/features/session/use-shared-session";
@@ -37,7 +38,7 @@ export function ThemeToggle() {
   const router = useRouter();
   const { token, organization } = useSharedSessionAuth();
   const hasSession = Boolean(token);
-  const isPublicEstimateRoute = Boolean(pathname && /^\/estimate\/[^/]+\/?$/.test(pathname));
+  const isPublicDocument = isPublicDocumentRoute(pathname);
   const hasActiveOpsMeta = opsMetaRoutes.some((route) => isRouteActive(pathname, route));
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<QuickJumpItem[]>([]);
@@ -136,17 +137,17 @@ export function ThemeToggle() {
 
   return (
     <div className="themeControls">
-      {hasSession && !isPublicEstimateRoute && organization ? (
+      {hasSession && !isPublicDocument && organization ? (
         <span className="sessionOrgBadge" title={`Organization slug: ${organization.slug}`}>
           {organization.displayName}
         </span>
       ) : null}
-      {hasSession && isPublicEstimateRoute ? (
+      {hasSession && isPublicDocument ? (
         <Link href="/" className="themeControlButton">
           Home
         </Link>
       ) : null}
-      {hasSession && !isPublicEstimateRoute ? (
+      {hasSession && !isPublicDocument ? (
         <details ref={quickJumpMenuRef} className="nonWorkflowMenu quickJumpMenu">
           <summary className="themeControlButton">Quick Jump</summary>
           <div className="nonWorkflowList quickJumpList" role="menu" aria-label="Global quick jump">
@@ -178,7 +179,7 @@ export function ThemeToggle() {
           </div>
         </details>
       ) : null}
-      {hasSession && !isPublicEstimateRoute ? (
+      {hasSession && !isPublicDocument ? (
         <details ref={opsMetaMenuRef} className="nonWorkflowMenu">
           <summary className={`themeControlButton ${hasActiveOpsMeta ? "isActive" : ""}`}>
             Ops / Meta

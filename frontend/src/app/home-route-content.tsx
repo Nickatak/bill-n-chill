@@ -1,12 +1,8 @@
 "use client";
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
-import { useEffect, useState } from "react";
-
 import { QuickAddConsole } from "@/features/intake";
-import { clearClientSession } from "@/features/session/client-session";
 import { HomeAuthConsole } from "@/features/session/components/home-auth-console";
-import { useSharedSessionAuth } from "@/features/session/use-shared-session";
+import { useSessionAuthorization } from "@/features/session/session-authorization";
 import homeStyles from "./page.module.css";
 import quickAddStyles from "./intake/quick-add/page.module.css";
 
@@ -20,57 +16,10 @@ type HomeRouteContentProps = {
   };
 };
 
-const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
-
 export function HomeRouteContent({ health }: HomeRouteContentProps) {
-  const { token } = useSharedSessionAuth();
-  const [authState, setAuthState] = useState<"checking" | "authorized" | "unauthorized">("checking");
+  const { token, isAuthorized, isChecking } = useSessionAuthorization();
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function verify() {
-      if (!token) {
-        if (!cancelled) {
-          setAuthState("unauthorized");
-        }
-        return;
-      }
-
-      if (!cancelled) {
-        setAuthState("checking");
-      }
-
-      try {
-        const response = await fetch(`${defaultApiBaseUrl}/auth/me/`, {
-          headers: buildAuthHeaders(token),
-        });
-        await response.json();
-        if (!response.ok) {
-          clearClientSession();
-          if (!cancelled) {
-            setAuthState("unauthorized");
-          }
-          return;
-        }
-        if (!cancelled) {
-          setAuthState("authorized");
-        }
-      } catch {
-        if (!cancelled) {
-          setAuthState("unauthorized");
-        }
-      }
-    }
-
-    void verify();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [token]);
-
-  if (authState === "authorized") {
+  if (isAuthorized) {
     return (
       <div className={quickAddStyles.page}>
         <main className={quickAddStyles.main}>
@@ -82,7 +31,7 @@ export function HomeRouteContent({ health }: HomeRouteContentProps) {
     );
   }
 
-  if (authState === "checking") {
+  if (token && isChecking) {
     return (
       <div className={homeStyles.page}>
         <main className={homeStyles.main}>

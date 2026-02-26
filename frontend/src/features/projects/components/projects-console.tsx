@@ -5,7 +5,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
-import { loadClientSession } from "../../session/client-session";
+import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { formatDateDisplay } from "../../../shared/date-format";
 import styles from "./projects-console.module.css";
 import { ApiResponse, ProjectFinancialSummary, ProjectRecord } from "../types";
@@ -24,8 +24,7 @@ export function ProjectsConsole() {
     cancelled: [],
   };
   const defaultProjectStatusFilters: ProjectStatusValue[] = ["active", "prospect"];
-  const [token, setToken] = useState("");
-  const [authMessage, setAuthMessage] = useState("Checking session...");
+  const { token, authMessage } = useSharedSessionAuth();
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [statusMessage, setStatusMessage] = useState("");
@@ -354,17 +353,6 @@ export function ProjectsConsole() {
       setAcceptedChangeOrderDeltaTotal("--");
     }
   }
-
-  useEffect(() => {
-    const session = loadClientSession();
-    if (!session?.token) {
-      setToken("");
-      setAuthMessage("No shared session found. Go to / and login first.");
-      return;
-    }
-    setToken(session.token);
-    setAuthMessage(`Using shared session for ${session.email || "user"}.`);
-  }, []);
 
   useEffect(() => {
     if (!token) {

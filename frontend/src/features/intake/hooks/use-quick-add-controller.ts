@@ -41,7 +41,6 @@ export function useQuickAddController({ token, baseAuthMessage }: UseQuickAddCon
   const authMessage = useQuickAddAuthStatus({
     token,
     baseAuthMessage,
-    normalizedBaseUrl,
   });
 
   const workflow = useQuickAddBusinessWorkflow({
