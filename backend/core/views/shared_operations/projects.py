@@ -63,7 +63,7 @@ def _date_filter_from_query(request):
     return date_from, date_to, None
 
 
-def _project_accepted_contract_totals_map(*, project_ids, actor_user_ids):
+def _project_active_budget_map(*, project_ids, actor_user_ids):
     if not project_ids:
         return {}
 
@@ -76,15 +76,25 @@ def _project_accepted_contract_totals_map(*, project_ids, actor_user_ids):
         .select_related("source_estimate")
         .order_by("project_id", "-created_at", "-id")
     )
-
-    totals: dict[int, Decimal] = {}
+    active_budget_by_project: dict[int, Budget] = {}
     for budget in active_budgets:
-        if budget.project_id in totals:
+        if budget.project_id in active_budget_by_project:
             continue
+        active_budget_by_project[budget.project_id] = budget
+    return active_budget_by_project
+
+
+def _project_accepted_contract_totals_map(*, project_ids, actor_user_ids):
+    active_budget_by_project = _project_active_budget_map(
+        project_ids=project_ids,
+        actor_user_ids=actor_user_ids,
+    )
+    totals: dict[int, Decimal] = {}
+    for project_id, budget in active_budget_by_project.items():
         if not budget.source_estimate_id:
-            totals[budget.project_id] = Decimal("0")
+            totals[project_id] = Decimal("0")
             continue
-        totals[budget.project_id] = budget.source_estimate.grand_total + budget.approved_change_order_total
+        totals[project_id] = budget.source_estimate.grand_total + budget.approved_change_order_total
     return totals
 
 
@@ -92,10 +102,16 @@ def _build_project_financial_summary_data(project: Project, user, *, actor_user_
     if actor_user_ids is None:
         actor_user_ids = _organization_user_ids(user)
 
-    accepted_contract_total = _project_accepted_contract_totals_map(
+    active_budget = _project_active_budget_map(
         project_ids=[project.id],
         actor_user_ids=actor_user_ids,
-    ).get(project.id, Decimal("0"))
+    ).get(project.id)
+    if active_budget and active_budget.source_estimate_id:
+        accepted_contract_total = (
+            active_budget.source_estimate.grand_total + active_budget.approved_change_order_total
+        )
+    else:
+        accepted_contract_total = Decimal("0")
 
     approved_co_rows = list(
         ChangeOrder.objects.filter(
@@ -264,6 +280,13 @@ def _build_project_financial_summary_data(project: Project, user, *, actor_user_
         "contract_value_original": project.contract_value_original,
         "contract_value_current": project.contract_value_current,
         "accepted_contract_total": accepted_contract_total,
+        "active_budget_id": active_budget.id if active_budget else None,
+        "active_budget_source_estimate_id": active_budget.source_estimate_id if active_budget else None,
+        "active_budget_source_estimate_version": (
+            active_budget.source_estimate.version
+            if active_budget and active_budget.source_estimate_id
+            else None
+        ),
         "approved_change_orders_total": approved_change_orders_total,
         "invoiced_to_date": invoiced_to_date,
         "paid_to_date": paid_to_date,

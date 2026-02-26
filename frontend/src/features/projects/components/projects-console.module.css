@@ -679,6 +679,36 @@
   gap: 8px;
 }
 
+.baselineCard {
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #eef2ff;
+  display: grid;
+  gap: 4px;
+}
+
+.baselineCardLabel {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #1e3a8a;
+  font-weight: 700;
+}
+
+.baselineCardValue {
+  font-size: 0.92rem;
+  color: #1e293b;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.baselineCardMeta {
+  font-size: 0.78rem;
+  color: #334155;
+  font-weight: 500;
+}
+
 .metricRow {
   display: flex;
   justify-content: space-between;
@@ -945,4 +975,21 @@
 
 :global(html[data-theme="dark"]) .metricsDivider {
   border-top-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .baselineCard {
+  border-color: #1d4ed8;
+  background: #172554;
+}
+
+:global(html[data-theme="dark"]) .baselineCardLabel {
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .baselineCardValue {
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .baselineCardMeta {
+  color: #bfdbfe;
 }

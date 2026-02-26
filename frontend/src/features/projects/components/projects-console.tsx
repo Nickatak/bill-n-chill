@@ -124,6 +124,16 @@ export function ProjectsConsole() {
   const paidDisplay = summary?.paid_to_date ?? "--";
   const inboundCreditDisplay = summary?.inbound_unapplied_credit ?? "--";
   const outboundCreditDisplay = summary?.outbound_unapplied_credit ?? "--";
+  const activeFinancialEstimateDisplay = summary
+    ? summary.active_budget_source_estimate_id
+      ? `Estimate #${summary.active_budget_source_estimate_id} v${summary.active_budget_source_estimate_version ?? "?"}`
+      : "No active financial baseline"
+    : "--";
+  const activeFinancialBudgetDisplay = summary
+    ? summary.active_budget_id
+      ? `Budget #${summary.active_budget_id}`
+      : "No active budget"
+    : "--";
 
   function parseMoneyValue(value: unknown): number {
     if (typeof value === "number") {
@@ -738,6 +748,11 @@ export function ProjectsConsole() {
               </div>
             </div>
             <div className={styles.metricsPanel}>
+              <div className={styles.baselineCard}>
+                <span className={styles.baselineCardLabel}>Active Financial Baseline</span>
+                <strong className={styles.baselineCardValue}>{activeFinancialEstimateDisplay}</strong>
+                <span className={styles.baselineCardMeta}>{activeFinancialBudgetDisplay}</span>
+              </div>
               <div className={styles.metricRow}>
                 <span>Eyeball / Initial Estimate</span>
                 <strong>{contractOriginalDisplay}</strong>

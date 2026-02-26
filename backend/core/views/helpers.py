@@ -960,20 +960,49 @@ def _build_budget_baseline_snapshot(estimate):
     }
 
 
-def _supersede_active_project_budgets(*, project, user):
+def _supersede_active_project_budgets(*, project, user, superseded_by_estimate=None):
     actor_user_ids = _organization_user_ids(user)
     active_budgets = Budget.objects.filter(
         project=project,
         created_by_id__in=actor_user_ids,
         status=Budget.Status.ACTIVE,
-    )
+    ).select_related("source_estimate")
     for budget in active_budgets:
+        previous_status = budget.status
         budget.status = Budget.Status.SUPERSEDED
         budget.save(update_fields=["status", "updated_at"])
+        superseded_by_label = ""
+        metadata = {
+            "superseded_budget_id": budget.id,
+            "superseded_source_estimate_id": budget.source_estimate_id,
+            "superseded_source_estimate_version": budget.source_estimate.version,
+        }
+        if superseded_by_estimate is not None:
+            superseded_by_label = (
+                f" by estimate #{superseded_by_estimate.id} (v{superseded_by_estimate.version})"
+            )
+            metadata["superseded_by_estimate_id"] = superseded_by_estimate.id
+            metadata["superseded_by_estimate_version"] = superseded_by_estimate.version
+        _record_financial_audit_event(
+            project=project,
+            event_type=FinancialAuditEvent.EventType.BUDGET_CONVERTED,
+            object_type="budget",
+            object_id=budget.id,
+            from_status=previous_status,
+            to_status=budget.status,
+            amount=budget.source_estimate.grand_total if budget.source_estimate_id else None,
+            note=f"Budget #{budget.id} superseded{superseded_by_label}.",
+            created_by=user,
+            metadata=metadata,
+        )
 
 
 def _create_budget_from_estimate(*, estimate, user):
-    _supersede_active_project_budgets(project=estimate.project, user=user)
+    _supersede_active_project_budgets(
+        project=estimate.project,
+        user=user,
+        superseded_by_estimate=estimate,
+    )
     budget = Budget.objects.create(
         project=estimate.project,
         status=Budget.Status.ACTIVE,

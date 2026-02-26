@@ -29,6 +29,7 @@ import { EstimateSheet, OrganizationDocumentDefaults } from "./estimate-sheet";
 
 type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amount";
 type EstimateStatusValue = string;
+type FinancialBaselineStatusValue = "none" | "active" | "superseded";
 type EstimatesConsoleProps = {
   scopedProjectId?: number | null;
 };
@@ -154,6 +155,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const [formSuccessMessage, setFormSuccessMessage] = useState("");
   const [formSuccessHref, setFormSuccessHref] = useState("");
   const [actionMessage, setActionMessage] = useState("");
+  const [isActivatingBaseline, setIsActivatingBaseline] = useState(false);
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -214,6 +216,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;
   const selectedEstimate =
     estimates.find((estimate) => String(estimate.id) === selectedEstimateId) ?? null;
+  const activeFinancialEstimate =
+    estimates.find((estimate) => estimate.is_active_financial_baseline) ?? null;
   const isEditingDraft = Boolean(selectedEstimate && selectedEstimate.status === "draft");
   const isReadOnly = Boolean(selectedEstimate && selectedEstimate.status !== "draft");
   const statusClasses: Record<string, string> = {
@@ -223,6 +227,11 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     rejected: styles.statusRejected,
     void: styles.statusArchived,
     archived: styles.statusArchived,
+  };
+  const financialBaselineClasses: Record<FinancialBaselineStatusValue, string> = {
+    none: styles.financialBaselineNone,
+    active: styles.financialBaselineActive,
+    superseded: styles.financialBaselineSuperseded,
   };
   const statusOptions: Array<{ value: EstimateStatusValue; label: string }> = estimateStatuses.map(
     (statusValue) => ({
@@ -263,12 +272,44 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const canSubmitStatusNote = selectedEstimate
     ? Boolean(statusNote.trim())
     : false;
+  const selectedFinancialBaselineStatus = estimateFinancialBaselineStatus(selectedEstimate);
+  const canActivateSelectedFinancialBaseline = Boolean(
+    selectedEstimate &&
+      selectedEstimate.status === "approved" &&
+      selectedFinancialBaselineStatus !== "active",
+  );
 
   function formatEstimateStatus(status?: string): string {
     if (!status) {
       return "";
     }
     return statusLabelByValue[status] ?? status;
+  }
+
+  function estimateFinancialBaselineStatus(
+    estimate?: EstimateRecord | null,
+  ): FinancialBaselineStatusValue {
+    if (!estimate) {
+      return "none";
+    }
+    if (estimate.is_active_financial_baseline) {
+      return "active";
+    }
+    const status = estimate.financial_baseline_status;
+    if (status === "active" || status === "superseded") {
+      return status;
+    }
+    return "none";
+  }
+
+  function formatFinancialBaselineStatus(status: FinancialBaselineStatusValue): string {
+    if (status === "active") {
+      return "Financial Baseline";
+    }
+    if (status === "superseded") {
+      return "Superseded Baseline";
+    }
+    return "";
   }
 
   function formatStatusAction(event: EstimateStatusEventRecord): string {
@@ -698,50 +739,82 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     }
   }, [normalizedBaseUrl, scopedProjectId, token]);
 
-  const loadEstimates = useCallback(async () => {
+  const loadEstimates = useCallback(async (
+    options?: {
+      preserveSelection?: boolean;
+      preferredEstimateId?: number | null;
+      quiet?: boolean;
+    },
+  ) => {
     const projectId = Number(selectedProjectId);
     if (!projectId) {
-      setActionMessage("Select a project first.");
+      if (!options?.quiet) {
+        setActionMessage("Select a project first.");
+      }
       return;
     }
 
-    clearSelectedEstimateState();
+    if (!options?.preserveSelection) {
+      clearSelectedEstimateState();
+    }
     setFormErrorMessage("");
     setFormSuccessMessage("");
     setFormSuccessHref("");
-    setActionMessage("");
+    if (!options?.quiet) {
+      setActionMessage("");
+    }
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
         headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setActionMessage(readApiErrorMessage(payload, "Failed loading estimates."));
+        if (!options?.quiet) {
+          setActionMessage(readApiErrorMessage(payload, "Failed loading estimates."));
+        }
         return;
       }
       const rows = (payload.data as EstimateRecord[]) ?? [];
       setEstimates(rows);
-      if (rows[0]) {
-        const activeFilters = estimateStatusFiltersRef.current;
-        const scopedEstimateMatch = scopedEstimateId
-          ? rows.find((estimate) => estimate.id === scopedEstimateId)
-          : null;
-        const scopedEstimateAllowed =
-          scopedEstimateMatch &&
-          activeFilters.includes(scopedEstimateMatch.status as EstimateStatusValue);
-        if (scopedEstimateAllowed) {
-          handleSelectEstimate(scopedEstimateMatch);
-          return;
-        }
-        const firstVisibleEstimate = rows.find((estimate) =>
-          activeFilters.includes(estimate.status as EstimateStatusValue),
-        );
-        if (firstVisibleEstimate) {
-          handleSelectEstimate(firstVisibleEstimate);
-        }
+      if (!rows[0]) {
+        return;
+      }
+      const activeFilters = estimateStatusFiltersRef.current;
+      const retainedEstimateId =
+        options?.preferredEstimateId ??
+        (options?.preserveSelection && /^\d+$/.test(selectedEstimateIdRef.current)
+          ? Number(selectedEstimateIdRef.current)
+          : null);
+      const retainedEstimate = retainedEstimateId
+        ? rows.find((estimate) => estimate.id === retainedEstimateId)
+        : null;
+      const retainedEstimateAllowed =
+        retainedEstimate &&
+        activeFilters.includes(retainedEstimate.status as EstimateStatusValue);
+      if (retainedEstimateAllowed) {
+        handleSelectEstimate(retainedEstimate);
+        return;
+      }
+      const scopedEstimateMatch = scopedEstimateId
+        ? rows.find((estimate) => estimate.id === scopedEstimateId)
+        : null;
+      const scopedEstimateAllowed =
+        scopedEstimateMatch &&
+        activeFilters.includes(scopedEstimateMatch.status as EstimateStatusValue);
+      if (scopedEstimateAllowed) {
+        handleSelectEstimate(scopedEstimateMatch);
+        return;
+      }
+      const firstVisibleEstimate = rows.find((estimate) =>
+        activeFilters.includes(estimate.status as EstimateStatusValue),
+      );
+      if (firstVisibleEstimate) {
+        handleSelectEstimate(firstVisibleEstimate);
       }
     } catch {
-      setActionMessage("Could not reach estimate endpoint.");
+      if (!options?.quiet) {
+        setActionMessage("Could not reach estimate endpoint.");
+      }
     }
   }, [
     clearSelectedEstimateState,
@@ -1085,6 +1158,20 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setSelectedStatus(updatedNextStatuses[0] ?? updated.status);
       setStatusNote("");
       await loadStatusEvents({ estimateId: updated.id, quiet: true });
+      const budgetConversionStatus = payload.meta?.budget_conversion_status;
+      if (payload.meta?.activation_required) {
+        const activeId = payload.meta.active_financial_estimate_id;
+        setActionMessage(
+          activeId
+            ? `Estimate approved. Financial baseline remains on estimate #${activeId}. Activate this estimate to supersede it.`
+            : "Estimate approved. Activate this estimate as the financial baseline.",
+        );
+        return;
+      }
+      if (budgetConversionStatus === "converted" || budgetConversionStatus === "already_converted") {
+        setActionMessage("Estimate approved and activated as the financial baseline.");
+        return;
+      }
       setActionMessage("");
     } catch {
       setActionMessage("Could not reach estimate status endpoint.");
@@ -1125,6 +1212,57 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setActionMessage("");
     } catch {
       setActionMessage("Could not reach estimate status note endpoint.");
+    }
+  }
+
+  async function handleActivateFinancialBaseline() {
+    const estimateId = Number(selectedEstimateId);
+    if (!estimateId || !selectedEstimate) {
+      setActionMessage("Select an approved estimate first.");
+      return;
+    }
+    if (selectedEstimate.status !== "approved") {
+      setActionMessage("Only approved estimates can be activated for financials.");
+      return;
+    }
+
+    setActionMessage("");
+    setIsActivatingBaseline(true);
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/estimates/${estimateId}/convert-to-budget/`, {
+        method: "POST",
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        body: JSON.stringify({ supersede_active: true }),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        const activeId = payload.error?.meta?.active_financial_estimate_id;
+        const message = readApiErrorMessage(payload, "Financial baseline activation failed.");
+        setActionMessage(
+          activeId ? `${message} Active baseline is estimate #${activeId}.` : message,
+        );
+        return;
+      }
+      const conversionStatus = payload.meta?.conversion_status ?? "converted";
+      await loadEstimates({
+        preserveSelection: true,
+        preferredEstimateId: estimateId,
+        quiet: true,
+      });
+      await loadStatusEvents({ estimateId, quiet: true });
+      if (conversionStatus === "superseded_and_converted") {
+        setActionMessage("Financial baseline switched to this estimate.");
+        return;
+      }
+      if (conversionStatus === "already_converted") {
+        setActionMessage("This estimate is already the active financial baseline.");
+        return;
+      }
+      setActionMessage("Financial baseline activated from this estimate.");
+    } catch {
+      setActionMessage("Could not reach estimate conversion endpoint.");
+    } finally {
+      setIsActivatingBaseline(false);
     }
   }
 
@@ -1289,6 +1427,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                   const quickActionKind = quickActionKindForStatus(latest.status);
                   const quickActionTitle = quickActionTitleForStatus(latest.status);
                   const latestTotal = formatMoney(toNumber(latest.grand_total || "0"));
+                  const latestFinancialBaselineStatus = estimateFinancialBaselineStatus(latest);
                   return (
                     <div
                       key={family.title}
@@ -1356,6 +1495,15 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                               >
                                 {formatEstimateStatus(latest.status)}
                               </span>
+                              {latestFinancialBaselineStatus !== "none" ? (
+                                <span
+                                  className={`${styles.financialBaselineBadge} ${
+                                    financialBaselineClasses[latestFinancialBaselineStatus]
+                                  }`}
+                                >
+                                  {formatFinancialBaselineStatus(latestFinancialBaselineStatus)}
+                                </span>
+                              ) : null}
                             </div>
                           </button>
                         </div>
@@ -1364,6 +1512,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                             {history.map((estimate) => {
                               const total = formatMoney(toNumber(estimate.grand_total || "0"));
                               const isSelected = String(estimate.id) === selectedEstimateId;
+                              const financialBaselineStatus =
+                                estimateFinancialBaselineStatus(estimate);
                               return (
                                 <div key={estimate.id} className={styles.versionCardWrap}>
                                   {estimate.public_ref ? (
@@ -1397,6 +1547,15 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                                         {formatEstimateStatus(estimate.status)}
                                       </span>
                                     </span>
+                                    {financialBaselineStatus !== "none" ? (
+                                      <span
+                                        className={`${styles.financialBaselineBadge} ${
+                                          financialBaselineClasses[financialBaselineStatus]
+                                        } ${styles.historyFinancialBaselineBadge}`}
+                                      >
+                                        {formatFinancialBaselineStatus(financialBaselineStatus)}
+                                      </span>
+                                    ) : null}
                                     <span className={styles.historyAmount}>${total}</span>
                                     <span className={styles.historyDate}>
                                       {formatEstimateLastActionDate(estimate)}
@@ -1427,6 +1586,29 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
             {selectedEstimateId ? (
               <>
+                {canActivateSelectedFinancialBaseline ? (
+                  <div className={styles.financialActivationPanel}>
+                    <span className={styles.financialActivationLabel}>Financial Baseline</span>
+                    <p className={styles.inlineHint}>
+                      {selectedFinancialBaselineStatus === "superseded"
+                        ? "This estimate was previously active and is now superseded."
+                        : "This approved estimate is not currently active for project financials."}{" "}
+                      {activeFinancialEstimate
+                        ? `Current active estimate: #${activeFinancialEstimate.id} v${activeFinancialEstimate.version}.`
+                        : "No active estimate is currently set."}
+                    </p>
+                    <button
+                      type="button"
+                      className={styles.financialActivationButton}
+                      onClick={handleActivateFinancialBaseline}
+                      disabled={isActivatingBaseline}
+                    >
+                      {isActivatingBaseline
+                        ? "Activating Financial Baseline..."
+                        : "Activate Selected Estimate for Financials"}
+                    </button>
+                  </div>
+                ) : null}
                 <div className={styles.lifecycleGrid}>
                   {!isTerminalEstimateStatus ? (
                     <div className={styles.statusPicker}>

@@ -22,6 +22,8 @@ export type EstimateRecord = {
   tax_percent: string;
   grand_total: string;
   public_ref?: string;
+  financial_baseline_status?: "none" | "active" | "superseded";
+  is_active_financial_baseline?: boolean;
   created_at: string;
   updated_at: string;
   line_items?: EstimateLineItemRecord[];
@@ -91,6 +93,20 @@ export type ApiResponse = {
     | EstimatePolicyContract
     | EstimateStatusEventRecord[]
     | EstimateRelatedChangeOrderRecord[];
-  meta?: { cloned_from?: number; duplicated_from?: number };
-  error?: { code?: string; message?: string; fields?: Record<string, string[]> };
+  meta?: {
+    cloned_from?: number;
+    duplicated_from?: number;
+    conversion_status?: string;
+    budget_conversion_status?: string;
+    active_financial_estimate_id?: number | null;
+    activation_required?: boolean;
+  };
+  error?: {
+    code?: string;
+    message?: string;
+    fields?: Record<string, string[]>;
+    meta?: {
+      active_financial_estimate_id?: number | null;
+    };
+  };
 };

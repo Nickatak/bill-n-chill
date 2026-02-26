@@ -198,18 +198,49 @@ class BudgetTests(TestCase):
 
         second_estimate_id = self._create_estimate(title="Approved Estimate B", unit_cost="700")
         self._approve_estimate(second_estimate_id)
-        second_conversion = self.client.post(
+        blocked = self.client.post(
             f"/api/v1/estimates/{second_estimate_id}/convert-to-budget/",
             data={},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(second_conversion.status_code, 200)
+        self.assertEqual(blocked.status_code, 409)
+        self.assertEqual(blocked.json()["error"]["code"], "conflict")
+
+        second_conversion = self.client.post(
+            f"/api/v1/estimates/{second_estimate_id}/convert-to-budget/",
+            data={"supersede_active": True},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(second_conversion.status_code, 201)
+        self.assertEqual(second_conversion.json()["meta"]["conversion_status"], "superseded_and_converted")
 
         first_budget = Budget.objects.get(id=first_budget_id)
         second_budget = Budget.objects.get(id=second_conversion.json()["data"]["id"])
         self.assertEqual(first_budget.status, Budget.Status.SUPERSEDED)
         self.assertEqual(second_budget.status, Budget.Status.ACTIVE)
+        self.assertEqual(second_budget.source_estimate_id, second_estimate_id)
+        supersede_event = FinancialAuditEvent.objects.filter(
+            object_type="budget",
+            object_id=first_budget.id,
+            to_status=Budget.Status.SUPERSEDED,
+        ).latest("id")
+        self.assertIn("superseded by estimate", supersede_event.note.lower())
+        self.assertEqual(
+            supersede_event.metadata_json.get("superseded_by_estimate_id"),
+            second_estimate_id,
+        )
+        summary = self.client.get(
+            f"/api/v1/projects/{self.project.id}/financial-summary/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(summary.status_code, 200)
+        summary_data = summary.json()["data"]
+        self.assertEqual(summary_data["active_budget_id"], second_budget.id)
+        self.assertEqual(summary_data["active_budget_source_estimate_id"], second_estimate_id)
+        self.assertEqual(summary_data["active_budget_source_estimate_version"], 1)
+        self.assertEqual(summary_data["accepted_contract_total"], "700.00")
 
     def test_superseded_budget_line_patch_is_blocked(self):
         first_estimate_id = self._create_estimate(title="Approved Estimate A", unit_cost="500")
@@ -228,11 +259,11 @@ class BudgetTests(TestCase):
         self._approve_estimate(second_estimate_id)
         second_conversion = self.client.post(
             f"/api/v1/estimates/{second_estimate_id}/convert-to-budget/",
-            data={},
+            data={"supersede_active": True},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(second_conversion.status_code, 200)
+        self.assertEqual(second_conversion.status_code, 201)
 
         blocked = self.client.patch(
             f"/api/v1/budgets/{first_budget_id}/lines/{first_line_id}/",
@@ -243,6 +274,42 @@ class BudgetTests(TestCase):
         self.assertEqual(blocked.status_code, 400)
         self.assertEqual(blocked.json()["error"]["code"], "validation_error")
         self.assertIn("status", blocked.json()["error"]["fields"])
+
+    def test_pm_role_cannot_supersede_active_baseline(self):
+        org = Organization.objects.create(
+            display_name="Budget PM Org",
+            slug="budget-pm-org",
+            created_by=self.user,
+        )
+        OrganizationMembership.objects.update_or_create(
+            user=self.user,
+            defaults={
+                "organization": org,
+                "role": OrganizationMembership.Role.PM,
+                "status": OrganizationMembership.Status.ACTIVE,
+            },
+        )
+
+        first_estimate_id = self._create_estimate(title="Approved Estimate A", unit_cost="500")
+        self._approve_estimate(first_estimate_id)
+        self.client.post(
+            f"/api/v1/estimates/{first_estimate_id}/convert-to-budget/",
+            data={},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+
+        second_estimate_id = self._create_estimate(title="Approved Estimate B", unit_cost="700")
+        self._approve_estimate(second_estimate_id)
+        forbidden = self.client.post(
+            f"/api/v1/estimates/{second_estimate_id}/convert-to-budget/",
+            data={"supersede_active": True},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(forbidden.status_code, 403)
+        self.assertEqual(forbidden.json()["error"]["code"], "forbidden")
+        self.assertEqual(Budget.objects.filter(project=self.project, status=Budget.Status.ACTIVE).count(), 1)
 
     def test_multiple_budget_conversions_keep_single_active_budget(self):
         estimate_a = self._create_estimate(title="Approved Estimate A", unit_cost="500")
@@ -256,20 +323,30 @@ class BudgetTests(TestCase):
 
         estimate_b = self._create_estimate(title="Approved Estimate B", unit_cost="700")
         self._approve_estimate(estimate_b)
-        self.client.post(
+        second_conversion = self.client.post(
             f"/api/v1/estimates/{estimate_b}/convert-to-budget/",
-            data={},
+            data={"supersede_active": True},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(second_conversion.status_code, 201)
+        self.assertEqual(
+            second_conversion.json().get("meta", {}).get("conversion_status"),
+            "superseded_and_converted",
         )
 
         estimate_c = self._create_estimate(title="Approved Estimate C", unit_cost="900")
         self._approve_estimate(estimate_c)
-        self.client.post(
+        third_conversion = self.client.post(
             f"/api/v1/estimates/{estimate_c}/convert-to-budget/",
-            data={},
+            data={"supersede_active": True},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(third_conversion.status_code, 201)
+        self.assertEqual(
+            third_conversion.json().get("meta", {}).get("conversion_status"),
+            "superseded_and_converted",
         )
 
         self.assertEqual(

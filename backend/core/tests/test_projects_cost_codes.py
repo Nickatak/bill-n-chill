@@ -602,6 +602,7 @@ class ProjectFinancialSummaryTests(TestCase):
             status=VendorBill.Status.SCHEDULED,
             issue_date="2026-02-13",
             due_date="2026-03-13",
+            scheduled_for="2026-02-20",
             total="900.00",
             balance_due="900.00",
             created_by=self.user,
@@ -664,6 +665,9 @@ class ProjectFinancialSummaryTests(TestCase):
         self.assertEqual(data["contract_value_original"], "100000.00")
         self.assertEqual(data["contract_value_current"], "103000.00")
         self.assertEqual(data["accepted_contract_total"], "0.00")
+        self.assertIsNone(data["active_budget_id"])
+        self.assertIsNone(data["active_budget_source_estimate_id"])
+        self.assertIsNone(data["active_budget_source_estimate_version"])
         self.assertEqual(data["approved_change_orders_total"], "2000.00")
         self.assertEqual(data["invoiced_to_date"], "1200.00")
         self.assertEqual(data["paid_to_date"], "800.00")
@@ -706,6 +710,9 @@ class ProjectFinancialSummaryTests(TestCase):
         self.assertEqual(data["contract_value_original"], "100000.00")
         self.assertEqual(data["contract_value_current"], "103000.00")
         self.assertEqual(data["accepted_contract_total"], "0.00")
+        self.assertIsNone(data["active_budget_id"])
+        self.assertIsNone(data["active_budget_source_estimate_id"])
+        self.assertIsNone(data["active_budget_source_estimate_version"])
 
     def test_project_accounting_export_json_and_csv_match_summary_totals(self):
         self._seed_financial_records()

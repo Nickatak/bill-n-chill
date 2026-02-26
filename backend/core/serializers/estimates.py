@@ -34,6 +34,15 @@ class EstimateLineItemSerializer(serializers.ModelSerializer):
 class EstimateSerializer(serializers.ModelSerializer):
     line_items = EstimateLineItemSerializer(many=True, read_only=True)
     public_ref = serializers.CharField(read_only=True)
+    financial_baseline_status = serializers.SerializerMethodField()
+    is_active_financial_baseline = serializers.SerializerMethodField()
+
+    def get_financial_baseline_status(self, obj: Estimate) -> str:
+        status_by_estimate_id = self.context.get("financial_baseline_status_by_estimate_id", {})
+        return status_by_estimate_id.get(obj.id, "none")
+
+    def get_is_active_financial_baseline(self, obj: Estimate) -> bool:
+        return self.get_financial_baseline_status(obj) == "active"
 
     class Meta:
         model = Estimate
@@ -51,6 +60,8 @@ class EstimateSerializer(serializers.ModelSerializer):
             "tax_total",
             "grand_total",
             "public_ref",
+            "financial_baseline_status",
+            "is_active_financial_baseline",
             "line_items",
             "created_at",
             "updated_at",

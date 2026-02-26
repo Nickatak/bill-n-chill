@@ -21,6 +21,9 @@ export type ProjectFinancialSummary = {
   contract_value_original: string;
   contract_value_current: string;
   accepted_contract_total: string;
+  active_budget_id: number | null;
+  active_budget_source_estimate_id: number | null;
+  active_budget_source_estimate_version: number | null;
   approved_change_orders_total: string;
   invoiced_to_date: string;
   paid_to_date: string;

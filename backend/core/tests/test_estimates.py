@@ -1045,6 +1045,90 @@ class EstimateTests(TestCase):
         self.assertEqual(convert.json()["meta"]["conversion_status"], "already_converted")
         self.assertEqual(Budget.objects.filter(source_estimate_id=estimate_id).count(), 1)
 
+    def test_estimate_approval_with_existing_active_budget_requires_explicit_supersede(self):
+        first_create = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Primary Baseline",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Primary scope",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        first_estimate_id = first_create.json()["data"]["id"]
+        self.client.patch(
+            f"/api/v1/estimates/{first_estimate_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        first_approved = self.client.patch(
+            f"/api/v1/estimates/{first_estimate_id}/",
+            data={"status": "approved"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(first_approved.status_code, 200)
+        self.assertEqual(
+            first_approved.json()["meta"]["budget_conversion_status"],
+            "converted",
+        )
+
+        second_create = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Alternate Baseline",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Alternate scope",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "700",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        second_estimate_id = second_create.json()["data"]["id"]
+        self.client.patch(
+            f"/api/v1/estimates/{second_estimate_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        second_approved = self.client.patch(
+            f"/api/v1/estimates/{second_estimate_id}/",
+            data={"status": "approved"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(second_approved.status_code, 200)
+        self.assertEqual(
+            second_approved.json()["meta"]["budget_conversion_status"],
+            "requires_supersede",
+        )
+        self.assertEqual(
+            second_approved.json()["meta"]["active_financial_estimate_id"],
+            first_estimate_id,
+        )
+        self.assertTrue(second_approved.json()["meta"]["activation_required"])
+
+        self.assertEqual(Budget.objects.filter(project=self.project).count(), 1)
+        active_budget = Budget.objects.get(project=self.project, status=Budget.Status.ACTIVE)
+        self.assertEqual(active_budget.source_estimate_id, first_estimate_id)
+
     def test_estimate_approval_does_not_override_existing_project_contract_baseline(self):
         Project.objects.filter(id=self.project.id).update(
             contract_value_original="1000.00",

@@ -27,6 +27,7 @@ from core.views.helpers import (
     _create_budget_from_estimate,
     _ensure_primary_membership,
     _organization_user_ids,
+    _parse_request_bool,
     _record_financial_audit_event,
     _record_estimate_status_event,
     _role_gate_error_payload,
@@ -139,6 +140,67 @@ def _next_estimate_family_version(*, project, user, title):
     return (latest.version + 1) if latest else 1
 
 
+def _active_budget_for_project(*, project, actor_user_ids):
+    return (
+        Budget.objects.filter(
+            project=project,
+            created_by_id__in=actor_user_ids,
+            status=Budget.Status.ACTIVE,
+        )
+        .select_related("source_estimate")
+        .order_by("-created_at", "-id")
+        .first()
+    )
+
+
+def _estimate_financial_baseline_context(*, project, actor_user_ids):
+    budgets = (
+        Budget.objects.filter(project=project, created_by_id__in=actor_user_ids)
+        .select_related("source_estimate")
+        .order_by("-created_at", "-id")
+    )
+    financial_baseline_status_by_estimate_id: dict[int, str] = {}
+    active_budget = None
+    for budget in budgets:
+        source_estimate_id = budget.source_estimate_id
+        if source_estimate_id is None:
+            continue
+        if budget.status == Budget.Status.ACTIVE:
+            if source_estimate_id not in financial_baseline_status_by_estimate_id:
+                financial_baseline_status_by_estimate_id[source_estimate_id] = "active"
+            if active_budget is None:
+                active_budget = budget
+            continue
+        if source_estimate_id not in financial_baseline_status_by_estimate_id:
+            financial_baseline_status_by_estimate_id[source_estimate_id] = "superseded"
+    return {
+        "financial_baseline_status_by_estimate_id": financial_baseline_status_by_estimate_id,
+        "active_budget_id": active_budget.id if active_budget else None,
+        "active_budget_source_estimate_id": active_budget.source_estimate_id if active_budget else None,
+        "active_budget_source_estimate_version": (
+            active_budget.source_estimate.version
+            if active_budget and active_budget.source_estimate_id
+            else None
+        ),
+    }
+
+
+def _serialize_estimate(*, estimate, actor_user_ids):
+    context = _estimate_financial_baseline_context(
+        project=estimate.project,
+        actor_user_ids=actor_user_ids,
+    )
+    return EstimateSerializer(estimate, context=context).data
+
+
+def _serialize_estimates(*, estimates, project, actor_user_ids):
+    context = _estimate_financial_baseline_context(
+        project=project,
+        actor_user_ids=actor_user_ids,
+    )
+    return EstimateSerializer(estimates, many=True, context=context).data
+
+
 def _sync_project_contract_baseline_if_unset(*, estimate):
     project = estimate.project
     if project.contract_value_original != Decimal("0") or project.contract_value_current != Decimal("0"):
@@ -149,17 +211,33 @@ def _sync_project_contract_baseline_if_unset(*, estimate):
     return True
 
 
-def _ensure_budget_from_approved_estimate(*, estimate, user, note: str):
+def _ensure_budget_from_approved_estimate(
+    *,
+    estimate,
+    user,
+    note: str,
+    allow_supersede: bool = False,
+):
     _sync_project_contract_baseline_if_unset(estimate=estimate)
     actor_user_ids = _organization_user_ids(user)
     existing = (
         Budget.objects.filter(source_estimate=estimate, created_by_id__in=actor_user_ids)
         .select_related("source_estimate")
         .prefetch_related("line_items", "line_items__cost_code")
+        .order_by("-created_at", "-id")
         .first()
     )
-    if existing:
+    if existing and existing.status == Budget.Status.ACTIVE:
         return existing, "already_converted"
+
+    active_budget = _active_budget_for_project(project=estimate.project, actor_user_ids=actor_user_ids)
+    active_budget_conflict = (
+        active_budget is not None
+        and active_budget.source_estimate_id is not None
+        and active_budget.source_estimate_id != estimate.id
+    )
+    if active_budget_conflict and not allow_supersede:
+        return active_budget, "requires_supersede"
 
     budget = _create_budget_from_estimate(estimate=estimate, user=user)
     budget = (
@@ -180,8 +258,13 @@ def _ensure_budget_from_approved_estimate(*, estimate, user, note: str):
         metadata={
             "estimate_id": estimate.id,
             "estimate_version": estimate.version,
+            "activation_mode": "supersede_active"
+            if active_budget_conflict and allow_supersede
+            else "initial_or_no_conflict",
         },
     )
+    if active_budget_conflict and allow_supersede:
+        return budget, "superseded_and_converted"
     return budget, "converted"
 
 
@@ -211,7 +294,15 @@ def project_estimates_view(request, project_id: int):
             .prefetch_related("line_items", "line_items__cost_code")
             .order_by("-version")
         )
-        return Response({"data": EstimateSerializer(estimates, many=True).data})
+        return Response(
+            {
+                "data": _serialize_estimates(
+                    estimates=estimates,
+                    project=project,
+                    actor_user_ids=actor_user_ids,
+                )
+            }
+        )
 
     permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
     if permission_error:
@@ -309,7 +400,10 @@ def project_estimates_view(request, project_id: int):
             continue
         if _estimate_signature(candidate) == input_signature:
             return Response(
-                {"data": EstimateSerializer(candidate).data, "meta": {"deduped": True}},
+                {
+                    "data": _serialize_estimate(estimate=candidate, actor_user_ids=actor_user_ids),
+                    "meta": {"deduped": True},
+                },
                 status=200,
             )
 
@@ -365,7 +459,10 @@ def project_estimates_view(request, project_id: int):
         exclude_ids=[estimate.id],
         note=f"Archived because estimate #{estimate.id} superseded this version.",
     )
-    return Response({"data": EstimateSerializer(estimate).data}, status=201)
+    return Response(
+        {"data": _serialize_estimate(estimate=estimate, actor_user_ids=actor_user_ids)},
+        status=201,
+    )
 
 
 @api_view(["GET", "PATCH"])
@@ -389,7 +486,7 @@ def estimate_detail_view(request, estimate_id: int):
         )
 
     if request.method == "GET":
-        return Response({"data": EstimateSerializer(estimate).data})
+        return Response({"data": _serialize_estimate(estimate=estimate, actor_user_ids=actor_user_ids)})
 
     permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
     if permission_error:
@@ -554,6 +651,7 @@ def estimate_detail_view(request, estimate_id: int):
             and status_note_requested
         )
     )
+    budget_conversion_meta = {}
     if should_record_status_event:
         _record_estimate_status_event(
             estimate=estimate,
@@ -563,14 +661,24 @@ def estimate_detail_view(request, estimate_id: int):
             changed_by=request.user,
         )
         if estimate.status == Estimate.Status.APPROVED:
-            _ensure_budget_from_approved_estimate(
+            budget_row, conversion_status = _ensure_budget_from_approved_estimate(
                 estimate=estimate,
                 user=request.user,
                 note=f"Budget auto-converted from approved estimate #{estimate.id}.",
+                allow_supersede=False,
             )
+            budget_conversion_meta["budget_conversion_status"] = conversion_status
+            if conversion_status == "requires_supersede":
+                budget_conversion_meta["active_financial_estimate_id"] = (
+                    budget_row.source_estimate_id if budget_row else None
+                )
+                budget_conversion_meta["activation_required"] = True
 
     estimate.refresh_from_db()
-    return Response({"data": EstimateSerializer(estimate).data})
+    response_payload = {"data": _serialize_estimate(estimate=estimate, actor_user_ids=actor_user_ids)}
+    if budget_conversion_meta:
+        response_payload["meta"] = budget_conversion_meta
+    return Response(response_payload)
 
 
 @api_view(["POST"])
@@ -669,7 +777,10 @@ def estimate_clone_version_view(request, estimate_id: int):
             changed_by=request.user,
         )
     return Response(
-        {"data": EstimateSerializer(cloned).data, "meta": {"cloned_from": estimate.id}},
+        {
+            "data": _serialize_estimate(estimate=cloned, actor_user_ids=actor_user_ids),
+            "meta": {"cloned_from": estimate.id},
+        },
         status=201,
     )
 
@@ -777,7 +888,7 @@ def estimate_duplicate_view(request, estimate_id: int):
     )
     return Response(
         {
-            "data": EstimateSerializer(duplicated).data,
+            "data": _serialize_estimate(estimate=duplicated, actor_user_ids=actor_user_ids),
             "meta": {"duplicated_from": estimate.id},
         },
         status=201,
@@ -818,9 +929,28 @@ def estimate_convert_to_budget_view(request, estimate_id: int):
             status=404,
         )
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    supersede_active = _parse_request_bool(
+        request.data.get("supersede_active", False),
+        default=False,
+    )
+    permission_error, effective_role = _role_gate_error_payload(request.user, {"owner", "pm"})
     if permission_error:
         return Response(permission_error, status=403)
+    if supersede_active and effective_role != "owner":
+        return Response(
+            {
+                "error": {
+                    "code": "forbidden",
+                    "message": "Only owners can supersede an active financial baseline.",
+                    "fields": {
+                        "role": [
+                            "Owner role is required when supersede_active=true."
+                        ]
+                    },
+                }
+            },
+            status=403,
+        )
 
     if estimate.status != Estimate.Status.APPROVED:
         return Response(
@@ -840,8 +970,28 @@ def estimate_convert_to_budget_view(request, estimate_id: int):
         estimate=estimate,
         user=request.user,
         note=f"Budget converted from estimate #{estimate.id}.",
+        allow_supersede=supersede_active,
     )
+    if conversion_status == "requires_supersede":
+        active_financial_estimate_id = budget.source_estimate_id if budget else None
+        return Response(
+            {
+                "error": {
+                    "code": "conflict",
+                    "message": "An active financial baseline already exists for this project.",
+                    "fields": {
+                        "supersede_active": [
+                            "Set supersede_active=true to explicitly activate this estimate for financials."
+                        ],
+                    },
+                    "meta": {
+                        "active_financial_estimate_id": active_financial_estimate_id,
+                    },
+                }
+            },
+            status=409,
+        )
     return Response(
         {"data": BudgetSerializer(budget).data, "meta": {"conversion_status": conversion_status}},
-        status=201 if conversion_status == "converted" else 200,
+        status=201 if conversion_status in {"converted", "superseded_and_converted"} else 200,
     )
