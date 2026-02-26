@@ -83,6 +83,18 @@ def vendors_list_create_view(request):
             status=400,
         )
 
+    if data.get("is_active") is False:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "New vendors must be active on creation.",
+                    "fields": {"is_active": ["New vendors must be active on creation."]},
+                }
+            },
+            status=400,
+        )
+
     duplicates = _find_duplicate_vendors(
         request.user,
         name=data["name"],
@@ -113,7 +125,7 @@ def vendors_list_create_view(request):
         phone=data.get("phone", ""),
         tax_id_last4=data.get("tax_id_last4", ""),
         notes=data.get("notes", ""),
-        is_active=data.get("is_active", True),
+        is_active=True,
         created_by=request.user,
     )
     return Response(
@@ -233,7 +245,7 @@ def vendors_import_csv_view(request):
         )
 
     reader = csv.DictReader(StringIO(str(csv_text)))
-    expected_headers = {"name", "vendor_type", "email", "phone", "tax_id_last4", "notes", "is_active"}
+    expected_headers = {"name", "vendor_type", "email", "phone", "tax_id_last4", "notes"}
     incoming_headers = set(reader.fieldnames or [])
     if "name" not in incoming_headers:
         return Response(
@@ -241,7 +253,7 @@ def vendors_import_csv_view(request):
                 "error": {
                     "code": "validation_error",
                     "message": "CSV headers are invalid for vendor import.",
-                    "fields": {"headers": [f"Expected at least: name. Optional: vendor_type,email,phone,tax_id_last4,notes,is_active. Found: {', '.join(sorted(incoming_headers))}"]},
+                    "fields": {"headers": [f"Expected at least: name. Optional: vendor_type,email,phone,tax_id_last4,notes. Found: {', '.join(sorted(incoming_headers))}"]},
                 }
             },
             status=400,
@@ -271,7 +283,6 @@ def vendors_import_csv_view(request):
         phone = (row.get("phone") or "").strip()
         tax_id_last4 = (row.get("tax_id_last4") or "").strip()
         notes = (row.get("notes") or "").strip()
-        is_active_raw = (row.get("is_active") or "true").strip().lower()
 
         if not name:
             error_count += 1
@@ -290,19 +301,6 @@ def vendors_import_csv_view(request):
                 }
             )
             continue
-        if is_active_raw not in {"true", "false", "1", "0", "yes", "no"}:
-            error_count += 1
-            rows_out.append(
-                {
-                    "row_number": index,
-                    "name": name,
-                    "status": "error",
-                    "message": "is_active must be true/false.",
-                }
-            )
-            continue
-        is_active = is_active_raw in {"true", "1", "yes"}
-
         existing = Vendor.objects.filter(scope_filter, name__iexact=name).first()
         if existing:
             if dry_run:
@@ -320,7 +318,6 @@ def vendors_import_csv_view(request):
                 existing.phone = phone
                 existing.tax_id_last4 = tax_id_last4
                 existing.notes = notes
-                existing.is_active = is_active
                 existing.save(
                     update_fields=[
                         "vendor_type",
@@ -328,7 +325,6 @@ def vendors_import_csv_view(request):
                         "phone",
                         "tax_id_last4",
                         "notes",
-                        "is_active",
                         "updated_at",
                     ]
                 )
@@ -362,7 +358,7 @@ def vendors_import_csv_view(request):
                 phone=phone,
                 tax_id_last4=tax_id_last4,
                 notes=notes,
-                is_active=is_active,
+                is_active=True,
             )
             created_count += 1
             rows_out.append(

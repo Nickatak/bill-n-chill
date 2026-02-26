@@ -21,7 +21,8 @@ export function VendorsConsole() {
   const [statusMessage, setStatusMessage] = useState("");
   const [statusTone, setStatusTone] = useState<StatusTone>("neutral");
   const [currentPage, setCurrentPage] = useState(1);
-  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
+  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("active");
+  const [includeCanonical, setIncludeCanonical] = useState(false);
 
   const [name, setName] = useState("");
   const [vendorEmail, setVendorEmail] = useState("");
@@ -32,16 +33,11 @@ export function VendorsConsole() {
   const [duplicateOverrideOnSave, setDuplicateOverrideOnSave] = useState(false);
   const [vendorType, setVendorType] = useState<"trade" | "retail">("trade");
 
-  const [newName, setNewName] = useState("");
-  const [newVendorType, setNewVendorType] = useState<"trade" | "retail">("trade");
-  const [newVendorEmail, setNewVendorEmail] = useState("");
-  const [newPhone, setNewPhone] = useState("");
-  const [newTaxIdLast4, setNewTaxIdLast4] = useState("");
-  const [newNotes, setNewNotes] = useState("");
-
   const [duplicateCandidates, setDuplicateCandidates] = useState<VendorRecord[]>([]);
   const [pendingCreatePayload, setPendingCreatePayload] = useState<VendorPayload | null>(null);
-  const [importCsvText, setImportCsvText] = useState("name,vendor_type,email,phone,is_active\n");
+  const [importCsvText, setImportCsvText] = useState(
+    "name,vendor_type,email,phone,tax_id_last4,notes\n",
+  );
   const [importResult, setImportResult] = useState<VendorCsvImportResult | null>(null);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
@@ -58,6 +54,9 @@ export function VendorsConsole() {
   );
   const filteredRows = useMemo(() => {
     return orderedRows.filter((row) => {
+      if (!includeCanonical && row.is_canonical) {
+        return false;
+      }
       if (activityFilter === "active") {
         return row.is_active;
       }
@@ -66,7 +65,7 @@ export function VendorsConsole() {
       }
       return true;
     });
-  }, [activityFilter, orderedRows]);
+  }, [activityFilter, includeCanonical, orderedRows]);
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
   const currentPageSafe = Math.min(currentPage, totalPages);
   const pageStartIndex = (currentPageSafe - 1) * pageSize;
@@ -76,6 +75,7 @@ export function VendorsConsole() {
     () => rows.find((row) => String(row.id) === selectedId) ?? null,
     [rows, selectedId],
   );
+  const selectedVendorIsCanonical = Boolean(selectedVendor?.is_canonical);
   const activeCount = useMemo(() => rows.filter((row) => row.is_active).length, [rows]);
   const inactiveCount = rows.length - activeCount;
   const canonicalCount = useMemo(() => rows.filter((row) => row.is_canonical).length, [rows]);
@@ -93,6 +93,24 @@ export function VendorsConsole() {
   function setErrorStatus(message: string) {
     setStatusTone("error");
     setStatusMessage(message);
+  }
+
+  function clearFormFields() {
+    setName("");
+    setVendorType("trade");
+    setVendorEmail("");
+    setPhone("");
+    setTaxIdLast4("");
+    setNotes("");
+    setIsActive(true);
+  }
+
+  function startCreateMode() {
+    setSelectedId("");
+    clearFormFields();
+    setDuplicateOverrideOnSave(false);
+    setDuplicateCandidates([]);
+    setPendingCreatePayload(null);
   }
 
   function hydrate(item: VendorRecord) {
@@ -129,13 +147,13 @@ export function VendorsConsole() {
       setDuplicateCandidates([]);
       setPendingCreatePayload(null);
       setImportResult(null);
-      if (items[0]) {
-        const persistedSelection =
-          items.find((row) => String(row.id) === selectedId) ?? items[0];
+      const persistedSelection = items.find((row) => String(row.id) === selectedId) ?? null;
+      if (persistedSelection) {
         setSelectedId(String(persistedSelection.id));
         hydrate(persistedSelection);
-      } else {
+      } else if (selectedId) {
         setSelectedId("");
+        clearFormFields();
       }
       setSuccessStatus(`Loaded ${items.length} vendor(s).`);
     } catch {
@@ -179,33 +197,17 @@ export function VendorsConsole() {
     }
 
     const created = payload.data as VendorRecord;
-    setRows((current) => [...current, created]);
+    setRows((current) => {
+      const nextRows = [...current, created];
+      setCurrentPage(Math.ceil(nextRows.length / pageSize));
+      return nextRows;
+    });
     setSelectedId(String(created.id));
     hydrate(created);
-    setNewName("");
-    setNewVendorEmail("");
-    setNewPhone("");
-    setNewTaxIdLast4("");
-    setNewNotes("");
+    setDuplicateOverrideOnSave(false);
     setDuplicateCandidates([]);
     setPendingCreatePayload(null);
-    setCurrentPage(Math.ceil((rows.length + 1) / pageSize));
     setSuccessStatus(`Created vendor #${created.id}.`);
-  }
-
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setNeutralStatus("Creating vendor...");
-
-    await createVendor({
-      name: newName.trim(),
-      vendor_type: newVendorType,
-      email: newVendorEmail.trim(),
-      phone: newPhone.trim(),
-      tax_id_last4: newTaxIdLast4.trim(),
-      notes: newNotes.trim(),
-      is_active: true,
-    });
   }
 
   async function handleCreateAnyway() {
@@ -218,27 +220,34 @@ export function VendorsConsole() {
     await createVendor(pendingCreatePayload, { duplicate_override: true });
   }
 
-  async function handleSave(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const id = Number(selectedId);
-    if (!id) {
-      setErrorStatus("Select a vendor first.");
+    const payloadBody: VendorPayload = {
+      name: name.trim(),
+      vendor_type: vendorType,
+      email: vendorEmail.trim(),
+      phone: phone.trim(),
+      tax_id_last4: taxIdLast4.trim(),
+      notes: notes.trim(),
+      is_active: selectedVendor ? isActive : true,
+    };
+
+    if (!selectedVendor) {
+      setNeutralStatus("Creating vendor...");
+      await createVendor(
+        payloadBody,
+        duplicateOverrideOnSave ? { duplicate_override: true } : undefined,
+      );
       return;
     }
 
     setNeutralStatus("Saving vendor...");
     try {
-      const response = await fetch(`${normalizedBaseUrl}/vendors/${id}/`, {
+      const response = await fetch(`${normalizedBaseUrl}/vendors/${selectedVendor.id}/`, {
         method: "PATCH",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
-          name: name.trim(),
-          vendor_type: vendorType,
-          email: vendorEmail.trim(),
-          phone: phone.trim(),
-          tax_id_last4: taxIdLast4.trim(),
-          notes: notes.trim(),
-          is_active: isActive,
+          ...payloadBody,
           duplicate_override: duplicateOverrideOnSave,
         }),
       });
@@ -300,7 +309,7 @@ export function VendorsConsole() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activityFilter]);
+  }, [activityFilter, includeCanonical]);
 
   return (
     <section className={styles.console}>
@@ -345,7 +354,7 @@ export function VendorsConsole() {
               </span>
             </div>
             <p className={styles.panelIntro}>
-              Search vendors by name/email/phone/tax id, then select one to edit.
+              Search vendors by name/email/phone/tax id, then select one for editing.
             </p>
 
             <div className={styles.filters}>
@@ -368,6 +377,16 @@ export function VendorsConsole() {
                   <option value="inactive">Inactive</option>
                 </select>
               </label>
+              <label className={styles.field}>
+                <span>Canonical</span>
+                <select
+                  value={includeCanonical ? "include" : "exclude"}
+                  onChange={(event) => setIncludeCanonical(event.target.value === "include")}
+                >
+                  <option value="exclude">Hide canonical</option>
+                  <option value="include">Include canonical</option>
+                </select>
+              </label>
               <div className={styles.filterActions}>
                 <button type="button" className={styles.secondaryButton} onClick={() => void loadVendors()}>
                   Run Search
@@ -377,7 +396,8 @@ export function VendorsConsole() {
                   className={styles.ghostButton}
                   onClick={() => {
                     setSearchQuery("");
-                    setActivityFilter("all");
+                    setActivityFilter("active");
+                    setIncludeCanonical(false);
                     void loadVendors("");
                   }}
                 >
@@ -396,7 +416,6 @@ export function VendorsConsole() {
                         <th>Contact</th>
                         <th>Type</th>
                         <th>Status</th>
-                        <th />
                       </tr>
                     </thead>
                     <tbody>
@@ -438,19 +457,6 @@ export function VendorsConsole() {
                               >
                                 {row.is_active ? "Active" : "Inactive"}
                               </span>
-                            </td>
-                            <td>
-                              <button
-                                type="button"
-                                className={styles.rowSelectButton}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  handleSelect(String(row.id));
-                                }}
-                                disabled={isSelectedRow}
-                              >
-                                {isSelectedRow ? "Selected" : "Select"}
-                              </button>
                             </td>
                           </tr>
                         );
@@ -506,61 +512,28 @@ export function VendorsConsole() {
           </section>
 
           <div className={styles.layoutRight}>
-            <form className={styles.panel} onSubmit={handleCreate}>
+            <form
+              className={`${styles.panel} ${selectedVendorIsCanonical ? styles.panelLocked : ""}`}
+              onSubmit={handleSubmit}
+            >
               <div className={styles.panelHeader}>
-                <h3 className={styles.panelTitle}>Create Vendor</h3>
+                <h3 className={styles.panelTitle}>Vendor Details</h3>
+                <div className={styles.panelActions}>
+                  <span className={styles.countBadge}>
+                    {selectedVendor ? `Editing #${selectedVendor.id}` : "Create mode"}
+                  </span>
+                  <button type="button" className={styles.ghostButton} onClick={startCreateMode}>
+                    Add New Vendor
+                  </button>
+                </div>
               </div>
-              <label className={styles.field}>
-                <span>Name</span>
-                <input value={newName} onChange={(event) => setNewName(event.target.value)} required />
-              </label>
-              <label className={styles.field}>
-                <span>Vendor type</span>
-                <select
-                  value={newVendorType}
-                  onChange={(event) => setNewVendorType(event.target.value as "trade" | "retail")}
-                >
-                  <option value="trade">Trade</option>
-                  <option value="retail">Retail</option>
-                </select>
-              </label>
-              <label className={styles.field}>
-                <span>Email</span>
-                <input value={newVendorEmail} onChange={(event) => setNewVendorEmail(event.target.value)} />
-              </label>
-              <label className={styles.field}>
-                <span>Phone</span>
-                <input value={newPhone} onChange={(event) => setNewPhone(event.target.value)} />
-              </label>
-              <label className={styles.field}>
-                <span>Tax ID (last 4)</span>
-                <input
-                  value={newTaxIdLast4}
-                  onChange={(event) => setNewTaxIdLast4(event.target.value)}
-                  inputMode="numeric"
-                  maxLength={4}
-                />
-              </label>
-              <label className={styles.field}>
-                <span>Notes</span>
-                <textarea value={newNotes} onChange={(event) => setNewNotes(event.target.value)} rows={4} />
-              </label>
-              <div className={styles.formActions}>
-                <button type="submit" className={styles.primaryButton}>
-                  Create Vendor
-                </button>
-              </div>
-            </form>
-
-            <form className={styles.panel} onSubmit={handleSave}>
-              <div className={styles.panelHeader}>
-                <h3 className={styles.panelTitle}>Edit Vendor</h3>
-                <span className={styles.countBadge}>
-                  {selectedVendor ? `#${selectedVendor.id}` : "No selection"}
-                </span>
-              </div>
-              {!selectedVendor ? (
-                <p className={styles.panelIntro}>Select a vendor from the table to edit fields.</p>
+              <p className={styles.panelIntro}>
+                {selectedVendor
+                  ? "Update the selected vendor record and save changes."
+                  : "Create a new vendor, or select a row from the table to edit existing data."}
+              </p>
+              {selectedVendorIsCanonical ? (
+                <p className={styles.panelIntro}>Canonical vendors are read-only and cannot be edited.</p>
               ) : null}
               <label className={styles.field}>
                 <span>Name</span>
@@ -568,7 +541,7 @@ export function VendorsConsole() {
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   required
-                  disabled={!selectedVendor}
+                  disabled={selectedVendorIsCanonical}
                 />
               </label>
               <label className={styles.field}>
@@ -576,7 +549,7 @@ export function VendorsConsole() {
                 <select
                   value={vendorType}
                   onChange={(event) => setVendorType(event.target.value as "trade" | "retail")}
-                  disabled={!selectedVendor}
+                  disabled={selectedVendorIsCanonical}
                 >
                   <option value="trade">Trade</option>
                   <option value="retail">Retail</option>
@@ -587,12 +560,16 @@ export function VendorsConsole() {
                 <input
                   value={vendorEmail}
                   onChange={(event) => setVendorEmail(event.target.value)}
-                  disabled={!selectedVendor}
+                  disabled={selectedVendorIsCanonical}
                 />
               </label>
               <label className={styles.field}>
                 <span>Phone</span>
-                <input value={phone} onChange={(event) => setPhone(event.target.value)} disabled={!selectedVendor} />
+                <input
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  disabled={selectedVendorIsCanonical}
+                />
               </label>
               <label className={styles.field}>
                 <span>Tax ID (last 4)</span>
@@ -601,7 +578,7 @@ export function VendorsConsole() {
                   onChange={(event) => setTaxIdLast4(event.target.value)}
                   inputMode="numeric"
                   maxLength={4}
-                  disabled={!selectedVendor}
+                  disabled={selectedVendorIsCanonical}
                 />
               </label>
               <label className={styles.field}>
@@ -610,33 +587,45 @@ export function VendorsConsole() {
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
                   rows={4}
-                  disabled={!selectedVendor}
+                  disabled={selectedVendorIsCanonical}
                 />
               </label>
-              <label className={styles.field}>
-                <span>Active status</span>
-                <select
-                  value={isActive ? "true" : "false"}
-                  onChange={(event) => setIsActive(event.target.value === "true")}
-                  disabled={!selectedVendor}
-                >
-                  <option value="true">Active</option>
-                  <option value="false">Inactive</option>
-                </select>
-              </label>
-              <label className={styles.checkboxField}>
+              {selectedVendor ? (
+                <label className={styles.field}>
+                  <span>Active status</span>
+                  <select
+                    value={isActive ? "true" : "false"}
+                    onChange={(event) => setIsActive(event.target.value === "true")}
+                    disabled={selectedVendorIsCanonical}
+                  >
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                  </select>
+                </label>
+              ) : null}
+              <label className={styles.overrideRow}>
                 <input
                   type="checkbox"
                   checked={duplicateOverrideOnSave}
                   onChange={(event) => setDuplicateOverrideOnSave(event.target.checked)}
-                  disabled={!selectedVendor}
+                  disabled={selectedVendorIsCanonical}
                 />
-                <span>Allow duplicate name/email on save</span>
+                <span className={styles.overrideBody}>
+                  <strong className={styles.overrideTitle}>Allow duplicate vendor identity</strong>
+                  <span className={styles.overrideHint}>
+                    Bypass duplicate name/email warning for intentional save/create.
+                  </span>
+                </span>
               </label>
               <div className={styles.formActions}>
-                <button type="submit" className={styles.primaryButton} disabled={!selectedVendor}>
-                  Save Vendor
+                <button type="submit" className={styles.primaryButton} disabled={selectedVendorIsCanonical}>
+                  {selectedVendor ? "Save Vendor" : "Create Vendor"}
                 </button>
+                {selectedVendor ? (
+                  <button type="button" className={styles.ghostButton} onClick={() => hydrate(selectedVendor)}>
+                    Reset Fields
+                  </button>
+                ) : null}
               </div>
             </form>
 
@@ -645,7 +634,7 @@ export function VendorsConsole() {
                 <h3 className={styles.panelTitle}>CSV Import</h3>
               </div>
               <p className={styles.panelIntro}>
-                Headers: <code>name,vendor_type,email,phone,tax_id_last4,notes,is_active</code>
+                Headers: <code>name,vendor_type,email,phone,tax_id_last4,notes</code>
               </p>
               <label className={styles.field}>
                 <span>CSV text</span>
@@ -682,4 +671,3 @@ export function VendorsConsole() {
     </section>
   );
 }
-

@@ -288,6 +288,21 @@ class VendorTests(TestCase):
         self.assertEqual(payload["vendor_type"], Vendor.VendorType.RETAIL)
         self.assertFalse(payload["is_canonical"])
 
+    def test_vendor_create_rejects_inactive_state(self):
+        create = self.client.post(
+            "/api/v1/vendors/",
+            data={
+                "name": "Inactive Vendor",
+                "is_active": False,
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(create.status_code, 400)
+        payload = create.json()["error"]
+        self.assertEqual(payload["code"], "validation_error")
+        self.assertIn("is_active", payload["fields"])
+
     def test_vendor_create_assigns_active_organization(self):
         membership = OrganizationMembership.objects.update_or_create(
             user=self.user,
@@ -340,7 +355,7 @@ class VendorTests(TestCase):
             "/api/v1/vendors/import-csv/",
             data={
                 "dry_run": True,
-                "csv_text": "name,vendor_type,email,phone,is_active\nStone Supply LLC,trade,ap@stone.example.com,555-1111,true\nFraming Crew,trade,frame@example.com,555-2222,true\n",
+                "csv_text": "name,vendor_type,email,phone\nStone Supply LLC,trade,ap@stone.example.com,555-1111\nFraming Crew,trade,frame@example.com,555-2222\n",
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -354,7 +369,7 @@ class VendorTests(TestCase):
             "/api/v1/vendors/import-csv/",
             data={
                 "dry_run": False,
-                "csv_text": "name,vendor_type,email,phone,is_active\nStone Supply LLC,trade,ap@stone.example.com,555-1111,true\nFraming Crew,trade,frame@example.com,555-2222,true\n",
+                "csv_text": "name,vendor_type,email,phone\nStone Supply LLC,trade,ap@stone.example.com,555-1111\nFraming Crew,trade,frame@example.com,555-2222\n",
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -370,7 +385,7 @@ class VendorTests(TestCase):
             "/api/v1/vendors/import-csv/",
             data={
                 "dry_run": "false",
-                "csv_text": "name,vendor_type,email,phone,is_active\nFraming Crew,trade,frame@example.com,555-2222,true\n",
+                "csv_text": "name,vendor_type,email,phone\nFraming Crew,trade,frame@example.com,555-2222\n",
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -382,3 +397,18 @@ class VendorTests(TestCase):
         self.assertTrue(
             Vendor.objects.filter(created_by=self.user, name="Framing Crew").exists()
         )
+
+    def test_vendor_csv_import_rejects_is_active_header(self):
+        response = self.client.post(
+            "/api/v1/vendors/import-csv/",
+            data={
+                "dry_run": True,
+                "csv_text": "name,vendor_type,email,phone,is_active\nFraming Crew,trade,frame@example.com,555-2222,true\n",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()["error"]
+        self.assertEqual(payload["code"], "validation_error")
+        self.assertIn("headers", payload["fields"])
