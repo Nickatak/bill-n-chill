@@ -163,11 +163,11 @@ export function ContactsList({
                     </button>
                     <button
                       type="button"
-                      className={styles.iconButton}
-                      aria-label={`Create project for ${row.display_name}`}
+                      className={styles.addProjectButton}
+                      aria-label={`Add new project for ${row.display_name}`}
                       onClick={() => onCreateProject(row)}
                     >
-                      +
+                      Add New Project
                     </button>
                   </div>
                   {isExpanded ? (

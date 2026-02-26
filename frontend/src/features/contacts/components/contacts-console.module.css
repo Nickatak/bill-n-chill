@@ -24,12 +24,17 @@
 
 .statusMessage {
   margin: 0;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent 18%);
+  border-radius: 12px;
+  padding: 10px 12px;
   font-size: 0.9rem;
-  color: var(--text-secondary);
-  background: color-mix(in srgb, var(--foreground) 88%, #e2e8f0 12%);
+  color: color-mix(in srgb, var(--text-secondary) 92%, var(--text-primary) 8%);
+  background:
+    linear-gradient(
+      140deg,
+      color-mix(in srgb, var(--foreground) 92%, #e2e8f0 8%) 0%,
+      color-mix(in srgb, var(--foreground) 97%, #dbeafe 3%) 100%
+    );
 }
 
 .controlsRow {
@@ -111,47 +116,74 @@
 }
 
 .tableWrap {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--foreground) 92%, #e2e8f0 8%);
-  overflow: hidden;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
 }
 
 .table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0 10px;
 }
 
 .table th,
 .table td {
   vertical-align: top;
   text-align: left;
-  padding: 10px 12px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent 20%);
+  padding: 13px 14px;
 }
 
 .table th {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-secondary);
-  background: color-mix(in srgb, var(--foreground) 94%, #e2e8f0 6%);
+  letter-spacing: 0.09em;
+  color: color-mix(in srgb, var(--text-secondary) 78%, var(--text-primary) 22%);
+  background: transparent;
+  border-bottom: none;
+  padding-top: 4px;
+  padding-bottom: 0;
+}
+
+.table tbody td {
+  background:
+    linear-gradient(
+      150deg,
+      color-mix(in srgb, var(--foreground) 94%, #e2e8f0 6%) 0%,
+      color-mix(in srgb, var(--foreground) 98%, #c7d2fe 2%) 100%
+    );
+  border-top: 1px solid color-mix(in srgb, var(--border) 78%, transparent 22%);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 74%, transparent 26%);
+}
+
+.table tbody td:first-child {
+  border-left: 1px solid color-mix(in srgb, var(--border) 78%, transparent 22%);
+  border-top-left-radius: 14px;
+  border-bottom-left-radius: 14px;
+}
+
+.table tbody td:last-child {
+  border-right: 1px solid color-mix(in srgb, var(--border) 78%, transparent 22%);
+  border-top-right-radius: 14px;
+  border-bottom-right-radius: 14px;
 }
 
 .tableRowInactive {
-  box-shadow: inset 4px 0 0 #dc2626;
+  box-shadow: inset 3px 0 0 #dc2626;
 }
 
 .rowPrimary {
   margin: 0;
-  font-weight: 600;
-  line-height: 1.25;
+  font-weight: 700;
+  font-size: 1.02rem;
+  line-height: 1.2;
   color: var(--text-primary);
 }
 
 .rowSecondary {
-  margin: 2px 0 0;
-  font-size: 0.84rem;
+  margin: 3px 0 0;
+  font-size: 0.86rem;
   color: var(--text-secondary);
   line-height: 1.3;
 }
@@ -163,9 +195,9 @@
 
 .projectCellHeader {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
 }
 
 .projectLink {
@@ -177,7 +209,7 @@
   background: transparent;
   padding: 0;
   display: grid;
-  gap: 4px;
+  gap: 6px;
   text-align: left;
   cursor: pointer;
   color: var(--text-primary);
@@ -197,12 +229,16 @@
 }
 
 .projectAccordionCaret {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .projectAccordionBody {
-  margin-top: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed color-mix(in srgb, var(--border) 70%, transparent 30%);
 }
 
 .projectStatusGroups {
@@ -212,7 +248,7 @@
 
 .projectStatusGroup {
   display: grid;
-  gap: 4px;
+  gap: 6px;
 }
 
 .projectStatusGroupHeader {
@@ -272,8 +308,8 @@
 
 .projectAccordionLink {
   border: 1px solid color-mix(in srgb, var(--border) 85%, transparent 15%);
-  border-radius: 8px;
-  padding: 6px 8px;
+  border-radius: 10px;
+  padding: 7px 9px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -291,21 +327,22 @@
   font-size: 0.84rem;
 }
 
-.iconButton {
-  width: 24px;
-  height: 24px;
+.addProjectButton {
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 10px;
   background: var(--foreground);
   color: var(--text-primary);
-  line-height: 1;
-  font-size: 1rem;
+  line-height: 1.1;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 7px 10px;
   cursor: pointer;
   flex-shrink: 0;
-  align-self: flex-start;
+  align-self: center;
+  white-space: nowrap;
 }
 
-.iconButton:hover {
+.addProjectButton:hover {
   border-color: color-mix(in srgb, var(--text-primary) 35%, var(--border) 65%);
 }
 
@@ -361,16 +398,18 @@
 }
 
 .customerActionsInline {
-  margin-top: 6px;
+  margin-top: 10px;
 }
 
 .secondaryButton {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 6px 10px;
+  border-radius: 10px;
+  padding: 6px 11px;
   background: var(--foreground);
   color: var(--text-primary);
   cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 600;
 }
 
 .secondaryButton:hover {
@@ -379,7 +418,7 @@
 
 .emptyState {
   margin: 0;
-  padding: 12px;
+  padding: 12px 2px;
   color: var(--text-secondary);
   font-size: 0.9rem;
 }
@@ -555,11 +594,12 @@
 
 @media (max-width: 900px) {
   .table {
-    min-width: 840px;
+    min-width: 760px;
   }
 
   .tableWrap {
     overflow-x: auto;
+    padding-bottom: 2px;
   }
 }
 
@@ -571,13 +611,31 @@
 }
 
 :global(html[data-theme="dark"]) .statusMessage,
-:global(html[data-theme="dark"]) .tableWrap,
 :global(html[data-theme="dark"]) .modalCard {
   background: color-mix(in srgb, var(--foreground) 94%, #0f172a 6%);
 }
 
 :global(html[data-theme="dark"]) .table th {
-  background: color-mix(in srgb, #0f172a 90%, #334155 10%);
+  color: color-mix(in srgb, var(--text-secondary) 84%, #cbd5e1 16%);
+}
+
+:global(html[data-theme="dark"]) .table tbody td {
+  background:
+    linear-gradient(
+      150deg,
+      color-mix(in srgb, var(--foreground) 93%, #0f172a 7%) 0%,
+      color-mix(in srgb, var(--foreground) 97%, #1e293b 3%) 100%
+    );
+  border-top-color: color-mix(in srgb, var(--border) 76%, transparent 24%);
+  border-bottom-color: color-mix(in srgb, var(--border) 72%, transparent 28%);
+}
+
+:global(html[data-theme="dark"]) .table tbody td:first-child {
+  border-left-color: color-mix(in srgb, var(--border) 76%, transparent 24%);
+}
+
+:global(html[data-theme="dark"]) .table tbody td:last-child {
+  border-right-color: color-mix(in srgb, var(--border) 76%, transparent 24%);
 }
 
 :global(html[data-theme="dark"]) .switchInput {

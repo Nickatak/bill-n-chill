@@ -907,7 +907,7 @@ export function FinancialsAuditingConsole() {
           <div>
             <p>
               Contract: eyeball/initial {summary.contract_value_original} | accepted total{" "}
-              {summary.contract_value_current}
+              {summary.accepted_contract_total}
             </p>
             <p>Approved CO total: {summary.approved_change_orders_total}</p>
             <p>
