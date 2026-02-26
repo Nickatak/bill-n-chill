@@ -1551,73 +1551,12 @@ export function InvoicesConsole() {
                               disabled={!canEditInvoiceWorkspace}
                             />
                           </label>
-                        </div>
-                        <div className={styles.organizationProfileCard}>
-                          <div className={styles.organizationProfileHeader}>
-                            <div className={styles.organizationProfileHeading}>
-                              <span className={styles.organizationProfileEyebrow}>
-                                Organization Billing Profile
-                              </span>
-                              <strong className={styles.organizationProfileName}>
-                                {senderDisplayName || "Sender identity"}
-                              </strong>
-                            </div>
-                            <a href="/organization" className={styles.organizationSettingsLink}>
-                              Manage Defaults <span aria-hidden="true">↗</span>
-                            </a>
-                          </div>
-                          <div className={styles.organizationProfilePreview}>
-                            <div className={styles.organizationLogoPreview}>
-                              {senderLogoUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={senderLogoUrl} alt="Organization logo preview" className={styles.invoiceLogoImage} />
-                              ) : (
-                                <span>No logo</span>
-                              )}
-                            </div>
-                            <div className={styles.organizationProfileMeta}>
-                              <span>{senderDisplayName || "Sender name not set"}</span>
-                              <span>{senderEmail || "Sender email not set"}</span>
-                              <span>
-                                {senderAddressLines.length
-                                  ? senderAddressLines.join(" · ")
-                                  : "Sender address not set"}
-                              </span>
-                            </div>
-                          </div>
-                          <div className={styles.organizationTemplateMetaGrid}>
-                            <div className={styles.organizationTemplateMetaRow}>
-                              <span>Sender name</span>
-                              <strong>{senderName || "Not set"}</strong>
-                            </div>
-                            <div className={styles.organizationTemplateMetaRow}>
-                              <span>Sender email</span>
-                              <strong>{senderEmail || "Not set"}</strong>
-                            </div>
-                            <div className={styles.organizationTemplateMetaRow}>
-                              <span>Template due days</span>
-                              <strong>{templateDueDays} days</strong>
-                            </div>
-                          </div>
-                          <div className={styles.organizationTemplateGrid}>
-                            <div className={styles.organizationTemplateBlock}>
-                              <span>Terms Template</span>
-                              <p>{termsText || "No default terms configured."}</p>
-                            </div>
-                            <div className={styles.organizationTemplateBlock}>
-                              <span>Footer Template</span>
-                              <p>{footerText || "No default footer configured."}</p>
-                            </div>
-                            <div className={`${styles.organizationTemplateBlock} ${styles.organizationTemplateBlockWide}`}>
-                              <span>Notes Template</span>
-                              <p>{notesText || "No default notes configured."}</p>
-                            </div>
+                          <div className={estimateStyles.metaLine}>
+                            <span>Payment terms</span>
+                            <strong className={styles.invoiceMetaStrong}>Net {templateDueDays} days</strong>
                           </div>
                         </div>
                       </div>
-                      <p className={estimateStyles.inlineHint}>
-                        Billing template settings are managed in Organization and automatically applied to invoices.
-                      </p>
 
                       <div className={styles.invoiceLineSectionIntro}>
                         <h3>Line Items</h3>
@@ -1768,45 +1707,84 @@ export function InvoicesConsole() {
                       ) : null}
 
                       <div className={styles.invoiceSheetFooter}>
-                        <div className={estimateStyles.summary}>
-                          <div className={estimateStyles.summaryRow}>
-                            <span>Subtotal</span>
-                            <strong>${formatMoney(draftLineSubtotal)}</strong>
+                        <div className={styles.invoiceTemplateColumn}>
+                          <div className={styles.invoiceTemplateColumnHeader}>
+                            <span className={styles.invoiceMetaCardLabel}>Invoice Footer Content</span>
+                            <a href="/organization" className={styles.organizationSettingsLink}>
+                              Manage Defaults <span aria-hidden="true">↗</span>
+                            </a>
                           </div>
-                          <div className={estimateStyles.summaryRow}>
-                            <span>Sales Tax</span>
-                            <span className={estimateStyles.summaryTaxLine}>
-                              <label className={estimateStyles.summaryTaxRate}>
-                                <input
-                                  className={`${estimateStyles.summaryTaxInput} ${styles.invoiceLockableControl}`}
-                                  value={taxPercent}
-                                  onChange={(event) => setTaxPercent(event.target.value)}
-                                  inputMode="decimal"
-                                  disabled={!canEditInvoiceWorkspace}
-                                />
-                                <span className={estimateStyles.summaryTaxSuffix}>%</span>
-                              </label>
-                              <span className={estimateStyles.summaryTaxAmount}>
-                                ${formatMoney(draftTaxTotal)}
-                              </span>
-                            </span>
-                          </div>
-                          <div className={`${estimateStyles.summaryRow} ${estimateStyles.summaryTotal}`}>
-                            <span>Total</span>
-                            <strong>${formatMoney(draftTotal)}</strong>
+                          <div className={styles.invoiceTemplateBlocks}>
+                            <div className={styles.invoiceTemplateBlock}>
+                              <h4>Terms</h4>
+                              {(termsText || "No default terms configured.")
+                                .split("\n")
+                                .filter((line) => line.trim())
+                                .map((line, index) => (
+                                  <p key={`${line}-${index}`}>{line}</p>
+                                ))}
+                            </div>
+                            <div className={styles.invoiceTemplateBlock}>
+                              <h4>Notes</h4>
+                              {(notesText || "No default notes configured.")
+                                .split("\n")
+                                .filter((line) => line.trim())
+                                .map((line, index) => (
+                                  <p key={`${line}-${index}`}>{line}</p>
+                                ))}
+                            </div>
+                            <div className={`${styles.invoiceTemplateBlock} ${styles.invoiceTemplateBlockWide}`}>
+                              <h4>Footer</h4>
+                              {(footerText || `${senderName || "Your Company"} · ${senderEmail || "billing@example.com"}`)
+                                .split("\n")
+                                .filter((line) => line.trim())
+                                .map((line, index) => (
+                                  <p key={`${line}-${index}`}>{line}</p>
+                                ))}
+                            </div>
                           </div>
                         </div>
-                        {canEditInvoiceWorkspace ? (
-                          <div className={styles.invoiceCreateActions}>
-                            <button
-                              type="submit"
-                              className={estimateStyles.primaryButton}
-                              disabled={!selectedProjectId}
-                            >
-                              Create Invoice
-                            </button>
+                        <div className={styles.invoiceTotalsColumn}>
+                          <div className={estimateStyles.summary}>
+                            <div className={estimateStyles.summaryRow}>
+                              <span>Subtotal</span>
+                              <strong>${formatMoney(draftLineSubtotal)}</strong>
+                            </div>
+                            <div className={estimateStyles.summaryRow}>
+                              <span>Sales Tax</span>
+                              <span className={estimateStyles.summaryTaxLine}>
+                                <label className={estimateStyles.summaryTaxRate}>
+                                  <input
+                                    className={`${estimateStyles.summaryTaxInput} ${styles.invoiceLockableControl}`}
+                                    value={taxPercent}
+                                    onChange={(event) => setTaxPercent(event.target.value)}
+                                    inputMode="decimal"
+                                    disabled={!canEditInvoiceWorkspace}
+                                  />
+                                  <span className={estimateStyles.summaryTaxSuffix}>%</span>
+                                </label>
+                                <span className={estimateStyles.summaryTaxAmount}>
+                                  ${formatMoney(draftTaxTotal)}
+                                </span>
+                              </span>
+                            </div>
+                            <div className={`${estimateStyles.summaryRow} ${estimateStyles.summaryTotal}`}>
+                              <span>Total</span>
+                              <strong>${formatMoney(draftTotal)}</strong>
+                            </div>
                           </div>
-                        ) : null}
+                          {canEditInvoiceWorkspace ? (
+                            <div className={styles.invoiceCreateActions}>
+                              <button
+                                type="submit"
+                                className={estimateStyles.primaryButton}
+                                disabled={!selectedProjectId}
+                              >
+                                Create Invoice
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
                     </>
                   ),
