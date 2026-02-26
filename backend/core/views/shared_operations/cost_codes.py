@@ -145,7 +145,7 @@ def cost_codes_import_csv_view(request):
         )
 
     reader = csv.DictReader(StringIO(str(csv_text)))
-    expected_headers = {"code", "name", "is_active"}
+    expected_headers = {"code", "name"}
     incoming_headers = set(reader.fieldnames or [])
     if not {"code", "name"}.issubset(incoming_headers):
         return Response(
@@ -153,7 +153,7 @@ def cost_codes_import_csv_view(request):
                 "error": {
                     "code": "validation_error",
                     "message": "CSV headers are invalid for cost code import.",
-                    "fields": {"headers": [f"Expected at least: code,name. Optional: is_active. Found: {', '.join(sorted(incoming_headers))}"]},
+                    "fields": {"headers": [f"Expected: code,name. Found: {', '.join(sorted(incoming_headers))}"]},
                 }
             },
             status=400,
@@ -179,7 +179,6 @@ def cost_codes_import_csv_view(request):
     for index, row in enumerate(reader, start=2):
         code = (row.get("code") or "").strip()
         name = (row.get("name") or "").strip()
-        is_active_raw = (row.get("is_active") or "true").strip().lower()
         if not code or not name:
             error_count += 1
             rows_out.append(
@@ -187,26 +186,11 @@ def cost_codes_import_csv_view(request):
                     "row_number": index,
                     "code": code,
                     "name": name,
-                    "is_active": None,
                     "status": "error",
                     "message": "code and name are required.",
                 }
             )
             continue
-        if is_active_raw not in {"true", "false", "1", "0", "yes", "no"}:
-            error_count += 1
-            rows_out.append(
-                {
-                    "row_number": index,
-                    "code": code,
-                    "name": name,
-                    "is_active": None,
-                    "status": "error",
-                    "message": "is_active must be true/false.",
-                }
-            )
-            continue
-        is_active = is_active_raw in {"true", "1", "yes"}
         existing = CostCode.objects.filter(scope_filter, code__iexact=code).first()
         if existing:
             if dry_run:
@@ -215,22 +199,19 @@ def cost_codes_import_csv_view(request):
                         "row_number": index,
                         "code": code,
                         "name": name,
-                        "is_active": is_active,
                         "status": "would_update",
                         "message": f"Would update cost code #{existing.id}.",
                     }
                 )
             else:
                 existing.name = name
-                existing.is_active = is_active
-                existing.save(update_fields=["name", "is_active", "updated_at"])
+                existing.save(update_fields=["name", "updated_at"])
                 updated_count += 1
                 rows_out.append(
                     {
                         "row_number": index,
                         "code": code,
                         "name": name,
-                        "is_active": is_active,
                         "status": "updated",
                         "message": f"Updated cost code #{existing.id}.",
                     }
@@ -243,7 +224,6 @@ def cost_codes_import_csv_view(request):
                     "row_number": index,
                     "code": code,
                     "name": name,
-                    "is_active": is_active,
                     "status": "would_create",
                     "message": "Would create new cost code.",
                 }
@@ -254,7 +234,7 @@ def cost_codes_import_csv_view(request):
                 organization_id=membership.organization_id,
                 code=code,
                 name=name,
-                is_active=is_active,
+                is_active=True,
             )
             created_count += 1
             rows_out.append(
@@ -262,7 +242,6 @@ def cost_codes_import_csv_view(request):
                     "row_number": index,
                     "code": code,
                     "name": name,
-                    "is_active": is_active,
                     "status": "created",
                     "message": "Created cost code.",
                 }

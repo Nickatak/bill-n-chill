@@ -14,7 +14,6 @@ export type CsvImportRowResult = {
   row_number: number;
   code?: string;
   name?: string;
-  is_active?: boolean | null;
   status: string;
   message: string;
 };

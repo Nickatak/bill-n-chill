@@ -26,8 +26,7 @@ export function CostCodesConsole() {
 
   const [newCode, setNewCode] = useState("");
   const [newName, setNewName] = useState("");
-  const [newIsActive, setNewIsActive] = useState(true);
-  const [importCsvText, setImportCsvText] = useState("code,name,is_active\n");
+  const [importCsvText, setImportCsvText] = useState("code,name\n");
   const [importResult, setImportResult] = useState<CsvImportResult | null>(null);
   const selectedIdRef = useRef<string>("");
 
@@ -148,7 +147,7 @@ export function CostCodesConsole() {
         body: JSON.stringify({
           code: newCode.trim(),
           name: newName.trim(),
-          is_active: newIsActive,
+          is_active: true,
         }),
       });
       const payload: ApiResponse = await response.json();
@@ -162,7 +161,6 @@ export function CostCodesConsole() {
       hydrate(created);
       setNewCode("");
       setNewName("");
-      setNewIsActive(true);
       setSuccessStatus(`Created cost code #${created.id} (${created.code} - ${created.name}).`);
     } catch {
       setErrorStatus("Could not reach cost code create endpoint.");
@@ -373,25 +371,6 @@ export function CostCodesConsole() {
                     required
                   />
                 </label>
-                <div className={styles.field}>
-                  Active
-                  <div className={styles.segmentRow}>
-                    <button
-                      type="button"
-                      className={`${styles.segmentButton} ${newIsActive ? styles.segmentButtonActive : ""}`}
-                      onClick={() => setNewIsActive(true)}
-                    >
-                      Active
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.segmentButton} ${!newIsActive ? styles.segmentButtonActive : ""}`}
-                      onClick={() => setNewIsActive(false)}
-                    >
-                      Inactive
-                    </button>
-                  </div>
-                </div>
                 <div className={styles.buttonRow}>
                   <button type="submit" className={styles.primaryButton}>
                     Create
@@ -448,7 +427,7 @@ export function CostCodesConsole() {
             <section className={styles.panel}>
               <h3 className={styles.panelTitle}>CSV Import</h3>
               <p className={styles.importSummary}>
-                Headers: code,name,is_active. Existing code updates; unknown code creates.
+                Headers: code,name. Existing code updates names; unknown code creates active.
               </p>
               <label className={styles.field}>
                 CSV text
