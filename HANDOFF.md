@@ -5,50 +5,83 @@
 - Workspace: `/home/nick/bill_n_chill`
 - Branch: `main`
 - Upstream: `origin/main`
-- Active direction: Billing UX hardening (Invoices + Vendor Bills)
+- Latest pushed commit: `6c14e8a`
+- Active direction: public customer approval flows for Estimate / Change Order / Invoice
 
 ## What Is Stable Right Now
 
-### Invoices
+### Public Approval Endpoints
 
-- Invoices route no longer uses the old `Invoice Workspace (WIP)` wrapper.
-- Project selector remains in place (dashboard/list style), and composer is now full-width.
-- Invoice create uses shared `DocumentComposer` with an estimate-style visual structure:
-  - from/to + logo/title header
-  - invoice details block
-  - full-width line table
-  - add-line action + totals footer
-  - create action anchored in the sheet footer
-- Viewer now owns invoice lifecycle actions:
-  - `Invoice Status & Send` panel in viewer section
-  - estimate-style status-pill selector
-  - `Duplicate as New Invoice` (no family/revision behavior)
-- Sales tax input is retained in totals (explicitly kept configurable).
+- Estimate:
+  - `GET /api/v1/public/estimates/<token>/` (existing)
+  - `POST /api/v1/public/estimates/<token>/decision/` (new)
+  - Decision policy: only while `status == sent`, supports `approve` and `reject`.
+  - Approval path triggers the existing estimate->budget conversion logic.
 
-### Vendor Bills
+- Change Order:
+  - `GET /api/v1/public/change-orders/<token>/` (new)
+  - `POST /api/v1/public/change-orders/<token>/decision/` (new)
+  - Decision policy: only while `status == pending_approval`, supports `approve` and `reject`.
+  - Approval applies CO financial delta into project + active budget totals.
 
-- Added viewer-side lifecycle/recreate panel:
-  - `Bill Status & Recreate`
-  - next-status pill selector
-  - `Save Status`
-  - `Recreate as New Planned`
-- Removed duplicate/competing status controls from the edit form so lifecycle actions are centralized in viewer.
-- Added corresponding CSS for new viewer status panel with dark-theme treatment.
+- Invoice:
+  - `GET /api/v1/public/invoices/<token>/` (existing)
+  - `POST /api/v1/public/invoices/<token>/decision/` (new)
+  - Decision policy: only while `status in {sent, partially_paid, overdue}`.
+  - `approve` marks invoice as `paid`; `dispute` records note/audit event without status change.
 
-## Files Updated In This Checkpoint Window
+### Public Share Identity
 
-- `frontend/src/features/invoices/components/invoices-console.tsx`
-- `frontend/src/features/invoices/components/invoices-console.module.css`
-- `frontend/src/features/vendor-bills/components/vendor-bills-console.tsx`
-- `frontend/src/features/vendor-bills/components/vendor-bills-console.module.css`
+- Change orders now have `public_token` + derived `public_ref` (slug + token form).
+- Public CO page route added: `/change-order/[publicRef]`.
 
-## Validation
+### Public UI Coverage
 
-- Frontend typecheck: `cd frontend && npx tsc --noEmit`.
+- Estimate public preview now includes decision form (name/email/note + approve/reject).
+- Change order public preview page added with full CO review and approve/reject actions.
+- Invoice public preview now includes decision form (name/email/note + approve/dispute).
+- Internal CO viewer now includes `Open Public CO` link when `public_ref` exists.
 
-## Recommended Next Focus (Billing)
+### Auditability
 
-1. Continue in Vendor Bills first (agreed path): spacing/alignment parity pass and interaction polish.
-2. Decide whether Vendor Bills should adopt shared `DocumentComposer` now or after lifecycle UX settles.
-3. Add/confirm guardrails for duplicate naming/id constraints where applicable in billing flows.
-4. Run manual UX pass for both billing surfaces (desktop/mobile, light/dark) after each small CSS batch.
+- Public decisions are written as explicit lifecycle/audit notes and include optional decider metadata.
+- Conflict handling uses `409` when item is not awaiting customer decision.
+- Validation handling uses `400` for invalid decision payloads.
+
+## Validation Run
+
+- Backend tests:
+  - `backend/.venv/bin/python backend/manage.py test core.tests.test_estimates core.tests.test_change_orders core.tests.test_invoices --keepdb --noinput`
+  - Result: `123` tests passed.
+- Frontend lint (targeted public approval files): passed.
+
+## Files Touched For This Slice
+
+- Backend:
+  - `backend/core/views/estimating/estimates.py`
+  - `backend/core/views/change_orders/change_orders.py`
+  - `backend/core/views/accounts_receivable/invoices.py`
+  - `backend/core/urls.py`
+  - `backend/core/views/__init__.py`
+  - `backend/core/models/change_orders/change_order.py`
+  - `backend/core/serializers/change_orders.py`
+  - `backend/core/migrations/0010_changeorder_public_token.py`
+  - `backend/core/tests/test_estimates.py`
+  - `backend/core/tests/test_change_orders.py`
+  - `backend/core/tests/test_invoices.py`
+- Frontend:
+  - `frontend/src/features/estimates/components/estimate-approval-preview.tsx`
+  - `frontend/src/features/change-orders/components/change-order-public-preview.tsx`
+  - `frontend/src/features/change-orders/components/change-order-public-preview.module.css`
+  - `frontend/src/app/change-order/[publicRef]/page.tsx`
+  - `frontend/src/features/change-orders/components/change-orders-console.tsx`
+  - `frontend/src/features/change-orders/types.ts`
+  - `frontend/src/features/invoices/components/invoice-public-preview.tsx`
+  - `frontend/src/features/invoices/components/invoice-public-preview.module.css`
+
+## Known Gaps / Next Steps
+
+1. Add optional token hardening (expiry/revocation/rate limiting) for public links.
+2. Decide whether invoice public `approve => paid` is final policy or should create an intermediate "customer-approved" status.
+3. Add analytics/notification hooks around public decisions (webhook/email/slack).
+4. Run full manual QA pass on all public pages (desktop/mobile, light/dark, invalid token, already-decided states).
