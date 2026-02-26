@@ -1,4 +1,8 @@
 export { DocumentComposer } from "./document-composer";
+export {
+  resolveOrganizationBranding,
+  toAddressLines,
+} from "./organization-branding";
 export type {
   ComposerAction,
   ComposerLineDraft,
@@ -13,4 +17,5 @@ export type {
   DocumentComposerAdapter,
   DocumentComposerProps,
   DocumentKind,
+  OrganizationBrandingDefaults,
 } from "./types";

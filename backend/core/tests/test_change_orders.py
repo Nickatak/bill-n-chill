@@ -4,6 +4,10 @@ from django.core.exceptions import ValidationError
 
 from core.tests.common import *
 
+
+SYSTEM_BUDGET_LINE_CODES = {"99-901", "99-902", "99-903"}
+
+
 class ChangeOrderTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -61,6 +65,15 @@ class ChangeOrderTests(TestCase):
             created_by=self.other_user,
         )
         self.last_approved_estimate_by_project = {}
+
+    def _bootstrap_primary_membership(self):
+        response = self.client.post(
+            "/api/v1/auth/login/",
+            data={"email": "pm12@example.com", "password": "secret123"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        return OrganizationMembership.objects.select_related("organization").get(user=self.user)
 
     def _create_estimate(self, *, project_id: int, cost_code_id: int, token: str):
         response = self.client.post(
@@ -134,6 +147,15 @@ class ChangeOrderTests(TestCase):
         return BudgetLine.objects.filter(
             budget__project=self.project,
             budget__status=Budget.Status.ACTIVE,
+        ).exclude(
+            cost_code__code__in=SYSTEM_BUDGET_LINE_CODES,
+        ).order_by("id").first()
+
+    def _generic_budget_line(self):
+        return BudgetLine.objects.filter(
+            budget__project=self.project,
+            budget__status=Budget.Status.ACTIVE,
+            cost_code__code__in=SYSTEM_BUDGET_LINE_CODES,
         ).order_by("id").first()
 
     def _create_change_order(self, *, title="Owner requested upgraded finish", amount_delta="1500.00"):
@@ -193,6 +215,7 @@ class ChangeOrderTests(TestCase):
             payload["revision_rules"],
             {
                 "edit_latest_revision_only": True,
+                "edit_requires_draft_status": True,
                 "clone_requires_latest_revision": True,
                 "revision_gt_one_requires_previous_change_order": True,
                 "previous_change_order_must_match_project_family_and_prior_revision": True,
@@ -226,7 +249,11 @@ class ChangeOrderTests(TestCase):
                 "co_line_total_must_match_amount_delta": "Sum of line_items amount_delta must match change-order amount_delta.",
                 "co_line_duplicate_budget_line": "Each budget_line can appear at most once per change order.",
                 "co_line_budget_line_invalid": "Each budget_line must exist, match project, and come from active budget.",
+                "co_line_scope_budget_line_disallows_generic": "Scope lines cannot use internal generic budget lines.",
+                "co_line_adjustment_requires_reason": "Adjustment lines require adjustment_reason.",
+                "co_line_adjustment_requires_generic_budget_line": "Adjustment lines must use a generic system budget line.",
                 "co_edit_latest_revision_only": "Only latest revision in family can be edited.",
+                "co_edit_requires_draft_status": "Only draft change orders can edit content fields.",
                 "co_clone_requires_latest_revision": "Clone revision only from latest revision in family.",
                 "co_status_transition_not_allowed": "Status transition must match allowed_status_transitions.",
                 "co_approval_metadata_invariant": "approved_by/approved_at must match approved status invariants.",
@@ -294,6 +321,75 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(first.json()["data"]["family_key"], "1")
         self.assertEqual(second.json()["data"]["family_key"], "2")
         self.assertEqual(ChangeOrder.objects.count(), 2)
+
+    def test_change_order_create_uses_org_default_reason_when_payload_omits_reason(self):
+        membership = self._bootstrap_primary_membership()
+        membership.organization.change_order_default_reason = "Default org change-order reason."
+        membership.organization.save(update_fields=["change_order_default_reason", "updated_at"])
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/change-orders/",
+            data={
+                "title": "Missing reason payload",
+                "amount_delta": "500.00",
+                "days_delta": 1,
+                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["data"]["reason"], "Default org change-order reason.")
+
+    def test_change_order_create_allows_per_change_order_reason_override(self):
+        membership = self._bootstrap_primary_membership()
+        membership.organization.change_order_default_reason = "Template-owned change-order reason."
+        membership.organization.save(update_fields=["change_order_default_reason", "updated_at"])
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/change-orders/",
+            data={
+                "title": "Reason override honored",
+                "amount_delta": "500.00",
+                "days_delta": 1,
+                "reason": "User-provided reason should be honored",
+                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["data"]["reason"], "User-provided reason should be honored")
+
+    def test_change_order_patch_allows_reason_updates(self):
+        membership = self._bootstrap_primary_membership()
+        membership.organization.change_order_default_reason = "Template reason v1."
+        membership.organization.save(update_fields=["change_order_default_reason", "updated_at"])
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        co_id = self._create_change_order(title="Patch reason update")
+
+        response = self.client.patch(
+            f"/api/v1/change-orders/{co_id}/",
+            data={"reason": "Patch override accepted"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["reason"], "Patch override accepted")
 
     def test_change_order_create_rolls_back_when_audit_write_fails(self):
         self._create_active_budget(
@@ -553,6 +649,45 @@ class ChangeOrderTests(TestCase):
         )
         self._assert_validation_rule(blocked, "co_edit_latest_revision_only")
 
+    def test_change_order_patch_allows_non_latest_revision_status_update(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        base_id = self._create_change_order(amount_delta="800.00")
+        to_pending = self.client.patch(
+            f"/api/v1/change-orders/{base_id}/",
+            data={"status": "pending_approval"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_pending.status_code, 200)
+        to_rejected = self.client.patch(
+            f"/api/v1/change-orders/{base_id}/",
+            data={"status": "rejected"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_rejected.status_code, 200)
+
+        clone = self.client.post(
+            f"/api/v1/change-orders/{base_id}/clone-revision/",
+            data={},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(clone.status_code, 201)
+
+        non_latest_status_update = self.client.patch(
+            f"/api/v1/change-orders/{base_id}/",
+            data={"status": "void"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(non_latest_status_update.status_code, 200)
+        self.assertEqual(non_latest_status_update.json()["data"]["status"], "void")
+
     def test_change_order_patch_rejects_origin_estimate_change_or_clear(self):
         self._create_active_budget(
             project_id=self.project.id,
@@ -654,7 +789,140 @@ class ChangeOrderTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self._assert_validation_rule(cross_project_response, "co_line_budget_line_invalid")
-        self.assertIn("budget_line", cross_project_response.json()["error"]["fields"])
+
+    def test_change_order_line_scope_rejects_generic_budget_line(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        generic_budget_line = self._generic_budget_line()
+        self.assertIsNotNone(generic_budget_line)
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/change-orders/",
+            data={
+                "title": "Generic line used as scope",
+                "amount_delta": "100.00",
+                "days_delta": 1,
+                "reason": "Should fail",
+                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+                "line_items": [
+                    {
+                        "line_type": "scope",
+                        "budget_line": generic_budget_line.id,
+                        "description": "Invalid scope/generic linkage",
+                        "amount_delta": "100.00",
+                        "days_delta": 1,
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self._assert_validation_rule(response, "co_line_scope_budget_line_disallows_generic")
+
+    def test_change_order_line_adjustment_requires_reason(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        generic_budget_line = self._generic_budget_line()
+        self.assertIsNotNone(generic_budget_line)
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/change-orders/",
+            data={
+                "title": "Adjustment missing reason",
+                "amount_delta": "75.00",
+                "days_delta": 0,
+                "reason": "Should fail",
+                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+                "line_items": [
+                    {
+                        "line_type": "adjustment",
+                        "budget_line": generic_budget_line.id,
+                        "description": "Adjustment row",
+                        "adjustment_reason": "",
+                        "amount_delta": "75.00",
+                        "days_delta": 0,
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self._assert_validation_rule(response, "co_line_adjustment_requires_reason")
+
+    def test_change_order_line_adjustment_requires_generic_budget_line(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        scope_budget_line = self._active_budget_line()
+        self.assertIsNotNone(scope_budget_line)
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/change-orders/",
+            data={
+                "title": "Adjustment non-generic budget line",
+                "amount_delta": "60.00",
+                "days_delta": 0,
+                "reason": "Should fail",
+                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+                "line_items": [
+                    {
+                        "line_type": "adjustment",
+                        "budget_line": scope_budget_line.id,
+                        "description": "Invalid adjustment target",
+                        "adjustment_reason": "Rounding adjustment",
+                        "amount_delta": "60.00",
+                        "days_delta": 0,
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self._assert_validation_rule(response, "co_line_adjustment_requires_generic_budget_line")
+
+    def test_change_order_line_adjustment_allows_generic_budget_line_with_reason(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        generic_budget_line = self._generic_budget_line()
+        self.assertIsNotNone(generic_budget_line)
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/change-orders/",
+            data={
+                "title": "Valid adjustment line",
+                "amount_delta": "125.00",
+                "days_delta": 0,
+                "reason": "Valid adjustment flow",
+                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+                "line_items": [
+                    {
+                        "line_type": "adjustment",
+                        "budget_line": generic_budget_line.id,
+                        "description": "General correction",
+                        "adjustment_reason": "Reconciliation adjustment",
+                        "amount_delta": "125.00",
+                        "days_delta": 0,
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        line = response.json()["data"]["line_items"][0]
+        self.assertEqual(line["line_type"], "adjustment")
+        self.assertEqual(line["adjustment_reason"], "Reconciliation adjustment")
 
     def test_change_order_line_rejects_budget_line_from_non_active_budget(self):
         self._create_active_budget(
@@ -874,6 +1142,37 @@ class ChangeOrderTests(TestCase):
         )
         self._assert_validation_rule(invalid_after_approved, "co_status_transition_not_allowed")
 
+        invalid_void_after_approved = self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "void"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self._assert_validation_rule(invalid_void_after_approved, "co_status_transition_not_allowed")
+
+        rejected_co_id = self._create_change_order(amount_delta="300.00")
+        self.client.patch(
+            f"/api/v1/change-orders/{rejected_co_id}/",
+            data={"status": "pending_approval"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        to_rejected = self.client.patch(
+            f"/api/v1/change-orders/{rejected_co_id}/",
+            data={"status": "rejected"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_rejected.status_code, 200)
+
+        invalid_after_rejected = self.client.patch(
+            f"/api/v1/change-orders/{rejected_co_id}/",
+            data={"status": "draft"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self._assert_validation_rule(invalid_after_rejected, "co_status_transition_not_allowed")
+
     def test_pending_approval_resend_records_audit_event(self):
         self._create_active_budget(
             project_id=self.project.id,
@@ -906,6 +1205,117 @@ class ChangeOrderTests(TestCase):
             to_status=ChangeOrder.Status.PENDING_APPROVAL,
         ).latest("id")
         self.assertEqual(resend_event.note, "Change order re-sent for approval.")
+
+    def test_pending_approval_cannot_transition_back_to_draft(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        change_order_id = self._create_change_order(amount_delta="900.00")
+
+        to_pending = self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "pending_approval"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_pending.status_code, 200)
+
+        back_to_draft = self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "draft"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self._assert_validation_rule(back_to_draft, "co_status_transition_not_allowed")
+
+    def test_change_order_patch_rejects_content_edits_when_pending_approval(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+        change_order_id = self._create_change_order(amount_delta="900.00")
+
+        to_pending = self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "pending_approval"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_pending.status_code, 200)
+
+        blocked = self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"title": "Should be read-only after send"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self._assert_validation_rule(blocked, "co_edit_requires_draft_status")
+
+    def test_change_order_patch_rejects_content_edits_when_approved_rejected_or_void(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+
+        approved_id = self._create_change_order(title="Approved lock", amount_delta="900.00")
+        self.client.patch(
+            f"/api/v1/change-orders/{approved_id}/",
+            data={"status": "pending_approval"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.client.patch(
+            f"/api/v1/change-orders/{approved_id}/",
+            data={"status": "approved"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        approved_blocked = self.client.patch(
+            f"/api/v1/change-orders/{approved_id}/",
+            data={"reason": "Attempted post-approval edit"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self._assert_validation_rule(approved_blocked, "co_edit_requires_draft_status")
+
+        rejected_void_id = self._create_change_order(title="Rejected/void lock", amount_delta="450.00")
+        self.client.patch(
+            f"/api/v1/change-orders/{rejected_void_id}/",
+            data={"status": "pending_approval"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.client.patch(
+            f"/api/v1/change-orders/{rejected_void_id}/",
+            data={"status": "rejected"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        rejected_blocked = self.client.patch(
+            f"/api/v1/change-orders/{rejected_void_id}/",
+            data={"amount_delta": "500.00"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self._assert_validation_rule(rejected_blocked, "co_edit_requires_draft_status")
+
+        self.client.patch(
+            f"/api/v1/change-orders/{rejected_void_id}/",
+            data={"status": "void"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        void_blocked = self.client.patch(
+            f"/api/v1/change-orders/{rejected_void_id}/",
+            data={"title": "Attempted post-void edit"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self._assert_validation_rule(void_blocked, "co_edit_requires_draft_status")
 
     def test_change_order_clone_revision_requires_latest_revision(self):
         self._create_active_budget(
@@ -1202,7 +1612,7 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(str(self.project.contract_value_current), "101500.00")
         self.assertEqual(str(active_budget.approved_change_order_total), "1500.00")
 
-    def test_void_after_approved_reverses_financial_propagation(self):
+    def test_approved_change_order_cannot_transition_to_void_and_financials_remain(self):
         self._create_active_budget(
             project_id=self.project.id,
             cost_code_id=self.cost_code.id,
@@ -1229,25 +1639,24 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(to_void.status_code, 200)
-
-        void_snapshot = ChangeOrderSnapshot.objects.filter(
-            change_order_id=change_order_id,
-            decision_status=ChangeOrderSnapshot.DecisionStatus.VOID,
-        ).latest("id")
-        self.assertEqual(void_snapshot.snapshot_json["decision_context"]["previous_status"], "approved")
-        self.assertEqual(void_snapshot.snapshot_json["decision_context"]["applied_financial_delta"], "-1200.00")
+        self._assert_validation_rule(to_void, "co_status_transition_not_allowed")
 
         change_order_row = ChangeOrder.objects.get(id=change_order_id)
-        self.assertIsNone(change_order_row.approved_by_id)
-        self.assertIsNone(change_order_row.approved_at)
+        self.assertIsNotNone(change_order_row.approved_by_id)
+        self.assertIsNotNone(change_order_row.approved_at)
+        self.assertFalse(
+            ChangeOrderSnapshot.objects.filter(
+                change_order_id=change_order_id,
+                decision_status=ChangeOrderSnapshot.DecisionStatus.VOID,
+            ).exists()
+        )
 
         self.project.refresh_from_db()
         active_budget = self._active_budget()
-        self.assertEqual(str(self.project.contract_value_current), "100000.00")
-        self.assertEqual(str(active_budget.approved_change_order_total), "0.00")
+        self.assertEqual(str(self.project.contract_value_current), "101200.00")
+        self.assertEqual(str(active_budget.approved_change_order_total), "1200.00")
 
-    def test_updating_approved_change_order_amount_adjusts_financial_totals_by_delta(self):
+    def test_editing_approved_change_order_amount_is_blocked(self):
         self._create_active_budget(
             project_id=self.project.id,
             cost_code_id=self.cost_code.id,
@@ -1274,12 +1683,12 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(amount_update.status_code, 200)
+        self._assert_validation_rule(amount_update, "co_edit_requires_draft_status")
 
         self.project.refresh_from_db()
         active_budget = self._active_budget()
-        self.assertEqual(str(self.project.contract_value_current), "101000.00")
-        self.assertEqual(str(active_budget.approved_change_order_total), "1000.00")
+        self.assertEqual(str(self.project.contract_value_current), "100900.00")
+        self.assertEqual(str(active_budget.approved_change_order_total), "900.00")
 
     def test_approved_change_order_line_deltas_are_exposed_on_budget_lines(self):
         self._create_active_budget(
@@ -1335,7 +1744,7 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(line_payload["approved_change_order_delta"], "250.00")
         self.assertEqual(line_payload["current_working_amount"], "1250.00")
 
-    def test_void_or_edited_approved_change_order_updates_budget_line_coupling(self):
+    def test_editing_approved_change_order_line_coupling_and_void_are_blocked(self):
         self._create_active_budget(
             project_id=self.project.id,
             cost_code_id=self.cost_code.id,
@@ -1396,7 +1805,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(edit.status_code, 200)
+        self._assert_validation_rule(edit, "co_edit_requires_draft_status")
 
         mid_budgets_response = self.client.get(
             f"/api/v1/projects/{self.project.id}/budgets/",
@@ -1404,8 +1813,8 @@ class ChangeOrderTests(TestCase):
         )
         self.assertEqual(mid_budgets_response.status_code, 200)
         mid_line_payload = mid_budgets_response.json()["data"][0]["line_items"][0]
-        self.assertEqual(mid_line_payload["approved_change_order_delta"], "500.00")
-        self.assertEqual(mid_line_payload["current_working_amount"], "1500.00")
+        self.assertEqual(mid_line_payload["approved_change_order_delta"], "300.00")
+        self.assertEqual(mid_line_payload["current_working_amount"], "1300.00")
 
         void_response = self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
@@ -1413,7 +1822,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(void_response.status_code, 200)
+        self._assert_validation_rule(void_response, "co_status_transition_not_allowed")
 
         final_budgets_response = self.client.get(
             f"/api/v1/projects/{self.project.id}/budgets/",
@@ -1421,5 +1830,5 @@ class ChangeOrderTests(TestCase):
         )
         self.assertEqual(final_budgets_response.status_code, 200)
         final_line_payload = final_budgets_response.json()["data"][0]["line_items"][0]
-        self.assertIn(final_line_payload["approved_change_order_delta"], {"0", "0.00"})
-        self.assertEqual(final_line_payload["current_working_amount"], "1000.00")
+        self.assertEqual(final_line_payload["approved_change_order_delta"], "300.00")
+        self.assertEqual(final_line_payload["current_working_amount"], "1300.00")

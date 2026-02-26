@@ -1,3 +1,5 @@
+import type { OrganizationBrandingDefaults } from "@/shared/document-composer";
+
 export type UserData = { token?: string; email?: string };
 
 export type ProjectRecord = {
@@ -20,6 +22,13 @@ export type InvoiceRecord = {
   status: string;
   issue_date: string;
   due_date: string;
+  sender_name: string;
+  sender_email: string;
+  sender_address: string;
+  sender_logo_url: string;
+  terms_text: string;
+  footer_text: string;
+  notes_text: string;
   subtotal: string;
   tax_percent: string;
   tax_total: string;
@@ -28,6 +37,9 @@ export type InvoiceRecord = {
   line_items?: Array<{
     id: number;
     line_type: string;
+    budget_line: number | null;
+    budget_line_description?: string;
+    budget_line_cost_code?: string;
     cost_code: number | null;
     scope_item: number | null;
     adjustment_reason: string;
@@ -38,6 +50,25 @@ export type InvoiceRecord = {
     unit_price: string;
     line_total: string;
   }>;
+};
+
+export type InvoiceStatusEventRecord = {
+  id: number;
+  invoice: number;
+  from_status: string | null;
+  to_status: string;
+  note: string;
+  changed_by: number;
+  changed_by_email: string;
+  changed_at: string;
+};
+
+export type OrganizationInvoiceDefaults = OrganizationBrandingDefaults & {
+  id: number;
+  invoice_default_due_days: number;
+  invoice_default_terms: string;
+  invoice_default_footer: string;
+  invoice_default_notes: string;
 };
 
 export type InvoicePolicyContract = {
@@ -56,7 +87,10 @@ export type InvoicePolicyContract = {
 
 export type InvoiceLineInput = {
   localId: number;
-  costCodeId: string;
+  lineType: "scope" | "adjustment";
+  budgetLineId: string;
+  adjustmentReason: string;
+  internalNote: string;
   description: string;
   quantity: string;
   unit: string;
@@ -70,6 +104,10 @@ export type ApiResponse = {
     | CostCode[]
     | InvoiceRecord
     | InvoiceRecord[]
-    | InvoicePolicyContract;
+    | InvoiceStatusEventRecord[]
+    | InvoicePolicyContract
+    | {
+        organization?: OrganizationInvoiceDefaults;
+      };
   error?: { code?: string; message?: string };
 };

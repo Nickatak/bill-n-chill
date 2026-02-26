@@ -164,8 +164,8 @@
 .projectCellHeader {
   display: flex;
   align-items: flex-start;
-  justify-content: flex-start;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .projectLink {
@@ -181,6 +181,8 @@
   text-align: left;
   cursor: pointer;
   color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
 }
 
 .projectAccordionSummary {
@@ -299,8 +301,8 @@
   line-height: 1;
   font-size: 1rem;
   cursor: pointer;
-  margin-left: 10%;
-  align-self: center;
+  flex-shrink: 0;
+  align-self: flex-start;
 }
 
 .iconButton:hover {
@@ -309,13 +311,12 @@
 
 .projectStatusPill {
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 2px 7px;
   font-size: 0.72rem;
   line-height: 1.2;
   border: 1px solid transparent;
   white-space: nowrap;
-  min-width: 22px;
-  text-align: center;
+  text-align: left;
 }
 
 .projectStatusHeader {

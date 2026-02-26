@@ -1,6 +1,8 @@
 from unittest.mock import patch
+from datetime import timedelta
 
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from core.tests.common import *
 
@@ -40,6 +42,38 @@ class InvoiceTests(TestCase):
             is_active=True,
             created_by=self.user,
         )
+        self.estimate = Estimate.objects.create(
+            project=self.project,
+            version=1,
+            status=Estimate.Status.APPROVED,
+            title="Invoice Baseline",
+            created_by=self.user,
+        )
+        self.budget = Budget.objects.create(
+            project=self.project,
+            status=Budget.Status.ACTIVE,
+            source_estimate=self.estimate,
+            baseline_snapshot_json={},
+            created_by=self.user,
+        )
+        self.budget_line = BudgetLine.objects.create(
+            budget=self.budget,
+            cost_code=self.cost_code,
+            description="Invoice Progress Draw",
+            budget_amount="5000.00",
+        )
+        self.generic_cost_code = CostCode.objects.create(
+            code="99-901",
+            name="Project Tools & Consumables",
+            is_active=True,
+            created_by=self.user,
+        )
+        self.generic_budget_line = BudgetLine.objects.create(
+            budget=self.budget,
+            cost_code=self.generic_cost_code,
+            description="System: Project tools and consumables (non-client-billable)",
+            budget_amount="0.00",
+        )
 
         other_customer = Customer.objects.create(
             display_name="Owner J",
@@ -54,6 +88,32 @@ class InvoiceTests(TestCase):
             status=Project.Status.ACTIVE,
             created_by=self.other_user,
         )
+        self.other_cost_code = CostCode.objects.create(
+            code="40-401",
+            name="Other Invoice Cost Code",
+            is_active=True,
+            created_by=self.other_user,
+        )
+        self.other_estimate = Estimate.objects.create(
+            project=self.other_project,
+            version=1,
+            status=Estimate.Status.APPROVED,
+            title="Other Invoice Baseline",
+            created_by=self.other_user,
+        )
+        self.other_budget = Budget.objects.create(
+            project=self.other_project,
+            status=Budget.Status.ACTIVE,
+            source_estimate=self.other_estimate,
+            baseline_snapshot_json={},
+            created_by=self.other_user,
+        )
+        self.other_budget_line = BudgetLine.objects.create(
+            budget=self.other_budget,
+            cost_code=self.other_cost_code,
+            description="Other Invoice Draw",
+            budget_amount="5000.00",
+        )
 
     def _create_invoice(self):
         response = self.client.post(
@@ -64,7 +124,7 @@ class InvoiceTests(TestCase):
                 "tax_percent": "10.00",
                 "line_items": [
                     {
-                        "cost_code": self.cost_code.id,
+                        "budget_line": self.budget_line.id,
                         "description": "Progress draw",
                         "quantity": "2",
                         "unit": "phase",
@@ -113,7 +173,7 @@ class InvoiceTests(TestCase):
                 "tax_percent": "10.00",
                 "line_items": [
                     {
-                        "cost_code": self.cost_code.id,
+                        "budget_line": self.budget_line.id,
                         "description": "Progress draw",
                         "quantity": "2",
                         "unit": "phase",
@@ -139,6 +199,145 @@ class InvoiceTests(TestCase):
         self.assertIsNone(created_event.from_status)
         self.assertEqual(created_event.to_status, Invoice.Status.DRAFT)
 
+    def test_invoice_create_uses_organization_invoice_defaults_when_payload_omits_them(self):
+        organization = Organization.objects.create(
+            display_name="Invoice Defaults Org",
+            slug="invoice-defaults-org",
+            logo_url="https://example.com/logo-default.png",
+            invoice_sender_name="Nick Construction LLC",
+            invoice_sender_email="billing@nickco.example.com",
+            invoice_sender_address="100 Main St\nAustin, TX 78701",
+            invoice_default_due_days=45,
+            invoice_default_terms="Net 45. Late fee after due date.",
+            invoice_default_footer="Thanks for your business.",
+            invoice_default_notes="Please include invoice number with payment.",
+            created_by=self.user,
+        )
+        OrganizationMembership.objects.update_or_create(
+            user=self.user,
+            defaults={
+                "organization": organization,
+                "role": OrganizationMembership.Role.OWNER,
+                "status": OrganizationMembership.Status.ACTIVE,
+            },
+        )
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/invoices/",
+            data={
+                "line_items": [
+                    {
+                        "budget_line": self.budget_line.id,
+                        "description": "Defaulted invoice draw",
+                        "quantity": "1",
+                        "unit": "phase",
+                        "unit_price": "750.00",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["data"]
+        expected_issue_date = timezone.localdate().isoformat()
+        expected_due_date = (timezone.localdate() + timedelta(days=45)).isoformat()
+
+        self.assertEqual(payload["issue_date"], expected_issue_date)
+        self.assertEqual(payload["due_date"], expected_due_date)
+        self.assertEqual(payload["sender_name"], organization.invoice_sender_name)
+        self.assertEqual(payload["sender_email"], organization.invoice_sender_email)
+        self.assertEqual(payload["sender_address"], organization.invoice_sender_address)
+        self.assertEqual(payload["sender_logo_url"], organization.logo_url)
+        self.assertEqual(payload["terms_text"], organization.invoice_default_terms)
+        self.assertEqual(payload["footer_text"], organization.invoice_default_footer)
+        self.assertEqual(payload["notes_text"], organization.invoice_default_notes)
+
+    def test_invoice_create_allows_overriding_organization_invoice_defaults(self):
+        organization = Organization.objects.create(
+            display_name="Invoice Override Org",
+            slug="invoice-override-org",
+            logo_url="https://example.com/logo-org.png",
+            invoice_sender_name="Org Sender",
+            invoice_sender_email="ap@org.example.com",
+            invoice_sender_address="Org Address",
+            invoice_default_due_days=30,
+            invoice_default_terms="Org terms",
+            invoice_default_footer="Org footer",
+            invoice_default_notes="Org notes",
+            created_by=self.user,
+        )
+        OrganizationMembership.objects.update_or_create(
+            user=self.user,
+            defaults={
+                "organization": organization,
+                "role": OrganizationMembership.Role.OWNER,
+                "status": OrganizationMembership.Status.ACTIVE,
+            },
+        )
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/invoices/",
+            data={
+                "issue_date": "2026-02-20",
+                "due_date": "2026-03-05",
+                "sender_name": "Manual Sender",
+                "sender_email": "manual@sender.example.com",
+                "sender_address": "Manual Sender Address",
+                "sender_logo_url": "https://example.com/logo-manual.png",
+                "terms_text": "Manual terms",
+                "footer_text": "Manual footer",
+                "notes_text": "Manual notes",
+                "line_items": [
+                    {
+                        "budget_line": self.budget_line.id,
+                        "description": "Manual invoice draw",
+                        "quantity": "1",
+                        "unit": "phase",
+                        "unit_price": "500.00",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["data"]
+        self.assertEqual(payload["sender_name"], "Manual Sender")
+        self.assertEqual(payload["sender_email"], "manual@sender.example.com")
+        self.assertEqual(payload["sender_address"], "Manual Sender Address")
+        self.assertEqual(payload["sender_logo_url"], "https://example.com/logo-manual.png")
+        self.assertEqual(payload["terms_text"], "Manual terms")
+        self.assertEqual(payload["footer_text"], "Manual footer")
+        self.assertEqual(payload["notes_text"], "Manual notes")
+
+    def test_invoice_patch_updates_sender_and_template_fields(self):
+        invoice_id = self._create_invoice()
+
+        response = self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={
+                "sender_name": "Updated Sender",
+                "sender_email": "updated@sender.example.com",
+                "sender_address": "Updated Sender Address",
+                "sender_logo_url": "https://example.com/logo-updated.png",
+                "terms_text": "Updated terms",
+                "footer_text": "Updated footer",
+                "notes_text": "Updated notes",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        self.assertEqual(payload["sender_name"], "Updated Sender")
+        self.assertEqual(payload["sender_email"], "updated@sender.example.com")
+        self.assertEqual(payload["sender_address"], "Updated Sender Address")
+        self.assertEqual(payload["sender_logo_url"], "https://example.com/logo-updated.png")
+        self.assertEqual(payload["terms_text"], "Updated terms")
+        self.assertEqual(payload["footer_text"], "Updated footer")
+        self.assertEqual(payload["notes_text"], "Updated notes")
+
     def test_invoice_create_rounds_tax_half_up_to_cents(self):
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/invoices/",
@@ -148,7 +347,7 @@ class InvoiceTests(TestCase):
                 "tax_percent": "10.00",
                 "line_items": [
                     {
-                        "cost_code": self.cost_code.id,
+                        "budget_line": self.budget_line.id,
                         "description": "Tiny taxable draw",
                         "quantity": "1",
                         "unit": "ea",
@@ -180,7 +379,7 @@ class InvoiceTests(TestCase):
                         "tax_percent": "10.00",
                         "line_items": [
                             {
-                                "cost_code": self.cost_code.id,
+                                "budget_line": self.budget_line.id,
                                 "description": "Progress draw",
                                 "quantity": "2",
                                 "unit": "phase",
@@ -307,7 +506,7 @@ class InvoiceTests(TestCase):
             data={
                 "line_items": [
                     {
-                        "cost_code": self.cost_code.id,
+                        "budget_line": self.budget_line.id,
                         "description": "Updated draw",
                         "quantity": "3",
                         "unit": "phase",
@@ -404,7 +603,7 @@ class InvoiceTests(TestCase):
             data={
                 "line_items": [
                     {
-                        "cost_code": self.cost_code.id,
+                        "budget_line": self.budget_line.id,
                         "description": "Expanded draw",
                         "quantity": "3",
                         "unit": "phase",
@@ -423,7 +622,7 @@ class InvoiceTests(TestCase):
             data={
                 "line_items": [
                     {
-                        "cost_code": self.cost_code.id,
+                        "budget_line": self.budget_line.id,
                         "description": "Expanded draw",
                         "quantity": "3",
                         "unit": "phase",
@@ -489,6 +688,80 @@ class InvoiceTests(TestCase):
         payload = response.json()["data"]
         self.assertEqual(payload["line_items"][0]["line_type"], "adjustment")
         self.assertEqual(payload["line_items"][0]["adjustment_reason"], "mobilization")
+
+    def test_invoice_create_scope_line_requires_budget_line(self):
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/invoices/",
+            data={
+                "issue_date": "2026-02-13",
+                "due_date": "2026-03-15",
+                "line_items": [
+                    {
+                        "line_type": "scope",
+                        "description": "Scope draw missing budget attribution",
+                        "quantity": "1",
+                        "unit": "ea",
+                        "unit_price": "100.00",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "validation_error")
+        self.assertIn("line_items", payload["error"]["fields"])
+
+    def test_invoice_create_scope_line_rejects_budget_line_from_other_project(self):
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/invoices/",
+            data={
+                "issue_date": "2026-02-13",
+                "due_date": "2026-03-15",
+                "line_items": [
+                    {
+                        "line_type": "scope",
+                        "budget_line": self.other_budget_line.id,
+                        "description": "Scope draw with foreign budget line",
+                        "quantity": "1",
+                        "unit": "ea",
+                        "unit_price": "100.00",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "validation_error")
+        self.assertIn("budget_line", payload["error"]["fields"])
+
+    def test_invoice_create_scope_line_rejects_generic_budget_line(self):
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/invoices/",
+            data={
+                "issue_date": "2026-02-13",
+                "due_date": "2026-03-15",
+                "line_items": [
+                    {
+                        "line_type": "scope",
+                        "budget_line": self.generic_budget_line.id,
+                        "description": "Attempted generic billable scope",
+                        "quantity": "1",
+                        "unit": "ea",
+                        "unit_price": "100.00",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "validation_error")
+        self.assertIn("line_items", payload["error"]["fields"])
 
     def test_invoice_tax_only_patch_preserves_adjustment_line_metadata(self):
         create = self.client.post(

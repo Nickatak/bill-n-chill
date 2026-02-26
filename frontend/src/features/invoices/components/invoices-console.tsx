@@ -13,7 +13,6 @@ import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { hasAnyRole } from "../../session/rbac";
 import {
   ApiResponse,
-  CostCode,
   InvoiceLineInput,
   InvoicePolicyContract,
   InvoiceRecord,
@@ -21,8 +20,11 @@ import {
   OrganizationInvoiceDefaults,
   ProjectRecord,
 } from "../types";
-import { CostCodeCombobox } from "@/shared/components/cost-code-combobox";
 import { DocumentComposer } from "@/shared/document-composer";
+import {
+  resolveOrganizationBranding,
+  toAddressLines,
+} from "@/shared/document-composer";
 import {
   createInvoiceDocumentAdapter,
   InvoiceFormState,
@@ -33,6 +35,31 @@ import estimateStyles from "../../estimates/components/estimates-console.module.
 
 type StatusTone = "neutral" | "success" | "error";
 type ProjectStatusValue = "prospect" | "active" | "on_hold" | "completed" | "cancelled";
+type ProjectBudgetRecord = {
+  id: number;
+  status: string;
+  source_estimate: number | null;
+  source_estimate_version?: number | null;
+  baseline_snapshot_json?: {
+    estimate?: {
+      title?: string;
+    };
+  };
+  line_items?: Array<{
+    id: number;
+    scope_item: number | null;
+    cost_code_code: string;
+    description: string;
+  }>;
+};
+type BudgetLineOption = {
+  id: number;
+  scopeItemId: number | null;
+  costCodeCode: string;
+  description: string;
+  label: string;
+  groupLabel: string;
+};
 
 const INVOICE_STATUSES_FALLBACK = ["draft", "sent", "partially_paid", "paid", "overdue", "void"];
 
@@ -57,6 +84,7 @@ const INVOICE_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
 const INVOICE_DEFAULT_STATUS_FILTERS_FALLBACK = ["draft", "sent", "partially_paid", "overdue"];
 const INVOICE_TERMINAL_STATUSES_FALLBACK = ["paid", "void"];
 const DEFAULT_PROJECT_STATUS_FILTERS: ProjectStatusValue[] = ["active", "prospect"];
+const GENERIC_BUDGET_COST_CODES = new Set(["99-901", "99-902", "99-903"]);
 
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
@@ -84,10 +112,13 @@ function formatMoney(value: number): string {
   return value.toFixed(2);
 }
 
-function emptyLine(localId: number, defaultCostCodeId = ""): InvoiceLineInput {
+function emptyLine(localId: number, defaultBudgetLineId = ""): InvoiceLineInput {
   return {
     localId,
-    costCodeId: defaultCostCodeId,
+    lineType: "scope",
+    budgetLineId: defaultBudgetLineId,
+    adjustmentReason: "",
+    internalNote: "",
     description: "Invoice scope item",
     quantity: "1",
     unit: "ea",
@@ -185,6 +216,7 @@ function projectStatusLabel(statusValue: string): string {
 export function InvoicesConsole() {
   const { token, authMessage, role } = useSharedSessionAuth();
   const canMutateInvoices = hasAnyRole(role, ["owner", "pm", "bookkeeping"]);
+  const canEditInvoiceWorkspace = canMutateInvoices;
 
   const searchParams = useSearchParams();
   const scopedProjectIdParam = searchParams.get("project");
@@ -203,7 +235,7 @@ export function InvoicesConsole() {
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [costCodes, setCostCodes] = useState<CostCode[]>([]);
+  const [budgetLineOptions, setBudgetLineOptions] = useState<BudgetLineOption[]>([]);
 
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
   const [selectedInvoiceStatusEvents, setSelectedInvoiceStatusEvents] = useState<
@@ -243,6 +275,17 @@ export function InvoicesConsole() {
     () => invoices.find((invoice) => String(invoice.id) === selectedInvoiceId) ?? null,
     [invoices, selectedInvoiceId],
   );
+  const budgetLineById = useMemo(
+    () => new Map(budgetLineOptions.map((option) => [String(option.id), option])),
+    [budgetLineOptions],
+  );
+  const budgetLineGroups = useMemo(() => {
+    const next = new Map<string, BudgetLineOption[]>();
+    for (const option of budgetLineOptions) {
+      next.set(option.groupLabel, [...(next.get(option.groupLabel) ?? []), option]);
+    }
+    return [...next.entries()];
+  }, [budgetLineOptions]);
   const projectPageSize = 5;
   const projectNeedle = projectSearch.trim().toLowerCase();
   const filteredProjects = !projectNeedle
@@ -337,36 +380,33 @@ export function InvoicesConsole() {
         return;
       }
 
-      setNeutralStatus("Loading projects and cost codes...");
+      setNeutralStatus("Loading projects...");
       try {
-        const [projectsRes, codesRes, orgRes] = await Promise.all([
+        const [projectsRes, orgRes] = await Promise.all([
           fetch(`${normalizedBaseUrl}/projects/`, { headers: buildAuthHeaders(token) }),
-          fetch(`${normalizedBaseUrl}/cost-codes/`, { headers: buildAuthHeaders(token) }),
           fetch(`${normalizedBaseUrl}/organization/`, { headers: buildAuthHeaders(token) }),
         ]);
         const projectsPayload: ApiResponse = await projectsRes.json();
-        const codesPayload: ApiResponse = await codesRes.json();
         const orgPayload: ApiResponse = await orgRes.json();
 
-        if (!projectsRes.ok || !codesRes.ok) {
+        if (!projectsRes.ok) {
           setErrorStatus("Failed loading dependencies.");
           return;
         }
 
         const projectRows = (projectsPayload.data as ProjectRecord[]) ?? [];
-        const codeRows = (codesPayload.data as CostCode[]) ?? [];
         const organizationData = (
           orgPayload.data as { organization?: OrganizationInvoiceDefaults } | undefined
         )?.organization;
 
         setProjects(projectRows);
-        setCostCodes(codeRows);
         if (orgRes.ok && organizationData) {
+          const organizationBranding = resolveOrganizationBranding(organizationData);
           setOrganizationInvoiceDefaults(organizationData);
-          setSenderName(organizationData.invoice_sender_name || organizationData.display_name || "");
-          setSenderEmail(organizationData.invoice_sender_email || "");
-          setSenderAddress(organizationData.invoice_sender_address || "");
-          setSenderLogoUrl(organizationData.logo_url || "");
+          setSenderName(organizationBranding.senderName);
+          setSenderEmail(organizationBranding.senderEmail);
+          setSenderAddress(organizationBranding.senderAddress);
+          setSenderLogoUrl(organizationBranding.logoUrl);
           setTermsText(organizationData.invoice_default_terms || "");
           setFooterText(organizationData.invoice_default_footer || "");
           setNotesText(organizationData.invoice_default_notes || "");
@@ -385,11 +425,6 @@ export function InvoicesConsole() {
           }
           return projectRows[0] ? String(projectRows[0].id) : "";
         });
-
-        const defaultCostCodeId = codeRows[0] ? String(codeRows[0].id) : "";
-        setLineItems((current) =>
-          current.map((line) => (line.costCodeId ? line : { ...line, costCodeId: defaultCostCodeId })),
-        );
 
         if (!options?.keepStatusOnSuccess) {
           setStatusMessage("");
@@ -482,6 +517,51 @@ export function InvoicesConsole() {
     [normalizedBaseUrl, selectedProjectId, setErrorStatus, setNeutralStatus, token],
   );
 
+  const loadBudgetLineOptions = useCallback(
+    async (projectIdArg?: number) => {
+      const resolvedProjectId = projectIdArg ?? Number(selectedProjectId);
+      if (!token || !resolvedProjectId) {
+        setBudgetLineOptions([]);
+        return;
+      }
+      try {
+        const response = await fetch(`${normalizedBaseUrl}/projects/${resolvedProjectId}/budgets/`, {
+          headers: buildAuthHeaders(token),
+        });
+        const payload = (await response.json()) as { data?: ProjectBudgetRecord[] };
+        if (!response.ok) {
+          setBudgetLineOptions([]);
+          return;
+        }
+        const budgets = payload.data ?? [];
+        const activeBudget = budgets.find((row) => row.status === "active");
+        const estimateTitle = activeBudget?.baseline_snapshot_json?.estimate?.title?.trim();
+        const baseGroupLabel =
+          estimateTitle ||
+          (activeBudget?.source_estimate ? `Estimate #${activeBudget.source_estimate}` : "Estimate scope");
+        const groupLabel =
+          activeBudget?.source_estimate_version != null
+            ? `${baseGroupLabel} (v${activeBudget.source_estimate_version})`
+            : baseGroupLabel;
+        const options =
+          activeBudget?.line_items?.map((line) => ({
+            id: line.id,
+            scopeItemId: line.scope_item,
+            costCodeCode: line.cost_code_code,
+            description: line.description,
+            label: `${line.cost_code_code || "CC"} - ${line.description}`,
+            groupLabel,
+          }))
+            .filter((line) => !GENERIC_BUDGET_COST_CODES.has(line.costCodeCode))
+            ?? [];
+        setBudgetLineOptions(options);
+      } catch {
+        setBudgetLineOptions([]);
+      }
+    },
+    [normalizedBaseUrl, selectedProjectId, token],
+  );
+
   const loadInvoiceStatusEvents = useCallback(
     async (invoiceId: number) => {
       if (!token || !invoiceId) {
@@ -527,10 +607,12 @@ export function InvoicesConsole() {
     if (!token || !projectId) {
       setInvoices([]);
       setSelectedInvoiceId("");
+      setBudgetLineOptions([]);
       return;
     }
     void loadInvoices(projectId);
-  }, [loadInvoices, selectedProjectId, token]);
+    void loadBudgetLineOptions(projectId);
+  }, [loadBudgetLineOptions, loadInvoices, selectedProjectId, token]);
 
   useEffect(() => {
     setCurrentProjectPage(1);
@@ -603,9 +685,27 @@ export function InvoicesConsole() {
     void loadInvoiceStatusEvents(invoiceId);
   }, [loadInvoiceStatusEvents, selectedInvoiceId]);
 
+  useEffect(() => {
+    const defaultBudgetLineId = budgetLineOptions[0] ? String(budgetLineOptions[0].id) : "";
+    if (!defaultBudgetLineId) {
+      return;
+    }
+    setLineItems((current) =>
+      current.map((line) => {
+        if (line.lineType !== "scope") {
+          return line;
+        }
+        if (line.budgetLineId && budgetLineById.has(line.budgetLineId)) {
+          return line;
+        }
+        return { ...line, budgetLineId: defaultBudgetLineId };
+      }),
+    );
+  }, [budgetLineById, budgetLineOptions]);
+
   function addLineItem() {
-    const defaultCostCodeId = costCodes[0] ? String(costCodes[0].id) : "";
-    setLineItems((current) => [...current, emptyLine(nextLineId, defaultCostCodeId)]);
+    const defaultBudgetLineId = budgetLineOptions[0] ? String(budgetLineOptions[0].id) : "";
+    setLineItems((current) => [...current, emptyLine(nextLineId, defaultBudgetLineId)]);
     setNextLineId((value) => value + 1);
   }
 
@@ -648,24 +748,21 @@ export function InvoicesConsole() {
   }
 
   function resetCreateDraft() {
-    const defaultCostCodeId = costCodes[0] ? String(costCodes[0].id) : "";
+    const defaultBudgetLineId = budgetLineOptions[0] ? String(budgetLineOptions[0].id) : "";
     const nextIssueDate = todayIsoDate();
     const dueDays = organizationInvoiceDefaults?.invoice_default_due_days ?? 30;
+    const organizationBranding = resolveOrganizationBranding(organizationInvoiceDefaults);
     setIssueDate(nextIssueDate);
     setDueDate(dueDateFromIssueDate(nextIssueDate, dueDays));
-    setSenderName(
-      organizationInvoiceDefaults?.invoice_sender_name ||
-        organizationInvoiceDefaults?.display_name ||
-        "",
-    );
-    setSenderEmail(organizationInvoiceDefaults?.invoice_sender_email || "");
-    setSenderAddress(organizationInvoiceDefaults?.invoice_sender_address || "");
-    setSenderLogoUrl(organizationInvoiceDefaults?.logo_url || "");
+    setSenderName(organizationBranding.senderName);
+    setSenderEmail(organizationBranding.senderEmail);
+    setSenderAddress(organizationBranding.senderAddress);
+    setSenderLogoUrl(organizationBranding.logoUrl);
     setTermsText(organizationInvoiceDefaults?.invoice_default_terms || "");
     setFooterText(organizationInvoiceDefaults?.invoice_default_footer || "");
     setNotesText(organizationInvoiceDefaults?.invoice_default_notes || "");
     setTaxPercent("0");
-    setLineItems([emptyLine(1, defaultCostCodeId)]);
+    setLineItems([emptyLine(1, defaultBudgetLineId)]);
     setNextLineId(2);
   }
 
@@ -679,6 +776,18 @@ export function InvoicesConsole() {
     const projectId = Number(selectedProjectId);
     if (!projectId) {
       setErrorStatus("Select a project first.");
+      return;
+    }
+    if (lineItems.some((line) => line.lineType === "scope" && !line.budgetLineId)) {
+      setErrorStatus("Each scope line requires a project budget line.");
+      return;
+    }
+    if (
+      lineItems.some(
+        (line) => line.lineType === "adjustment" && !line.adjustmentReason.trim(),
+      )
+    ) {
+      setErrorStatus("Each adjustment line requires a reason.");
       return;
     }
 
@@ -798,19 +907,34 @@ export function InvoicesConsole() {
     }
 
     const duplicateSourceLines = selectedInvoice.line_items ?? [];
-    const fallbackCostCodeId = costCodes[0] ? String(costCodes[0].id) : "";
+    const fallbackBudgetLineId = budgetLineOptions[0] ? String(budgetLineOptions[0].id) : "";
     const nextDraftLines: InvoiceLineInput[] = duplicateSourceLines.length
-      ? duplicateSourceLines.map((line, index) => ({
-          localId: index + 1,
-          costCodeId: line.cost_code ? String(line.cost_code) : fallbackCostCodeId,
-          description: line.description || "Invoice scope item",
-          quantity: line.quantity || "1",
-          unit: line.unit || "ea",
-          unitPrice: line.unit_price || "0",
-        }))
-      : [emptyLine(1, fallbackCostCodeId)];
+      ? duplicateSourceLines.map((line, index) => {
+          const lineType: InvoiceLineInput["lineType"] =
+            line.line_type === "adjustment" ? "adjustment" : "scope";
+          const rawBudgetLineId = line.budget_line ? String(line.budget_line) : "";
+          const budgetLineId =
+            lineType === "scope"
+              ? budgetLineById.has(rawBudgetLineId)
+                ? rawBudgetLineId
+                : fallbackBudgetLineId
+              : "";
+          return {
+            localId: index + 1,
+            lineType,
+            budgetLineId,
+            adjustmentReason: line.adjustment_reason || "",
+            internalNote: line.internal_note || "",
+            description: line.description || "Invoice scope item",
+            quantity: line.quantity || "1",
+            unit: line.unit || "ea",
+            unitPrice: line.unit_price || "0",
+          };
+        })
+      : [emptyLine(1, fallbackBudgetLineId)];
 
     const nextIssueDate = todayIsoDate();
+    const organizationBranding = resolveOrganizationBranding(organizationInvoiceDefaults);
     setIssueDate(nextIssueDate);
     setDueDate(
       selectedInvoice.due_date ||
@@ -821,17 +945,16 @@ export function InvoicesConsole() {
     );
     setSenderName(
       selectedInvoice.sender_name ||
-        organizationInvoiceDefaults?.invoice_sender_name ||
-        organizationInvoiceDefaults?.display_name ||
+        organizationBranding.senderName ||
         "",
     );
     setSenderEmail(
-      selectedInvoice.sender_email || organizationInvoiceDefaults?.invoice_sender_email || "",
+      selectedInvoice.sender_email || organizationBranding.senderEmail || "",
     );
     setSenderAddress(
-      selectedInvoice.sender_address || organizationInvoiceDefaults?.invoice_sender_address || "",
+      selectedInvoice.sender_address || organizationBranding.senderAddress || "",
     );
-    setSenderLogoUrl(selectedInvoice.sender_logo_url || organizationInvoiceDefaults?.logo_url || "");
+    setSenderLogoUrl(selectedInvoice.sender_logo_url || organizationBranding.logoUrl || "");
     setTermsText(selectedInvoice.terms_text || organizationInvoiceDefaults?.invoice_default_terms || "");
     setFooterText(
       selectedInvoice.footer_text || organizationInvoiceDefaults?.invoice_default_footer || "",
@@ -844,6 +967,12 @@ export function InvoicesConsole() {
   }
 
   const selectedProject = projects.find((project) => String(project.id) === selectedProjectId) ?? null;
+  const senderDisplayName = (
+    senderName ||
+    organizationInvoiceDefaults?.display_name ||
+    "Your Company"
+  ).trim();
+  const senderAddressLines = useMemo(() => toAddressLines(senderAddress), [senderAddress]);
   const invoiceComposerStatusPolicy = useMemo(
     () =>
       toInvoiceStatusPolicy({
@@ -1150,19 +1279,24 @@ export function InvoicesConsole() {
 
                 {selectedInvoice ? (
                   <>
-                    <div className={styles.viewerStatusActions}>
-                      <button
-                        type="button"
-                        className={styles.secondaryButton}
-                        onClick={handleDuplicateInvoiceIntoDraft}
-                        disabled={!canMutateInvoices}
-                      >
-                        Duplicate as New Invoice
-                      </button>
+                    {canMutateInvoices ? (
+                      <div className={styles.viewerStatusActions}>
+                        <button
+                          type="button"
+                          className={styles.secondaryButton}
+                          onClick={handleDuplicateInvoiceIntoDraft}
+                        >
+                          Duplicate as New Invoice
+                        </button>
+                        <p className={styles.inlineHint}>
+                          Invoices do not use revision families. Duplicate always creates a new invoice #.
+                        </p>
+                      </div>
+                    ) : (
                       <p className={styles.inlineHint}>
-                        Invoices do not use revision families. Duplicate always creates a new invoice #.
+                        Status and duplication actions are read-only for your role.
                       </p>
-                    </div>
+                    )}
 
                     <div className={styles.selectedInvoiceSummary}>
                       <span className={`${styles.statusBadge} ${invoiceStatusClass(selectedInvoice.status)}`}>
@@ -1215,73 +1349,79 @@ export function InvoicesConsole() {
                       )}
                     </section>
 
-                    <div className={styles.statusPicker}>
-                      <span className={styles.lifecycleFieldLabel}>Next status</span>
-                      <div className={styles.statusPills}>
-                        {nextStatusOptions.map((status) => {
-                          const isSelected = selectedStatus === status;
-                          return (
+                    {canMutateInvoices ? (
+                      <>
+                        <div className={styles.statusPicker}>
+                          <span className={styles.lifecycleFieldLabel}>Next status</span>
+                          <div className={styles.statusPills}>
+                            {nextStatusOptions.map((status) => {
+                              const isSelected = selectedStatus === status;
+                              return (
+                                <button
+                                  key={status}
+                                  type="button"
+                                  className={`${styles.statusPill} ${
+                                    isSelected
+                                      ? `${styles.statusPillActive} ${invoiceStatusToneClass(status)}`
+                                      : styles.statusPillInactive
+                                  }`}
+                                  onClick={() => setSelectedStatus(status)}
+                                  aria-pressed={isSelected}
+                                >
+                                  {selectedInvoice.status === "sent" && status === "sent"
+                                    ? "Re-send"
+                                    : statusLabel(status)}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        {!nextStatusOptions.length ? (
+                          <p className={styles.inlineHint}>No next statuses available for this invoice.</p>
+                        ) : null}
+
+                        <label className={styles.toggleRow}>
+                          <input
+                            type="checkbox"
+                            checked={scopeOverride}
+                            onChange={(event) => setScopeOverride(event.target.checked)}
+                            className={styles.invoiceLockableControl}
+                          />
+                          <span>Allow unapproved scope billing</span>
+                        </label>
+
+                        {scopeOverride ? (
+                          <label className={styles.field}>
+                            <span>Override audit note</span>
+                            <textarea
+                              value={scopeOverrideNote}
+                              onChange={(event) => setScopeOverrideNote(event.target.value)}
+                              placeholder="Required when override is enabled and invoice exceeds approved scope."
+                              className={styles.invoiceLockableControl}
+                            />
+                          </label>
+                        ) : null}
+
+                        <div className={styles.buttonRow}>
+                          {nextStatusOptions.length ? (
                             <button
-                              key={status}
                               type="button"
-                              className={`${styles.statusPill} ${
-                                isSelected
-                                  ? `${styles.statusPillActive} ${invoiceStatusToneClass(status)}`
-                                  : styles.statusPillInactive
-                              }`}
-                              onClick={() => setSelectedStatus(status)}
-                              aria-pressed={isSelected}
+                              className={styles.secondaryButton}
+                              onClick={handleUpdateInvoiceStatus}
                             >
-                              {selectedInvoice.status === "sent" && status === "sent"
-                                ? "Re-send"
-                                : statusLabel(status)}
+                              Save Status
                             </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    {!nextStatusOptions.length ? (
-                      <p className={styles.inlineHint}>No next statuses available for this invoice.</p>
+                          ) : null}
+                          <button
+                            type="button"
+                            className={styles.primaryButton}
+                            onClick={handleSendInvoice}
+                          >
+                            Send Invoice
+                          </button>
+                        </div>
+                      </>
                     ) : null}
-
-                    <label className={styles.toggleRow}>
-                      <input
-                        type="checkbox"
-                        checked={scopeOverride}
-                        onChange={(event) => setScopeOverride(event.target.checked)}
-                      />
-                      <span>Allow unapproved scope billing</span>
-                    </label>
-
-                    {scopeOverride ? (
-                      <label className={styles.field}>
-                        <span>Override audit note</span>
-                        <textarea
-                          value={scopeOverrideNote}
-                          onChange={(event) => setScopeOverrideNote(event.target.value)}
-                          placeholder="Required when override is enabled and invoice exceeds approved scope."
-                        />
-                      </label>
-                    ) : null}
-
-                    <div className={styles.buttonRow}>
-                      <button
-                        type="button"
-                        className={styles.secondaryButton}
-                        onClick={handleUpdateInvoiceStatus}
-                        disabled={!canMutateInvoices || !nextStatusOptions.length}
-                      >
-                        Save Status
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.primaryButton}
-                        onClick={handleSendInvoice}
-                        disabled={!canMutateInvoices}
-                      >
-                        Send Invoice
-                      </button>
-                    </div>
                   </>
                 ) : (
                   <p className={styles.emptyState}>Select an invoice from the project rail to manage status and send operations.</p>
@@ -1294,7 +1434,7 @@ export function InvoicesConsole() {
                 adapter={invoiceComposerAdapter}
                 document={null}
                 formState={invoiceDraftFormState}
-                className={`${estimateStyles.sheet} ${styles.invoiceComposerSheet}`}
+                className={`${estimateStyles.sheet} ${styles.invoiceComposerSheet} ${!canEditInvoiceWorkspace ? styles.invoiceComposerSheetLocked : ""}`}
                 sectionClassName={styles.invoiceComposerSection}
                 onSubmit={handleCreateInvoice}
                 sections={[{ slot: "context" }]}
@@ -1306,19 +1446,21 @@ export function InvoicesConsole() {
                           <div className={estimateStyles.fromBlock}>
                             <span className={estimateStyles.blockLabel}>From</span>
                             <p className={estimateStyles.blockText}>
-                              {senderName || organizationInvoiceDefaults?.display_name || "Your Company"}
+                              {senderDisplayName}
                             </p>
                             {senderEmail ? (
                               <p className={estimateStyles.blockMuted}>{senderEmail}</p>
                             ) : null}
-                            {senderAddress
-                              ? senderAddress.split("\n").map((line, index) => (
+                            {senderAddressLines.length
+                              ? senderAddressLines.map((line, index) => (
                                   <p key={`${line}-${index}`} className={estimateStyles.blockMuted}>
                                     {line}
                                   </p>
                                 ))
                               : (
-                                <p className={estimateStyles.blockMuted}>Set sender address in Org settings</p>
+                                <p className={estimateStyles.blockMuted}>
+                                  Set sender address in Organization settings.
+                                </p>
                               )}
                           </div>
                           <div className={estimateStyles.toBlock}>
@@ -1357,44 +1499,44 @@ export function InvoicesConsole() {
                           <label className={estimateStyles.inlineField}>
                             Issue date
                             <input
-                              className={estimateStyles.fieldInput}
+                              className={`${estimateStyles.fieldInput} ${styles.invoiceLockableControl}`}
                               type="date"
                               value={issueDate}
                               onChange={(event) => setIssueDate(event.target.value)}
                               required
-                              disabled={!canMutateInvoices}
+                              disabled={!canEditInvoiceWorkspace}
                             />
                           </label>
                           <label className={estimateStyles.inlineField}>
                             Due date
                             <input
-                              className={estimateStyles.fieldInput}
+                              className={`${estimateStyles.fieldInput} ${styles.invoiceLockableControl}`}
                               type="date"
                               value={dueDate}
                               onChange={(event) => setDueDate(event.target.value)}
                               required
-                              disabled={!canMutateInvoices}
+                              disabled={!canEditInvoiceWorkspace}
                             />
                           </label>
                           <label className={estimateStyles.inlineField}>
-                            Sender name
+                            Organization sender name
                             <input
-                              className={estimateStyles.fieldInput}
+                              className={`${estimateStyles.fieldInput} ${styles.invoiceLockableControl}`}
                               value={senderName}
                               onChange={(event) => setSenderName(event.target.value)}
                               placeholder="Your company name"
-                              disabled={!canMutateInvoices}
+                              disabled={!canEditInvoiceWorkspace}
                             />
                           </label>
                           <label className={estimateStyles.inlineField}>
-                            Sender email
+                            Organization sender email
                             <input
-                              className={estimateStyles.fieldInput}
+                              className={`${estimateStyles.fieldInput} ${styles.invoiceLockableControl}`}
                               type="email"
                               value={senderEmail}
                               onChange={(event) => setSenderEmail(event.target.value)}
                               placeholder="billing@example.com"
-                              disabled={!canMutateInvoices}
+                              disabled={!canEditInvoiceWorkspace}
                             />
                           </label>
                         </div>
@@ -1402,69 +1544,84 @@ export function InvoicesConsole() {
 
                       <div className={styles.invoiceTemplateGrid}>
                         <label className={styles.invoiceTemplateField}>
-                          <span>Sender address</span>
+                          <span>Organization sender address</span>
                           <textarea
+                            className={styles.invoiceLockableControl}
                             value={senderAddress}
                             onChange={(event) => setSenderAddress(event.target.value)}
                             rows={3}
                             placeholder="Street, city, state, ZIP"
-                            disabled={!canMutateInvoices}
+                            disabled={!canEditInvoiceWorkspace}
                           />
                         </label>
                         <label className={styles.invoiceTemplateField}>
-                          <span>Logo URL</span>
+                          <span>Organization logo URL</span>
                           <input
+                            className={styles.invoiceLockableControl}
                             value={senderLogoUrl}
                             onChange={(event) => setSenderLogoUrl(event.target.value)}
                             placeholder="https://example.com/logo.png"
-                            disabled={!canMutateInvoices}
+                            disabled={!canEditInvoiceWorkspace}
                           />
                         </label>
                         <label className={styles.invoiceTemplateField}>
                           <span>Default notes</span>
                           <textarea
+                            className={styles.invoiceLockableControl}
                             value={notesText}
                             onChange={(event) => setNotesText(event.target.value)}
                             rows={3}
                             placeholder="Optional billing notes shown on invoice"
-                            disabled={!canMutateInvoices}
+                            disabled={!canEditInvoiceWorkspace}
                           />
                         </label>
                         <label className={styles.invoiceTemplateField}>
                           <span>Terms</span>
                           <textarea
+                            className={styles.invoiceLockableControl}
                             value={termsText}
                             onChange={(event) => setTermsText(event.target.value)}
                             rows={3}
                             placeholder="Payment terms"
-                            disabled={!canMutateInvoices}
+                            disabled={!canEditInvoiceWorkspace}
                           />
                         </label>
                         <label className={styles.invoiceTemplateField}>
                           <span>Footer</span>
                           <textarea
+                            className={styles.invoiceLockableControl}
                             value={footerText}
                             onChange={(event) => setFooterText(event.target.value)}
                             rows={3}
                             placeholder="Footer message"
-                            disabled={!canMutateInvoices}
+                            disabled={!canEditInvoiceWorkspace}
                           />
                         </label>
                       </div>
+                      <p className={estimateStyles.inlineHint}>
+                        Sender fields are prefilled from Organization settings and can be overridden per invoice.
+                      </p>
 
                       <div className={styles.invoiceLineSectionIntro}>
                         <h3>Line Items</h3>
                       </div>
+                      {budgetLineOptions.length === 0 ? (
+                        <p className={estimateStyles.inlineHint}>
+                          Scope lines require an active project budget line. Convert an approved estimate to budget or
+                          use adjustment lines with a reason. Internal generic lines are not billable here.
+                        </p>
+                      ) : null}
 
                       <div className={estimateStyles.lineTable}>
                         <div className={styles.invoiceLineHeader}>
+                          <span>Type</span>
+                          <span>Scope source / Reason</span>
                           <span>Qty</span>
                           <span>Description</span>
-                          <span>Cost code</span>
                           <span>Unit</span>
                           <span>Unit price</span>
                           <span>Amount</span>
-                          <span>Actions</span>
+                          <span>{canEditInvoiceWorkspace ? "Actions" : ""}</span>
                         </div>
                         {lineItems.map((line, index) => {
                           const lineAmount = parseAmount(line.quantity) * parseAmount(line.unitPrice);
@@ -1473,82 +1630,121 @@ export function InvoicesConsole() {
                               key={line.localId}
                               className={`${styles.invoiceLineRow} ${index % 2 === 1 ? styles.invoiceLineRowAlt : ""}`}
                             >
+                              <select
+                                className={`${estimateStyles.lineInput} ${styles.invoiceLockableControl}`}
+                                value={line.lineType}
+                                onChange={(event) =>
+                                  updateLineItem(
+                                    line.localId,
+                                    "lineType",
+                                    event.target.value as InvoiceLineInput["lineType"],
+                                  )
+                                }
+                                disabled={!canEditInvoiceWorkspace}
+                              >
+                                <option value="scope">Scope</option>
+                                <option value="adjustment">Adjustment</option>
+                              </select>
+                              {line.lineType === "scope" ? (
+                                <select
+                                  className={`${estimateStyles.lineInput} ${styles.invoiceLockableControl}`}
+                                  value={line.budgetLineId}
+                                  onChange={(event) =>
+                                    updateLineItem(line.localId, "budgetLineId", event.target.value)
+                                  }
+                                  required
+                                  disabled={!canEditInvoiceWorkspace}
+                                >
+                                  <option value="">Select budget line</option>
+                                  {budgetLineGroups.map(([groupLabel, options]) => (
+                                    <optgroup key={groupLabel} label={groupLabel}>
+                                      {options.map((option) => (
+                                        <option key={option.id} value={option.id}>
+                                          {option.label}
+                                        </option>
+                                      ))}
+                                    </optgroup>
+                                  ))}
+                                </select>
+                              ) : (
+                                <input
+                                  className={`${estimateStyles.lineInput} ${styles.invoiceLockableControl}`}
+                                  value={line.adjustmentReason}
+                                  onChange={(event) =>
+                                    updateLineItem(line.localId, "adjustmentReason", event.target.value)
+                                  }
+                                  placeholder="Adjustment reason"
+                                  required
+                                  disabled={!canEditInvoiceWorkspace}
+                                />
+                              )}
                               <input
-                                className={estimateStyles.lineInput}
+                                className={`${estimateStyles.lineInput} ${styles.invoiceLockableControl}`}
                                 value={line.quantity}
                                 onChange={(event) =>
                                   updateLineItem(line.localId, "quantity", event.target.value)
                                 }
                                 inputMode="decimal"
                                 required
-                                disabled={!canMutateInvoices}
+                                disabled={!canEditInvoiceWorkspace}
                               />
                               <input
-                                className={estimateStyles.lineInput}
+                                className={`${estimateStyles.lineInput} ${styles.invoiceLockableControl}`}
                                 value={line.description}
                                 onChange={(event) =>
                                   updateLineItem(line.localId, "description", event.target.value)
                                 }
                                 required
-                                disabled={!canMutateInvoices}
+                                disabled={!canEditInvoiceWorkspace}
                               />
-                              <div className={styles.invoiceLineCostCodeCell}>
-                                <CostCodeCombobox
-                                  costCodes={costCodes}
-                                  value={line.costCodeId}
-                                  onChange={(nextValue) =>
-                                    updateLineItem(line.localId, "costCodeId", nextValue)
-                                  }
-                                  ariaLabel="Cost code"
-                                  allowEmptySelection
-                                  emptySelectionLabel="No cost code"
-                                  placeholder="Search cost code"
-                                  disabled={!canMutateInvoices}
-                                />
-                              </div>
                               <input
-                                className={estimateStyles.lineInput}
+                                className={`${estimateStyles.lineInput} ${styles.invoiceLockableControl}`}
                                 value={line.unit}
                                 onChange={(event) => updateLineItem(line.localId, "unit", event.target.value)}
                                 required
-                                disabled={!canMutateInvoices}
+                                disabled={!canEditInvoiceWorkspace}
                               />
                               <input
-                                className={estimateStyles.lineInput}
+                                className={`${estimateStyles.lineInput} ${styles.invoiceLockableControl}`}
                                 value={line.unitPrice}
                                 onChange={(event) =>
                                   updateLineItem(line.localId, "unitPrice", event.target.value)
                                 }
                                 inputMode="decimal"
                                 required
-                                disabled={!canMutateInvoices}
+                                disabled={!canEditInvoiceWorkspace}
                               />
-                              <span className={estimateStyles.amountCell}>${formatMoney(lineAmount)}</span>
+                              <span className={`${estimateStyles.amountCell} ${styles.invoiceReadAmount}`}>
+                                ${formatMoney(lineAmount)}
+                              </span>
                               <div className={styles.invoiceLineActionsCell}>
-                                <button
-                                  type="button"
-                                  className={estimateStyles.smallButton}
-                                  onClick={() => removeLineItem(line.localId)}
-                                  disabled={lineItems.length <= 1 || !canMutateInvoices}
-                                >
-                                  Remove
-                                </button>
+                                {canEditInvoiceWorkspace ? (
+                                  <button
+                                    type="button"
+                                    className={estimateStyles.smallButton}
+                                    onClick={() => removeLineItem(line.localId)}
+                                    disabled={lineItems.length <= 1}
+                                  >
+                                    Remove
+                                  </button>
+                                ) : null}
                               </div>
                             </div>
                           );
                         })}
                       </div>
 
-                      <div className={styles.invoiceLineActions}>
-                        <button
-                          type="button"
-                          className={estimateStyles.secondaryButton}
-                          onClick={addLineItem}
-                          disabled={!canMutateInvoices}
-                        >
-                          Add Line Item
-                        </button>
-                      </div>
+                      {canEditInvoiceWorkspace ? (
+                        <div className={styles.invoiceLineActions}>
+                          <button
+                            type="button"
+                            className={estimateStyles.secondaryButton}
+                            onClick={addLineItem}
+                          >
+                            Add Line Item
+                          </button>
+                        </div>
+                      ) : null}
 
                       {!selectedProjectId ? (
                         <p className={estimateStyles.inlineHint}>Select a project before creating an invoice.</p>
@@ -1565,11 +1761,11 @@ export function InvoicesConsole() {
                             <span className={estimateStyles.summaryTaxLine}>
                               <label className={estimateStyles.summaryTaxRate}>
                                 <input
-                                  className={estimateStyles.summaryTaxInput}
+                                  className={`${estimateStyles.summaryTaxInput} ${styles.invoiceLockableControl}`}
                                   value={taxPercent}
                                   onChange={(event) => setTaxPercent(event.target.value)}
                                   inputMode="decimal"
-                                  disabled={!canMutateInvoices}
+                                  disabled={!canEditInvoiceWorkspace}
                                 />
                                 <span className={estimateStyles.summaryTaxSuffix}>%</span>
                               </label>
@@ -1583,15 +1779,17 @@ export function InvoicesConsole() {
                             <strong>${formatMoney(draftTotal)}</strong>
                           </div>
                         </div>
-                        <div className={styles.invoiceCreateActions}>
-                          <button
-                            type="submit"
-                            className={estimateStyles.primaryButton}
-                            disabled={!selectedProjectId || !canMutateInvoices}
-                          >
-                            Create Invoice
-                          </button>
-                        </div>
+                        {canEditInvoiceWorkspace ? (
+                          <div className={styles.invoiceCreateActions}>
+                            <button
+                              type="submit"
+                              className={estimateStyles.primaryButton}
+                              disabled={!selectedProjectId}
+                            >
+                              Create Invoice
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                     </>
                   ),

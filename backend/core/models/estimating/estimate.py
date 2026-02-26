@@ -74,6 +74,7 @@ class Estimate(models.Model):
     )
     title = models.CharField(max_length=255, blank=True)
     valid_through = models.DateField(null=True, blank=True)
+    terms_text = models.TextField(blank=True, default="")
     public_token = models.CharField(max_length=24, unique=True, blank=True, default="")
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     markup_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)

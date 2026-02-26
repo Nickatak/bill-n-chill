@@ -25,7 +25,7 @@ import {
   EstimateStatusEventRecord,
   ProjectRecord,
 } from "../types";
-import { EstimateSheet } from "./estimate-sheet";
+import { EstimateSheet, OrganizationDocumentDefaults } from "./estimate-sheet";
 
 type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amount";
 type EstimateStatusValue = string;
@@ -127,6 +127,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [costCodes, setCostCodes] = useState<CostCode[]>([]);
+  const [organizationDefaults, setOrganizationDefaults] =
+    useState<OrganizationDocumentDefaults | null>(null);
 
   const [estimates, setEstimates] = useState<EstimateRecord[]>([]);
   const [selectedEstimateId, setSelectedEstimateId] = useState("");
@@ -145,6 +147,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const [statusNote, setStatusNote] = useState("");
   const [statusEvents, setStatusEvents] = useState<EstimateStatusEventRecord[]>([]);
   const [estimateTitle, setEstimateTitle] = useState("Initial Estimate");
+  const [termsText, setTermsText] = useState("");
   const [taxPercent, setTaxPercent] = useState("0");
   const [lineItems, setLineItems] = useState<EstimateLineInput[]>([emptyLine(1)]);
   const [lineSortKey, setLineSortKey] = useState<LineSortKey | null>(null);
@@ -443,7 +446,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   }
 
   const loadEstimateIntoForm = useCallback((estimate: EstimateRecord) => {
+    const estimateTerms = (estimate.terms_text || "").trim();
     setEstimateTitle(estimate.title || "Untitled");
+    setTermsText(estimateTerms || organizationDefaults?.estimate_default_terms || "");
     setTaxPercent(String(estimate.tax_percent ?? "0"));
     setValidThrough(estimate.valid_through ?? "");
     const mapped = mapEstimateLineItemsToInputs(estimate.line_items ?? []);
@@ -453,7 +458,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     if (createdDate) {
       setEstimateDate(createdDate);
     }
-  }, []);
+  }, [organizationDefaults?.estimate_default_terms]);
 
   const handleSelectEstimate = useCallback((estimate: EstimateRecord) => {
     const nextEstimateId = String(estimate.id);
@@ -489,6 +494,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setStatusNote("");
     setStatusEvents([]);
     setEstimateTitle("New Estimate");
+    setTermsText(organizationDefaults?.estimate_default_terms || "");
     setTaxPercent("0");
     setLineItems([emptyLine(1, defaultCostCodeId)]);
     setLineSortKey(null);
@@ -497,7 +503,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setEstimateDate(new Date().toISOString().slice(0, 10));
     setValidThrough("");
     setShowDuplicatePanel(false);
-  }, [costCodes, defaultCreateStatus]);
+  }, [costCodes, defaultCreateStatus, organizationDefaults?.estimate_default_terms]);
 
   function startNewEstimate() {
     setIsViewerExpanded(false);
@@ -547,17 +553,21 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const loadDependencies = useCallback(async () => {
     setActionMessage("");
     try {
-      const [projectsRes, codesRes] = await Promise.all([
+      const [projectsRes, codesRes, organizationRes] = await Promise.all([
         fetch(`${normalizedBaseUrl}/projects/`, {
           headers: buildAuthHeaders(token),
         }),
         fetch(`${normalizedBaseUrl}/cost-codes/`, {
           headers: buildAuthHeaders(token),
         }),
+        fetch(`${normalizedBaseUrl}/organization/`, {
+          headers: buildAuthHeaders(token),
+        }),
       ]);
 
       const projectsJson: ApiResponse = await projectsRes.json();
       const codesJson: ApiResponse = await codesRes.json();
+      const organizationJson: ApiResponse = await organizationRes.json();
 
       if (!projectsRes.ok) {
         setActionMessage(readApiErrorMessage(projectsJson, "Failed loading projects."));
@@ -570,8 +580,15 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
       const projectRows = (projectsJson.data as ProjectRecord[]) ?? [];
       const codeRows = ((codesJson.data as CostCode[]) ?? []).filter((code) => code.is_active);
+      const organizationData = (
+        organizationJson.data as { organization?: OrganizationDocumentDefaults } | undefined
+      )?.organization;
       setProjects(projectRows);
       setCostCodes(codeRows);
+      if (organizationRes.ok && organizationData) {
+        setOrganizationDefaults(organizationData);
+        setTermsText((current) => current || organizationData.estimate_default_terms || "");
+      }
 
       if (projectRows[0]) {
         const scopedMatch = scopedProjectId
@@ -1378,10 +1395,12 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
       <EstimateSheet
         project={selectedProject}
+        organizationDefaults={organizationDefaults}
         estimateId={selectedEstimateId}
         estimateTitle={estimateTitle}
         estimateDate={estimateDate}
         validThrough={validThrough}
+        termsText={termsText}
         taxPercent={taxPercent}
         lineItems={lineItems}
         lineTotals={lineTotals}

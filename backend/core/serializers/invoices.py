@@ -4,6 +4,8 @@ from core.models import Invoice, InvoiceLine, InvoiceStatusEvent
 
 
 class InvoiceLineSerializer(serializers.ModelSerializer):
+    budget_line_description = serializers.CharField(source="budget_line.description", read_only=True)
+    budget_line_cost_code = serializers.CharField(source="budget_line.cost_code.code", read_only=True)
     cost_code_code = serializers.CharField(source="cost_code.code", read_only=True)
     cost_code_name = serializers.CharField(source="cost_code.name", read_only=True)
     scope_item_name = serializers.CharField(source="scope_item.name", read_only=True)
@@ -14,6 +16,9 @@ class InvoiceLineSerializer(serializers.ModelSerializer):
             "id",
             "invoice",
             "line_type",
+            "budget_line",
+            "budget_line_description",
+            "budget_line_cost_code",
             "cost_code",
             "cost_code_code",
             "cost_code_name",
@@ -32,6 +37,8 @@ class InvoiceLineSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "invoice",
+            "budget_line_description",
+            "budget_line_cost_code",
             "cost_code_code",
             "cost_code_name",
             "scope_item_name",
@@ -56,6 +63,13 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "status",
             "issue_date",
             "due_date",
+            "sender_name",
+            "sender_email",
+            "sender_address",
+            "sender_logo_url",
+            "terms_text",
+            "footer_text",
+            "notes_text",
             "subtotal",
             "tax_percent",
             "tax_total",
@@ -87,6 +101,7 @@ class InvoiceLineItemInputSerializer(serializers.Serializer):
         required=False,
         default=InvoiceLine.LineType.SCOPE,
     )
+    budget_line = serializers.IntegerField(required=False, allow_null=True)
     cost_code = serializers.IntegerField(required=False, allow_null=True)
     scope_item = serializers.IntegerField(required=False, allow_null=True)
     adjustment_reason = serializers.CharField(
@@ -111,6 +126,13 @@ class InvoiceWriteSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=Invoice.Status.choices, required=False)
     issue_date = serializers.DateField(required=False)
     due_date = serializers.DateField(required=False)
+    sender_name = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
+    sender_email = serializers.EmailField(required=False, allow_blank=True, default="")
+    sender_address = serializers.CharField(max_length=5000, required=False, allow_blank=True, default="")
+    sender_logo_url = serializers.URLField(required=False, allow_blank=True, default="")
+    terms_text = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
+    footer_text = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
+    notes_text = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
     tax_percent = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, default=0)
     line_items = InvoiceLineItemInputSerializer(many=True, required=False)
     scope_override = serializers.BooleanField(required=False, default=False)

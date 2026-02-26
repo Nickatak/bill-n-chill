@@ -119,13 +119,14 @@ class BudgetTests(TestCase):
         self.assertEqual(response.json()["data"]["base_working_total"], "500.00")
         self.assertEqual(response.json()["data"]["current_working_total"], "500.00")
         self.assertEqual(Budget.objects.count(), 1)
-        self.assertEqual(BudgetLine.objects.count(), 1)
+        self.assertEqual(BudgetLine.objects.count(), 4)
 
         budget = Budget.objects.first()
-        line = BudgetLine.objects.first()
+        line = BudgetLine.objects.filter(scope_item__isnull=False).first()
         self.assertEqual(budget.status, Budget.Status.ACTIVE)
         self.assertEqual(budget.source_estimate_id, estimate_id)
         self.assertEqual(str(line.budget_amount), "500.00")
+        self.assertEqual(BudgetLine.objects.filter(scope_item__isnull=True, budget_amount="0.00").count(), 3)
         self.assertEqual(budget.baseline_snapshot_json["estimate"]["id"], estimate_id)
         self.assertEqual(
             budget.baseline_snapshot_json["line_items"][0]["line_total"],
@@ -145,7 +146,10 @@ class BudgetTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
         estimate_line = EstimateLineItem.objects.get(estimate_id=estimate_id)
-        budget_line = BudgetLine.objects.get(budget_id=response.json()["data"]["id"])
+        budget_line = BudgetLine.objects.get(
+            budget_id=response.json()["data"]["id"],
+            scope_item_id=estimate_line.scope_item_id,
+        )
         self.assertIsNotNone(estimate_line.scope_item_id)
         self.assertEqual(budget_line.scope_item_id, estimate_line.scope_item_id)
         self.assertEqual(

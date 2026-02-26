@@ -14,8 +14,8 @@ export function WorkflowNavbar() {
   const [isBillingOpen, setIsBillingOpen] = useState(false);
   const [billingMenuPosition, setBillingMenuPosition] = useState({ top: 0, left: 0 });
   const isInvoicesPath = pathname === "/invoices";
-  const isVendorBillsPath = /^\/projects\/\d+\/vendor-bills$/.test(pathname);
-  const isBillingPath = isInvoicesPath || isVendorBillsPath;
+  const isBillsPath = pathname === "/bills";
+  const isBillingPath = isInvoicesPath || isBillsPath;
 
   function updateBillingMenuPosition() {
     const button = billingButtonRef.current;
@@ -86,9 +86,9 @@ export function WorkflowNavbar() {
         <div className="workflowNavScroll">
           {workflowRoutes.map((route) => {
             if (route.href === "/billing") {
-              const vendorBillsHref = projectId
-                ? `/projects/${encodeURIComponent(projectId)}/vendor-bills`
-                : "/projects";
+              const billsHref = projectId
+                ? `/bills?project=${encodeURIComponent(projectId)}`
+                : "/bills";
               return (
                 <div key={route.href} className="workflowDropdownMenu">
                   <button
@@ -123,12 +123,12 @@ export function WorkflowNavbar() {
                         Invoices (WIP)
                       </Link>
                       <Link
-                        href={vendorBillsHref}
-                        className={`nonWorkflowItem ${isVendorBillsPath ? "isActive" : ""}`}
+                        href={billsHref}
+                        className={`nonWorkflowItem ${isBillsPath ? "isActive" : ""}`}
                         role="menuitem"
                         onClick={closeBillingMenu}
                       >
-                        Vendor Bills (WIP)
+                        Bills (WIP)
                       </Link>
                     </div>
                   ) : null}

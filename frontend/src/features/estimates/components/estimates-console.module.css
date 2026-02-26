@@ -149,6 +149,21 @@
   font-size: 0.9rem;
 }
 
+.logoImage {
+  width: 100%;
+  max-height: 80px;
+  object-fit: contain;
+  display: block;
+}
+
+.logoUrlLink {
+  color: #2563eb;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
 .sheetTitle {
   font-size: 2rem;
   letter-spacing: 0.2em;
@@ -609,6 +624,22 @@
   color: #475569;
   display: grid;
   gap: 6px;
+}
+
+.termsInput {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.6;
+  min-height: 96px;
+  resize: none;
+}
+
+.termsInput:focus {
+  outline: none;
 }
 
 .terms h4 {
@@ -1309,6 +1340,10 @@
 :global(html[data-theme="dark"]) .logoBox {
   border-color: #334155;
   color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .logoUrlLink {
+  color: #93c5fd;
 }
 
 :global(html[data-theme="dark"]) .fieldInput,

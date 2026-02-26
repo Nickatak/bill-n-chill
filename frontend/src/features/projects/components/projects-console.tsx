@@ -715,7 +715,7 @@ export function ProjectsConsole() {
                   <div className={styles.branchGroup}>
                     <span className={styles.branchSubLabel}>Payables</span>
                     <div className={styles.node}>
-                      <Link href={`/projects/${selectedProject.id}/vendor-bills`}>Vendor Bills (WIP)</Link>
+                      <Link href={`/bills?project=${selectedProject.id}`}>Bills (WIP)</Link>
                       <span className={styles.nodeCount}>
                         {summaryCounts ? summaryCounts.vendorBills : "--"}
                       </span>

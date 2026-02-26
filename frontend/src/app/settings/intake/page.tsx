@@ -1,7 +1,10 @@
-"use client";
-
+import type { Metadata } from "next";
 import { IntakeSettingsConsole } from "@/features/settings-intake";
 import shell from "@/app/wip-shell.module.css";
+
+export const metadata: Metadata = {
+  title: "Intake Settings",
+};
 
 export default function IntakeSettingsPage() {
   return (

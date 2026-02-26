@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 
 from core.models.change_orders.change_order import ChangeOrder
 from core.models.financial_auditing.budget_line import BudgetLine
@@ -20,6 +21,10 @@ class ChangeOrderLine(models.Model):
     - Visibility: `internal-facing`.
     """
 
+    class LineType(models.TextChoices):
+        SCOPE = "scope", "Scope"
+        ADJUSTMENT = "adjustment", "Adjustment"
+
     change_order = models.ForeignKey(
         "ChangeOrder",
         on_delete=models.CASCADE,
@@ -31,6 +36,12 @@ class ChangeOrderLine(models.Model):
         related_name="change_order_lines",
     )
     description = models.CharField(max_length=255, blank=True)
+    line_type = models.CharField(
+        max_length=24,
+        choices=LineType.choices,
+        default=LineType.SCOPE,
+    )
+    adjustment_reason = models.CharField(max_length=64, blank=True, default="")
     amount_delta = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     days_delta = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -42,6 +53,11 @@ class ChangeOrderLine(models.Model):
             models.UniqueConstraint(
                 fields=["change_order", "budget_line"],
                 name="co_line_unique_budget_line_per_change_order",
+            ),
+            models.CheckConstraint(
+                condition=Q(line_type="adjustment", adjustment_reason__gt="")
+                | ~Q(line_type="adjustment"),
+                name="co_line_adjustment_requires_reason",
             ),
         ]
 

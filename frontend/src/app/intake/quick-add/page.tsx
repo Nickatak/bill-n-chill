@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import { QuickAddConsole } from "@/features/intake";
 import styles from "./page.module.css";
+
+export const metadata: Metadata = {
+  title: "Quick Add",
+};
 
 export default function QuickAddPage() {
   return (

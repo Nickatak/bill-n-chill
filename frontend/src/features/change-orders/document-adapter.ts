@@ -12,6 +12,8 @@ import {
 
 type ChangeOrderLineInput = {
   localId: number;
+  lineType: "scope" | "adjustment";
+  adjustmentReason: string;
   budgetLineId: string;
   description: string;
   amountDelta: string;
@@ -113,8 +115,10 @@ export function createChangeOrderDocumentAdapter(
       amount_delta: form.amountDelta,
       days_delta: Number(form.daysDelta || "0"),
       line_items: form.lineItems.map((line) => ({
+        line_type: line.lineType,
         budget_line: Number(line.budgetLineId),
         description: line.description,
+        adjustment_reason: line.adjustmentReason,
         amount_delta: line.amountDelta,
         days_delta: Number(line.daysDelta || "0"),
       })),
@@ -125,8 +129,10 @@ export function createChangeOrderDocumentAdapter(
       amount_delta: form.amountDelta,
       days_delta: Number(form.daysDelta || "0"),
       line_items: form.lineItems.map((line) => ({
+        line_type: line.lineType,
         budget_line: Number(line.budgetLineId),
         description: line.description,
+        adjustment_reason: line.adjustmentReason,
         amount_delta: line.amountDelta,
         days_delta: Number(line.daysDelta || "0"),
       })),

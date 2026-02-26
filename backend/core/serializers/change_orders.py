@@ -19,6 +19,8 @@ class ChangeOrderLineSerializer(serializers.ModelSerializer):
             "budget_line_cost_code",
             "budget_line_description",
             "description",
+            "line_type",
+            "adjustment_reason",
             "amount_delta",
             "days_delta",
             "created_at",
@@ -91,8 +93,19 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
 
 
 class ChangeOrderLineInputSerializer(serializers.Serializer):
+    line_type = serializers.ChoiceField(
+        choices=ChangeOrderLine.LineType.choices,
+        required=False,
+        default=ChangeOrderLine.LineType.SCOPE,
+    )
     budget_line = serializers.IntegerField()
     description = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    adjustment_reason = serializers.CharField(
+        max_length=64,
+        required=False,
+        allow_blank=True,
+        default="",
+    )
     amount_delta = serializers.DecimalField(max_digits=12, decimal_places=2)
     days_delta = serializers.IntegerField(required=False, default=0)
 

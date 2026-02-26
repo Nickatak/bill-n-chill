@@ -15,6 +15,7 @@ import {
 type EstimateFormState = {
   title: string;
   validThrough: string;
+  termsText: string;
   taxPercent: string;
   subtotal: number;
   taxAmount: number;

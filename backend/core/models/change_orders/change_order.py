@@ -36,16 +36,12 @@ class ChangeOrder(models.Model):
             Status.VOID,
         },
         Status.PENDING_APPROVAL: {
-            Status.DRAFT,
             Status.APPROVED,
             Status.REJECTED,
             Status.VOID,
         },
-        Status.APPROVED: {
-            Status.VOID,
-        },
+        Status.APPROVED: set(),
         Status.REJECTED: {
-            Status.DRAFT,
             Status.VOID,
         },
         Status.VOID: set(),

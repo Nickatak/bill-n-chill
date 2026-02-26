@@ -57,6 +57,14 @@ export type ComposerAction = {
   onClick: () => void | Promise<void>;
 };
 
+export type OrganizationBrandingDefaults = {
+  display_name: string;
+  logo_url: string;
+  invoice_sender_name: string;
+  invoice_sender_email: string;
+  invoice_sender_address: string;
+};
+
 export type ComposerSectionSlot =
   | "header"
   | "meta"

@@ -85,6 +85,7 @@ class FinancialAuditTrailTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(budget_convert.status_code, 200)
+        budget = budget_convert.json()["data"]
 
         change_order_create = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
@@ -120,6 +121,7 @@ class FinancialAuditTrailTests(TestCase):
             data={
                 "line_items": [
                     {
+                        "budget_line": budget["line_items"][0]["id"],
                         "description": "Draw 1",
                         "quantity": "1",
                         "unit": "ea",
@@ -144,7 +146,12 @@ class FinancialAuditTrailTests(TestCase):
         vendor = Vendor.objects.create(name="Audit Vendor", created_by=self.user)
         vendor_bill_create = self.client.post(
             f"/api/v1/projects/{self.project.id}/vendor-bills/",
-            data={"vendor": vendor.id, "bill_number": "VB-1", "total": "200.00"},
+            data={
+                "vendor": vendor.id,
+                "bill_number": "VB-1",
+                "status": "planned",
+                "total": "200.00",
+            },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )

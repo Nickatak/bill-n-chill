@@ -56,6 +56,15 @@ class EstimateTests(TestCase):
             created_by=self.user,
         )
 
+    def _bootstrap_primary_membership(self):
+        response = self.client.post(
+            "/api/v1/auth/login/",
+            data={"email": "pm8@example.com", "password": "secret123"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        return OrganizationMembership.objects.select_related("organization").get(user=self.user)
+
     def test_public_estimate_detail_view_allows_unauthenticated_access(self):
         estimate = Estimate.objects.create(
             project=self.project,
@@ -192,6 +201,130 @@ class EstimateTests(TestCase):
 
         estimate = Estimate.objects.get(id=payload["id"])
         self.assertEqual(str(estimate.valid_through), "2026-06-30")
+
+    def test_project_estimates_create_uses_organization_default_terms_when_omitted(self):
+        membership = self._bootstrap_primary_membership()
+        membership.organization.estimate_default_terms = "Org default estimate terms."
+        membership.organization.save(update_fields=["estimate_default_terms", "updated_at"])
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Estimate Default Terms",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo and prep",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["data"]
+        self.assertEqual(payload["terms_text"], "Org default estimate terms.")
+
+    def test_project_estimates_rejects_per_estimate_terms_overrides(self):
+        self._bootstrap_primary_membership()
+        create_with_override = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Estimate Terms Override",
+                "terms_text": "Custom estimate terms v1.",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo and prep",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(create_with_override.status_code, 400)
+        self.assertEqual(create_with_override.json()["error"]["code"], "validation_error")
+        self.assertIn("terms_text", create_with_override.json()["error"]["fields"])
+
+        create = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Estimate Terms Base",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo and prep",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(create.status_code, 201)
+        estimate_id = create.json()["data"]["id"]
+
+        patch = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"terms_text": "Custom estimate terms v2."},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(patch.status_code, 400)
+        self.assertEqual(patch.json()["error"]["code"], "validation_error")
+        self.assertIn("terms_text", patch.json()["error"]["fields"])
+
+    def test_project_estimates_patch_rejects_terms_edit_when_non_draft(self):
+        self._bootstrap_primary_membership()
+        create = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Locked Terms",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo and prep",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(create.status_code, 201)
+        estimate_id = create.json()["data"]["id"]
+
+        sent = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(sent.status_code, 200)
+
+        locked_patch = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"terms_text": "Cannot change once sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(locked_patch.status_code, 400)
+        self.assertEqual(locked_patch.json()["error"]["code"], "validation_error")
+        self.assertIn("terms_text", locked_patch.json()["error"]["fields"])
 
     def test_project_estimates_create_rounds_tax_half_up_to_cents(self):
         response = self.client.post(

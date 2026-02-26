@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import { FinancialsAuditingConsole } from "@/features/financials-auditing";
 import { PaymentsConsole } from "@/features/payments";
 import shell from "@/app/wip-shell.module.css";
+
+export const metadata: Metadata = {
+  title: "Financials and Accounting",
+};
 
 export default function FinancialsAuditingPage() {
   return (

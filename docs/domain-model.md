@@ -53,6 +53,14 @@ Key fields:
 - `id`
 - `display_name`
 - `slug`
+- `logo_url`
+- `invoice_sender_name`
+- `invoice_sender_email`
+- `invoice_sender_address`
+- `invoice_default_due_days`
+- `invoice_default_terms`
+- `invoice_default_footer`
+- `invoice_default_notes`
 - `created_by`
 
 Policy:
@@ -425,6 +433,13 @@ Key fields:
 - `status` (`draft`, `sent`, `partially_paid`, `paid`, `overdue`, `void`)
 - `issue_date`
 - `due_date`
+- `sender_name`
+- `sender_email`
+- `sender_address`
+- `sender_logo_url`
+- `terms_text`
+- `footer_text`
+- `notes_text`
 - `subtotal`
 - `tax_total`
 - `total`

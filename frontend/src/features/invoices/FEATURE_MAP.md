@@ -44,6 +44,8 @@ Manage AR invoice composition, lifecycle transitions, and send operations.
    updates selected invoice details and status.
 6. `POST /invoices/{id}/send/`:
    triggers invoice send operation.
+7. `GET /organization/`:
+   loads org-level invoice branding/default templates (logo/sender/terms/footer/notes/due-days).
 
 ## Backend Contracts Used
 - Contract endpoint(s): none

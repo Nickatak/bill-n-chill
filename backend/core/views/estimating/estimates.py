@@ -25,6 +25,7 @@ from core.serializers import (
 from core.views.helpers import (
     _apply_estimate_lines_and_totals,
     _create_budget_from_estimate,
+    _ensure_primary_membership,
     _organization_user_ids,
     _record_financial_audit_event,
     _record_estimate_status_event,
@@ -195,6 +196,8 @@ def project_estimates_view(request, project_id: int):
     - Applies duplicate-submit suppression window and archives superseded family rows after create.
     """
     actor_user_ids = _organization_user_ids(request.user)
+    membership = _ensure_primary_membership(request.user)
+    organization = membership.organization
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -217,6 +220,21 @@ def project_estimates_view(request, project_id: int):
     serializer = EstimateWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
+    if "terms_text" in data:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Estimate terms are managed by organization templates.",
+                    "fields": {
+                        "terms_text": [
+                            "Set estimate terms in Organization settings; per-estimate overrides are disabled."
+                        ]
+                    },
+                }
+            },
+            status=400,
+        )
     line_items = data.get("line_items", [])
     if not line_items:
         return Response(
@@ -276,6 +294,10 @@ def project_estimates_view(request, project_id: int):
             continue
         if candidate.valid_through != data.get("valid_through"):
             continue
+        candidate_terms_text = (candidate.terms_text or "").strip()
+        incoming_terms_text = (organization.estimate_default_terms or "").strip()
+        if candidate_terms_text != incoming_terms_text:
+            continue
         if candidate.tax_percent != data.get("tax_percent", Decimal("0")):
             continue
         if _estimate_signature(candidate) == input_signature:
@@ -289,6 +311,7 @@ def project_estimates_view(request, project_id: int):
         user=request.user,
         title=data.get("title", ""),
     )
+    terms_text = (organization.estimate_default_terms or "").strip()
 
     estimate = Estimate.objects.create(
         project=project,
@@ -297,6 +320,7 @@ def project_estimates_view(request, project_id: int):
         status=data.get("status", Estimate.Status.DRAFT),
         title=data.get("title", ""),
         valid_through=data.get("valid_through"),
+        terms_text=terms_text,
         tax_percent=data.get("tax_percent", Decimal("0")),
     )
 
@@ -376,6 +400,21 @@ def estimate_detail_view(request, estimate_id: int):
                     "code": "validation_error",
                     "message": "Estimate title cannot be changed after creation.",
                     "fields": {"title": ["Create a new estimate if the title needs to change."]},
+                }
+            },
+            status=400,
+        )
+    if "terms_text" in data:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Estimate terms are managed by organization templates.",
+                    "fields": {
+                        "terms_text": [
+                            "Set estimate terms in Organization settings; per-estimate overrides are disabled."
+                        ]
+                    },
                 }
             },
             status=400,
@@ -570,6 +609,7 @@ def estimate_clone_version_view(request, estimate_id: int):
         status=Estimate.Status.DRAFT,
         title=estimate.title,
         valid_through=estimate.valid_through,
+        terms_text=estimate.terms_text,
         tax_percent=estimate.tax_percent,
     )
 
@@ -686,6 +726,7 @@ def estimate_duplicate_view(request, estimate_id: int):
         status=Estimate.Status.DRAFT,
         title=target_title,
         valid_through=estimate.valid_through,
+        terms_text=estimate.terms_text,
         tax_percent=estimate.tax_percent,
     )
 

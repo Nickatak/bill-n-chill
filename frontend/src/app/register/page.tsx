@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import { HomeRegisterConsole } from "@/features/session/components/home-register-console";
 import homeStyles from "../page.module.css";
+
+export const metadata: Metadata = {
+  title: "Register",
+};
 
 type HealthResponse = {
   data?: {

@@ -2,7 +2,7 @@
 
 from core.models import ChangeOrder
 
-CHANGE_ORDER_POLICY_VERSION = "2026-02-24.change_orders.v4"
+CHANGE_ORDER_POLICY_VERSION = "2026-02-24.change_orders.v8"
 
 
 def _status_order() -> list[str]:
@@ -27,6 +27,7 @@ def get_change_order_policy_contract() -> dict:
 
     revision_rules = {
         "edit_latest_revision_only": True,
+        "edit_requires_draft_status": True,
         "clone_requires_latest_revision": True,
         "revision_gt_one_requires_previous_change_order": True,
         "previous_change_order_must_match_project_family_and_prior_revision": True,
@@ -51,7 +52,11 @@ def get_change_order_policy_contract() -> dict:
         "co_line_total_must_match_amount_delta": "Sum of line_items amount_delta must match change-order amount_delta.",
         "co_line_duplicate_budget_line": "Each budget_line can appear at most once per change order.",
         "co_line_budget_line_invalid": "Each budget_line must exist, match project, and come from active budget.",
+        "co_line_scope_budget_line_disallows_generic": "Scope lines cannot use internal generic budget lines.",
+        "co_line_adjustment_requires_reason": "Adjustment lines require adjustment_reason.",
+        "co_line_adjustment_requires_generic_budget_line": "Adjustment lines must use a generic system budget line.",
         "co_edit_latest_revision_only": "Only latest revision in family can be edited.",
+        "co_edit_requires_draft_status": "Only draft change orders can edit content fields.",
         "co_clone_requires_latest_revision": "Clone revision only from latest revision in family.",
         "co_status_transition_not_allowed": "Status transition must match allowed_status_transitions.",
         "co_approval_metadata_invariant": "approved_by/approved_at must match approved status invariants.",

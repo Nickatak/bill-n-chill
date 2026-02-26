@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import { VendorsConsole } from "@/features/vendors";
 import shell from "@/app/wip-shell.module.css";
+
+export const metadata: Metadata = {
+  title: "Vendors",
+};
 
 export default function VendorsPage() {
   return (
@@ -10,7 +15,7 @@ export default function VendorsPage() {
             <p className={shell.eyebrow}>Ops / Meta</p>
             <h1 className={shell.title}>Vendors (WIP)</h1>
             <p className={shell.copy}>
-              Maintain canonical payees for AP workflows. This directory feeds Vendor Bills and
+              Maintain canonical payees for AP workflows. This directory feeds Bills and
               outbound payment allocation.
             </p>
           </div>

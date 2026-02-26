@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { EstimateApprovalPreview } from "@/features/estimates/components/estimate-approval-preview";
 import { notFound } from "next/navigation";
 import shell from "@/app/wip-shell.module.css";
@@ -10,6 +11,10 @@ function parsePublicToken(publicRef: string): string | null {
   const match = publicRef.match(/--([A-Za-z0-9]{8,24})$/);
   return match ? match[1] : null;
 }
+
+export const metadata: Metadata = {
+  title: "Estimate Review",
+};
 
 export default async function EstimateReviewPage({ params }: EstimateReviewPageProps) {
   const { publicRef } = await params;

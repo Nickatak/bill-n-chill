@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import { ProjectsConsole } from "@/features/projects";
 import styles from "./page.module.css";
+
+export const metadata: Metadata = {
+  title: "Projects",
+};
 
 export default function ProjectsPage() {
   return (

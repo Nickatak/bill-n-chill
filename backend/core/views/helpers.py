@@ -30,6 +30,7 @@ from core.models import (
 )
 from core.policies.cost_codes import STARTER_COST_CODE_ROWS
 from core.utils.money import MONEY_ZERO, quantize_money
+from core.utils.organization_defaults import build_invoice_profile_defaults
 
 BILLABLE_INVOICE_STATUSES = {
     Invoice.Status.SENT,
@@ -50,6 +51,25 @@ RBAC_ROLE_PRECEDENCE = [
     RBAC_ROLE_WORKER,
     RBAC_ROLE_VIEWER,
 ]
+
+SYSTEM_BUDGET_LINE_SPECS = [
+    {
+        "cost_code": "99-901",
+        "cost_code_name": "Project Tools & Consumables",
+        "description": "System: Project tools and consumables (non-client-billable)",
+    },
+    {
+        "cost_code": "99-902",
+        "cost_code_name": "Project Overhead",
+        "description": "System: Project overhead and indirect spend (non-client-billable)",
+    },
+    {
+        "cost_code": "99-903",
+        "cost_code_name": "Unplanned Project Spend",
+        "description": "System: Unplanned project spend bucket (non-client-billable)",
+    },
+]
+SYSTEM_BUDGET_LINE_CODES = {row["cost_code"] for row in SYSTEM_BUDGET_LINE_SPECS}
 
 
 def _validate_project_for_user(project_id: int, user):
@@ -135,6 +155,16 @@ def _build_organization_snapshot(organization: Organization) -> dict:
             "id": organization.id,
             "display_name": organization.display_name,
             "slug": organization.slug,
+            "logo_url": organization.logo_url,
+            "invoice_sender_name": organization.invoice_sender_name,
+            "invoice_sender_email": organization.invoice_sender_email,
+            "invoice_sender_address": organization.invoice_sender_address,
+            "invoice_default_due_days": organization.invoice_default_due_days,
+            "invoice_default_terms": organization.invoice_default_terms,
+            "estimate_default_terms": organization.estimate_default_terms,
+            "change_order_default_reason": organization.change_order_default_reason,
+            "invoice_default_footer": organization.invoice_default_footer,
+            "invoice_default_notes": organization.invoice_default_notes,
             "created_by_id": organization.created_by_id,
             "created_at": organization.created_at.isoformat() if organization.created_at else None,
         }
@@ -240,9 +270,22 @@ def _ensure_primary_membership(user):
         return membership
 
     with transaction.atomic():
+        display_name = _default_org_name_for_user(user)
+        bootstrap_invoice_defaults = build_invoice_profile_defaults(
+            display_name=display_name,
+            owner_email=user.email or "",
+        )
         organization = Organization.objects.create(
-            display_name=_default_org_name_for_user(user),
+            display_name=display_name,
             slug=_next_org_slug((user.email or user.username or f"user-{user.id}").split("@")[0]),
+            invoice_sender_name=bootstrap_invoice_defaults["invoice_sender_name"],
+            invoice_sender_email=bootstrap_invoice_defaults["invoice_sender_email"],
+            invoice_default_due_days=bootstrap_invoice_defaults["invoice_default_due_days"],
+            invoice_default_terms=bootstrap_invoice_defaults["invoice_default_terms"],
+            estimate_default_terms=bootstrap_invoice_defaults["estimate_default_terms"],
+            change_order_default_reason=bootstrap_invoice_defaults["change_order_default_reason"],
+            invoice_default_footer=bootstrap_invoice_defaults["invoice_default_footer"],
+            invoice_default_notes=bootstrap_invoice_defaults["invoice_default_notes"],
             created_by=user,
         )
         _record_organization_record(
@@ -718,8 +761,32 @@ def _resolve_invoice_scope_items_for_user(user, line_items_data):
     return item_map, missing
 
 
+def _resolve_invoice_budget_lines_for_project(*, project, user, line_items_data):
+    ids = [item["budget_line"] for item in line_items_data if item.get("budget_line")]
+    if not ids:
+        return {}, []
+
+    actor_user_ids = _organization_user_ids(user)
+    rows = BudgetLine.objects.select_related("cost_code", "scope_item").filter(
+        id__in=ids,
+        budget__project=project,
+        budget__created_by_id__in=actor_user_ids,
+        budget__status=Budget.Status.ACTIVE,
+    )
+    line_map = {row.id: row for row in rows}
+    missing = [line_id for line_id in ids if line_id not in line_map]
+    return line_map, missing
+
+
 def _apply_invoice_lines_and_totals(invoice, line_items_data, tax_percent, user):
     normalized_items, subtotal = _calculate_invoice_line_totals(line_items_data)
+    budget_line_map, missing_budget_lines = _resolve_invoice_budget_lines_for_project(
+        project=invoice.project,
+        user=user,
+        line_items_data=normalized_items,
+    )
+    if missing_budget_lines:
+        return {"missing_budget_lines": missing_budget_lines}
     code_map, missing = _resolve_invoice_cost_codes_for_user(user, normalized_items)
     if missing:
         return {"missing_cost_codes": missing}
@@ -741,10 +808,36 @@ def _apply_invoice_lines_and_totals(invoice, line_items_data, tax_percent, user)
         line_type = item.get("line_type", InvoiceLine.LineType.SCOPE)
         adjustment_reason = (item.get("adjustment_reason") or "").strip()
         internal_note = (item.get("internal_note") or "").strip()
+        budget_line_id = item.get("budget_line")
+        budget_line = budget_line_map.get(budget_line_id) if budget_line_id else None
         cost_code_id = item.get("cost_code")
         cost_code = code_map.get(cost_code_id) if cost_code_id else None
         scope_item_id = item.get("scope_item")
         scope_item = scope_item_map.get(scope_item_id) if scope_item_id else None
+
+        if line_type == InvoiceLine.LineType.SCOPE and not budget_line:
+            invalid_lines.append(
+                {
+                    "line_index": index,
+                    "field": "budget_line",
+                    "message": "Scope lines require budget_line from the project's active budget.",
+                }
+            )
+            continue
+        if (
+            line_type == InvoiceLine.LineType.SCOPE
+            and budget_line
+            and budget_line.cost_code
+            and budget_line.cost_code.code in SYSTEM_BUDGET_LINE_CODES
+        ):
+            invalid_lines.append(
+                {
+                    "line_index": index,
+                    "field": "budget_line",
+                    "message": "Scope lines cannot use internal generic budget lines.",
+                }
+            )
+            continue
 
         if line_type == InvoiceLine.LineType.ADJUSTMENT and not adjustment_reason:
             invalid_lines.append(
@@ -755,6 +848,28 @@ def _apply_invoice_lines_and_totals(invoice, line_items_data, tax_percent, user)
                 }
             )
             continue
+
+        if budget_line:
+            if cost_code and budget_line.cost_code_id != cost_code.id:
+                invalid_lines.append(
+                    {
+                        "line_index": index,
+                        "field": "cost_code",
+                        "message": "cost_code must match selected budget_line cost_code.",
+                    }
+                )
+                continue
+            if scope_item and budget_line.scope_item_id != scope_item.id:
+                invalid_lines.append(
+                    {
+                        "line_index": index,
+                        "field": "scope_item",
+                        "message": "scope_item must match selected budget_line scope_item.",
+                    }
+                )
+                continue
+            cost_code = budget_line.cost_code
+            scope_item = budget_line.scope_item
 
         if scope_item and cost_code and scope_item.cost_code_id != cost_code.id:
             invalid_lines.append(
@@ -770,6 +885,7 @@ def _apply_invoice_lines_and_totals(invoice, line_items_data, tax_percent, user)
             InvoiceLine(
                 invoice=invoice,
                 line_type=line_type,
+                budget_line=budget_line,
                 cost_code=cost_code,
                 scope_item=scope_item,
                 adjustment_reason=adjustment_reason,
@@ -872,5 +988,27 @@ def _create_budget_from_estimate(*, estimate, user):
         )
         for line in estimate.line_items.all()
     ]
+
+    membership = _ensure_primary_membership(user)
+    for spec in SYSTEM_BUDGET_LINE_SPECS:
+        cost_code, _created = CostCode.objects.get_or_create(
+            organization_id=membership.organization_id,
+            code=spec["cost_code"],
+            defaults={
+                "name": spec["cost_code_name"],
+                "is_active": True,
+                "created_by": user,
+            },
+        )
+        budget_lines.append(
+            BudgetLine(
+                budget=budget,
+                scope_item=None,
+                cost_code=cost_code,
+                description=spec["description"],
+                budget_amount=Decimal("0.00"),
+            )
+        )
+
     BudgetLine.objects.bulk_create(budget_lines)
     return budget

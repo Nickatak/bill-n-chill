@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { ProjectActivityConsole } from "@/features/projects/components/project-activity-console";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -6,6 +7,14 @@ import shell from "@/app/wip-shell.module.css";
 type ProjectActivityPageProps = {
   params: Promise<{ projectId: string }>;
 };
+
+export async function generateMetadata({ params }: ProjectActivityPageProps): Promise<Metadata> {
+  const { projectId } = await params;
+  if (/^\d+$/.test(projectId)) {
+    return { title: `Project #${projectId} Activity` };
+  }
+  return { title: "Project Activity" };
+}
 
 export default async function ProjectActivityPage({ params }: ProjectActivityPageProps) {
   const { projectId } = await params;

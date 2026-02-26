@@ -6,18 +6,28 @@ import { CostCode, EstimateLineInput, ProjectRecord } from "../types";
 import { CostCodeCombobox } from "@/shared/components/cost-code-combobox";
 import { DocumentComposer } from "@/shared/document-composer";
 import {
+  resolveOrganizationBranding,
+  type OrganizationBrandingDefaults,
+} from "@/shared/document-composer";
+import {
   createEstimateDocumentAdapter,
   EstimateFormState,
 } from "../document-adapter";
 
 type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amount";
 
+type OrganizationDocumentDefaults = OrganizationBrandingDefaults & {
+  estimate_default_terms: string;
+};
+
 type EstimateSheetProps = {
   project: ProjectRecord | null;
+  organizationDefaults?: OrganizationDocumentDefaults | null;
   estimateId: string;
   estimateTitle: string;
   estimateDate: string;
   validThrough: string;
+  termsText: string;
   taxPercent: string;
   lineItems: EstimateLineInput[];
   lineTotals: number[];
@@ -29,7 +39,6 @@ type EstimateSheetProps = {
   isSubmitting: boolean;
   isEditingDraft: boolean;
   readOnly: boolean;
-  showReadOnlyHint?: boolean;
   formErrorMessage?: string;
   formSuccessMessage?: string;
   formSuccessHref?: string;
@@ -81,10 +90,12 @@ function formatMoney(value: number): string {
 
 export function EstimateSheet({
   project,
+  organizationDefaults = null,
   estimateId,
   estimateTitle,
   estimateDate,
   validThrough,
+  termsText,
   taxPercent,
   lineItems,
   lineTotals,
@@ -96,7 +107,6 @@ export function EstimateSheet({
   isSubmitting,
   isEditingDraft,
   readOnly,
-  showReadOnlyHint = true,
   formErrorMessage = "",
   formSuccessMessage = "",
   formSuccessHref = "",
@@ -129,6 +139,11 @@ export function EstimateSheet({
     : ["Customer address"];
   const sortIndicator = lineSortDirection === "asc" ? "▲" : "▼";
   const showReadOnlyText = readOnly && readOnlyPresentation === "text";
+  const senderBranding = resolveOrganizationBranding(organizationDefaults);
+  const senderName = senderBranding.senderDisplayName;
+  const senderEmail = senderBranding.senderEmail;
+  const senderAddressLines = senderBranding.senderAddressLines;
+  const senderLogoUrl = senderBranding.logoUrl;
 
   function formatDisplayDate(value: string): string {
     if (!value) {
@@ -176,6 +191,7 @@ export function EstimateSheet({
   const draftFormState: EstimateFormState = {
     title: estimateTitle,
     validThrough,
+    termsText,
     taxPercent,
     subtotal,
     taxAmount,
@@ -205,12 +221,34 @@ export function EstimateSheet({
           <div className={styles.sheetHeader}>
             <div className={styles.fromBlock}>
               <span className={styles.blockLabel}>From</span>
-              <p className={styles.blockText}>Your Company</p>
-              <p className={styles.blockMuted}>Your Address 1234</p>
-              <p className={styles.blockMuted}>City, ST 12345</p>
+              <p className={styles.blockText}>{senderName || "Your Company"}</p>
+              {senderEmail ? <p className={styles.blockMuted}>{senderEmail}</p> : null}
+              {senderAddressLines.length ? (
+                senderAddressLines.map((line, index) => (
+                  <p key={`${line}-${index}`} className={styles.blockMuted}>
+                    {line}
+                  </p>
+                ))
+              ) : (
+                <p className={styles.blockMuted}>Set sender address in Organization settings.</p>
+              )}
             </div>
             <div className={styles.headerRight}>
-              <div className={styles.logoBox}>Upload Logo</div>
+              <div className={styles.logoBox}>
+                {/* TODO(nick): Replace temporary logo URL link with uploaded logo image rendering. */}
+                {senderLogoUrl ? (
+                  <a
+                    className={styles.logoUrlLink}
+                    href={senderLogoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {senderLogoUrl}
+                  </a>
+                ) : (
+                  "No logo URL set"
+                )}
+              </div>
               {titlePresentation === "header" ? (
                 <div className={styles.sheetTitleValue}>{estimateTitle || "Untitled"}</div>
               ) : (
@@ -499,9 +537,6 @@ export function EstimateSheet({
         ),
         totals: () => (
           <>
-            {readOnly && showReadOnlyHint ? (
-              <p className={styles.readOnlyHint}>Read-only estimate. Clone or add new to edit.</p>
-            ) : null}
             <div className={styles.summary}>
               <div className={styles.summaryRow}>
                 <span>Subtotal</span>
@@ -563,15 +598,18 @@ export function EstimateSheet({
           <>
             <div className={styles.terms}>
               <h4>Terms and Conditions</h4>
-              <p>Payment is due within 14 days of project completion.</p>
-              <p>All checks to be made out to __________________.</p>
-              <p>Thank you for your business.</p>
+              {(termsText || organizationDefaults?.estimate_default_terms || "Not set")
+                .split("\n")
+                .filter((line) => line.trim())
+                .map((line, index) => (
+                  <p key={`${line}-${index}`}>{line}</p>
+                ))}
             </div>
 
             <div className={styles.footer}>
-              <span>Tel: +1 234 567 8901</span>
-              <span>Email: company@email.com</span>
-              <span>Web: company.com</span>
+              <span>{senderName || "Your Company"}</span>
+              <span>{senderEmail || "billing@example.com"}</span>
+              <span>{senderAddressLines[0] || "Set address in Organization settings"}</span>
             </div>
           </>
         ),
@@ -579,3 +617,5 @@ export function EstimateSheet({
     />
   );
 }
+
+export type { OrganizationDocumentDefaults };

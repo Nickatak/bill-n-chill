@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import { HomeRouteContent } from "./home-route-content";
+
+export const metadata: Metadata = {
+  title: "Home",
+};
 
 type HealthResponse = {
   data?: {

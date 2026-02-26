@@ -4,6 +4,11 @@ from core.views.shared_operations.accounting import (
     accounting_sync_event_retry_view,
     project_accounting_sync_events_view,
 )
+from core.views.shared_operations.organization_management import (
+    organization_membership_detail_view,
+    organization_memberships_view,
+    organization_profile_view,
+)
 from core.views.auth import health_view, login_view, me_view, register_view
 from core.views.estimating.budgets import budget_line_detail_view, project_budgets_view
 from core.views.change_orders.change_orders import (
@@ -70,6 +75,9 @@ __all__ = [
     "login_view",
     "register_view",
     "me_view",
+    "organization_profile_view",
+    "organization_memberships_view",
+    "organization_membership_detail_view",
     "project_accounting_sync_events_view",
     "accounting_sync_event_retry_view",
     "quick_add_customer_intake_view",

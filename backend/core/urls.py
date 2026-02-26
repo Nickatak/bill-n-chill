@@ -26,6 +26,9 @@ from core.views import (
     login_view,
     me_view,
     register_view,
+    organization_membership_detail_view,
+    organization_memberships_view,
+    organization_profile_view,
     accounting_sync_event_retry_view,
     attention_feed_view,
     change_impact_summary_view,
@@ -60,6 +63,17 @@ urlpatterns = [
     path("auth/login/", login_view, name="auth-login"),
     path("auth/register/", register_view, name="auth-register"),
     path("auth/me/", me_view, name="auth-me"),
+    path("organization/", organization_profile_view, name="organization-profile"),
+    path(
+        "organization/memberships/",
+        organization_memberships_view,
+        name="organization-memberships",
+    ),
+    path(
+        "organization/memberships/<int:membership_id>/",
+        organization_membership_detail_view,
+        name="organization-membership-detail",
+    ),
     path("customers/quick-add/", quick_add_customer_intake_view, name="customers-quick-add"),
     # Canonical customer-management routes.
     path("customers/", customers_list_view, name="customers-list"),

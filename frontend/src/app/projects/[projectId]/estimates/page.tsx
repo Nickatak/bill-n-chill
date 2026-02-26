@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { EstimatesConsole } from "@/features/estimates";
 import { redirect } from "next/navigation";
 import styles from "../../../estimates/page.module.css";
@@ -6,6 +7,14 @@ type ProjectEstimatesPageProps = {
   params: Promise<{ projectId: string }>;
   searchParams: Promise<{ estimate?: string }>;
 };
+
+export async function generateMetadata({ params }: ProjectEstimatesPageProps): Promise<Metadata> {
+  const { projectId } = await params;
+  if (/^\d+$/.test(projectId)) {
+    return { title: `Project #${projectId} Estimates` };
+  }
+  return { title: "Project Estimates" };
+}
 
 export default async function ProjectEstimatesPage({
   params,

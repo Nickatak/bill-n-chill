@@ -4,6 +4,7 @@ export type ProjectRecord = { id: number; name: string; customer_display_name: s
 
 export type BudgetLineRecord = {
   id: number;
+  scope_item?: number | null;
   cost_code: number;
   cost_code_code: string;
   description: string;
@@ -19,6 +20,8 @@ export type ChangeOrderLineRecord = {
   budget_line_cost_code: string;
   budget_line_description: string;
   description: string;
+  line_type?: "scope" | "adjustment";
+  adjustment_reason?: string;
   amount_delta: string;
   days_delta: number;
   created_at: string;

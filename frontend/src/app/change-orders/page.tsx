@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import { ChangeOrdersConsole } from "@/features/change-orders";
 import styles from "./page.module.css";
+
+export const metadata: Metadata = {
+  title: "Change Orders",
+};
 
 export default function ChangeOrdersPage() {
   return (

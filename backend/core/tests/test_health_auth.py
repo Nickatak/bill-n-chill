@@ -82,6 +82,39 @@ class AuthEndpointTests(TestCase):
             len(STARTER_COST_CODE_ROWS),
         )
 
+    def test_register_bootstraps_organization_invoice_defaults(self):
+        register_response = self.client.post(
+            "/api/v1/auth/register/",
+            data={"email": "defaults@example.com", "password": "secret123"},
+            content_type="application/json",
+        )
+        self.assertEqual(register_response.status_code, 201)
+
+        user = User.objects.get(email="defaults@example.com")
+        membership = OrganizationMembership.objects.select_related("organization").get(user=user)
+        organization = membership.organization
+
+        self.assertEqual(organization.invoice_sender_name, organization.display_name)
+        self.assertEqual(organization.invoice_sender_email, "defaults@example.com")
+        self.assertEqual(organization.invoice_default_due_days, 30)
+        self.assertEqual(
+            organization.invoice_default_terms,
+            "Payment due within 30 days of invoice date.",
+        )
+        self.assertEqual(
+            organization.estimate_default_terms,
+            "Estimate is valid for 30 days. Scope and pricing are based on visible conditions only; hidden conditions may require a change order.",
+        )
+        self.assertEqual(
+            organization.change_order_default_reason,
+            "Scope adjustment requested after baseline approval due to field conditions or owner request.",
+        )
+        self.assertEqual(organization.invoice_default_footer, "Thank you for your business.")
+        self.assertEqual(
+            organization.invoice_default_notes,
+            "Please include invoice number with your payment.",
+        )
+
     def test_register_rejects_duplicate_email(self):
         response = self.client.post(
             "/api/v1/auth/register/",

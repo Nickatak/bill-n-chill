@@ -25,6 +25,16 @@ class Organization(models.Model):
 
     display_name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=80, unique=True, null=True, blank=True)
+    logo_url = models.URLField(blank=True, default="")
+    invoice_sender_name = models.CharField(max_length=255, blank=True, default="")
+    invoice_sender_email = models.EmailField(blank=True, default="")
+    invoice_sender_address = models.TextField(blank=True, default="")
+    invoice_default_due_days = models.PositiveSmallIntegerField(default=30)
+    invoice_default_terms = models.TextField(blank=True, default="")
+    estimate_default_terms = models.TextField(blank=True, default="")
+    change_order_default_reason = models.TextField(blank=True, default="")
+    invoice_default_footer = models.TextField(blank=True, default="")
+    invoice_default_notes = models.TextField(blank=True, default="")
     created_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,

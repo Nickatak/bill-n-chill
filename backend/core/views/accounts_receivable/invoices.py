@@ -1,6 +1,5 @@
 """Accounts receivable invoice endpoints and state transitions."""
 
-from datetime import timedelta
 from decimal import Decimal
 
 from django.db import transaction
@@ -25,6 +24,7 @@ from core.views.accounts_receivable.invoice_ingress import (
 from core.views.helpers import (
     _apply_invoice_lines_and_totals,
     _calculate_invoice_line_totals,
+    _ensure_primary_membership,
     _enforce_invoice_scope_guard,
     _is_billable_invoice_status,
     _next_invoice_number,
@@ -38,6 +38,17 @@ from core.views.helpers import (
 
 
 def _invoice_line_apply_error_response(apply_error):
+    if "missing_budget_lines" in apply_error:
+        return (
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "One or more budget lines are invalid for this project's active budget.",
+                    "fields": {"budget_line": apply_error["missing_budget_lines"]},
+                }
+            },
+            400,
+        )
     if "missing_cost_codes" in apply_error:
         return (
             {
@@ -178,7 +189,13 @@ def project_invoices_view(request, project_id: int):
         rows = (
             Invoice.objects.filter(project=project, created_by_id__in=actor_user_ids)
             .select_related("customer")
-            .prefetch_related("line_items", "line_items__cost_code", "line_items__scope_item")
+            .prefetch_related(
+                "line_items",
+                "line_items__budget_line",
+                "line_items__budget_line__cost_code",
+                "line_items__cost_code",
+                "line_items__scope_item",
+            )
             .order_by("-created_at")
         )
         return Response({"data": InvoiceSerializer(rows, many=True).data})
@@ -189,10 +206,21 @@ def project_invoices_view(request, project_id: int):
 
     serializer = InvoiceWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
+    membership = _ensure_primary_membership(request.user)
+    organization = membership.organization
+    default_due_days = int(organization.invoice_default_due_days or 30)
+    default_due_days = max(1, min(default_due_days, 365))
     ingress = build_invoice_create_ingress(
         serializer.validated_data,
         default_issue_date=timezone.localdate(),
-        default_due_date=timezone.localdate() + timedelta(days=30),
+        default_due_days=default_due_days,
+        default_sender_name=(organization.invoice_sender_name or organization.display_name or "").strip(),
+        default_sender_email=(organization.invoice_sender_email or "").strip(),
+        default_sender_address=(organization.invoice_sender_address or "").strip(),
+        default_sender_logo_url=(organization.logo_url or "").strip(),
+        default_terms_text=(organization.invoice_default_terms or "").strip(),
+        default_footer_text=(organization.invoice_default_footer or "").strip(),
+        default_notes_text=(organization.invoice_default_notes or "").strip(),
     )
     line_items = ingress.line_items
     if not line_items:
@@ -229,6 +257,13 @@ def project_invoices_view(request, project_id: int):
             status=Invoice.Status.DRAFT,
             issue_date=issue_date,
             due_date=due_date,
+            sender_name=ingress.sender_name,
+            sender_email=ingress.sender_email,
+            sender_address=ingress.sender_address,
+            sender_logo_url=ingress.sender_logo_url,
+            terms_text=ingress.terms_text,
+            footer_text=ingress.footer_text,
+            notes_text=ingress.notes_text,
             tax_percent=ingress.tax_percent,
             created_by=request.user,
         )
@@ -344,9 +379,19 @@ def invoice_detail_view(request, invoice_id: int):
     """
     actor_user_ids = _organization_user_ids(request.user)
     try:
-        invoice = Invoice.objects.select_related("customer").get(
-            id=invoice_id,
-            created_by_id__in=actor_user_ids,
+        invoice = (
+            Invoice.objects.select_related("customer")
+            .prefetch_related(
+                "line_items",
+                "line_items__budget_line",
+                "line_items__budget_line__cost_code",
+                "line_items__cost_code",
+                "line_items__scope_item",
+            )
+            .get(
+                id=invoice_id,
+                created_by_id__in=actor_user_ids,
+            )
         )
     except Invoice.DoesNotExist:
         return Response(
@@ -400,6 +445,17 @@ def invoice_detail_view(request, invoice_id: int):
         )
 
     totals_changing = ingress.has_line_items or ingress.has_tax_percent
+    template_changing = any(
+        [
+            ingress.has_sender_name,
+            ingress.has_sender_email,
+            ingress.has_sender_address,
+            ingress.has_sender_logo_url,
+            ingress.has_terms_text,
+            ingress.has_footer_text,
+            ingress.has_notes_text,
+        ]
+    )
     candidate_total = invoice.total
     if ingress.has_line_items:
         line_items = ingress.line_items
@@ -431,6 +487,7 @@ def invoice_detail_view(request, invoice_id: int):
         line_items_for_preview = [
             {
                 "line_type": line.line_type,
+                "budget_line": line.budget_line_id,
                 "cost_code": line.cost_code_id,
                 "scope_item": line.scope_item_id,
                 "adjustment_reason": line.adjustment_reason,
@@ -486,6 +543,27 @@ def invoice_detail_view(request, invoice_id: int):
         if ingress.has_tax_percent:
             invoice.tax_percent = ingress.tax_percent
             update_fields.append("tax_percent")
+        if ingress.has_sender_name:
+            invoice.sender_name = (ingress.sender_name or "").strip()
+            update_fields.append("sender_name")
+        if ingress.has_sender_email:
+            invoice.sender_email = (ingress.sender_email or "").strip()
+            update_fields.append("sender_email")
+        if ingress.has_sender_address:
+            invoice.sender_address = (ingress.sender_address or "").strip()
+            update_fields.append("sender_address")
+        if ingress.has_sender_logo_url:
+            invoice.sender_logo_url = (ingress.sender_logo_url or "").strip()
+            update_fields.append("sender_logo_url")
+        if ingress.has_terms_text:
+            invoice.terms_text = (ingress.terms_text or "").strip()
+            update_fields.append("terms_text")
+        if ingress.has_footer_text:
+            invoice.footer_text = (ingress.footer_text or "").strip()
+            update_fields.append("footer_text")
+        if ingress.has_notes_text:
+            invoice.notes_text = (ingress.notes_text or "").strip()
+            update_fields.append("notes_text")
         if len(update_fields) > 1:
             invoice.save(update_fields=update_fields)
 
@@ -504,6 +582,7 @@ def invoice_detail_view(request, invoice_id: int):
             existing_lines = [
                 {
                     "line_type": line.line_type,
+                    "budget_line": line.budget_line_id,
                     "cost_code": line.cost_code_id,
                     "scope_item": line.scope_item_id,
                     "adjustment_reason": line.adjustment_reason,
@@ -527,7 +606,7 @@ def invoice_detail_view(request, invoice_id: int):
             )
             invoice.save(update_fields=["balance_due", "updated_at"])
 
-        if previous_status != next_status or totals_changing:
+        if previous_status != next_status or totals_changing or template_changing:
             if previous_status != next_status:
                 _record_invoice_status_event(
                     invoice=invoice,
@@ -550,6 +629,7 @@ def invoice_detail_view(request, invoice_id: int):
                     "invoice_number": invoice.invoice_number,
                     "totals_changed": totals_changing,
                     "status_changed": previous_status != next_status,
+                    "template_changed": template_changing,
                 },
             )
 

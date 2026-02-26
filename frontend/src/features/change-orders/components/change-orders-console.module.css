@@ -122,6 +122,57 @@
   font-weight: 700;
 }
 
+.formContextValueRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.editStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 2px 8px;
+  font-size: 0.66rem;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.editStatusDraft {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1e3a8a;
+}
+
+.editStatusPendingApproval {
+  background: #fef3c7;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+.editStatusApproved {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.editStatusRejected {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.editStatusVoid {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
 .roleReadOnlyNote {
   margin: 0 0 12px;
   border: 1px solid #fcd34d;
@@ -693,6 +744,27 @@
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
 }
 
+.lockableControl {
+  min-width: 0;
+}
+
+.editSheetLocked .lockableControl:disabled {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.editSheetLocked .lockableControl:disabled::placeholder {
+  color: #94a3b8;
+}
+
+.editSheetLocked .coReadValue {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+
 .coMetaField {
   min-width: 0;
 }
@@ -732,7 +804,15 @@
 
 .coLineHeader {
   display: grid;
-  grid-template-columns: minmax(190px, 1.2fr) minmax(220px, 1.4fr) 150px 140px 120px 90px;
+  grid-template-columns:
+    minmax(120px, 0.9fr)
+    minmax(180px, 1.2fr)
+    minmax(190px, 1.2fr)
+    minmax(220px, 1.4fr)
+    150px
+    140px
+    120px
+    90px;
   gap: 8px;
   align-items: center;
   padding: 10px;
@@ -742,17 +822,25 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
-  min-width: 920px;
+  min-width: 1380px;
 }
 
 .coLineRow {
   display: grid;
-  grid-template-columns: minmax(190px, 1.2fr) minmax(220px, 1.4fr) 150px 140px 120px 90px;
+  grid-template-columns:
+    minmax(120px, 0.9fr)
+    minmax(180px, 1.2fr)
+    minmax(190px, 1.2fr)
+    minmax(220px, 1.4fr)
+    150px
+    140px
+    120px
+    90px;
   gap: 8px;
   align-items: center;
   padding: 9px 10px;
   background: #ffffff;
-  min-width: 920px;
+  min-width: 1380px;
 }
 
 .coLineRowGroup {
@@ -875,6 +963,15 @@
 
 .coSheetFooter button.coFooterPrimaryButton {
   border-radius: 10px;
+}
+
+.coSheetFooter button.coFooterPrimaryButton:disabled {
+  background: #94a3b8;
+  border-color: #94a3b8;
+  color: #e2e8f0;
+  cursor: not-allowed;
+  box-shadow: none;
+  opacity: 0.85;
 }
 
 @media (min-width: 980px) {
@@ -1158,6 +1255,36 @@
   color: #fbbf24;
 }
 
+:global(html[data-theme="dark"]) .editStatusDraft {
+  background: #1d4ed8;
+  border-color: #60a5fa;
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .editStatusPendingApproval {
+  background: #b45309;
+  border-color: #f59e0b;
+  color: #fef3c7;
+}
+
+:global(html[data-theme="dark"]) .editStatusApproved {
+  background: #15803d;
+  border-color: #22c55e;
+  color: #dcfce7;
+}
+
+:global(html[data-theme="dark"]) .editStatusRejected {
+  background: #991b1b;
+  border-color: #ef4444;
+  color: #fee2e2;
+}
+
+:global(html[data-theme="dark"]) .editStatusVoid {
+  background: #4b5563;
+  border-color: #9ca3af;
+  color: #f3f4f6;
+}
+
 :global(html[data-theme="dark"]) .viewerHistoryDraft {
   border-color: #3b82f6;
   background: linear-gradient(180deg, rgba(29, 78, 216, 0.24), #0b1220);
@@ -1239,6 +1366,13 @@
 :global(html[data-theme="dark"]) .statusEventRejected {
   background: #7f1d1d;
   color: #fecaca;
+}
+
+:global(html[data-theme="dark"]) .coSheetFooter button.coFooterPrimaryButton:disabled {
+  background: #334155;
+  border-color: #475569;
+  color: #94a3b8;
+  opacity: 1;
 }
 
 :global(html[data-theme="dark"]) .coLineSectionIntro h3 {
@@ -1341,6 +1475,22 @@
 :global(html[data-theme="dark"]) .editSheet {
   border-color: #334155;
   box-shadow: 0 14px 26px rgba(2, 6, 23, 0.35);
+}
+
+:global(html[data-theme="dark"]) .editSheetLocked .lockableControl:disabled {
+  background: #0f172a;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .editSheetLocked .lockableControl:disabled::placeholder {
+  color: #64748b;
+}
+
+:global(html[data-theme="dark"]) .editSheetLocked .coReadValue {
+  background: #0f172a;
+  border-color: #334155;
+  color: #94a3b8;
 }
 
 :global(html[data-theme="dark"]) .coFooterErrorHint {

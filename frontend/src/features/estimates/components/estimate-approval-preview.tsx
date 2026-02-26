@@ -107,6 +107,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
             estimateTitle={estimate.title || "Untitled"}
             estimateDate={estimateDate}
             validThrough={validThrough}
+            termsText={estimate.terms_text || ""}
             taxPercent={taxPercent}
             lineItems={lineItems}
             lineTotals={lineTotals}
@@ -127,6 +128,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
             onTitleChange={() => undefined}
             onValidThroughChange={() => undefined}
             onTaxPercentChange={() => undefined}
+            onTermsTextChange={() => undefined}
             onLineItemChange={() => undefined}
             onAddLineItem={() => undefined}
             onMoveLineItem={() => undefined}

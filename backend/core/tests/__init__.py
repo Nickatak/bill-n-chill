@@ -12,6 +12,10 @@ from core.tests.test_projects_cost_codes import CostCodeTests, ProjectProfileTes
 from core.tests.test_vendor_bills import VendorBillTests
 from core.tests.test_vendors import VendorTests
 from core.tests.test_accounting_sync import AccountingSyncEventTests
+from core.tests.test_organization_management import OrganizationManagementTests
+from core.tests.test_organization_invoice_defaults_backfill import (
+    OrganizationInvoiceDefaultsBackfillCommandTests,
+)
 
 __all__ = [
     "HealthEndpointTests",
@@ -30,4 +34,6 @@ __all__ = [
     "PaymentTests",
     "VendorBillTests",
     "AccountingSyncEventTests",
+    "OrganizationManagementTests",
+    "OrganizationInvoiceDefaultsBackfillCommandTests",
 ]

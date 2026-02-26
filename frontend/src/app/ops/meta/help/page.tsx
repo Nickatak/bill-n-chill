@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import shell from "@/app/wip-shell.module.css";
 import styles from "./page.module.css";
+
+export const metadata: Metadata = {
+  title: "Help",
+};
 
 const quickStartSteps = [
   {

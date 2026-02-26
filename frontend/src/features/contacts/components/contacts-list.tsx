@@ -33,6 +33,10 @@ function projectStatusLabel(status: string): string {
   return status.replaceAll("_", " ");
 }
 
+function projectStatusSummaryLabel(status: ProjectStatusKey, count: number): string {
+  return `${count} ${projectStatusLabel(status)}`;
+}
+
 function projectStatusClass(status: string): string {
   if (status === "prospect") {
     return styles.projectStatusProspect;
@@ -83,9 +87,22 @@ export function ContactsList({
             const projects = projectsByCustomer[row.id] ?? [];
             const isInactive = Boolean(row.is_archived);
             const isExpanded = visibleOpenCustomerId === row.id;
-            const prospectCount = projects.filter((project) => project.status === "prospect").length;
-            const activeCount = projects.filter((project) => project.status === "active").length;
-            const onHoldCount = projects.filter((project) => project.status === "on_hold").length;
+            const projectCountsByStatus = PROJECT_STATUS_ORDER.reduce(
+              (acc, status) => {
+                acc[status] = projects.filter((project) => project.status === status).length;
+                return acc;
+              },
+              {
+                prospect: 0,
+                active: 0,
+                on_hold: 0,
+                completed: 0,
+                cancelled: 0,
+              } as Record<ProjectStatusKey, number>,
+            );
+            const summaryStatuses = PROJECT_STATUS_ORDER.filter(
+              (status) => projectCountsByStatus[status] > 0,
+            );
             const customerStatusFilters = projectStatusFiltersByCustomer[row.id] ?? ALL_PROJECT_STATUS_FILTERS;
             const visibleProjects = projects.filter(
               (project) => customerStatusFilters[project.status as ProjectStatusKey] ?? true,
@@ -127,37 +144,21 @@ export function ContactsList({
                         setOpenCustomerId((current) => (current === row.id ? null : row.id))
                       }
                     >
-                      <span className={styles.projectAccordionSummary}>
-                        {projects.length} project{projects.length === 1 ? "" : "s"}
-                      </span>
                       <span className={styles.projectAccordionStatusList}>
-                        {prospectCount > 0 ? (
+                        {summaryStatuses.map((status) => (
                           <span
-                            className={`${styles.projectStatusPill} ${styles.projectStatusProspect}`}
-                            title={`${prospectCount} prospect project${prospectCount === 1 ? "" : "s"}`}
+                            key={`${row.id}-${status}-summary`}
+                            className={`${styles.projectStatusPill} ${projectStatusClass(status)}`}
+                            title={`${projectStatusSummaryLabel(status, projectCountsByStatus[status])} project${
+                              projectCountsByStatus[status] === 1 ? "" : "s"
+                            }`}
                           >
-                            {prospectCount}
+                            {projectStatusSummaryLabel(status, projectCountsByStatus[status])}
                           </span>
-                        ) : null}
-                        {activeCount > 0 ? (
-                          <span
-                            className={`${styles.projectStatusPill} ${styles.projectStatusActive}`}
-                            title={`${activeCount} active project${activeCount === 1 ? "" : "s"}`}
-                          >
-                            {activeCount}
-                          </span>
-                        ) : null}
-                        {onHoldCount > 0 ? (
-                          <span
-                            className={`${styles.projectStatusPill} ${styles.projectStatusOnHold}`}
-                            title={`${onHoldCount} on-hold project${onHoldCount === 1 ? "" : "s"}`}
-                          >
-                            {onHoldCount}
-                          </span>
-                        ) : null}
+                        ))}
                       </span>
                       <span className={styles.projectAccordionCaret}>
-                        {isExpanded ? "Hide" : "Show"}
+                        {isExpanded ? "Hide projects" : "Show projects"}
                       </span>
                     </button>
                     <button
@@ -173,7 +174,7 @@ export function ContactsList({
                     <div id={`customer-projects-${row.id}`} className={styles.projectAccordionBody}>
                       <div className={styles.projectFilterBar}>
                         {PROJECT_STATUS_ORDER.map((status) => {
-                          const count = projects.filter((project) => project.status === status).length;
+                          const count = projectCountsByStatus[status];
                           const enabled = customerStatusFilters[status];
                           return (
                             <button

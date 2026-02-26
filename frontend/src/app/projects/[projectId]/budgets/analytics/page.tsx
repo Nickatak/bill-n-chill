@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { BudgetAnalyticsConsole } from "@/features/budgets";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -6,6 +7,16 @@ import shell from "@/app/wip-shell.module.css";
 type ProjectBudgetAnalyticsPageProps = {
   params: Promise<{ projectId: string }>;
 };
+
+export async function generateMetadata({
+  params,
+}: ProjectBudgetAnalyticsPageProps): Promise<Metadata> {
+  const { projectId } = await params;
+  if (/^\d+$/.test(projectId)) {
+    return { title: `Project #${projectId} Budget Analytics` };
+  }
+  return { title: "Project Budget Analytics" };
+}
 
 export default async function ProjectBudgetAnalyticsPage({
   params,

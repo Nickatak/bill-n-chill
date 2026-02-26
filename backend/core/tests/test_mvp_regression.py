@@ -90,7 +90,7 @@ class MvpRegressionMoneyLoopTests(TestCase):
         self.assertIn(budget_convert.status_code, {200, 201})
         budget = budget_convert.json()["data"]
         self.assertEqual(budget["status"], "active")
-        self.assertEqual(len(budget["line_items"]), 2)
+        self.assertEqual(len(budget["line_items"]), 5)
 
         create_co = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
@@ -129,6 +129,7 @@ class MvpRegressionMoneyLoopTests(TestCase):
             data={
                 "line_items": [
                     {
+                        "budget_line": budget["line_items"][0]["id"],
                         "description": "Draw 1",
                         "quantity": "1",
                         "unit": "ea",
@@ -185,7 +186,12 @@ class MvpRegressionMoneyLoopTests(TestCase):
         )
         vendor_bill_create = self.client.post(
             f"/api/v1/projects/{self.project.id}/vendor-bills/",
-            data={"vendor": vendor.id, "bill_number": "VB-100", "total": "500.00"},
+            data={
+                "vendor": vendor.id,
+                "bill_number": "VB-100",
+                "status": "planned",
+                "total": "500.00",
+            },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )

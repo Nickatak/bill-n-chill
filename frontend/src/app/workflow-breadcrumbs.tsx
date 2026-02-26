@@ -68,8 +68,8 @@ const hierarchyRules: HierarchyRule[] = [
   },
   {
     when: (pathname) =>
-      /^\/projects\/\d+\/vendor-bills$/.test(pathname),
-    crumbs: [BILLING_HUB_CRUMB, { href: "/vendor-bills", label: "Vendor Bills" }],
+      pathname === "/bills",
+    crumbs: [BILLING_HUB_CRUMB, { href: "/bills", label: "Bills" }],
   },
   {
     when: (pathname) =>
@@ -151,7 +151,7 @@ function isLegacyProjectScopedRoute(pathname: string): boolean {
 }
 
 function isBillingRoute(pathname: string): boolean {
-  return pathname === "/invoices" || /^\/projects\/\d+\/vendor-bills$/.test(pathname);
+  return pathname === "/invoices" || pathname === "/bills";
 }
 
 function projectScopedHref(href: string, projectId: string): string {
@@ -170,8 +170,8 @@ function projectScopedHref(href: string, projectId: string): string {
   if (href === "/invoices") {
     return `/invoices?project=${encodeURIComponent(projectId)}`;
   }
-  if (href === "/vendor-bills") {
-    return `/projects/${encodeURIComponent(projectId)}/vendor-bills`;
+  if (href === "/bills") {
+    return `/bills?project=${encodeURIComponent(projectId)}`;
   }
   if (href === "/activity") {
     return `/projects/${encodeURIComponent(projectId)}/activity`;

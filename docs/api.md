@@ -99,6 +99,50 @@ bill-n-chill currently uses DRF token authentication for API access.
   - `bookkeeping`: invoice/vendor-bill/payment/accounting-sync writes.
   - `viewer`: read-only across protected surfaces.
 
+## Organization Management (OPS-ORG-01)
+
+- `GET /api/v1/organization/`
+  - Auth required
+  - Returns:
+    - `organization` profile/settings
+    - `current_membership`
+    - `active_member_count`
+    - `role_policy`
+
+- `PATCH /api/v1/organization/`
+  - Auth required
+  - Role guard: `owner`, `pm`
+  - Supports updating:
+    - `display_name`
+    - `slug`
+    - `logo_url`
+    - `invoice_sender_name`
+    - `invoice_sender_email`
+    - `invoice_sender_address`
+    - `invoice_default_due_days` (`1..365`)
+    - `invoice_default_terms`
+    - `invoice_default_footer`
+    - `invoice_default_notes`
+  - Audit behavior:
+    - appends immutable `OrganizationRecord(event_type=updated, capture_source=manual_ui)`
+
+- `GET /api/v1/organization/memberships/`
+  - Auth required
+  - Returns organization-scoped membership list plus `role_policy`.
+
+- `PATCH /api/v1/organization/memberships/{membership_id}/`
+  - Auth required
+  - Role guard: `owner`
+  - Supports updating:
+    - `role`
+    - `status`
+  - Safety guards:
+    - self-disable blocked
+    - self-owner-downgrade blocked
+    - last-active-owner removal blocked
+  - Audit behavior:
+    - appends immutable `OrganizationMembershipRecord` for role/status changes.
+
 ## Customer Intake (INT-01)
 
 - `POST /api/v1/customers/quick-add/`
@@ -478,7 +522,14 @@ CO-02 extends existing CO endpoints with propagation behavior.
   - Auth required
   - Creates a new invoice in `draft` with:
     - `issue_date` (optional; defaults to today)
-    - `due_date` (optional; defaults to `issue_date + 30 days`)
+    - `due_date` (optional; defaults to `issue_date + organization.invoice_default_due_days`)
+    - `sender_name` (optional; defaults to org invoice sender name/display name)
+    - `sender_email` (optional; defaults to org invoice sender email)
+    - `sender_address` (optional; defaults to org invoice sender address)
+    - `sender_logo_url` (optional; defaults to org logo URL)
+    - `terms_text` (optional; defaults to org invoice terms template)
+    - `footer_text` (optional; defaults to org invoice footer template)
+    - `notes_text` (optional; defaults to org invoice notes template)
     - `tax_percent` (optional; default `0`)
     - `line_items[]` (required)
       - `line_type` (optional; `scope` or `adjustment`, default `scope`)
@@ -515,6 +566,13 @@ CO-02 extends existing CO endpoints with propagation behavior.
     - `status`
     - `issue_date`
     - `due_date`
+    - `sender_name`
+    - `sender_email`
+    - `sender_address`
+    - `sender_logo_url`
+    - `terms_text`
+    - `footer_text`
+    - `notes_text`
     - `tax_percent`
     - `line_items` (replaces existing lines)
       - accepts same line schema as create (`line_type`, `scope_item`, adjustment metadata)

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import shell from "@/app/wip-shell.module.css";
@@ -5,6 +6,14 @@ import shell from "@/app/wip-shell.module.css";
 type ProjectExpensesPageProps = {
   params: Promise<{ projectId: string }>;
 };
+
+export async function generateMetadata({ params }: ProjectExpensesPageProps): Promise<Metadata> {
+  const { projectId } = await params;
+  if (/^\d+$/.test(projectId)) {
+    return { title: `Project #${projectId} Expenses` };
+  }
+  return { title: "Project Expenses" };
+}
 
 export default async function ProjectExpensesPage({ params }: ProjectExpensesPageProps) {
   const { projectId } = await params;
@@ -28,8 +37,8 @@ export default async function ProjectExpensesPage({ params }: ProjectExpensesPag
             <Link className={shell.linkButton} href={`/projects?project=${projectId}`}>
               Back to Project Hub
             </Link>
-            <Link className={shell.linkButton} href={`/projects/${projectId}/vendor-bills`}>
-              Next: Vendor Bills
+            <Link className={shell.linkButton} href={`/bills?project=${projectId}`}>
+              Next: Bills
             </Link>
           </div>
         </header>
@@ -50,7 +59,7 @@ export default async function ProjectExpensesPage({ params }: ProjectExpensesPag
             that still require budget attribution and downstream AP traceability.
           </p>
           <p className={shell.sectionCopy}>
-            This route complements Vendor Bills by covering ad hoc spend rather than formal vendor
+            This route complements Bills by covering ad hoc spend rather than formal vendor
             contract billing.
           </p>
         </section>

@@ -75,6 +75,13 @@ class Invoice(models.Model):
     )
     issue_date = models.DateField()
     due_date = models.DateField()
+    sender_name = models.CharField(max_length=255, blank=True, default="")
+    sender_email = models.EmailField(blank=True, default="")
+    sender_address = models.TextField(blank=True, default="")
+    sender_logo_url = models.URLField(blank=True, default="")
+    terms_text = models.TextField(blank=True, default="")
+    footer_text = models.TextField(blank=True, default="")
+    notes_text = models.TextField(blank=True, default="")
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     tax_percent = models.DecimalField(max_digits=6, decimal_places=2, default=0)
     tax_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -160,7 +167,8 @@ class InvoiceLine(models.Model):
     - Canonical invoice row used for both customer-facing and internal-facing views.
     - Customer view uses billed descriptors/amounts; internal view can additionally
       use linkage metadata (for example `line_type`, `scope_item`).
-    - May reference cost code and/or canonical scope identity for internal traceability.
+    - Scope lines are anchored to a project budget line for deterministic attribution.
+    - May additionally reference cost code/scope identity metadata for internal traceability.
     """
 
     class LineType(models.TextChoices):
@@ -171,6 +179,13 @@ class InvoiceLine(models.Model):
         "Invoice",
         on_delete=models.CASCADE,
         related_name="line_items",
+    )
+    budget_line = models.ForeignKey(
+        "BudgetLine",
+        on_delete=models.PROTECT,
+        related_name="invoice_lines",
+        null=True,
+        blank=True,
     )
     cost_code = models.ForeignKey(
         "CostCode",

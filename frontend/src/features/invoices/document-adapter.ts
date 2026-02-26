@@ -23,6 +23,13 @@ type InvoiceStatusEvent = {
 type InvoiceFormState = {
   issueDate: string;
   dueDate: string;
+  senderName: string;
+  senderEmail: string;
+  senderAddress: string;
+  senderLogoUrl: string;
+  termsText: string;
+  footerText: string;
+  notesText: string;
   taxPercent: string;
   subtotal: number;
   taxAmount: number;
@@ -72,7 +79,6 @@ export function createInvoiceDocumentAdapter(
     getDraftLines: (form) =>
       form.lineItems.map((line) => ({
         localId: line.localId,
-        costCodeId: line.costCodeId,
         description: line.description,
         quantity: line.quantity,
         unit: line.unit,
@@ -87,9 +93,19 @@ export function createInvoiceDocumentAdapter(
     toCreatePayload: (form) => ({
       issue_date: form.issueDate,
       due_date: form.dueDate,
+      sender_name: form.senderName,
+      sender_email: form.senderEmail,
+      sender_address: form.senderAddress,
+      sender_logo_url: form.senderLogoUrl,
+      terms_text: form.termsText,
+      footer_text: form.footerText,
+      notes_text: form.notesText,
       tax_percent: form.taxPercent,
       line_items: form.lineItems.map((line) => ({
-        cost_code: line.costCodeId ? Number(line.costCodeId) : null,
+        line_type: line.lineType,
+        budget_line: line.budgetLineId ? Number(line.budgetLineId) : null,
+        adjustment_reason: line.adjustmentReason,
+        internal_note: line.internalNote,
         description: line.description,
         quantity: line.quantity,
         unit: line.unit,
@@ -99,9 +115,19 @@ export function createInvoiceDocumentAdapter(
     toUpdatePayload: (form) => ({
       issue_date: form.issueDate,
       due_date: form.dueDate,
+      sender_name: form.senderName,
+      sender_email: form.senderEmail,
+      sender_address: form.senderAddress,
+      sender_logo_url: form.senderLogoUrl,
+      terms_text: form.termsText,
+      footer_text: form.footerText,
+      notes_text: form.notesText,
       tax_percent: form.taxPercent,
       line_items: form.lineItems.map((line) => ({
-        cost_code: line.costCodeId ? Number(line.costCodeId) : null,
+        line_type: line.lineType,
+        budget_line: line.budgetLineId ? Number(line.budgetLineId) : null,
+        adjustment_reason: line.adjustmentReason,
+        internal_note: line.internalNote,
         description: line.description,
         quantity: line.quantity,
         unit: line.unit,

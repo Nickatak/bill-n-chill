@@ -25,6 +25,8 @@ from core.policies import get_change_order_policy_contract
 from core.serializers import ChangeOrderSerializer, ChangeOrderWriteSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
+    SYSTEM_BUDGET_LINE_CODES,
+    _ensure_primary_membership,
     _get_active_budget_for_project,
     _next_change_order_family_key,
     _organization_user_ids,
@@ -97,8 +99,15 @@ def project_change_orders_view(request, project_id: int):
     serializer = ChangeOrderWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
+    membership = _ensure_primary_membership(request.user)
+    organization = membership.organization
     incoming_line_items = data.get("line_items", [])
     origin_estimate = None
+    reason_text = (
+        str(data["reason"]).strip()
+        if "reason" in data
+        else (organization.change_order_default_reason or "").strip()
+    )
 
     fields = {}
     if "title" not in data:
@@ -171,7 +180,7 @@ def project_change_orders_view(request, project_id: int):
                 status=ChangeOrder.Status.DRAFT,
                 amount_delta=data["amount_delta"],
                 days_delta=data.get("days_delta", 0),
-                reason=data.get("reason", ""),
+                reason=reason_text,
                 origin_estimate=origin_estimate,
                 requested_by=request.user,
             )
@@ -244,18 +253,30 @@ def change_order_detail_view(request, change_order_id: int):
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
     incoming_line_items = data.get("line_items", None)
+    content_fields = {"title", "reason", "amount_delta", "days_delta", "origin_estimate", "line_items"}
+    attempted_content_fields = sorted(field for field in content_fields if field in data)
 
     latest_revision_exists = ChangeOrder.objects.filter(
         project=change_order.project,
         family_key=change_order.family_key,
         revision_number__gt=change_order.revision_number,
     ).exists()
-    if latest_revision_exists:
+    if latest_revision_exists and attempted_content_fields:
         return _validation_error_response(
             message="Only the latest change-order revision can be edited.",
             fields={"change_order": ["Create or edit the latest revision for this family."]},
             rule="co_edit_latest_revision_only",
         )
+    if change_order.status != ChangeOrder.Status.DRAFT:
+        if attempted_content_fields:
+            return _validation_error_response(
+                message="Only draft change orders can edit content fields.",
+                fields={
+                    field: ["This field is read-only after draft. Clone a new revision to change content."]
+                    for field in attempted_content_fields
+                },
+                rule="co_edit_requires_draft_status",
+            )
 
     previous_status = change_order.status
     current_amount_delta = quantize_money(change_order.amount_delta)
@@ -535,6 +556,8 @@ def change_order_clone_revision_view(request, change_order_id: int):
                 {
                     "budget_line": line.budget_line_id,
                     "description": line.description,
+                    "line_type": line.line_type,
+                    "adjustment_reason": line.adjustment_reason,
                     "amount_delta": str(line.amount_delta),
                     "days_delta": line.days_delta,
                 }
@@ -629,6 +652,50 @@ def _validate_change_order_lines(*, project, line_items):
 
     total = MONEY_ZERO
     for row in line_items:
+        budget_line_id = int(row["budget_line"])
+        budget_line = line_map[budget_line_id]
+        line_type = row.get("line_type", ChangeOrderLine.LineType.SCOPE)
+        adjustment_reason = str(row.get("adjustment_reason", "")).strip()
+
+        if line_type == ChangeOrderLine.LineType.SCOPE:
+            if (
+                budget_line.cost_code
+                and budget_line.cost_code.code in SYSTEM_BUDGET_LINE_CODES
+            ):
+                return (
+                    {},
+                    MONEY_ZERO,
+                    _validation_error_response(
+                        message="Scope lines cannot use internal generic budget lines.",
+                        fields={"line_items": ["Scope lines must use estimate-derived budget lines."]},
+                        rule="co_line_scope_budget_line_disallows_generic",
+                    ),
+                )
+        elif line_type == ChangeOrderLine.LineType.ADJUSTMENT:
+            if not adjustment_reason:
+                return (
+                    {},
+                    MONEY_ZERO,
+                    _validation_error_response(
+                        message="Adjustment lines require adjustment_reason.",
+                        fields={"line_items": ["Provide adjustment_reason for adjustment lines."]},
+                        rule="co_line_adjustment_requires_reason",
+                    ),
+                )
+            if (
+                not budget_line.cost_code
+                or budget_line.cost_code.code not in SYSTEM_BUDGET_LINE_CODES
+            ):
+                return (
+                    {},
+                    MONEY_ZERO,
+                    _validation_error_response(
+                        message="Adjustment lines must use generic adjustment budget lines.",
+                        fields={"line_items": ["Adjustment lines must target a generic system budget line."]},
+                        rule="co_line_adjustment_requires_generic_budget_line",
+                    ),
+                )
+
         total = quantize_money(total + Decimal(str(row["amount_delta"])))
     return line_map, total, None
 
@@ -640,6 +707,8 @@ def _sync_change_order_lines(*, change_order, line_items, line_map):
             change_order=change_order,
             budget_line=line_map[int(row["budget_line"])],
             description=row.get("description", ""),
+            line_type=row.get("line_type", ChangeOrderLine.LineType.SCOPE),
+            adjustment_reason=str(row.get("adjustment_reason", "")).strip(),
             amount_delta=quantize_money(row["amount_delta"]),
             days_delta=row.get("days_delta", 0),
         )
@@ -694,6 +763,8 @@ def _record_change_order_decision_snapshot(
                 "cost_code_code": row.budget_line.cost_code.code,
                 "cost_code_name": row.budget_line.cost_code.name,
                 "description": row.description,
+                "line_type": row.line_type,
+                "adjustment_reason": row.adjustment_reason,
                 "amount_delta": str(row.amount_delta),
                 "days_delta": row.days_delta,
             }
@@ -731,6 +802,8 @@ def _infer_model_validation_rule(*, fields: dict) -> str | None:
         return "co_origin_estimate_project_scope"
     if {"budget_line", "line_items"} & field_keys:
         return "co_line_budget_line_invalid"
+    if {"adjustment_reason", "line_type"} & field_keys:
+        return "co_line_adjustment_requires_reason"
     return None
 
 
