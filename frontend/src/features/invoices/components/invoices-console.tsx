@@ -3,7 +3,7 @@
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { formatDateDisplay } from "@/shared/date-format";
+import { formatDateDisplay, formatDateTimeDisplay } from "@/shared/date-format";
 import {
   defaultApiBaseUrl,
   fetchInvoicePolicyContract,
@@ -17,6 +17,7 @@ import {
   InvoiceLineInput,
   InvoicePolicyContract,
   InvoiceRecord,
+  InvoiceStatusEventRecord,
   OrganizationInvoiceDefaults,
   ProjectRecord,
 } from "../types";
@@ -205,6 +206,10 @@ export function InvoicesConsole() {
   const [costCodes, setCostCodes] = useState<CostCode[]>([]);
 
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
+  const [selectedInvoiceStatusEvents, setSelectedInvoiceStatusEvents] = useState<
+    InvoiceStatusEventRecord[]
+  >([]);
+  const [statusEventsLoading, setStatusEventsLoading] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("draft");
   const [invoiceStatuses, setInvoiceStatuses] = useState<string[]>(INVOICE_STATUSES_FALLBACK);
@@ -477,6 +482,32 @@ export function InvoicesConsole() {
     [normalizedBaseUrl, selectedProjectId, setErrorStatus, setNeutralStatus, token],
   );
 
+  const loadInvoiceStatusEvents = useCallback(
+    async (invoiceId: number) => {
+      if (!token || !invoiceId) {
+        setSelectedInvoiceStatusEvents([]);
+        return;
+      }
+      setStatusEventsLoading(true);
+      try {
+        const response = await fetch(`${normalizedBaseUrl}/invoices/${invoiceId}/status-events/`, {
+          headers: buildAuthHeaders(token),
+        });
+        const payload: ApiResponse = await response.json();
+        if (!response.ok) {
+          setSelectedInvoiceStatusEvents([]);
+          return;
+        }
+        setSelectedInvoiceStatusEvents((payload.data as InvoiceStatusEventRecord[]) ?? []);
+      } catch {
+        setSelectedInvoiceStatusEvents([]);
+      } finally {
+        setStatusEventsLoading(false);
+      }
+    },
+    [normalizedBaseUrl, token],
+  );
+
   useEffect(() => {
     if (!token) {
       return;
@@ -561,6 +592,16 @@ export function InvoicesConsole() {
     setSelectedInvoiceId(String(fallbackInvoice.id));
     setSelectedStatus(fallbackInvoice.status);
   }, [filteredInvoices, selectedInvoiceId]);
+
+  useEffect(() => {
+    const invoiceId = Number(selectedInvoiceId);
+    if (!invoiceId) {
+      setSelectedInvoiceStatusEvents([]);
+      setStatusEventsLoading(false);
+      return;
+    }
+    void loadInvoiceStatusEvents(invoiceId);
+  }, [loadInvoiceStatusEvents, selectedInvoiceId]);
 
   function addLineItem() {
     const defaultCostCodeId = costCodes[0] ? String(costCodes[0].id) : "";
@@ -702,6 +743,7 @@ export function InvoicesConsole() {
         current.map((invoice) => (invoice.id === updated.id ? updated : invoice)),
       );
       setSelectedStatus(updated.status);
+      await loadInvoiceStatusEvents(updated.id);
       setSuccessStatus(`Updated ${updated.invoice_number} to ${statusLabel(updated.status)}.`);
     } catch {
       setErrorStatus("Could not reach invoice status endpoint.");
@@ -742,6 +784,7 @@ export function InvoicesConsole() {
         current.map((invoice) => (invoice.id === updated.id ? updated : invoice)),
       );
       setSelectedStatus(updated.status);
+      await loadInvoiceStatusEvents(updated.id);
       setSuccessStatus(`Sent ${updated.invoice_number}.`);
     } catch {
       setErrorStatus("Could not reach invoice send endpoint.");
@@ -1127,6 +1170,50 @@ export function InvoicesConsole() {
                       </span>
                       <p>{invoiceNextActionHint(selectedInvoice.status)}</p>
                     </div>
+
+                    <section className={styles.statusHistoryBlock}>
+                      <div className={styles.statusHistoryHeader}>
+                        <h4>Status History</h4>
+                        <span>
+                          {statusEventsLoading
+                            ? "Loading..."
+                            : `${selectedInvoiceStatusEvents.length} event${
+                                selectedInvoiceStatusEvents.length === 1 ? "" : "s"
+                              }`}
+                        </span>
+                      </div>
+                      {selectedInvoiceStatusEvents.length ? (
+                        <div className={styles.statusHistoryTableWrap}>
+                          <table className={styles.statusHistoryTable}>
+                            <thead>
+                              <tr>
+                                <th>When</th>
+                                <th>Transition</th>
+                                <th>By</th>
+                                <th>Note</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {selectedInvoiceStatusEvents.map((event) => (
+                                <tr key={event.id}>
+                                  <td>{formatDateTimeDisplay(event.changed_at, "--")}</td>
+                                  <td>
+                                    {event.from_status ? statusLabel(event.from_status) : "—"} to{" "}
+                                    {statusLabel(event.to_status)}
+                                  </td>
+                                  <td>{event.changed_by_email || `User #${event.changed_by}`}</td>
+                                  <td>{event.note || "--"}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <p className={styles.inlineHint}>
+                          {statusEventsLoading ? "Loading status history..." : "No status history yet."}
+                        </p>
+                      )}
+                    </section>
 
                     <div className={styles.statusPicker}>
                       <span className={styles.lifecycleFieldLabel}>Next status</span>
