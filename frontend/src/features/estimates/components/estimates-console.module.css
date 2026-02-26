@@ -1252,6 +1252,11 @@
   color: #6b7280;
 }
 
+.statusNotated {
+  background: #e8edf4;
+  color: #475569;
+}
+
 .statusCreated {
   background: #e2e8f0;
   color: #475569;
@@ -1687,6 +1692,11 @@
 :global(html[data-theme="dark"]) .statusArchived {
   background: #334155;
   color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .statusNotated {
+  background: #2a3647;
+  color: #b8c7da;
 }
 
 :global(html[data-theme="dark"]) .statusCreated {

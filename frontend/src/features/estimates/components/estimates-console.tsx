@@ -295,6 +295,13 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     return actionByStatus[event.to_status] ?? formatEstimateStatus(event.to_status);
   }
 
+  function isNotatedStatusEvent(event: EstimateStatusEventRecord): boolean {
+    if (event.action_type === "notate") {
+      return true;
+    }
+    return event.from_status === event.to_status && (event.note || "").trim().length > 0;
+  }
+
   function formatEventDate(dateValue: string): string {
     return formatDateTimeDisplay(dateValue, dateValue);
   }
@@ -1498,7 +1505,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                     </thead>
                     <tbody>
                       {statusEvents.map((event) => {
-                        const toStatusClass = statusClasses[event.to_status] ?? "";
+                        const toStatusClass = isNotatedStatusEvent(event)
+                          ? styles.statusNotated
+                          : statusClasses[event.to_status] ?? "";
                         return (
                           <tr key={event.id}>
                             <td>
