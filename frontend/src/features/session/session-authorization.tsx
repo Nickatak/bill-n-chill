@@ -7,6 +7,7 @@ import { clearClientSession, type SessionOrganization, type SessionRole } from "
 import { useSharedSessionAuth } from "./use-shared-session";
 
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+const AUTH_FAILURE_STATUSES = new Set([401, 403]);
 
 type AuthorizationStatus = "checking" | "authorized" | "unauthorized";
 
@@ -29,7 +30,7 @@ type SessionAuthorizationProviderProps = {
 
 export function SessionAuthorizationProvider({ children }: SessionAuthorizationProviderProps) {
   const { token, role, organization, authMessage } = useSharedSessionAuth();
-  const [status, setStatus] = useState<AuthorizationStatus>(token ? "checking" : "unauthorized");
+  const [status, setStatus] = useState<AuthorizationStatus>(token ? "authorized" : "unauthorized");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const verifiedTokenRef = useRef("");
   const statusRef = useRef<AuthorizationStatus>(status);
@@ -42,11 +43,7 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
     let cancelled = false;
 
     async function verifyToken(candidateToken: string, runAsRefresh: boolean) {
-      if (runAsRefresh) {
-        setIsRefreshing(true);
-      } else {
-        setStatus("checking");
-      }
+      setIsRefreshing(true);
 
       try {
         const response = await fetch(`${defaultApiBaseUrl}/auth/me/`, {
@@ -57,10 +54,17 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
           return;
         }
         if (!response.ok) {
-          clearClientSession();
-          verifiedTokenRef.current = "";
-          setStatus("unauthorized");
-          setIsRefreshing(false);
+          if (AUTH_FAILURE_STATUSES.has(response.status)) {
+            clearClientSession();
+            verifiedTokenRef.current = "";
+            setStatus("unauthorized");
+            setIsRefreshing(false);
+            return;
+          }
+          // Preserve current authorized UI on transient upstream/CDN failures.
+          if (statusRef.current === "authorized" || runAsRefresh) {
+            setStatus("authorized");
+          }
           return;
         }
         verifiedTokenRef.current = candidateToken;
@@ -69,9 +73,12 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
         if (cancelled) {
           return;
         }
-        if (!runAsRefresh || statusRef.current !== "authorized") {
-          setStatus("unauthorized");
+        // Network/transient errors should not force logout.
+        if (statusRef.current === "authorized" || runAsRefresh) {
+          setStatus("authorized");
+          return;
         }
+        setStatus("checking");
       } finally {
         if (!cancelled) {
           setIsRefreshing(false);
