@@ -4,6 +4,7 @@ import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { formatDateDisplay } from "@/shared/date-format";
+import { ProjectListStatusValue, ProjectListViewer } from "@/shared/project-list-viewer";
 
 import {
   defaultApiBaseUrl,
@@ -50,8 +51,9 @@ const VENDOR_BILL_STATUS_LABELS_FALLBACK: Record<string, string> = {
   paid: "Paid",
   void: "Void",
 };
-type ProjectStatusValue = "prospect" | "active" | "on_hold" | "completed" | "cancelled";
+type ProjectStatusValue = ProjectListStatusValue;
 const DEFAULT_PROJECT_STATUS_FILTERS: ProjectStatusValue[] = ["active", "prospect"];
+const PROJECT_STATUS_VALUES: ProjectStatusValue[] = ["prospect", "active", "on_hold", "completed", "cancelled"];
 
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
@@ -552,7 +554,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     );
   }
 
-  function handleSelectProject(project: ProjectRecord) {
+  function handleSelectProject(project: { id: number }) {
     if (String(project.id) === selectedProjectId) {
       return;
     }
@@ -1177,165 +1179,42 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   return (
     <section className={styles.console}>
       {projects.length > 0 ? (
-        <section className={invoiceStyles.controlBar}>
-          <div className={invoiceStyles.projectSelector}>
-            <div className={invoiceStyles.panelHeader}>
-              <h3>Project List</h3>
-              <div className={invoiceStyles.panelHeaderActions}>
-                <span className={invoiceStyles.countBadge}>
-                  {statusFilteredProjects.length}/{projects.length}
-                </span>
-                <button
-                  type="button"
-                  className={invoiceStyles.panelToggleButton}
-                  onClick={() => setIsProjectListExpanded((current) => !current)}
-                  aria-expanded={isProjectListExpanded}
-                >
-                  {isProjectListExpanded ? "Collapse" : "Expand"}
-                </button>
-              </div>
-            </div>
-
-            {isProjectListExpanded ? (
-              !isProjectScoped ? (
-                <>
-                  <label className={invoiceStyles.searchField}>
-                    <span>Search projects</span>
-                    <input
-                      value={projectSearch}
-                      onChange={(event) => setProjectSearch(event.target.value)}
-                      placeholder="Search by id, name, customer, or status"
-                    />
-                  </label>
-                  <div className={invoiceStyles.projectFilters}>
-                    <span className={invoiceStyles.projectFiltersLabel}>Project status filter</span>
-                    <div className={invoiceStyles.projectFilterButtons}>
-                      {(["prospect", "active", "on_hold", "completed", "cancelled"] as ProjectStatusValue[]).map(
-                        (statusValue) => {
-                          const active = projectStatusFilters.includes(statusValue);
-                          return (
-                            <button
-                              key={statusValue}
-                              type="button"
-                              className={`${invoiceStyles.projectFilterButton} ${
-                                active
-                                  ? `${invoiceStyles.projectFilterButtonActive} ${projectStatusClass(statusValue)}`
-                                  : invoiceStyles.projectFilterButtonInactive
-                              }`}
-                              onClick={() => toggleProjectStatusFilter(statusValue)}
-                            >
-                              {projectStatusLabel(statusValue)}
-                            </button>
-                          );
-                        },
-                      )}
-                    </div>
-                    <div className={invoiceStyles.projectFilterActions}>
-                      <button
-                        type="button"
-                        className={invoiceStyles.projectFilterActionButton}
-                        onClick={() =>
-                          setProjectStatusFilters(["active", "on_hold", "prospect", "completed", "cancelled"])
-                        }
-                      >
-                        Show all projects
-                      </button>
-                      <button
-                        type="button"
-                        className={invoiceStyles.projectFilterActionButton}
-                        onClick={() => setProjectStatusFilters(DEFAULT_PROJECT_STATUS_FILTERS)}
-                      >
-                        Reset default
-                      </button>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <p className={invoiceStyles.inlineHint}>
-                  Project context:{" "}
-                  {selectedProject
-                    ? `#${selectedProject.id} - ${selectedProject.name} (${selectedProject.customer_display_name})`
-                    : `#${scopedProjectId}`}
-                </p>
-              )
-            ) : (
-              <p className={invoiceStyles.inlineHint}>
-                Project list collapsed. Expand to search, filter, or select a project.
-              </p>
-            )}
-
-            {isProjectListExpanded ? (
-              <div className={invoiceStyles.projectTableWrap}>
-                <table className={invoiceStyles.projectTable}>
-                  <thead>
-                    <tr>
-                      <th>Project</th>
-                      <th>Customer</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedProjects.length ? (
-                      pagedProjects.map((project) => {
-                        const isActive = String(project.id) === selectedProjectId;
-                        return (
-                          <tr
-                            key={project.id}
-                            className={`${invoiceStyles.projectRow} ${isActive ? invoiceStyles.projectRowActive : ""}`}
-                            onClick={() => handleSelectProject(project)}
-                          >
-                            <td className={invoiceStyles.projectCellTitle}>
-                              <strong>#{project.id}</strong> {project.name}
-                            </td>
-                            <td>{project.customer_display_name}</td>
-                            <td>
-                              {project.status ? (
-                                <span className={`${invoiceStyles.projectStatus} ${projectStatusClass(project.status)}`}>
-                                  {projectStatusLabel(project.status)}
-                                </span>
-                              ) : (
-                                <span className={invoiceStyles.projectStatus}>Unknown</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan={3} className={invoiceStyles.projectEmptyCell}>
-                          No projects match your filters.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-                {!isProjectScoped ? (
-                  <div className={invoiceStyles.projectPagination}>
-                    <button
-                      type="button"
-                      className={invoiceStyles.projectFilterActionButton}
-                      onClick={() => setCurrentProjectPage((page) => Math.max(1, page - 1))}
-                      disabled={currentProjectPageSafe <= 1}
-                    >
-                      Prev
-                    </button>
-                    <span>
-                      Page {currentProjectPageSafe} of {totalProjectPages}
-                    </span>
-                    <button
-                      type="button"
-                      className={invoiceStyles.projectFilterActionButton}
-                      onClick={() => setCurrentProjectPage((page) => Math.min(totalProjectPages, page + 1))}
-                      disabled={currentProjectPageSafe >= totalProjectPages}
-                    >
-                      Next
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        </section>
+        <ProjectListViewer
+          projectsTotal={projects.length}
+          filteredProjectsTotal={statusFilteredProjects.length}
+          isExpanded={isProjectListExpanded}
+          onToggleExpanded={() => setIsProjectListExpanded((current) => !current)}
+          showSearchAndFilters={!isProjectScoped}
+          contextHint={
+            selectedProject
+              ? `Project context: #${selectedProject.id} - ${selectedProject.name} (${selectedProject.customer_display_name})`
+              : `Project context: #${scopedProjectId}`
+          }
+          searchValue={projectSearch}
+          onSearchChange={setProjectSearch}
+          statusValues={PROJECT_STATUS_VALUES}
+          statusFilters={projectStatusFilters}
+          onToggleStatusFilter={toggleProjectStatusFilter}
+          onShowAllStatuses={() =>
+            setProjectStatusFilters(["active", "on_hold", "prospect", "completed", "cancelled"])
+          }
+          onResetStatuses={() => setProjectStatusFilters(DEFAULT_PROJECT_STATUS_FILTERS)}
+          pagedProjects={pagedProjects.map((project) => ({
+            id: project.id,
+            name: project.name,
+            customer_display_name: project.customer_display_name,
+            status: project.status ?? "",
+          }))}
+          selectedProjectId={selectedProjectId}
+          onSelectProject={handleSelectProject}
+          statusLabel={projectStatusLabel}
+          statusToneClass={projectStatusClass}
+          showPagination={!isProjectScoped}
+          currentPage={currentProjectPageSafe}
+          totalPages={totalProjectPages}
+          onPrevPage={() => setCurrentProjectPage((page) => Math.max(1, page - 1))}
+          onNextPage={() => setCurrentProjectPage((page) => Math.min(totalProjectPages, page + 1))}
+        />
       ) : (
         <p>Create or load a project before entering bills.</p>
       )}

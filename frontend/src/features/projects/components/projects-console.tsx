@@ -7,11 +7,12 @@ import { useSearchParams } from "next/navigation";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import styles from "./projects-console.module.css";
-import invoiceStyles from "../../invoices/components/invoices-console.module.css";
+import { ProjectListStatusValue, ProjectListViewer } from "@/shared/project-list-viewer";
 import { ApiResponse, ProjectFinancialSummary, ProjectRecord } from "../types";
 
-type ProjectStatusValue = "prospect" | "active" | "on_hold" | "completed" | "cancelled";
+type ProjectStatusValue = ProjectListStatusValue;
 type StatusMessageTone = "neutral" | "success" | "error";
+const PROJECT_STATUS_VALUES: ProjectStatusValue[] = ["prospect", "active", "on_hold", "completed", "cancelled"];
 
 export function ProjectsConsole() {
   const searchParams = useSearchParams();
@@ -169,14 +170,6 @@ export function ProjectsConsole() {
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
       .join("")}`;
     return styles[key] ?? "";
-  }
-
-  function projectStatusListClass(statusValue: string): string {
-    const key = `projectStatus${statusValue
-      .split("_")
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join("")}`;
-    return invoiceStyles[key] ?? "";
   }
 
   function projectStatusLabel(statusValue: string): string {
@@ -428,8 +421,12 @@ export function ProjectsConsole() {
     }
   }, [selectedProjectId, statusFilteredProjects, currentProjectPageSafe]);
 
-  function handleSelectProject(project: ProjectRecord) {
+  function handleSelectProject(project: { id: number }) {
     if (String(project.id) === selectedProjectId) {
+      return;
+    }
+    const selected = projects.find((row) => row.id === project.id);
+    if (!selected) {
       return;
     }
     setSelectedProjectId(String(project.id));
@@ -439,7 +436,7 @@ export function ProjectsConsole() {
     setChangeOrderStatusCounts(null);
     setAcceptedEstimateTotal("--");
     setAcceptedChangeOrderDeltaTotal("--");
-    hydrateForm(project);
+    hydrateForm(selected);
   }
 
   async function handleSaveProject(event: FormEvent<HTMLFormElement>) {
@@ -496,150 +493,38 @@ export function ProjectsConsole() {
       ) : null}
 
       {projects.length > 0 ? (
-        <section className={invoiceStyles.controlBar}>
-          <div className={invoiceStyles.projectSelector}>
-            <div className={invoiceStyles.panelHeader}>
-              <h3>Project List</h3>
-              <div className={invoiceStyles.panelHeaderActions}>
-                <span className={invoiceStyles.countBadge}>
-                  {statusFilteredProjects.length}/{projects.length}
-                </span>
-                <button
-                  type="button"
-                  className={invoiceStyles.panelToggleButton}
-                  onClick={() => setIsProjectListExpanded((current) => !current)}
-                  aria-expanded={isProjectListExpanded}
-                >
-                  {isProjectListExpanded ? "Collapse" : "Expand"}
-                </button>
-              </div>
-            </div>
-            {isProjectListExpanded ? (
-              <>
-                <p className={invoiceStyles.inlineHint}>
-                  Select a project to open its map, financial snapshot, and downstream actions.
-                </p>
-                <label className={invoiceStyles.searchField}>
-                  <span>Search projects</span>
-                  <input
-                    value={projectSearch}
-                    onChange={(event) => setProjectSearch(event.target.value)}
-                    placeholder="Search by id, name, customer, or status"
-                  />
-                </label>
-                <div className={invoiceStyles.projectFilters}>
-                  <span className={invoiceStyles.projectFiltersLabel}>Project status filter</span>
-                  <div className={invoiceStyles.projectFilterButtons}>
-                    {(["prospect", "active", "on_hold", "completed", "cancelled"] as ProjectStatusValue[]).map(
-                      (statusValue) => {
-                        const active = projectStatusFilters.includes(statusValue);
-                        return (
-                          <button
-                            key={statusValue}
-                            type="button"
-                            className={`${invoiceStyles.projectFilterButton} ${
-                              active
-                                ? `${invoiceStyles.projectFilterButtonActive} ${projectStatusListClass(statusValue)}`
-                                : invoiceStyles.projectFilterButtonInactive
-                            }`}
-                            aria-pressed={active}
-                            onClick={() => toggleProjectStatusFilter(statusValue)}
-                          >
-                            {projectStatusLabel(statusValue)}
-                          </button>
-                        );
-                      },
-                    )}
-                  </div>
-                  <div className={invoiceStyles.projectFilterActions}>
-                    <button
-                      type="button"
-                      className={invoiceStyles.projectFilterActionButton}
-                      onClick={() =>
-                        setProjectStatusFilters(["active", "on_hold", "prospect", "completed", "cancelled"])
-                      }
-                    >
-                      Show all projects
-                    </button>
-                    <button
-                      type="button"
-                      className={invoiceStyles.projectFilterActionButton}
-                      onClick={() => setProjectStatusFilters(defaultProjectStatusFilters)}
-                    >
-                      Reset default
-                    </button>
-                  </div>
-                </div>
-                <div className={invoiceStyles.projectTableWrap}>
-                  <table className={invoiceStyles.projectTable}>
-                    <thead>
-                      <tr>
-                        <th>Project</th>
-                        <th>Customer</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagedProjects.length ? (
-                        pagedProjects.map((project) => {
-                          const isActive = String(project.id) === selectedProjectId;
-                          return (
-                            <tr
-                              key={project.id}
-                              className={`${invoiceStyles.projectRow} ${isActive ? invoiceStyles.projectRowActive : ""}`}
-                              onClick={() => handleSelectProject(project)}
-                            >
-                              <td className={invoiceStyles.projectCellTitle}>
-                                <strong>#{project.id}</strong> {project.name}
-                              </td>
-                              <td>{formatCustomerName(project)}</td>
-                              <td>
-                                <span className={`${invoiceStyles.projectStatus} ${projectStatusListClass(project.status)}`}>
-                                  {projectStatusLabel(project.status)}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      ) : (
-                        <tr>
-                          <td colSpan={3} className={invoiceStyles.projectEmptyCell}>
-                            No projects match your filters.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                  <div className={invoiceStyles.projectPagination}>
-                    <button
-                      type="button"
-                      className={invoiceStyles.projectFilterActionButton}
-                      onClick={() => setCurrentProjectPage((page) => Math.max(1, page - 1))}
-                      disabled={currentProjectPageSafe <= 1}
-                    >
-                      Prev
-                    </button>
-                    <span>
-                      Page {currentProjectPageSafe} of {totalProjectPages}
-                    </span>
-                    <button
-                      type="button"
-                      className={invoiceStyles.projectFilterActionButton}
-                      onClick={() => setCurrentProjectPage((page) => Math.min(totalProjectPages, page + 1))}
-                      disabled={currentProjectPageSafe >= totalProjectPages}
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <p className={invoiceStyles.inlineHint}>
-                Project list collapsed. Expand to search, filter, or select a project.
-              </p>
-            )}
-          </div>
-        </section>
+        <ProjectListViewer
+          projectsTotal={projects.length}
+          filteredProjectsTotal={statusFilteredProjects.length}
+          isExpanded={isProjectListExpanded}
+          onToggleExpanded={() => setIsProjectListExpanded((current) => !current)}
+          expandedHint="Select a project to open its map, financial snapshot, and downstream actions."
+          showSearchAndFilters
+          searchValue={projectSearch}
+          onSearchChange={setProjectSearch}
+          statusValues={PROJECT_STATUS_VALUES}
+          statusFilters={projectStatusFilters}
+          onToggleStatusFilter={toggleProjectStatusFilter}
+          onShowAllStatuses={() =>
+            setProjectStatusFilters(["active", "on_hold", "prospect", "completed", "cancelled"])
+          }
+          onResetStatuses={() => setProjectStatusFilters(defaultProjectStatusFilters)}
+          pagedProjects={pagedProjects.map((project) => ({
+            id: project.id,
+            name: project.name,
+            customer_display_name: formatCustomerName(project),
+            status: project.status,
+          }))}
+          selectedProjectId={selectedProjectId}
+          onSelectProject={handleSelectProject}
+          statusLabel={projectStatusLabel}
+          statusToneClass={projectStatusClass}
+          showPagination
+          currentPage={currentProjectPageSafe}
+          totalPages={totalProjectPages}
+          onPrevPage={() => setCurrentProjectPage((page) => Math.max(1, page - 1))}
+          onNextPage={() => setCurrentProjectPage((page) => Math.min(totalProjectPages, page + 1))}
+        />
       ) : null}
 
       {selectedProject ? (
