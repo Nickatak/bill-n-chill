@@ -1031,7 +1031,12 @@ export function InvoicesConsole() {
     if (editingDraftInvoiceId) {
       setNeutralStatus("Saving draft invoice...");
       try {
-        const updatePayload = invoiceComposerAdapter.toUpdatePayload(invoiceDraftFormState);
+        const currentDraft = invoices.find((invoice) => invoice.id === editingDraftInvoiceId);
+        if (!currentDraft) {
+          setErrorStatus("Draft context is stale. Re-select the invoice and try again.");
+          return;
+        }
+        const updatePayload = invoiceComposerAdapter.toUpdatePayload(invoiceDraftFormState, currentDraft);
         const response = await fetch(`${normalizedBaseUrl}/invoices/${editingDraftInvoiceId}/`, {
           method: "PATCH",
           headers: buildAuthHeaders(token, { contentType: "application/json" }),

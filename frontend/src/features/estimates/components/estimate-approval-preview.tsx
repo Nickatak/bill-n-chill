@@ -276,7 +276,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
                   </div>
                 </>
               ) : (
-                <p className={styles.inlineHint}>{decisionAcknowledgement}</p>
+                <p className={styles.inlineHint}>{nonPendingDecisionMessage}</p>
               )}
             </div>
           ) : null}
