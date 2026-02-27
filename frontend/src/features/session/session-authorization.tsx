@@ -3,7 +3,12 @@
 import { createContext, ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { buildAuthHeaders } from "./auth-headers";
-import { clearClientSession, type SessionOrganization, type SessionRole } from "./client-session";
+import {
+  clearClientSession,
+  SESSION_STORAGE_KEY,
+  type SessionOrganization,
+  type SessionRole,
+} from "./client-session";
 import { useSharedSessionAuth } from "./use-shared-session";
 
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
@@ -30,7 +35,7 @@ type SessionAuthorizationProviderProps = {
 
 export function SessionAuthorizationProvider({ children }: SessionAuthorizationProviderProps) {
   const { token, role, organization, authMessage } = useSharedSessionAuth();
-  const [status, setStatus] = useState<AuthorizationStatus>(token ? "authorized" : "unauthorized");
+  const [status, setStatus] = useState<AuthorizationStatus>("checking");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const verifiedTokenRef = useRef("");
   const statusRef = useRef<AuthorizationStatus>(status);
@@ -42,7 +47,7 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
   useEffect(() => {
     let cancelled = false;
 
-    async function verifyToken(candidateToken: string, runAsRefresh: boolean) {
+    async function verifyToken(candidateToken: string) {
       setIsRefreshing(true);
 
       try {
@@ -61,10 +66,8 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
             setIsRefreshing(false);
             return;
           }
-          // Preserve current authorized UI on transient upstream/CDN failures.
-          if (statusRef.current === "authorized" || runAsRefresh) {
-            setStatus("authorized");
-          }
+          // Preserve authorized UI on transient upstream/CDN failures.
+          setStatus("authorized");
           return;
         }
         verifiedTokenRef.current = candidateToken;
@@ -74,11 +77,7 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
           return;
         }
         // Network/transient errors should not force logout.
-        if (statusRef.current === "authorized" || runAsRefresh) {
-          setStatus("authorized");
-          return;
-        }
-        setStatus("checking");
+        setStatus("authorized");
       } finally {
         if (!cancelled) {
           setIsRefreshing(false);
@@ -87,6 +86,24 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
     }
 
     if (!token) {
+      let hasPendingToken = false;
+      if (typeof window !== "undefined") {
+        const rawSnapshot = window.localStorage.getItem(SESSION_STORAGE_KEY);
+        if (rawSnapshot) {
+          try {
+            const parsed = JSON.parse(rawSnapshot) as { token?: string };
+            hasPendingToken = Boolean(parsed?.token);
+          } catch {
+            hasPendingToken = false;
+          }
+        }
+      }
+      if (hasPendingToken) {
+        setStatus("checking");
+        return () => {
+          cancelled = true;
+        };
+      }
       verifiedTokenRef.current = "";
       setIsRefreshing(false);
       setStatus("unauthorized");
@@ -102,8 +119,10 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
       };
     }
 
-    const runAsRefresh = statusRef.current === "authorized";
-    void verifyToken(token, runAsRefresh);
+    if (statusRef.current !== "authorized") {
+      setStatus("authorized");
+    }
+    void verifyToken(token);
 
     return () => {
       cancelled = true;
