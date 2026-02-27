@@ -284,6 +284,7 @@ export function EstimateSheet({
                           className={styles.fieldInput}
                           value={estimateTitle}
                           onChange={(event) => onTitleChange(event.target.value)}
+                          placeholder="Enter estimate title"
                           disabled={titleReadOnly}
                           aria-disabled={titleReadOnly}
                           required

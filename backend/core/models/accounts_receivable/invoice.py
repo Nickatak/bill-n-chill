@@ -40,7 +40,6 @@ class Invoice(models.Model):
     ALLOWED_STATUS_TRANSITIONS = {
         Status.DRAFT: {Status.SENT, Status.VOID},
         Status.SENT: {
-            Status.DRAFT,
             Status.PARTIALLY_PAID,
             Status.PAID,
             Status.OVERDUE,

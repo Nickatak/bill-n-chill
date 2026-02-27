@@ -135,11 +135,22 @@ class EstimateTests(TestCase):
 
         estimate.refresh_from_db()
         self.assertEqual(estimate.status, Estimate.Status.APPROVED)
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.status, Project.Status.ACTIVE)
         latest_event = EstimateStatusEvent.objects.filter(estimate=estimate).first()
         self.assertIsNotNone(latest_event)
         self.assertEqual(latest_event.from_status, Estimate.Status.SENT)
         self.assertEqual(latest_event.to_status, Estimate.Status.APPROVED)
         self.assertIn("Approved via public link", latest_event.note)
+        project_status_audit_event = FinancialAuditEvent.objects.filter(
+            project=self.project,
+            event_type="project_status_changed",
+            object_type="project",
+            object_id=self.project.id,
+        ).first()
+        self.assertIsNotNone(project_status_audit_event)
+        self.assertEqual(project_status_audit_event.from_status, Project.Status.PROSPECT)
+        self.assertEqual(project_status_audit_event.to_status, Project.Status.ACTIVE)
 
     def test_public_estimate_decision_view_rejects_sent_estimate(self):
         estimate = Estimate.objects.create(
@@ -664,6 +675,7 @@ class EstimateTests(TestCase):
             f"/api/v1/projects/{self.project.id}/estimates/",
             data={
                 "title": "Kitchen Demo",
+                "allow_existing_title_family": True,
                 "line_items": [
                     {
                         "cost_code": self.cost_code.id,
@@ -688,6 +700,108 @@ class EstimateTests(TestCase):
                 to_status=Estimate.Status.ARCHIVED,
             ).exists()
         )
+
+    def test_project_estimates_create_requires_explicit_confirmation_for_existing_title_family(self):
+        first = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Collision Demo",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo and prep",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(first.status_code, 201)
+
+        conflict = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Collision Demo",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Second version attempt without confirmation",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "600",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(conflict.status_code, 409)
+        self.assertEqual(conflict.json()["error"]["code"], "estimate_family_exists")
+
+    def test_project_estimates_create_blocks_existing_title_family_after_approval(self):
+        first = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Approved Family Lock",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Demo and prep",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(first.status_code, 201)
+        estimate_id = first.json()["data"]["id"]
+
+        to_sent = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_sent.status_code, 200)
+
+        to_approved = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"status": "approved"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_approved.status_code, 200)
+
+        blocked = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Approved Family Lock",
+                "allow_existing_title_family": True,
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Follow-up draft should be blocked",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "600",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(blocked.status_code, 409)
+        self.assertEqual(blocked.json()["error"]["code"], "estimate_family_approved_locked")
 
     def test_project_estimates_create_rejects_user_archived_status(self):
         response = self.client.post(
@@ -1188,6 +1302,61 @@ class EstimateTests(TestCase):
         self.assertEqual(Budget.objects.filter(project=self.project).count(), 1)
         active_budget = Budget.objects.get(project=self.project, status=Budget.Status.ACTIVE)
         self.assertEqual(active_budget.source_estimate_id, first_estimate_id)
+
+    def test_estimate_patch_approval_promotes_project_to_active_and_records_audit_event(self):
+        create = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data={
+                "title": "Prospect Activation Estimate",
+                "line_items": [
+                    {
+                        "cost_code": self.cost_code.id,
+                        "description": "Activation scope",
+                        "quantity": "1",
+                        "unit": "day",
+                        "unit_cost": "500",
+                        "markup_percent": "0",
+                    }
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(create.status_code, 201)
+        estimate_id = create.json()["data"]["id"]
+
+        to_sent = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_sent.status_code, 200)
+
+        to_approved = self.client.patch(
+            f"/api/v1/estimates/{estimate_id}/",
+            data={"status": "approved"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_approved.status_code, 200)
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.status, Project.Status.ACTIVE)
+        project_status_audit_event = FinancialAuditEvent.objects.filter(
+            project=self.project,
+            event_type="project_status_changed",
+            object_type="project",
+            object_id=self.project.id,
+        ).first()
+        self.assertIsNotNone(project_status_audit_event)
+        self.assertEqual(project_status_audit_event.from_status, Project.Status.PROSPECT)
+        self.assertEqual(project_status_audit_event.to_status, Project.Status.ACTIVE)
+        self.assertEqual(project_status_audit_event.created_by_id, self.user.id)
+        self.assertEqual(
+            project_status_audit_event.metadata_json.get("estimate_id"),
+            estimate_id,
+        )
 
     def test_estimate_approval_does_not_override_existing_project_contract_baseline(self):
         Project.objects.filter(id=self.project.id).update(

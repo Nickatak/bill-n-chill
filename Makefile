@@ -2,14 +2,14 @@
 	env-init \
 	local-install local-install-frontend local-install-backend \
 	local-env-local local-env-prod \
-	local-up local-run local-run-frontend local-run-backend local-check-db \
-	local-migrate local-makemigrations local-superuser \
-	local-test local-test-backend local-test-frontend local-build local-lint local-clean \
-	replace-backend replace-frontend replace-app \
-	docker-build docker-up docker-down docker-logs docker-ps docker-config docker-seed docker-migrate docker-reset-fresh \
-	db-up db-down db-logs db-reset db-grant-test-db-perms \
-	docker-prod-build docker-prod-up docker-prod-down docker-prod-logs docker-prod-ps docker-prod-config docker-prod-seed \
-	db-prod-up db-prod-down db-prod-logs db-prod-reset
+	local-stop-docker-frontend local-stop-docker-backend \
+	local-run-frontend local-run-backend local-check-db \
+	local-makemigrations local-superuser \
+	local-test local-test-backend local-test-frontend local-clean local-kill-ports \
+	docker-up docker-down docker-logs docker-migrate \
+	db-seed db-reset db-reset-hard db-grant-test-db-perms \
+	docker-prod-up docker-prod-down docker-prod-logs docker-prod-seed \
+	db-prod-reset
 
 BACKEND_PYTHON := backend/.venv/bin/python
 BACKEND_MANAGE := $(BACKEND_PYTHON) backend/manage.py
@@ -26,45 +26,39 @@ LOCAL_KILL_PORTS ?= 3000 3001 3002 3003 3004 3005 8000
 # ============================================================================
 
 help:
-	@echo "bill-n-chill - Monorepo Development Commands"
+	@echo "bill-n-chill - command reference"
 	@echo ""
-	@echo "Command Prefix Pattern:"
-	@echo "  local-*   direct local workflow commands (frontend/backend on host)"
-	@echo "  docker-*  Dockerized dev stack (.env.local)"
-	@echo "  db-*      MySQL-only Docker commands for dev (.env.local)"
-	@echo "  docker-prod-*  Dockerized prod-like stack (.env.prod)"
-	@echo "  db-prod-*      MySQL-only Docker commands for prod-like (.env.prod)"
+	@echo "Core Local Workflow"
+	@echo "  make local-install          Install frontend + backend dependencies"
+	@echo "  make local-run-frontend     Stop docker frontend, run Next.js on host"
+	@echo "  make local-run-backend      Stop docker backend, run Django on host"
+	@echo "  make local-test             Run backend tests + frontend lint"
 	@echo ""
-	@echo "Local Commands:"
-	@echo "  make local-install         - Install all dependencies (frontend + backend)"
-	@echo "  make local-run-frontend    - Start Next.js development server on host"
-	@echo "  make local-run-backend     - Start Django development server on host"
-	@echo "  make local-up              - Run local frontend + backend together"
-	@echo "  make local-migrate         - Apply Django migrations"
-	@echo "  make local-test            - Run backend tests + frontend lint"
-	@echo "  make local-kill-ports      - Kill processes listening on ports 3000-3005/8000"
-	@echo "  make replace-backend       - Stop docker backend, run local backend"
-	@echo "  make replace-frontend      - Stop docker frontend, run local frontend"
-	@echo "  make replace-app           - Stop docker frontend+backend, run local frontend+backend"
+	@echo "Core Dev Docker Workflow (.env.local)"
+	@echo "  make docker-up              Start full dev stack (detached, with build)"
+	@echo "  make docker-down            Stop dev stack"
+	@echo "  make docker-logs            Stream dev stack logs"
+	@echo "  make docker-migrate         Apply Django migrations against dev DB"
+	@echo "  make db-seed                Seed Bob demo data into dev DB"
+	@echo "  make db-reset               Destructive app-data reset + Bob demo reseed"
 	@echo ""
-	@echo "Dev Docker Commands (.env.local):"
-	@echo "  make docker-up             - Start full dev stack (frontend + backend + mysql)"
-	@echo "  make docker-down           - Stop dev stack"
-	@echo "  make docker-logs           - Stream dev stack logs"
-	@echo "  make docker-migrate        - Apply Django migrations against dev DB"
-	@echo "  make docker-reset-fresh    - Destructive DB flush + Bob demo reseed (dev DB)"
-	@echo "  make db-up                 - Start only MySQL container (for local host workflow)"
-	@echo "  make db-down               - Stop only MySQL container"
-	@echo "  make db-grant-test-db-perms - Grant MySQL CREATE/DROP perms for Django test DBs"
-	@echo "  make db-reset              - Drop dev DB volume and recreate MySQL container"
-	@echo "  make docker-seed           - Seed Bob demo data into dev MySQL database"
+	@echo "Dev DB Utilities (.env.local)"
+	@echo "  make db-reset-hard          Drop dev DB volume and recreate DB container"
+	@echo "  make db-grant-test-db-perms Grant MySQL CREATE/DROP perms for Django tests"
 	@echo ""
-	@echo "Prod-like Docker Commands (.env.prod):"
-	@echo "  make docker-prod-up        - Start prod-like stack in detached mode"
-	@echo "  make docker-prod-down      - Stop prod-like stack"
-	@echo "  make docker-prod-logs      - Stream prod-like stack logs"
-	@echo "  make db-prod-up            - Start only prod-like MySQL container"
-	@echo "  make docker-prod-seed      - Seed Bob demo data into prod-like MySQL database"
+	@echo "Prod-like Docker Workflow (.env.prod)"
+	@echo "  make docker-prod-up         Start prod-like stack (detached, with build)"
+	@echo "  make docker-prod-down       Stop prod-like stack"
+	@echo "  make docker-prod-logs       Stream prod-like stack logs"
+	@echo "  make docker-prod-seed       Seed Bob demo data into prod-like DB"
+	@echo "  make db-prod-reset          Drop prod-like DB volume and recreate DB"
+	@echo ""
+	@echo "Local Utilities"
+	@echo "  make env-init               Switch environment to local (.env.local)"
+	@echo "  make local-makemigrations   Create Django migration files"
+	@echo "  make local-superuser        Create Django admin user"
+	@echo "  make local-clean            Clear local build/cache artifacts"
+	@echo "  make local-kill-ports       Manual rescue for ports 3000-3005/8000"
 
 # ============================================================================
 # LOCAL (HOST PROCESSES)
@@ -87,16 +81,16 @@ local-env-local:
 local-env-prod:
 	./scripts/toggle-env.sh prod
 
-local-up:
-	@echo "Starting frontend and backend servers (press Ctrl+C to stop both)..."
-	@(trap 'kill 0' INT TERM; $(MAKE) local-run-frontend & $(MAKE) local-run-backend &)
+local-stop-docker-frontend: local-env-local
+	@$(DEV_COMPOSE) stop frontend >/dev/null 2>&1 || true
 
-local-run: local-run-frontend
+local-stop-docker-backend: local-env-local
+	@$(DEV_COMPOSE) stop backend >/dev/null 2>&1 || true
 
-local-run-frontend:
+local-run-frontend: local-stop-docker-frontend
 	npm run dev --prefix frontend
 
-local-run-backend: local-check-db
+local-run-backend: local-stop-docker-backend local-check-db
 	$(BACKEND_MANAGE) runserver
 
 local-check-db:
@@ -104,9 +98,6 @@ local-check-db:
 
 local-makemigrations:
 	$(BACKEND_MANAGE) makemigrations
-
-local-migrate:
-	$(BACKEND_MANAGE) migrate
 
 local-superuser:
 	$(BACKEND_MANAGE) createsuperuser
@@ -117,12 +108,6 @@ local-test-backend:
 	$(BACKEND_MANAGE) test core.tests --keepdb --noinput
 
 local-test-frontend:
-	npm run lint --prefix frontend
-
-local-build:
-	npm run build --prefix frontend
-
-local-lint:
 	npm run lint --prefix frontend
 
 local-clean:
@@ -164,31 +149,11 @@ local-kill-ports:
 		fi; \
 	done
 
-# ============================================================================
-# BRIDGE (DOCKER -> LOCAL)
-# ============================================================================
-
-replace-backend: local-env-local
-	$(DEV_COMPOSE) stop backend
-	$(MAKE) local-run-backend
-
-replace-frontend: local-env-local
-	$(DEV_COMPOSE) stop frontend
-	$(MAKE) local-run-frontend
-
-replace-app: local-env-local
-	$(DEV_COMPOSE) stop backend frontend
-	$(MAKE) local-up
-
-# ============================================================================
 # DOCKER DEV (.env.local)
 # ============================================================================
 
-docker-build: local-env-local
-	$(DEV_COMPOSE) build
-
 docker-up: local-env-local
-	$(DEV_COMPOSE) up --build
+	$(DEV_COMPOSE) up -d --build
 
 docker-down: local-env-local
 	$(DEV_COMPOSE) down --remove-orphans
@@ -196,31 +161,16 @@ docker-down: local-env-local
 docker-logs: local-env-local
 	$(DEV_COMPOSE) logs -f --tail=200
 
-docker-ps: local-env-local
-	$(DEV_COMPOSE) ps
-
-docker-config: local-env-local
-	$(DEV_COMPOSE) config
-
-docker-seed: local-env-local local-check-db
+db-seed: local-env-local local-check-db
 	$(BACKEND_MANAGE) seed_bob_demo
 
 docker-migrate: local-env-local local-check-db
 	$(BACKEND_MANAGE) migrate
 
-docker-reset-fresh: local-env-local local-check-db
+db-reset: local-env-local local-check-db
 	$(BACKEND_MANAGE) reset_fresh_demo
 
-db-up: local-env-local
-	$(DEV_COMPOSE) up -d $(DB_SERVICE)
-
-db-down: local-env-local
-	$(DEV_COMPOSE) stop $(DB_SERVICE)
-
-db-logs: local-env-local
-	$(DEV_COMPOSE) logs -f --tail=200 $(DB_SERVICE)
-
-db-reset: local-env-local
+db-reset-hard: local-env-local
 	$(DEV_COMPOSE) down -v --remove-orphans
 	$(DEV_COMPOSE) up -d $(DB_SERVICE)
 
@@ -231,9 +181,6 @@ db-grant-test-db-perms: local-env-local
 # DOCKER PROD-LIKE (.env.prod)
 # ============================================================================
 
-docker-prod-build: local-env-prod
-	$(PROD_COMPOSE) build
-
 docker-prod-up: local-env-prod
 	$(PROD_COMPOSE) up -d --build
 
@@ -243,23 +190,8 @@ docker-prod-down: local-env-prod
 docker-prod-logs: local-env-prod
 	$(PROD_COMPOSE) logs -f --tail=200
 
-docker-prod-ps: local-env-prod
-	$(PROD_COMPOSE) ps
-
-docker-prod-config: local-env-prod
-	$(PROD_COMPOSE) config
-
 docker-prod-seed: local-env-prod local-check-db
 	$(BACKEND_MANAGE) seed_bob_demo
-
-db-prod-up: local-env-prod
-	$(PROD_COMPOSE) up -d $(DB_SERVICE)
-
-db-prod-down: local-env-prod
-	$(PROD_COMPOSE) stop $(DB_SERVICE)
-
-db-prod-logs: local-env-prod
-	$(PROD_COMPOSE) logs -f --tail=200 $(DB_SERVICE)
 
 db-prod-reset: local-env-prod
 	$(PROD_COMPOSE) down -v --remove-orphans

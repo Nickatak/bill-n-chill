@@ -82,32 +82,31 @@ npx create-next-app@latest frontend
 
 ## Run Plan
 
-### 1) Start MySQL only (recommended for local host workflows)
+### 1) Start Docker stack (recommended baseline)
 
 ```bash
-make db-up
+make docker-up
 ```
 
-This starts only the Dockerized MySQL container while you continue to run backend/frontend directly on your host.
+This starts frontend + backend + MySQL in detached mode.
 
-### 2) Run backend + frontend locally
+### 2) Replace services locally (optional)
 
-Backend:
+If you want to run a service on host for focused logs/debugging, start it directly:
+
+Backend on host (auto-stops docker backend first):
 
 ```bash
-cd backend
-.venv/bin/python manage.py migrate
-.venv/bin/python manage.py runserver
+make local-run-backend
 ```
 
-Frontend:
+Frontend on host (auto-stops docker frontend first):
 
 ```bash
-cd frontend
-npm run dev
+make local-run-frontend
 ```
 
-### 3) Optional full Docker stack
+### 3) Docker-only workflow
 
 ```bash
 make docker-up
@@ -145,7 +144,7 @@ To fully reset local data (delete everything) and reseed the Bob demo:
 ```bash
 backend/.venv/bin/python backend/manage.py reset_fresh_demo
 # or (with dev env selection)
-make docker-reset-fresh
+make db-reset
 ```
 
 `reset_fresh_demo` also updates a runtime marker timestamp used by `/api/v1/health/` and login/register warning panels so testers can see when demo data was last reset.
@@ -167,14 +166,14 @@ The Makefile now uses five primary command prefixes:
 
 - `local-*`: direct local host workflows (frontend/backend run on host).
 - `docker-*`: Dockerized development stack using `.env.local`.
-- `db-*`: Dockerized MySQL-only commands for `.env.local`.
+- `db-*`: DB/data maintenance helpers for `.env.local`.
 - `docker-prod-*`: Dockerized prod-like stack using `.env.prod`.
-- `db-prod-*`: Dockerized MySQL-only commands for `.env.prod`.
+- `db-prod-*`: DB/data maintenance helpers for `.env.prod`.
 
 Examples:
 
-- `make local-up`
 - `make docker-up`
-- `make db-up` (MySQL only)
+- `make db-reset`
+- `make db-reset-hard`
 - `make docker-prod-up`
-- `make db-prod-up` (MySQL only)
+- `make db-prod-reset`

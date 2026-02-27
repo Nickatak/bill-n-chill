@@ -39,6 +39,7 @@ export function ThemeToggle() {
   const { token, organization } = useSharedSessionAuth();
   const hasSession = Boolean(token);
   const isPublicDocument = isPublicDocumentRoute(pathname);
+  const isOrganizationPath = pathname === "/ops/organization";
   const hasActiveOpsMeta = opsMetaRoutes.some((route) => isRouteActive(pathname, route));
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<QuickJumpItem[]>([]);
@@ -138,9 +139,13 @@ export function ThemeToggle() {
   return (
     <div className="themeControls">
       {hasSession && !isPublicDocument && organization ? (
-        <span className="sessionOrgBadge" title={`Organization slug: ${organization.slug}`}>
-          {organization.displayName}
-        </span>
+        <Link
+          href="/ops/organization"
+          className={`themeControlButton ${isOrganizationPath ? "isActive" : ""}`}
+          title={`Organization slug: ${organization.slug}`}
+        >
+          {organization.displayName} Organization (WIP)
+        </Link>
       ) : null}
       {hasSession && isPublicDocument ? (
         <Link href="/" className="themeControlButton">

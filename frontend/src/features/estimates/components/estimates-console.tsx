@@ -30,6 +30,12 @@ import { EstimateSheet, OrganizationDocumentDefaults } from "./estimate-sheet";
 type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amount";
 type EstimateStatusValue = string;
 type FinancialBaselineStatusValue = "none" | "active" | "superseded";
+type EstimateFamilyCollisionPrompt = {
+  title: string;
+  latestEstimateId: number | null;
+  latestVersion: number | null;
+  familySize: number | null;
+};
 type EstimatesConsoleProps = {
   scopedProjectId?: number | null;
 };
@@ -147,6 +153,10 @@ function readApiErrorMessage(payload: ApiResponse | undefined, fallback: string)
   return fallback;
 }
 
+function normalizeFamilyTitle(value: string): string {
+  return value.trim().toLowerCase();
+}
+
 export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }: EstimatesConsoleProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -179,7 +189,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const [selectedStatus, setSelectedStatus] = useState<EstimateStatusValue>("draft");
   const [statusNote, setStatusNote] = useState("");
   const [statusEvents, setStatusEvents] = useState<EstimateStatusEventRecord[]>([]);
-  const [estimateTitle, setEstimateTitle] = useState("Initial Estimate");
+  const [estimateTitle, setEstimateTitle] = useState("");
+  const [familyCollisionPrompt, setFamilyCollisionPrompt] =
+    useState<EstimateFamilyCollisionPrompt | null>(null);
+  const [confirmedFamilyTitleKey, setConfirmedFamilyTitleKey] = useState("");
   const [termsText, setTermsText] = useState("");
   const [taxPercent, setTaxPercent] = useState("0");
   const [lineItems, setLineItems] = useState<EstimateLineInput[]>([emptyLine(1)]);
@@ -572,6 +585,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setFormErrorMessage("");
     setFormSuccessMessage("");
     setFormSuccessHref("");
+    setFamilyCollisionPrompt(null);
+    setConfirmedFamilyTitleKey("");
     loadEstimateIntoForm(estimate);
     setDuplicateTitle(`${estimate.title || "Estimate"} Copy`);
   }, [estimateAllowedStatusTransitions, loadEstimateIntoForm]);
@@ -596,7 +611,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setSelectedStatus(defaultCreateStatus);
     setStatusNote("");
     setStatusEvents([]);
-    setEstimateTitle("New Estimate");
+    setEstimateTitle("");
+    setFamilyCollisionPrompt(null);
+    setConfirmedFamilyTitleKey("");
     setTermsText(organizationDefaults?.estimate_default_terms || "");
     setTaxPercent("0");
     setLineItems([emptyLine(1, defaultCostCodeId)]);
@@ -639,6 +656,17 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
             (statusValue) => statusValue === nextStatus || current.includes(statusValue),
           ),
     );
+  }
+
+  function handleEstimateTitleChange(value: string) {
+    setEstimateTitle(value);
+    const nextKey = normalizeFamilyTitle(value);
+    if (confirmedFamilyTitleKey && confirmedFamilyTitleKey !== nextKey) {
+      setConfirmedFamilyTitleKey("");
+    }
+    if (familyCollisionPrompt && normalizeFamilyTitle(familyCollisionPrompt.title) !== nextKey) {
+      setFamilyCollisionPrompt(null);
+    }
   }
 
   useEffect(() => {
@@ -958,6 +986,83 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     [lineItems.length, selectedProjectId],
   );
 
+  async function submitNewEstimateWithTitle({
+    projectId,
+    title,
+    allowExistingTitleFamily,
+  }: {
+    projectId: number;
+    title: string;
+    allowExistingTitleFamily: boolean;
+  }) {
+    setActionMessage("");
+    submitGuard.current = true;
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
+        method: "POST",
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        body: JSON.stringify({
+          title,
+          allow_existing_title_family: allowExistingTitleFamily,
+          valid_through: validThrough || null,
+          tax_percent: taxPercent,
+          line_items: lineItems.map((line) => ({
+            cost_code: Number(line.costCodeId),
+            description: line.description,
+            quantity: line.quantity,
+            unit: line.unit,
+            unit_cost: line.unitCost,
+            markup_percent: line.markupPercent,
+          })),
+        }),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        if (response.status === 409 && payload.error?.code === "estimate_family_exists") {
+          const conflictMeta = payload.error?.meta ?? {};
+          setFamilyCollisionPrompt({
+            title,
+            latestEstimateId:
+              typeof conflictMeta.latest_estimate_id === "number"
+                ? conflictMeta.latest_estimate_id
+                : null,
+            latestVersion:
+              typeof conflictMeta.latest_version === "number" ? conflictMeta.latest_version : null,
+            familySize: typeof conflictMeta.family_size === "number" ? conflictMeta.family_size : null,
+          });
+          setConfirmedFamilyTitleKey("");
+        } else if (
+          response.status === 409 &&
+          payload.error?.code === "estimate_family_approved_locked"
+        ) {
+          setFamilyCollisionPrompt(null);
+          setConfirmedFamilyTitleKey("");
+        }
+        setFormErrorMessage(
+          readApiErrorMessage(payload, "Create estimate failed. Check values and try again."),
+        );
+        return;
+      }
+      const created = payload.data as EstimateRecord;
+      setEstimates((current) => [created, ...current]);
+      setIsViewerExpanded(true);
+      handleSelectEstimate(created);
+      setStatusEvents([]);
+      setFormErrorMessage("");
+      setFormSuccessMessage(`Created estimate #${created.id} v${created.version}.`);
+      setFormSuccessHref(created.public_ref ? publicEstimateHref(created.public_ref) : "");
+      loadEstimateIntoForm(created);
+      setFamilyCollisionPrompt(null);
+      setConfirmedFamilyTitleKey("");
+    } catch {
+      setFormErrorMessage("Could not reach estimate create endpoint.");
+    } finally {
+      submitGuard.current = false;
+      setIsSubmitting(false);
+    }
+  }
+
   async function handleCreateEstimate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormErrorMessage("");
@@ -1034,49 +1139,51 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       return;
     }
 
-    setActionMessage("");
-    submitGuard.current = true;
-    setIsSubmitting(true);
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
-        method: "POST",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
-        body: JSON.stringify({
+    const normalizedTitle = normalizeFamilyTitle(trimmedTitle);
+    const existingFamily = estimateFamilies.find(
+      (family) => normalizeFamilyTitle(family.title) === normalizedTitle,
+    );
+    const familyHasApprovedVersion = Boolean(
+      existingFamily?.items.some((estimate) => estimate.status === "approved"),
+    );
+    const promptMatchesCurrentTitle =
+      familyCollisionPrompt &&
+      normalizeFamilyTitle(familyCollisionPrompt.title) === normalizedTitle;
+    if (existingFamily && familyHasApprovedVersion) {
+      setConfirmedFamilyTitleKey("");
+      setFamilyCollisionPrompt(null);
+      setFormErrorMessage(
+        `The estimate family "${existingFamily.title}" is locked because it already has an approved version. Use a new title or create a change order instead.`,
+      );
+      return;
+    }
+    if (existingFamily && confirmedFamilyTitleKey !== normalizedTitle) {
+      if (promptMatchesCurrentTitle) {
+        await submitNewEstimateWithTitle({
+          projectId,
           title: trimmedTitle,
-          valid_through: validThrough || null,
-          tax_percent: taxPercent,
-          line_items: lineItems.map((line) => ({
-            cost_code: Number(line.costCodeId),
-            description: line.description,
-            quantity: line.quantity,
-            unit: line.unit,
-            unit_cost: line.unitCost,
-            markup_percent: line.markupPercent,
-          })),
-        }),
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setFormErrorMessage(
-          readApiErrorMessage(payload, "Create estimate failed. Check values and try again."),
-        );
+          allowExistingTitleFamily: true,
+        });
         return;
       }
-      const created = payload.data as EstimateRecord;
-      setEstimates((current) => [created, ...current]);
-      setIsViewerExpanded(true);
-      handleSelectEstimate(created);
-      setStatusEvents([]);
-      setFormErrorMessage("");
-      setFormSuccessMessage(`Created estimate #${created.id} v${created.version}.`);
-      setFormSuccessHref(created.public_ref ? publicEstimateHref(created.public_ref) : "");
-      loadEstimateIntoForm(created);
-    } catch {
-      setFormErrorMessage("Could not reach estimate create endpoint.");
-    } finally {
-      submitGuard.current = false;
-      setIsSubmitting(false);
+      const latest = existingFamily.items[existingFamily.items.length - 1];
+      setFamilyCollisionPrompt({
+        title: existingFamily.title,
+        latestEstimateId: latest?.id ?? null,
+        latestVersion: latest?.version ?? null,
+        familySize: existingFamily.items.length,
+      });
+      setFormErrorMessage(
+        `An estimate family named "${existingFamily.title}" already exists. Confirm to create a new version in that family.`,
+      );
+      return;
     }
+
+    await submitNewEstimateWithTitle({
+      projectId,
+      title: trimmedTitle,
+      allowExistingTitleFamily: Boolean(existingFamily),
+    });
   }
 
   async function handleDuplicateEstimate() {
@@ -1318,52 +1425,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
         {isViewerExpanded ? (
           <>
-            <div className={styles.lifecycleActions}>
-              <button type="button" onClick={startNewEstimate}>
-                Add New Estimate
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!selectedEstimate) {
-                    setActionMessage("Select an existing estimate version before duplicating.");
-                    return;
-                  }
-                  setDuplicateTitle(`${selectedEstimate.title || "Estimate"} Copy`);
-                  setShowDuplicatePanel((current) => !current);
-                }}
-              >
-                Duplicate as New Estimate
-              </button>
-            </div>
-            {actionMessage ? <p className={styles.actionError}>{actionMessage}</p> : null}
-            {showDuplicatePanel ? (
-              <div className={styles.duplicatePanel}>
-                <p className={styles.inlineHint}>
-                  Duplicating in project{" "}
-                  {selectedProject
-                    ? `#${selectedProject.id} - ${selectedProject.name} (${selectedProject.customer_display_name})`
-                    : "current selection"}.
-                </p>
-                <label className={styles.lifecycleField}>
-                  New estimate title
-                  <input
-                    value={duplicateTitle}
-                    onChange={(event) => setDuplicateTitle(event.target.value)}
-                    placeholder="Estimate title"
-                  />
-                </label>
-                <div className={styles.lifecycleActions}>
-                  <button type="button" onClick={handleDuplicateEstimate}>
-                    Confirm Duplicate
-                  </button>
-                  <button type="button" onClick={() => setShowDuplicatePanel(false)}>
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
             <div className={styles.versionFilters}>
               <span className={styles.versionFiltersLabel}>Estimate status filter</span>
               <div className={styles.versionFilterButtons}>
@@ -1486,7 +1547,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                               aria-label={`Open public view for estimate #${latest.id}`}
                               title="Open public view"
                             >
-                              ↗
+                              Public
                             </Link>
                           ) : null}
                           <button
@@ -1544,7 +1605,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                                       aria-label={`Open public view for estimate #${estimate.id}`}
                                       title="Open public view"
                                     >
-                                      ↗
+                                      Public
                                     </Link>
                                   ) : null}
                                   <button
@@ -1733,6 +1794,100 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         )}
       </section>
 
+      <section className={styles.composerPrep}>
+        <div className={`${styles.lifecycleActions} ${styles.composerPrepActions}`}>
+          <button type="button" onClick={startNewEstimate}>
+            Add New Estimate
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!selectedEstimate) {
+                setActionMessage("Select an existing estimate version before duplicating.");
+                return;
+              }
+              setDuplicateTitle(`${selectedEstimate.title || "Estimate"} Copy`);
+              setShowDuplicatePanel((current) => !current);
+            }}
+          >
+            Duplicate as New Estimate
+          </button>
+        </div>
+        {actionMessage ? <p className={`${styles.actionError} ${styles.composerPrepMessage}`}>{actionMessage}</p> : null}
+        {showDuplicatePanel ? (
+          <div className={`${styles.duplicatePanel} ${styles.composerPrepPanel}`}>
+            <p className={styles.inlineHint}>
+              Duplicating in project{" "}
+              {selectedProject
+                ? `#${selectedProject.id} - ${selectedProject.name} (${selectedProject.customer_display_name})`
+                : "current selection"}.
+            </p>
+            <label className={styles.lifecycleField}>
+              New estimate title
+              <input
+                value={duplicateTitle}
+                onChange={(event) => setDuplicateTitle(event.target.value)}
+                placeholder="Estimate title"
+              />
+            </label>
+            <div className={styles.lifecycleActions}>
+              <button type="button" onClick={handleDuplicateEstimate}>
+                Confirm Duplicate
+              </button>
+              <button type="button" onClick={() => setShowDuplicatePanel(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {familyCollisionPrompt ? (
+          <div className={`${styles.duplicatePanel} ${styles.composerPrepPanel}`}>
+            <p className={styles.inlineHint}>
+              A family titled <strong>{familyCollisionPrompt.title}</strong> already exists
+              {familyCollisionPrompt.latestVersion
+                ? ` (latest v${familyCollisionPrompt.latestVersion})`
+                : ""}
+              . Creating now will add a new version to that family.
+            </p>
+            <div className={styles.lifecycleActions}>
+              <button
+                type="button"
+                onClick={() => {
+                  const projectId = Number(selectedProjectId);
+                  const trimmedTitle = estimateTitle.trim();
+                  if (!projectId) {
+                    setFormErrorMessage("Select a project first.");
+                    return;
+                  }
+                  if (!trimmedTitle) {
+                    setFormErrorMessage("Estimate title is required.");
+                    return;
+                  }
+                  setConfirmedFamilyTitleKey(normalizeFamilyTitle(trimmedTitle));
+                  setFamilyCollisionPrompt(null);
+                  void submitNewEstimateWithTitle({
+                    projectId,
+                    title: trimmedTitle,
+                    allowExistingTitleFamily: true,
+                  });
+                }}
+              >
+                Create Revision In Existing Family
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmedFamilyTitleKey("");
+                  setFamilyCollisionPrompt(null);
+                }}
+              >
+                Use Different Title
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </section>
+
       <EstimateSheet
         project={selectedProject}
         organizationDefaults={organizationDefaults}
@@ -1757,7 +1912,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         formSuccessHref={formSuccessHref}
         lineSortKey={lineSortKey}
         lineSortDirection={lineSortDirection}
-        onTitleChange={setEstimateTitle}
+        onTitleChange={handleEstimateTitleChange}
         onValidThroughChange={setValidThrough}
         onTaxPercentChange={setTaxPercent}
         onLineItemChange={updateLineItem}

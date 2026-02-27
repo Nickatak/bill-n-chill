@@ -26,13 +26,6 @@ export default async function InvoiceReviewPage({ params }: InvoiceReviewPagePro
   return (
     <div className={shell.page}>
       <main className={`${shell.main} ${shell.mainNarrow}`}>
-        <header className={shell.hero}>
-          <div className={shell.heroTop}>
-            <p className={shell.eyebrow}>Client Facing</p>
-            <h1 className={shell.title}>Invoice</h1>
-            <p className={shell.copy}>Review the invoice details, billing breakdown, and payment terms.</p>
-          </div>
-        </header>
         <section className={shell.card}>
           <InvoicePublicPreview publicToken={publicToken} />
         </section>

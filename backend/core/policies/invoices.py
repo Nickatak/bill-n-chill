@@ -2,7 +2,7 @@
 
 from core.models import Invoice
 
-INVOICE_POLICY_VERSION = "2026-02-25.invoices.v1"
+INVOICE_POLICY_VERSION = "2026-02-27.invoices.v2"
 
 
 def _status_order() -> list[str]:

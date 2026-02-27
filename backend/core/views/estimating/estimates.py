@@ -14,6 +14,7 @@ from core.models import (
     Estimate,
     EstimateStatusEvent,
     FinancialAuditEvent,
+    Project,
 )
 from core.policies import get_estimate_policy_contract
 from core.serializers import (
@@ -146,6 +147,11 @@ def public_estimate_decision_view(request, public_token: str):
             changed_by=estimate.created_by,
         )
         if estimate.status == Estimate.Status.APPROVED:
+            _activate_project_from_estimate_approval(
+                estimate=estimate,
+                actor=estimate.created_by,
+                note=f"Project moved to active after public approval of estimate #{estimate.id}.",
+            )
             budget_row, conversion_status = _ensure_budget_from_approved_estimate(
                 estimate=estimate,
                 user=estimate.created_by,
@@ -320,6 +326,34 @@ def _sync_project_contract_baseline_if_unset(*, estimate):
     project.contract_value_original = estimate.grand_total
     project.contract_value_current = estimate.grand_total
     project.save(update_fields=["contract_value_original", "contract_value_current", "updated_at"])
+    return True
+
+
+def _activate_project_from_estimate_approval(*, estimate, actor, note: str):
+    project = estimate.project
+    if project.status != Project.Status.PROSPECT:
+        return False
+    if not Project.is_transition_allowed(project.status, Project.Status.ACTIVE):
+        return False
+
+    previous_status = project.status
+    project.status = Project.Status.ACTIVE
+    project.save(update_fields=["status", "updated_at"])
+    _record_financial_audit_event(
+        project=project,
+        event_type="project_status_changed",
+        object_type="project",
+        object_id=project.id,
+        from_status=previous_status,
+        to_status=project.status,
+        note=note,
+        created_by=actor,
+        metadata={
+            "trigger": "estimate_approved",
+            "estimate_id": estimate.id,
+            "estimate_version": estimate.version,
+        },
+    )
     return True
 
 
@@ -518,6 +552,55 @@ def project_estimates_view(request, project_id: int):
                 },
                 status=200,
             )
+
+    same_title_family = Estimate.objects.filter(
+        project=project,
+        created_by_id__in=actor_user_ids,
+        title=data.get("title", ""),
+    ).order_by("-version", "-id")
+    approved_family_row = same_title_family.filter(status=Estimate.Status.APPROVED).first()
+    if approved_family_row:
+        return Response(
+            {
+                "error": {
+                    "code": "estimate_family_approved_locked",
+                    "message": "This estimate family already has an approved version and is locked. Use a new title or manage scope changes via change orders.",
+                    "fields": {
+                        "title": [
+                            "Approved estimate families cannot create additional draft versions."
+                        ]
+                    },
+                    "meta": {
+                        "latest_estimate_id": approved_family_row.id,
+                        "latest_version": approved_family_row.version,
+                        "latest_status": approved_family_row.status,
+                        "family_size": same_title_family.count(),
+                    },
+                }
+            },
+            status=409,
+        )
+    if same_title_family.exists() and not data.get("allow_existing_title_family", False):
+        latest_family_row = same_title_family.first()
+        return Response(
+            {
+                "error": {
+                    "code": "estimate_family_exists",
+                    "message": "An estimate family with this title already exists. Confirm to create a new version in that family.",
+                    "fields": {
+                        "title": [
+                            "Use explicit confirmation before creating another version in an existing title family."
+                        ]
+                    },
+                    "meta": {
+                        "latest_estimate_id": latest_family_row.id if latest_family_row else None,
+                        "latest_version": latest_family_row.version if latest_family_row else None,
+                        "family_size": same_title_family.count(),
+                    },
+                }
+            },
+            status=409,
+        )
 
     next_version = _next_estimate_family_version(
         project=project,
@@ -773,6 +856,11 @@ def estimate_detail_view(request, estimate_id: int):
             changed_by=request.user,
         )
         if estimate.status == Estimate.Status.APPROVED:
+            _activate_project_from_estimate_approval(
+                estimate=estimate,
+                actor=request.user,
+                note=f"Project moved to active after approval of estimate #{estimate.id}.",
+            )
             budget_row, conversion_status = _ensure_budget_from_approved_estimate(
                 estimate=estimate,
                 user=request.user,

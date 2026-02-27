@@ -107,6 +107,10 @@ export type ApiResponse = {
     fields?: Record<string, string[]>;
     meta?: {
       active_financial_estimate_id?: number | null;
+      latest_estimate_id?: number | null;
+      latest_version?: number | null;
+      latest_status?: string | null;
+      family_size?: number | null;
     };
   };
 };

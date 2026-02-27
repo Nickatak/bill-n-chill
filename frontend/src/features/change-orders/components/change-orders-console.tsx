@@ -664,6 +664,9 @@ export function ChangeOrdersConsole({
     if (statusAction === "notate") {
       return styles.statusEventNeutral;
     }
+    if (statusAction === "resend") {
+      return styles.statusEventSent;
+    }
     if (!fromStatus && toStatus === "draft") {
       return styles.statusEventCreated;
     }
@@ -671,7 +674,7 @@ export function ChangeOrdersConsole({
       return styles.statusEventNeutral;
     }
     if (fromStatus === "pending_approval" && toStatus === "pending_approval") {
-      return styles.statusEventResent;
+      return styles.statusEventSent;
     }
     if (fromStatus === "draft" && toStatus === "pending_approval") {
       return styles.statusEventSent;
@@ -1726,38 +1729,51 @@ export function ChangeOrdersConsole({
                         const active = String(changeOrder.id) === selectedChangeOrderId;
                         const lastStatusEvent = lastStatusEventForChangeOrder(changeOrder.id);
                         return (
-                          <button
-                            key={changeOrder.id}
-                            type="button"
-                            className={`${styles.viewerRailItem} ${styles.viewerHistoryItem} ${viewerHistoryStatusClass(changeOrder.status)} ${
-                              active ? `${styles.viewerRailItemActive} ${styles.viewerHistoryItemActive}` : ""
-                            }`}
-                            onClick={() => {
-                              hydrateEditForm(changeOrder);
-                            }}
-                          >
-                            <span className={styles.viewerRailTitle}>
-                              {coLabel(changeOrder)} {changeOrder.title}
-                            </span>
-                            <span className={styles.viewerHistoryStatusText}>{statusLabel(changeOrder.status)}</span>
-                            <span
-                              className={`${styles.viewerHistoryMetaText} ${styles.viewerHistoryLineDelta} ${
-                                ["approved", "accepted"].includes(changeOrder.status)
-                                  ? styles.viewerHistoryLineDeltaApproved
-                                  : ""
+                          <div key={changeOrder.id} className={styles.viewerHistoryCardWrap}>
+                            {changeOrder.public_ref ? (
+                              <Link
+                                href={publicChangeOrderHref(changeOrder.public_ref)}
+                                className={styles.viewerHistoryPublicLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`Open public view for ${coLabel(changeOrder)}`}
+                                title="Open public view"
+                              >
+                                Public
+                              </Link>
+                            ) : null}
+                            <button
+                              type="button"
+                              className={`${styles.viewerRailItem} ${styles.viewerHistoryItem} ${viewerHistoryStatusClass(changeOrder.status)} ${
+                                active ? `${styles.viewerRailItemActive} ${styles.viewerHistoryItemActive}` : ""
                               }`}
+                              onClick={() => {
+                                hydrateEditForm(changeOrder);
+                              }}
                             >
-                              Line delta: ${changeOrder.line_total_delta}
-                            </span>
-                            {lastStatusEvent ? (
-                              <span className={styles.viewerHistoryMetaText}>
-                                Last action: {statusEventActionLabel(lastStatusEvent)} on{" "}
-                                {formatEventDateTime(lastStatusEvent.created_at)} by {eventActorLabel(lastStatusEvent)}
+                              <span className={styles.viewerRailTitle}>
+                                {coLabel(changeOrder)} {changeOrder.title}
                               </span>
-                            ) : (
-                              <span className={styles.viewerHistoryMetaText}>No status events yet.</span>
-                            )}
-                          </button>
+                              <span className={styles.viewerHistoryStatusText}>{statusLabel(changeOrder.status)}</span>
+                              <span
+                                className={`${styles.viewerHistoryMetaText} ${styles.viewerHistoryLineDelta} ${
+                                  ["approved", "accepted"].includes(changeOrder.status)
+                                    ? styles.viewerHistoryLineDeltaApproved
+                                    : ""
+                                }`}
+                              >
+                                Line delta: ${changeOrder.line_total_delta}
+                              </span>
+                              {lastStatusEvent ? (
+                                <span className={styles.viewerHistoryMetaText}>
+                                  Last action: {statusEventActionLabel(lastStatusEvent)} on{" "}
+                                  {formatEventDateTime(lastStatusEvent.created_at)} by {eventActorLabel(lastStatusEvent)}
+                                </span>
+                              ) : (
+                                <span className={styles.viewerHistoryMetaText}>No status events yet.</span>
+                              )}
+                            </button>
+                          </div>
                         );
                       })}
                     </div>
@@ -1777,16 +1793,6 @@ export function ChangeOrdersConsole({
                         <p className={styles.viewerHint}>
                           Post-approval total = pre-approval total + this CO line delta.
                         </p>
-                        {selectedViewerChangeOrder.public_ref ? (
-                          <Link
-                            href={publicChangeOrderHref(selectedViewerChangeOrder.public_ref)}
-                            className={styles.viewerCardLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            Open Public CO <span aria-hidden="true">↗</span>
-                          </Link>
-                        ) : null}
                         {quickStatusOptions.length > 0 ? (
                           <div className={styles.quickStatusPanel}>
                             <span className={estimateStyles.lifecycleFieldLabel}>Next status</span>
@@ -1810,9 +1816,10 @@ export function ChangeOrdersConsole({
                                 );
                               })}
                             </div>
-                            <div className={estimateStyles.lifecycleActions}>
+                            <div className={`${estimateStyles.lifecycleActions} ${styles.viewerStatusActionRow}`}>
                               <button
                                 type="button"
+                                className={`${styles.viewerStatusActionButton} ${styles.viewerStatusActionButtonPrimary}`}
                                 onClick={handleQuickUpdateStatus}
                                 disabled={!canMutateChangeOrders || !quickStatusOptions.length}
                               >
@@ -1820,6 +1827,7 @@ export function ChangeOrdersConsole({
                               </button>
                               <button
                                 type="button"
+                                className={`${styles.viewerStatusActionButton} ${styles.viewerStatusActionButtonSecondary}`}
                                 onClick={handleAddChangeOrderStatusNote}
                                 disabled={!canMutateChangeOrders || !quickStatusNote.trim()}
                               >
@@ -1849,9 +1857,10 @@ export function ChangeOrdersConsole({
                                 rows={3}
                               />
                             </label>
-                            <div className={estimateStyles.lifecycleActions}>
+                            <div className={`${estimateStyles.lifecycleActions} ${styles.viewerStatusActionRow}`}>
                               <button
                                 type="button"
+                                className={`${styles.viewerStatusActionButton} ${styles.viewerStatusActionButtonSecondary}`}
                                 onClick={handleAddChangeOrderStatusNote}
                                 disabled={!canMutateChangeOrders || !quickStatusNote.trim()}
                               >

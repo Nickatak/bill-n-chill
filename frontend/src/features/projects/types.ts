@@ -70,7 +70,8 @@ export type FinancialAuditEventRecord = {
     | "vendor_bill_updated"
     | "payment_updated"
     | "payment_allocated"
-    | "invoice_scope_override";
+    | "invoice_scope_override"
+    | "project_status_changed";
   object_type: string;
   object_id: number;
   from_status: string;

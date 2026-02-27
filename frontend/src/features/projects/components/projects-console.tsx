@@ -118,6 +118,9 @@ export function ProjectsConsole() {
   const acceptedContractDisplay =
     summary?.accepted_contract_total ?? selectedProject?.accepted_contract_total ?? acceptedEstimateTotal;
   const arOutstandingDisplay = summary?.ar_outstanding ?? "--";
+  const unbilledFromAcceptedDisplay = summary
+    ? formatMoneyValue(parseMoneyValue(acceptedContractDisplay) - parseMoneyValue(arOutstandingDisplay))
+    : "--";
   const apOutstandingDisplay = summary?.ap_outstanding ?? "--";
   const invoicedDisplay = summary?.invoiced_to_date ?? "--";
   const paidDisplay = summary?.paid_to_date ?? "--";
@@ -766,6 +769,10 @@ export function ProjectsConsole() {
               <div className={styles.metricRow}>
                 <span>AR outstanding</span>
                 <strong>{arOutstandingDisplay}</strong>
+              </div>
+              <div className={styles.metricRow}>
+                <span>Not Yet Billed (Accepted - AR Outstanding)</span>
+                <strong>{unbilledFromAcceptedDisplay}</strong>
               </div>
               <div className={styles.metricRow}>
                 <span>AP outstanding</span>

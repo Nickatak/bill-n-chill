@@ -13,7 +13,7 @@ function parsePublicToken(publicRef: string): string | null {
 }
 
 export const metadata: Metadata = {
-  title: "Estimate Review",
+  title: "Estimate",
 };
 
 export default async function EstimateReviewPage({ params }: EstimateReviewPageProps) {
@@ -26,16 +26,6 @@ export default async function EstimateReviewPage({ params }: EstimateReviewPageP
   return (
     <div className={shell.page}>
       <main className={shell.main}>
-        <header className={shell.hero}>
-          <div className={shell.heroTop}>
-            <p className={shell.eyebrow}>Client Facing</p>
-            <h1 className={shell.title}>Estimate Review (WIP)</h1>
-            <p className={shell.copy}>
-              Customer-facing estimate preview while final approval/denial language and response
-              handling are finalized.
-            </p>
-          </div>
-        </header>
         <section className={shell.card}>
           <EstimateApprovalPreview publicToken={publicToken} />
         </section>

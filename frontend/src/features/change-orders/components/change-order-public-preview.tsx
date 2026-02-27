@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatDateDisplay } from "@/shared/date-format";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { ApiResponse, ChangeOrderRecord } from "../types";
@@ -56,9 +56,29 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
   const [deciderEmail, setDeciderEmail] = useState("");
   const [decisionMessage, setDecisionMessage] = useState("");
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
+  const [decisionReceiptName, setDecisionReceiptName] = useState("");
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const canDecide = changeOrder?.status === "pending_approval";
+  const showDecisionSection = canDecide;
+  const decisionStatusLabel = statusLabel(changeOrder?.status);
+  const approvalAcknowledgement = useMemo(() => {
+    const name = decisionReceiptName.trim();
+    if (name) {
+      return `Thank you for your approval, ${name}.`;
+    }
+    return "Thank you for your approval.";
+  }, [decisionReceiptName]);
+  const nonPendingDecisionMessage =
+    changeOrder?.status === "approved"
+      ? `Decision status: ${decisionStatusLabel}. ${approvalAcknowledgement}`
+      : `Decision status: ${decisionStatusLabel}. This change order is not awaiting response.`;
+
+  useEffect(() => {
+    if (!canDecide) {
+      setDecisionMessage("");
+    }
+  }, [canDecide]);
 
   useEffect(() => {
     async function loadChangeOrder() {
@@ -70,6 +90,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
           return;
         }
         setChangeOrder(payload.data as ChangeOrderRecord);
+        setDecisionReceiptName("");
         setStatusMessage("");
       } catch {
         setStatusMessage("Could not reach change-order endpoint.");
@@ -105,11 +126,8 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
         return;
       }
       setChangeOrder(payload.data as ChangeOrderRecord);
-      setDecisionMessage(
-        decision === "approve"
-          ? "Change order approved. Thank you."
-          : "Change order rejected. The team has been notified.",
-      );
+      setDecisionReceiptName(deciderName.trim());
+      setDecisionMessage("");
     } catch {
       setDecisionMessage("Could not reach change-order decision endpoint.");
     } finally {
@@ -123,6 +141,28 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
 
       {changeOrder ? (
         <>
+          <section
+            className={`${styles.publicDecisionBanner} ${
+              canDecide ? styles.publicDecisionBannerPending : styles.publicDecisionBannerComplete
+            }`}
+          >
+            <div className={styles.publicDecisionBannerBody}>
+              <p className={styles.publicDecisionBannerEyebrow}>Decision</p>
+              {canDecide ? (
+                <p className={styles.publicDecisionBannerText}>
+                  Ready to sign? Jump to the decision section and submit your response.
+                </p>
+              ) : (
+                <p className={styles.publicDecisionBannerText}>{nonPendingDecisionMessage}</p>
+              )}
+            </div>
+            {canDecide ? (
+              <a href="#change-order-decision" className={styles.publicDecisionBannerLink}>
+                Review & Sign
+              </a>
+            ) : null}
+          </section>
+
           <header className={styles.header}>
             <div>
               <p className={styles.eyebrow}>Change Order</p>
@@ -190,62 +230,58 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
             <p className={styles.updatedText}>Updated {formatDateDisplay(changeOrder.updated_at, "Unknown date")}</p>
           </section>
 
-          <section className={styles.decisionCard}>
-            <h3>Decision</h3>
-            {decisionMessage ? <p className={styles.decisionMessage}>{decisionMessage}</p> : null}
-            {!canDecide ? (
-              <p className={styles.decisionMessage}>
-                This change order is currently <strong>{statusLabel(changeOrder.status)}</strong> and no longer
-                awaiting decision.
-              </p>
-            ) : null}
-            <label className={styles.field}>
-              Your name (optional)
-              <input
-                value={deciderName}
-                onChange={(event) => setDeciderName(event.target.value)}
-                placeholder="Homeowner name"
-                disabled={decisionSubmitting || !canDecide}
-              />
-            </label>
-            <label className={styles.field}>
-              Your email (optional)
-              <input
-                value={deciderEmail}
-                onChange={(event) => setDeciderEmail(event.target.value)}
-                placeholder="owner@example.com"
-                disabled={decisionSubmitting || !canDecide}
-              />
-            </label>
-            <label className={styles.field}>
-              Note (optional)
-              <textarea
-                value={decisionNote}
-                onChange={(event) => setDecisionNote(event.target.value)}
-                rows={3}
-                placeholder="Optional decision note."
-                disabled={decisionSubmitting || !canDecide}
-              />
-            </label>
-            <div className={styles.decisionActions}>
-              <button
-                type="button"
-                className={styles.primaryButton}
-                onClick={() => void applyDecision("approve")}
-                disabled={decisionSubmitting || !canDecide}
-              >
-                Approve Change Order
-              </button>
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                onClick={() => void applyDecision("reject")}
-                disabled={decisionSubmitting || !canDecide}
-              >
-                Reject Change Order
-              </button>
-            </div>
-          </section>
+          {showDecisionSection ? (
+            <section id="change-order-decision" className={`${styles.decisionCard} ${styles.publicDecisionSection}`}>
+              <h3>Decision</h3>
+              {decisionMessage ? <p className={styles.decisionMessage}>{decisionMessage}</p> : null}
+              <label className={styles.field}>
+                Your name (optional)
+                <input
+                  value={deciderName}
+                  onChange={(event) => setDeciderName(event.target.value)}
+                  placeholder="Homeowner name"
+                  disabled={decisionSubmitting}
+                />
+              </label>
+              <label className={styles.field}>
+                Your email (optional)
+                <input
+                  value={deciderEmail}
+                  onChange={(event) => setDeciderEmail(event.target.value)}
+                  placeholder="owner@example.com"
+                  disabled={decisionSubmitting}
+                />
+              </label>
+              <label className={styles.field}>
+                Note (optional)
+                <textarea
+                  value={decisionNote}
+                  onChange={(event) => setDecisionNote(event.target.value)}
+                  rows={3}
+                  placeholder="Optional decision note."
+                  disabled={decisionSubmitting}
+                />
+              </label>
+              <div className={styles.decisionActions}>
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  onClick={() => void applyDecision("approve")}
+                  disabled={decisionSubmitting}
+                >
+                  Approve Change Order
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={() => void applyDecision("reject")}
+                  disabled={decisionSubmitting}
+                >
+                  Reject Change Order
+                </button>
+              </div>
+            </section>
+          ) : null}
         </>
       ) : null}
     </section>

@@ -127,14 +127,6 @@ function normalizeDecimalInput(value: number, fallback = "0"): string {
   return value.toFixed(2);
 }
 
-function timeStampLabel(): string {
-  return new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(new Date());
-}
-
 function emptyLine(localId: number, defaultBudgetLineId = ""): InvoiceLineInput {
   return {
     localId,
@@ -386,12 +378,17 @@ export function InvoicesConsole() {
   const [taxPercent, setTaxPercent] = useState("0");
   const [lineItems, setLineItems] = useState<InvoiceLineInput[]>([emptyLine(1)]);
   const [nextLineId, setNextLineId] = useState(2);
+  const [workspaceSourceInvoiceId, setWorkspaceSourceInvoiceId] = useState<number | null>(null);
+  const [editingDraftInvoiceId, setEditingDraftInvoiceId] = useState<number | null>(null);
   const [workspaceContext, setWorkspaceContext] = useState("New invoice draft");
-  const [workspaceNotice, setWorkspaceNotice] = useState("Ready for a new invoice draft.");
 
   const selectedInvoice = useMemo(
     () => invoices.find((invoice) => String(invoice.id) === selectedInvoiceId) ?? null,
     [invoices, selectedInvoiceId],
+  );
+  const workspaceSourceInvoice = useMemo(
+    () => invoices.find((invoice) => invoice.id === workspaceSourceInvoiceId) ?? null,
+    [invoices, workspaceSourceInvoiceId],
   );
   const budgetLineById = useMemo(
     () => new Map(budgetLineOptions.map((option) => [String(option.id), option])),
@@ -451,7 +448,18 @@ export function InvoicesConsole() {
       paid: byStatus.get("paid") ?? 0,
     };
   }, [invoices]);
+  const invoiceStatusTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const row of invoices) {
+      totals.set(row.status, (totals.get(row.status) ?? 0) + 1);
+    }
+    return totals;
+  }, [invoices]);
   const nextDraftInvoiceNumber = useMemo(() => nextInvoiceNumberPreview(invoices), [invoices]);
+  const workspaceInvoiceNumber = workspaceSourceInvoice?.invoice_number ?? nextDraftInvoiceNumber;
+  const workspaceIsEditingDraft = editingDraftInvoiceId !== null;
+  const workspaceIsLockedByStatus = workspaceSourceInvoice ? workspaceSourceInvoice.status !== "draft" : false;
+  const workspaceIsLocked = !canEditInvoiceWorkspace || workspaceIsLockedByStatus;
 
   const balanceSummary = useMemo(() => {
     return invoices.reduce(
@@ -911,6 +919,59 @@ export function InvoicesConsole() {
     );
   }
 
+  const invoiceToWorkspaceLines = useCallback(
+    (invoice: InvoiceRecord): InvoiceLineInput[] => {
+      const sourceLines = invoice.line_items ?? [];
+      const fallbackBudgetLineId = budgetLineOptions[0] ? String(budgetLineOptions[0].id) : "";
+      if (!sourceLines.length) {
+        return [emptyLine(1, fallbackBudgetLineId)];
+      }
+      return sourceLines.map((line, index) => {
+        const lineType: InvoiceLineInput["lineType"] =
+          line.line_type === "adjustment" ? "adjustment" : "scope";
+        const rawBudgetLineId = line.budget_line ? String(line.budget_line) : "";
+        const budgetLineId =
+          lineType === "scope"
+            ? budgetLineById.has(rawBudgetLineId)
+              ? rawBudgetLineId
+              : fallbackBudgetLineId
+            : "";
+        return {
+          localId: index + 1,
+          lineType,
+          budgetLineId,
+          adjustmentReason: line.adjustment_reason || "",
+          internalNote: line.internal_note || "",
+          description: line.description || "Invoice scope item",
+          quantity: line.quantity || "1",
+          unit: line.unit || "ea",
+          unitPrice: line.unit_price || "0",
+        };
+      });
+    },
+    [budgetLineById, budgetLineOptions],
+  );
+
+  const loadInvoiceIntoWorkspace = useCallback(
+    (invoice: InvoiceRecord) => {
+      const workspaceLines = invoiceToWorkspaceLines(invoice);
+      setIssueDate(invoice.issue_date || todayIsoDate());
+      setDueDate(invoice.due_date || dueDateIsoDate());
+      setTaxPercent(invoice.tax_percent || "0");
+      setLineItems(workspaceLines);
+      setNextLineId(workspaceLines.length + 1);
+      setWorkspaceSourceInvoiceId(invoice.id);
+      if (invoice.status === "draft") {
+        setEditingDraftInvoiceId(invoice.id);
+        setWorkspaceContext(`Editing ${invoice.invoice_number}`);
+      } else {
+        setEditingDraftInvoiceId(null);
+        setWorkspaceContext(`Viewing ${invoice.invoice_number} (locked)`);
+      }
+    },
+    [invoiceToWorkspaceLines],
+  );
+
   function handleSelectProject(project: ProjectRecord) {
     if (String(project.id) === selectedProjectId) {
       return;
@@ -921,6 +982,7 @@ export function InvoicesConsole() {
   function handleSelectInvoice(invoice: InvoiceRecord) {
     setSelectedInvoiceId(String(invoice.id));
     setSelectedStatus(resolvePreferredStatusSelection(invoice, invoiceAllowedStatusTransitions));
+    loadInvoiceIntoWorkspace(invoice);
   }
 
   function resetCreateDraft() {
@@ -932,12 +994,13 @@ export function InvoicesConsole() {
     setTaxPercent("0");
     setLineItems([emptyLine(1, defaultBudgetLineId)]);
     setNextLineId(2);
+    setWorkspaceSourceInvoiceId(null);
+    setEditingDraftInvoiceId(null);
     setWorkspaceContext("New invoice draft");
   }
 
   function handleStartNewInvoiceDraft() {
     resetCreateDraft();
-    setWorkspaceNotice(`Started a new invoice draft at ${timeStampLabel()}.`);
     setSuccessStatus("Started a new invoice draft.");
   }
 
@@ -947,12 +1010,11 @@ export function InvoicesConsole() {
       setErrorStatus(`Role ${role} is read-only for invoice mutations.`);
       return;
     }
-
-    const projectId = Number(selectedProjectId);
-    if (!projectId) {
-      setErrorStatus("Select a project first.");
+    if (workspaceIsLocked) {
+      setErrorStatus("This invoice workspace is read-only. Start a new draft or duplicate to edit.");
       return;
     }
+
     if (lineItems.some((line) => line.lineType === "scope" && !line.budgetLineId)) {
       setErrorStatus("Each scope line requires a project budget line.");
       return;
@@ -963,6 +1025,42 @@ export function InvoicesConsole() {
       )
     ) {
       setErrorStatus("Each adjustment line requires a reason.");
+      return;
+    }
+
+    if (editingDraftInvoiceId) {
+      setNeutralStatus("Saving draft invoice...");
+      try {
+        const updatePayload = invoiceComposerAdapter.toUpdatePayload(invoiceDraftFormState);
+        const response = await fetch(`${normalizedBaseUrl}/invoices/${editingDraftInvoiceId}/`, {
+          method: "PATCH",
+          headers: buildAuthHeaders(token, { contentType: "application/json" }),
+          body: JSON.stringify(updatePayload),
+        });
+        const payload: ApiResponse = await response.json();
+        if (!response.ok) {
+          setErrorStatus(readApiError(payload, "Save draft failed."));
+          return;
+        }
+        const updated = payload.data as InvoiceRecord;
+        setInvoices((current) =>
+          current.map((invoice) => (invoice.id === updated.id ? updated : invoice)),
+        );
+        setWorkspaceSourceInvoiceId(updated.id);
+        setSelectedInvoiceId(String(updated.id));
+        setSelectedStatus(resolvePreferredStatusSelection(updated, invoiceAllowedStatusTransitions));
+        setWorkspaceContext(`Editing ${updated.invoice_number}`);
+        setSuccessStatus(`Saved ${updated.invoice_number} draft.`);
+        return;
+      } catch {
+        setErrorStatus("Could not reach invoice update endpoint.");
+        return;
+      }
+    }
+
+    const projectId = Number(selectedProjectId);
+    if (!projectId) {
+      setErrorStatus("Select a project first.");
       return;
     }
 
@@ -986,7 +1084,6 @@ export function InvoicesConsole() {
       setSelectedInvoiceId(String(created.id));
       setSelectedStatus(created.status);
       resetCreateDraft();
-      setWorkspaceNotice(`Created ${created.invoice_number} at ${timeStampLabel()}.`);
       setSuccessStatus(`Created ${created.invoice_number} (${statusLabel(created.status)}).`);
     } catch {
       setErrorStatus("Could not reach invoice create endpoint.");
@@ -1093,32 +1190,7 @@ export function InvoicesConsole() {
       return;
     }
 
-    const duplicateSourceLines = selectedInvoice.line_items ?? [];
-    const fallbackBudgetLineId = budgetLineOptions[0] ? String(budgetLineOptions[0].id) : "";
-    const nextDraftLines: InvoiceLineInput[] = duplicateSourceLines.length
-      ? duplicateSourceLines.map((line, index) => {
-          const lineType: InvoiceLineInput["lineType"] =
-            line.line_type === "adjustment" ? "adjustment" : "scope";
-          const rawBudgetLineId = line.budget_line ? String(line.budget_line) : "";
-          const budgetLineId =
-            lineType === "scope"
-              ? budgetLineById.has(rawBudgetLineId)
-                ? rawBudgetLineId
-                : fallbackBudgetLineId
-              : "";
-          return {
-            localId: index + 1,
-            lineType,
-            budgetLineId,
-            adjustmentReason: line.adjustment_reason || "",
-            internalNote: line.internal_note || "",
-            description: line.description || "Invoice scope item",
-            quantity: line.quantity || "1",
-            unit: line.unit || "ea",
-            unitPrice: line.unit_price || "0",
-          };
-        })
-      : [emptyLine(1, fallbackBudgetLineId)];
+    const nextDraftLines = invoiceToWorkspaceLines(selectedInvoice);
 
     const nextIssueDate = todayIsoDate();
     setIssueDate(nextIssueDate);
@@ -1129,8 +1201,9 @@ export function InvoicesConsole() {
     setTaxPercent(selectedInvoice.tax_percent || "0");
     setLineItems(nextDraftLines);
     setNextLineId(nextDraftLines.length + 1);
+    setWorkspaceSourceInvoiceId(null);
+    setEditingDraftInvoiceId(null);
     setWorkspaceContext(`Draft from ${selectedInvoice.invoice_number}`);
-    setWorkspaceNotice(`Loaded ${selectedInvoice.invoice_number} into draft workspace at ${timeStampLabel()}.`);
     setSuccessStatus(`Loaded ${selectedInvoice.invoice_number} into a new draft. A new invoice # is assigned on create.`);
   }
 
@@ -1409,7 +1482,8 @@ export function InvoicesConsole() {
                       }`}
                       onClick={() => toggleInvoiceStatusFilter(status)}
                     >
-                      {statusLabel(status)}
+                      <span>{statusLabel(status)}</span>
+                      <span className={styles.statusFilterCount}>{invoiceStatusTotals.get(status) ?? 0}</span>
                     </button>
                   );
                 })}
@@ -1651,14 +1725,13 @@ export function InvoicesConsole() {
                   <p className={styles.workspaceToolbarHint}>
                     Invoices do not use revision families. Duplicate always creates a new invoice #.
                   </p>
-                  <p className={styles.workspaceToolbarNotice}>{workspaceNotice}</p>
                 </div>
               ) : null}
               <DocumentComposer
                 adapter={invoiceComposerAdapter}
                 document={null}
                 formState={invoiceDraftFormState}
-                className={`${estimateStyles.sheet} ${styles.invoiceComposerSheet} ${!canEditInvoiceWorkspace ? styles.invoiceComposerSheetLocked : ""}`}
+                className={`${estimateStyles.sheet} ${styles.invoiceComposerSheet} ${workspaceIsLocked ? styles.invoiceComposerSheetLocked : ""}`}
                 sectionClassName={styles.invoiceComposerSection}
                 onSubmit={handleCreateInvoice}
                 sections={[{ slot: "context" }]}
@@ -1717,7 +1790,24 @@ export function InvoicesConsole() {
                           <span className={styles.invoiceMetaCardLabel}>Invoice Details</span>
                           <div className={estimateStyles.metaLine}>
                             <span>Invoice #</span>
-                            <strong className={styles.invoiceMetaStrong}>{nextDraftInvoiceNumber}</strong>
+                            <div className={styles.invoiceNumberContext}>
+                              <strong className={styles.invoiceMetaStrong}>{workspaceInvoiceNumber}</strong>
+                              <span
+                                className={`${styles.invoiceNumberIndicator} ${
+                                  workspaceIsEditingDraft
+                                    ? styles.invoiceNumberIndicatorEditing
+                                    : workspaceSourceInvoice
+                                      ? styles.invoiceNumberIndicatorLocked
+                                      : styles.invoiceNumberIndicatorGenerated
+                                }`}
+                              >
+                                {workspaceIsEditingDraft
+                                  ? "Editing existing draft"
+                                  : workspaceSourceInvoice
+                                    ? `Read-only ${statusLabel(workspaceSourceInvoice.status)}`
+                                    : "Generated on create"}
+                              </span>
+                            </div>
                           </div>
                           <label className={estimateStyles.inlineField}>
                             Issue date
@@ -1727,7 +1817,7 @@ export function InvoicesConsole() {
                               value={issueDate}
                               onChange={(event) => setIssueDate(event.target.value)}
                               required
-                              disabled={!canEditInvoiceWorkspace}
+                              disabled={workspaceIsLocked}
                             />
                           </label>
                           <label className={estimateStyles.inlineField}>
@@ -1738,7 +1828,7 @@ export function InvoicesConsole() {
                               value={dueDate}
                               onChange={(event) => setDueDate(event.target.value)}
                               required
-                              disabled={!canEditInvoiceWorkspace}
+                              disabled={workspaceIsLocked}
                             />
                           </label>
                         </div>
@@ -1763,7 +1853,7 @@ export function InvoicesConsole() {
                           <span>Unit</span>
                           <span>Unit price</span>
                           <span>Amount</span>
-                          <span>{canEditInvoiceWorkspace ? "Actions" : ""}</span>
+                          <span>{workspaceIsLocked ? "" : "Actions"}</span>
                         </div>
                         {lineItems.map((line, index) => {
                           const lineAmount = parseAmount(line.quantity) * parseAmount(line.unitPrice);
@@ -1782,7 +1872,7 @@ export function InvoicesConsole() {
                                     event.target.value as InvoiceLineInput["lineType"],
                                   )
                                 }
-                                disabled={!canEditInvoiceWorkspace}
+                                disabled={workspaceIsLocked}
                               >
                                 <option value="scope">Scope</option>
                                 <option value="adjustment">Adjustment</option>
@@ -1795,7 +1885,7 @@ export function InvoicesConsole() {
                                     updateLineItem(line.localId, "budgetLineId", event.target.value)
                                   }
                                   required
-                                  disabled={!canEditInvoiceWorkspace}
+                                  disabled={workspaceIsLocked}
                                 >
                                   <option value="">Select budget line</option>
                                   {budgetLineGroups.map(([groupLabel, options]) => (
@@ -1817,7 +1907,7 @@ export function InvoicesConsole() {
                                   }
                                   placeholder="Adjustment reason"
                                   required
-                                  disabled={!canEditInvoiceWorkspace}
+                                  disabled={workspaceIsLocked}
                                 />
                               )}
                               <input
@@ -1828,7 +1918,7 @@ export function InvoicesConsole() {
                                 }
                                 inputMode="decimal"
                                 required
-                                disabled={!canEditInvoiceWorkspace}
+                                disabled={workspaceIsLocked}
                               />
                               <input
                                 className={`${estimateStyles.lineInput} ${styles.invoiceLockableControl}`}
@@ -1837,14 +1927,14 @@ export function InvoicesConsole() {
                                   updateLineItem(line.localId, "description", event.target.value)
                                 }
                                 required
-                                disabled={!canEditInvoiceWorkspace}
+                                disabled={workspaceIsLocked}
                               />
                               <input
                                 className={`${estimateStyles.lineInput} ${styles.invoiceLockableControl}`}
                                 value={line.unit}
                                 onChange={(event) => updateLineItem(line.localId, "unit", event.target.value)}
                                 required
-                                disabled={!canEditInvoiceWorkspace}
+                                disabled={workspaceIsLocked}
                               />
                               <input
                                 className={`${estimateStyles.lineInput} ${styles.invoiceLockableControl}`}
@@ -1854,13 +1944,13 @@ export function InvoicesConsole() {
                                 }
                                 inputMode="decimal"
                                 required
-                                disabled={!canEditInvoiceWorkspace}
+                                disabled={workspaceIsLocked}
                               />
                               <span className={`${estimateStyles.amountCell} ${styles.invoiceReadAmount}`}>
                                 ${formatMoney(lineAmount)}
                               </span>
                               <div className={styles.invoiceLineActionsCell}>
-                                {canEditInvoiceWorkspace ? (
+                                {!workspaceIsLocked ? (
                                   <button
                                     type="button"
                                     className={estimateStyles.smallButton}
@@ -1876,7 +1966,7 @@ export function InvoicesConsole() {
                         })}
                       </div>
 
-                      {canEditInvoiceWorkspace ? (
+                      {!workspaceIsLocked ? (
                         <div className={styles.invoiceLineActions}>
                           <button
                             type="button"
@@ -1908,7 +1998,7 @@ export function InvoicesConsole() {
                                     value={taxPercent}
                                     onChange={(event) => setTaxPercent(event.target.value)}
                                     inputMode="decimal"
-                                    disabled={!canEditInvoiceWorkspace}
+                                    disabled={workspaceIsLocked}
                                   />
                                   <span className={estimateStyles.summaryTaxSuffix}>%</span>
                                 </label>
@@ -1922,14 +2012,14 @@ export function InvoicesConsole() {
                               <strong>${formatMoney(draftTotal)}</strong>
                             </div>
                           </div>
-                          {canEditInvoiceWorkspace ? (
+                          {canMutateInvoices ? (
                             <div className={styles.invoiceCreateActions}>
                               <button
                                 type="submit"
                                 className={`${styles.primaryButton} ${styles.invoiceCreatePrimary}`}
-                                disabled={!selectedProjectId}
+                                disabled={workspaceIsLocked || (!editingDraftInvoiceId && !selectedProjectId)}
                               >
-                                Create Invoice
+                                {workspaceIsLocked ? "Locked" : editingDraftInvoiceId ? "Save Draft" : "Create Invoice"}
                               </button>
                             </div>
                           ) : null}

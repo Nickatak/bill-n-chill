@@ -127,6 +127,7 @@ class EstimateLineItemInputSerializer(serializers.Serializer):
 
 class EstimateWriteSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=255, required=True, allow_blank=False)
+    allow_existing_title_family = serializers.BooleanField(required=False, default=False)
     status = serializers.ChoiceField(choices=Estimate.Status.choices, required=False)
     status_note = serializers.CharField(max_length=5000, required=False, allow_blank=True, default="")
     valid_through = serializers.DateField(required=False, allow_null=True)

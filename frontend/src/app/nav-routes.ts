@@ -36,7 +36,6 @@ export const workflowRoutes: NavRoute[] = [
 export const opsMetaRoutes: NavRoute[] = [
   { href: "/customers", label: "Customers", exact: ["/customers"] },
   { href: "/cost-codes", label: "Cost Codes", exact: ["/cost-codes"] },
-  { href: "/ops/organization", label: "Organization (WIP)", exact: ["/ops/organization"] },
   { href: "/vendors", label: "Vendors (WIP)", exact: ["/vendors"] },
   { href: "/settings/intake", label: "Settings (WIP)", exact: ["/settings/intake"] },
   { href: "/ops/meta/help", label: "Help (WIP)", exact: ["/ops/meta/help"] },

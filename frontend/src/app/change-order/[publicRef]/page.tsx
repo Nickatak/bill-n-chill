@@ -26,15 +26,6 @@ export default async function ChangeOrderPublicPage({ params }: ChangeOrderPubli
   return (
     <div className={shell.page}>
       <main className={`${shell.main} ${shell.mainNarrow}`}>
-        <header className={shell.hero}>
-          <div className={shell.heroTop}>
-            <p className={shell.eyebrow}>Client Facing</p>
-            <h1 className={shell.title}>Change Order</h1>
-            <p className={shell.copy}>
-              Review change-order scope and make an approval decision.
-            </p>
-          </div>
-        </header>
         <section className={shell.card}>
           <ChangeOrderPublicPreview publicToken={publicToken} />
         </section>
