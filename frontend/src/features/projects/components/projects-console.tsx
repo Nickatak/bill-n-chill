@@ -97,6 +97,21 @@ export function ProjectsConsole() {
           .toLowerCase();
         return haystack.includes(needle);
       });
+  const projectStatusCounts = PROJECT_STATUS_VALUES.reduce<Record<ProjectStatusValue, number>>(
+    (acc, statusValue) => {
+      acc[statusValue] = filteredProjects.filter(
+        (project) => (project.status as ProjectStatusValue) === statusValue,
+      ).length;
+      return acc;
+    },
+    {
+      prospect: 0,
+      active: 0,
+      on_hold: 0,
+      completed: 0,
+      cancelled: 0,
+    },
+  );
   const statusFilteredProjects = filteredProjects.filter((project) =>
     projectStatusFilters.includes(project.status as ProjectStatusValue),
   );
@@ -405,22 +420,6 @@ export function ProjectsConsole() {
     setAcceptedChangeOrderDeltaTotal("--");
   }, [selectedProjectId, statusFilteredProjects]);
 
-  useEffect(() => {
-    if (!selectedProjectId || statusFilteredProjects.length === 0) {
-      return;
-    }
-    const selectedIndex = statusFilteredProjects.findIndex(
-      (project) => String(project.id) === selectedProjectId,
-    );
-    if (selectedIndex < 0) {
-      return;
-    }
-    const targetPage = Math.floor(selectedIndex / projectPageSize) + 1;
-    if (targetPage !== currentProjectPageSafe) {
-      setCurrentProjectPage(targetPage);
-    }
-  }, [selectedProjectId, statusFilteredProjects, currentProjectPageSafe]);
-
   function handleSelectProject(project: { id: number }) {
     if (String(project.id) === selectedProjectId) {
       return;
@@ -494,8 +493,6 @@ export function ProjectsConsole() {
 
       {projects.length > 0 ? (
         <ProjectListViewer
-          projectsTotal={projects.length}
-          filteredProjectsTotal={statusFilteredProjects.length}
           isExpanded={isProjectListExpanded}
           onToggleExpanded={() => setIsProjectListExpanded((current) => !current)}
           expandedHint="Select a project to open its map, financial snapshot, and downstream actions."
@@ -504,6 +501,7 @@ export function ProjectsConsole() {
           onSearchChange={setProjectSearch}
           statusValues={PROJECT_STATUS_VALUES}
           statusFilters={projectStatusFilters}
+          statusCounts={projectStatusCounts}
           onToggleStatusFilter={toggleProjectStatusFilter}
           onShowAllStatuses={() =>
             setProjectStatusFilters(["active", "on_hold", "prospect", "completed", "cancelled"])
@@ -532,11 +530,6 @@ export function ProjectsConsole() {
             <div>
               <h3>Project Map</h3>
               <p>Workflow map: scope control first, then billing execution.</p>
-            </div>
-            <div className={styles.overviewActions}>
-              <Link href="/financials-auditing" className={styles.projectActionLink}>
-                Open Financials & Accounting
-              </Link>
             </div>
           </div>
           <div className={styles.overviewGrid}>

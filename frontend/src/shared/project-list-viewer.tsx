@@ -13,8 +13,6 @@ export type ProjectListEntry = {
 
 type ProjectListViewerProps = {
   title?: string;
-  projectsTotal: number;
-  filteredProjectsTotal: number;
   isExpanded: boolean;
   onToggleExpanded: () => void;
   expandedHint?: string;
@@ -25,6 +23,7 @@ type ProjectListViewerProps = {
   onSearchChange: (value: string) => void;
   statusValues: ProjectListStatusValue[];
   statusFilters: ProjectListStatusValue[];
+  statusCounts?: Partial<Record<ProjectListStatusValue, number>>;
   onToggleStatusFilter: (status: ProjectListStatusValue) => void;
   onShowAllStatuses: () => void;
   onResetStatuses: () => void;
@@ -42,8 +41,6 @@ type ProjectListViewerProps = {
 
 export function ProjectListViewer({
   title = "Project List",
-  projectsTotal,
-  filteredProjectsTotal,
   isExpanded,
   onToggleExpanded,
   expandedHint = "",
@@ -54,6 +51,7 @@ export function ProjectListViewer({
   onSearchChange,
   statusValues,
   statusFilters,
+  statusCounts,
   onToggleStatusFilter,
   onShowAllStatuses,
   onResetStatuses,
@@ -76,15 +74,37 @@ export function ProjectListViewer({
     return styles[key] ?? "";
   }
 
+  function statusFilterToneClass(statusValue: ProjectListStatusValue): string {
+    switch (statusValue) {
+      case "prospect":
+        return styles.projectFilterToneProspect;
+      case "active":
+        return styles.projectFilterToneActive;
+      case "on_hold":
+        return styles.projectFilterToneOnHold;
+      case "completed":
+        return styles.projectFilterToneCompleted;
+      case "cancelled":
+        return styles.projectFilterToneCancelled;
+      default:
+        return "";
+    }
+  }
+
+  function rowToneClass(statusValue: string): string {
+    const key = `projectRowStatus${statusValue
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join("")}`;
+    return styles[key] ?? "";
+  }
+
   return (
     <section className={styles.controlBar}>
       <div className={styles.projectSelector}>
         <div className={styles.panelHeader}>
           <h3>{title}</h3>
           <div className={styles.panelHeaderActions}>
-            <span className={styles.countBadge}>
-              {filteredProjectsTotal}/{projectsTotal}
-            </span>
             <button
               type="button"
               className={styles.panelToggleButton}
@@ -119,14 +139,16 @@ export function ProjectListViewer({
                           key={statusValue}
                           type="button"
                           className={`${styles.projectFilterButton} ${
-                            active
-                              ? `${styles.projectFilterButtonActive} ${statusToneClass(statusValue)}`
-                              : styles.projectFilterButtonInactive
-                          }`}
+                            active ? styles.projectFilterButtonActive : styles.projectFilterButtonInactive
+                          } ${statusFilterToneClass(statusValue)}`}
+                          data-active={active ? "true" : "false"}
                           aria-pressed={active}
                           onClick={() => onToggleStatusFilter(statusValue)}
                         >
                           {statusLabel(statusValue)}
+                          <span className={styles.projectFilterCount}>
+                            {statusCounts?.[statusValue] ?? 0}
+                          </span>
                         </button>
                       );
                     })}
@@ -144,7 +166,7 @@ export function ProjectListViewer({
                       className={styles.projectFilterActionButton}
                       onClick={onResetStatuses}
                     >
-                      Reset default
+                      Reset filters
                     </button>
                   </div>
                 </div>
@@ -169,7 +191,9 @@ export function ProjectListViewer({
                       return (
                         <tr
                           key={project.id}
-                          className={`${styles.projectRow} ${isActive ? styles.projectRowActive : ""}`}
+                          className={`${styles.projectRow} ${rowToneClass(project.status)} ${
+                            isActive ? styles.projectRowActive : ""
+                          }`}
                           onClick={() => onSelectProject(project)}
                         >
                           <td className={styles.projectCellTitle}>
@@ -201,7 +225,7 @@ export function ProjectListViewer({
                 <div className={styles.projectPagination}>
                   <button
                     type="button"
-                    className={styles.projectFilterActionButton}
+                    className={styles.projectPagerButton}
                     onClick={onPrevPage}
                     disabled={currentPage <= 1}
                   >
@@ -212,7 +236,7 @@ export function ProjectListViewer({
                   </span>
                   <button
                     type="button"
-                    className={styles.projectFilterActionButton}
+                    className={styles.projectPagerButton}
                     onClick={onNextPage}
                     disabled={currentPage >= totalPages}
                   >

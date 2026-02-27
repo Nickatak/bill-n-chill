@@ -233,6 +233,21 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
           .toLowerCase();
         return haystack.includes(projectNeedle);
       });
+  const projectStatusCounts = PROJECT_STATUS_VALUES.reduce<Record<ProjectStatusValue, number>>(
+    (acc, statusValue) => {
+      acc[statusValue] = filteredProjects.filter(
+        (project) => (project.status as ProjectStatusValue) === statusValue,
+      ).length;
+      return acc;
+    },
+    {
+      prospect: 0,
+      active: 0,
+      on_hold: 0,
+      completed: 0,
+      cancelled: 0,
+    },
+  );
   const statusFilteredProjects = scopedProjectId !== null
     ? filteredProjects.filter((project) => String(project.id) === String(scopedProjectId))
     : filteredProjects.filter((project) =>
@@ -1180,8 +1195,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     <section className={styles.console}>
       {projects.length > 0 ? (
         <ProjectListViewer
-          projectsTotal={projects.length}
-          filteredProjectsTotal={statusFilteredProjects.length}
           isExpanded={isProjectListExpanded}
           onToggleExpanded={() => setIsProjectListExpanded((current) => !current)}
           showSearchAndFilters={!isProjectScoped}
@@ -1194,6 +1207,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
           onSearchChange={setProjectSearch}
           statusValues={PROJECT_STATUS_VALUES}
           statusFilters={projectStatusFilters}
+          statusCounts={projectStatusCounts}
           onToggleStatusFilter={toggleProjectStatusFilter}
           onShowAllStatuses={() =>
             setProjectStatusFilters(["active", "on_hold", "prospect", "completed", "cancelled"])

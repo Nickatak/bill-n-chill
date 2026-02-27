@@ -36,15 +36,16 @@
   gap: 8px;
 }
 
-.panelToggleButton {
-  border: 1px solid #94a3b8;
-  border-radius: 6px;
-  background: #f1f5f9;
-  color: #334155;
-  font-size: 0.64rem;
-  letter-spacing: 0.06em;
+.controlBar .panelToggleButton {
+  border: 1px solid #5f7ea6;
+  border-radius: 8px;
+  background: #1b2a42;
+  color: #eaf2ff;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  padding: 2px 7px;
+  font-weight: 700;
+  padding: 5px 11px;
   line-height: 1.1;
   min-height: 0;
   display: inline-flex;
@@ -52,10 +53,10 @@
   cursor: pointer;
 }
 
-.panelToggleButton:hover {
-  border-color: #64748b;
-  background: #e2e8f0;
-  color: #1f2937;
+.controlBar .panelToggleButton:hover {
+  border-color: #8bb5e6;
+  background: #274369;
+  color: #ffffff;
 }
 
 .countBadge {
@@ -79,10 +80,10 @@
 }
 
 .searchField span {
-  color: var(--text-secondary);
+  color: var(--text-primary);
   font-size: 0.78rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 
@@ -101,8 +102,9 @@
 }
 
 .projectFiltersLabel {
-  color: var(--text-secondary);
+  color: var(--text-primary);
   font-size: 0.85rem;
+  font-weight: 600;
 }
 
 .projectFilterButtons {
@@ -111,56 +113,71 @@
   gap: 8px;
 }
 
-.projectFilterButton {
-  border: 1px solid #cbd5f5;
+.controlBar .projectFilterButton {
+  border: 1px solid #6b7f99;
   border-radius: 999px;
   padding: 6px 12px;
   text-transform: uppercase;
   font-size: 0.75rem;
   letter-spacing: 0.12em;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #eff6ff;
+  background: #1b2a42;
 }
 
-.projectFilterButtonInactive {
-  background: var(--surface-elevated);
-  color: var(--text-secondary);
+.controlBar .projectFilterButton.projectFilterToneProspect {
+  background-color: #1e3a8a;
+  border-color: #60a5fa;
+  color: #eff6ff;
 }
 
-.projectFilterButtonActive {
+.controlBar .projectFilterButton.projectFilterToneActive {
+  background-color: #166534;
+  border-color: #4ade80;
+  color: #f0fdf4;
+}
+
+.controlBar .projectFilterButton.projectFilterToneOnHold {
+  background-color: #92400e;
+  border-color: #fbbf24;
+  color: #fffbeb;
+}
+
+.controlBar .projectFilterButton.projectFilterToneCompleted {
+  background-color: #334155;
+  border-color: #cbd5e1;
+  color: #f8fafc;
+}
+
+.controlBar .projectFilterButton.projectFilterToneCancelled {
+  background-color: #991b1b;
+  border-color: #fca5a5;
+  color: #fff1f2;
+}
+
+.controlBar .projectFilterButtonInactive {
+  filter: saturate(0.55) brightness(0.84);
+  opacity: 0.8;
+}
+
+.controlBar .projectFilterButtonActive {
   box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.12);
   transform: translateY(-1px);
 }
 
-.projectFilterButtonActive.projectStatusProspect {
-  background: #2563eb;
-  border-color: #1d4ed8;
-  color: #eff6ff;
-}
-
-.projectFilterButtonActive.projectStatusActive {
-  background: #16a34a;
-  border-color: #15803d;
-  color: #f0fdf4;
-}
-
-.projectFilterButtonActive.projectStatusOnHold {
-  background: #eab308;
-  border-color: #ca8a04;
-  color: #422006;
-}
-
-.projectFilterButtonActive.projectStatusCompleted {
-  background: #6b7280;
-  border-color: #4b5563;
-  color: #f9fafb;
-}
-
-.projectFilterButtonActive.projectStatusCancelled {
-  background: #dc2626;
-  border-color: #b91c1c;
-  color: #fee2e2;
+.projectFilterCount {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 0.64rem;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  opacity: 0.95;
 }
 
 .projectFilterActions {
@@ -169,15 +186,16 @@
   flex-wrap: wrap;
 }
 
-.projectFilterActionButton {
-  border: 1px solid #94a3b8;
-  border-radius: 6px;
-  background: #f1f5f9;
-  color: #334155;
-  font-size: 0.64rem;
-  letter-spacing: 0.06em;
+.controlBar .projectFilterActionButton {
+  border: 1px solid #4f6280;
+  border-radius: 8px;
+  background: #1b2a42;
+  color: #dbe7ff;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  padding: 2px 7px;
+  font-weight: 700;
+  padding: 5px 10px;
   line-height: 1.1;
   min-height: 0;
   display: inline-flex;
@@ -185,13 +203,13 @@
   cursor: pointer;
 }
 
-.projectFilterActionButton:hover {
-  border-color: #64748b;
-  background: #e2e8f0;
-  color: #1f2937;
+.controlBar .projectFilterActionButton:hover {
+  border-color: #7aa2d6;
+  background: #243a5f;
+  color: #eef6ff;
 }
 
-.projectFilterActionButton:disabled {
+.controlBar .projectFilterActionButton:disabled {
   opacity: 0.6;
   cursor: default;
 }
@@ -214,8 +232,9 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 0.7rem;
-  background: #eef2ff;
-  color: #1e3a8a;
+  background: #1d4ed8;
+  color: #f0f7ff;
+  border-bottom: 1px solid #1e40af;
 }
 
 .projectTable tbody td {
@@ -229,12 +248,33 @@
   transition: background 0.2s ease;
 }
 
+.projectRowStatusProspect {
+  background: rgba(37, 99, 235, 0.16);
+}
+
+.projectRowStatusActive {
+  background: rgba(22, 163, 74, 0.24);
+}
+
+.projectRowStatusOnHold {
+  background: rgba(217, 119, 6, 0.18);
+}
+
+.projectRowStatusCompleted {
+  background: rgba(107, 114, 128, 0.24);
+}
+
+.projectRowStatusCancelled {
+  background: rgba(220, 38, 38, 0.24);
+}
+
 .projectRow:hover {
-  background: #e0e7ff;
+  filter: brightness(1.06) saturate(1.04);
 }
 
 .projectRow.projectRowActive {
-  background: #c7d2fe;
+  box-shadow: inset 0 0 0 2px rgba(96, 165, 250, 0.64);
+  filter: brightness(1.09) saturate(1.06);
 }
 
 .projectCellTitle strong {
@@ -293,8 +333,39 @@
 }
 
 .projectPagination span {
-  color: var(--text-secondary);
+  color: #e3eeff;
+  font-weight: 600;
   font-size: 0.85rem;
+}
+
+.controlBar .projectPagerButton {
+  border: 1px solid #4f6280;
+  border-radius: 10px;
+  background: #1b2a42;
+  color: #dbe7ff;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  padding: 6px 11px;
+  line-height: 1.1;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.controlBar .projectPagerButton:hover {
+  border-color: #7aa2d6;
+  background: #2a4367;
+  color: #ffffff;
+}
+
+.controlBar .projectPagerButton:disabled {
+  opacity: 0.7;
+  color: #9fb3d1;
+  border-color: #3d5270;
+  background: #152238;
+  cursor: default;
 }
 
 :global(html[data-theme="dark"]) .controlBar {
@@ -305,37 +376,28 @@
   --surface-elevated: #111827;
 }
 
-:global(html[data-theme="dark"]) .projectFilterButton {
-  border-color: #334155;
+:global(html[data-theme="dark"]) .controlBar .projectFilterActionButton {
+  border-color: #4f6280;
+  background: #1b2a42;
+  color: #dbe7ff;
 }
 
-:global(html[data-theme="dark"]) .projectFilterButtonInactive {
-  background: #0b152a;
-  color: #94a3b8;
+:global(html[data-theme="dark"]) .controlBar .panelToggleButton {
+  border-color: #5f7ea6;
+  background: #1b2a42;
+  color: #eaf2ff;
 }
 
-:global(html[data-theme="dark"]) .projectFilterActionButton {
-  border-color: #334155;
-  background: #0f172a;
-  color: #cbd5e1;
+:global(html[data-theme="dark"]) .controlBar .panelToggleButton:hover {
+  border-color: #8bb5e6;
+  background: #274369;
+  color: #ffffff;
 }
 
-:global(html[data-theme="dark"]) .panelToggleButton {
-  border-color: #334155;
-  background: #0f172a;
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .panelToggleButton:hover {
-  border-color: #475569;
-  background: #17233a;
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .projectFilterActionButton:hover {
-  border-color: #475569;
-  background: #17233a;
-  color: #e2e8f0;
+:global(html[data-theme="dark"]) .controlBar .projectFilterActionButton:hover {
+  border-color: #7aa2d6;
+  background: #243a5f;
+  color: #eef6ff;
 }
 
 :global(html[data-theme="dark"]) .projectTableWrap {
@@ -343,16 +405,65 @@
 }
 
 :global(html[data-theme="dark"]) .projectTable thead th {
-  background: #172554;
-  color: #bfdbfe;
+  background: #1f3657;
+  color: #f0f7ff;
+  border-bottom-color: #2f4d79;
+}
+
+:global(html[data-theme="dark"]) .projectRowStatusProspect {
+  background: rgba(67, 56, 202, 0.34);
+}
+
+:global(html[data-theme="dark"]) .projectRowStatusActive {
+  background: rgba(21, 128, 61, 0.42);
+}
+
+:global(html[data-theme="dark"]) .projectRowStatusOnHold {
+  background: rgba(180, 83, 9, 0.34);
+}
+
+:global(html[data-theme="dark"]) .projectRowStatusCompleted {
+  background: rgba(82, 82, 91, 0.4);
+}
+
+:global(html[data-theme="dark"]) .projectRowStatusCancelled {
+  background: rgba(153, 27, 27, 0.42);
 }
 
 :global(html[data-theme="dark"]) .projectRow:hover {
-  background: #1e3a8a;
+  filter: brightness(1.08) saturate(1.08);
 }
 
 :global(html[data-theme="dark"]) .projectRow.projectRowActive {
-  background: #1d4ed8;
+  box-shadow: inset 0 0 0 2px rgba(125, 211, 252, 0.62);
+  filter: brightness(1.12) saturate(1.1);
+}
+
+:global(html[data-theme="dark"]) .searchField span,
+:global(html[data-theme="dark"]) .projectFiltersLabel {
+  color: #dbe7ff;
+}
+
+:global(html[data-theme="dark"]) .projectPagination span {
+  color: #e3eeff;
+}
+
+:global(html[data-theme="dark"]) .controlBar .projectPagerButton {
+  border-color: #4f6280;
+  background: #1b2a42;
+  color: #dbe7ff;
+}
+
+:global(html[data-theme="dark"]) .controlBar .projectPagerButton:hover {
+  border-color: #7aa2d6;
+  background: #2a4367;
+  color: #ffffff;
+}
+
+:global(html[data-theme="dark"]) .controlBar .projectPagerButton:disabled {
+  color: #9fb3d1;
+  border-color: #3d5270;
+  background: #152238;
 }
 
 @media (max-width: 900px) {

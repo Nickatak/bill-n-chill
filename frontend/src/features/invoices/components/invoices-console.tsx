@@ -424,6 +424,21 @@ export function InvoicesConsole() {
           .toLowerCase();
         return haystack.includes(projectNeedle);
       });
+  const projectStatusCounts = PROJECT_STATUS_VALUES.reduce<Record<ProjectStatusValue, number>>(
+    (acc, statusValue) => {
+      acc[statusValue] = filteredProjects.filter(
+        (project) => (project.status as ProjectStatusValue) === statusValue,
+      ).length;
+      return acc;
+    },
+    {
+      prospect: 0,
+      active: 0,
+      on_hold: 0,
+      completed: 0,
+      cancelled: 0,
+    },
+  );
   const statusFilteredProjects = filteredProjects.filter((project) =>
     projectStatusFilters.includes(project.status as ProjectStatusValue),
   );
@@ -631,7 +646,6 @@ export function InvoicesConsole() {
         return;
       }
 
-      setNeutralStatus("Loading invoices...");
       try {
         const response = await fetch(`${normalizedBaseUrl}/projects/${resolvedProjectId}/invoices/`, {
           headers: buildAuthHeaders(token),
@@ -657,7 +671,7 @@ export function InvoicesConsole() {
         setErrorStatus("Could not reach invoice endpoint.");
       }
     },
-    [normalizedBaseUrl, selectedProjectId, setErrorStatus, setNeutralStatus, token],
+    [normalizedBaseUrl, selectedProjectId, setErrorStatus, token],
   );
 
   const loadBudgetLineOptions = useCallback(
@@ -838,7 +852,6 @@ export function InvoicesConsole() {
             return;
           }
           setSelectedProjectId(String(project.id));
-          setSuccessStatus(`Loaded ${project.name} because it has invoices.`);
           return;
         } catch {
           // Best effort fallback; continue probing.
@@ -856,7 +869,6 @@ export function InvoicesConsole() {
     normalizedBaseUrl,
     scopedProjectId,
     selectedProjectId,
-    setSuccessStatus,
     statusFilteredProjects,
     token,
   ]);
@@ -878,22 +890,6 @@ export function InvoicesConsole() {
     const fallbackProject = statusFilteredProjects[0];
     setSelectedProjectId(String(fallbackProject.id));
   }, [selectedProjectId, statusFilteredProjects]);
-
-  useEffect(() => {
-    if (!selectedProjectId || statusFilteredProjects.length === 0) {
-      return;
-    }
-    const selectedIndex = statusFilteredProjects.findIndex(
-      (project) => String(project.id) === selectedProjectId,
-    );
-    if (selectedIndex < 0) {
-      return;
-    }
-    const targetPage = Math.floor(selectedIndex / projectPageSize) + 1;
-    if (targetPage !== currentProjectPageSafe) {
-      setCurrentProjectPage(targetPage);
-    }
-  }, [currentProjectPageSafe, selectedProjectId, statusFilteredProjects]);
 
   useEffect(() => {
     if (!selectedInvoice) {
@@ -1395,8 +1391,6 @@ export function InvoicesConsole() {
           ) : null}
 
           <ProjectListViewer
-            projectsTotal={projects.length}
-            filteredProjectsTotal={statusFilteredProjects.length}
             isExpanded={isProjectListExpanded}
             onToggleExpanded={() => setIsProjectListExpanded((current) => !current)}
             showSearchAndFilters
@@ -1404,6 +1398,7 @@ export function InvoicesConsole() {
             onSearchChange={setProjectSearch}
             statusValues={PROJECT_STATUS_VALUES}
             statusFilters={projectStatusFilters}
+            statusCounts={projectStatusCounts}
             onToggleStatusFilter={toggleProjectStatusFilter}
             onShowAllStatuses={() =>
               setProjectStatusFilters(["active", "on_hold", "prospect", "completed", "cancelled"])
