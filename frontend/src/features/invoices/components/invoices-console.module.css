@@ -355,11 +355,6 @@
   border-top: 1px solid var(--border);
 }
 
-.viewerStatusActions {
-  display: grid;
-  gap: 6px;
-}
-
 .panel {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -380,6 +375,34 @@
 .panelHeader h3 {
   margin: 0;
   font-size: 1rem;
+}
+
+.panelHeaderActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panelToggleButton {
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 0.64rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  line-height: 1.1;
+  min-height: 0;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.panelToggleButton:hover {
+  border-color: #64748b;
+  background: #e2e8f0;
+  color: #1f2937;
 }
 
 .countBadge {
@@ -436,44 +459,111 @@
 
 .invoiceRail {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   max-height: 610px;
   overflow: auto;
   align-content: start;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 6px;
+  background: var(--surface-elevated);
 }
 
 .invoiceCard {
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px;
+  border-radius: 9px;
+  padding: 8px 9px;
   background: var(--surface-elevated);
   cursor: pointer;
   text-align: left;
   display: grid;
-  gap: 8px;
+  gap: 6px;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
 }
 
 .invoiceCard:hover {
   border-color: #93c5fd;
 }
 
+.invoiceCardStatusDraft {
+  border-color: #93c5fd;
+  background: linear-gradient(180deg, rgba(219, 234, 254, 0.85), rgba(239, 246, 255, 0.75));
+}
+
+.invoiceCardStatusSent {
+  border-color: #fcd34d;
+  background: linear-gradient(180deg, rgba(254, 243, 199, 0.9), rgba(255, 251, 235, 0.8));
+}
+
+.invoiceCardStatusPartial {
+  border-color: #c4b5fd;
+  background: linear-gradient(180deg, rgba(237, 233, 254, 0.85), rgba(245, 243, 255, 0.78));
+}
+
+.invoiceCardStatusPaid {
+  border-color: #86efac;
+  background: linear-gradient(180deg, rgba(220, 252, 231, 0.88), rgba(240, 253, 244, 0.78));
+}
+
+.invoiceCardStatusOverdue {
+  border-color: #fca5a5;
+  background: linear-gradient(180deg, rgba(254, 226, 226, 0.88), rgba(255, 241, 242, 0.8));
+}
+
+.invoiceCardStatusVoid {
+  border-color: #cbd5e1;
+  background: linear-gradient(180deg, rgba(226, 232, 240, 0.92), rgba(241, 245, 249, 0.82));
+}
+
 .invoiceCardSelected {
   border-color: var(--accent);
-  background: var(--accent-soft);
+  box-shadow:
+    0 0 0 2px rgba(29, 78, 216, 0.28),
+    inset 2px 0 0 var(--accent);
 }
 
 .invoiceCardRow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
+}
+
+.invoiceCardIdentity {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.invoiceCardPublicLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #93c5fd;
+  border-radius: 7px;
+  padding: 3px 8px;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  text-decoration: none;
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.invoiceCardPublicLink:hover,
+.invoiceCardPublicLink:focus-visible {
+  border-color: #60a5fa;
+  background: #dbeafe;
+  outline: none;
 }
 
 .invoiceMetaGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px 10px;
-  font-size: 0.78rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px 8px;
+  font-size: 0.74rem;
   color: var(--text-secondary);
 }
 
@@ -481,6 +571,55 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 12px;
+}
+
+.workspaceToolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: start;
+}
+
+.workspaceContext {
+  display: grid;
+  gap: 2px;
+  color: var(--text-primary);
+}
+
+.workspaceContextLabel {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.workspaceContextValueRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.workspaceToolbarActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.workspaceToolbarHint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.workspaceToolbarNotice {
+  margin: 0;
+  color: #1e3a8a;
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
 .invoiceComposerSheet {
@@ -537,12 +676,13 @@
 
 .invoiceMetaLayout {
   display: grid;
-  grid-template-columns: minmax(260px, 420px);
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 420px);
   gap: 16px;
   align-items: start;
 }
 
 .invoiceDetailCard {
+  grid-column: 2;
   border: 1px solid #cbd5e1;
   border-radius: 12px;
   padding: 12px;
@@ -781,13 +921,21 @@
   object-fit: contain;
 }
 
+.invoiceLineSectionIntro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .invoiceLineSectionIntro h3 {
   margin: 0;
 }
 
 .invoiceLineHeader {
   display: grid;
-  grid-template-columns: 110px 280px 80px 1.3fr 90px 130px 130px 96px;
+  grid-template-columns: 100px minmax(220px, 1.1fr) 78px minmax(220px, 1.5fr) 84px 120px 120px 88px;
   gap: 8px;
   align-items: center;
   padding: 11px 12px;
@@ -797,22 +945,31 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.09em;
-  min-width: 1120px;
+  min-width: 1040px;
 }
 
 .invoiceLineRow {
   display: grid;
-  grid-template-columns: 110px 280px 80px 1.3fr 90px 130px 130px 96px;
+  grid-template-columns: 100px minmax(220px, 1.1fr) 78px minmax(220px, 1.5fr) 84px 120px 120px 88px;
   gap: 8px;
   align-items: center;
   padding: 8px 12px;
   border-top: 1px solid #e2e8f0;
   background: #ffffff;
-  min-width: 1120px;
+  min-width: 1040px;
 }
 
 .invoiceLineRowAlt {
   background: #f4f7fc;
+}
+
+.invoiceLineRow > * {
+  min-width: 0;
+}
+
+.invoiceLineRow input,
+.invoiceLineRow select {
+  width: 100%;
 }
 
 .invoiceLineCostCodeCell {
@@ -832,24 +989,28 @@
 }
 
 .invoiceSheetFooter {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 14px;
+  display: flex;
+  justify-content: flex-end;
   margin-top: 6px;
   padding-top: 14px;
   border-top: 1px solid #e2e8f0;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .invoiceTotalsColumn {
   display: grid;
   gap: 12px;
-  justify-items: end;
+  justify-items: stretch;
+  width: min(320px, 100%);
 }
 
 .invoiceCreateActions {
   display: flex;
   justify-content: flex-end;
+}
+
+.invoiceCreatePrimary {
+  min-width: 180px;
 }
 
 .formGrid {
@@ -1113,12 +1274,17 @@
   background: #f8fafc;
 }
 
-.toggleRow {
+.statusHistoryActionBadge {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  color: var(--text-primary);
-  font-size: 0.9rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 2px 8px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .lifecycleFieldLabel {
@@ -1218,6 +1384,12 @@
   border-color: #cbd5e1;
 }
 
+.statusToneNotate {
+  background: #e2e8f0;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+
 .statusBadge {
   font-size: 0.67rem;
   letter-spacing: 0.08em;
@@ -1285,7 +1457,10 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .invoiceSheetFooter,
+  .invoiceDetailCard {
+    grid-column: 1;
+  }
+
   .invoiceTemplateBlocks,
   .organizationTemplateMetaGrid,
   .organizationTemplateGrid {
@@ -1298,11 +1473,13 @@
 }
 
 @media (max-width: 640px) {
+  .panelHeaderActions,
   .statusFilters,
   .projectFilterButtons,
   .projectFilterActions,
   .controlActions,
   .buttonRow,
+  .workspaceToolbarActions,
   .quickStatusRow {
     display: grid;
     grid-template-columns: 1fr;
@@ -1310,8 +1487,24 @@
 
   .primaryButton,
   .secondaryButton,
+  .panelToggleButton,
   .quickStatusButton {
     width: 100%;
+  }
+
+  .workspaceToolbar {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+
+  .workspaceToolbarActions {
+    grid-column: 1;
+    grid-row: auto;
+    justify-content: stretch;
+  }
+
+  .workspaceToolbarHint {
+    text-align: left;
   }
 
   .lineGrid {
@@ -1352,6 +1545,18 @@
   border-color: #334155;
   background: #0f172a;
   color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .panelToggleButton {
+  border-color: #334155;
+  background: #0f172a;
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .panelToggleButton:hover {
+  border-color: #475569;
+  background: #17233a;
+  color: #e2e8f0;
 }
 
 :global(html[data-theme="dark"]) .projectFilterActionButton:hover {
@@ -1437,14 +1642,60 @@
   background: #111827;
 }
 
-:global(html[data-theme="dark"]) .publicInvoiceLink {
-  border-color: #2563eb;
-  background: #1e3a8a;
-  color: #dbeafe;
+:global(html[data-theme="dark"]) .invoiceRail {
+  background: #0b1220;
 }
 
-:global(html[data-theme="dark"]) .publicInvoiceLink:hover,
-:global(html[data-theme="dark"]) .publicInvoiceLink:focus-visible {
+:global(html[data-theme="dark"]) .invoiceCard {
+  border-color: #334155;
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .invoiceCardStatusDraft {
+  border-color: #3b82f6;
+  background: linear-gradient(180deg, rgba(30, 58, 138, 0.46), rgba(15, 23, 42, 0.9));
+}
+
+:global(html[data-theme="dark"]) .invoiceCardStatusSent {
+  border-color: #f59e0b;
+  background: linear-gradient(180deg, rgba(161, 98, 7, 0.42), rgba(15, 23, 42, 0.9));
+}
+
+:global(html[data-theme="dark"]) .invoiceCardStatusPartial {
+  border-color: #8b5cf6;
+  background: linear-gradient(180deg, rgba(76, 29, 149, 0.44), rgba(15, 23, 42, 0.9));
+}
+
+:global(html[data-theme="dark"]) .invoiceCardStatusPaid {
+  border-color: #22c55e;
+  background: linear-gradient(180deg, rgba(20, 83, 45, 0.48), rgba(15, 23, 42, 0.9));
+}
+
+:global(html[data-theme="dark"]) .invoiceCardStatusOverdue {
+  border-color: #ef4444;
+  background: linear-gradient(180deg, rgba(127, 29, 29, 0.46), rgba(15, 23, 42, 0.9));
+}
+
+:global(html[data-theme="dark"]) .invoiceCardStatusVoid {
+  border-color: #64748b;
+  background: linear-gradient(180deg, rgba(31, 41, 55, 0.72), rgba(15, 23, 42, 0.9));
+}
+
+:global(html[data-theme="dark"]) .invoiceCardSelected {
+  border-color: #60a5fa;
+  box-shadow:
+    0 0 0 2px rgba(147, 197, 253, 0.36),
+    inset 2px 0 0 #60a5fa;
+}
+
+:global(html[data-theme="dark"]) .invoiceCardPublicLink {
+  border-color: #1d4ed8;
+  background: #1e3a8a;
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .invoiceCardPublicLink:hover,
+:global(html[data-theme="dark"]) .invoiceCardPublicLink:focus-visible {
   border-color: #3b82f6;
   background: #1d4ed8;
 }
@@ -1656,4 +1907,14 @@
   background: #1f2937;
   color: #e2e8f0;
   border-color: #64748b;
+}
+
+:global(html[data-theme="dark"]) .statusToneNotate {
+  background: #1f2937;
+  color: #e2e8f0;
+  border-color: #64748b;
+}
+
+:global(html[data-theme="dark"]) .workspaceToolbarNotice {
+  color: #bfdbfe;
 }
