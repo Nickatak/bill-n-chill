@@ -161,9 +161,19 @@ function publicChangeOrderHref(publicRef?: string): string {
 }
 
 function readApiErrorMessage(payload: ApiResponse | undefined, fallback: string): string {
+  const withStaleTransitionHint = (message: string): string => {
+    if (
+      /invalid .*status transition/i.test(message) &&
+      !/refresh/i.test(message)
+    ) {
+      return `${message} This change order may have changed from a client action on the public page. Refresh to load the latest status.`;
+    }
+    return message;
+  };
+
   const topLevelMessage = payload?.error?.message?.trim();
   if (topLevelMessage) {
-    return topLevelMessage;
+    return withStaleTransitionHint(topLevelMessage);
   }
   const fieldEntries = Object.entries(payload?.error?.fields ?? {});
   for (const [fieldName, fieldMessages] of fieldEntries) {
@@ -172,7 +182,7 @@ function readApiErrorMessage(payload: ApiResponse | undefined, fallback: string)
     }
     const firstFieldMessage = fieldMessages.find((message) => Boolean((message || "").trim()));
     if (firstFieldMessage) {
-      return `${fieldName}: ${firstFieldMessage}`;
+      return withStaleTransitionHint(`${fieldName}: ${firstFieldMessage}`);
     }
   }
   return fallback;
@@ -206,6 +216,8 @@ type AuditEventRecord = {
   metadata_json?: Record<string, unknown> | null;
   created_by: number;
   created_by_email: string | null;
+  created_by_display?: string | null;
+  created_by_customer_id?: number | null;
   created_at: string;
 };
 
@@ -381,14 +393,16 @@ export function ChangeOrdersConsole({
   const workspaceContext = selectedChangeOrder
     ? `${coLabel(selectedChangeOrder)} · ${selectedChangeOrder.title || "Untitled"}`
     : "New change order draft";
-  const workspaceBadgeLabel = selectedChangeOrder
-    ? isSelectedChangeOrderEditable
-      ? "Editing existing draft"
-      : `Read-only ${statusLabel(selectedChangeOrder.status)}`
-    : "New unsaved draft";
-  const workspaceBadgeClass = selectedChangeOrder
-    ? editStatusBadgeClass(selectedChangeOrder.status)
-    : styles.editStatusDraft;
+  const workspaceBadgeLabel = !selectedChangeOrder
+    ? "NEW CHANGE ORDER"
+    : isSelectedChangeOrderEditable
+      ? "EDITING"
+      : "READ-ONLY";
+  const workspaceBadgeClass = !selectedChangeOrder
+    ? styles.editStatusDraft
+    : isSelectedChangeOrderEditable
+      ? styles.editStatusDraft
+      : editStatusBadgeClass(selectedChangeOrder.status);
   const isEditSubmitDisabled =
     !isSelectedChangeOrderEditable ||
     editLineValidation.issues.length > 0;
@@ -576,6 +590,10 @@ export function ChangeOrdersConsole({
   }
 
   function eventActorLabel(event: AuditEventRecord): string {
+    const actorDisplay = (event.created_by_display || "").trim();
+    if (actorDisplay) {
+      return actorDisplay;
+    }
     const actorEmail = (event.created_by_email || "").trim();
     if (actorEmail) {
       return actorEmail;
@@ -584,6 +602,27 @@ export function ChangeOrdersConsole({
       return `user #${event.created_by}`;
     }
     return "unknown user";
+  }
+
+  function eventActorHref(event: AuditEventRecord): string | null {
+    const actorCustomerId = Number(event.created_by_customer_id);
+    if (Number.isInteger(actorCustomerId) && actorCustomerId > 0) {
+      return `/customers?customer=${actorCustomerId}`;
+    }
+    return null;
+  }
+
+  function renderEventActor(event: AuditEventRecord) {
+    const label = eventActorLabel(event);
+    const href = eventActorHref(event);
+    if (!href) {
+      return label;
+    }
+    return (
+      <Link href={href} className={styles.eventActorLink}>
+        {label}
+      </Link>
+    );
   }
 
   function approvedRollingDeltaForEstimate(estimateId: number): string {
@@ -991,6 +1030,8 @@ export function ChangeOrdersConsole({
           metadata_json?: Record<string, unknown> | null;
           created_by: number;
           created_by_email: string | null;
+          created_by_display?: string | null;
+          created_by_customer_id?: number | null;
           created_at: string;
         }>) ?? [];
       setProjectAuditEvents(rows);
@@ -1816,7 +1857,7 @@ export function ChangeOrdersConsole({
                                     {statusEventActionLabel(event)}
                                   </span>
                                   <span className={styles.viewerEventMeta}>
-                                    {formatEventDateTime(event.created_at)} by {eventActorLabel(event)}
+                                    {formatEventDateTime(event.created_at)} by {renderEventActor(event)}
                                   </span>
                                   {event.note ? (
                                     <span className={styles.viewerEventNote}>{event.note}</span>

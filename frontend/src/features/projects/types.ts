@@ -81,6 +81,8 @@ export type FinancialAuditEventRecord = {
   metadata_json: Record<string, unknown>;
   created_by: number;
   created_by_email?: string | null;
+  created_by_display?: string | null;
+  created_by_customer_id?: number | null;
   created_at: string;
 };
 

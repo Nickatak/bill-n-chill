@@ -1103,7 +1103,10 @@ def estimate_status_events_view(request, estimate_id: int):
             status=404,
         )
 
-    events = EstimateStatusEvent.objects.filter(estimate=estimate).select_related("changed_by")
+    events = EstimateStatusEvent.objects.filter(estimate=estimate).select_related(
+        "changed_by",
+        "estimate__project__customer",
+    )
     return Response({"data": EstimateStatusEventSerializer(events, many=True).data})
 
 

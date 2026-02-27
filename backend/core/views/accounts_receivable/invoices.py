@@ -1009,5 +1009,9 @@ def invoice_status_events_view(request, invoice_id: int):
             status=404,
         )
 
-    events = InvoiceStatusEvent.objects.filter(invoice=invoice).select_related("changed_by")
+    events = InvoiceStatusEvent.objects.filter(invoice=invoice).select_related(
+        "changed_by",
+        "invoice__customer",
+        "invoice__project__customer",
+    )
     return Response({"data": InvoiceStatusEventSerializer(events, many=True).data})

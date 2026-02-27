@@ -64,6 +64,8 @@ export type EstimateStatusEventRecord = {
   note: string;
   action_type?: "create" | "transition" | "resend" | "notate" | "unchanged";
   changed_by_email: string;
+  changed_by_display?: string | null;
+  changed_by_customer_id?: number | null;
   changed_at: string;
 };
 

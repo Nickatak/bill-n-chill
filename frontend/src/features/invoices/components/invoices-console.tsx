@@ -3,6 +3,7 @@
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { formatDateDisplay, formatDateTimeDisplay } from "@/shared/date-format";
 import {
   defaultApiBaseUrl,
@@ -312,7 +313,16 @@ function resolvePreferredStatusSelection(
 
 function readApiError(payload: ApiResponse | undefined, fallback: string): string {
   const message = payload?.error?.message?.trim();
-  return message || fallback;
+  if (!message) {
+    return fallback;
+  }
+  if (
+    /invalid .*status transition/i.test(message) &&
+    !/refresh/i.test(message)
+  ) {
+    return `${message} This invoice may have changed from a client action on the public page. Refresh to load the latest status.`;
+  }
+  return message;
 }
 
 function projectStatusClass(statusValue: string): string {
@@ -461,6 +471,16 @@ export function InvoicesConsole() {
   const workspaceIsEditingDraft = editingDraftInvoiceId !== null;
   const workspaceIsLockedByStatus = workspaceSourceInvoice ? workspaceSourceInvoice.status !== "draft" : false;
   const workspaceIsLocked = !canEditInvoiceWorkspace || workspaceIsLockedByStatus;
+  const workspaceBadgeLabel = !workspaceSourceInvoice
+    ? "NEW INVOICE"
+    : workspaceIsLocked
+      ? "READ-ONLY"
+      : "EDITING";
+  const workspaceBadgeClass = !workspaceSourceInvoice
+    ? styles.statusDraft
+    : workspaceIsLocked
+      ? invoiceStatusClass(workspaceSourceInvoice.status)
+      : styles.statusDraft;
 
   const balanceSummary = useMemo(() => {
     return invoices.reduce(
@@ -1676,7 +1696,20 @@ export function InvoicesConsole() {
                                       {invoiceStatusEventActionLabel(event, statusLabel)}
                                     </span>
                                   </td>
-                                  <td>{event.changed_by_email || `User #${event.changed_by}`}</td>
+                                  <td>
+                                    {event.changed_by_customer_id ? (
+                                      <Link
+                                        href={`/customers?customer=${event.changed_by_customer_id}`}
+                                        className={styles.statusActorLink}
+                                      >
+                                        {event.changed_by_display || `Customer #${event.changed_by_customer_id}`}
+                                      </Link>
+                                    ) : (
+                                      event.changed_by_display ||
+                                      event.changed_by_email ||
+                                      `User #${event.changed_by}`
+                                    )}
+                                  </td>
                                   <td>{event.note || "--"}</td>
                                 </tr>
                               ))}
@@ -1773,7 +1806,7 @@ export function InvoicesConsole() {
                     <span className={styles.workspaceContextLabel}>Editing</span>
                     <div className={styles.workspaceContextValueRow}>
                       <strong>{workspaceContext}</strong>
-                      <span className={`${styles.statusBadge} ${styles.statusDraft}`}>Draft Workspace</span>
+                      <span className={`${styles.statusBadge} ${workspaceBadgeClass}`}>{workspaceBadgeLabel}</span>
                     </div>
                   </div>
                   <div className={styles.workspaceToolbarActions}>

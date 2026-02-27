@@ -809,6 +809,17 @@
   color: #64748b;
 }
 
+.eventActorLink {
+  color: #1d4ed8;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.eventActorLink:hover,
+.eventActorLink:focus-visible {
+  text-decoration: underline;
+}
+
 .viewerEventNote {
   font-size: 0.76rem;
   color: #475569;
@@ -1448,6 +1459,10 @@
 
 :global(html[data-theme="dark"]) .viewerEventMeta {
   color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .eventActorLink {
+  color: #93c5fd;
 }
 
 :global(html[data-theme="dark"]) .viewerEventNote {

@@ -796,6 +796,7 @@
 
 .publicDecisionSection {
   scroll-margin-top: 96px;
+  --foreground: var(--surface);
 }
 
 .lifecycle h3 {
@@ -985,6 +986,17 @@
 
 .statusEventsTable tbody tr:nth-child(even) {
   background: #f8fafc;
+}
+
+.statusEventActorLink {
+  color: #1d4ed8;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.statusEventActorLink:hover,
+.statusEventActorLink:focus-visible {
+  text-decoration: underline;
 }
 
 .versionTree {
@@ -1760,6 +1772,10 @@
   background: #111827;
 }
 
+:global(html[data-theme="dark"]) .statusEventActorLink {
+  color: #93c5fd;
+}
+
 :global(html[data-theme="dark"]) .lineHeader {
   background: #1e293b;
   color: #bfdbfe;
@@ -2107,6 +2123,18 @@
 .decisionBannerSettled {
 }
 
+.decisionBannerRecentlyApproved {
+  border-color: #86efac;
+  background: #f0fdf4;
+  box-shadow: none;
+}
+
+.decisionBannerRecentlyRejected {
+  border-color: #fca5a5;
+  background: #fef2f2;
+  box-shadow: none;
+}
+
 @media print {
   .decisionBannerAwaiting {
     display: none;
@@ -2115,4 +2143,14 @@
   .publicDecisionSection {
     display: none;
   }
+}
+
+:global(html[data-theme="dark"]) .decisionBannerRecentlyApproved {
+  border-color: #22c55e;
+  background: #10271a;
+}
+
+:global(html[data-theme="dark"]) .decisionBannerRecentlyRejected {
+  border-color: #ef4444;
+  background: #2f1417;
 }

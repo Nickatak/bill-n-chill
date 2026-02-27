@@ -136,9 +136,19 @@ function mapEstimateLineItemsToInputs(items: EstimateLineItemRecord[] = []): Est
 }
 
 function readApiErrorMessage(payload: ApiResponse | undefined, fallback: string): string {
+  const withStaleTransitionHint = (message: string): string => {
+    if (
+      /invalid .*status transition/i.test(message) &&
+      !/refresh/i.test(message)
+    ) {
+      return `${message} This estimate may have changed from a client action on the public page. Refresh to load the latest status.`;
+    }
+    return message;
+  };
+
   const topLevelMessage = payload?.error?.message?.trim();
   if (topLevelMessage) {
-    return topLevelMessage;
+    return withStaleTransitionHint(topLevelMessage);
   }
   const fieldEntries = Object.entries(payload?.error?.fields ?? {});
   for (const [fieldName, fieldMessages] of fieldEntries) {
@@ -147,7 +157,7 @@ function readApiErrorMessage(payload: ApiResponse | undefined, fallback: string)
     }
     const firstFieldMessage = fieldMessages.find((message) => Boolean((message || "").trim()));
     if (firstFieldMessage) {
-      return `${fieldName}: ${firstFieldMessage}`;
+      return withStaleTransitionHint(`${fieldName}: ${firstFieldMessage}`);
     }
   }
   return fallback;
@@ -294,16 +304,16 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const workspaceContext = selectedEstimate
     ? `${selectedEstimate.title || "Untitled"} · #${selectedEstimate.id} v${selectedEstimate.version}`
     : "New estimate draft";
-  const workspaceBadgeLabel = isEditingDraft
-    ? "Editing existing draft"
-    : selectedEstimate
-      ? `Read-only ${formatEstimateStatus(selectedEstimate.status)}`
-      : "New unsaved draft";
-  const workspaceBadgeClass = isEditingDraft
+  const workspaceBadgeLabel = !selectedEstimate
+    ? "NEW ESTIMATE"
+    : isEditingDraft
+      ? "EDITING"
+      : "READ-ONLY";
+  const workspaceBadgeClass = !selectedEstimate
     ? styles.statusDraft
-    : selectedEstimate
-      ? statusClasses[selectedEstimate.status] ?? styles.statusArchived
-      : styles.statusDraft;
+    : isEditingDraft
+      ? styles.statusDraft
+      : statusClasses[selectedEstimate.status] ?? styles.statusArchived;
 
   function formatEstimateStatus(status?: string): string {
     if (!status) {
@@ -1792,7 +1802,18 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                             </td>
                             <td>{formatEventDate(event.changed_at)}</td>
                             <td>{event.note || "—"}</td>
-                            <td>{event.changed_by_email}</td>
+                            <td>
+                              {event.changed_by_customer_id ? (
+                                <Link
+                                  href={`/customers?customer=${event.changed_by_customer_id}`}
+                                  className={styles.statusEventActorLink}
+                                >
+                                  {event.changed_by_display || `Customer #${event.changed_by_customer_id}`}
+                                </Link>
+                              ) : (
+                                event.changed_by_display || event.changed_by_email || "Unknown user"
+                              )}
+                            </td>
                           </tr>
                         );
                       })}
