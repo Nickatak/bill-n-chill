@@ -87,6 +87,7 @@ class OrganizationManagementTests(TestCase):
         payload = response.json()["data"]
         self.assertEqual(payload["organization"]["id"], self.organization.id)
         self.assertEqual(payload["organization"]["display_name"], self.organization.display_name)
+        self.assertIn("help_email", payload["organization"])
         self.assertEqual(payload["current_membership"]["id"], self.owner_membership.id)
         self.assertEqual(payload["active_member_count"], 3)
         self.assertEqual(payload["role_policy"]["effective_role"], "owner")
@@ -135,6 +136,7 @@ class OrganizationManagementTests(TestCase):
                 "logo_url": "https://example.com/new-logo.png",
                 "invoice_sender_name": "Billing Team",
                 "invoice_sender_email": "billing@example.com",
+                "help_email": "help@example.com",
                 "invoice_sender_address": "123 Main St\nAustin, TX 78701",
                 "invoice_default_due_days": 21,
                 "estimate_validation_delta_days": 45,
@@ -152,6 +154,7 @@ class OrganizationManagementTests(TestCase):
         self.assertEqual(self.organization.logo_url, "https://example.com/new-logo.png")
         self.assertEqual(self.organization.invoice_sender_name, "Billing Team")
         self.assertEqual(self.organization.invoice_sender_email, "billing@example.com")
+        self.assertEqual(self.organization.help_email, "help@example.com")
         self.assertEqual(self.organization.invoice_sender_address, "123 Main St\nAustin, TX 78701")
         self.assertEqual(self.organization.invoice_default_due_days, 21)
         self.assertEqual(self.organization.estimate_validation_delta_days, 45)

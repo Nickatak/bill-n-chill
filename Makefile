@@ -6,7 +6,7 @@
 	local-run-frontend local-run-backend local-check-db \
 	local-makemigrations local-superuser \
 	local-test local-test-backend local-test-frontend local-clean local-kill-ports \
-	docker-up docker-down docker-logs docker-migrate \
+	docker-up docker-down docker-logs db-migrate \
 	db-seed db-reset db-reset-hard db-grant-test-db-perms \
 	docker-prod-up docker-prod-down docker-prod-logs docker-prod-seed \
 	db-prod-reset
@@ -38,7 +38,7 @@ help:
 	@echo "  make docker-up              Start full dev stack (detached, with build)"
 	@echo "  make docker-down            Stop dev stack"
 	@echo "  make docker-logs            Stream dev stack logs"
-	@echo "  make docker-migrate         Apply Django migrations against dev DB"
+	@echo "  make db-migrate             Apply Django migrations against dev DB"
 	@echo "  make db-seed                Seed Bob demo data into dev DB"
 	@echo "  make db-reset               Destructive app-data reset + Bob demo reseed"
 	@echo ""
@@ -164,7 +164,7 @@ docker-logs: local-env-local
 db-seed: local-env-local local-check-db
 	$(BACKEND_MANAGE) seed_bob_demo
 
-docker-migrate: local-env-local local-check-db
+db-migrate: local-env-local local-check-db
 	$(BACKEND_MANAGE) migrate
 
 db-reset: local-env-local local-check-db

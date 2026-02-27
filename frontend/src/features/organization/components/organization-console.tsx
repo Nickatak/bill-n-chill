@@ -96,6 +96,7 @@ export function OrganizationConsole() {
   const [logoUrlDraft, setLogoUrlDraft] = useState("");
   const [invoiceSenderNameDraft, setInvoiceSenderNameDraft] = useState("");
   const [invoiceSenderEmailDraft, setInvoiceSenderEmailDraft] = useState("");
+  const [helpEmailDraft, setHelpEmailDraft] = useState("");
   const [invoiceSenderAddressDraft, setInvoiceSenderAddressDraft] = useState("");
   const [invoiceDefaultDueDaysDraft, setInvoiceDefaultDueDaysDraft] = useState("30");
   const [estimateValidationDeltaDaysDraft, setEstimateValidationDeltaDaysDraft] = useState("30");
@@ -125,6 +126,7 @@ export function OrganizationConsole() {
       logoUrlDraft.trim() !== (organizationProfile.logo_url || "") ||
       invoiceSenderNameDraft.trim() !== (organizationProfile.invoice_sender_name || "") ||
       invoiceSenderEmailDraft.trim() !== (organizationProfile.invoice_sender_email || "") ||
+      helpEmailDraft.trim() !== (organizationProfile.help_email || "") ||
       invoiceSenderAddressDraft.trim() !== (organizationProfile.invoice_sender_address || "") ||
       String(Number(invoiceDefaultDueDaysDraft || "30")) !==
         String(organizationProfile.invoice_default_due_days || 30) ||
@@ -206,6 +208,7 @@ export function OrganizationConsole() {
         setLogoUrlDraft(nextProfile.logo_url ?? "");
         setInvoiceSenderNameDraft(nextProfile.invoice_sender_name ?? "");
         setInvoiceSenderEmailDraft(nextProfile.invoice_sender_email ?? "");
+        setHelpEmailDraft(nextProfile.help_email ?? "");
         setInvoiceSenderAddressDraft(nextProfile.invoice_sender_address ?? "");
         setInvoiceDefaultDueDaysDraft(String(nextProfile.invoice_default_due_days ?? 30));
         setEstimateValidationDeltaDaysDraft(
@@ -262,6 +265,7 @@ export function OrganizationConsole() {
       logo_url: logoUrlDraft.trim(),
       invoice_sender_name: invoiceSenderNameDraft.trim(),
       invoice_sender_email: invoiceSenderEmailDraft.trim(),
+      help_email: helpEmailDraft.trim(),
       invoice_sender_address: invoiceSenderAddressDraft.trim(),
       invoice_default_due_days: sanitizedDueDays,
       estimate_validation_delta_days: sanitizedEstimateDeltaDays,
@@ -296,6 +300,7 @@ export function OrganizationConsole() {
         setLogoUrlDraft(data.organization.logo_url ?? "");
         setInvoiceSenderNameDraft(data.organization.invoice_sender_name ?? "");
         setInvoiceSenderEmailDraft(data.organization.invoice_sender_email ?? "");
+        setHelpEmailDraft(data.organization.help_email ?? "");
         setInvoiceSenderAddressDraft(data.organization.invoice_sender_address ?? "");
         setInvoiceDefaultDueDaysDraft(String(data.organization.invoice_default_due_days ?? 30));
         setEstimateValidationDeltaDaysDraft(
@@ -504,6 +509,16 @@ export function OrganizationConsole() {
                     onChange={(event) => setInvoiceSenderEmailDraft(event.target.value)}
                     type="email"
                     placeholder="billing@example.com"
+                    disabled={!canEditProfile || isSavingProfile || !organizationProfile}
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span className={styles.fieldLabel}>Help Email</span>
+                  <input
+                    value={helpEmailDraft}
+                    onChange={(event) => setHelpEmailDraft(event.target.value)}
+                    type="email"
+                    placeholder="help@example.com"
                     disabled={!canEditProfile || isSavingProfile || !organizationProfile}
                   />
                 </label>

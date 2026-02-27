@@ -30,9 +30,12 @@ from core.views.helpers import (
     _next_invoice_number,
     _organization_user_ids,
     _resolve_invoice_cost_codes_for_user,
+    _resolve_organization_for_public_actor,
     _record_financial_audit_event,
     _record_invoice_status_event,
     _role_gate_error_payload,
+    _serialize_public_organization_context,
+    _serialize_public_project_context,
     _validate_project_for_user,
 )
 
@@ -115,7 +118,7 @@ def public_invoice_detail_view(request, public_token: str):
     """Return public invoice detail for share links, including lightweight project context."""
     try:
         invoice = (
-            Invoice.objects.select_related("project__customer")
+            Invoice.objects.select_related("project__customer", "created_by")
             .prefetch_related(
                 "line_items",
                 "line_items__budget_line",
@@ -132,13 +135,9 @@ def public_invoice_detail_view(request, public_token: str):
         )
 
     serialized = InvoiceSerializer(invoice).data
-    serialized["project_context"] = {
-        "id": invoice.project.id,
-        "name": invoice.project.name,
-        "status": invoice.project.status,
-        "customer_display_name": invoice.project.customer.display_name,
-        "customer_billing_address": invoice.project.customer.billing_address,
-    }
+    organization = _resolve_organization_for_public_actor(invoice.created_by)
+    serialized["project_context"] = _serialize_public_project_context(invoice.project)
+    serialized["organization_context"] = _serialize_public_organization_context(organization)
     return Response({"data": serialized})
 
 
@@ -277,7 +276,7 @@ def public_invoice_decision_view(request, public_token: str):
 
     refreshed = (
         Invoice.objects.filter(id=invoice.id)
-        .select_related("project__customer")
+        .select_related("project__customer", "created_by")
         .prefetch_related(
             "line_items",
             "line_items__budget_line",
@@ -288,13 +287,9 @@ def public_invoice_decision_view(request, public_token: str):
         .get()
     )
     serialized = InvoiceSerializer(refreshed).data
-    serialized["project_context"] = {
-        "id": refreshed.project.id,
-        "name": refreshed.project.name,
-        "status": refreshed.project.status,
-        "customer_display_name": refreshed.project.customer.display_name,
-        "customer_billing_address": refreshed.project.customer.billing_address,
-    }
+    organization = _resolve_organization_for_public_actor(refreshed.created_by)
+    serialized["project_context"] = _serialize_public_project_context(refreshed.project)
+    serialized["organization_context"] = _serialize_public_organization_context(organization)
     return Response({"data": serialized, "meta": {"public_decision_applied": decision_type}})
 
 

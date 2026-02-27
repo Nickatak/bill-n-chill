@@ -2,6 +2,18 @@ export type UserData = { token?: string; email?: string };
 
 export type ProjectRecord = { id: number; name: string; customer_display_name: string };
 
+export type OrganizationPublicContext = {
+  display_name: string;
+  logo_url: string;
+  sender_name: string;
+  sender_email: string;
+  sender_address: string;
+  help_email: string;
+  invoice_default_terms: string;
+  estimate_default_terms: string;
+  change_order_default_reason: string;
+};
+
 export type BudgetLineRecord = {
   id: number;
   scope_item?: number | null;
@@ -58,11 +70,15 @@ export type ChangeOrderRecord = {
     status: string;
     customer_display_name: string;
     customer_billing_address?: string | null;
+    customer_email?: string | null;
+    customer_phone?: string | null;
   };
+  organization_context?: OrganizationPublicContext;
   origin_estimate_context?: {
     id: number;
     title: string;
     version: number;
+    public_ref?: string;
   };
 };
 

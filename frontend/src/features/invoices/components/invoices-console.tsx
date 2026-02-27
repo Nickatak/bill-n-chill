@@ -1810,7 +1810,7 @@ export function InvoicesConsole() {
                                   ? "Editing existing draft"
                                   : workspaceSourceInvoice
                                     ? `Read-only ${statusLabel(workspaceSourceInvoice.status)}`
-                                    : "Generated on create"}
+                                    : "Number assigned on create"}
                               </span>
                             </div>
                           </div>

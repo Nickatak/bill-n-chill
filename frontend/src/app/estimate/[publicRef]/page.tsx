@@ -12,9 +12,43 @@ function parsePublicToken(publicRef: string): string | null {
   return match ? match[1] : null;
 }
 
-export const metadata: Metadata = {
-  title: "Estimate",
-};
+const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+
+async function loadPublicEstimateTitle(publicToken: string): Promise<string | null> {
+  const normalizedBaseUrl = defaultApiBaseUrl.trim().replace(/\/$/, "");
+  try {
+    const response = await fetch(`${normalizedBaseUrl}/public/estimates/${publicToken}/`, {
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const payload = (await response.json()) as {
+      data?: { title?: string; project_context?: { name?: string } };
+    };
+    const estimateTitle = payload.data?.title?.trim();
+    if (estimateTitle) {
+      return estimateTitle;
+    }
+    const projectName = payload.data?.project_context?.name?.trim();
+    if (projectName) {
+      return `${projectName} Estimate`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function generateMetadata({ params }: EstimateReviewPageProps): Promise<Metadata> {
+  const { publicRef } = await params;
+  const publicToken = parsePublicToken(publicRef);
+  if (!publicToken) {
+    return { title: "Estimate" };
+  }
+  const resolvedTitle = await loadPublicEstimateTitle(publicToken);
+  return { title: resolvedTitle ? `${resolvedTitle} | Estimate` : "Estimate" };
+}
 
 export default async function EstimateReviewPage({ params }: EstimateReviewPageProps) {
   const { publicRef } = await params;

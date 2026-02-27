@@ -3,7 +3,7 @@ import { QuickAddConsole } from "@/features/intake";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = {
-  title: "Quick Add",
+  title: "Quick Add Customer",
 };
 
 export default function QuickAddPage() {

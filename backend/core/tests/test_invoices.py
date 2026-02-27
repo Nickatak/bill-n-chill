@@ -153,6 +153,9 @@ class InvoiceTests(TestCase):
             payload["project_context"]["customer_display_name"],
             self.customer.display_name,
         )
+        self.assertIn("organization_context", payload)
+        self.assertIn("sender_name", payload["organization_context"])
+        self.assertIn("help_email", payload["organization_context"])
         self.assertEqual(len(payload["line_items"]), 1)
 
     def test_public_invoice_detail_view_not_found(self):

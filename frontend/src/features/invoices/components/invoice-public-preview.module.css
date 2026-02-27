@@ -1,37 +1,64 @@
-.preview {
-  --foreground: #ffffff;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --surface: #ffffff;
-  --surface-muted: #f8fafc;
-  --border: #cbd5e1;
-  --accent: #1d4ed8;
-
-  display: grid;
-  gap: 14px;
-  color: var(--text-primary);
-}
-
-.statusMessage {
-  margin: 0;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px;
-  background: var(--surface-muted);
-  color: var(--text-secondary);
-}
-
 .paymentSection {
   gap: 10px;
+  scroll-margin-top: 96px;
+}
+
+.paymentBannerAwaiting {
+}
+
+.paymentBannerSettled {
+}
+
+.paymentCard {
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.paymentCard h3 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.paymentHint {
+  margin: 0;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.paymentField {
+  display: grid;
+  gap: 6px;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.paymentInput {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.paymentInput:disabled {
+  background: #f1f5f9;
+  color: #64748b;
+  border-color: #dbe3f0;
+  opacity: 1;
+  cursor: default;
 }
 
 .paymentInactiveBanner {
   margin: 0;
-  border: 1px dashed var(--border);
+  border: 1px dashed #cbd5e1;
   border-radius: 10px;
   padding: 10px 12px;
-  background: var(--surface-muted);
-  color: var(--text-secondary);
+  background: #f8fafc;
+  color: #475569;
   font-size: 0.86rem;
   font-weight: 600;
 }
@@ -58,466 +85,112 @@
   gap: 10px;
 }
 
-.paymentSection .paymentUnavailableButton:disabled {
-  border-color: #94a3b8;
-  background: #e2e8f0;
-  color: #64748b;
-  opacity: 1;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.publicDecisionBanner {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 12px 14px;
-  background: var(--surface);
+.summaryWrap {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-end;
+}
+
+.detailsPanel {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.paymentActions {
+  display: flex;
   flex-wrap: wrap;
+  gap: 8px;
 }
 
-.publicDecisionBannerPending {
-  border-color: #93c5fd;
-  background: #eff6ff;
-}
-
-.publicDecisionBannerComplete {
-  border-color: #cbd5e1;
-  background: var(--surface-muted);
-}
-
-.publicDecisionBannerBody {
-  display: grid;
-  gap: 4px;
-}
-
-.publicDecisionBannerEyebrow {
-  margin: 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-
-.publicDecisionBannerText {
-  margin: 0;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-}
-
-.publicDecisionBannerLink {
-  border: 1px solid #1d4ed8;
+.paymentSecondaryButton,
+.paymentPrimaryButton {
   border-radius: 8px;
-  background: #1d4ed8;
-  color: #ffffff;
-  padding: 8px 12px;
-  font-size: 0.84rem;
-  font-weight: 600;
-  line-height: 1.1;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.publicDecisionBannerLink:hover,
-.publicDecisionBannerLink:focus-visible {
-  background: #1e40af;
-  border-color: #1e40af;
-  outline: none;
-}
-
-.header {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px;
-  background: var(--surface);
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.eyebrow {
-  margin: 0;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--accent);
-  font-weight: 700;
-}
-
-.title {
-  margin: 4px 0;
-  font-size: 1.4rem;
-}
-
-.subhead {
-  margin: 0;
-  color: var(--text-secondary);
-}
-
-.headerRight {
-  display: grid;
-  justify-items: end;
-  align-content: start;
-  gap: 4px;
-}
-
-.statusBadge {
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  border: 1px solid transparent;
-}
-
-.statusDraft {
-  background: #dbeafe;
-  border-color: #93c5fd;
-  color: #1e40af;
-}
-
-.statusSent {
-  background: #fef3c7;
-  border-color: #fcd34d;
-  color: #92400e;
-}
-
-.statusPartial {
-  background: #ede9fe;
-  border-color: #c4b5fd;
-  color: #5b21b6;
-}
-
-.statusPaid {
-  background: #dcfce7;
-  border-color: #86efac;
-  color: #166534;
-}
-
-.statusOverdue {
-  background: #fee2e2;
-  border-color: #fca5a5;
-  color: #991b1b;
-}
-
-.statusVoid {
-  background: #e2e8f0;
-  border-color: #cbd5e1;
-  color: #334155;
-}
-
-.total {
-  font-size: 1.5rem;
-}
-
-.balance {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-}
-
-.metaGrid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.metaCard {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  background: var(--surface);
-  display: grid;
-  gap: 4px;
-}
-
-.metaCard h3 {
-  margin: 0 0 4px;
-  font-size: 0.74rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.primaryText {
-  margin: 0;
-  font-weight: 700;
-}
-
-.secondaryText {
-  margin: 0;
-  color: var(--text-secondary);
-  line-height: 1.35;
-}
-
-.dateGrid {
-  margin-top: 8px;
-  display: grid;
-  gap: 4px;
-  color: var(--text-secondary);
-  font-size: 0.86rem;
-}
-
-.lineSection {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  background: var(--surface);
-  display: grid;
-  gap: 10px;
-}
-
-.lineSection h3 {
-  margin: 0;
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-secondary);
-}
-
-.tableWrap {
-  overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-
-.table {
-  width: 100%;
-  min-width: 600px;
-  border-collapse: collapse;
-}
-
-.table th,
-.table td {
-  text-align: left;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-}
-
-.table th {
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  background: var(--surface-muted);
-}
-
-.footerGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.footerCard {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  background: var(--surface);
-}
-
-.footerCard h4 {
-  margin: 0 0 6px;
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.footerCard p {
-  margin: 0;
-  white-space: pre-wrap;
-  color: var(--text-primary);
-}
-
-.footerCardWide {
-  grid-column: 1 / -1;
-}
-
-.totalsCard {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  background: var(--surface-muted);
-  display: grid;
-  gap: 8px;
-}
-
-.totalsCard div {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  color: var(--text-secondary);
-}
-
-.totalsCard strong {
-  color: var(--text-primary);
-}
-
-.totalRow {
-  padding-top: 6px;
-  border-top: 1px solid var(--border);
-}
-
-.emptyHint {
-  margin: 0;
-  color: var(--text-secondary);
-}
-
-.decisionCard {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  background: var(--surface);
-  display: grid;
-  gap: 8px;
-}
-
-.decisionCard h4 {
-  margin: 0;
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.decisionCard h3 {
-  margin: 0;
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.decisionMessage {
-  margin: 0;
-  color: var(--text-secondary);
-}
-
-.decisionField {
-  display: grid;
-  gap: 6px;
-  font-size: 0.88rem;
-  color: var(--text-secondary);
-}
-
-.decisionField input,
-.decisionField textarea {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: var(--surface-muted);
-  color: var(--text-primary);
-}
-
-.decisionActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.publicDecisionSection {
-  scroll-margin-top: 96px;
-}
-
-.primaryButton,
-.secondaryButton {
-  border-radius: 10px;
   padding: 8px 12px;
   font-weight: 700;
   cursor: pointer;
 }
 
-.primaryButton {
+.paymentSecondaryButton {
+  border: 1px solid #cbd5f5;
+  background: #f8fafc;
+  color: #1e3a8a;
+}
+
+.paymentPrimaryButton {
   border: 1px solid #1d4ed8;
   background: #1d4ed8;
-  color: #eff6ff;
-}
-
-.secondaryButton {
-  border: 1px solid var(--border);
-  background: var(--surface-muted);
-  color: var(--text-primary);
-}
-
-.primaryButton:disabled,
-.secondaryButton:disabled {
-  opacity: 0.6;
-  cursor: default;
+  color: #ffffff;
 }
 
 @media (max-width: 820px) {
-  .publicDecisionBanner {
-    align-items: flex-start;
-  }
-
-  .publicDecisionBannerLink {
-    width: 100%;
-  }
-
-  .metaGrid,
-  .footerGrid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .paymentGrid,
   .paymentGridTight {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: 1fr;
   }
 
-  .decisionActions {
+  .summaryWrap {
+    justify-content: stretch;
+  }
+
+  .paymentActions {
     display: grid;
     grid-template-columns: 1fr;
   }
 }
 
-:global(html[data-theme="dark"]) .preview {
-  --foreground: #111827;
-  --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --surface: #111827;
-  --surface-muted: #0f172a;
-  --border: #334155;
-  --accent: #93c5fd;
+@media print {
+  .paymentBannerAwaiting {
+    display: none;
+  }
+
+  .paymentSection {
+    display: none;
+  }
 }
 
-:global(html[data-theme="dark"]) .paymentTestMessage {
-  border-color: #2563eb;
-  background: #1e3a8a;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .paymentSection .paymentUnavailableButton:disabled {
-  border-color: #475569;
-  background: #334155;
+:global(html[data-theme="dark"]) .paymentInactiveBanner {
+  border-color: #334155;
+  background: #0f172a;
   color: #94a3b8;
 }
 
-:global(html[data-theme="dark"]) .publicDecisionBannerPending {
-  border-color: #1d4ed8;
+:global(html[data-theme="dark"]) .paymentTestMessage {
+  border-color: #3b82f6;
   background: #172554;
+  color: #bfdbfe;
 }
 
-:global(html[data-theme="dark"]) .publicDecisionBannerComplete {
+:global(html[data-theme="dark"]) .paymentCard {
+  border-color: #334155;
+  background: #111827;
+}
+
+:global(html[data-theme="dark"]) .paymentCard h3,
+:global(html[data-theme="dark"]) .paymentHint,
+:global(html[data-theme="dark"]) .paymentField {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .paymentInput {
   border-color: #334155;
   background: #0f172a;
+  color: #e2e8f0;
 }
 
-:global(html[data-theme="dark"]) .publicDecisionBannerLink {
+:global(html[data-theme="dark"]) .paymentInput:disabled {
+  background: #0a1324;
+  border-color: #2b3b52;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .paymentSecondaryButton {
+  border-color: #334155;
+  background: #0f172a;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .paymentPrimaryButton {
+  border-color: #2563eb;
   background: #2563eb;
-  border-color: #3b82f6;
   color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .publicDecisionBannerLink:hover,
-:global(html[data-theme="dark"]) .publicDecisionBannerLink:focus-visible {
-  background: #1d4ed8;
-  border-color: #60a5fa;
 }

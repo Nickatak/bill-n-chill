@@ -110,13 +110,13 @@ export function QuickAddConsole() {
 
   return (
     <section className={styles.section}>
-      <h2>Intake: Quick Add</h2>
+      <h2>Quick Add Customer</h2>
       <div className={styles.introCard}>
         <p className={styles.introLead}>
-          Capture a customer fast, then optionally create a project in the same submit.
+          Add a customer in under a minute, then optionally start a project in the same step.
         </p>
         <p className={styles.introMeta}>
-          If duplicates are detected, resolve them inline so we avoid overlapping customer records.
+          If we find a possible match, we will ask before creating anything so your customer list stays clean.
         </p>
       </div>
       {controllerApi.authMessage ? <p>{controllerApi.authMessage}</p> : null}

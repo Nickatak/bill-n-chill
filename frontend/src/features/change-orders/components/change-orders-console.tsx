@@ -244,7 +244,6 @@ export function ChangeOrdersConsole({
   const [selectedChangeOrderId, setSelectedChangeOrderId] = useState("");
   const [selectedViewerEstimateId, setSelectedViewerEstimateId] = useState("");
   const [isViewerExpanded, setIsViewerExpanded] = useState(true);
-  const [hideVoidedHistory, setHideVoidedHistory] = useState(true);
   const [budgetLines, setBudgetLines] = useState<BudgetLineRecord[]>([]);
   const [originEstimateOriginalTotals, setOriginEstimateOriginalTotals] = useState<
     Record<number, number>
@@ -317,24 +316,10 @@ export function ChangeOrdersConsole({
       changeOrders.filter((changeOrder) => changeOrder.origin_estimate === originEstimateId),
     );
   }, [changeOrders, selectedViewerEstimateId, sortChangeOrdersForViewer]);
-  const viewerVisibleChangeOrders = useMemo(
-    () =>
-      hideVoidedHistory
-        ? viewerChangeOrders.filter((changeOrder) => changeOrder.status !== "void")
-        : viewerChangeOrders,
-    [hideVoidedHistory, viewerChangeOrders],
-  );
   const selectedViewerChangeOrder =
-    viewerVisibleChangeOrders.find((changeOrder) => String(changeOrder.id) === selectedChangeOrderId) ??
-    viewerVisibleChangeOrders[0] ??
+    viewerChangeOrders.find((changeOrder) => String(changeOrder.id) === selectedChangeOrderId) ??
+    viewerChangeOrders[0] ??
     null;
-  const totalChangeOrderCount = changeOrders.length;
-  const draftChangeOrderCount = changeOrders.filter(
-    (changeOrder) => changeOrder.status === "draft",
-  ).length;
-  const pendingChangeOrderCount = changeOrders.filter(
-    (changeOrder) => changeOrder.status === "pending_approval",
-  ).length;
   const scopedProjectLabel = selectedProjectId
     ? `Project #${selectedProjectId}${selectedProjectName ? ` · ${selectedProjectName}` : ""}`
     : "No project selected";
@@ -393,6 +378,17 @@ export function ChangeOrdersConsole({
     Boolean(selectedChangeOrderId) &&
     Boolean(selectedChangeOrder?.is_latest_revision) &&
     isSelectedChangeOrderDraft;
+  const workspaceContext = selectedChangeOrder
+    ? `${coLabel(selectedChangeOrder)} · ${selectedChangeOrder.title || "Untitled"}`
+    : "New change order draft";
+  const workspaceBadgeLabel = selectedChangeOrder
+    ? isSelectedChangeOrderEditable
+      ? "Editing existing draft"
+      : `Read-only ${statusLabel(selectedChangeOrder.status)}`
+    : "New unsaved draft";
+  const workspaceBadgeClass = selectedChangeOrder
+    ? editStatusBadgeClass(selectedChangeOrder.status)
+    : styles.editStatusDraft;
   const isEditSubmitDisabled =
     !isSelectedChangeOrderEditable ||
     editLineValidation.issues.length > 0;
@@ -760,10 +756,10 @@ export function ChangeOrdersConsole({
 
   function financialBaselineLabel(status: FinancialBaselineStatusValue): string {
     if (status === "active") {
-      return "Financial Baseline";
+      return "Active Estimate";
     }
     if (status === "superseded") {
-      return "Superseded Baseline";
+      return "Superseded Estimate";
     }
     return "";
   }
@@ -1185,16 +1181,16 @@ export function ChangeOrdersConsole({
     if (!selectedChangeOrderId) {
       return;
     }
-    if (!viewerVisibleChangeOrders.length) {
+    if (!viewerChangeOrders.length) {
       return;
     }
-    const selectedStillVisible = viewerVisibleChangeOrders.some(
+    const selectedStillVisible = viewerChangeOrders.some(
       (changeOrder) => String(changeOrder.id) === selectedChangeOrderId,
     );
     if (!selectedStillVisible) {
-      hydrateEditForm(viewerVisibleChangeOrders[0]);
+      hydrateEditForm(viewerChangeOrders[0]);
     }
-  }, [hydrateEditForm, selectedChangeOrderId, viewerVisibleChangeOrders]);
+  }, [hydrateEditForm, selectedChangeOrderId, viewerChangeOrders]);
 
   useEffect(() => {
     const projectId = Number(selectedProjectId);
@@ -1557,32 +1553,6 @@ export function ChangeOrdersConsole({
             billing.
           </p>
         </div>
-        <div className={styles.consoleStats}>
-          <article className={styles.consoleStatCard}>
-            <span className={styles.consoleStatLabel}>Active Financial Baseline</span>
-            <strong className={styles.consoleStatValue}>
-              {activeFinancialBaselineEstimate
-                ? `#${activeFinancialBaselineEstimate.id} v${activeFinancialBaselineEstimate.version}`
-                : "None"}
-            </strong>
-          </article>
-          <article className={styles.consoleStatCard}>
-            <span className={styles.consoleStatLabel}>Approved Estimates (Origin)</span>
-            <strong className={styles.consoleStatValue}>{projectEstimates.length}</strong>
-          </article>
-          <article className={styles.consoleStatCard}>
-            <span className={styles.consoleStatLabel}>Draft Change Orders</span>
-            <strong className={styles.consoleStatValue}>{draftChangeOrderCount}</strong>
-          </article>
-          <article className={styles.consoleStatCard}>
-            <span className={styles.consoleStatLabel}>Sent for Approval</span>
-            <strong className={styles.consoleStatValue}>{pendingChangeOrderCount}</strong>
-          </article>
-          <article className={styles.consoleStatCard}>
-            <span className={styles.consoleStatLabel}>Total Change Orders</span>
-            <strong className={styles.consoleStatValue}>{totalChangeOrderCount}</strong>
-          </article>
-        </div>
       </section>
 
       <section className={styles.viewer}>
@@ -1602,20 +1572,12 @@ export function ChangeOrdersConsole({
             Select an approved origin estimate on the left. Change-order families are grouped by
             that origin anchor.
           </p>
-          <p className={styles.viewerBaselineSummary}>
-            {activeFinancialBaselineEstimate
-              ? `Current project baseline: estimate #${activeFinancialBaselineEstimate.id} v${activeFinancialBaselineEstimate.version}.`
-              : "No active financial baseline is set for this project yet."}
-          </p>
         </div>
         {isViewerExpanded ? (projectEstimates.length > 0 ? (
           <div className={styles.viewerGrid}>
             <div className={styles.viewerRail}>
               <div className={styles.viewerRailHeader}>
                 <span className={styles.viewerRailHeading}>Origin Estimates</span>
-                <span className={styles.viewerRailSubheading}>
-                  1) Select an approved origin estimate to scope the history.
-                </span>
               </div>
               {projectEstimates.map((estimate) => {
                 const active = String(estimate.id) === selectedViewerEstimateId;
@@ -1636,18 +1598,15 @@ export function ChangeOrdersConsole({
                             (changeOrder) => String(changeOrder.origin_estimate) === nextEstimateId,
                           ),
                         );
-                        const visibleRelated = hideVoidedHistory
-                          ? related.filter((changeOrder) => changeOrder.status !== "void")
-                          : related;
-                        if (!visibleRelated.length) {
+                        if (!related.length) {
                           hydrateEditForm(undefined);
                           return;
                         }
-                        const selectedStillValid = visibleRelated.some(
+                        const selectedStillValid = related.some(
                           (changeOrder) => String(changeOrder.id) === selectedChangeOrderId,
                         );
                         if (!selectedStillValid) {
-                          hydrateEditForm(visibleRelated[0]);
+                          hydrateEditForm(related[0]);
                         }
                       }}
                     >
@@ -1707,25 +1666,16 @@ export function ChangeOrdersConsole({
                   }`}
                 >
                   {selectedViewerEstimateIsActiveBaseline
-                    ? `This origin estimate (#${selectedViewerEstimate.id} v${selectedViewerEstimate.version}) is the active project financial baseline.`
+                    ? `This origin estimate (#${selectedViewerEstimate.id} v${selectedViewerEstimate.version}) is the active estimate for this project.`
                     : activeFinancialBaselineEstimate
-                      ? `This origin estimate is not the active baseline. Current baseline is estimate #${activeFinancialBaselineEstimate.id} v${activeFinancialBaselineEstimate.version}.`
-                      : "This project currently has no active financial baseline."}
+                      ? `This origin estimate is not the active estimate. Current active estimate is #${activeFinancialBaselineEstimate.id} v${activeFinancialBaselineEstimate.version}.`
+                      : "This project currently has no active estimate."}
                 </p>
                 {viewerChangeOrders.length > 0 ? (
                   <>
-                    <h4 className={styles.viewerSectionHeading}>2) Linked Change Order History</h4>
-                    <p className={styles.viewerHint}>Oldest at top. Most recent is the bottom item.</p>
-                    <label className={styles.viewerToggleRow}>
-                      <input
-                        type="checkbox"
-                        checked={hideVoidedHistory}
-                        onChange={(event) => setHideVoidedHistory(event.target.checked)}
-                      />
-                      Hide voided revisions
-                    </label>
+                    <h4 className={styles.viewerSectionHeading}>Linked Change Orders</h4>
                     <div className={`${styles.viewerRail} ${styles.viewerHistoryRail}`}>
-                      {viewerVisibleChangeOrders.map((changeOrder) => {
+                      {viewerChangeOrders.map((changeOrder) => {
                         const active = String(changeOrder.id) === selectedChangeOrderId;
                         const lastStatusEvent = lastStatusEventForChangeOrder(changeOrder.id);
                         return (
@@ -1777,22 +1727,8 @@ export function ChangeOrdersConsole({
                         );
                       })}
                     </div>
-                    {!viewerVisibleChangeOrders.length ? (
-                      <p className={styles.viewerHint}>No visible revisions. Turn off the void filter to view voided revisions.</p>
-                    ) : null}
                     {selectedViewerChangeOrder ? (
                       <>
-                        <div className={styles.viewerMetaRow}>
-                          <span className={styles.viewerMetaLabel}>Working total pre-approval (this CO)</span>
-                          <strong>${selectedViewerWorkingTotals.preApproval}</strong>
-                        </div>
-                        <div className={styles.viewerMetaRow}>
-                          <span className={styles.viewerMetaLabel}>Working total post-approval (this CO)</span>
-                          <strong>${selectedViewerWorkingTotals.postApproval}</strong>
-                        </div>
-                        <p className={styles.viewerHint}>
-                          Post-approval total = pre-approval total + this CO line delta.
-                        </p>
                         {quickStatusOptions.length > 0 ? (
                           <div className={styles.quickStatusPanel}>
                             <span className={estimateStyles.lifecycleFieldLabel}>Next status</span>
@@ -1938,6 +1874,17 @@ export function ChangeOrdersConsole({
                           <span className={styles.viewerMetaLabel}>Line delta total</span>
                           <strong>${selectedViewerChangeOrder.line_total_delta}</strong>
                         </div>
+                        <div className={styles.viewerMetaRow}>
+                          <span className={styles.viewerMetaLabel}>Working total pre-approval (this CO)</span>
+                          <strong>${selectedViewerWorkingTotals.preApproval}</strong>
+                        </div>
+                        <div className={styles.viewerMetaRow}>
+                          <span className={styles.viewerMetaLabel}>Working total post-approval (this CO)</span>
+                          <strong>${selectedViewerWorkingTotals.postApproval}</strong>
+                        </div>
+                        <p className={styles.viewerHint}>
+                          Post-approval total = pre-approval total + this CO line delta.
+                        </p>
                       </>
                     ) : null}
                   </>
@@ -1960,24 +1907,16 @@ export function ChangeOrdersConsole({
 
       <div className={styles.formToolbar}>
         <div className={styles.formContext}>
-          {selectedChangeOrder ? (
-            <>
-              <span className={styles.formContextLabel}>Editing</span>
-              <div className={styles.formContextValueRow}>
-                <strong>{coLabel(selectedChangeOrder)}</strong>
-                <span
-                  className={`${styles.editStatusBadge} ${editStatusBadgeClass(selectedChangeOrder.status)}`}
-                >
-                  {statusLabel(selectedChangeOrder.status)}
-                </span>
-              </div>
-            </>
-          ) : (
-            <>
-              <span className={styles.formContextLabel}>Creating</span>
-              <strong>New Change Order Draft</strong>
-            </>
-          )}
+          <span className={styles.formContextLabel}>Editing</span>
+          <div className={styles.formContextValueRow}>
+            <strong>{workspaceContext}</strong>
+            <span className={`${styles.editStatusBadge} ${workspaceBadgeClass}`}>
+              {workspaceBadgeLabel}
+            </span>
+          </div>
+          <p className={styles.formContextHint}>
+            Add New Change Order opens a fresh draft workspace. Clone as New Revision copies the selected change order into a new draft revision.
+          </p>
         </div>
         <div className={styles.formToolbarActions}>
           {selectedViewerChangeOrder?.is_latest_revision ? (

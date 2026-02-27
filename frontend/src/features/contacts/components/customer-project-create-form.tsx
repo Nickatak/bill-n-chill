@@ -52,13 +52,32 @@ export function CustomerProjectCreateForm({
       </label>
       <label className={styles.field}>
         Status
-        <select
-          value={projectStatus}
-          onChange={(event) => onProjectStatusChange(event.target.value as ProjectStatusValue)}
-        >
-          <option value="prospect">Prospect</option>
-          <option value="active">Active</option>
-        </select>
+        <div className={styles.projectStatusSelector} role="group" aria-label="Project status">
+          <button
+            type="button"
+            className={`${styles.projectStatusSelectorButton} ${
+              projectStatus === "prospect"
+                ? `${styles.projectStatusSelectorButtonActive} ${styles.projectStatusProspect}`
+                : styles.projectStatusSelectorButtonInactive
+            }`}
+            aria-pressed={projectStatus === "prospect"}
+            onClick={() => onProjectStatusChange("prospect")}
+          >
+            Prospect
+          </button>
+          <button
+            type="button"
+            className={`${styles.projectStatusSelectorButton} ${
+              projectStatus === "active"
+                ? `${styles.projectStatusSelectorButtonActive} ${styles.projectStatusActive}`
+                : styles.projectStatusSelectorButtonInactive
+            }`}
+            aria-pressed={projectStatus === "active"}
+            onClick={() => onProjectStatusChange("active")}
+          >
+            Active
+          </button>
+        </div>
       </label>
 
       <div className={styles.actionRow}>

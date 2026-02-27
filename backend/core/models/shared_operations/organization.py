@@ -28,6 +28,7 @@ class Organization(models.Model):
     logo_url = models.URLField(blank=True, default="")
     invoice_sender_name = models.CharField(max_length=255, blank=True, default="")
     invoice_sender_email = models.EmailField(blank=True, default="")
+    help_email = models.EmailField(blank=True, default="")
     invoice_sender_address = models.TextField(blank=True, default="")
     invoice_default_due_days = models.PositiveSmallIntegerField(default=30)
     estimate_validation_delta_days = models.PositiveSmallIntegerField(default=30)

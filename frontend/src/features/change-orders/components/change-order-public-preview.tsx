@@ -1,7 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { formatDateDisplay } from "@/shared/date-format";
+import { PublicDocumentViewerShell } from "@/shared/document-viewer/public-document-viewer-shell";
+import {
+  PublicDocumentFrame,
+  publicDocumentFrameStyles as frameStyles,
+  publicDocumentViewerClassNames,
+} from "@/shared/document-viewer/public-document-frame";
+import {
+  resolveDefaultTerms,
+  resolvePublicRecipient,
+  resolvePublicSender,
+} from "@/shared/document-viewer/public-document-context";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { ApiResponse, ChangeOrderRecord } from "../types";
 import styles from "./change-order-public-preview.module.css";
@@ -23,22 +33,6 @@ function statusLabel(status?: string): string {
   return STATUS_LABELS[value] || value || "Unknown";
 }
 
-function statusClass(status?: string): string {
-  if (status === "pending_approval") {
-    return styles.statusPending;
-  }
-  if (status === "approved") {
-    return styles.statusApproved;
-  }
-  if (status === "rejected") {
-    return styles.statusRejected;
-  }
-  if (status === "void") {
-    return styles.statusVoid;
-  }
-  return styles.statusDraft;
-}
-
 function parseAmount(value?: string): number {
   const parsed = Number(value ?? "0");
   return Number.isFinite(parsed) ? parsed : 0;
@@ -46,6 +40,30 @@ function parseAmount(value?: string): number {
 
 function formatMoney(value?: string): string {
   return parseAmount(value).toFixed(2);
+}
+
+function formatDisplayDateTime(value?: string): string {
+  if (!value) {
+    return "Unknown";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(parsed);
+}
+
+function publicEstimateHref(publicRef?: string): string {
+  if (!publicRef) {
+    return "";
+  }
+  return `/estimate/${publicRef}`;
 }
 
 export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPreviewProps) {
@@ -57,6 +75,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
   const [decisionMessage, setDecisionMessage] = useState("");
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [decisionReceiptName, setDecisionReceiptName] = useState("");
+  const [printTimestamp, setPrintTimestamp] = useState("");
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const canDecide = changeOrder?.status === "pending_approval";
@@ -73,12 +92,66 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
     changeOrder?.status === "approved"
       ? `Decision status: ${decisionStatusLabel}. ${approvalAcknowledgement}`
       : `Decision status: ${decisionStatusLabel}. This change order is not awaiting response.`;
+  const sender = useMemo(
+    () => resolvePublicSender(changeOrder?.organization_context),
+    [changeOrder?.organization_context],
+  );
+  const recipient = useMemo(
+    () => resolvePublicRecipient(changeOrder?.project_context),
+    [changeOrder?.project_context],
+  );
+  const termsText = useMemo(() => {
+    const organizationTerms = resolveDefaultTerms(changeOrder?.organization_context, "estimate");
+    return organizationTerms || "No terms specified.";
+  }, [changeOrder?.organization_context]);
+  const reasonFallback = useMemo(() => {
+    const organizationReason = resolveDefaultTerms(changeOrder?.organization_context, "change_order");
+    return organizationReason || "No reason provided.";
+  }, [changeOrder?.organization_context]);
 
   useEffect(() => {
     if (!canDecide) {
       setDecisionMessage("");
     }
   }, [canDecide]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const titleBeforeMount = document.title;
+    const formatPrintedAt = () =>
+      new Intl.DateTimeFormat("en-US", {
+        month: "numeric",
+        day: "numeric",
+        year: "2-digit",
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(new Date());
+
+    const setPrintContext = () => {
+      setPrintTimestamp(formatPrintedAt());
+    };
+
+    const handleBeforePrint = () => {
+      setPrintContext();
+      document.title = "";
+    };
+
+    const handleAfterPrint = () => {
+      document.title = titleBeforeMount;
+    };
+
+    setPrintContext();
+    window.addEventListener("beforeprint", handleBeforePrint);
+    window.addEventListener("afterprint", handleAfterPrint);
+
+    return () => {
+      window.removeEventListener("beforeprint", handleBeforePrint);
+      window.removeEventListener("afterprint", handleAfterPrint);
+      document.title = titleBeforeMount;
+    };
+  }, []);
 
   useEffect(() => {
     async function loadChangeOrder() {
@@ -136,99 +209,174 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
   }
 
   return (
-    <section className={styles.preview}>
-      {statusMessage ? <p className={styles.statusMessage}>{statusMessage}</p> : null}
-
+    <PublicDocumentViewerShell
+      classNames={publicDocumentViewerClassNames()}
+      statusMessage={statusMessage}
+      banner={
+        changeOrder
+          ? {
+              tone: canDecide ? "pending" : "complete",
+              eyebrow: "Decision",
+              text: canDecide
+                ? "Ready to sign? Jump to the decision section and submit your response."
+                : nonPendingDecisionMessage,
+              linkHref: canDecide ? "#change-order-decision" : undefined,
+              linkLabel: canDecide ? "Review & Sign" : undefined,
+              stateClassName: canDecide ? styles.decisionBannerAwaiting : styles.decisionBannerSettled,
+            }
+          : undefined
+      }
+    >
       {changeOrder ? (
         <>
-          <section
-            className={`${styles.publicDecisionBanner} ${
-              canDecide ? styles.publicDecisionBannerPending : styles.publicDecisionBannerComplete
-            }`}
-          >
-            <div className={styles.publicDecisionBannerBody}>
-              <p className={styles.publicDecisionBannerEyebrow}>Decision</p>
-              {canDecide ? (
-                <p className={styles.publicDecisionBannerText}>
-                  Ready to sign? Jump to the decision section and submit your response.
-                </p>
-              ) : (
-                <p className={styles.publicDecisionBannerText}>{nonPendingDecisionMessage}</p>
-              )}
-            </div>
-            {canDecide ? (
-              <a href="#change-order-decision" className={styles.publicDecisionBannerLink}>
-                Review & Sign
-              </a>
-            ) : null}
-          </section>
-
-          <header className={styles.header}>
-            <div>
-              <p className={styles.eyebrow}>Change Order</p>
-              <h2 className={styles.title}>
-                CO-{changeOrder.family_key} v{changeOrder.revision_number}
-              </h2>
-              <p className={styles.subhead}>{changeOrder.title}</p>
-              <p className={styles.subhead}>
-                {changeOrder.project_context?.name} · {changeOrder.project_context?.customer_display_name}
-              </p>
-            </div>
-            <div className={styles.headerRight}>
-              <span className={`${styles.statusBadge} ${statusClass(changeOrder.status)}`}>
-                {statusLabel(changeOrder.status)}
-              </span>
-              <strong className={styles.totalDelta}>${formatMoney(changeOrder.amount_delta)}</strong>
-              <span className={styles.deltaMeta}>Schedule delta: {changeOrder.days_delta} day(s)</span>
-            </div>
-          </header>
-
-          {changeOrder.origin_estimate_context ? (
-            <div className={styles.contextRow}>
-              Origin estimate: #{changeOrder.origin_estimate_context.id} · v
-              {changeOrder.origin_estimate_context.version} · {changeOrder.origin_estimate_context.title}
-            </div>
-          ) : null}
-
-          <section className={styles.lineSection}>
-            <h3>Line Items</h3>
-            {changeOrder.line_items?.length ? (
-              <div className={styles.tableWrap}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>Type</th>
-                      <th>Budget Line</th>
-                      <th>Description</th>
-                      <th>Amount Delta</th>
-                      <th>Days Delta</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {changeOrder.line_items.map((line) => (
-                      <tr key={line.id}>
-                        <td>{line.line_type === "adjustment" ? "Adjustment" : "Scope"}</td>
-                        <td>
-                          #{line.budget_line} {line.budget_line_cost_code}
-                        </td>
-                        <td>{line.description || line.budget_line_description}</td>
-                        <td>${formatMoney(line.amount_delta)}</td>
-                        <td>{line.days_delta}</td>
-                      </tr>
+          <PublicDocumentFrame
+            headerLeft={
+              <>
+                <section className={frameStyles.partyBlock}>
+                  <p className={frameStyles.partyLabel}>From</p>
+                  <p className={frameStyles.partyPrimary}>{sender.senderName || sender.companyName}</p>
+                  {sender.senderEmail ? (
+                    <p className={frameStyles.partySecondary}>{sender.senderEmail}</p>
+                  ) : null}
+                  {sender.senderAddressLines.length ? (
+                    sender.senderAddressLines.map((line, index) => (
+                      <p key={`sender-${line}-${index}`} className={frameStyles.partySecondary}>
+                        {line}
+                      </p>
+                    ))
+                  ) : (
+                    <p className={frameStyles.partySecondary}>Set sender address in Organization settings.</p>
+                  )}
+                </section>
+                <section className={frameStyles.partyBlock}>
+                  <p className={frameStyles.partyLabel}>To</p>
+                  <p className={frameStyles.partyPrimary}>{recipient.name}</p>
+                  {recipient.email ? (
+                    <p className={frameStyles.partySecondary}>{recipient.email}</p>
+                  ) : null}
+                  {recipient.phone ? (
+                    <p className={frameStyles.partySecondary}>{recipient.phone}</p>
+                  ) : null}
+                  {recipient.addressLines.length ? (
+                    recipient.addressLines.map((line, index) => (
+                      <p key={`${line}-${index}`} className={frameStyles.partySecondary}>
+                        {line}
+                      </p>
+                    ))
+                  ) : (
+                    <p className={frameStyles.partySecondary}>Billing address unavailable.</p>
+                  )}
+                </section>
+              </>
+            }
+            headerRight={
+              <>
+                <div className={frameStyles.logoBox}>
+                  {sender.logoUrl ? (
+                    <img
+                      className={frameStyles.logoImage}
+                      src={sender.logoUrl}
+                      alt={`${sender.companyName} logo`}
+                    />
+                  ) : (
+                    <p className={frameStyles.logoPlaceholder}>No logo URL set</p>
+                  )}
+                </div>
+                <div>
+                  <p className={frameStyles.identityEyebrow}>Change Order</p>
+                  <h2 className={frameStyles.identityTitle}>{changeOrder.title || "Untitled Change Order"}</h2>
+                  <p className={frameStyles.identitySubhead}>
+                    {(changeOrder.project_context?.name || "Project") +
+                      ` · CO-${changeOrder.family_key} v${changeOrder.revision_number}`}
+                  </p>
+                </div>
+                <div className={frameStyles.identityMetaRow}>
+                  {changeOrder.origin_estimate_context?.public_ref ? (
+                    <a
+                      className={frameStyles.metaLink}
+                      href={publicEstimateHref(changeOrder.origin_estimate_context.public_ref)}
+                    >
+                      View Related Estimate
+                    </a>
+                  ) : null}
+                </div>
+                <hr className={frameStyles.identityDivider} />
+                <section className={`${frameStyles.metaDetails} ${styles.detailsPanel}`}>
+                  <h4 className={frameStyles.metaDetailsTitle}>Change Order Details</h4>
+                  <div className={frameStyles.metaDetailsRow}>
+                    <span>CO #</span>
+                    <span>CO-{changeOrder.family_key}</span>
+                  </div>
+                  <div className={frameStyles.metaDetailsRow}>
+                    <span>Version</span>
+                    <span>v{changeOrder.revision_number}</span>
+                  </div>
+                  <div className={frameStyles.metaDetailsRow}>
+                    <span>Status</span>
+                    <span>{decisionStatusLabel}</span>
+                  </div>
+                  <div className={frameStyles.metaDetailsRow}>
+                    <span>Updated</span>
+                    <span>{formatDisplayDateTime(changeOrder.updated_at)}</span>
+                  </div>
+                </section>
+              </>
+            }
+            lineTitle="Line Items"
+            columns={["Budget Line", "Description", "Amount Delta", "Days Delta"]}
+            rows={(changeOrder.line_items ?? []).map((line) => ({
+              key: line.id,
+              cells: [
+                `#${line.budget_line} ${line.budget_line_cost_code}`,
+                line.description || line.budget_line_description,
+                `$${formatMoney(line.amount_delta)}`,
+                line.days_delta,
+              ],
+            }))}
+            afterLineSection={
+              <>
+                <div className={frameStyles.panelGrid}>
+                  <section className={styles.reasonPanel}>
+                    <h4 className={`${frameStyles.panelTitle} ${styles.reasonTitle}`}>Reason</h4>
+                    <p className={styles.reasonBody}>{changeOrder.reason || reasonFallback}</p>
+                  </section>
+                  <section className={frameStyles.panelCard}>
+                    <h4 className={frameStyles.panelTitle}>Totals</h4>
+                    <div className={styles.totalRow}>
+                      <span>Line delta</span>
+                      <strong>${formatMoney(changeOrder.amount_delta)}</strong>
+                    </div>
+                    <div className={styles.totalRow}>
+                      <span>Schedule delta</span>
+                      <strong>{changeOrder.days_delta} day(s)</strong>
+                    </div>
+                  </section>
+                </div>
+                <div className={frameStyles.terms}>
+                  <h4>Terms and Conditions</h4>
+                  {termsText
+                    .split("\n")
+                    .filter((line) => line.trim())
+                    .map((line, index) => (
+                      <p key={`co-terms-${line}-${index}`}>{line}</p>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className={styles.emptyHint}>No line items available.</p>
-            )}
-          </section>
-
-          <section className={styles.reasonCard}>
-            <h4>Reason</h4>
-            <p>{changeOrder.reason || "No reason provided."}</p>
-            <p className={styles.updatedText}>Updated {formatDateDisplay(changeOrder.updated_at, "Unknown date")}</p>
-          </section>
+                </div>
+              </>
+            }
+            footer={
+              <footer>
+                <div className={frameStyles.footerRow}>
+                  <span>{sender.companyName}</span>
+                  <span>{sender.helpEmail || "Help email not set"}</span>
+                  <span>{changeOrder.public_ref || publicToken}</span>
+                </div>
+                <div className={frameStyles.printFooter}>
+                  <span>{printTimestamp}</span>
+                  <span>{changeOrder.public_ref || publicToken}</span>
+                </div>
+              </footer>
+            }
+          />
 
           {showDecisionSection ? (
             <section id="change-order-decision" className={`${styles.decisionCard} ${styles.publicDecisionSection}`}>
@@ -284,6 +432,6 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
           ) : null}
         </>
       ) : null}
-    </section>
+    </PublicDocumentViewerShell>
   );
 }

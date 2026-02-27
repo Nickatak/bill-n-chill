@@ -9,6 +9,7 @@ export type OrganizationProfile = {
   logo_url: string;
   invoice_sender_name: string;
   invoice_sender_email: string;
+  help_email: string;
   invoice_sender_address: string;
   invoice_default_due_days: number;
   estimate_validation_delta_days: number;

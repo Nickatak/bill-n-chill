@@ -31,7 +31,10 @@ from core.views.helpers import (
     _next_change_order_family_key,
     _organization_user_ids,
     _record_financial_audit_event,
+    _resolve_organization_for_public_actor,
     _role_gate_error_payload,
+    _serialize_public_organization_context,
+    _serialize_public_project_context,
     _validate_project_for_user,
 )
 
@@ -52,18 +55,15 @@ def _build_public_decision_note(
 
 def _serialize_public_change_order(change_order: ChangeOrder) -> dict:
     serialized = ChangeOrderSerializer(change_order).data
-    serialized["project_context"] = {
-        "id": change_order.project.id,
-        "name": change_order.project.name,
-        "status": change_order.project.status,
-        "customer_display_name": change_order.project.customer.display_name,
-        "customer_billing_address": change_order.project.customer.billing_address,
-    }
+    organization = _resolve_organization_for_public_actor(change_order.requested_by)
+    serialized["project_context"] = _serialize_public_project_context(change_order.project)
+    serialized["organization_context"] = _serialize_public_organization_context(organization)
     if change_order.origin_estimate_id:
         serialized["origin_estimate_context"] = {
             "id": change_order.origin_estimate_id,
             "title": change_order.origin_estimate.title,
             "version": change_order.origin_estimate.version,
+            "public_ref": change_order.origin_estimate.public_ref,
         }
     return serialized
 

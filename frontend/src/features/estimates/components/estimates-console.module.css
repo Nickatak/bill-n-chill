@@ -308,7 +308,40 @@
 .composerPrep {
   display: grid;
   gap: 10px;
-  justify-items: end;
+  justify-items: stretch;
+}
+
+.workspaceToolbar {
+  display: grid;
+  gap: 8px 12px;
+  align-items: start;
+}
+
+.workspaceContext {
+  display: grid;
+  gap: 2px;
+  color: var(--text-primary);
+}
+
+.workspaceContextLabel {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.workspaceContextValueRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.workspaceToolbarHint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
 }
 
 .composerPrepActions {
@@ -2060,4 +2093,26 @@
   background: #0b1220;
   border-color: #334155;
   color: #bfdbfe;
+}
+
+.publicDetailsPanel {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.decisionBannerAwaiting {
+}
+
+.decisionBannerSettled {
+}
+
+@media print {
+  .decisionBannerAwaiting {
+    display: none;
+  }
+
+  .publicDecisionSection {
+    display: none;
+  }
 }

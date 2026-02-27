@@ -12,9 +12,47 @@ function parsePublicToken(publicRef: string): string | null {
   return match ? match[1] : null;
 }
 
-export const metadata: Metadata = {
-  title: "Invoice",
-};
+const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+
+async function loadPublicInvoiceTitle(publicToken: string): Promise<string | null> {
+  const normalizedBaseUrl = defaultApiBaseUrl.trim().replace(/\/$/, "");
+  try {
+    const response = await fetch(`${normalizedBaseUrl}/public/invoices/${publicToken}/`, {
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const payload = (await response.json()) as {
+      data?: { invoice_number?: string; project_context?: { name?: string }; id?: number };
+    };
+    const invoiceNumber = payload.data?.invoice_number?.trim();
+    if (invoiceNumber) {
+      return invoiceNumber;
+    }
+    const invoiceId = payload.data?.id;
+    if (typeof invoiceId === "number") {
+      return `Invoice #${invoiceId}`;
+    }
+    const projectName = payload.data?.project_context?.name?.trim();
+    if (projectName) {
+      return `${projectName} Invoice`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function generateMetadata({ params }: InvoiceReviewPageProps): Promise<Metadata> {
+  const { publicRef } = await params;
+  const publicToken = parsePublicToken(publicRef);
+  if (!publicToken) {
+    return { title: "Invoice" };
+  }
+  const resolvedTitle = await loadPublicInvoiceTitle(publicToken);
+  return { title: resolvedTitle ? `${resolvedTitle} | Invoice` : "Invoice" };
+}
 
 export default async function InvoiceReviewPage({ params }: InvoiceReviewPageProps) {
   const { publicRef } = await params;

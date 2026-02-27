@@ -37,36 +37,6 @@
   max-width: 68ch;
 }
 
-.consoleStats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.consoleStatCard {
-  border: 1px solid #d7e2f0;
-  border-radius: 12px;
-  padding: 10px 12px;
-  background: #ffffff;
-  display: grid;
-  gap: 4px;
-}
-
-.consoleStatLabel {
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #64748b;
-  font-weight: 700;
-}
-
-.consoleStatValue {
-  color: #0f172a;
-  font-size: 1.02rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
 .primaryCreateButton {
   border: 1px solid #1e3a8a;
   border-radius: 10px;
@@ -127,6 +97,12 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.formContextHint {
+  margin: 0;
+  color: #475569;
+  font-size: 0.82rem;
 }
 
 .editStatusBadge {
@@ -219,13 +195,6 @@
   margin: 8px 0 10px;
   color: #475569;
   font-size: 0.88rem;
-}
-
-.viewerBaselineSummary {
-  margin: 0;
-  font-size: 0.8rem;
-  color: #1e3a8a;
-  font-weight: 600;
 }
 
 .viewerGrid {
@@ -444,19 +413,6 @@
 .viewerBaselineHintWarning {
   background: #fffbeb;
   border-color: #fcd34d;
-  color: #92400e;
-}
-
-.viewerToggleRow {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: #475569;
-  font-size: 0.79rem;
-  font-weight: 600;
-}
-
-.viewerWarningHint {
   color: #92400e;
 }
 
@@ -939,15 +895,7 @@
 
 .coLineHeader {
   display: grid;
-  grid-template-columns:
-    minmax(120px, 0.9fr)
-    minmax(180px, 1.2fr)
-    minmax(190px, 1.2fr)
-    minmax(220px, 1.4fr)
-    150px
-    140px
-    120px
-    90px;
+  grid-template-columns: 0.85fr 1.2fr 1.2fr 1.45fr 1fr 0.9fr 0.9fr 0.7fr;
   gap: 8px;
   align-items: center;
   padding: 10px;
@@ -957,25 +905,20 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
-  min-width: 1380px;
 }
 
 .coLineRow {
   display: grid;
-  grid-template-columns:
-    minmax(120px, 0.9fr)
-    minmax(180px, 1.2fr)
-    minmax(190px, 1.2fr)
-    minmax(220px, 1.4fr)
-    150px
-    140px
-    120px
-    90px;
+  grid-template-columns: 0.85fr 1.2fr 1.2fr 1.45fr 1fr 0.9fr 0.9fr 0.7fr;
   gap: 8px;
   align-items: center;
   padding: 9px 10px;
   background: #ffffff;
-  min-width: 1380px;
+}
+
+.coLineHeader > span,
+.coLineRow > * {
+  min-width: 0;
 }
 
 .coLineRowGroup {
@@ -1110,10 +1053,6 @@
 }
 
 @media (min-width: 980px) {
-  .consoleStats {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
   .viewerGrid {
     grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
   }
@@ -1155,10 +1094,6 @@
 
   .consoleHeading {
     font-size: 1rem;
-  }
-
-  .consoleStats {
-    grid-template-columns: 1fr;
   }
 
   .formToolbar {
@@ -1237,19 +1172,6 @@
   color: #cbd5e1;
 }
 
-:global(html[data-theme="dark"]) .consoleStatCard {
-  border-color: #334155;
-  background: #0b1220;
-}
-
-:global(html[data-theme="dark"]) .consoleStatLabel {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .consoleStatValue {
-  color: #f1f5f9;
-}
-
 :global(html[data-theme="dark"]) .primaryCreateButton {
   border-color: #3b82f6;
   color: #dbeafe;
@@ -1260,6 +1182,10 @@
 }
 
 :global(html[data-theme="dark"]) .formContextLabel {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .formContextHint {
   color: #94a3b8;
 }
 
@@ -1278,10 +1204,6 @@
 
 :global(html[data-theme="dark"]) .viewerHeader p {
   color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .viewerBaselineSummary {
-  color: #93c5fd;
 }
 
 :global(html[data-theme="dark"]) .viewerToggleButton {
@@ -1437,14 +1359,6 @@
   background: #451a03;
   border-color: #92400e;
   color: #fcd34d;
-}
-
-:global(html[data-theme="dark"]) .viewerToggleRow {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .viewerWarningHint {
-  color: #fbbf24;
 }
 
 :global(html[data-theme="dark"]) .editStatusDraft {

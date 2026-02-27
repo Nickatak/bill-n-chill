@@ -203,6 +203,9 @@ class ChangeOrderTests(TestCase):
         self.assertTrue(payload["public_ref"].endswith(f"--{change_order.public_token}"))
         self.assertEqual(payload["project_context"]["id"], self.project.id)
         self.assertEqual(payload["project_context"]["customer_display_name"], self.customer.display_name)
+        self.assertIn("organization_context", payload)
+        self.assertIn("sender_name", payload["organization_context"])
+        self.assertIn("help_email", payload["organization_context"])
 
     def test_public_change_order_decision_view_approves_pending_approval(self):
         self._create_active_budget(

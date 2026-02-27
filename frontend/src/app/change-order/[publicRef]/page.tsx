@@ -12,9 +12,43 @@ function parsePublicToken(publicRef: string): string | null {
   return match ? match[1] : null;
 }
 
-export const metadata: Metadata = {
-  title: "Change Order",
-};
+const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+
+async function loadPublicChangeOrderTitle(publicToken: string): Promise<string | null> {
+  const normalizedBaseUrl = defaultApiBaseUrl.trim().replace(/\/$/, "");
+  try {
+    const response = await fetch(`${normalizedBaseUrl}/public/change-orders/${publicToken}/`, {
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const payload = (await response.json()) as {
+      data?: { title?: string; project_context?: { name?: string } };
+    };
+    const changeOrderTitle = payload.data?.title?.trim();
+    if (changeOrderTitle) {
+      return changeOrderTitle;
+    }
+    const projectName = payload.data?.project_context?.name?.trim();
+    if (projectName) {
+      return `${projectName} Change Order`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function generateMetadata({ params }: ChangeOrderPublicPageProps): Promise<Metadata> {
+  const { publicRef } = await params;
+  const publicToken = parsePublicToken(publicRef);
+  if (!publicToken) {
+    return { title: "Change Order" };
+  }
+  const resolvedTitle = await loadPublicChangeOrderTitle(publicToken);
+  return { title: resolvedTitle ? `${resolvedTitle} | Change Order` : "Change Order" };
+}
 
 export default async function ChangeOrderPublicPage({ params }: ChangeOrderPublicPageProps) {
   const { publicRef } = await params;

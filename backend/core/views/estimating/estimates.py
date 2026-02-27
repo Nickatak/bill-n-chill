@@ -32,7 +32,10 @@ from core.views.helpers import (
     _parse_request_bool,
     _record_financial_audit_event,
     _record_estimate_status_event,
+    _resolve_organization_for_public_actor,
     _role_gate_error_payload,
+    _serialize_public_organization_context,
+    _serialize_public_project_context,
     _validate_project_for_user,
 )
 
@@ -43,7 +46,7 @@ def public_estimate_detail_view(request, public_token: str):
     """Return public estimate detail for share links, including lightweight project context."""
     try:
         estimate = (
-            Estimate.objects.select_related("project__customer")
+            Estimate.objects.select_related("project__customer", "created_by")
             .prefetch_related("line_items", "line_items__cost_code")
             .get(public_token=public_token)
         )
@@ -54,13 +57,9 @@ def public_estimate_detail_view(request, public_token: str):
         )
 
     serialized = EstimateSerializer(estimate).data
-    serialized["project_context"] = {
-        "id": estimate.project.id,
-        "name": estimate.project.name,
-        "status": estimate.project.status,
-        "customer_display_name": estimate.project.customer.display_name,
-        "customer_billing_address": estimate.project.customer.billing_address,
-    }
+    organization = _resolve_organization_for_public_actor(estimate.created_by)
+    serialized["project_context"] = _serialize_public_project_context(estimate.project)
+    serialized["organization_context"] = _serialize_public_organization_context(organization)
     return Response({"data": serialized})
 
 
@@ -167,13 +166,9 @@ def public_estimate_decision_view(request, public_token: str):
 
     actor_user_ids = _organization_user_ids(estimate.created_by)
     serialized = _serialize_estimate(estimate=estimate, actor_user_ids=actor_user_ids)
-    serialized["project_context"] = {
-        "id": estimate.project.id,
-        "name": estimate.project.name,
-        "status": estimate.project.status,
-        "customer_display_name": estimate.project.customer.display_name,
-        "customer_billing_address": estimate.project.customer.billing_address,
-    }
+    organization = _resolve_organization_for_public_actor(estimate.created_by)
+    serialized["project_context"] = _serialize_public_project_context(estimate.project)
+    serialized["organization_context"] = _serialize_public_organization_context(organization)
     response_payload = {"data": serialized}
     if budget_conversion_meta:
         response_payload["meta"] = budget_conversion_meta

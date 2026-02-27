@@ -75,14 +75,16 @@ export function DuplicateResolutionPanel({
     ? "Create New Customer + Project Instead"
     : "Create New Customer Instead";
   const helperText = isProjectFlow
-    ? "Choose an existing customer to attach this project, or create a brand-new customer + project."
-    : "Choose an existing customer, or create a brand-new customer instead.";
+    ? "Use an existing customer for this project, or continue by creating a new customer and project."
+    : "Use an existing customer, or continue by creating a new one.";
 
   return (
     <section className={styles.duplicatePanel} aria-label="Duplicate resolution">
       <div className={styles.duplicateHeader}>
-        <h3 className={styles.duplicateTitle}>Possible duplicates found</h3>
-        <span className={styles.duplicateCount}>{duplicateCandidates.length} matches</span>
+        <h3 className={styles.duplicateTitle}>Potential Matches Found</h3>
+        <span className={styles.duplicateCount}>
+          {duplicateCandidates.length} possible {duplicateCandidates.length === 1 ? "match" : "matches"}
+        </span>
       </div>
       <p className={styles.duplicateHint}>{helperText}</p>
       <div className={styles.duplicateList}>

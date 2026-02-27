@@ -6,6 +6,20 @@ export type ProjectRecord = {
   status: string;
   customer_display_name: string;
   customer_billing_address?: string;
+  customer_email?: string;
+  customer_phone?: string;
+};
+
+export type OrganizationPublicContext = {
+  display_name: string;
+  logo_url: string;
+  sender_name: string;
+  sender_email: string;
+  sender_address: string;
+  help_email: string;
+  invoice_default_terms: string;
+  estimate_default_terms: string;
+  change_order_default_reason: string;
 };
 
 export type CostCode = { id: number; code: string; name: string; is_active: boolean };
@@ -28,6 +42,7 @@ export type EstimateRecord = {
   updated_at: string;
   line_items?: EstimateLineItemRecord[];
   project_context?: ProjectRecord;
+  organization_context?: OrganizationPublicContext;
 };
 
 export type EstimateLineItemRecord = {

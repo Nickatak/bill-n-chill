@@ -291,6 +291,19 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       selectedEstimate.status === "approved" &&
       selectedFinancialBaselineStatus !== "active",
   );
+  const workspaceContext = selectedEstimate
+    ? `${selectedEstimate.title || "Untitled"} · #${selectedEstimate.id} v${selectedEstimate.version}`
+    : "New estimate draft";
+  const workspaceBadgeLabel = isEditingDraft
+    ? "Editing existing draft"
+    : selectedEstimate
+      ? `Read-only ${formatEstimateStatus(selectedEstimate.status)}`
+      : "New unsaved draft";
+  const workspaceBadgeClass = isEditingDraft
+    ? styles.statusDraft
+    : selectedEstimate
+      ? statusClasses[selectedEstimate.status] ?? styles.statusArchived
+      : styles.statusDraft;
 
   function formatEstimateStatus(status?: string): string {
     if (!status) {
@@ -317,10 +330,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
   function formatFinancialBaselineStatus(status: FinancialBaselineStatusValue): string {
     if (status === "active") {
-      return "Financial Baseline";
+      return "Active Estimate";
     }
     if (status === "superseded") {
-      return "Superseded Baseline";
+      return "Superseded Estimate";
     }
     return "";
   }
@@ -1261,13 +1274,13 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         const activeId = payload.meta.active_financial_estimate_id;
         setActionMessage(
           activeId
-            ? `Estimate approved. Financial baseline remains on estimate #${activeId}. Activate this estimate to supersede it.`
-            : "Estimate approved. Activate this estimate as the financial baseline.",
+            ? `Estimate approved. Active estimate remains #${activeId}. Set this estimate as active to supersede it.`
+            : "Estimate approved. Set this estimate as the active estimate.",
         );
         return;
       }
       if (budgetConversionStatus === "converted" || budgetConversionStatus === "already_converted") {
-        setActionMessage("Estimate approved and activated as the financial baseline.");
+        setActionMessage("Estimate approved and set as the active estimate.");
         return;
       }
       setActionMessage("");
@@ -1335,9 +1348,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
         const activeId = payload.error?.meta?.active_financial_estimate_id;
-        const message = readApiErrorMessage(payload, "Financial baseline activation failed.");
+        const message = readApiErrorMessage(payload, "Active estimate update failed.");
         setActionMessage(
-          activeId ? `${message} Active baseline is estimate #${activeId}.` : message,
+          activeId ? `${message} Current active estimate is #${activeId}.` : message,
         );
         return;
       }
@@ -1349,14 +1362,14 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       });
       await loadStatusEvents({ estimateId, quiet: true });
       if (conversionStatus === "superseded_and_converted") {
-        setActionMessage("Financial baseline switched to this estimate.");
+        setActionMessage("Active estimate switched to this estimate.");
         return;
       }
       if (conversionStatus === "already_converted") {
-        setActionMessage("This estimate is already the active financial baseline.");
+        setActionMessage("This estimate is already the active estimate.");
         return;
       }
-      setActionMessage("Financial baseline activated from this estimate.");
+      setActionMessage("Active estimate set to this estimate.");
     } catch {
       setActionMessage("Could not reach estimate conversion endpoint.");
     } finally {
@@ -1467,7 +1480,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
               {activeFinancialEstimate ? (
                 <div className={styles.versionBaselineBanner}>
                   <div className={styles.versionBaselineCopy}>
-                    <span className={styles.versionBaselineLabel}>Active Financial Baseline</span>
+                    <span className={styles.versionBaselineLabel}>Active Estimate</span>
                     <span className={styles.versionBaselineValue}>
                       Estimate #{activeFinancialEstimate.id} · v{activeFinancialEstimate.version} ·{" "}
                       {activeFinancialEstimate.title || "Untitled"}
@@ -1475,21 +1488,21 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                   </div>
                   <div className={styles.versionBaselineActions}>
                     {String(activeFinancialEstimate.id) === selectedEstimateId ? (
-                      <span className={styles.versionBaselineSelected}>Viewing baseline</span>
+                      <span className={styles.versionBaselineSelected}>Viewing active estimate</span>
                     ) : (
                       <button
                         type="button"
                         className={styles.versionBaselineJumpButton}
                         onClick={() => handleSelectEstimate(activeFinancialEstimate)}
                       >
-                        Jump to Baseline
+                        Jump to Active Estimate
                       </button>
                     )}
                   </div>
                 </div>
               ) : (
                 <p className={`${styles.inlineHint} ${styles.versionBaselineEmpty}`}>
-                  No active financial baseline is set for this project yet.
+                  No active estimate is set for this project yet.
                 </p>
               )}
               {visibleEstimateFamilies.length > 0 ? (
@@ -1668,11 +1681,11 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
               <>
                 {canActivateSelectedFinancialBaseline ? (
                   <div className={styles.financialActivationPanel}>
-                    <span className={styles.financialActivationLabel}>Financial Baseline</span>
+                    <span className={styles.financialActivationLabel}>Active Estimate</span>
                     <p className={styles.inlineHint}>
                       {selectedFinancialBaselineStatus === "superseded"
                         ? "This estimate was previously active and is now superseded."
-                        : "This approved estimate is not currently active for project financials."}{" "}
+                        : "This approved estimate is not currently the active estimate for this project."}{" "}
                       {activeFinancialEstimate
                         ? `Current active estimate: #${activeFinancialEstimate.id} v${activeFinancialEstimate.version}.`
                         : "No active estimate is currently set."}
@@ -1684,8 +1697,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                       disabled={isActivatingBaseline}
                     >
                       {isActivatingBaseline
-                        ? "Activating Financial Baseline..."
-                        : "Activate Selected Estimate for Financials"}
+                        ? "Setting Active Estimate..."
+                        : "Set as Active Estimate"}
                     </button>
                   </div>
                 ) : null}
@@ -1795,6 +1808,20 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       </section>
 
       <section className={styles.composerPrep}>
+        <div className={styles.workspaceToolbar}>
+          <div className={styles.workspaceContext}>
+            <span className={styles.workspaceContextLabel}>Editing</span>
+            <div className={styles.workspaceContextValueRow}>
+              <strong>{workspaceContext}</strong>
+              <span className={`${styles.versionStatus} ${workspaceBadgeClass}`}>
+                {workspaceBadgeLabel}
+              </span>
+            </div>
+            <p className={styles.workspaceToolbarHint}>
+              Add New Estimate opens a fresh draft workspace. Duplicate creates a new draft from the selected estimate.
+            </p>
+          </div>
+        </div>
         <div className={`${styles.lifecycleActions} ${styles.composerPrepActions}`}>
           <button type="button" onClick={startNewEstimate}>
             Add New Estimate

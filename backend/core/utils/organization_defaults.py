@@ -26,6 +26,7 @@ def build_invoice_profile_defaults(*, display_name: str, owner_email: str = "") 
     return {
         "invoice_sender_name": resolved_display_name,
         "invoice_sender_email": resolved_email,
+        "help_email": resolved_email,
         "invoice_default_due_days": DEFAULT_INVOICE_DUE_DAYS,
         "estimate_validation_delta_days": DEFAULT_ESTIMATE_VALIDATION_DELTA_DAYS,
         "invoice_default_terms": DEFAULT_INVOICE_TERMS,
@@ -57,6 +58,11 @@ def apply_missing_invoice_profile_defaults(*, organization, owner_email: str = "
     if not current_sender_email and defaults["invoice_sender_email"]:
         organization.invoice_sender_email = defaults["invoice_sender_email"]
         changed_fields.append("invoice_sender_email")
+
+    current_help_email = (organization.help_email or "").strip()
+    if not current_help_email and defaults["help_email"]:
+        organization.help_email = defaults["help_email"]
+        changed_fields.append("help_email")
 
     if int(organization.invoice_default_due_days or 0) < 1:
         organization.invoice_default_due_days = DEFAULT_INVOICE_DUE_DAYS

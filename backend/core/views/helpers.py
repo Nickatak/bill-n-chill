@@ -158,6 +158,7 @@ def _build_organization_snapshot(organization: Organization) -> dict:
             "logo_url": organization.logo_url,
             "invoice_sender_name": organization.invoice_sender_name,
             "invoice_sender_email": organization.invoice_sender_email,
+            "help_email": organization.help_email,
             "invoice_sender_address": organization.invoice_sender_address,
             "invoice_default_due_days": organization.invoice_default_due_days,
             "estimate_validation_delta_days": organization.estimate_validation_delta_days,
@@ -281,6 +282,7 @@ def _ensure_primary_membership(user):
             slug=_next_org_slug((user.email or user.username or f"user-{user.id}").split("@")[0]),
             invoice_sender_name=bootstrap_invoice_defaults["invoice_sender_name"],
             invoice_sender_email=bootstrap_invoice_defaults["invoice_sender_email"],
+            help_email=bootstrap_invoice_defaults["help_email"],
             invoice_default_due_days=bootstrap_invoice_defaults["invoice_default_due_days"],
             estimate_validation_delta_days=bootstrap_invoice_defaults[
                 "estimate_validation_delta_days"
@@ -323,7 +325,66 @@ def _ensure_primary_membership(user):
             organization=organization,
             created_by=user,
         )
-        return membership
+    return membership
+
+
+def _resolve_organization_for_public_actor(actor_user):
+    if not actor_user:
+        return None
+    membership = (
+        OrganizationMembership.objects.select_related("organization")
+        .filter(
+            user=actor_user,
+            status=OrganizationMembership.Status.ACTIVE,
+        )
+        .order_by("id")
+        .first()
+    )
+    if membership and membership.organization_id:
+        return membership.organization
+    return Organization.objects.filter(created_by=actor_user).order_by("id").first()
+
+
+def _serialize_public_organization_context(organization: Organization | None) -> dict:
+    if not organization:
+        return {
+            "display_name": "",
+            "logo_url": "",
+            "sender_name": "",
+            "sender_email": "",
+            "sender_address": "",
+            "help_email": "",
+            "invoice_default_terms": "",
+            "estimate_default_terms": "",
+            "change_order_default_reason": "",
+        }
+
+    sender_name = (organization.invoice_sender_name or organization.display_name or "").strip()
+    sender_email = (organization.invoice_sender_email or "").strip()
+    return {
+        "display_name": (organization.display_name or "").strip(),
+        "logo_url": (organization.logo_url or "").strip(),
+        "sender_name": sender_name,
+        "sender_email": sender_email,
+        "sender_address": (organization.invoice_sender_address or "").strip(),
+        "help_email": (organization.help_email or sender_email).strip(),
+        "invoice_default_terms": (organization.invoice_default_terms or "").strip(),
+        "estimate_default_terms": (organization.estimate_default_terms or "").strip(),
+        "change_order_default_reason": (organization.change_order_default_reason or "").strip(),
+    }
+
+
+def _serialize_public_project_context(project: Project) -> dict:
+    customer = project.customer
+    return {
+        "id": project.id,
+        "name": project.name,
+        "status": project.status,
+        "customer_display_name": customer.display_name,
+        "customer_billing_address": customer.billing_address,
+        "customer_email": customer.email,
+        "customer_phone": customer.phone,
+    }
 
 
 def _resolve_user_role(user) -> str:

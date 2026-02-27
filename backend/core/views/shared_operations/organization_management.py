@@ -128,6 +128,13 @@ def organization_profile_view(request):
             changed_fields.append("invoice_sender_email")
             update_fields.append("invoice_sender_email")
 
+    if "help_email" in incoming:
+        help_email = str(incoming.get("help_email") or "").strip()
+        if help_email != organization.help_email:
+            organization.help_email = help_email
+            changed_fields.append("help_email")
+            update_fields.append("help_email")
+
     if "invoice_sender_address" in incoming:
         sender_address = str(incoming.get("invoice_sender_address") or "").strip()
         if sender_address != organization.invoice_sender_address:

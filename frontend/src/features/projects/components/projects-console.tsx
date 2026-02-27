@@ -129,7 +129,7 @@ export function ProjectsConsole() {
   const activeFinancialEstimateDisplay = summary
     ? summary.active_budget_source_estimate_id
       ? `Estimate #${summary.active_budget_source_estimate_id} v${summary.active_budget_source_estimate_version ?? "?"}`
-      : "No active financial baseline"
+      : "No active estimate"
     : "--";
   const activeFinancialBudgetDisplay = summary
     ? summary.active_budget_id
@@ -740,7 +740,7 @@ export function ProjectsConsole() {
             </div>
             <div className={styles.metricsPanel}>
               <div className={styles.baselineCard}>
-                <span className={styles.baselineCardLabel}>Active Financial Baseline</span>
+                <span className={styles.baselineCardLabel}>Active Estimate</span>
                 <strong className={styles.baselineCardValue}>{activeFinancialEstimateDisplay}</strong>
                 <span className={styles.baselineCardMeta}>{activeFinancialBudgetDisplay}</span>
               </div>

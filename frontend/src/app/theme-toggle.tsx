@@ -66,6 +66,10 @@ export function ThemeToggle() {
     router.refresh();
   }
 
+  function printPage() {
+    window.print();
+  }
+
   useEffect(() => {
     let cancelled = false;
 
@@ -203,6 +207,11 @@ export function ThemeToggle() {
             ))}
           </div>
         </details>
+      ) : null}
+      {hasSession || isPublicDocument ? (
+        <button type="button" className="themeControlButton" onClick={printPage}>
+          Print
+        </button>
       ) : null}
       <button type="button" className="themeToggle" onClick={toggleTheme} aria-label="Toggle theme">
         Toggle theme
