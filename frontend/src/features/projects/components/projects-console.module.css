@@ -446,6 +446,7 @@
   background: #f8fafc;
   display: grid;
   gap: 12px;
+  align-content: start;
 }
 
 .treeRoot {
@@ -454,26 +455,19 @@
   padding: 10px 12px;
   background: #ffffff;
   display: grid;
-  gap: 4px;
-}
-
-.rootLabel {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-  color: #1d4ed8;
-  font-weight: 600;
+  gap: 2px;
+  align-self: start;
 }
 
 .rootTitle {
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-size: 1.14rem;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
 .rootTitleRow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
 }
@@ -489,11 +483,6 @@
   font-weight: 600;
   padding: 4px 10px;
   cursor: pointer;
-}
-
-.rootMeta {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
 }
 
 .quickStatusRow {
@@ -676,7 +665,7 @@
   padding: 16px;
   background: #ffffff;
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .baselineCard {
@@ -707,6 +696,22 @@
   font-size: 0.78rem;
   color: #334155;
   font-weight: 500;
+}
+
+.metricSection {
+  display: grid;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.metricSectionTitle {
+  margin: 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  color: #1e3a8a;
+  font-weight: 700;
 }
 
 .metricRow {
@@ -747,6 +752,15 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.projectStatusCurrentLabel {
+  width: 100%;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #475569;
+  font-weight: 700;
 }
 
 .projectStatusPill {
@@ -827,7 +841,6 @@
   border-color: #1f2937;
 }
 
-:global(html[data-theme="dark"]) .rootLabel,
 :global(html[data-theme="dark"]) .branchLabel {
   color: #93c5fd;
 }
@@ -992,4 +1005,16 @@
 
 :global(html[data-theme="dark"]) .baselineCardMeta {
   color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .metricSection {
+  border-top-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .metricSectionTitle {
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .projectStatusCurrentLabel {
+  color: #94a3b8;
 }

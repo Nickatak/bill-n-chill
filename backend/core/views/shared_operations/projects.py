@@ -396,6 +396,29 @@ def project_detail_view(request, project_id: int):
 
     serializer = ProjectProfileSerializer(project, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
+    changed_fields = [
+        field_name
+        for field_name, next_value in serializer.validated_data.items()
+        if getattr(project, field_name) != next_value
+    ]
+    if not changed_fields:
+        fields = {"non_field_errors": ["No project changes detected."]}
+        if "status" in request.data and request.data.get("status") == project.status:
+            fields = {
+                "status": [
+                    f"Project is already {project.status}. Choose a different status or update another field."
+                ]
+            }
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "No project changes detected.",
+                    "fields": fields,
+                }
+            },
+            status=400,
+        )
     next_start_date = serializer.validated_data.get("start_date_planned", project.start_date_planned)
     next_end_date = serializer.validated_data.get("end_date_planned", project.end_date_planned)
     if next_start_date and next_end_date and next_end_date < next_start_date:

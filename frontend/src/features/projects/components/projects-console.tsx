@@ -2,7 +2,7 @@
 
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
@@ -50,6 +50,7 @@ export function ProjectsConsole() {
   const [acceptedEstimateTotal, setAcceptedEstimateTotal] = useState("--");
   const [acceptedChangeOrderDeltaTotal, setAcceptedChangeOrderDeltaTotal] = useState("--");
   const [isProjectProfileOpen, setIsProjectProfileOpen] = useState(false);
+  const projectProfileFormRef = useRef<HTMLFormElement | null>(null);
 
   const [projectName, setProjectName] = useState("");
   const [projectStatus, setProjectStatus] = useState<ProjectStatusValue>("prospect");
@@ -79,8 +80,7 @@ export function ProjectsConsole() {
     ? projectStatusTransitions[selectedProject.status as ProjectStatusValue] ?? []
     : [];
   const allowedProfileStatuses = selectedProject
-    ? [selectedProject.status as ProjectStatusValue, ...allowedNextProjectStatuses]
-        .filter((value, index, source) => source.indexOf(value) === index)
+    ? [...allowedNextProjectStatuses].filter((value, index, source) => source.indexOf(value) === index)
     : [];
   const hasInvalidDateRange = Boolean(startDate && endDate && endDate < startDate);
   const needle = projectSearch.trim().toLowerCase();
@@ -139,6 +139,8 @@ export function ProjectsConsole() {
     ? formatMoneyValue(parseMoneyValue(acceptedContractDisplay) - parseMoneyValue(arOutstandingDisplay))
     : "--";
   const apOutstandingDisplay = summary?.ap_outstanding ?? "--";
+  const apTotalDisplay = summary?.ap_total ?? "--";
+  const apPaidDisplay = summary?.ap_paid ?? "--";
   const invoicedDisplay = summary?.invoiced_to_date ?? "--";
   const paidDisplay = summary?.paid_to_date ?? "--";
   const inboundCreditDisplay = summary?.inbound_unapplied_credit ?? "--";
@@ -151,7 +153,10 @@ export function ProjectsConsole() {
   const activeFinancialBudgetDisplay = summary
     ? summary.active_budget_id
       ? `Budget #${summary.active_budget_id}`
-      : "No active budget"
+      : "Approve an estimate to activate project financials."
+    : "--";
+  const unspentFromAcceptedDisplay = summary
+    ? formatMoneyValue(parseMoneyValue(acceptedContractDisplay) - parseMoneyValue(apOutstandingDisplay))
     : "--";
 
   function parseMoneyValue(value: unknown): number {
@@ -219,6 +224,11 @@ export function ProjectsConsole() {
   function setErrorStatusMessage(message: string) {
     setStatusMessageTone("error");
     setStatusMessage(message);
+  }
+
+  function readApiError(payload: ApiResponse | undefined, fallback: string): string {
+    const message = payload?.error?.message?.trim();
+    return message || fallback;
   }
 
   async function loadProjects() {
@@ -420,6 +430,22 @@ export function ProjectsConsole() {
     setAcceptedChangeOrderDeltaTotal("--");
   }, [selectedProjectId, statusFilteredProjects]);
 
+  useEffect(() => {
+    if (!isProjectProfileOpen || isSelectedProjectTerminal) {
+      return;
+    }
+    const formEl = projectProfileFormRef.current;
+    if (!formEl) {
+      return;
+    }
+    const rect = formEl.getBoundingClientRect();
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const isFullyVisible = rect.top >= 0 && rect.bottom <= viewportHeight;
+    if (!isFullyVisible) {
+      formEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [isProjectProfileOpen, isSelectedProjectTerminal, selectedProjectId]);
+
   function handleSelectProject(project: { id: number }) {
     if (String(project.id) === selectedProjectId) {
       return;
@@ -436,6 +462,18 @@ export function ProjectsConsole() {
     setAcceptedEstimateTotal("--");
     setAcceptedChangeOrderDeltaTotal("--");
     hydrateForm(selected);
+  }
+
+  function toggleProjectProfile() {
+    setIsProjectProfileOpen((current) => {
+      const nextOpen = !current;
+      if (nextOpen && selectedProject) {
+        const currentStatus = selectedProject.status as ProjectStatusValue;
+        const nextStatuses = projectStatusTransitions[currentStatus] ?? [];
+        setProjectStatus(nextStatuses[0] ?? currentStatus);
+      }
+      return nextOpen;
+    });
   }
 
   async function handleSaveProject(event: FormEvent<HTMLFormElement>) {
@@ -466,7 +504,7 @@ export function ProjectsConsole() {
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setErrorStatusMessage("Save failed. Check values and auth token.");
+        setErrorStatusMessage(readApiError(payload, "Save failed. Check values and auth token."));
         return;
       }
 
@@ -493,6 +531,7 @@ export function ProjectsConsole() {
 
       {projects.length > 0 ? (
         <ProjectListViewer
+          title="Choose a project below"
           isExpanded={isProjectListExpanded}
           onToggleExpanded={() => setIsProjectListExpanded((current) => !current)}
           expandedHint="Select a project to open its map, financial snapshot, and downstream actions."
@@ -526,16 +565,9 @@ export function ProjectsConsole() {
 
       {selectedProject ? (
         <section className={styles.overview}>
-          <div className={styles.overviewHeader}>
-            <div>
-              <h3>Project Map</h3>
-              <p>Workflow map: scope control first, then billing execution.</p>
-            </div>
-          </div>
           <div className={styles.overviewGrid}>
             <div className={styles.treePanel}>
               <div className={styles.treeRoot}>
-                <span className={styles.rootLabel}>Project</span>
                 <div className={styles.rootTitleRow}>
                   <span className={styles.rootTitle}>{selectedProject.name}</span>
                   {!isSelectedProjectTerminal ? (
@@ -543,15 +575,12 @@ export function ProjectsConsole() {
                       type="button"
                       className={styles.projectSettingsToggle}
                       aria-expanded={isProjectProfileOpen}
-                      onClick={() => setIsProjectProfileOpen((current) => !current)}
+                      onClick={toggleProjectProfile}
                     >
                       {isProjectProfileOpen ? "Close Settings" : "Edit Project"}
                     </button>
                   ) : null}
                 </div>
-                <span className={styles.rootMeta}>
-                  {formatCustomerName(selectedProject)} • {projectStatusLabel(selectedProject.status)}
-                </span>
               </div>
               <div className={styles.treeBranches}>
                 <div className={styles.branch}>
@@ -645,60 +674,74 @@ export function ProjectsConsole() {
                 <strong className={styles.baselineCardValue}>{activeFinancialEstimateDisplay}</strong>
                 <span className={styles.baselineCardMeta}>{activeFinancialBudgetDisplay}</span>
               </div>
-              <div className={styles.metricRow}>
-                <span>Eyeball / Initial Estimate</span>
-                <strong>{contractOriginalDisplay}</strong>
-              </div>
-              <div className={styles.metricRow}>
-                <span>Accepted Contract Total</span>
-                <strong>{acceptedContractDisplay}</strong>
-              </div>
-              <div className={styles.metricRow}>
-                <span>Accepted CO Delta</span>
-                <strong>{acceptedChangeOrderDeltaTotal}</strong>
-              </div>
-              <hr className={styles.metricsDivider} />
-              <p className={styles.metricHint}>Developer note: lower metrics are staged for iteration.</p>
-              <div className={styles.metricRow}>
-                <span>Invoiced to date</span>
-                <strong>{invoicedDisplay}</strong>
-              </div>
-              <div className={styles.metricRow}>
-                <span>Paid to date</span>
-                <strong>{paidDisplay}</strong>
-              </div>
-              <div className={styles.metricRow}>
-                <span>AR outstanding</span>
-                <strong>{arOutstandingDisplay}</strong>
-              </div>
-              <div className={styles.metricRow}>
-                <span>Not Yet Billed (Accepted - AR Outstanding)</span>
-                <strong>{unbilledFromAcceptedDisplay}</strong>
-              </div>
-              <div className={styles.metricRow}>
-                <span>AP outstanding</span>
-                <strong>{apOutstandingDisplay}</strong>
-              </div>
-              <div className={styles.metricRow}>
-                <span>Inbound credit</span>
-                <strong>{inboundCreditDisplay}</strong>
-              </div>
-              <div className={styles.metricRow}>
-                <span>Outbound credit</span>
-                <strong>{outboundCreditDisplay}</strong>
-              </div>
-              <p className={styles.metricHint}>
-                {summary
-                  ? "Summary auto-refreshed on project selection."
-                  : "Load summary to populate totals."}
-              </p>
+              <section className={styles.metricSection}>
+                <h4 className={styles.metricSectionTitle}>Estimates / Approvals</h4>
+                <div className={styles.metricRow}>
+                  <span>Eyeball / Initial Estimate</span>
+                  <strong>{contractOriginalDisplay}</strong>
+                </div>
+                <div className={styles.metricRow}>
+                  <span>Accepted Contract Total</span>
+                  <strong>{acceptedContractDisplay}</strong>
+                </div>
+                <div className={styles.metricRow}>
+                  <span>Accepted CO Delta</span>
+                  <strong>{acceptedChangeOrderDeltaTotal}</strong>
+                </div>
+              </section>
+              <section className={styles.metricSection}>
+                <h4 className={styles.metricSectionTitle}>Income</h4>
+                <div className={styles.metricRow}>
+                  <span>Invoiced to date</span>
+                  <strong>{invoicedDisplay}</strong>
+                </div>
+                <div className={styles.metricRow}>
+                  <span>Inbound payments to date</span>
+                  <strong>{paidDisplay}</strong>
+                </div>
+                <div className={styles.metricRow}>
+                  <span>Inbound credit</span>
+                  <strong>{inboundCreditDisplay}</strong>
+                </div>
+                <div className={styles.metricRow}>
+                  <span>AR outstanding</span>
+                  <strong>{arOutstandingDisplay}</strong>
+                </div>
+                <div className={styles.metricRow}>
+                  <span>Not Yet Billed (Accepted - AR Outstanding)</span>
+                  <strong>{unbilledFromAcceptedDisplay}</strong>
+                </div>
+              </section>
+              <section className={styles.metricSection}>
+                <h4 className={styles.metricSectionTitle}>Expenses</h4>
+                <div className={styles.metricRow}>
+                  <span>Bills to date</span>
+                  <strong>{apTotalDisplay}</strong>
+                </div>
+                <div className={styles.metricRow}>
+                  <span>Payments out to date</span>
+                  <strong>{apPaidDisplay}</strong>
+                </div>
+                <div className={styles.metricRow}>
+                  <span>Outbound credit</span>
+                  <strong>{outboundCreditDisplay}</strong>
+                </div>
+                <div className={styles.metricRow}>
+                  <span>AP outstanding</span>
+                  <strong>{apOutstandingDisplay}</strong>
+                </div>
+                <div className={styles.metricRow}>
+                  <span>Not Yet Expensed (Accepted - AP Outstanding)</span>
+                  <strong>{unspentFromAcceptedDisplay}</strong>
+                </div>
+              </section>
             </div>
           </div>
         </section>
       ) : null}
 
       {selectedProject && isProjectProfileOpen && !isSelectedProjectTerminal ? (
-        <form className={styles.projectProfileForm} onSubmit={handleSaveProject}>
+        <form ref={projectProfileFormRef} className={styles.projectProfileForm} onSubmit={handleSaveProject}>
           <h3>Project Details</h3>
           <label>
             Project name
@@ -707,6 +750,9 @@ export function ProjectsConsole() {
           <label>
             Status
             <div className={styles.projectStatusPills}>
+              <span className={styles.projectStatusCurrentLabel}>
+                Current: {projectStatusLabel(selectedProject.status)}
+              </span>
               {allowedProfileStatuses.map((statusOption) => {
                 const active = projectStatus === statusOption;
                 return (

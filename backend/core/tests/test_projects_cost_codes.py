@@ -211,6 +211,51 @@ class ProjectProfileTests(TestCase):
         self.assertEqual(immutable_terminal.json()["error"]["code"], "validation_error")
         self.assertIn("status", immutable_terminal.json()["error"]["fields"])
 
+    def test_project_patch_allows_active_on_hold_round_trip(self):
+        to_active = self.client.patch(
+            f"/api/v1/projects/{self.project.id}/",
+            data={"status": "active"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_active.status_code, 200)
+
+        to_on_hold = self.client.patch(
+            f"/api/v1/projects/{self.project.id}/",
+            data={"status": "on_hold"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_on_hold.status_code, 200)
+
+        back_to_active = self.client.patch(
+            f"/api/v1/projects/{self.project.id}/",
+            data={"status": "active"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(back_to_active.status_code, 200)
+
+    def test_project_patch_rejects_noop_same_status_without_other_changes(self):
+        to_active = self.client.patch(
+            f"/api/v1/projects/{self.project.id}/",
+            data={"status": "active"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(to_active.status_code, 200)
+
+        noop_status = self.client.patch(
+            f"/api/v1/projects/{self.project.id}/",
+            data={"status": "active"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(noop_status.status_code, 400)
+        payload = noop_status.json()["error"]
+        self.assertEqual(payload["code"], "validation_error")
+        self.assertIn("status", payload["fields"])
+
     def test_project_patch_rejects_end_date_before_start_date(self):
         response = self.client.patch(
             f"/api/v1/projects/{self.project.id}/",
