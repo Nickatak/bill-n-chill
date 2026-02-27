@@ -518,6 +518,7 @@
     --accent: #93c5fd;
 
     gap: 10px;
+    display: block;
   }
 
   .viewer,
@@ -532,6 +533,11 @@
     border-left: 0;
     border-right: 0;
     background: #ffffff;
+    break-after: avoid-page;
+    page-break-after: avoid;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 10px;
   }
 
   .bannerLink {
@@ -548,6 +554,7 @@
   }
 
   .card {
+    border-top: 0;
     border-left: 0;
     border-right: 0;
     padding: 12px 0;
@@ -555,10 +562,7 @@
   }
 
   .logoBox {
-    border-style: solid;
-    border-radius: 0;
-    padding: 6px 8px;
-    min-height: 0;
+    display: none;
   }
 
   .metaLink {
@@ -603,6 +607,26 @@
     background: #ffffff;
   }
 
+  .header {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    align-items: start;
+    gap: 20px;
+  }
+
+  .identityColumn {
+    justify-items: end;
+  }
+
+  .identityEyebrow,
+  .identityTitle,
+  .identitySubhead {
+    text-align: right;
+  }
+
+  .identityMetaRow {
+    justify-content: flex-end;
+  }
+
   .panelGrid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 0.55fr);
     break-inside: avoid;
@@ -624,5 +648,20 @@
     padding-top: 8px;
     font-size: 0.74rem;
     word-break: break-all;
+  }
+
+  .footerRow {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    border-top: 1px solid #9ca3af;
+    padding-top: 8px;
+  }
+
+  .footerRow span:nth-child(2) {
+    text-align: right;
+  }
+
+  .footerRow span:nth-child(3) {
+    display: none;
   }
 }
