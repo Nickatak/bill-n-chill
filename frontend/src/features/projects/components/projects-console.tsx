@@ -6,8 +6,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
-import { formatDateDisplay } from "../../../shared/date-format";
 import styles from "./projects-console.module.css";
+import invoiceStyles from "../../invoices/components/invoices-console.module.css";
 import { ApiResponse, ProjectFinancialSummary, ProjectRecord } from "../types";
 
 type ProjectStatusValue = "prospect" | "active" | "on_hold" | "completed" | "cancelled";
@@ -34,6 +34,7 @@ export function ProjectsConsole() {
     defaultProjectStatusFilters,
   );
   const [currentProjectPage, setCurrentProjectPage] = useState(1);
+  const [isProjectListExpanded, setIsProjectListExpanded] = useState(true);
   const [summary, setSummary] = useState<ProjectFinancialSummary | null>(null);
   const [estimateStatusCounts, setEstimateStatusCounts] = useState<{
     draft: number;
@@ -168,6 +169,14 @@ export function ProjectsConsole() {
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
       .join("")}`;
     return styles[key] ?? "";
+  }
+
+  function projectStatusListClass(statusValue: string): string {
+    const key = `projectStatus${statusValue
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join("")}`;
+    return invoiceStyles[key] ?? "";
   }
 
   function projectStatusLabel(statusValue: string): string {
@@ -487,134 +496,149 @@ export function ProjectsConsole() {
       ) : null}
 
       {projects.length > 0 ? (
-        <section>
-          <h3>Project List</h3>
-          <p>Select a project to open its map, financial snapshot, and downstream actions.</p>
-          <label className={styles.searchField}>
-            Search projects
-            <input
-              value={projectSearch}
-              onChange={(event) => setProjectSearch(event.target.value)}
-              placeholder="ID, name, customer, or status"
-            />
-          </label>
-          <div className={styles.projectFilters}>
-            <span className={styles.projectFiltersLabel}>Project status filter</span>
-            <div className={styles.projectFilterButtons}>
-              {(["prospect", "active", "on_hold", "cancelled", "completed"] as ProjectStatusValue[]).map(
-                (statusValue) => {
-                  const active = projectStatusFilters.includes(statusValue);
-                  return (
+        <section className={invoiceStyles.controlBar}>
+          <div className={invoiceStyles.projectSelector}>
+            <div className={invoiceStyles.panelHeader}>
+              <h3>Project List</h3>
+              <div className={invoiceStyles.panelHeaderActions}>
+                <span className={invoiceStyles.countBadge}>
+                  {statusFilteredProjects.length}/{projects.length}
+                </span>
+                <button
+                  type="button"
+                  className={invoiceStyles.panelToggleButton}
+                  onClick={() => setIsProjectListExpanded((current) => !current)}
+                  aria-expanded={isProjectListExpanded}
+                >
+                  {isProjectListExpanded ? "Collapse" : "Expand"}
+                </button>
+              </div>
+            </div>
+            {isProjectListExpanded ? (
+              <>
+                <p className={invoiceStyles.inlineHint}>
+                  Select a project to open its map, financial snapshot, and downstream actions.
+                </p>
+                <label className={invoiceStyles.searchField}>
+                  <span>Search projects</span>
+                  <input
+                    value={projectSearch}
+                    onChange={(event) => setProjectSearch(event.target.value)}
+                    placeholder="Search by id, name, customer, or status"
+                  />
+                </label>
+                <div className={invoiceStyles.projectFilters}>
+                  <span className={invoiceStyles.projectFiltersLabel}>Project status filter</span>
+                  <div className={invoiceStyles.projectFilterButtons}>
+                    {(["prospect", "active", "on_hold", "completed", "cancelled"] as ProjectStatusValue[]).map(
+                      (statusValue) => {
+                        const active = projectStatusFilters.includes(statusValue);
+                        return (
+                          <button
+                            key={statusValue}
+                            type="button"
+                            className={`${invoiceStyles.projectFilterButton} ${
+                              active
+                                ? `${invoiceStyles.projectFilterButtonActive} ${projectStatusListClass(statusValue)}`
+                                : invoiceStyles.projectFilterButtonInactive
+                            }`}
+                            aria-pressed={active}
+                            onClick={() => toggleProjectStatusFilter(statusValue)}
+                          >
+                            {projectStatusLabel(statusValue)}
+                          </button>
+                        );
+                      },
+                    )}
+                  </div>
+                  <div className={invoiceStyles.projectFilterActions}>
                     <button
-                      key={statusValue}
                       type="button"
-                      className={`${styles.projectFilterButton} ${
-                        active ? projectStatusClass(statusValue) : styles.projectFilterButtonInactive
-                      } ${active ? styles.projectFilterButtonActive : ""}`}
-                      aria-pressed={active}
-                      onClick={() => toggleProjectStatusFilter(statusValue)}
+                      className={invoiceStyles.projectFilterActionButton}
+                      onClick={() =>
+                        setProjectStatusFilters(["active", "on_hold", "prospect", "completed", "cancelled"])
+                      }
                     >
-                      {projectStatusLabel(statusValue)}
+                      Show all projects
                     </button>
-                  );
-                },
-              )}
-            </div>
-            <div className={styles.projectFilterActions}>
-              <button
-                type="button"
-                className={styles.projectFilterActionButton}
-                onClick={() =>
-                  setProjectStatusFilters(["active", "on_hold", "prospect", "completed", "cancelled"])
-                }
-              >
-                Show All Projects
-              </button>
-              <button
-                type="button"
-                className={styles.projectFilterActionButton}
-                onClick={() => setProjectStatusFilters(defaultProjectStatusFilters)}
-              >
-                Reset Filters
-              </button>
-            </div>
-          </div>
-          <div className={styles.projectTableWrap}>
-            <table className={styles.projectTable}>
-              <thead>
-                <tr>
-                  <th>Project</th>
-                  <th>Customer</th>
-                  <th>Status</th>
-                  <th>Workflow</th>
-                  <th>Accepted Contract Total</th>
-                  <th>Start</th>
-                  <th>End</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pagedProjects.map((project) => {
-                  const isActive = String(project.id) === selectedProjectId;
-                  const startLabel = formatDateDisplay(project.start_date_planned, "TBD");
-                  const endLabel = formatDateDisplay(project.end_date_planned, "TBD");
-                  return (
-                    <tr
-                      key={project.id}
-                      className={`${styles.projectRow} ${isActive ? styles.projectRowActive : ""}`}
-                      onClick={() => handleSelectProject(project)}
+                    <button
+                      type="button"
+                      className={invoiceStyles.projectFilterActionButton}
+                      onClick={() => setProjectStatusFilters(defaultProjectStatusFilters)}
                     >
-                      <td>
-                        <div className={styles.projectCellTitle}>
-                          <strong>
-                            #{project.id} {project.name}
-                          </strong>
-                        </div>
-                      </td>
-                      <td>{formatCustomerName(project)}</td>
-                      <td>
-                        <span className={`${styles.projectStatus} ${projectStatusClass(project.status)}`}>
-                          {project.status}
-                        </span>
-                      </td>
-                      <td>
-                        <Link
-                          href={`/projects/${project.id}/estimates`}
-                          className={styles.projectActionLink}
-                        >
-                          Open Estimates
-                        </Link>
-                      </td>
-                      <td>{project.accepted_contract_total}</td>
-                      <td>{startLabel}</td>
-                      <td>{endLabel}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            <div className={styles.projectPagination}>
-              <button
-                type="button"
-                onClick={() => setCurrentProjectPage((page) => Math.max(1, page - 1))}
-                disabled={currentProjectPageSafe <= 1}
-              >
-                Prev
-              </button>
-              <span>
-                Page {currentProjectPageSafe} of {totalProjectPages}
-              </span>
-              <button
-                type="button"
-                onClick={() => setCurrentProjectPage((page) => Math.min(totalProjectPages, page + 1))}
-                disabled={currentProjectPageSafe >= totalProjectPages}
-              >
-                Next
-              </button>
-            </div>
+                      Reset default
+                    </button>
+                  </div>
+                </div>
+                <div className={invoiceStyles.projectTableWrap}>
+                  <table className={invoiceStyles.projectTable}>
+                    <thead>
+                      <tr>
+                        <th>Project</th>
+                        <th>Customer</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagedProjects.length ? (
+                        pagedProjects.map((project) => {
+                          const isActive = String(project.id) === selectedProjectId;
+                          return (
+                            <tr
+                              key={project.id}
+                              className={`${invoiceStyles.projectRow} ${isActive ? invoiceStyles.projectRowActive : ""}`}
+                              onClick={() => handleSelectProject(project)}
+                            >
+                              <td className={invoiceStyles.projectCellTitle}>
+                                <strong>#{project.id}</strong> {project.name}
+                              </td>
+                              <td>{formatCustomerName(project)}</td>
+                              <td>
+                                <span className={`${invoiceStyles.projectStatus} ${projectStatusListClass(project.status)}`}>
+                                  {projectStatusLabel(project.status)}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={3} className={invoiceStyles.projectEmptyCell}>
+                            No projects match your filters.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                  <div className={invoiceStyles.projectPagination}>
+                    <button
+                      type="button"
+                      className={invoiceStyles.projectFilterActionButton}
+                      onClick={() => setCurrentProjectPage((page) => Math.max(1, page - 1))}
+                      disabled={currentProjectPageSafe <= 1}
+                    >
+                      Prev
+                    </button>
+                    <span>
+                      Page {currentProjectPageSafe} of {totalProjectPages}
+                    </span>
+                    <button
+                      type="button"
+                      className={invoiceStyles.projectFilterActionButton}
+                      onClick={() => setCurrentProjectPage((page) => Math.min(totalProjectPages, page + 1))}
+                      disabled={currentProjectPageSafe >= totalProjectPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className={invoiceStyles.inlineHint}>
+                Project list collapsed. Expand to search, filter, or select a project.
+              </p>
+            )}
           </div>
-          {statusFilteredProjects.length === 0 ? (
-            <p className={styles.searchEmpty}>No projects match your search/filter.</p>
-          ) : null}
         </section>
       ) : null}
 
