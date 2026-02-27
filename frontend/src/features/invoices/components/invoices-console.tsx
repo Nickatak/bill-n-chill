@@ -348,6 +348,7 @@ export function InvoicesConsole() {
   const [currentProjectPage, setCurrentProjectPage] = useState(1);
   const [isProjectListExpanded, setIsProjectListExpanded] = useState(true);
   const [isInvoiceViewerExpanded, setIsInvoiceViewerExpanded] = useState(true);
+  const [hasAutoSelectedProjectWithInvoices, setHasAutoSelectedProjectWithInvoices] = useState(false);
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -527,6 +528,7 @@ export function InvoicesConsole() {
         )?.organization;
 
         setProjects(projectRows);
+        setHasAutoSelectedProjectWithInvoices(false);
         if (orgRes.ok && organizationData) {
           setOrganizationInvoiceDefaults(organizationData);
           setDueDate(dueDateFromIssueDate(issueDate, organizationData.invoice_default_due_days || 30));
@@ -773,6 +775,69 @@ export function InvoicesConsole() {
     void loadInvoices(projectId);
     void loadBudgetLineOptions(projectId);
   }, [loadBudgetLineOptions, loadInvoices, selectedProjectId, token]);
+
+  useEffect(() => {
+    if (!token || scopedProjectId || hasAutoSelectedProjectWithInvoices) {
+      return;
+    }
+    if (!selectedProjectId || invoices.length > 0) {
+      return;
+    }
+    if (statusFilteredProjects.length <= 1) {
+      return;
+    }
+
+    const selectedProjectIdNumber = Number(selectedProjectId);
+    if (!selectedProjectIdNumber) {
+      return;
+    }
+
+    let cancelled = false;
+    setHasAutoSelectedProjectWithInvoices(true);
+
+    async function selectFirstProjectWithInvoices() {
+      for (const project of statusFilteredProjects) {
+        if (project.id === selectedProjectIdNumber) {
+          continue;
+        }
+        try {
+          const response = await fetch(`${normalizedBaseUrl}/projects/${project.id}/invoices/`, {
+            headers: buildAuthHeaders(token),
+          });
+          const payload: ApiResponse = await response.json();
+          if (!response.ok) {
+            continue;
+          }
+          const rows = (payload.data as InvoiceRecord[]) ?? [];
+          if (!rows.length) {
+            continue;
+          }
+          if (cancelled) {
+            return;
+          }
+          setSelectedProjectId(String(project.id));
+          setSuccessStatus(`Loaded ${project.name} because it has invoices.`);
+          return;
+        } catch {
+          // Best effort fallback; continue probing.
+        }
+      }
+    }
+
+    void selectFirstProjectWithInvoices();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    hasAutoSelectedProjectWithInvoices,
+    invoices.length,
+    normalizedBaseUrl,
+    scopedProjectId,
+    selectedProjectId,
+    setSuccessStatus,
+    statusFilteredProjects,
+    token,
+  ]);
 
   useEffect(() => {
     setCurrentProjectPage(1);
