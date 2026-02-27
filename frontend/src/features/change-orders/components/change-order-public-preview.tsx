@@ -75,23 +75,36 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
   const [decisionMessage, setDecisionMessage] = useState("");
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [decisionReceiptName, setDecisionReceiptName] = useState("");
+  const [justSubmittedDecision, setJustSubmittedDecision] = useState<"approve" | "reject" | null>(null);
   const [printTimestamp, setPrintTimestamp] = useState("");
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const canDecide = changeOrder?.status === "pending_approval";
   const showDecisionSection = canDecide;
   const decisionStatusLabel = statusLabel(changeOrder?.status);
-  const approvalAcknowledgement = useMemo(() => {
-    const name = decisionReceiptName.trim();
-    if (name) {
-      return `Thank you for your approval, ${name}.`;
-    }
-    return "Thank you for your approval.";
-  }, [decisionReceiptName]);
   const nonPendingDecisionMessage =
     changeOrder?.status === "approved"
-      ? `Decision status: ${decisionStatusLabel}. ${approvalAcknowledgement}`
+      ? decisionReceiptName.trim()
+        ? `Decision status: ${decisionStatusLabel}. Thank you for your approval, ${decisionReceiptName.trim()}.`
+        : `Decision status: ${decisionStatusLabel}.`
       : `Decision status: ${decisionStatusLabel}. This change order is not awaiting response.`;
+  const decisionFeedbackMessage = useMemo(() => {
+    if (!justSubmittedDecision) {
+      return null;
+    }
+    if (justSubmittedDecision === "approve") {
+      return decisionReceiptName.trim()
+        ? `Decision received: Approved. Thank you, ${decisionReceiptName.trim()}. Your response has been recorded.`
+        : "Decision received: Approved. Your response has been recorded.";
+    }
+    return "Decision received: Rejected. Your response has been recorded.";
+  }, [decisionReceiptName, justSubmittedDecision]);
+  const settledBannerClassName =
+    justSubmittedDecision === "approve"
+      ? `${styles.decisionBannerSettled} ${styles.decisionBannerRecentlyApproved}`
+      : justSubmittedDecision === "reject"
+        ? `${styles.decisionBannerSettled} ${styles.decisionBannerRecentlyRejected}`
+        : styles.decisionBannerSettled;
   const sender = useMemo(
     () => resolvePublicSender(changeOrder?.organization_context),
     [changeOrder?.organization_context],
@@ -114,6 +127,16 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
       setDecisionMessage("");
     }
   }, [canDecide]);
+
+  useEffect(() => {
+    if (!justSubmittedDecision) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setJustSubmittedDecision(null);
+    }, 9000);
+    return () => window.clearTimeout(timer);
+  }, [justSubmittedDecision]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -164,6 +187,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
         }
         setChangeOrder(payload.data as ChangeOrderRecord);
         setDecisionReceiptName("");
+        setJustSubmittedDecision(null);
         setStatusMessage("");
       } catch {
         setStatusMessage("Could not reach change-order endpoint.");
@@ -200,6 +224,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
       }
       setChangeOrder(payload.data as ChangeOrderRecord);
       setDecisionReceiptName(deciderName.trim());
+      setJustSubmittedDecision(decision);
       setDecisionMessage("");
     } catch {
       setDecisionMessage("Could not reach change-order decision endpoint.");
@@ -219,10 +244,10 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
               eyebrow: "Decision",
               text: canDecide
                 ? "Ready to sign? Jump to the decision section and submit your response."
-                : nonPendingDecisionMessage,
+                : decisionFeedbackMessage ?? nonPendingDecisionMessage,
               linkHref: canDecide ? "#change-order-decision" : undefined,
               linkLabel: canDecide ? "Review & Sign" : undefined,
-              stateClassName: canDecide ? styles.decisionBannerAwaiting : styles.decisionBannerSettled,
+              stateClassName: canDecide ? styles.decisionBannerAwaiting : settledBannerClassName,
             }
           : undefined
       }

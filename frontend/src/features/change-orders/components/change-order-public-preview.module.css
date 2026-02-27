@@ -4,6 +4,18 @@
 .decisionBannerSettled {
 }
 
+.decisionBannerRecentlyApproved {
+  border-color: #86efac;
+  background: #f0fdf4;
+  box-shadow: none;
+}
+
+.decisionBannerRecentlyRejected {
+  border-color: #fca5a5;
+  background: #fef2f2;
+  box-shadow: none;
+}
+
 .reasonBody {
   margin: 0 !important;
   padding: 0;
@@ -161,6 +173,16 @@
   border-color: #334155;
   background: #0f172a;
   color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .decisionBannerRecentlyApproved {
+  border-color: #22c55e;
+  background: #10271a;
+}
+
+:global(html[data-theme="dark"]) .decisionBannerRecentlyRejected {
+  border-color: #ef4444;
+  background: #2f1417;
 }
 
 @media print {
