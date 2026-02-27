@@ -1,6 +1,6 @@
 "use client";
 
-import styles from "@/features/invoices/components/invoices-console.module.css";
+import styles from "./project-list-viewer.module.css";
 
 export type ProjectListStatusValue = "prospect" | "active" | "on_hold" | "completed" | "cancelled";
 
@@ -32,7 +32,6 @@ type ProjectListViewerProps = {
   selectedProjectId: string;
   onSelectProject: (project: ProjectListEntry) => void;
   statusLabel: (status: string) => string;
-  statusToneClass: (status: string) => string;
   showPagination: boolean;
   currentPage: number;
   totalPages: number;
@@ -62,7 +61,6 @@ export function ProjectListViewer({
   selectedProjectId,
   onSelectProject,
   statusLabel,
-  statusToneClass,
   showPagination,
   currentPage,
   totalPages,
@@ -70,6 +68,14 @@ export function ProjectListViewer({
   onNextPage,
   emptyMessage = "No projects match your filters.",
 }: ProjectListViewerProps) {
+  function statusToneClass(statusValue: string): string {
+    const key = `projectStatus${statusValue
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join("")}`;
+    return styles[key] ?? "";
+  }
+
   return (
     <section className={styles.controlBar}>
       <div className={styles.projectSelector}>

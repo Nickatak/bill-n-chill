@@ -1208,7 +1208,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
           selectedProjectId={selectedProjectId}
           onSelectProject={handleSelectProject}
           statusLabel={projectStatusLabel}
-          statusToneClass={projectStatusClass}
           showPagination={!isProjectScoped}
           currentPage={currentProjectPageSafe}
           totalPages={totalProjectPages}

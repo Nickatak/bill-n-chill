@@ -518,7 +518,6 @@ export function ProjectsConsole() {
           selectedProjectId={selectedProjectId}
           onSelectProject={handleSelectProject}
           statusLabel={projectStatusLabel}
-          statusToneClass={projectStatusClass}
           showPagination
           currentPage={currentProjectPageSafe}
           totalPages={totalProjectPages}
