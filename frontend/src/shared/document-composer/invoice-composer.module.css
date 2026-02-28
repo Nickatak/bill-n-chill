@@ -1,0 +1,288 @@
+.invoiceComposerSheet {
+  border: 1px solid #cbd5e1;
+  border-radius: 18px;
+  padding: 24px;
+  background: #ffffff;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-flow: row;
+  gap: 20px;
+}
+
+.invoiceComposerSection {
+  display: grid;
+  gap: 20px;
+  grid-column: 1 / -1;
+  min-width: 0;
+  width: 100%;
+}
+
+.invoicePartyStack {
+  display: grid;
+  gap: 20px;
+  align-content: start;
+}
+
+.invoiceMetaLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 420px);
+  gap: 16px;
+  align-items: start;
+}
+
+.invoiceDetailCard {
+  grid-column: 2;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  display: grid;
+  gap: 10px;
+}
+
+.invoiceMetaCardLabel {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #1e3a8a;
+  font-weight: 700;
+}
+
+.invoiceMetaStrong {
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.invoiceNumberContext {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.invoiceNumberIndicator {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.64rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.invoiceNumberIndicatorGenerated {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1e40af;
+}
+
+.invoiceNumberIndicatorEditing {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+.invoiceNumberIndicatorLocked {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.invoiceLogoImage {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.invoiceLineSectionIntro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.invoiceLineSectionIntro h3 {
+  margin: 0;
+}
+
+.invoiceLineHeader {
+  display: grid;
+  grid-template-columns: 100px minmax(220px, 1.1fr) 78px minmax(220px, 1.5fr) 84px 120px 120px 88px;
+  gap: 8px;
+  align-items: center;
+  padding: 11px 12px;
+  background: #eef2ff;
+  color: #1e3a8a;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  min-width: 1040px;
+}
+
+.invoiceLineRow {
+  display: grid;
+  grid-template-columns: 100px minmax(220px, 1.1fr) 78px minmax(220px, 1.5fr) 84px 120px 120px 88px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-top: 1px solid #e2e8f0;
+  background: #ffffff;
+  min-width: 1040px;
+}
+
+.invoiceLineRowAlt {
+  background: #f4f7fc;
+}
+
+.invoiceLineRow > * {
+  min-width: 0;
+}
+
+.invoiceLineRow input,
+.invoiceLineRow select {
+  width: 100%;
+}
+
+.invoiceLockableControl {
+  min-width: 0;
+}
+
+.invoiceReadAmount {
+  border-color: #cbd5e1;
+}
+
+.invoiceLineActionsCell {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.invoiceLineActions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+
+.invoiceSheetFooter {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+  align-items: flex-start;
+}
+
+.invoiceTotalsColumn {
+  display: grid;
+  gap: 12px;
+  justify-items: stretch;
+  width: min(320px, 100%);
+}
+
+.invoiceCreateActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.invoiceCreatePrimary {
+  min-width: 180px;
+}
+
+.invoiceComposerSheetLocked .invoiceLockableControl:disabled {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.invoiceComposerSheetLocked .invoiceLockableControl:disabled::placeholder {
+  color: #94a3b8;
+}
+
+.invoiceComposerSheetLocked .invoiceReadAmount {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+
+:global(html[data-theme="dark"]) .invoiceComposerSheet {
+  border-color: #334155;
+  background: #0f172a;
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.45);
+}
+
+:global(html[data-theme="dark"]) .invoiceComposerSheetLocked .invoiceLockableControl:disabled {
+  background: #0f172a;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .invoiceComposerSheetLocked .invoiceLockableControl:disabled::placeholder {
+  color: #64748b;
+}
+
+:global(html[data-theme="dark"]) .invoiceComposerSheetLocked .invoiceReadAmount {
+  background: #0f172a;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .invoiceLineHeader {
+  background: #1e293b;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .invoiceLineRow {
+  border-color: #334155;
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .invoiceLineRowAlt {
+  background: #131d31;
+}
+
+:global(html[data-theme="dark"]) .invoiceDetailCard {
+  background: #111827;
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .invoiceMetaCardLabel {
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .invoiceMetaStrong {
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .invoiceNumberIndicatorGenerated {
+  background: #1e3a8a;
+  border-color: #3b82f6;
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .invoiceNumberIndicatorEditing {
+  background: #1f2937;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .invoiceNumberIndicatorLocked {
+  background: #7f1d1d;
+  border-color: #ef4444;
+  color: #fee2e2;
+}
+
+@media (max-width: 980px) {
+  .invoiceMetaLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .invoiceDetailCard {
+    grid-column: 1;
+  }
+}

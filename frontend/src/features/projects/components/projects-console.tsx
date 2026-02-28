@@ -696,11 +696,11 @@ export function ProjectsConsole() {
                   <strong>{invoicedDisplay}</strong>
                 </div>
                 <div className={styles.metricRow}>
-                  <span>Inbound payments to date</span>
+                  <span>Inbound payments to date (WIP)</span>
                   <strong>{paidDisplay}</strong>
                 </div>
                 <div className={styles.metricRow}>
-                  <span>Inbound credit</span>
+                  <span>Inbound credit (WIP)</span>
                   <strong>{inboundCreditDisplay}</strong>
                 </div>
                 <div className={styles.metricRow}>
@@ -708,14 +708,14 @@ export function ProjectsConsole() {
                   <strong>{arOutstandingDisplay}</strong>
                 </div>
                 <div className={styles.metricRow}>
-                  <span>Not Yet Billed (Accepted - AR Outstanding)</span>
+                  <span>Not Yet Billed</span>
                   <strong>{unbilledFromAcceptedDisplay}</strong>
                 </div>
               </section>
               <section className={styles.metricSection}>
                 <h4 className={styles.metricSectionTitle}>Expenses</h4>
                 <div className={styles.metricRow}>
-                  <span>Bills to date</span>
+                  <span>Bills to date (WIP)</span>
                   <strong>{apTotalDisplay}</strong>
                 </div>
                 <div className={styles.metricRow}>
@@ -723,7 +723,7 @@ export function ProjectsConsole() {
                   <strong>{apPaidDisplay}</strong>
                 </div>
                 <div className={styles.metricRow}>
-                  <span>Outbound credit</span>
+                  <span>Outbound credit (WIP)</span>
                   <strong>{outboundCreditDisplay}</strong>
                 </div>
                 <div className={styles.metricRow}>

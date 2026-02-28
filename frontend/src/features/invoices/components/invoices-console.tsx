@@ -32,7 +32,8 @@ import {
   toInvoiceStatusPolicy,
 } from "../document-adapter";
 import styles from "./invoices-console.module.css";
-import estimateStyles from "../../estimates/components/estimates-console.module.css";
+import composerStyles from "@/shared/document-composer/composer-foundation.module.css";
+import invoiceComposerStyles from "@/shared/document-composer/invoice-composer.module.css";
 
 type StatusTone = "neutral" | "success" | "error";
 type ProjectStatusValue = ProjectListStatusValue;
@@ -1642,7 +1643,7 @@ export function InvoicesConsole() {
                             value={statusNote}
                             onChange={(event) => setStatusNote(event.target.value)}
                             placeholder="Optional note for this status action or history-only note."
-                            className={styles.invoiceLockableControl}
+                            className={invoiceComposerStyles.invoiceLockableControl}
                           />
                         </label>
 
@@ -1717,74 +1718,74 @@ export function InvoicesConsole() {
                 adapter={invoiceComposerAdapter}
                 document={null}
                 formState={invoiceDraftFormState}
-                className={`${estimateStyles.sheet} ${styles.invoiceComposerSheet} ${workspaceIsLocked ? styles.invoiceComposerSheetLocked : ""}`}
-                sectionClassName={styles.invoiceComposerSection}
+                className={`${composerStyles.sheet} ${invoiceComposerStyles.invoiceComposerSheet} ${workspaceIsLocked ? invoiceComposerStyles.invoiceComposerSheetLocked : ""}`}
+                sectionClassName={invoiceComposerStyles.invoiceComposerSection}
                 onSubmit={handleCreateInvoice}
                 sections={[{ slot: "context" }]}
                 renderers={{
                   context: () => (
                     <>
-                      <div className={estimateStyles.sheetHeader}>
-                        <div className={styles.invoicePartyStack}>
-                          <div className={estimateStyles.fromBlock}>
-                            <span className={estimateStyles.blockLabel}>From</span>
-                            <p className={estimateStyles.blockText}>
+                      <div className={composerStyles.sheetHeader}>
+                        <div className={invoiceComposerStyles.invoicePartyStack}>
+                          <div className={composerStyles.fromBlock}>
+                            <span className={composerStyles.blockLabel}>From</span>
+                            <p className={composerStyles.blockText}>
                               {senderDisplayName}
                             </p>
                             {senderEmail ? (
-                              <p className={estimateStyles.blockMuted}>{senderEmail}</p>
+                              <p className={composerStyles.blockMuted}>{senderEmail}</p>
                             ) : null}
                             {senderAddressLines.length
                               ? senderAddressLines.map((line, index) => (
-                                  <p key={`${line}-${index}`} className={estimateStyles.blockMuted}>
+                                  <p key={`${line}-${index}`} className={composerStyles.blockMuted}>
                                     {line}
                                   </p>
                                 ))
                               : (
-                                <p className={estimateStyles.blockMuted}>
+                                <p className={composerStyles.blockMuted}>
                                   Set sender address in Organization settings.
                                 </p>
                               )}
                           </div>
-                          <div className={estimateStyles.toBlock}>
-                            <span className={estimateStyles.blockLabel}>To</span>
-                            <p className={estimateStyles.blockText}>
+                          <div className={composerStyles.toBlock}>
+                            <span className={composerStyles.blockLabel}>To</span>
+                            <p className={composerStyles.blockText}>
                               {selectedProject?.customer_display_name || "Select project"}
                             </p>
-                            <p className={estimateStyles.blockMuted}>
+                            <p className={composerStyles.blockMuted}>
                               {selectedProject
                                 ? `#${selectedProject.id} ${selectedProject.name}`
                                 : "Choose a project from the project list"}
                             </p>
                           </div>
                         </div>
-                        <div className={estimateStyles.headerRight}>
-                          <div className={estimateStyles.logoBox}>
+                        <div className={composerStyles.headerRight}>
+                          <div className={composerStyles.logoBox}>
                             {senderLogoUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={senderLogoUrl} alt="Organization logo" className={styles.invoiceLogoImage} />
+                              <img src={senderLogoUrl} alt="Organization logo" className={invoiceComposerStyles.invoiceLogoImage} />
                             ) : (
                               "Logo"
                             )}
                           </div>
-                          <div className={estimateStyles.sheetTitle}>Invoice</div>
+                          <div className={composerStyles.sheetTitle}>Invoice</div>
                         </div>
                       </div>
 
-                      <div className={styles.invoiceMetaLayout}>
-                        <div className={styles.invoiceDetailCard}>
-                          <span className={styles.invoiceMetaCardLabel}>Invoice Details</span>
-                          <div className={estimateStyles.metaLine}>
+                      <div className={invoiceComposerStyles.invoiceMetaLayout}>
+                        <div className={invoiceComposerStyles.invoiceDetailCard}>
+                          <span className={invoiceComposerStyles.invoiceMetaCardLabel}>Invoice Details</span>
+                          <div className={composerStyles.metaLine}>
                             <span>Invoice #</span>
-                            <div className={styles.invoiceNumberContext}>
-                              <strong className={styles.invoiceMetaStrong}>{workspaceInvoiceNumber}</strong>
+                            <div className={invoiceComposerStyles.invoiceNumberContext}>
+                              <strong className={invoiceComposerStyles.invoiceMetaStrong}>{workspaceInvoiceNumber}</strong>
                               <span
-                                className={`${styles.invoiceNumberIndicator} ${
+                                className={`${invoiceComposerStyles.invoiceNumberIndicator} ${
                                   workspaceIsEditingDraft
-                                    ? styles.invoiceNumberIndicatorEditing
+                                    ? invoiceComposerStyles.invoiceNumberIndicatorEditing
                                     : workspaceSourceInvoice
-                                      ? styles.invoiceNumberIndicatorLocked
-                                      : styles.invoiceNumberIndicatorGenerated
+                                      ? invoiceComposerStyles.invoiceNumberIndicatorLocked
+                                      : invoiceComposerStyles.invoiceNumberIndicatorGenerated
                                 }`}
                               >
                                 {workspaceIsEditingDraft
@@ -1795,10 +1796,10 @@ export function InvoicesConsole() {
                               </span>
                             </div>
                           </div>
-                          <label className={estimateStyles.inlineField}>
+                          <label className={composerStyles.inlineField}>
                             Issue date
                             <input
-                              className={`${estimateStyles.fieldInput} ${styles.invoiceLockableControl}`}
+                              className={`${composerStyles.fieldInput} ${invoiceComposerStyles.invoiceLockableControl}`}
                               type="date"
                               value={issueDate}
                               onChange={(event) => setIssueDate(event.target.value)}
@@ -1806,10 +1807,10 @@ export function InvoicesConsole() {
                               disabled={workspaceIsLocked}
                             />
                           </label>
-                          <label className={estimateStyles.inlineField}>
+                          <label className={composerStyles.inlineField}>
                             Due date
                             <input
-                              className={`${estimateStyles.fieldInput} ${styles.invoiceLockableControl}`}
+                              className={`${composerStyles.fieldInput} ${invoiceComposerStyles.invoiceLockableControl}`}
                               type="date"
                               value={dueDate}
                               onChange={(event) => setDueDate(event.target.value)}
@@ -1820,18 +1821,18 @@ export function InvoicesConsole() {
                         </div>
                       </div>
 
-                      <div className={styles.invoiceLineSectionIntro}>
+                      <div className={invoiceComposerStyles.invoiceLineSectionIntro}>
                         <h3>Line Items</h3>
                       </div>
                       {budgetLineOptions.length === 0 ? (
-                        <p className={estimateStyles.inlineHint}>
+                        <p className={composerStyles.inlineHint}>
                           Scope lines require an active project budget line. Convert an approved estimate to budget or
                           use adjustment lines with a reason. Internal generic lines are not billable here.
                         </p>
                       ) : null}
 
-                      <div className={estimateStyles.lineTable}>
-                        <div className={styles.invoiceLineHeader}>
+                      <div className={composerStyles.lineTable}>
+                        <div className={invoiceComposerStyles.invoiceLineHeader}>
                           <span>Type</span>
                           <span>Scope source / Reason</span>
                           <span>Qty</span>
@@ -1846,10 +1847,10 @@ export function InvoicesConsole() {
                           return (
                             <div
                               key={line.localId}
-                              className={`${styles.invoiceLineRow} ${index % 2 === 1 ? styles.invoiceLineRowAlt : ""}`}
+                              className={`${invoiceComposerStyles.invoiceLineRow} ${index % 2 === 1 ? invoiceComposerStyles.invoiceLineRowAlt : ""}`}
                             >
                               <select
-                                className={`${estimateStyles.lineInput} ${styles.invoiceLockableControl}`}
+                                className={`${composerStyles.lineInput} ${invoiceComposerStyles.invoiceLockableControl}`}
                                 value={line.lineType}
                                 onChange={(event) =>
                                   updateLineItem(
@@ -1865,7 +1866,7 @@ export function InvoicesConsole() {
                               </select>
                               {line.lineType === "scope" ? (
                                 <select
-                                  className={`${estimateStyles.lineInput} ${styles.invoiceLockableControl}`}
+                                  className={`${composerStyles.lineInput} ${invoiceComposerStyles.invoiceLockableControl}`}
                                   value={line.budgetLineId}
                                   onChange={(event) =>
                                     updateLineItem(line.localId, "budgetLineId", event.target.value)
@@ -1886,7 +1887,7 @@ export function InvoicesConsole() {
                                 </select>
                               ) : (
                                 <input
-                                  className={`${estimateStyles.lineInput} ${styles.invoiceLockableControl}`}
+                                  className={`${composerStyles.lineInput} ${invoiceComposerStyles.invoiceLockableControl}`}
                                   value={line.adjustmentReason}
                                   onChange={(event) =>
                                     updateLineItem(line.localId, "adjustmentReason", event.target.value)
@@ -1897,7 +1898,7 @@ export function InvoicesConsole() {
                                 />
                               )}
                               <input
-                                className={`${estimateStyles.lineInput} ${styles.invoiceLockableControl}`}
+                                className={`${composerStyles.lineInput} ${invoiceComposerStyles.invoiceLockableControl}`}
                                 value={line.quantity}
                                 onChange={(event) =>
                                   updateLineItem(line.localId, "quantity", event.target.value)
@@ -1907,7 +1908,7 @@ export function InvoicesConsole() {
                                 disabled={workspaceIsLocked}
                               />
                               <input
-                                className={`${estimateStyles.lineInput} ${styles.invoiceLockableControl}`}
+                                className={`${composerStyles.lineInput} ${invoiceComposerStyles.invoiceLockableControl}`}
                                 value={line.description}
                                 onChange={(event) =>
                                   updateLineItem(line.localId, "description", event.target.value)
@@ -1916,14 +1917,14 @@ export function InvoicesConsole() {
                                 disabled={workspaceIsLocked}
                               />
                               <input
-                                className={`${estimateStyles.lineInput} ${styles.invoiceLockableControl}`}
+                                className={`${composerStyles.lineInput} ${invoiceComposerStyles.invoiceLockableControl}`}
                                 value={line.unit}
                                 onChange={(event) => updateLineItem(line.localId, "unit", event.target.value)}
                                 required
                                 disabled={workspaceIsLocked}
                               />
                               <input
-                                className={`${estimateStyles.lineInput} ${styles.invoiceLockableControl}`}
+                                className={`${composerStyles.lineInput} ${invoiceComposerStyles.invoiceLockableControl}`}
                                 value={line.unitPrice}
                                 onChange={(event) =>
                                   updateLineItem(line.localId, "unitPrice", event.target.value)
@@ -1932,14 +1933,14 @@ export function InvoicesConsole() {
                                 required
                                 disabled={workspaceIsLocked}
                               />
-                              <span className={`${estimateStyles.amountCell} ${styles.invoiceReadAmount}`}>
+                              <span className={`${composerStyles.amountCell} ${invoiceComposerStyles.invoiceReadAmount}`}>
                                 ${formatMoney(lineAmount)}
                               </span>
-                              <div className={styles.invoiceLineActionsCell}>
+                              <div className={invoiceComposerStyles.invoiceLineActionsCell}>
                                 {!workspaceIsLocked ? (
                                   <button
                                     type="button"
-                                    className={estimateStyles.smallButton}
+                                    className={composerStyles.smallButton}
                                     onClick={() => removeLineItem(line.localId)}
                                     disabled={lineItems.length <= 1}
                                   >
@@ -1953,10 +1954,10 @@ export function InvoicesConsole() {
                       </div>
 
                       {!workspaceIsLocked ? (
-                        <div className={styles.invoiceLineActions}>
+                        <div className={invoiceComposerStyles.invoiceLineActions}>
                           <button
                             type="button"
-                            className={estimateStyles.secondaryButton}
+                            className={composerStyles.secondaryButton}
                             onClick={addLineItem}
                           >
                             Add Line Item
@@ -1965,44 +1966,44 @@ export function InvoicesConsole() {
                       ) : null}
 
                       {!selectedProjectId ? (
-                        <p className={estimateStyles.inlineHint}>Select a project before creating an invoice.</p>
+                        <p className={composerStyles.inlineHint}>Select a project before creating an invoice.</p>
                       ) : null}
 
-                      <div className={styles.invoiceSheetFooter}>
-                        <div className={styles.invoiceTotalsColumn}>
-                          <div className={estimateStyles.summary}>
-                            <div className={estimateStyles.summaryRow}>
+                      <div className={invoiceComposerStyles.invoiceSheetFooter}>
+                        <div className={invoiceComposerStyles.invoiceTotalsColumn}>
+                          <div className={composerStyles.summary}>
+                            <div className={composerStyles.summaryRow}>
                               <span>Subtotal</span>
                               <strong>${formatMoney(draftLineSubtotal)}</strong>
                             </div>
-                            <div className={estimateStyles.summaryRow}>
+                            <div className={composerStyles.summaryRow}>
                               <span>Sales Tax</span>
-                              <span className={estimateStyles.summaryTaxLine}>
-                                <label className={estimateStyles.summaryTaxRate}>
+                              <span className={composerStyles.summaryTaxLine}>
+                                <label className={composerStyles.summaryTaxRate}>
                                   <input
-                                    className={`${estimateStyles.summaryTaxInput} ${styles.invoiceLockableControl}`}
+                                    className={`${composerStyles.summaryTaxInput} ${invoiceComposerStyles.invoiceLockableControl}`}
                                     value={taxPercent}
                                     onChange={(event) => setTaxPercent(event.target.value)}
                                     inputMode="decimal"
                                     disabled={workspaceIsLocked}
                                   />
-                                  <span className={estimateStyles.summaryTaxSuffix}>%</span>
+                                  <span className={composerStyles.summaryTaxSuffix}>%</span>
                                 </label>
-                                <span className={estimateStyles.summaryTaxAmount}>
+                                <span className={composerStyles.summaryTaxAmount}>
                                   ${formatMoney(draftTaxTotal)}
                                 </span>
                               </span>
                             </div>
-                            <div className={`${estimateStyles.summaryRow} ${estimateStyles.summaryTotal}`}>
+                            <div className={`${composerStyles.summaryRow} ${composerStyles.summaryTotal}`}>
                               <span>Total</span>
                               <strong>${formatMoney(draftTotal)}</strong>
                             </div>
                           </div>
                           {canMutateInvoices ? (
-                            <div className={styles.invoiceCreateActions}>
+                            <div className={invoiceComposerStyles.invoiceCreateActions}>
                               <button
                                 type="submit"
-                                className={`${styles.primaryButton} ${styles.invoiceCreatePrimary}`}
+                                className={`${composerStyles.primaryButton} ${invoiceComposerStyles.invoiceCreatePrimary}`}
                                 disabled={workspaceIsLocked || (!editingDraftInvoiceId && !selectedProjectId)}
                               >
                                 {workspaceIsLocked ? "Locked" : editingDraftInvoiceId ? "Save Draft" : "Create Invoice"}

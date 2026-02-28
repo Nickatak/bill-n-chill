@@ -1,0 +1,349 @@
+.workflowSheet {
+  margin: 14px 0;
+  border-radius: 16px;
+}
+
+.changeOrderComposerSection {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.createSheet {
+  border: 1px solid #bfdbfe;
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.12);
+}
+
+.editSheet {
+  border: 1px solid #d4dbe8;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+}
+
+.lockableControl {
+  min-width: 0;
+}
+
+.editSheetLocked .lockableControl:disabled {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.editSheetLocked .lockableControl:disabled::placeholder {
+  color: #94a3b8;
+}
+
+.coMetaField {
+  min-width: 0;
+}
+
+.coMetaInput {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.coFieldWide {
+  grid-column: 1 / -1;
+}
+
+.viewerBaselineBadge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 2px 8px;
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.viewerBaselineBadgeActive {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.viewerBaselineBadgeSuperseded {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+.coLineSectionIntro {
+  display: grid;
+  gap: 6px;
+  margin: 2px 0 0;
+}
+
+.coLineSectionIntro h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+.coLineSectionIntro p {
+  margin: 0;
+  font-size: 0.83rem;
+  color: #475569;
+}
+
+.coLineLegend {
+  font-size: 0.79rem;
+  color: #334155;
+}
+
+.coLineHeader {
+  display: grid;
+  grid-template-columns: 0.85fr 1.2fr 1.2fr 1.45fr 1fr 0.9fr 0.9fr 0.7fr;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  background: #eef2ff;
+  color: #1e3a8a;
+  font-size: 0.69rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.coLineRow {
+  display: grid;
+  grid-template-columns: 0.85fr 1.2fr 1.2fr 1.45fr 1fr 0.9fr 0.9fr 0.7fr;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 10px;
+  background: #ffffff;
+}
+
+.coLineHeader > span,
+.coLineRow > * {
+  min-width: 0;
+}
+
+.coLineRowGroup {
+  border-top: 1px solid #dbe5f3;
+}
+
+.coLineRowAlt {
+  background: #f7faff;
+}
+
+.coLineRowInvalid {
+  border-left: 3px solid #dc2626;
+}
+
+.coLineIssue {
+  margin: 0;
+  padding: 0 10px 9px;
+  color: #991b1b;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  background: #fff7f7;
+}
+
+.coReadValue {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 0.84rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.coLineActions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+
+.coLineAddButton {
+  border-radius: 10px;
+}
+
+.coSheetFooter {
+  display: grid;
+  grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
+  grid-template-areas: "summary actions";
+  align-items: stretch;
+  gap: 14px;
+  border-top: 1px solid #dbe5f3;
+  padding-top: 14px;
+  margin-top: 6px;
+}
+
+.coSummaryCard {
+  grid-area: summary;
+  height: 100%;
+  width: 100%;
+}
+
+.coSummaryPrimaryLabel {
+  white-space: nowrap;
+}
+
+.coSummarySecondaryValue {
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  color: #64748b;
+}
+
+.coSheetFooterActions {
+  grid-area: actions;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  min-width: 0;
+  gap: 10px;
+}
+
+.coActionButtonRow {
+  display: flex;
+  width: 100%;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.coFooterHint {
+  margin: 0;
+  max-width: 54ch;
+  text-align: right;
+}
+
+.coFooterErrorHint {
+  color: #991b1b;
+}
+
+.coFooterPrimaryButton {
+  width: fit-content;
+  min-width: 150px;
+  min-height: 0;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.2;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 10px;
+}
+
+.coFooterPrimaryButton:disabled {
+  background: #94a3b8;
+  border-color: #94a3b8;
+  color: #e2e8f0;
+  cursor: not-allowed;
+  box-shadow: none;
+  opacity: 0.85;
+}
+
+.editSheetLocked .coReadValue {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+
+:global(html[data-theme="dark"]) .viewerBaselineBadgeActive {
+  background: #14532d;
+  border-color: #22c55e;
+  color: #bbf7d0;
+}
+
+:global(html[data-theme="dark"]) .viewerBaselineBadgeSuperseded {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .coLineRowGroup {
+  border-top-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .coLineRowAlt {
+  background: #1a2334;
+}
+
+:global(html[data-theme="dark"]) .coLineRowInvalid {
+  border-left-color: #f87171;
+}
+
+:global(html[data-theme="dark"]) .coLineIssue {
+  background: #2a1216;
+  color: #fecaca;
+}
+
+:global(html[data-theme="dark"]) .createSheet,
+:global(html[data-theme="dark"]) .editSheet {
+  border-color: #334155;
+  box-shadow: 0 14px 26px rgba(2, 6, 23, 0.35);
+}
+
+:global(html[data-theme="dark"]) .editSheetLocked .lockableControl:disabled {
+  background: #0f172a;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .editSheetLocked .lockableControl:disabled::placeholder {
+  color: #64748b;
+}
+
+:global(html[data-theme="dark"]) .editSheetLocked .coReadValue {
+  background: #0f172a;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .coFooterErrorHint {
+  color: #fecaca;
+}
+
+:global(html[data-theme="dark"]) .coLineHeader {
+  background: #1e293b;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .coLineRow {
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .coLineRowAlt {
+  background: #131d31;
+}
+
+:global(html[data-theme="dark"]) .coReadValue {
+  background: #0b1220;
+  border-color: #334155;
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .coSummarySecondaryValue {
+  color: #94a3b8;
+}
+
+@media (max-width: 980px) {
+  .coSheetFooter {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "summary"
+      "actions";
+  }
+
+  .coSheetFooterActions,
+  .coFooterHint,
+  .coActionButtonRow {
+    align-items: flex-start;
+    justify-content: flex-start;
+    text-align: left;
+  }
+}

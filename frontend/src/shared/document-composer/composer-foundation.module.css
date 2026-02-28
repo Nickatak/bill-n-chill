@@ -1,0 +1,1255 @@
+.sheet {
+  --composer-text-primary: #0f172a;
+  --composer-text-secondary: #475569;
+  --composer-border: #d4deee;
+  --composer-foreground: #ffffff;
+  border: 1px solid var(--composer-border, #d4deee);
+  border-radius: 18px;
+  padding: 24px;
+  background: #ffffff;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-flow: row;
+  gap: 20px;
+}
+
+.sheetSection {
+  display: grid;
+  gap: 20px;
+  grid-column: 1 / -1;
+  min-width: 0;
+  width: 100%;
+}
+
+.sheetReadOnly {
+  background: #fcfdff;
+}
+
+.sheetHeader {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.fromBlock {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.blockLabel {
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.blockText {
+  margin: 0;
+  font-weight: 600;
+  color: var(--composer-text-primary, #0f172a);
+}
+
+.blockMuted {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.headerRight {
+  display: grid;
+  justify-items: end;
+  gap: 12px;
+}
+
+.logoBox {
+  width: 220px;
+  border: 1px dashed #cbd5f5;
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.logoImage {
+  width: 100%;
+  max-height: 80px;
+  object-fit: contain;
+  display: block;
+}
+
+.logoUrlLink {
+  color: #2563eb;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.sheetTitle {
+  font-size: 2rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.sheetTitleValue {
+  color: #0f172a;
+  font-size: clamp(1.05rem, 2.1vw, 1.75rem);
+  font-weight: 700;
+  line-height: 1.2;
+  max-width: none;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.partyGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.toBlock {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.inlineField {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--composer-text-secondary, #475569);
+}
+
+.staticFieldValue {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  color: var(--composer-text-primary, #0f172a);
+  font-size: 0.95rem;
+}
+
+.staticFieldInlineValue {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 2px 0;
+  border-bottom: 1px solid #cbd5e1;
+  color: var(--composer-text-primary, #0f172a);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.fieldInput,
+.fieldSelect {
+  border: 1px solid #cbd5f5;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #ffffff;
+  color: var(--composer-text-primary, #0f172a);
+  font-size: 0.95rem;
+}
+
+.fieldInput[readonly] {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.fieldInput:disabled,
+.lineInput:disabled,
+.summaryTaxInput:disabled,
+.lineSelect:disabled {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #dbe3f0;
+  opacity: 1;
+  cursor: default;
+}
+
+.sheetReadOnly .fieldInput,
+.sheetReadOnly .lineInput,
+.sheetReadOnly .summaryTaxInput {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #dbe3f0;
+}
+
+.sheetReadOnly .lineSelect:disabled {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #dbe3f0;
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.inlineHint {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.actionError {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.actionSuccess {
+  margin: 0;
+  color: #15803d;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.actionSuccess a {
+  color: #166534;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.composerPrep {
+  display: grid;
+  gap: 10px;
+  justify-items: stretch;
+}
+
+.workspaceToolbar {
+  display: grid;
+  gap: 8px 12px;
+  align-items: start;
+}
+
+.workspaceContext {
+  display: grid;
+  gap: 2px;
+  color: var(--composer-text-primary, #0f172a);
+}
+
+.workspaceContextLabel {
+  color: var(--composer-text-secondary, #475569);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.workspaceContextValueRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.workspaceToolbarHint {
+  margin: 0;
+  color: var(--composer-text-secondary, #475569);
+  font-size: 0.82rem;
+}
+
+.composerPrepActions {
+  justify-content: flex-end;
+}
+
+.composerPrepMessage {
+  text-align: right;
+}
+
+.composerPrepPanel {
+  width: min(540px, 100%);
+}
+
+.metaBlock {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  display: grid;
+  gap: 10px;
+}
+
+.metaTitle {
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #1e3a8a;
+  font-weight: 600;
+}
+
+.metaLine {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.9rem;
+  color: var(--composer-text-primary, #0f172a);
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 0;
+}
+
+.staticMetaValue {
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.lineTable {
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  overflow-x: auto;
+  background: #ffffff;
+  width: 100%;
+}
+
+.lineHeader {
+  display: grid;
+  grid-template-columns: 70px 1.4fr 160px 80px 110px 100px 110px 180px;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  background: #eef2ff;
+  color: #1e3a8a;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  min-width: 980px;
+}
+
+.lineHeaderReadOnly {
+  grid-template-columns: 70px 1.4fr 160px 80px 110px 100px 110px;
+  min-width: 790px;
+}
+
+.lineHeaderNoMarkup {
+  grid-template-columns: 70px 1.5fr 170px 90px 130px 120px;
+  min-width: 760px;
+}
+
+.lineHeaderCell {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  padding-right: 8px;
+}
+
+.lineHeaderButton {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  cursor: pointer;
+}
+
+.lineHeaderButtonActive {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.sortIndicator {
+  font-size: 0.62rem;
+  line-height: 1;
+  margin-right: -3px;
+}
+
+.lineRow {
+  display: grid;
+  grid-template-columns: 70px 1.4fr 160px 80px 110px 100px 110px 180px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-top: 1px solid #e2e8f0;
+  background: #ffffff;
+  min-width: 980px;
+}
+
+.lineRowReadOnly {
+  grid-template-columns: 70px 1.4fr 160px 80px 110px 100px 110px;
+  min-width: 790px;
+}
+
+.lineRowNoMarkup {
+  grid-template-columns: 70px 1.5fr 170px 90px 130px 120px;
+  min-width: 760px;
+}
+
+.lineRow:nth-child(even) {
+  background: #f4f7fc;
+}
+
+.lineCell {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.staticCellValue {
+  color: #0f172a;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.lineHeaderCell:not(:last-child)::after {
+  /* TODO(nick): Revisit header separator styling after broader estimate-table UI polish pass. */
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #4d688f;
+  pointer-events: none;
+}
+
+.lineCell:not(:last-child)::after {
+  display: none;
+}
+
+.lineInput,
+.lineSelect {
+  border: 1px solid #cbd5f5;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: #ffffff;
+  color: var(--composer-text-primary, #0f172a);
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+.percentField {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.percentField .lineInput {
+  width: 100%;
+  min-width: 0;
+}
+
+.percentSuffix {
+  font-size: 0.8rem;
+  color: var(--composer-text-secondary, #475569);
+}
+
+.amountCell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #0f172a;
+}
+
+.removeButton {
+  border: 1px solid transparent;
+  background: transparent;
+  color: #dc2626;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.lineActionsCell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.smallButton {
+  border: 1px solid #cbd5f5;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #1e3a8a;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.actionDisabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.lineActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.primaryButton {
+  border: 1px solid #1d4ed8;
+  border-radius: 8px;
+  background: #1d4ed8;
+  color: #ffffff;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.secondaryButton {
+  border: 1px solid #cbd5f5;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #1e3a8a;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.summary {
+  max-width: 320px;
+  margin-left: auto;
+  border: 1px solid #cbd5f5;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.finalizeActions {
+  max-width: 320px;
+  margin-left: auto;
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.summaryRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  color: var(--composer-text-primary, #0f172a);
+}
+
+.summaryTaxLine {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.summaryTaxRate {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+.summaryTaxInput {
+  width: 52px;
+  border: 1px solid #cbd5f5;
+  border-radius: 6px;
+  padding: 4px 6px;
+  background: #ffffff;
+  color: var(--composer-text-primary, #0f172a);
+  font-size: 0.85rem;
+  text-align: right;
+}
+
+.summaryTaxSuffix {
+  font-size: 0.85rem;
+  color: var(--composer-text-secondary, #475569);
+}
+
+.summaryTaxAmount {
+  margin-left: 6px;
+  text-align: right;
+}
+
+.summaryTotal {
+  background: #e0e7ff;
+  color: #1e3a8a;
+  font-weight: 600;
+  border-top: 1px solid #cbd5f5;
+}
+
+.readOnlyHint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--composer-text-secondary, #475569);
+}
+
+.terms {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 16px;
+  color: #475569;
+  display: grid;
+  gap: 6px;
+}
+
+.termsInput {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.6;
+  min-height: 96px;
+  resize: none;
+}
+
+.termsInput:focus {
+  outline: none;
+}
+
+.terms h4 {
+  margin: 0;
+  color: #1e3a8a;
+  font-size: 0.8rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.lifecycle {
+  border: 1px solid var(--composer-border, #d4deee);
+  border-radius: 14px;
+  padding: 16px;
+  background: var(--composer-foreground, #ffffff);
+  display: grid;
+  gap: 12px;
+}
+
+.publicDecisionBanner {
+  border: 1px solid var(--composer-border, #d4deee);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: var(--composer-foreground, #ffffff);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.publicDecisionBannerPending {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.publicDecisionBannerComplete {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.publicDecisionBannerBody {
+  display: grid;
+  gap: 4px;
+}
+
+.publicDecisionBannerEyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #1d4ed8;
+}
+
+.publicDecisionBannerText {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--composer-text-secondary, #475569);
+}
+
+.publicDecisionBannerLink {
+  border: 1px solid #1d4ed8;
+  border-radius: 8px;
+  background: #1d4ed8;
+  color: #ffffff;
+  padding: 8px 12px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.1;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.publicDecisionBannerLink:hover,
+.publicDecisionBannerLink:focus-visible {
+  background: #1e40af;
+  border-color: #1e40af;
+  outline: none;
+}
+
+.publicDecisionSection {
+  scroll-margin-top: 96px;
+  --foreground: var(--surface);
+}
+
+.lifecycle h3 {
+  margin: 0;
+  color: var(--composer-text-primary, #0f172a);
+}
+
+.lifecycleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lifecycleToggleButton {
+  border: 1px solid var(--composer-border, #d4deee);
+  border-radius: 8px;
+  background: var(--composer-foreground, #ffffff);
+  color: var(--composer-text-secondary, #475569);
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lifecycleField {
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--composer-text-secondary, #475569);
+}
+
+.lifecycleField select,
+.lifecycleField input,
+.lifecycleField textarea {
+  border: 1px solid var(--composer-border, #d4deee);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--composer-foreground, #ffffff);
+  color: var(--composer-text-primary, #0f172a);
+}
+
+.lifecycleFieldLabel {
+  font-size: 0.9rem;
+  color: var(--composer-text-secondary, #475569);
+}
+
+.statusPicker {
+  display: grid;
+  gap: 8px;
+}
+
+.statusPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.statusPill {
+  border: 1px solid #cbd5f5;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.statusPillInactive {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.statusPillActive {
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+}
+
+.statusPillActive.statusDraft {
+  background: #2563eb;
+  border-color: #1d4ed8;
+  color: #eff6ff;
+}
+
+.statusPillActive.statusSent {
+  background: #d97706;
+  border-color: #b45309;
+  color: #fffbeb;
+}
+
+.statusPillActive.statusApproved {
+  background: #16a34a;
+  border-color: #15803d;
+  color: #f0fdf4;
+}
+
+.statusPillActive.statusRejected {
+  background: #dc2626;
+  border-color: #b91c1c;
+  color: #fee2e2;
+}
+
+.statusPillActive.statusArchived {
+  background: #6b7280;
+  border-color: #4b5563;
+  color: #f9fafb;
+}
+
+.statusNote {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.lifecycleActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.lifecycleActions button {
+  flex: 0 0 auto;
+}
+
+.lifecycleLinkAction {
+  border: 1px solid var(--composer-border, #d4deee);
+  border-radius: 8px;
+  background: #1d4ed8;
+  color: #f9fafb;
+  padding: 8px 12px;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.lifecycleGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .sheetHeader,
+  .partyGrid,
+  .lifecycleGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .headerRight {
+    justify-items: start;
+  }
+
+  .summary {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .sheetTitleValue {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .composerPrep {
+    justify-items: stretch;
+  }
+
+  .composerPrepActions {
+    justify-content: flex-start;
+  }
+
+  .composerPrepMessage {
+    text-align: left;
+  }
+
+  .composerPrepPanel {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .publicDecisionBanner {
+    align-items: flex-start;
+  }
+
+  .publicDecisionBannerLink {
+    width: 100%;
+  }
+}
+
+:global(html[data-theme="dark"]) .sheet {
+  --composer-text-primary: #e2e8f0;
+  --composer-text-secondary: #94a3b8;
+  --composer-border: #334155;
+  --composer-foreground: #0b1220;
+  background: #0f172a;
+  border-color: #334155;
+  box-shadow: 0 18px 45px rgba(2, 6, 23, 0.5);
+}
+
+:global(html[data-theme="dark"]) .blockLabel,
+:global(html[data-theme="dark"]) .sheetTitle,
+:global(html[data-theme="dark"]) .metaTitle,
+:global(html[data-theme="dark"]) .terms h4 {
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .sheetTitleValue {
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .blockMuted,
+:global(html[data-theme="dark"]) .inlineHint,
+:global(html[data-theme="dark"]) .footer {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .staticFieldValue {
+  background: #111827;
+  border-color: #1f2937;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .staticFieldInlineValue {
+  border-bottom-color: #334155;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .staticMetaValue,
+:global(html[data-theme="dark"]) .staticCellValue {
+  color: #cbd5f5;
+}
+
+:global(html[data-theme="dark"]) .actionError {
+  color: #fca5a5;
+}
+
+:global(html[data-theme="dark"]) .actionSuccess {
+  color: #86efac;
+}
+
+:global(html[data-theme="dark"]) .actionSuccess a {
+  color: #bbf7d0;
+}
+
+:global(html[data-theme="dark"]) .logoBox {
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .logoUrlLink {
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .fieldInput,
+:global(html[data-theme="dark"]) .fieldSelect,
+:global(html[data-theme="dark"]) .lineInput,
+:global(html[data-theme="dark"]) .lineSelect {
+  background: #0b1220;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .fieldInput[readonly] {
+  background: #111827;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .sheetReadOnly {
+  background: #0c1629;
+}
+
+:global(html[data-theme="dark"]) .sheetReadOnly .fieldInput,
+:global(html[data-theme="dark"]) .sheetReadOnly .lineInput,
+:global(html[data-theme="dark"]) .sheetReadOnly .summaryTaxInput {
+  background: #0a1324;
+  border-color: #2b3b52;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .sheetReadOnly .lineSelect:disabled {
+  background: #0a1324;
+  border-color: #2b3b52;
+  color: #94a3b8;
+  opacity: 1;
+}
+
+:global(html[data-theme="dark"]) .fieldInput:disabled,
+:global(html[data-theme="dark"]) .lineInput:disabled,
+:global(html[data-theme="dark"]) .summaryTaxInput:disabled,
+:global(html[data-theme="dark"]) .lineSelect:disabled {
+  background: #0a1324;
+  border-color: #2b3b52;
+  color: #94a3b8;
+  opacity: 1;
+  cursor: default;
+}
+
+:global(html[data-theme="dark"]) .sheetReadOnly .amountCell,
+:global(html[data-theme="dark"]) .sheetReadOnly .summaryRow {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .metaBlock {
+  background: #111827;
+  border-color: #1f2937;
+}
+
+:global(html[data-theme="dark"]) .duplicatePanel {
+  background: #0b1220;
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .metaLine {
+  border-color: #1f2937;
+}
+
+:global(html[data-theme="dark"]) .lineTable {
+  border-color: #1f2937;
+}
+
+:global(html[data-theme="dark"]) .projectTableWrap {
+  background: #0f172a;
+  border-color: #1f2937;
+}
+
+:global(html[data-theme="dark"]) .projectTable thead th {
+  background: #1e293b;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .projectTable tbody td {
+  border-color: #1f2937;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .projectRow:nth-child(even) {
+  background: #111827;
+}
+
+:global(html[data-theme="dark"]) .projectRow:hover {
+  background: #1e293b;
+}
+
+:global(html[data-theme="dark"]) .projectRowActive {
+  background: #334155;
+}
+
+:global(html[data-theme="dark"]) .statusEventsTableWrap {
+  background: #0f172a;
+  border-color: #1f2937;
+}
+
+:global(html[data-theme="dark"]) .statusEventsTable thead th {
+  background: #1e293b;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .statusEventsTable tbody td {
+  border-color: #1f2937;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .statusEventsTable tbody tr:nth-child(even) {
+  background: #111827;
+}
+
+:global(html[data-theme="dark"]) .statusEventActorLink {
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .lineHeader {
+  background: #1e293b;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .lineRow {
+  border-color: #1f2937;
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .lineRow:nth-child(even) {
+  background: #131d31;
+}
+
+:global(html[data-theme="dark"]) .lineHeaderCell:not(:last-child)::after {
+  background: #5f7cab;
+}
+
+:global(html[data-theme="dark"]) .lineCell:not(:last-child)::after {
+  display: none;
+}
+
+:global(html[data-theme="dark"]) .amountCell {
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .secondaryButton {
+  background: #0b1220;
+  border-color: #334155;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .primaryButton {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+:global(html[data-theme="dark"]) .summary {
+  background: #111827;
+  border-color: #1f2937;
+}
+
+:global(html[data-theme="dark"]) .summaryRow {
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .summaryTotal {
+  background: #1e293b;
+  color: #bfdbfe;
+  border-color: #1f2937;
+}
+
+:global(html[data-theme="dark"]) .terms {
+  border-color: #1f2937;
+  color: #cbd5f5;
+}
+
+
+:global(html[data-theme="dark"]) .lifecycleLinkAction {
+  background: #2563eb;
+  border-color: #3b82f6;
+  color: #f8fafc;
+}
+
+:global(html[data-theme="dark"]) .historyNotice {
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .familyActionLink,
+:global(html[data-theme="dark"]) .familyActionButton {
+  border-color: #1d4ed8;
+  background: #1e3a8a;
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .familyActionLink:hover,
+:global(html[data-theme="dark"]) .familyActionLink:focus-visible,
+:global(html[data-theme="dark"]) .familyActionButton:hover,
+:global(html[data-theme="dark"]) .familyActionButton:focus-visible {
+  background: #1d4ed8;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.45);
+}
+
+:global(html[data-theme="dark"]) .publicEstimateLinkIcon {
+  border-color: #1d4ed8;
+  background: #1e3a8a;
+  color: #93c5fd;
+}
+
+:global(html[data-theme="dark"]) .publicEstimateLinkIcon:hover,
+:global(html[data-theme="dark"]) .publicEstimateLinkIcon:focus-visible {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.4);
+  background: #1d4ed8;
+}
+
+:global(html[data-theme="dark"]) .historyCard {
+  background: #0b1220;
+  border-color: #1f2937;
+}
+
+:global(html[data-theme="dark"]) .historyCardActive {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+  background: #172554;
+}
+
+:global(html[data-theme="dark"]) .versionNode {
+  background: #0b1220;
+  border-color: #1f2937;
+}
+
+:global(html[data-theme="dark"]) .versionStatus {
+  background: #1e293b;
+  color: #bfdbfe;
+}
+
+:global(html[data-theme="dark"]) .statusPill {
+  border-color: #334155;
+}
+
+:global(html[data-theme="dark"]) .statusPillInactive {
+  background: #0b1220;
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .statusPillActive.statusDraft {
+  background: #1d4ed8;
+  border-color: #3b82f6;
+  color: #dbeafe;
+}
+
+:global(html[data-theme="dark"]) .statusPillActive.statusSent {
+  background: #b45309;
+  border-color: #f59e0b;
+  color: #fef3c7;
+}
+
+:global(html[data-theme="dark"]) .statusPillActive.statusApproved {
+  background: #15803d;
+  border-color: #22c55e;
+  color: #dcfce7;
+}
+
+:global(html[data-theme="dark"]) .statusPillActive.statusRejected {
+  background: #991b1b;
+  border-color: #ef4444;
+  color: #fee2e2;
+}
+
+:global(html[data-theme="dark"]) .statusPillActive.statusArchived {
+  background: #4b5563;
+  border-color: #9ca3af;
+  color: #f3f4f6;
+}
+
+
+:global(html[data-theme="dark"]) .summaryTaxInput {
+  background: #0b1220;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+:global(html[data-theme="dark"]) .smallButton {
+  background: #0b1220;
+  border-color: #334155;
+  color: #bfdbfe;
+}
