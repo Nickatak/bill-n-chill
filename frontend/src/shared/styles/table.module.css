@@ -1,0 +1,46 @@
+/* Shared table styles. Compose from feature modules to avoid duplicating table structure. */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-base);
+}
+
+.th {
+  background: var(--table-header-bg);
+  color: var(--table-header-text);
+  font-size: var(--font-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 10px 12px;
+  white-space: nowrap;
+}
+
+.td {
+  padding: 10px 12px;
+  border-top: 1px solid var(--table-border);
+  color: var(--text-primary);
+  font-size: var(--font-base);
+  vertical-align: top;
+}
+
+.rowAlt:nth-child(even) {
+  background: var(--table-row-alt);
+}
+
+.rowHover:hover {
+  background: var(--table-row-hover);
+  cursor: pointer;
+}
+
+.rowActive {
+  background: var(--table-row-active);
+}
+
+.tableWrap {
+  border: 1px solid var(--table-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}

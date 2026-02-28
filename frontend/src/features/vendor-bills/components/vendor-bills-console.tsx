@@ -1,9 +1,18 @@
 "use client";
 
+/**
+ * Vendor bills (accounts payable) console. Lets users browse, create, edit,
+ * and manage the lifecycle of vendor bills for a selected project. Includes
+ * line-item allocation to budget scope items, duplicate detection, status
+ * transitions driven by a policy contract, and a "recreate as new" workflow.
+ */
+
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { formatDateDisplay } from "@/shared/date-format";
+import { usePagination } from "@/shared/hooks/use-pagination";
+import { formatDateDisplay, todayDateInput, futureDateInput } from "@/shared/date-format";
+import { readApiErrorMessage } from "@/shared/api/error";
 import { ProjectListStatusValue, ProjectListViewer } from "@/shared/project-list-viewer";
 
 import {
@@ -55,16 +64,6 @@ type ProjectStatusValue = ProjectListStatusValue;
 const DEFAULT_PROJECT_STATUS_FILTERS: ProjectStatusValue[] = ["active", "prospect"];
 const PROJECT_STATUS_VALUES: ProjectStatusValue[] = ["prospect", "active", "on_hold", "completed", "cancelled"];
 
-function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function dueDateIsoDate(daysFromNow = 30) {
-  const current = new Date();
-  current.setDate(current.getDate() + daysFromNow);
-  return current.toISOString().slice(0, 10);
-}
-
 const GENERIC_BUDGET_LINE_SPECS = [
   { costCode: "99-901", label: "Generic: Tools & Consumables" },
   { costCode: "99-902", label: "Generic: Project Overhead" },
@@ -96,6 +95,7 @@ type AllocationFormRow = VendorBillAllocationInput & {
   ui_target_budget_id?: number;
 };
 
+/** Creates a blank allocation row for the bill allocation form. */
 function createEmptyAllocationRow(): AllocationFormRow {
   return {
     budget_line: 0,
@@ -110,33 +110,18 @@ type VendorBillsConsoleProps = {
   scopedProjectId?: number | null;
 };
 
+/** Returns default bill status filters -- all statuses except "void". */
 function defaultBillStatusFilters(statuses: string[]): string[] {
   const withoutVoid = statuses.filter((value) => value !== "void");
   return withoutVoid.length ? withoutVoid : statuses;
 }
 
+/** Converts a snake_case status to a human-readable label. */
 function projectStatusLabel(statusValue: string): string {
   return statusValue.replace("_", " ");
 }
 
-function readApiErrorMessage(payload: ApiResponse | undefined, fallback: string): string {
-  const topLevelMessage = payload?.error?.message?.trim();
-  if (topLevelMessage) {
-    return topLevelMessage;
-  }
-  const fieldEntries = Object.entries((payload?.error as { fields?: Record<string, string[]> } | undefined)?.fields ?? {});
-  for (const [fieldName, fieldMessages] of fieldEntries) {
-    if (!Array.isArray(fieldMessages)) {
-      continue;
-    }
-    const firstFieldMessage = fieldMessages.find((message) => Boolean((message || "").trim()));
-    if (firstFieldMessage) {
-      return `${fieldName}: ${firstFieldMessage}`;
-    }
-  }
-  return fallback;
-}
-
+/** Renders the vendor bills dashboard: project picker, bill list, status panel, and bill form. */
 export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null }: VendorBillsConsoleProps) {
   const searchParams = useSearchParams();
   const queryProjectParam = searchParams.get("project");
@@ -146,7 +131,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const preferredProjectId = scopedProjectId ?? queryProjectId;
 
   const { token, role } = useSharedSessionAuth();
-  const projectPageSize = 5;
   const dueSoonWindowDays = 7;
   const [statusMessage, setStatusMessage] = useState("");
   const [createErrorMessage, setCreateErrorMessage] = useState("");
@@ -156,7 +140,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const [projectStatusFilters, setProjectStatusFilters] = useState<ProjectStatusValue[]>(
     DEFAULT_PROJECT_STATUS_FILTERS,
   );
-  const [currentProjectPage, setCurrentProjectPage] = useState(1);
   const [isProjectListExpanded, setIsProjectListExpanded] = useState(true);
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -183,7 +166,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   const [newVendorId, setNewVendorId] = useState("");
   const [newBillNumber, setNewBillNumber] = useState("");
-  const [newReceivedDate, setNewReceivedDate] = useState(todayIsoDate());
+  const [newReceivedDate, setNewReceivedDate] = useState(todayDateInput());
   const [newIssueDate, setNewIssueDate] = useState("");
   const [newDueDate, setNewDueDate] = useState("");
   const [newCurrency, setNewCurrency] = useState("USD");
@@ -200,7 +183,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   const [vendorId, setVendorId] = useState("");
   const [billNumber, setBillNumber] = useState("");
-  const [receivedDate, setReceivedDate] = useState(todayIsoDate());
+  const [receivedDate, setReceivedDate] = useState(todayDateInput());
   const [issueDate, setIssueDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [currency, setCurrency] = useState("USD");
@@ -245,10 +228,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     : filteredProjects.filter((project) =>
         projectStatusFilters.includes((project.status as ProjectStatusValue) ?? "active"),
       );
-  const totalProjectPages = Math.max(1, Math.ceil(statusFilteredProjects.length / projectPageSize));
-  const currentProjectPageSafe = Math.min(currentProjectPage, totalProjectPages);
-  const projectPageStart = (currentProjectPageSafe - 1) * projectPageSize;
-  const pagedProjects = statusFilteredProjects.slice(projectPageStart, projectPageStart + projectPageSize);
+  const { pageItems: pagedProjects, currentPage: currentProjectPageSafe, totalPages: totalProjectPages, prevPage: prevProjectPage, nextPage: nextProjectPage, resetPage: resetProjectPage } = usePagination(statusFilteredProjects, 5);
   const filteredVendorBills = vendorBills.filter((bill) => {
     if (billStatusFilters.length === 0 || !billStatusFilters.includes(bill.status)) {
       return false;
@@ -259,11 +239,11 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     if (!bill.due_date || bill.status === "paid" || bill.status === "void") {
       return false;
     }
-    const today = todayIsoDate();
+    const today = todayDateInput();
     if (dueFilter === "overdue") {
       return bill.due_date < today;
     }
-    const dueSoonDate = dueDateIsoDate(dueSoonWindowDays);
+    const dueSoonDate = futureDateInput(dueSoonWindowDays);
     return bill.due_date >= today && bill.due_date <= dueSoonDate;
   });
   const createAllocationTotal = newAllocations.reduce((sum, row) => {
@@ -351,6 +331,10 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     formShippingAmountValue
   ).toFixed(2);
 
+  // --- Form field delegates ---
+  // Each setter routes to either the "new bill" or "edit bill" state based on mode.
+
+  /** Routes vendor ID changes to the correct create/edit state. */
   function setFormVendorId(value: string) {
     if (isEditingMode) {
       setVendorId(value);
@@ -417,7 +401,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   function setFormScheduledFor(value: string) {
     if (isEditingMode) {
-      if (value && value < todayIsoDate()) {
+      if (value && value < todayDateInput()) {
         setStatusMessage("Scheduled for date cannot be in the past.");
         return;
       }
@@ -451,12 +435,14 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
   }
 
+  /** Patches a single allocation row by index. */
   function updateFormAllocation(index: number, patch: Partial<AllocationFormRow>) {
     const next = [...formAllocations];
     next[index] = { ...next[index], ...patch };
     setFormAllocations(next);
   }
 
+  /** Removes an allocation row, keeping at least one row. */
   function removeFormAllocation(index: number) {
     const current = formAllocations;
     setFormAllocations(
@@ -464,15 +450,18 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     );
   }
 
+  /** Appends a new blank allocation row to the form. */
   function addFormAllocation() {
     setFormAllocations([...formAllocations, createEmptyAllocationRow()]);
   }
 
+  /** Formats a string dollar value to two decimal places, defaulting to "0.00". */
   function formatMoney(value?: string): string {
     const parsed = Number(value ?? "0");
     return Number.isFinite(parsed) ? parsed.toFixed(2) : "0.00";
   }
 
+  /** Derives the UI key and target budget for a generic-scope budget line. */
   function resolveGenericUiState(budgetLineId: number): Pick<AllocationFormRow, "ui_line_key" | "ui_target_budget_id"> {
     const meta = budgetLineMetaById.get(Number(budgetLineId));
     const code = meta?.cost_code_code ?? "";
@@ -485,6 +474,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     };
   }
 
+  /** Converts an API allocation input into a form row with resolved generic-scope UI state. */
   function toAllocationFormRow(row: VendorBillAllocationInput): AllocationFormRow {
     const genericUi = resolveGenericUiState(Number(row.budget_line));
     return {
@@ -495,6 +485,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     };
   }
 
+  /** Routes form submission to create or save based on the current editing mode. */
   function handleSubmitVendorBillForm(event: FormEvent<HTMLFormElement>) {
     if (!canMutateVendorBills) {
       event.preventDefault();
@@ -508,6 +499,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     void handleCreateVendorBill(event);
   }
 
+  /** Populates the edit form fields from a vendor bill record. */
   function hydrate(item: VendorBillRecord) {
     setVendorId(String(item.vendor));
     setBillNumber(item.bill_number);
@@ -533,18 +525,22 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setAllocations(mapped.length > 0 ? mapped : [createEmptyAllocationRow()]);
   }
 
+  /** Returns the display label for a bill status, using policy-provided labels. */
   function statusDisplayLabel(value: VendorBillStatus): string {
     return billStatusLabels[value] ?? value;
   }
 
+  /** Returns the CSS class for a status badge in the bill table. */
   function statusBadgeClass(value: VendorBillStatus): string {
     return styles[`tableStatus${value[0].toUpperCase()}${value.slice(1)}`] ?? "";
   }
 
+  /** Returns the CSS class for a status pill button. */
   function statusPillClass(value: VendorBillStatus): string {
     return styles[`statusPill${value[0].toUpperCase()}${value.slice(1)}`] ?? "";
   }
 
+  /** Toggles a bill status in or out of the active filter set. */
   function toggleBillStatusFilter(nextStatus: VendorBillStatus) {
     setBillStatusFilters((current) =>
       current.includes(nextStatus)
@@ -553,6 +549,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     );
   }
 
+  /** Toggles a project status in or out of the project list filter. */
   function toggleProjectStatusFilter(statusValue: ProjectStatusValue) {
     setProjectStatusFilters((current) =>
       current.includes(statusValue)
@@ -561,6 +558,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     );
   }
 
+  /** Switches the selected project context for bill loading. */
   function handleSelectProject(project: { id: number }) {
     if (String(project.id) === selectedProjectId) {
       return;
@@ -568,6 +566,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setSelectedProjectId(String(project.id));
   }
 
+  /** Fetches the policy contract that drives status options, transitions, and labels. */
   async function loadVendorBillPolicy() {
     try {
       const response = await fetchVendorBillPolicyContract({
@@ -626,6 +625,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
   }
 
+  /** Loads projects and vendors in parallel on initial mount. */
   async function loadDependencies() {
     setStatusMessage("Loading projects and vendors...");
 
@@ -680,6 +680,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
   }
 
+  /** Fetches vendor bills for the selected project and auto-selects the most recent non-void bill. */
   async function loadVendorBills() {
     const projectId = Number(selectedProjectId);
     if (!projectId) {
@@ -718,6 +719,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
   }
 
+  /** Loads budget line items grouped by estimate origin for the allocation dropdown. */
   async function loadBudgetLineOptions(projectId: number) {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/budgets/`, {
@@ -779,6 +781,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
   }
 
+  /** POSTs a new vendor bill to the API, handling duplicate detection. */
   async function createVendorBill(payloadBody: VendorBillPayload) {
     const response = await fetch(
       `${normalizedBaseUrl}/projects/${payloadBody.projectId}/vendor-bills/`,
@@ -828,6 +831,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setStatusMessage(`Created vendor bill #${created.id}.`);
   }
 
+  /** Validates form inputs and delegates to createVendorBill. */
   async function handleCreateVendorBill(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setCreateErrorMessage("");
@@ -872,6 +876,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     });
   }
 
+  /** Selects a vendor bill from the list and hydrates the edit form. */
   function handleSelectVendorBill(id: string) {
     setSelectedVendorBillId(id);
     setViewerErrorMessage("");
@@ -881,9 +886,10 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     hydrate(selected);
   }
 
+  /** Resets the form to create-mode with default values for a new bill. */
   function handleStartNewVendorBill() {
-    const today = todayIsoDate();
-    const due = dueDateIsoDate();
+    const today = todayDateInput();
+    const due = futureDateInput();
     setSelectedVendorBillId("");
     setCreateErrorMessage("");
     setEditErrorMessage("");
@@ -908,6 +914,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setStatusMessage("New vendor bill create mode.");
   }
 
+  /** PATCHes the currently selected vendor bill with the edit form values. */
   async function handleSaveVendorBill(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setEditErrorMessage("");
@@ -925,7 +932,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       setStatusMessage(message);
       return;
     }
-    if (scheduledFor && scheduledFor < todayIsoDate()) {
+    if (scheduledFor && scheduledFor < todayDateInput()) {
       const message = "Scheduled for date cannot be in the past.";
       setEditErrorMessage(message);
       setStatusMessage(message);
@@ -985,6 +992,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
   }
 
+  /** Applies a single-field status transition to the selected vendor bill. */
   async function handleQuickVendorBillStatus(nextStatus: VendorBillStatus) {
     if (!canMutateVendorBills) {
       const message = `Role ${role} is read-only for vendor bill mutations.`;
@@ -1026,6 +1034,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
   }
 
+  /** Validates that a next status is selected, then delegates to the quick status handler. */
   async function handleUpdateVendorBillStatus() {
     if (!viewerNextStatus) {
       const message = "Select a next status first.";
@@ -1036,6 +1045,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     await handleQuickVendorBillStatus(viewerNextStatus);
   }
 
+  /** Copies the selected bill's details into the create form for a "recreate" workflow. */
   function handleRecreateAsNewDraftTemplate() {
     if (!selectedVendorBillId) {
       setStatusMessage("Select a vendor bill first.");
@@ -1075,6 +1085,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setStatusMessage(`Copied bill #${selected.id} into create form.`);
   }
 
+  // Bootstrap: load the policy contract and project/vendor lists once authenticated.
   useEffect(() => {
     if (!token) {
       return;
@@ -1087,9 +1098,10 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  // Ensure date fields have sensible defaults on mount.
   useEffect(() => {
-    const today = todayIsoDate();
-    const due = dueDateIsoDate();
+    const today = todayDateInput();
+    const due = futureDateInput();
     setNewReceivedDate((current) => current || today);
     setNewIssueDate((current) => current || today);
     setNewDueDate((current) => current || due);
@@ -1098,6 +1110,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setDueDate((current) => current || due);
   }, []);
 
+  // Reload vendor bills and budget lines whenever the selected project changes.
   useEffect(() => {
     if (!token || !selectedProjectId) {
       return;
@@ -1110,10 +1123,12 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, selectedProjectId]);
 
+  // Reset to page 1 when search or filters change.
   useEffect(() => {
-    setCurrentProjectPage(1);
-  }, [projectSearch, projectStatusFilters]);
+    resetProjectPage();
+  }, [projectSearch, projectStatusFilters, resetProjectPage]);
 
+  // If the selected project is filtered out, fall back to the first visible project.
   useEffect(() => {
     if (!statusFilteredProjects.length) {
       return;
@@ -1127,6 +1142,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setSelectedProjectId(String(statusFilteredProjects[0].id));
   }, [statusFilteredProjects, selectedProjectId]);
 
+  // If the selected bill is no longer visible after filter changes, fall back to the first match.
   useEffect(() => {
     if (!filteredVendorBills.length) {
       return;
@@ -1146,6 +1162,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredVendorBills, selectedVendorBillId]);
 
+  // Keep the viewer's next-status picker in sync with the selected bill's allowed transitions.
   useEffect(() => {
     if (!selectedVendorBill) {
       setViewerNextStatus("");
@@ -1155,6 +1172,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setViewerNextStatus((current) => (nextStatuses.includes(current) ? current : (nextStatuses[0] ?? "")));
   }, [allowedStatusTransitions, selectedVendorBill]);
 
+  // Back-fill generic scope UI keys on allocation rows once budget line metadata loads.
   useEffect(() => {
     if (!budgetLineMetaById.size) {
       return;
@@ -1217,8 +1235,8 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
           showPagination={!isProjectScoped}
           currentPage={currentProjectPageSafe}
           totalPages={totalProjectPages}
-          onPrevPage={() => setCurrentProjectPage((page) => Math.max(1, page - 1))}
-          onNextPage={() => setCurrentProjectPage((page) => Math.min(totalProjectPages, page + 1))}
+          onPrevPage={prevProjectPage}
+          onNextPage={nextProjectPage}
         />
       ) : (
         <p>Create or load a project before entering bills.</p>

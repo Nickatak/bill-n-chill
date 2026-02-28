@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Controlled form for creating a new project under a specific customer.
+ * Rendered inside a modal dialog from ContactsConsole. Allows the user to
+ * set a project name, optional site address, and initial status (prospect/active).
+ */
+
 import { FormEventHandler } from "react";
 
 import styles from "./contacts-console.module.css";
@@ -17,6 +23,7 @@ type CustomerProjectCreateFormProps = {
   onSubmit: FormEventHandler<HTMLFormElement>;
 };
 
+/** Project creation form scoped to a single customer, with prospect/active status selector. */
 export function CustomerProjectCreateForm({
   customerName,
   projectName,
@@ -50,6 +57,8 @@ export function CustomerProjectCreateForm({
           placeholder="Optional"
         />
       </label>
+      {/* Status selector — only prospect and active are valid for new projects */}
+
       <label className={styles.field}>
         Status
         <div className={styles.projectStatusSelector} role="group" aria-label="Project status">

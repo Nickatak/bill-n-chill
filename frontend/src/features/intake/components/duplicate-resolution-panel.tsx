@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Duplicate resolution UI shown during quick-add when existing customer matches are detected.
+ * Lets the user pick an existing customer or override and create a new one anyway.
+ */
+
 import { KeyboardEvent } from "react";
 
 import { CustomerIntakePayload, DuplicateCustomerCandidate } from "../types";
@@ -15,6 +20,7 @@ type DuplicateResolutionPanelProps = {
   onResolve: (resolution: DuplicateResolution, targetId?: number) => void;
 };
 
+/** Format a created_at timestamp for display in the candidate card. */
 function formatCreatedAt(value: string) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
@@ -23,10 +29,12 @@ function formatCreatedAt(value: string) {
   return parsed.toLocaleString();
 }
 
+/** Normalize a string for case-insensitive field comparison. */
 function normalized(value: string | null | undefined) {
   return (value ?? "").trim().toLowerCase();
 }
 
+/** Identify which fields match between a candidate and the submitted intake payload. */
 function matchedFields(candidate: DuplicateCustomerCandidate, payload: CustomerIntakePayload | null) {
   if (!payload) {
     return [];
@@ -55,6 +63,7 @@ function matchedFields(candidate: DuplicateCustomerCandidate, payload: CustomerI
   return matches;
 }
 
+/** Renders duplicate candidate cards with match highlighting and resolution actions. */
 export function DuplicateResolutionPanel({
   duplicateCandidates,
   selectedDuplicateId,
@@ -68,6 +77,7 @@ export function DuplicateResolutionPanel({
   }
 
   const isProjectFlow = duplicateResolutionIntent === "customer_and_project";
+
   const resolveActionLabel = isProjectFlow
     ? "Create Project for This Customer"
     : "Use This Customer";

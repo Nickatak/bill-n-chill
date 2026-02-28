@@ -1,6 +1,6 @@
 .errorText {
   margin: 0;
-  color: #b91c1c;
+  color: var(--tone-error-text);
   font-size: 0.88rem;
 }
 
@@ -12,8 +12,8 @@
 
 .profileMeta {
   display: grid;
-  gap: 4px;
-  color: #334155;
+  gap: var(--space-xs);
+  color: var(--text-secondary);
   font-size: 0.85rem;
 }
 
@@ -26,7 +26,7 @@
 
 .field {
   display: grid;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 .fieldLabel {
@@ -34,62 +34,62 @@
   font-size: 0.76rem;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: #475569;
+  color: var(--text-secondary);
   font-weight: 700;
 }
 
 .field input,
 .field select {
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--input-border);
   border-radius: 10px;
-  padding: 8px 10px;
-  background: #f8fafc;
-  color: #0f172a;
-  font-size: 0.9rem;
+  padding: var(--space-sm) 10px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: var(--font-base);
 }
 
 .field textarea {
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--input-border);
   border-radius: 10px;
-  padding: 8px 10px;
-  background: #f8fafc;
-  color: #0f172a;
-  font-size: 0.9rem;
+  padding: var(--space-sm) 10px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: var(--font-base);
   resize: vertical;
 }
 
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
-  outline: 2px solid #93c5fd;
-  border-color: #60a5fa;
+  outline: 2px solid var(--accent-border);
+  border-color: var(--accent);
 }
 
 .profileDivider {
-  border-top: 1px solid #dbe5f1;
+  border-top: 1px solid var(--border);
   padding-top: 10px;
-  margin-top: 4px;
+  margin-top: var(--space-xs);
   display: grid;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 .documentPresetHeader {
-  border-top: 1px solid #dbe5f1;
+  border-top: 1px solid var(--border);
   padding-top: 10px;
-  margin-top: 4px;
+  margin-top: var(--space-xs);
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-md);
 }
 
 .documentPresetPanel {
-  border: 1px solid #dbe5f1;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: #f8fbff;
+  background: var(--surface-secondary);
   padding: 10px;
   display: grid;
-  gap: 6px;
+  gap: var(--space-sm);
 }
 
 .documentTypeField {
@@ -99,13 +99,13 @@
 
 .sectionSubTitle {
   margin: 0;
-  color: #0f172a;
+  color: var(--text-primary);
   font-size: 0.92rem;
 }
 
 .sectionSubCopy {
   margin: 0;
-  color: #475569;
+  color: var(--text-secondary);
   font-size: 0.84rem;
 }
 
@@ -120,17 +120,17 @@
   font-weight: 700;
   letter-spacing: 0.01em;
   cursor: pointer;
-  padding: 8px 12px;
+  padding: var(--space-sm) var(--space-md);
 }
 
 .primaryButton {
-  background: #1d4ed8;
-  color: #ffffff;
+  background: var(--accent);
+  color: var(--text-on-accent);
 }
 
 .secondaryButton {
-  background: #e2e8f0;
-  color: #0f172a;
+  background: var(--surface-inset);
+  color: var(--text-primary);
 }
 
 .primaryButton:disabled,
@@ -146,12 +146,12 @@
 }
 
 .membershipRow {
-  border: 1px solid #dbe5f1;
-  border-radius: 12px;
-  background: #f8fbff;
-  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-secondary);
+  padding: var(--space-md);
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .memberIdentity {
@@ -162,31 +162,31 @@
 .memberName {
   margin: 0;
   font-size: 0.92rem;
-  color: #0f172a;
+  color: var(--text-primary);
   font-weight: 700;
 }
 
 .memberEmail {
   margin: 0;
   font-size: 0.84rem;
-  color: #334155;
+  color: var(--text-secondary);
 }
 
 .selfBadge {
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  border: 1px solid #bfdbfe;
-  border-radius: 999px;
-  background: #dbeafe;
-  color: #1e3a8a;
-  font-size: 0.72rem;
-  padding: 3px 8px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-pill);
+  background: var(--accent-light);
+  color: var(--accent-text);
+  font-size: var(--font-xs);
+  padding: 3px var(--space-sm);
 }
 
 .memberControls {
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -194,17 +194,17 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .permissionHint {
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 0.78rem;
 }
 
 .emptyText {
   margin: 0;
-  color: #475569;
+  color: var(--text-secondary);
   font-size: 0.88rem;
 }
 
@@ -220,78 +220,4 @@
   .memberControls {
     grid-template-columns: 1fr;
   }
-}
-
-:global(html[data-theme="dark"]) .errorText {
-  color: #fca5a5;
-}
-
-:global(html[data-theme="dark"]) .profileMeta {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .fieldLabel {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .field input,
-:global(html[data-theme="dark"]) .field select,
-:global(html[data-theme="dark"]) .field textarea {
-  border-color: #334155;
-  background: #0f1a2d;
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .profileDivider {
-  border-top-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .documentPresetHeader {
-  border-top-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .documentPresetPanel {
-  border-color: #334155;
-  background: #0f1a2d;
-}
-
-:global(html[data-theme="dark"]) .sectionSubTitle {
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .sectionSubCopy {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .primaryButton {
-  background: #2563eb;
-}
-
-:global(html[data-theme="dark"]) .secondaryButton {
-  background: #1e293b;
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .membershipRow {
-  border-color: #334155;
-  background: #0f1a2d;
-}
-
-:global(html[data-theme="dark"]) .memberName {
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .memberEmail {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .selfBadge {
-  border-color: #1d4ed8;
-  background: #1e3a8a;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .permissionHint,
-:global(html[data-theme="dark"]) .emptyText {
-  color: #94a3b8;
 }

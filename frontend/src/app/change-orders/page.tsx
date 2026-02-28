@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ChangeOrdersConsole } from "@/features/change-orders";
-import styles from "./page.module.css";
+import { PageCard, PageShell } from "@/shared/shell";
 
 export const metadata: Metadata = {
   title: "Change Orders",
@@ -8,12 +8,10 @@ export const metadata: Metadata = {
 
 export default function ChangeOrdersPage() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <section className={styles.card}>
-          <ChangeOrdersConsole />
-        </section>
-      </main>
-    </div>
+    <PageShell>
+      <PageCard>
+        <ChangeOrdersConsole />
+      </PageCard>
+    </PageShell>
   );
 }

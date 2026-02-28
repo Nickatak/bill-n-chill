@@ -1,8 +1,14 @@
 "use client";
 
+/**
+ * Settings console for configuring intake validation rules.
+ * Controls which fields are required during quick-add customer creation.
+ */
+
 import { useIntakeSettingsController } from "../hooks/use-intake-settings-controller";
 import styles from "./intake-settings-console.module.css";
 
+/** Renders the intake rules settings form with toggle controls and save action. */
 export function IntakeSettingsConsole() {
   // Composition owner: wires controller state/actions into the settings form rendering.
   const controllerApi = useIntakeSettingsController();

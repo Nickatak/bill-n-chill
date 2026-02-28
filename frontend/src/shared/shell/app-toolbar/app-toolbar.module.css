@@ -3,21 +3,21 @@
 .controls {
   position: fixed;
   top: 0;
-  right: 12px;
+  right: var(--space-md);
   height: 48px;
   z-index: 1000;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .button {
-  border: 1px solid #d1d5db;
-  border-radius: 999px;
-  background: #ffffff;
-  color: #111827;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-primary);
   min-height: 38px;
-  padding: 0 12px;
+  padding: 0 var(--space-md);
   font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
@@ -26,30 +26,30 @@
 }
 
 .buttonActive {
-  border-color: #111827;
-  background: #111827;
-  color: #ffffff;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--text-on-accent);
 }
 
 .themeToggle {
-  border: 1px solid #d1d5db;
-  border-radius: 999px;
-  background: #ffffff;
-  color: #111827;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-primary);
   min-height: 38px;
-  padding: 0 12px;
+  padding: 0 var(--space-md);
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
 }
 
 .logout {
-  border: 1px solid #d1d5db;
-  border-radius: 999px;
-  background: #ffffff;
-  color: #111827;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-primary);
   min-height: 38px;
-  padding: 0 12px;
+  padding: 0 var(--space-md);
   font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
@@ -79,19 +79,19 @@
   min-width: 180px;
   display: grid;
   gap: 6px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: #ffffff;
-  padding: 8px;
+  background: var(--surface);
+  padding: var(--space-sm);
 }
 
 .menuItem {
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 0.82rem;
-  color: #111827;
-  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) 10px;
+  font-size: var(--font-sm);
+  color: var(--text-primary);
+  background: var(--surface);
   transition:
     border-color 140ms ease,
     background-color 140ms ease,
@@ -100,8 +100,8 @@
 }
 
 .menuItem:hover {
-  border-color: #94a3b8;
-  background: #f8fafc;
+  border-color: var(--text-muted);
+  background: var(--surface-secondary);
   transform: translateY(-1px);
 }
 
@@ -110,9 +110,9 @@
 }
 
 .menuItemActive {
-  border-color: #111827;
-  background: #111827;
-  color: #ffffff;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--text-on-accent);
 }
 
 /* -- Quick Jump -- */
@@ -130,102 +130,36 @@
 
 .quickJumpInputWrap {
   display: grid;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 .quickJumpLabel {
-  font-size: 0.72rem;
+  font-size: var(--font-xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .quickJumpInput {
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 8px 10px;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) 10px;
   font-size: 0.85rem;
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--input-bg);
+  color: var(--text-primary);
 }
 
 .quickJumpHint {
   margin: 0;
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .quickJumpSubLabel {
   display: block;
   margin-top: 2px;
   font-size: 0.76rem;
-  color: #475569;
-}
-
-/* -- Dark theme -- */
-
-:global(html[data-theme="dark"]) .button {
-  border-color: #334155;
-  background: #111827;
-  color: #f3f4f6;
-}
-
-:global(html[data-theme="dark"]) .buttonActive {
-  border-color: #e5e7eb;
-  background: #e5e7eb;
-  color: #0f172a;
-}
-
-:global(html[data-theme="dark"]) .themeToggle {
-  border-color: #334155;
-  background: #111827;
-  color: #f3f4f6;
-}
-
-:global(html[data-theme="dark"]) .logout {
-  border-color: #334155;
-  background: #111827;
-  color: #f3f4f6;
-}
-
-:global(html[data-theme="dark"]) .menuList {
-  border-color: #334155;
-  background: #0f172a;
-}
-
-:global(html[data-theme="dark"]) .menuItem {
-  border-color: #334155;
-  color: #e5e7eb;
-  background: #111827;
-}
-
-:global(html[data-theme="dark"]) .menuItem:hover {
-  border-color: #64748b;
-  background: #0f172a;
-}
-
-:global(html[data-theme="dark"]) .menuItemActive {
-  border-color: #e5e7eb;
-  background: #e5e7eb;
-  color: #0f172a;
-}
-
-:global(html[data-theme="dark"]) .quickJumpLabel {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .quickJumpInput {
-  border-color: #334155;
-  background: #0f172a;
-  color: #e5e7eb;
-}
-
-:global(html[data-theme="dark"]) .quickJumpHint {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .quickJumpSubLabel {
-  color: #94a3b8;
+  color: var(--text-secondary);
 }
 
 @media print {

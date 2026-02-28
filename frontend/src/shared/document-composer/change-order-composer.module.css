@@ -1,21 +1,21 @@
 .workflowSheet {
   margin: 14px 0;
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
 }
 
 .changeOrderComposerSection {
   display: grid;
-  gap: 16px;
+  gap: var(--space-lg);
   min-width: 0;
 }
 
 .createSheet {
-  border: 1px solid #bfdbfe;
+  border: 1px solid var(--accent-light);
   box-shadow: 0 12px 24px rgba(37, 99, 235, 0.12);
 }
 
 .editSheet {
-  border: 1px solid #d4dbe8;
+  border: 1px solid var(--border);
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
 }
 
@@ -24,14 +24,14 @@
 }
 
 .editSheetLocked .lockableControl:disabled {
-  background: #e2e8f0;
-  border-color: #cbd5e1;
-  color: #64748b;
+  background: var(--input-disabled-bg);
+  border-color: var(--input-disabled-border);
+  color: var(--input-disabled-text);
   cursor: not-allowed;
 }
 
 .editSheetLocked .lockableControl:disabled::placeholder {
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .coMetaField {
@@ -42,7 +42,7 @@
   font-size: 0.8rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #1e3a8a;
+  color: var(--accent-text);
   font-weight: 700;
 }
 
@@ -60,9 +60,9 @@
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid transparent;
-  padding: 2px 8px;
+  padding: 2px var(--space-sm);
   font-size: 0.64rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -70,15 +70,15 @@
 }
 
 .viewerBaselineBadgeActive {
-  background: #dcfce7;
-  border-color: #86efac;
-  color: #166534;
+  background: var(--status-approved-bg);
+  border-color: var(--status-approved-border);
+  color: var(--status-approved-text);
 }
 
 .viewerBaselineBadgeSuperseded {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-  color: #475569;
+  background: var(--status-void-bg);
+  border-color: var(--status-void-border);
+  color: var(--status-void-text);
 }
 
 .coLineSectionIntro {
@@ -90,28 +90,28 @@
 .coLineSectionIntro h3 {
   margin: 0;
   font-size: 0.92rem;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .coLineSectionIntro p {
   margin: 0;
   font-size: 0.83rem;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .coLineLegend {
   font-size: 0.79rem;
-  color: #334155;
+  color: var(--status-void-text);
 }
 
 .coLineHeader {
   display: grid;
   grid-template-columns: 0.85fr 1.2fr 1.2fr 1.45fr 1fr 0.9fr 0.9fr 0.7fr;
-  gap: 8px;
+  gap: var(--space-sm);
   align-items: stretch;
   padding: 10px;
-  background: #eef2ff;
-  color: #1e3a8a;
+  background: var(--table-header-bg);
+  color: var(--table-header-text);
   font-size: 0.76rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -121,10 +121,10 @@
 .coLineRow {
   display: grid;
   grid-template-columns: 0.85fr 1.2fr 1.2fr 1.45fr 1fr 0.9fr 0.9fr 0.7fr;
-  gap: 8px;
+  gap: var(--space-sm);
   align-items: stretch;
   padding: 9px 10px;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .coLineHeader > span,
@@ -135,8 +135,8 @@
 
 .coLineHeader > span + span,
 .coLineRow > * + * {
-  padding-left: 12px;
-  box-shadow: -1px 0 0 #dbe5f3;
+  padding-left: var(--space-md);
+  box-shadow: -1px 0 0 var(--border);
 }
 
 .coLineHeader > span + span {
@@ -144,35 +144,35 @@
 }
 
 .coLineRowGroup {
-  border-top: 1px solid #dbe5f3;
+  border-top: 1px solid var(--border);
 }
 
 .coLineRowAlt {
-  background: #f7faff;
+  background: var(--table-row-alt);
 }
 
 .coLineRowInvalid {
-  border-left: 3px solid #dc2626;
+  border-left: 3px solid var(--tone-error-border);
 }
 
 .coLineIssue {
   margin: 0;
   padding: 0 10px 9px;
-  color: #991b1b;
+  color: var(--tone-error-text);
   font-size: 0.78rem;
   line-height: 1.4;
-  background: #fff7f7;
+  background: var(--tone-error-bg);
 }
 
 .coReadValue {
   display: inline-flex;
   align-items: center;
   min-height: 36px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 6px 8px;
-  background: #f8fafc;
-  color: #0f172a;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 6px var(--space-sm);
+  background: var(--surface-secondary);
+  color: var(--text-primary);
   font-size: 0.84rem;
   font-variant-numeric: tabular-nums;
 }
@@ -193,7 +193,7 @@
   grid-template-areas: "summary actions";
   align-items: stretch;
   gap: 14px;
-  border-top: 1px solid #dbe5f3;
+  border-top: 1px solid var(--border);
   padding-top: 14px;
   margin-top: 6px;
 }
@@ -209,9 +209,9 @@
 }
 
 .coSummarySecondaryValue {
-  font-size: 0.82rem;
+  font-size: var(--font-sm);
   font-variant-numeric: tabular-nums;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .coSheetFooterActions {
@@ -229,7 +229,7 @@
   width: 100%;
   justify-content: flex-end;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
 }
 
@@ -240,15 +240,15 @@
 }
 
 .coFooterErrorHint {
-  color: #991b1b;
+  color: var(--tone-error-text);
 }
 
 .coFooterPrimaryButton {
   width: fit-content;
   min-width: 150px;
   min-height: 0;
-  padding: 8px 12px;
-  font-size: 0.9rem;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-base);
   font-weight: 700;
   line-height: 1.2;
   display: inline-flex;
@@ -258,110 +258,18 @@
 }
 
 .coFooterPrimaryButton:disabled {
-  background: #94a3b8;
-  border-color: #94a3b8;
-  color: #e2e8f0;
+  background: var(--text-muted);
+  border-color: var(--text-muted);
+  color: var(--border);
   cursor: not-allowed;
   box-shadow: none;
   opacity: 0.85;
 }
 
 .editSheetLocked .coReadValue {
-  background: #e2e8f0;
-  border-color: #cbd5e1;
-  color: #64748b;
-}
-
-:global(html[data-theme="dark"]) .viewerBaselineBadgeActive {
-  background: #14532d;
-  border-color: #22c55e;
-  color: #bbf7d0;
-}
-
-:global(html[data-theme="dark"]) .viewerBaselineBadgeSuperseded {
-  background: #1e293b;
-  border-color: #334155;
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .coMetaLabel {
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .coLineRowGroup {
-  border-top-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .coLineRowAlt {
-  background: #1a2334;
-}
-
-:global(html[data-theme="dark"]) .coLineRowInvalid {
-  border-left-color: #f87171;
-}
-
-:global(html[data-theme="dark"]) .coLineIssue {
-  background: #2a1216;
-  color: #fecaca;
-}
-
-:global(html[data-theme="dark"]) .createSheet,
-:global(html[data-theme="dark"]) .editSheet {
-  border-color: #334155;
-  box-shadow: 0 14px 26px rgba(2, 6, 23, 0.35);
-}
-
-:global(html[data-theme="dark"]) .editSheetLocked .lockableControl:disabled {
-  background: var(--composer-readonly-bg, #2a3448);
-  border-color: var(--composer-readonly-border, #5b6d8b);
-  color: var(--composer-readonly-text, #d6deea);
-  -webkit-text-fill-color: var(--composer-readonly-text, #d6deea);
-}
-
-:global(html[data-theme="dark"]) .editSheetLocked .lockableControl:disabled::placeholder {
-  color: var(--composer-readonly-text, #d6deea);
-  -webkit-text-fill-color: var(--composer-readonly-text, #d6deea);
-}
-
-:global(html[data-theme="dark"]) .editSheetLocked .coReadValue {
-  background: var(--composer-readonly-bg, #2a3448);
-  border-color: var(--composer-readonly-border, #5b6d8b);
-  color: var(--composer-readonly-text, #d6deea);
-}
-
-:global(html[data-theme="dark"]) .coFooterErrorHint {
-  color: #fecaca;
-}
-
-:global(html[data-theme="dark"]) .coLineHeader {
-  background: #1e293b;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .coLineHeader > span + span {
-  box-shadow: -1px 0 0 #5f7cab;
-}
-
-:global(html[data-theme="dark"]) .coLineRow {
-  background: #0f172a;
-}
-
-:global(html[data-theme="dark"]) .coLineRowAlt {
-  background: #131d31;
-}
-
-:global(html[data-theme="dark"]) .coLineRow > * + * {
-  box-shadow: -1px 0 0 #334155;
-}
-
-:global(html[data-theme="dark"]) .coReadValue {
-  background: var(--composer-readonly-bg, #2a3448);
-  border-color: var(--composer-readonly-border, #5b6d8b);
-  color: var(--composer-readonly-text, #d6deea);
-}
-
-:global(html[data-theme="dark"]) .coSummarySecondaryValue {
-  color: #94a3b8;
+  background: var(--input-disabled-bg);
+  border-color: var(--input-disabled-border);
+  color: var(--input-disabled-text);
 }
 
 @media (max-width: 980px) {

@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Customer table with an expandable per-row project accordion. Each customer row
+ * shows contact info, an edit button, and a collapsible project list grouped by
+ * status with per-customer status chip filters.
+ */
+
 import { useState } from "react";
 import Link from "next/link";
 
@@ -29,14 +35,17 @@ const ALL_PROJECT_STATUS_FILTERS: ProjectStatusFilterState = {
   cancelled: true,
 };
 
+/** Convert a snake_case status key to a human-readable label. */
 function projectStatusLabel(status: string): string {
   return status.replaceAll("_", " ");
 }
 
+/** Build a compact summary like "3 active" for status pill tooltips. */
 function projectStatusSummaryLabel(status: ProjectStatusKey, count: number): string {
   return `${count} ${projectStatusLabel(status)}`;
 }
 
+/** Map a project status to its CSS module class for color-coding. */
 function projectStatusClass(status: string): string {
   if (status === "prospect") {
     return styles.projectStatusProspect;
@@ -56,6 +65,7 @@ function projectStatusClass(status: string): string {
   return "";
 }
 
+/** Customer table with expandable project accordions and per-customer status filters. */
 export function ContactsList({
   rows,
   filteredRows,
@@ -68,6 +78,7 @@ export function ContactsList({
   const [projectStatusFiltersByCustomer, setProjectStatusFiltersByCustomer] = useState<
     Record<number, ProjectStatusFilterState>
   >({});
+  // Collapse the accordion if the expanded customer is filtered out of view
   const visibleOpenCustomerId = filteredRows.some((row) => row.id === openCustomerId)
     ? openCustomerId
     : null;

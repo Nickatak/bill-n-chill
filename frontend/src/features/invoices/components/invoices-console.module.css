@@ -1,18 +1,4 @@
 .console {
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --border: #cbd5e1;
-  --surface: #f8fafc;
-  --surface-elevated: #ffffff;
-  --accent: #1d4ed8;
-  --accent-soft: #dbeafe;
-  --success-bg: #dcfce7;
-  --success-border: #4ade80;
-  --success-text: #14532d;
-  --error-bg: #fee2e2;
-  --error-border: #f87171;
-  --error-text: #7f1d1d;
-
   display: grid;
   gap: 14px;
   color: var(--text-primary);
@@ -35,14 +21,14 @@
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .statCard {
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--surface-elevated);
-  padding: 10px 12px;
+  background: var(--surface);
+  padding: 10px var(--space-md);
   display: grid;
   gap: 6px;
   align-content: start;
@@ -50,10 +36,10 @@
 }
 
 .statCard span {
-  font-size: 0.72rem;
+  font-size: var(--font-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--text-secondary);
   font-weight: 700;
 }
 
@@ -61,7 +47,7 @@
   font-size: 1.08rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .authNotice,
@@ -69,28 +55,22 @@
 .statusBanner {
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 10px var(--space-md);
   margin: 0;
-  background: var(--surface);
+  background: var(--surface-secondary);
   color: var(--text-secondary);
 }
 
 .readOnlyNotice {
-  border-color: #fcd34d;
-  background: #fffbeb;
-  color: #92400e;
+  composes: noticeWarning from '../../../shared/styles/notices.module.css';
 }
 
 .statusSuccess {
-  border-color: var(--success-border);
-  background: var(--success-bg);
-  color: var(--success-text);
+  composes: noticeSuccess from '../../../shared/styles/notices.module.css';
 }
 
 .statusError {
-  border-color: var(--error-border);
-  background: var(--error-bg);
-  color: var(--error-text);
+  composes: noticeError from '../../../shared/styles/notices.module.css';
 }
 
 .controlBar {
@@ -98,9 +78,9 @@
   grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 10px 12px;
-  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 10px var(--space-md);
+  background: var(--surface-secondary);
 }
 
 .projectSelector {
@@ -123,16 +103,16 @@
 
 .searchField input {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: var(--surface-elevated);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) 10px;
+  background: var(--surface);
   color: var(--text-primary);
   font-size: 0.92rem;
 }
 
 .projectFilters {
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .projectFiltersLabel {
@@ -143,13 +123,13 @@
 .projectFilterButtons {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .projectFilterButton {
-  border: 1px solid #cbd5f5;
-  border-radius: 999px;
-  padding: 6px 12px;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-pill);
+  padding: 6px var(--space-md);
   text-transform: uppercase;
   font-size: 0.75rem;
   letter-spacing: 0.12em;
@@ -159,7 +139,7 @@
 }
 
 .projectFilterButtonInactive {
-  background: var(--surface-elevated);
+  background: var(--surface);
   color: var(--text-secondary);
 }
 
@@ -170,8 +150,8 @@
 
 .projectFilterButtonActive.projectStatusProspect {
   background: #2563eb;
-  border-color: #1d4ed8;
-  color: #eff6ff;
+  border-color: var(--accent);
+  color: var(--accent-lighter);
 }
 
 .projectFilterButtonActive.projectStatusActive {
@@ -195,20 +175,20 @@
 .projectFilterButtonActive.projectStatusCancelled {
   background: #dc2626;
   border-color: #b91c1c;
-  color: #fee2e2;
+  color: var(--status-rejected-bg);
 }
 
 .projectFilterActions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
 }
 
 .projectFilterActionButton {
-  border: 1px solid #94a3b8;
-  border-radius: 6px;
-  background: #f1f5f9;
-  color: #334155;
+  border: 1px solid var(--text-muted);
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  color: var(--status-void-text);
   font-size: 0.64rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -221,8 +201,8 @@
 }
 
 .projectFilterActionButton:hover {
-  border-color: #64748b;
-  background: #e2e8f0;
+  border-color: var(--text-secondary);
+  background: var(--border);
   color: #1f2937;
 }
 
@@ -232,29 +212,26 @@
 }
 
 .projectTableWrap {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--surface-elevated);
+  composes: tableWrap from '../../../shared/styles/table.module.css';
+  background: var(--surface);
 }
 
 .projectTable {
-  width: 100%;
-  border-collapse: collapse;
+  composes: table from '../../../shared/styles/table.module.css';
 }
 
 .projectTable thead th {
   text-align: left;
-  padding: 10px 12px;
+  padding: 10px var(--space-md);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 0.7rem;
-  background: #eef2ff;
-  color: #1e3a8a;
+  background: var(--table-header-bg);
+  color: var(--table-header-text);
 }
 
 .projectTable tbody td {
-  padding: 10px 12px;
+  padding: 10px var(--space-md);
   border-top: 1px solid var(--border);
   color: var(--text-primary);
 }
@@ -265,11 +242,11 @@
 }
 
 .projectRow:hover {
-  background: #e0e7ff;
+  background: var(--surface-hover);
 }
 
 .projectRow.projectRowActive {
-  background: #c7d2fe;
+  background: var(--table-row-active);
 }
 
 .projectCellTitle strong {
@@ -280,16 +257,16 @@
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  padding: 4px 10px;
-  border-radius: 999px;
+  padding: var(--space-xs) 10px;
+  border-radius: var(--radius-pill);
   font-weight: 600;
-  background: #e0e7ff;
-  color: #1e3a8a;
+  background: var(--surface-hover);
+  color: var(--accent-text);
 }
 
 .projectStatusProspect {
-  background: #e0e7ff;
-  color: #1e3a8a;
+  background: var(--surface-hover);
+  color: var(--accent-text);
 }
 
 .projectStatusActive {
@@ -309,7 +286,7 @@
 
 .projectStatusCancelled {
   background: #fecaca;
-  color: #991b1b;
+  color: var(--status-rejected-text);
 }
 
 .projectEmptyCell {
@@ -321,10 +298,10 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 10px;
   border-top: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--surface-secondary);
 }
 
 .projectPagination span {
@@ -334,13 +311,13 @@
 
 .controlActions {
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
   align-content: start;
 }
 
 .layout {
   display: grid;
-  gap: 12px;
+  gap: var(--space-md);
 }
 
 .viewerPanel {
@@ -350,16 +327,16 @@
 .viewerStatusPanel {
   display: grid;
   gap: 10px;
-  margin-top: 4px;
-  padding-top: 12px;
+  margin-top: var(--space-xs);
+  padding-top: var(--space-md);
   border-top: 1px solid var(--border);
 }
 
 .panel {
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  background: var(--surface-secondary);
   display: grid;
   gap: 10px;
   align-content: start;
@@ -369,7 +346,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .panelHeader h3 {
@@ -380,16 +357,16 @@
 .panelHeaderActions {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .countBadge {
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 2px 10px;
   font-size: 0.8rem;
   color: var(--text-secondary);
-  background: var(--surface-elevated);
+  background: var(--surface);
 }
 
 .inlineHint {
@@ -414,9 +391,9 @@
   align-self: flex-start;
   flex: 0 0 auto;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   min-height: 30px;
-  padding: 4px 11px;
+  padding: var(--space-xs) 11px;
   line-height: 1.1;
   font-size: 0.7rem;
   letter-spacing: 0.08em;
@@ -427,7 +404,7 @@
 }
 
 .statusFilterPillInactive {
-  background: var(--surface-elevated);
+  background: var(--surface);
   color: var(--text-secondary);
 }
 
@@ -438,7 +415,7 @@
 
 .statusFilterCount {
   border: 1px solid rgba(100, 116, 139, 0.4);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   min-width: 20px;
   padding: 0 6px;
   font-size: 0.66rem;
@@ -454,16 +431,16 @@
   overflow: auto;
   align-content: start;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 6px;
-  background: var(--surface-elevated);
+  background: var(--surface);
 }
 
 .invoiceCard {
   border: 1px solid var(--border);
   border-radius: 9px;
-  padding: 8px 9px;
-  background: var(--surface-elevated);
+  padding: var(--space-sm) 9px;
+  background: var(--surface);
   cursor: pointer;
   text-align: left;
   display: grid;
@@ -472,16 +449,16 @@
 }
 
 .invoiceCard:hover {
-  border-color: #93c5fd;
+  border-color: var(--accent-border);
 }
 
 .invoiceCardStatusDraft {
-  border-color: #93c5fd;
+  border-color: var(--status-draft-border);
   background: linear-gradient(180deg, rgba(219, 234, 254, 0.85), rgba(239, 246, 255, 0.75));
 }
 
 .invoiceCardStatusSent {
-  border-color: #fcd34d;
+  border-color: var(--status-sent-border);
   background: linear-gradient(180deg, rgba(254, 243, 199, 0.9), rgba(255, 251, 235, 0.8));
 }
 
@@ -491,17 +468,17 @@
 }
 
 .invoiceCardStatusPaid {
-  border-color: #86efac;
+  border-color: var(--status-approved-border);
   background: linear-gradient(180deg, rgba(220, 252, 231, 0.88), rgba(240, 253, 244, 0.78));
 }
 
 .invoiceCardStatusOverdue {
-  border-color: #fca5a5;
+  border-color: var(--status-rejected-border);
   background: linear-gradient(180deg, rgba(254, 226, 226, 0.88), rgba(255, 241, 242, 0.8));
 }
 
 .invoiceCardStatusVoid {
-  border-color: #cbd5e1;
+  border-color: var(--border);
   background: linear-gradient(180deg, rgba(226, 232, 240, 0.92), rgba(241, 245, 249, 0.82));
 }
 
@@ -516,7 +493,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .invoiceCardIdentity {
@@ -530,29 +507,29 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #93c5fd;
+  border: 1px solid var(--accent-border);
   border-radius: 7px;
-  padding: 3px 8px;
+  padding: 3px var(--space-sm);
   font-size: 0.66rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
   text-decoration: none;
-  background: #eff6ff;
-  color: #1e40af;
+  background: var(--accent-lighter);
+  color: var(--accent-hover);
 }
 
 .invoiceCardPublicLink:hover,
 .invoiceCardPublicLink:focus-visible {
   border-color: #60a5fa;
-  background: #dbeafe;
+  background: var(--accent-light);
   outline: none;
 }
 
 .invoiceMetaGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 3px 8px;
+  gap: 3px var(--space-sm);
   font-size: 0.74rem;
   color: var(--text-secondary);
 }
@@ -560,13 +537,13 @@
 .workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
+  gap: var(--space-md);
 }
 
 .workspaceToolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px 12px;
+  gap: var(--space-sm) var(--space-md);
   align-items: start;
 }
 
@@ -578,7 +555,7 @@
 
 .workspaceContextLabel {
   color: var(--text-secondary);
-  font-size: 0.72rem;
+  font-size: var(--font-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
@@ -587,14 +564,14 @@
 .workspaceContextValueRow {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
 }
 
 .workspaceToolbarActions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--space-sm);
   grid-column: 2;
   grid-row: 1 / span 2;
 }
@@ -602,20 +579,20 @@
 .workspaceToolbarHint {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 0.82rem;
+  font-size: var(--font-sm);
 }
 
 .invoiceComposerSheet {
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--border);
   border-radius: 18px;
-  padding: 24px;
-  background: #ffffff;
+  padding: var(--space-2xl);
+  background: var(--surface);
   box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
   display: grid;
   width: 100%;
   grid-template-columns: minmax(0, 1fr);
   grid-auto-flow: row;
-  gap: 20px;
+  gap: var(--space-xl);
 }
 
 .invoiceLockableControl {
@@ -623,29 +600,29 @@
 }
 
 .invoiceComposerSheetLocked .invoiceLockableControl:disabled {
-  background: #e2e8f0;
-  border-color: #cbd5e1;
-  color: #64748b;
+  background: var(--border);
+  border-color: var(--input-border);
+  color: var(--text-secondary);
   cursor: not-allowed;
 }
 
 .invoiceComposerSheetLocked .invoiceLockableControl:disabled::placeholder {
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .invoiceReadAmount {
-  border-color: #cbd5e1;
+  border-color: var(--input-border);
 }
 
 .invoiceComposerSheetLocked .invoiceReadAmount {
-  background: #e2e8f0;
-  border-color: #cbd5e1;
-  color: #64748b;
+  background: var(--border);
+  border-color: var(--input-border);
+  color: var(--text-secondary);
 }
 
 .invoiceComposerSection {
   display: grid;
-  gap: 20px;
+  gap: var(--space-xl);
   grid-column: 1 / -1;
   min-width: 0;
   width: 100%;
@@ -653,23 +630,23 @@
 
 .invoicePartyStack {
   display: grid;
-  gap: 20px;
+  gap: var(--space-xl);
   align-content: start;
 }
 
 .invoiceMetaLayout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 420px);
-  gap: 16px;
+  gap: var(--space-lg);
   align-items: start;
 }
 
 .invoiceDetailCard {
   grid-column: 2;
-  border: 1px solid #cbd5e1;
-  border-radius: 12px;
-  padding: 12px;
-  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  background: var(--surface-secondary);
   display: grid;
   gap: 10px;
 }
@@ -678,19 +655,19 @@
   font-size: 0.68rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #1e3a8a;
+  color: var(--accent-text);
   font-weight: 700;
 }
 
 .organizationProfileCard {
   border: 1px solid #c7d2fe;
-  border-radius: 12px;
-  padding: 12px;
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
   background:
     radial-gradient(circle at top right, rgba(59, 130, 246, 0.1), transparent 42%),
     #f8faff;
   display: grid;
-  gap: 12px;
+  gap: var(--space-md);
 }
 
 .organizationProfileHeader {
@@ -710,12 +687,12 @@
   font-size: 0.66rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #1d4ed8;
+  color: var(--accent);
   font-weight: 700;
 }
 
 .organizationProfileName {
-  color: #0f172a;
+  color: var(--text-primary);
   font-size: 0.96rem;
   font-weight: 700;
 }
@@ -723,17 +700,17 @@
 .organizationSettingsLink {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  border: 1px solid #93c5fd;
-  border-radius: 999px;
-  background: #dbeafe;
-  color: #1e40af;
+  gap: var(--space-xs);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-pill);
+  background: var(--accent-light);
+  color: var(--accent-hover);
   text-decoration: none;
   font-size: 0.66rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
-  padding: 4px 9px;
+  padding: var(--space-xs) 9px;
 }
 
 .organizationSettingsLink:hover,
@@ -751,16 +728,16 @@
   border: 1px dashed #bfdbfe;
   border-radius: 10px;
   padding: 9px 10px;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .organizationLogoPreview {
   width: 84px;
   height: 56px;
-  border: 1px dashed #cbd5e1;
-  border-radius: 8px;
-  background: #f8fafc;
-  color: #64748b;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-secondary);
+  color: var(--text-secondary);
   font-size: 0.7rem;
   font-weight: 600;
   display: inline-flex;
@@ -776,13 +753,13 @@
 
 .organizationProfileMeta span {
   font-size: 0.78rem;
-  color: #334155;
+  color: var(--status-void-text);
   line-height: 1.35;
 }
 
 .organizationTemplateMetaGrid {
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
@@ -796,13 +773,13 @@
   display: grid;
   gap: 3px;
   border: 1px solid #bfdbfe;
-  border-radius: 8px;
-  background: #ffffff;
-  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: var(--space-sm) 10px;
 }
 
 .organizationTemplateMetaRow span {
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -810,7 +787,7 @@
 }
 
 .organizationTemplateMetaRow strong {
-  color: #0f172a;
+  color: var(--text-primary);
   font-size: 0.84rem;
   font-weight: 700;
 }
@@ -820,7 +797,7 @@
   gap: 6px;
   border: 1px solid #bfdbfe;
   border-radius: 10px;
-  background: #ffffff;
+  background: var(--surface);
   padding: 10px;
 }
 
@@ -829,7 +806,7 @@
 }
 
 .organizationTemplateBlock span {
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -839,7 +816,7 @@
 .organizationTemplateBlock p {
   margin: 0;
   white-space: pre-wrap;
-  color: #334155;
+  color: var(--status-void-text);
   font-size: 0.84rem;
   line-height: 1.45;
 }
@@ -854,7 +831,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
 }
 
@@ -866,10 +843,10 @@
 
 .invoiceTemplateBlock {
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
   border: 1px solid #bfdbfe;
   border-radius: 10px;
-  background: #ffffff;
+  background: var(--surface);
   padding: 10px;
 }
 
@@ -879,7 +856,7 @@
 
 .invoiceTemplateBlock h4 {
   margin: 0;
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -888,14 +865,14 @@
 
 .invoiceTemplateBlock p {
   margin: 0;
-  color: #334155;
+  color: var(--status-void-text);
   font-size: 0.86rem;
   line-height: 1.45;
 }
 
 .invoiceMetaStrong {
   font-weight: 700;
-  color: #1e3a8a;
+  color: var(--accent-text);
 }
 
 .invoiceNumberContext {
@@ -908,8 +885,8 @@
 
 .invoiceNumberIndicator {
   border: 1px solid transparent;
-  border-radius: 999px;
-  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-sm);
   font-size: 0.64rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -917,21 +894,21 @@
 }
 
 .invoiceNumberIndicatorGenerated {
-  background: #dbeafe;
-  border-color: #93c5fd;
-  color: #1e40af;
+  background: var(--status-draft-bg);
+  border-color: var(--status-draft-border);
+  color: var(--accent-hover);
 }
 
 .invoiceNumberIndicatorEditing {
-  background: #e2e8f0;
-  border-color: #cbd5e1;
-  color: #334155;
+  background: var(--status-void-bg);
+  border-color: var(--status-void-border);
+  color: var(--status-void-text);
 }
 
 .invoiceNumberIndicatorLocked {
-  background: #fee2e2;
-  border-color: #fca5a5;
-  color: #991b1b;
+  background: var(--status-rejected-bg);
+  border-color: var(--status-rejected-border);
+  color: var(--status-rejected-text);
 }
 
 .invoiceLogoImage {
@@ -944,7 +921,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
 }
 
@@ -955,12 +932,12 @@
 .invoiceLineHeader {
   display: grid;
   grid-template-columns: 100px minmax(220px, 1.1fr) 78px minmax(220px, 1.5fr) 84px 120px 120px 88px;
-  gap: 8px;
+  gap: var(--space-sm);
   align-items: center;
-  padding: 11px 12px;
-  background: #eef2ff;
-  color: #1e3a8a;
-  font-size: 0.72rem;
+  padding: 11px var(--space-md);
+  background: var(--table-header-bg);
+  color: var(--table-header-text);
+  font-size: var(--font-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.09em;
@@ -970,11 +947,11 @@
 .invoiceLineRow {
   display: grid;
   grid-template-columns: 100px minmax(220px, 1.1fr) 78px minmax(220px, 1.5fr) 84px 120px 120px 88px;
-  gap: 8px;
+  gap: var(--space-sm);
   align-items: center;
-  padding: 8px 12px;
-  border-top: 1px solid #e2e8f0;
-  background: #ffffff;
+  padding: var(--space-sm) var(--space-md);
+  border-top: 1px solid var(--table-border);
+  background: var(--surface);
   min-width: 1040px;
 }
 
@@ -1012,13 +989,13 @@
   justify-content: flex-end;
   margin-top: 6px;
   padding-top: 14px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--table-border);
   align-items: flex-start;
 }
 
 .invoiceTotalsColumn {
   display: grid;
-  gap: 12px;
+  gap: var(--space-md);
   justify-items: stretch;
   width: min(320px, 100%);
 }
@@ -1055,9 +1032,9 @@
 .field select,
 .field textarea {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: var(--surface-elevated);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) 10px;
+  background: var(--surface);
   color: var(--text-primary);
   font-size: 0.92rem;
 }
@@ -1076,7 +1053,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .lineHeaderRow h4 {
@@ -1091,22 +1068,22 @@
 .lineCard {
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--surface-elevated);
+  background: var(--surface);
   padding: 10px;
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .lineTopRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .lineGrid {
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -1126,7 +1103,7 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 9px 10px;
-  background: var(--surface-elevated);
+  background: var(--surface);
   display: grid;
   gap: 6px;
   min-width: 220px;
@@ -1149,7 +1126,7 @@
 .buttonRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
   justify-content: flex-start;
 }
 
@@ -1158,22 +1135,22 @@
 .ghostDangerButton,
 .quickStatusButton {
   border-radius: 10px;
-  padding: 8px 12px;
+  padding: var(--space-sm) var(--space-md);
   cursor: pointer;
   font-weight: 700;
-  font-size: 0.82rem;
+  font-size: var(--font-sm);
   letter-spacing: 0.02em;
 }
 
 .primaryButton {
-  border: 1px solid #1d4ed8;
-  background: #1d4ed8;
-  color: #eff6ff;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-lighter);
 }
 
 .secondaryButton {
   border: 1px solid var(--border);
-  background: var(--surface-elevated);
+  background: var(--surface);
   color: var(--text-primary);
 }
 
@@ -1196,9 +1173,9 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px;
-  background: var(--surface-elevated);
+  background: var(--surface);
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .selectedInvoiceSummary p {
@@ -1210,41 +1187,41 @@
 .publicInvoiceLink {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-xs);
   width: fit-content;
-  border: 1px solid #93c5fd;
-  border-radius: 999px;
-  padding: 4px 10px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-pill);
+  padding: var(--space-xs) 10px;
   text-decoration: none;
   font-size: 0.7rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
-  background: #eff6ff;
-  color: #1e40af;
+  background: var(--accent-lighter);
+  color: var(--accent-hover);
 }
 
 .publicInvoiceLink:hover,
 .publicInvoiceLink:focus-visible {
   border-color: #60a5fa;
-  background: #dbeafe;
+  background: var(--accent-light);
   outline: none;
 }
 
 .statusHistoryBlock {
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--surface-elevated);
+  background: var(--surface);
   padding: 10px;
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .statusHistoryHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .statusHistoryHeader h4 {
@@ -1262,7 +1239,7 @@
 
 .statusHistoryTableWrap {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: auto;
 }
 
@@ -1275,7 +1252,7 @@
 .statusHistoryTable th,
 .statusHistoryTable td {
   text-align: left;
-  padding: 8px 10px;
+  padding: var(--space-sm) 10px;
   border-bottom: 1px solid var(--border);
   font-size: 0.84rem;
   color: var(--text-primary);
@@ -1285,16 +1262,16 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 0.68rem;
-  background: #eef2ff;
-  color: #1e3a8a;
+  background: var(--table-header-bg);
+  color: var(--table-header-text);
 }
 
 .statusHistoryTable tbody tr:nth-child(even) {
-  background: #f8fafc;
+  background: var(--table-row-alt);
 }
 
 .statusActorLink {
-  color: #1d4ed8;
+  color: var(--accent);
   text-decoration: none;
   font-weight: 600;
 }
@@ -1307,9 +1284,9 @@
 .statusHistoryActionBadge {
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid transparent;
-  padding: 2px 8px;
+  padding: 2px var(--space-sm);
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1318,27 +1295,27 @@
 }
 
 .lifecycleFieldLabel {
-  font-size: 0.9rem;
+  font-size: var(--font-base);
   color: var(--text-secondary);
 }
 
 .statusPicker {
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .statusPills {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .statusPill {
   appearance: none;
   -webkit-appearance: none;
-  border: 1px solid #cbd5f5;
-  border-radius: 999px;
-  padding: 6px 12px;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-pill);
+  padding: 6px var(--space-md);
   font-size: 0.75rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1348,7 +1325,7 @@
 }
 
 .statusPillInactive {
-  background: var(--surface-elevated);
+  background: var(--surface);
   color: var(--text-secondary);
 }
 
@@ -1360,17 +1337,17 @@
 .quickStatusRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .quickStatusButton {
   border: 1px solid var(--border);
-  background: var(--surface-elevated);
+  background: var(--surface);
   color: var(--text-primary);
 }
 
 .quickStatusButtonInactive {
-  background: var(--surface-elevated);
+  background: var(--surface);
   color: var(--text-secondary);
 }
 
@@ -1379,15 +1356,15 @@
 }
 
 .statusToneDraft {
-  background: #dbeafe;
-  color: #1e40af;
-  border-color: #93c5fd;
+  background: var(--status-draft-bg);
+  color: var(--accent-hover);
+  border-color: var(--status-draft-border);
 }
 
 .statusToneSent {
-  background: #fef3c7;
-  color: #92400e;
-  border-color: #fcd34d;
+  background: var(--status-sent-bg);
+  color: var(--status-sent-text);
+  border-color: var(--status-sent-border);
 }
 
 .statusTonePartial {
@@ -1397,27 +1374,27 @@
 }
 
 .statusTonePaid {
-  background: #dcfce7;
-  color: #166534;
-  border-color: #86efac;
+  background: var(--status-approved-bg);
+  color: var(--status-approved-text);
+  border-color: var(--status-approved-border);
 }
 
 .statusToneOverdue {
-  background: #fee2e2;
-  color: #991b1b;
-  border-color: #fca5a5;
+  background: var(--status-rejected-bg);
+  color: var(--status-rejected-text);
+  border-color: var(--status-rejected-border);
 }
 
 .statusToneVoid {
-  background: #e2e8f0;
-  color: #334155;
-  border-color: #cbd5e1;
+  background: var(--status-void-bg);
+  color: var(--status-void-text);
+  border-color: var(--status-void-border);
 }
 
 .statusToneNotate {
-  background: #e2e8f0;
-  color: #334155;
-  border-color: #cbd5e1;
+  background: var(--status-void-bg);
+  color: var(--status-void-text);
+  border-color: var(--status-void-border);
 }
 
 .statusBadge {
@@ -1425,22 +1402,18 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
-  border-radius: 999px;
-  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  padding: 3px var(--space-sm);
   width: fit-content;
   border: 1px solid transparent;
 }
 
 .statusDraft {
-  background: #dbeafe;
-  color: #1e40af;
-  border-color: #93c5fd;
+  composes: draft from '../../../shared/styles/status.module.css';
 }
 
 .statusSent {
-  background: #fef3c7;
-  color: #92400e;
-  border-color: #fcd34d;
+  composes: sent from '../../../shared/styles/status.module.css';
 }
 
 .statusPartial {
@@ -1450,27 +1423,21 @@
 }
 
 .statusPaid {
-  background: #dcfce7;
-  color: #166534;
-  border-color: #86efac;
+  composes: paid from '../../../shared/styles/status.module.css';
 }
 
 .statusOverdue {
-  background: #fee2e2;
-  color: #991b1b;
-  border-color: #fca5a5;
+  composes: overdue from '../../../shared/styles/status.module.css';
 }
 
 .statusVoid {
-  background: #e2e8f0;
-  color: #334155;
-  border-color: #cbd5e1;
+  composes: void from '../../../shared/styles/status.module.css';
 }
 
 .emptyState {
   border: 1px dashed var(--border);
   border-radius: 10px;
-  padding: 12px;
+  padding: var(--space-md);
   margin: 0;
   color: var(--text-secondary);
   align-self: start;
@@ -1543,418 +1510,4 @@
   .invoiceMetaGrid {
     grid-template-columns: 1fr;
   }
-}
-
-:global(html[data-theme="dark"]) .console {
-  --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --border: #334155;
-  --surface: #0f172a;
-  --surface-elevated: #111827;
-  --accent: #60a5fa;
-  --accent-soft: #1e3a8a;
-  --success-bg: #052e16;
-  --success-border: #22c55e;
-  --success-text: #bbf7d0;
-  --error-bg: #3f0b12;
-  --error-border: #ef4444;
-  --error-text: #fecaca;
-}
-
-:global(html[data-theme="dark"]) .projectFilterButton {
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .projectFilterButtonInactive {
-  background: #0b152a;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .projectFilterActionButton {
-  border-color: #334155;
-  background: #0f172a;
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .projectFilterActionButton:hover {
-  border-color: #475569;
-  background: #17233a;
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .projectTableWrap {
-  background: #0b152a;
-}
-
-:global(html[data-theme="dark"]) .projectTable thead th {
-  background: #172554;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .projectRow:hover {
-  background: #1e3a8a;
-}
-
-:global(html[data-theme="dark"]) .projectRow.projectRowActive {
-  background: #1d4ed8;
-}
-
-:global(html[data-theme="dark"]) .statCard {
-  border-color: #334155;
-  background: #0b1220;
-}
-
-:global(html[data-theme="dark"]) .invoiceComposerSheet {
-  border-color: #334155;
-  background: #0f172a;
-  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.45);
-}
-
-:global(html[data-theme="dark"]) .invoiceComposerSheetLocked .invoiceLockableControl:disabled {
-  background: #0f172a;
-  border-color: #334155;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .invoiceComposerSheetLocked .invoiceLockableControl:disabled::placeholder {
-  color: #64748b;
-}
-
-:global(html[data-theme="dark"]) .invoiceComposerSheetLocked .invoiceReadAmount {
-  background: #0f172a;
-  border-color: #334155;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .viewerStatusPanel {
-  border-top-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .statusHistoryBlock {
-  border-color: #334155;
-  background: #0b1220;
-}
-
-:global(html[data-theme="dark"]) .statusHistoryHeader h4,
-:global(html[data-theme="dark"]) .statusHistoryHeader span {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .statusHistoryTableWrap {
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .statusHistoryTable th,
-:global(html[data-theme="dark"]) .statusHistoryTable td {
-  border-bottom-color: #334155;
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .statusHistoryTable th {
-  background: #1e293b;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .statusHistoryTable tbody tr:nth-child(even) {
-  background: #111827;
-}
-
-:global(html[data-theme="dark"]) .statusActorLink {
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .invoiceRail {
-  background: #0b1220;
-}
-
-:global(html[data-theme="dark"]) .invoiceCard {
-  border-color: #334155;
-  background: #0f172a;
-}
-
-:global(html[data-theme="dark"]) .invoiceCardStatusDraft {
-  border-color: #3b82f6;
-  background: linear-gradient(180deg, rgba(30, 58, 138, 0.46), rgba(15, 23, 42, 0.9));
-}
-
-:global(html[data-theme="dark"]) .invoiceCardStatusSent {
-  border-color: #f59e0b;
-  background: linear-gradient(180deg, rgba(161, 98, 7, 0.42), rgba(15, 23, 42, 0.9));
-}
-
-:global(html[data-theme="dark"]) .invoiceCardStatusPartial {
-  border-color: #8b5cf6;
-  background: linear-gradient(180deg, rgba(76, 29, 149, 0.44), rgba(15, 23, 42, 0.9));
-}
-
-:global(html[data-theme="dark"]) .invoiceCardStatusPaid {
-  border-color: #22c55e;
-  background: linear-gradient(180deg, rgba(20, 83, 45, 0.48), rgba(15, 23, 42, 0.9));
-}
-
-:global(html[data-theme="dark"]) .invoiceCardStatusOverdue {
-  border-color: #ef4444;
-  background: linear-gradient(180deg, rgba(127, 29, 29, 0.46), rgba(15, 23, 42, 0.9));
-}
-
-:global(html[data-theme="dark"]) .invoiceCardStatusVoid {
-  border-color: #64748b;
-  background: linear-gradient(180deg, rgba(31, 41, 55, 0.72), rgba(15, 23, 42, 0.9));
-}
-
-:global(html[data-theme="dark"]) .invoiceCardSelected {
-  border-color: #60a5fa;
-  box-shadow:
-    0 0 0 2px rgba(147, 197, 253, 0.36),
-    inset 2px 0 0 #60a5fa;
-}
-
-:global(html[data-theme="dark"]) .invoiceCardPublicLink {
-  border-color: #1d4ed8;
-  background: #1e3a8a;
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .invoiceCardPublicLink:hover,
-:global(html[data-theme="dark"]) .invoiceCardPublicLink:focus-visible {
-  border-color: #3b82f6;
-  background: #1d4ed8;
-}
-
-:global(html[data-theme="dark"]) .statusPill {
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .statusPillInactive {
-  background: #0b1220;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .statusPillActive {
-  box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.28);
-}
-
-:global(html[data-theme="dark"]) .invoiceMetaStrong {
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .invoiceNumberIndicatorGenerated {
-  background: #1e3a8a;
-  border-color: #3b82f6;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .invoiceNumberIndicatorEditing {
-  background: #1f2937;
-  border-color: #475569;
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .invoiceNumberIndicatorLocked {
-  background: #7f1d1d;
-  border-color: #ef4444;
-  color: #fecaca;
-}
-
-:global(html[data-theme="dark"]) .invoiceDetailCard {
-  border-color: #334155;
-  background: #0b1220;
-}
-
-:global(html[data-theme="dark"]) .invoiceMetaCardLabel {
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .organizationProfileCard {
-  border-color: #1d4ed8;
-  background:
-    radial-gradient(circle at top right, rgba(59, 130, 246, 0.26), transparent 42%),
-    #0b1220;
-}
-
-:global(html[data-theme="dark"]) .organizationProfileEyebrow {
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .organizationProfileName {
-  color: #f8fafc;
-}
-
-:global(html[data-theme="dark"]) .organizationSettingsLink {
-  border-color: #2563eb;
-  background: #1e3a8a;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .organizationSettingsLink:hover,
-:global(html[data-theme="dark"]) .organizationSettingsLink:focus-visible {
-  border-color: #3b82f6;
-  background: #1d4ed8;
-}
-
-:global(html[data-theme="dark"]) .organizationProfilePreview {
-  border-color: #1d4ed8;
-  background: #111827;
-}
-
-:global(html[data-theme="dark"]) .organizationLogoPreview {
-  border-color: #334155;
-  background: #0f172a;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .organizationProfileMeta span {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .organizationTemplateMetaRow {
-  border-color: #1d4ed8;
-  background: #0f172a;
-}
-
-:global(html[data-theme="dark"]) .organizationTemplateMetaRow span {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .organizationTemplateMetaRow strong {
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .organizationTemplateBlock {
-  border-color: #1d4ed8;
-  background: #0f172a;
-}
-
-:global(html[data-theme="dark"]) .organizationTemplateBlock span {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .organizationTemplateBlock p {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .invoiceTemplateBlock {
-  border-color: #334155;
-  background: #0b1220;
-}
-
-:global(html[data-theme="dark"]) .invoiceTemplateBlock h4 {
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .invoiceTemplateBlock p {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .invoiceLineHeader {
-  background: #1e293b;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .invoiceLineRow {
-  border-top-color: #1f2937;
-  background: #0f172a;
-}
-
-:global(html[data-theme="dark"]) .invoiceLineRowAlt {
-  background: #131d31;
-}
-
-:global(html[data-theme="dark"]) .invoiceSheetFooter {
-  border-top-color: #1f2937;
-}
-
-:global(html[data-theme="dark"]) .statCard span {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .quickViewTitle {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .readOnlyNotice {
-  border-color: #f59e0b;
-  background: #451a03;
-  color: #fde68a;
-}
-
-:global(html[data-theme="dark"]) .primaryButton {
-  border-color: #93c5fd;
-  background: #1d4ed8;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .ghostDangerButton {
-  border-color: #b91c1c;
-  background: #450a0a;
-  color: #fecaca;
-}
-
-:global(html[data-theme="dark"]) .quickStatusButtonActive {
-  box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.3);
-}
-
-:global(html[data-theme="dark"]) .statCard strong {
-  color: #f8fafc;
-}
-
-:global(html[data-theme="dark"]) .statusFilterPillInactive {
-  background: #0b1220;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .statusFilterCount {
-  border-color: #475569;
-  background: rgba(2, 6, 23, 0.5);
-}
-
-:global(html[data-theme="dark"]) .statusFilterPillActive {
-  box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.28);
-}
-
-:global(html[data-theme="dark"]) .quickStatusButtonInactive {
-  background: #0b1220;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .statusToneDraft {
-  background: #1e3a8a;
-  color: #dbeafe;
-  border-color: #3b82f6;
-}
-
-:global(html[data-theme="dark"]) .statusToneSent {
-  background: #a16207;
-  color: #fef3c7;
-  border-color: #f59e0b;
-}
-
-:global(html[data-theme="dark"]) .statusTonePartial {
-  background: #4c1d95;
-  color: #ddd6fe;
-  border-color: #8b5cf6;
-}
-
-:global(html[data-theme="dark"]) .statusTonePaid {
-  background: #14532d;
-  color: #bbf7d0;
-  border-color: #22c55e;
-}
-
-:global(html[data-theme="dark"]) .statusToneOverdue {
-  background: #7f1d1d;
-  color: #fecaca;
-  border-color: #ef4444;
-}
-
-:global(html[data-theme="dark"]) .statusToneVoid {
-  background: #1f2937;
-  color: #e2e8f0;
-  border-color: #64748b;
-}
-
-:global(html[data-theme="dark"]) .statusToneNotate {
-  background: #1f2937;
-  color: #e2e8f0;
-  border-color: #64748b;
 }

@@ -1,22 +1,27 @@
 "use client";
 
+/**
+ * Cost code management console. Supports browsing, searching, creating, and editing
+ * individual cost codes as well as bulk CSV import with dry-run preview. Cost codes
+ * are the shared coding standard for estimates, budgets, and downstream reporting.
+ */
+
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
+import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import styles from "./cost-codes-console.module.css";
 import { ApiResponse, CostCode, CsvImportResult } from "../types";
-
-type StatusTone = "neutral" | "success" | "error";
 type VisibilityFilter = "active" | "all";
 
+/** Full CRUD console for cost codes with search, visibility filter, and CSV import. */
 export function CostCodesConsole() {
   const { token, authMessage } = useSharedSessionAuth();
 
   const [rows, setRows] = useState<CostCode[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
-  const [statusMessage, setStatusMessage] = useState("");
-  const [statusTone, setStatusTone] = useState<StatusTone>("neutral");
+  const { message: statusMessage, tone: statusTone, setNeutral: setNeutralStatus, setSuccess: setSuccessStatus, setError: setErrorStatus, setMessage: setStatusMessage } = useStatusMessage();
   const [searchTerm, setSearchTerm] = useState("");
   const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("active");
 
@@ -52,31 +57,19 @@ export function CostCodesConsole() {
   const activeRowCount = rows.filter((row) => row.is_active).length;
   const archivedRowCount = rows.length - activeRowCount;
 
+  /** Populate the edit form fields from a cost code record. */
   function hydrate(item: CostCode) {
     setCode(item.code);
     setName(item.name);
     setIsActive(item.is_active);
   }
 
-  function setNeutralStatus(message: string) {
-    setStatusTone("neutral");
-    setStatusMessage(message);
-  }
-
-  function setSuccessStatus(message: string) {
-    setStatusTone("success");
-    setStatusMessage(message);
-  }
-
-  function setErrorStatus(message: string) {
-    setStatusTone("error");
-    setStatusMessage(message);
-  }
-
+  // Keep ref in sync so the async loadCostCodes callback can read the latest selection
   useEffect(() => {
     selectedIdRef.current = selectedId;
   }, [selectedId]);
 
+  /** Fetch all cost codes and re-select the previously-selected row if still present. */
   const loadCostCodes = useCallback(
     async (options?: { keepStatusOnSuccess?: boolean }) => {
       setNeutralStatus("Loading cost codes...");
@@ -115,9 +108,10 @@ export function CostCodesConsole() {
         setErrorStatus("Could not reach cost code endpoint.");
       }
     },
-    [normalizedBaseUrl, token],
+    [normalizedBaseUrl, setErrorStatus, setNeutralStatus, setStatusMessage, token],
   );
 
+  // Initial data load once a session token is available
   useEffect(() => {
     if (!token) {
       return;
@@ -128,6 +122,7 @@ export function CostCodesConsole() {
     return () => window.clearTimeout(run);
   }, [loadCostCodes, token]);
 
+  /** Select a cost code row and populate the edit form. */
   function handleSelect(id: string) {
     setSelectedId(id);
     const item = rows.find((row) => String(row.id) === id);
@@ -136,6 +131,7 @@ export function CostCodesConsole() {
     }
   }
 
+  /** POST a new cost code and select it on success. */
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setNeutralStatus("Creating cost code...");
@@ -167,6 +163,7 @@ export function CostCodesConsole() {
     }
   }
 
+  /** PATCH the selected cost code with edited name and active status. */
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const id = Number(selectedId);
@@ -196,6 +193,7 @@ export function CostCodesConsole() {
     }
   }
 
+  /** Run a CSV import (preview or apply) and reload cost codes on successful apply. */
   async function runCsvImport(dryRun: boolean) {
     setNeutralStatus(dryRun ? "Previewing CSV import..." : "Applying CSV import...");
     try {

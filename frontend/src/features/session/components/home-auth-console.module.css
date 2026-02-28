@@ -4,29 +4,29 @@
 }
 
 .card {
-  border: 1px solid #d1d5db;
-  border-radius: 12px;
-  background: #fbfdff;
-  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: var(--space-lg);
   display: grid;
   gap: 10px;
 }
 
 .title {
   margin: 0;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 1.2rem;
 }
 
 .text {
   margin: 0;
-  color: #4b5563;
+  color: var(--text-secondary);
 }
 
 .warning {
-  border: 1px solid #f59e0b;
+  border: 1px solid var(--tone-warning-border);
   border-radius: 10px;
-  background: #fffbeb;
+  background: var(--tone-warning-bg);
   padding: 10px 12px;
   display: grid;
   gap: 4px;
@@ -34,8 +34,8 @@
 
 .warningTitle {
   margin: 0;
-  color: #92400e;
-  font-size: 0.9rem;
+  color: var(--tone-warning-text);
+  font-size: var(--font-base);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -43,13 +43,13 @@
 
 .warningText {
   margin: 0;
-  color: #78350f;
-  font-size: 0.9rem;
+  color: var(--tone-warning-text);
+  font-size: var(--font-base);
 }
 
 .warningMeta {
   margin: 0;
-  color: #92400e;
+  color: var(--tone-warning-text);
   font-size: 0.8rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
     monospace;
@@ -63,54 +63,54 @@
 .form label {
   display: grid;
   gap: 4px;
-  color: #111827;
+  color: var(--text-primary);
   font-weight: 600;
 }
 
 .form input {
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
   min-height: 40px;
   padding: 0 10px;
-  background: #ffffff;
-  color: #111827;
+  background: var(--input-bg);
+  color: var(--input-text);
 }
 
 .buttonRow {
   display: flex;
-  gap: 8px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
 }
 
 .formHint {
   margin: 0;
-  color: #4b5563;
-  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-size: var(--font-base);
 }
 
 .formHint a {
-  color: #111827;
+  color: var(--text-primary);
   font-weight: 700;
 }
 
 .button {
-  border: 1px solid #111827;
-  border-radius: 999px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-pill);
   min-height: 38px;
   padding: 0 12px;
-  background: #111827;
-  color: #ffffff;
+  background: var(--accent);
+  color: var(--text-on-accent);
   font-weight: 700;
   cursor: pointer;
 }
 
 .buttonSecondary {
-  border: 1px solid #d1d5db;
-  border-radius: 999px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
   min-height: 38px;
   padding: 0 12px;
-  background: #ffffff;
-  color: #111827;
+  background: var(--surface);
+  color: var(--text-primary);
   font-weight: 700;
   cursor: pointer;
 }
@@ -123,40 +123,40 @@
 
 .message {
   margin: 0;
-  color: #4b5563;
+  color: var(--text-secondary);
   font-size: 0.95rem;
 }
 
 .messageError {
-  color: #b91c1c;
+  color: var(--tone-error-text);
   font-weight: 600;
 }
 
 .healthOk,
 .healthBad {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--font-base);
   font-weight: 600;
 }
 
 .healthOk {
-  color: #047857;
+  color: var(--tone-success-text);
 }
 
 .healthBad {
-  color: #b91c1c;
+  color: var(--tone-error-text);
 }
 
 .quickLinks {
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .quickLink {
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: #ffffff;
-  color: #111827;
+  background: var(--surface);
+  color: var(--text-primary);
   padding: 10px;
   text-decoration: none;
   font-weight: 700;
@@ -165,74 +165,13 @@
 .quickHint {
   display: block;
   margin-top: 4px;
-  color: #4b5563;
+  color: var(--text-secondary);
   font-weight: 500;
-  font-size: 0.9rem;
+  font-size: var(--font-base);
 }
 
 @media (min-width: 760px) {
   .quickLinks {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-}
-
-:global(html[data-theme="dark"]) .card {
-  border-color: #334155;
-  background: #0f172a;
-}
-
-:global(html[data-theme="dark"]) .title,
-:global(html[data-theme="dark"]) .form label,
-:global(html[data-theme="dark"]) .buttonSecondary,
-:global(html[data-theme="dark"]) .quickLink {
-  color: #e5e7eb;
-}
-
-:global(html[data-theme="dark"]) .text,
-:global(html[data-theme="dark"]) .message,
-:global(html[data-theme="dark"]) .quickHint,
-:global(html[data-theme="dark"]) .formHint {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .messageError {
-  color: #fca5a5;
-}
-
-:global(html[data-theme="dark"]) .formHint a {
-  color: #e5e7eb;
-}
-
-:global(html[data-theme="dark"]) .warning {
-  border-color: #f59e0b;
-  background: #1f2937;
-}
-
-:global(html[data-theme="dark"]) .warningTitle {
-  color: #fcd34d;
-}
-
-:global(html[data-theme="dark"]) .warningText {
-  color: #fde68a;
-}
-
-:global(html[data-theme="dark"]) .warningMeta {
-  color: #fcd34d;
-}
-
-:global(html[data-theme="dark"]) .form input,
-:global(html[data-theme="dark"]) .buttonSecondary,
-:global(html[data-theme="dark"]) .quickLink {
-  border-color: #334155;
-  background: #111827;
-}
-
-:global(html[data-theme="dark"]) .form input {
-  color: #f3f4f6;
-}
-
-:global(html[data-theme="dark"]) .button {
-  border-color: #e5e7eb;
-  background: #e5e7eb;
-  color: #0f172a;
 }

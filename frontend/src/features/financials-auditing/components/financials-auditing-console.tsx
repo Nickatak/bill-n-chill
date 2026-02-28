@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Central financial auditing console for a project. Provides a financial summary
+ * panel, portfolio-level reporting, a git-style chronological audit trail graph,
+ * and accounting sync event management (create / retry). This is the primary
+ * tool for bookkeepers and PMs to verify financial integrity.
+ */
+
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -36,14 +43,17 @@ type AuditGraphGroup = {
   midX: number;
 };
 
+/** Converts a snake_case token to a space-separated display label. */
 function toLabelCase(value: string): string {
   return value.replaceAll("_", " ");
 }
 
+/** Derives a date-based group key (YYYY-MM-DD) for bucketing audit events by day. */
 function toAuditGroupKey(createdAt: string): string {
   return createdAt.slice(0, 10);
 }
 
+/** Formats a timestamp into a short human-readable date label for graph group headers. */
 function toAuditGroupLabel(createdAt: string): string {
   const asDate = new Date(createdAt);
   if (Number.isNaN(asDate.getTime())) {
@@ -56,19 +66,23 @@ function toAuditGroupLabel(createdAt: string): string {
   });
 }
 
+/** Creates a unique key for an audited object (e.g. "invoice:42"). */
 function toAuditObjectKey(objectType: string, objectId: number): string {
   return `${objectType}:${objectId}`;
 }
 
+/** Creates a graph lane key for a branch row in the SVG audit graph. */
 function toAuditLaneKey(objectType: string, objectId: number): string {
   return `branch-${toAuditObjectKey(objectType, objectId)}`;
 }
 
+/** Escapes a value for safe embedding in a CSV cell. */
 function escapeCsvCell(value: unknown): string {
   const asString = String(value ?? "");
   return `"${asString.replaceAll('"', '""')}"`;
 }
 
+/** Serializes a list of audit event records into a downloadable CSV string. */
 function toAuditTrailCsv(rows: FinancialAuditEventRecord[]): string {
   const header = [
     "id",
@@ -107,6 +121,7 @@ function toAuditTrailCsv(rows: FinancialAuditEventRecord[]): string {
   return [header.join(","), ...lines].join("\n");
 }
 
+/** Initiates a browser file download from an in-memory string payload. */
 function triggerDownload(filename: string, content: string, contentType: string): void {
   const blob = new Blob([content], { type: contentType });
   const url = window.URL.createObjectURL(blob);
@@ -119,6 +134,7 @@ function triggerDownload(filename: string, content: string, contentType: string)
   window.URL.revokeObjectURL(url);
 }
 
+/** Maps an audit event's object type to the appropriate frontend route for "Open Source Record". */
 function toAuditRoute(projectId: number, objectType: string, objectId: number): string {
   if (objectType === "estimate") {
     return `/projects/${projectId}/estimates?estimate=${objectId}`;
@@ -135,6 +151,7 @@ function toAuditRoute(projectId: number, objectType: string, objectId: number): 
   return `/financials-auditing?project=${projectId}`;
 }
 
+/** Returns the CSS class for a color-coded badge based on audit object type. */
 function auditObjectBadgeClass(objectType: string): string {
   if (objectType === "invoice") {
     return styles.auditBadgeInvoice;
@@ -157,6 +174,7 @@ function auditObjectBadgeClass(objectType: string): string {
   return styles.auditBadgeNeutral;
 }
 
+/** Normalizes a status string to a lowercase snake_case token for consistent comparison. */
 function normalizeStatusToken(status: string | null | undefined): string {
   return String(status ?? "")
     .trim()
@@ -165,6 +183,7 @@ function normalizeStatusToken(status: string | null | undefined): string {
     .replaceAll(" ", "_");
 }
 
+/** Returns a CSS tone class (draft, sent, approved, etc.) for a status chip. */
 function auditStatusToneClass(status: string | null | undefined): string {
   const token = normalizeStatusToken(status);
   if (!token) {
@@ -220,6 +239,7 @@ function auditStatusToneClass(status: string | null | undefined): string {
   return styles.auditStatusToneNeutral;
 }
 
+/** Resolves the effective status after an audit event, preferring toStatus over fromStatus. */
 function postActionStatus(
   fromStatus: string | null | undefined,
   toStatus: string | null | undefined,
@@ -232,6 +252,7 @@ function postActionStatus(
   return fromValue || null;
 }
 
+/** Renders the full financial auditing dashboard: summary, reports, audit graph, and sync events. */
 export function FinancialsAuditingConsole() {
   const { token, authMessage } = useSharedSessionAuth();
   const searchParams = useSearchParams();
@@ -456,6 +477,7 @@ export function FinancialsAuditingConsole() {
     return postActionStatus(selectedAuditEvent.from_status, selectedAuditEvent.to_status);
   }, [selectedAuditEvent]);
 
+  /** Rewrites legacy /payments routes to the current /financials-auditing path. */
   function normalizeUiRoute(route: string): string {
     if (!route.startsWith("/payments")) {
       return route;
@@ -467,6 +489,7 @@ export function FinancialsAuditingConsole() {
     return `/financials-auditing${route.slice(queryIndex)}`;
   }
 
+  /** Fetches the project list and auto-selects based on the URL query param. */
   async function loadProjects() {
     if (!token) {
       return;
@@ -498,6 +521,7 @@ export function FinancialsAuditingConsole() {
     }
   }
 
+  // Load the project list on mount and when auth or the URL project param changes.
   useEffect(() => {
     if (!token) {
       return;
@@ -506,6 +530,7 @@ export function FinancialsAuditingConsole() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestedProjectId, token]);
 
+  /** Fetches the project-level financial summary (contract, AR, AP). */
   async function loadFinancialSummary() {
     const projectId = Number(selectedProjectId);
     if (!projectId) {
@@ -529,6 +554,7 @@ export function FinancialsAuditingConsole() {
     }
   }
 
+  /** Downloads the project's accounting export as a CSV file. */
   async function downloadAccountingExport() {
     const projectId = Number(selectedProjectId);
     if (!projectId) {
@@ -563,6 +589,7 @@ export function FinancialsAuditingConsole() {
     }
   }
 
+  /** Low-level fetch for audit events, optionally filtered by object type. */
   async function fetchAuditEvents(
     projectId: number,
     objectTypes: string[] = [],
@@ -588,6 +615,7 @@ export function FinancialsAuditingConsole() {
     }
   }
 
+  /** Loads audit events and updates filters, catalog, and status message. */
   async function loadAuditEvents(
     projectIdValue?: number,
     options?: { resetFilters?: boolean; objectTypes?: string[] },
@@ -628,6 +656,7 @@ export function FinancialsAuditingConsole() {
     );
   }
 
+  /** Exports the full audit trail for the selected project as a JSON or CSV download. */
   async function downloadAuditTrail(format: "json" | "csv") {
     const projectId = Number(selectedProjectId);
     if (!projectId) {
@@ -667,6 +696,7 @@ export function FinancialsAuditingConsole() {
     setStatusMessage(`Downloaded ${orderedRows.length} audit event(s) as CSV.`);
   }
 
+  /** Fetches accounting sync events for the selected project. */
   async function loadAccountingSyncEvents() {
     const projectId = Number(selectedProjectId);
     if (!projectId) {
@@ -696,6 +726,7 @@ export function FinancialsAuditingConsole() {
     }
   }
 
+  /** Creates a new accounting sync event from the sync form fields. */
   async function createAccountingSyncEvent(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const projectId = Number(selectedProjectId);
@@ -737,6 +768,7 @@ export function FinancialsAuditingConsole() {
     }
   }
 
+  /** Retries a previously failed accounting sync event. */
   async function retryAccountingSyncEvent() {
     const syncEventId = Number(retryTargetId);
     if (!syncEventId) {
@@ -762,6 +794,7 @@ export function FinancialsAuditingConsole() {
     }
   }
 
+  /** Fetches the cross-project portfolio snapshot, optionally date-bounded. */
   async function loadPortfolioSnapshot() {
     setStatusMessage("Loading portfolio snapshot...");
     try {
@@ -790,6 +823,7 @@ export function FinancialsAuditingConsole() {
     }
   }
 
+  /** Fetches the approved change order impact rollup across projects. */
   async function loadChangeImpactSummary() {
     setStatusMessage("Loading change impact summary...");
     try {
@@ -818,6 +852,7 @@ export function FinancialsAuditingConsole() {
     }
   }
 
+  /** Fetches the attention feed of items that need user action (overdue, due soon, etc.). */
   async function loadAttentionFeed() {
     setStatusMessage("Loading attention feed...");
     try {
@@ -836,6 +871,7 @@ export function FinancialsAuditingConsole() {
     }
   }
 
+  // Reload the full audit trail whenever the selected project changes.
   useEffect(() => {
     const projectId = Number(selectedProjectId);
     if (!token || !projectId) {
@@ -850,6 +886,8 @@ export function FinancialsAuditingConsole() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProjectId, token]);
 
+  // Keep the selected audit event in sync with visibility -- auto-select the latest if the
+  // current selection is filtered out or empty.
   useEffect(() => {
     if (visibleAuditEvents.length === 0) {
       if (selectedAuditEventId !== null) {
@@ -865,6 +903,7 @@ export function FinancialsAuditingConsole() {
     }
   }, [selectedAuditEventId, visibleAuditEvents]);
 
+  /** Toggles an object type filter and immediately re-fetches matching audit events. */
   function toggleAuditObjectType(objectType: string) {
     const nextFilters = auditObjectFilters.includes(objectType)
       ? auditObjectFilters.filter((value) => value !== objectType)
@@ -873,6 +912,7 @@ export function FinancialsAuditingConsole() {
     void loadAuditEvents(undefined, { resetFilters: false, objectTypes: nextFilters });
   }
 
+  /** Clears all audit filters and reloads the unfiltered event set. */
   function resetAuditFilters() {
     setAuditEventFilter("all");
     setAuditObjectFilters([]);

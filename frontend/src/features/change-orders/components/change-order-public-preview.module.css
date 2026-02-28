@@ -5,13 +5,13 @@
 }
 
 .decisionBannerRecentlyApproved {
-  border-color: #86efac;
+  border-color: var(--status-approved-border);
   background: #f0fdf4;
   box-shadow: none;
 }
 
 .decisionBannerRecentlyRejected {
-  border-color: #fca5a5;
+  border-color: var(--status-rejected-border);
   background: #fef2f2;
   box-shadow: none;
 }
@@ -47,21 +47,21 @@
 .totalRow {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
-  color: #475569;
+  gap: var(--space-sm);
+  color: var(--text-secondary);
   font-size: 1rem;
 }
 
 .totalRow strong {
-  color: #0f172a;
+  color: var(--text-primary);
   font-size: 1.25rem;
   line-height: 1;
 }
 
 .decisionCard {
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--border);
   border-radius: 14px;
-  background: #ffffff;
+  background: var(--surface);
   padding: 14px 16px;
   display: grid;
   gap: 10px;
@@ -72,34 +72,34 @@
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .decisionMessage {
   margin: 0;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .field {
   display: grid;
   gap: 6px;
-  color: #475569;
+  color: var(--text-secondary);
   font-size: 0.88rem;
 }
 
 .field input,
 .field textarea {
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
   padding: 8px 10px;
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--input-bg);
+  color: var(--input-text);
 }
 
 .decisionActions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .publicDecisionSection {
@@ -115,15 +115,15 @@
 }
 
 .primaryButton {
-  border: 1px solid #1d4ed8;
-  background: #1d4ed8;
-  color: #eff6ff;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--text-on-accent);
 }
 
 .secondaryButton {
-  border: 1px solid #cbd5e1;
-  background: #f8fafc;
-  color: #0f172a;
+  border: 1px solid var(--border);
+  background: var(--surface-secondary);
+  color: var(--text-primary);
 }
 
 .primaryButton:disabled,
@@ -141,48 +141,6 @@
     display: grid;
     grid-template-columns: 1fr;
   }
-}
-
-:global(html[data-theme="dark"]) .totalRow {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .totalRow strong {
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .decisionCard {
-  border-color: #334155;
-  background: #111827;
-}
-
-:global(html[data-theme="dark"]) .decisionCard h3,
-:global(html[data-theme="dark"]) .decisionMessage,
-:global(html[data-theme="dark"]) .field {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .field input,
-:global(html[data-theme="dark"]) .field textarea {
-  border-color: #334155;
-  background: #0f172a;
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .secondaryButton {
-  border-color: #334155;
-  background: #0f172a;
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .decisionBannerRecentlyApproved {
-  border-color: #22c55e;
-  background: #10271a;
-}
-
-:global(html[data-theme="dark"]) .decisionBannerRecentlyRejected {
-  border-color: #ef4444;
-  background: #2f1417;
 }
 
 @media print {

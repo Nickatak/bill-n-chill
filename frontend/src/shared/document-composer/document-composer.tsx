@@ -1,3 +1,12 @@
+/**
+ * Generic document composer component.
+ *
+ * Renders a slot-based form layout shared by all financial document editors
+ * (invoices, estimates, change orders). Each document type provides its own
+ * adapter and section renderers; this component owns the section iteration,
+ * visibility gating, and action-button bar.
+ */
+
 import styles from "./document-composer.module.css";
 import {
   ComposerLineDraft,
@@ -5,6 +14,7 @@ import {
   DocumentComposerProps,
 } from "./types";
 
+/** Default section ordering when no custom layout is provided. */
 const DEFAULT_SECTIONS: ComposerSectionConfig[] = [
   { slot: "header" },
   { slot: "meta" },
@@ -16,6 +26,14 @@ const DEFAULT_SECTIONS: ComposerSectionConfig[] = [
   { slot: "footer" },
 ];
 
+/**
+ * Render a slot-driven document composer form.
+ *
+ * Iterates the section list, delegates rendering to the matching renderer
+ * for each slot, and appends an action-button bar when actions are provided.
+ * Sections whose renderer returns null or whose `visible` flag is false are
+ * silently skipped, so feature-specific sections can be toggled per document type.
+ */
 export function DocumentComposer<TDocument, TLine extends ComposerLineDraft, TFormState>({
   adapter,
   document,

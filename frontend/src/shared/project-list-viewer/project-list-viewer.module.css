@@ -1,15 +1,10 @@
 .controlBar {
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --border: #cbd5e1;
-  --surface: #ffffff;
-  --surface-elevated: #f8fafc;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  padding: 10px var(--space-md);
   background: var(--surface);
 }
 
@@ -22,7 +17,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .panelHeader h3 {
@@ -33,16 +28,16 @@
 .panelHeaderActions {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .countBadge {
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 2px 10px;
   font-size: 0.8rem;
   color: var(--text-secondary);
-  background: var(--surface-elevated);
+  background: var(--surface-secondary);
 }
 
 .inlineHint {
@@ -53,7 +48,7 @@
 
 .searchField {
   display: grid;
-  gap: 6px;
+  gap: var(--radius-sm);
 }
 
 .searchField span {
@@ -65,17 +60,17 @@
 }
 
 .searchField input {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: var(--surface-elevated);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) 10px;
+  background: var(--surface-secondary);
   color: var(--text-primary);
   font-size: 0.92rem;
 }
 
 .projectFilters {
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .projectFiltersLabel {
@@ -87,13 +82,13 @@
 .projectFilterButtons {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .controlBar .projectFilterButton {
   border: 1px solid #6b7f99;
-  border-radius: 999px;
-  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  padding: var(--radius-sm) var(--space-md);
   text-transform: uppercase;
   font-size: 0.75rem;
   letter-spacing: 0.12em;
@@ -102,15 +97,15 @@
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  color: #eff6ff;
+  gap: var(--space-sm);
+  color: var(--accent-lighter);
   background: #1b2a42;
 }
 
 .controlBar .projectFilterButton.projectFilterToneProspect {
-  background-color: #1e3a8a;
+  background-color: var(--accent-text);
   border-color: #60a5fa;
-  color: #eff6ff;
+  color: var(--accent-lighter);
 }
 
 .controlBar .projectFilterButton.projectFilterToneActive {
@@ -126,14 +121,14 @@
 }
 
 .controlBar .projectFilterButton.projectFilterToneCompleted {
-  background-color: #334155;
-  border-color: #cbd5e1;
-  color: #f8fafc;
+  background-color: var(--status-void-text);
+  border-color: var(--input-border);
+  color: var(--surface-secondary);
 }
 
 .controlBar .projectFilterButton.projectFilterToneCancelled {
-  background-color: #991b1b;
-  border-color: #fca5a5;
+  background-color: var(--status-rejected-text);
+  border-color: var(--status-rejected-border);
   color: #fff1f2;
 }
 
@@ -149,8 +144,8 @@
 
 .projectFilterCount {
   border: 1px solid currentColor;
-  border-radius: 999px;
-  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  padding: 1px var(--space-sm);
   font-size: 0.64rem;
   letter-spacing: 0.04em;
   line-height: 1.1;
@@ -159,13 +154,13 @@
 
 .projectFilterActions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
 }
 
 .controlBar .projectFilterActionButton {
   border: 1px solid #4f6280;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #1b2a42;
   color: #dbe7ff;
   font-size: 0.68rem;
@@ -193,9 +188,9 @@
 
 .projectTableWrap {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  background: var(--surface-elevated);
+  background: var(--surface-secondary);
 }
 
 .projectTable {
@@ -205,17 +200,17 @@
 
 .projectTable thead th {
   text-align: left;
-  padding: 10px 12px;
+  padding: 10px var(--space-md);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 0.7rem;
-  background: #1d4ed8;
+  background: var(--accent);
   color: #f0f7ff;
-  border-bottom: 1px solid #1e40af;
+  border-bottom: 1px solid var(--accent-hover);
 }
 
 .projectTable tbody td {
-  padding: 10px 12px;
+  padding: 10px var(--space-md);
   border-top: 1px solid var(--border);
   color: var(--text-primary);
 }
@@ -262,16 +257,16 @@
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  padding: 4px 10px;
-  border-radius: 999px;
+  padding: var(--space-xs) 10px;
+  border-radius: var(--radius-pill);
   font-weight: 600;
-  background: #e0e7ff;
-  color: #1e3a8a;
+  background: var(--surface-hover);
+  color: var(--accent-text);
 }
 
 .projectStatusProspect {
-  background: #e0e7ff;
-  color: #1e3a8a;
+  background: var(--surface-hover);
+  color: var(--accent-text);
 }
 
 .projectStatusActive {
@@ -291,7 +286,7 @@
 
 .projectStatusCancelled {
   background: #fecaca;
-  color: #991b1b;
+  color: var(--status-rejected-text);
 }
 
 .projectEmptyCell {
@@ -303,8 +298,8 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 10px;
   border-top: 1px solid var(--border);
   background: var(--surface);
 }
@@ -320,11 +315,11 @@
   border-radius: 10px;
   background: #1b2a42;
   color: #dbe7ff;
-  font-size: 0.72rem;
+  font-size: var(--font-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
-  padding: 6px 11px;
+  padding: var(--radius-sm) 11px;
   line-height: 1.1;
   display: inline-flex;
   align-items: center;
@@ -334,7 +329,7 @@
 .controlBar .projectPagerButton:hover {
   border-color: #7aa2d6;
   background: #2a4367;
-  color: #ffffff;
+  color: var(--surface);
 }
 
 .controlBar .projectPagerButton:disabled {
@@ -343,92 +338,6 @@
   border-color: #3d5270;
   background: #152238;
   cursor: default;
-}
-
-:global(html[data-theme="dark"]) .controlBar {
-  --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --border: #334155;
-  --surface: #0f172a;
-  --surface-elevated: #111827;
-}
-
-:global(html[data-theme="dark"]) .controlBar .projectFilterActionButton {
-  border-color: #4f6280;
-  background: #1b2a42;
-  color: #dbe7ff;
-}
-
-:global(html[data-theme="dark"]) .controlBar .projectFilterActionButton:hover {
-  border-color: #7aa2d6;
-  background: #243a5f;
-  color: #eef6ff;
-}
-
-:global(html[data-theme="dark"]) .projectTableWrap {
-  background: #0b152a;
-}
-
-:global(html[data-theme="dark"]) .projectTable thead th {
-  background: #1f3657;
-  color: #f0f7ff;
-  border-bottom-color: #2f4d79;
-}
-
-:global(html[data-theme="dark"]) .projectRowStatusProspect {
-  background: rgba(67, 56, 202, 0.34);
-}
-
-:global(html[data-theme="dark"]) .projectRowStatusActive {
-  background: rgba(21, 128, 61, 0.42);
-}
-
-:global(html[data-theme="dark"]) .projectRowStatusOnHold {
-  background: rgba(180, 83, 9, 0.34);
-}
-
-:global(html[data-theme="dark"]) .projectRowStatusCompleted {
-  background: rgba(82, 82, 91, 0.4);
-}
-
-:global(html[data-theme="dark"]) .projectRowStatusCancelled {
-  background: rgba(153, 27, 27, 0.42);
-}
-
-:global(html[data-theme="dark"]) .projectRow:hover {
-  filter: brightness(1.08) saturate(1.08);
-}
-
-:global(html[data-theme="dark"]) .projectRow.projectRowActive {
-  box-shadow: inset 0 0 0 2px rgba(125, 211, 252, 0.62);
-  filter: brightness(1.12) saturate(1.1);
-}
-
-:global(html[data-theme="dark"]) .searchField span,
-:global(html[data-theme="dark"]) .projectFiltersLabel {
-  color: #dbe7ff;
-}
-
-:global(html[data-theme="dark"]) .projectPagination span {
-  color: #e3eeff;
-}
-
-:global(html[data-theme="dark"]) .controlBar .projectPagerButton {
-  border-color: #4f6280;
-  background: #1b2a42;
-  color: #dbe7ff;
-}
-
-:global(html[data-theme="dark"]) .controlBar .projectPagerButton:hover {
-  border-color: #7aa2d6;
-  background: #2a4367;
-  color: #ffffff;
-}
-
-:global(html[data-theme="dark"]) .controlBar .projectPagerButton:disabled {
-  color: #9fb3d1;
-  border-color: #3d5270;
-  background: #152238;
 }
 
 @media (max-width: 900px) {

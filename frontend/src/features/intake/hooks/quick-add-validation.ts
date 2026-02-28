@@ -1,6 +1,22 @@
+/**
+ * Client-side validation for the quick-add customer intake form.
+ *
+ * Validates lead fields before the payload is sent to the API, providing
+ * immediate feedback so obviously invalid submissions never hit the server.
+ * The contact field (phone) accepts either a phone number or email address,
+ * since field workers often have one but not the other.
+ */
+
 import { CustomerIntakePayload } from "../types";
 import { LeadFieldErrors, SubmitIntent } from "./quick-add-controller.types";
 
+/**
+ * Validate lead-capture fields and return a map of field-level errors.
+ *
+ * Returns an empty object when all fields pass. The `intent` parameter
+ * controls whether project-specific fields (e.g. project name) are
+ * required — they are only enforced for "customer_and_project" submissions.
+ */
 export function validateLeadFields(
   payload: CustomerIntakePayload,
   {
@@ -18,6 +34,8 @@ export function validateLeadFields(
     nextErrors.full_name = "Full name is required.";
   }
 
+  // The contact field accepts either a phone number or an email address,
+  // since field crews may only have one form of contact for a lead.
   if (!contactValue) {
     nextErrors.phone = "Provide a valid phone number or email address.";
   } else {
@@ -33,6 +51,9 @@ export function validateLeadFields(
   if (!payload.project_address.trim()) {
     nextErrors.project_address = "Project address is required.";
   }
+
+  // Project name is only required when the user explicitly chose to create
+  // both a customer and a project in a single submission.
   if (intent === "customer_and_project" && !projectName.trim()) {
     nextErrors.project_name = "Project name is required when creating project + customer.";
   }

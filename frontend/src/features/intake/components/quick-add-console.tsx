@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Top-level quick-add console that composes the customer intake workflow.
+ * Bridges shared-session auth into the quick-add controller, renders status feedback,
+ * and orchestrates the duplicate-resolution and form sub-components.
+ */
+
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 
@@ -9,6 +15,7 @@ import { QuickAddForm } from "./quick-add-form";
 import { useQuickAddController } from "../hooks/use-quick-add-controller";
 import styles from "./quick-add-console.module.css";
 
+/** Orchestrates the quick-add customer workflow, combining auth, form, and duplicate resolution. */
 export function QuickAddConsole() {
   // Composition owner: bridges shared-session auth into the controller before child workflows run.
   const { token, authMessage: baseAuthMessage } = useSharedSessionAuth();
@@ -23,6 +30,7 @@ export function QuickAddConsole() {
   const statusAnchorRef = useRef<HTMLDivElement | null>(null);
   const lastScrollKeyRef = useRef("");
 
+  /** Build status message content with linked entity references on success. */
   function renderStatusMessageContent() {
     if (statusTone !== "success") {
       return statusMessage;
@@ -92,6 +100,7 @@ export function QuickAddConsole() {
     return statusMessage;
   }
 
+  // Scroll to status area when a new message or duplicate panel appears.
   useEffect(() => {
     const duplicateCount = controllerApi.duplicateCandidates.length;
     const nextKey = `${statusMessage}|${duplicateCount}`;

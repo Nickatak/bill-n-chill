@@ -1,3 +1,16 @@
+/**
+ * Context resolution for public (token-authenticated) document viewers.
+ *
+ * Public viewer pages receive minimal organization and project context from
+ * the API. These helpers normalize that raw context into display-ready sender
+ * and recipient shapes so individual viewer pages don't duplicate fallback logic.
+ */
+
+// ---------------------------------------------------------------------------
+// Raw API context shapes
+// ---------------------------------------------------------------------------
+
+/** Organization-level fields available on public document endpoints. */
 type PublicOrganizationContext = {
   display_name?: string | null;
   logo_url?: string | null;
@@ -10,6 +23,7 @@ type PublicOrganizationContext = {
   change_order_default_reason?: string | null;
 };
 
+/** Project-level customer fields available on public document endpoints. */
 type PublicProjectContext = {
   customer_display_name?: string | null;
   customer_billing_address?: string | null;
@@ -17,6 +31,11 @@ type PublicProjectContext = {
   customer_phone?: string | null;
 };
 
+// ---------------------------------------------------------------------------
+// Resolved display shapes
+// ---------------------------------------------------------------------------
+
+/** Normalized sender information ready for rendering in document headers. */
 export type PublicViewerSender = {
   companyName: string;
   senderName: string;
@@ -27,6 +46,7 @@ export type PublicViewerSender = {
   helpEmail: string;
 };
 
+/** Normalized recipient information ready for rendering in document headers. */
 export type PublicViewerRecipient = {
   name: string;
   address: string;
@@ -35,10 +55,21 @@ export type PublicViewerRecipient = {
   phone: string;
 };
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Trim a nullable string to a safe empty-string default. */
 function normalizeValue(value?: string | null): string {
   return (value || "").trim();
 }
 
+/**
+ * Split an address string into individual display lines.
+ *
+ * Handles both newline-delimited and comma-delimited addresses so it works
+ * regardless of how the address was entered in organization settings.
+ */
 export function toAddressLines(value?: string | null): string[] {
   const normalized = normalizeValue(value);
   if (!normalized) {
@@ -51,6 +82,16 @@ export function toAddressLines(value?: string | null): string[] {
     .filter(Boolean);
 }
 
+// ---------------------------------------------------------------------------
+// Resolvers
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve organization context into a display-ready sender shape.
+ *
+ * Cascades through available name fields so the document always shows a
+ * reasonable company identity even when branding is partially configured.
+ */
 export function resolvePublicSender(
   organizationContext?: PublicOrganizationContext | null,
 ): PublicViewerSender {
@@ -62,6 +103,7 @@ export function resolvePublicSender(
   const senderEmail = normalizeValue(organizationContext?.sender_email);
   const senderAddress = normalizeValue(organizationContext?.sender_address);
   const helpEmail = normalizeValue(organizationContext?.help_email) || senderEmail;
+
   return {
     companyName,
     senderName,
@@ -73,11 +115,18 @@ export function resolvePublicSender(
   };
 }
 
+/**
+ * Resolve project context into a display-ready recipient shape.
+ *
+ * Falls back to "Customer" when no display name is available so the
+ * document header always has a label for the recipient block.
+ */
 export function resolvePublicRecipient(
   projectContext?: PublicProjectContext | null,
 ): PublicViewerRecipient {
   const name = normalizeValue(projectContext?.customer_display_name) || "Customer";
   const address = normalizeValue(projectContext?.customer_billing_address);
+
   return {
     name,
     address,
@@ -87,6 +136,12 @@ export function resolvePublicRecipient(
   };
 }
 
+/**
+ * Look up the default terms/reason text for a given document type.
+ *
+ * Used to pre-fill the terms section when composing a new document from
+ * a public viewer action (e.g. "approve with changes").
+ */
 export function resolveDefaultTerms(
   organizationContext: PublicOrganizationContext | null | undefined,
   documentType: "estimate" | "invoice" | "change_order",

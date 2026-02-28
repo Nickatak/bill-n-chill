@@ -11,29 +11,29 @@
 }
 
 .input {
-  border: 1px solid #cbd5f5;
-  border-radius: 8px;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
   padding: 6px 8px;
   padding-right: 24px;
-  background: #ffffff;
+  background: var(--surface);
   color: var(--text-primary);
   font-size: 0.85rem;
   width: 100%;
 }
 
 .inputDisabled {
-  background: #f1f5f9;
-  color: #475569;
-  border-color: #dbe3f0;
+  background: var(--input-disabled-bg);
+  color: var(--input-disabled-text);
+  border-color: var(--input-disabled-border);
   cursor: default;
 }
 
 .menu {
   position: fixed;
   z-index: 1200;
-  border: 1px solid #cbd5f5;
-  border-radius: 8px;
-  background: #ffffff;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  background: var(--surface);
   max-height: 180px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -42,7 +42,7 @@
 .option {
   width: 100%;
   border: 0;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--border);
   background: transparent;
   color: var(--text-primary);
   padding: 7px 9px;
@@ -64,7 +64,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.8rem;
   font-weight: 700;
   line-height: 1;
@@ -72,7 +72,7 @@
 }
 
 .inputWrap .clearButton:hover {
-  color: #1e3a8a;
+  color: var(--accent-text);
 }
 
 .inputWrap .clearButton:disabled {
@@ -85,24 +85,24 @@
 }
 
 .optionActive {
-  background: #dbeafe;
+  background: var(--accent-light);
 }
 
 .optionCode {
-  font-size: 0.72rem;
+  font-size: var(--font-xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #1d4ed8;
+  color: var(--accent);
   font-weight: 700;
 }
 
 .optionName {
-  font-size: 0.82rem;
+  font-size: var(--font-sm);
   color: var(--text-primary);
 }
 
 .noResults {
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--border);
   padding: 8px 9px;
   font-size: 0.8rem;
   color: var(--text-secondary);
@@ -113,62 +113,11 @@
 }
 
 .manageCodesLink {
-  color: #1d4ed8;
+  color: var(--accent);
   text-decoration: none;
   font-weight: 600;
 }
 
 .manageCodesLink:hover {
   text-decoration: underline;
-}
-
-:global(html[data-theme="dark"]) .input {
-  background: #0b1220;
-  border-color: #334155;
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .inputDisabled {
-  background: #0a1324;
-  border-color: #2b3b52;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .menu {
-  background: #0f172a;
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .inputWrap .clearButton {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .inputWrap .clearButton:hover {
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .option {
-  border-top-color: #1f2937;
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .optionActive {
-  background: #1e3a8a;
-}
-
-:global(html[data-theme="dark"]) .optionCode {
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .optionName {
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .noResults {
-  border-top-color: #1f2937;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .manageCodesLink {
-  color: #93c5fd;
 }

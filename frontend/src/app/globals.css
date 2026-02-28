@@ -1,13 +1,221 @@
-/* Base reset and theme custom properties. */
+/* Base reset and design token system. */
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* --- Accent / Primary --- */
+  --accent: #1d4ed8;
+  --accent-hover: #1e40af;
+  --accent-light: #dbeafe;
+  --accent-lighter: #eff6ff;
+  --accent-border: #93c5fd;
+  --accent-text: #1e3a8a;
+
+  /* --- Surface / Layout --- */
+  --surface: #ffffff;
+  --surface-secondary: #f8fafc;
+  --surface-hover: #e0e7ff;
+  --surface-inset: #f1f5f9;
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+  --border-accent: #cbd5f5;
+
+  /* --- Text --- */
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --text-on-accent: #eff6ff;
+
+  /* --- Status: Draft --- */
+  --status-draft-bg: #dbeafe;
+  --status-draft-border: #93c5fd;
+  --status-draft-text: #1e3a8a;
+
+  /* --- Status: Sent / Pending Approval --- */
+  --status-sent-bg: #fef3c7;
+  --status-sent-border: #fcd34d;
+  --status-sent-text: #92400e;
+
+  /* --- Status: Approved --- */
+  --status-approved-bg: #dcfce7;
+  --status-approved-border: #86efac;
+  --status-approved-text: #166534;
+
+  /* --- Status: Rejected --- */
+  --status-rejected-bg: #fee2e2;
+  --status-rejected-border: #fca5a5;
+  --status-rejected-text: #991b1b;
+
+  /* --- Status: Void / Inactive / Archived --- */
+  --status-void-bg: #e2e8f0;
+  --status-void-border: #cbd5e1;
+  --status-void-text: #334155;
+
+  /* --- Status: Paid --- */
+  --status-paid-bg: #d1fae5;
+  --status-paid-border: #6ee7b7;
+  --status-paid-text: #065f46;
+
+  /* --- Status: Overdue --- */
+  --status-overdue-bg: #fff7ed;
+  --status-overdue-border: #fdba74;
+  --status-overdue-text: #9a3412;
+
+  /* --- Semantic Tones --- */
+  --tone-success-bg: #dcfce7;
+  --tone-success-border: #4ade80;
+  --tone-success-text: #14532d;
+
+  --tone-error-bg: #fee2e2;
+  --tone-error-border: #f87171;
+  --tone-error-text: #991b1b;
+
+  --tone-warning-bg: #fef3c7;
+  --tone-warning-border: #fcd34d;
+  --tone-warning-text: #92400e;
+
+  --tone-neutral-bg: #f1f5f9;
+  --tone-neutral-border: #cbd5e1;
+  --tone-neutral-text: #334155;
+
+  /* --- Table --- */
+  --table-header-bg: #eef2ff;
+  --table-header-text: #1e3a8a;
+  --table-row-alt: #f8fafc;
+  --table-row-hover: #e0e7ff;
+  --table-row-active: #c7d2fe;
+  --table-border: #e2e8f0;
+
+  /* --- Inputs / Forms --- */
+  --input-bg: #ffffff;
+  --input-border: #cbd5e1;
+  --input-text: #0f172a;
+  --input-readonly-bg: #f8fafc;
+  --input-readonly-text: #64748b;
+  --input-disabled-bg: #f1f5f9;
+  --input-disabled-text: #94a3b8;
+  --input-disabled-border: #e2e8f0;
+
+  /* --- Spacing Scale --- */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 20px;
+  --space-2xl: 24px;
+
+  /* --- Border Radius --- */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  /* --- Typography --- */
+  --font-xs: 0.72rem;
+  --font-sm: 0.82rem;
+  --font-base: 0.9rem;
+  --font-md: 0.98rem;
+  --font-lg: 1.1rem;
 }
 
-:root[data-theme="dark"] {
+html[data-theme="dark"] {
   --background: #0a0a0a;
   --foreground: #ededed;
+
+  /* --- Accent / Primary --- */
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-light: #1e293b;
+  --accent-lighter: #172033;
+  --accent-border: #3b82f6;
+  --accent-text: #93c5fd;
+
+  /* --- Surface / Layout --- */
+  --surface: #18181b;
+  --surface-secondary: #27272a;
+  --surface-hover: #3f3f46;
+  --surface-inset: #09090b;
+  --border: #3f3f46;
+  --border-light: #27272a;
+  --border-accent: #52525b;
+
+  /* --- Text --- */
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --text-on-accent: #dbeafe;
+
+  /* --- Status: Draft --- */
+  --status-draft-bg: #1d4ed8;
+  --status-draft-border: #3b82f6;
+  --status-draft-text: #dbeafe;
+
+  /* --- Status: Sent / Pending Approval --- */
+  --status-sent-bg: #b45309;
+  --status-sent-border: #f59e0b;
+  --status-sent-text: #fef3c7;
+
+  /* --- Status: Approved --- */
+  --status-approved-bg: #15803d;
+  --status-approved-border: #22c55e;
+  --status-approved-text: #dcfce7;
+
+  /* --- Status: Rejected --- */
+  --status-rejected-bg: #991b1b;
+  --status-rejected-border: #ef4444;
+  --status-rejected-text: #fee2e2;
+
+  /* --- Status: Void / Inactive / Archived --- */
+  --status-void-bg: #4b5563;
+  --status-void-border: #9ca3af;
+  --status-void-text: #f3f4f6;
+
+  /* --- Status: Paid --- */
+  --status-paid-bg: #065f46;
+  --status-paid-border: #10b981;
+  --status-paid-text: #d1fae5;
+
+  /* --- Status: Overdue --- */
+  --status-overdue-bg: #9a3412;
+  --status-overdue-border: #f97316;
+  --status-overdue-text: #fff7ed;
+
+  /* --- Semantic Tones --- */
+  --tone-success-bg: #14532d;
+  --tone-success-border: #22c55e;
+  --tone-success-text: #bbf7d0;
+
+  --tone-error-bg: #7f1d1d;
+  --tone-error-border: #ef4444;
+  --tone-error-text: #fecaca;
+
+  --tone-warning-bg: #78350f;
+  --tone-warning-border: #f59e0b;
+  --tone-warning-text: #fef3c7;
+
+  --tone-neutral-bg: #27272a;
+  --tone-neutral-border: #52525b;
+  --tone-neutral-text: #d4d4d8;
+
+  /* --- Table --- */
+  --table-header-bg: #27272a;
+  --table-header-text: #93c5fd;
+  --table-row-alt: #1c1c1f;
+  --table-row-hover: #27272a;
+  --table-row-active: #3f3f46;
+  --table-border: #27272a;
+
+  /* --- Inputs / Forms --- */
+  --input-bg: #09090b;
+  --input-border: #3f3f46;
+  --input-text: #fafafa;
+  --input-readonly-bg: #18181b;
+  --input-readonly-text: #a1a1aa;
+  --input-disabled-bg: #09090b;
+  --input-disabled-text: #71717a;
+  --input-disabled-border: #27272a;
 }
 
 html,

@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Organization settings console. Covers two concerns: editing the org profile
+ * (identity, document presets for invoices/estimates/change orders) and managing
+ * membership roles and statuses. Profile edits require owner or PM; membership
+ * management is owner-only with self-edit protections.
+ */
+
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import shell from "@/shared/shell/page-shell.module.css";
@@ -49,14 +56,17 @@ const DOCUMENT_SETTINGS_OPTIONS: Array<{
   },
 ];
 
+/** Convert a role slug to a human-readable label. */
 function roleLabel(role: string): string {
   return role.replace("_", " ");
 }
 
+/** Convert a status slug to a human-readable label. */
 function statusLabel(status: string): string {
   return status.replace("_", " ");
 }
 
+/** Snapshot current membership rows into a draft map for inline editing. */
 function buildMembershipDrafts(
   rows: OrganizationMembershipRecord[],
 ): Record<number, MembershipDraft> {
@@ -67,6 +77,7 @@ function buildMembershipDrafts(
   return next;
 }
 
+/** Extract the most useful error string from an API response, falling back to a default. */
 function extractErrorMessage(payload: ApiResponse | null, fallback: string): string {
   if (!payload?.error) {
     return fallback;
@@ -78,6 +89,7 @@ function extractErrorMessage(payload: ApiResponse | null, fallback: string): str
   return payload.error.message || fieldErrors || fallback;
 }
 
+/** Organization profile editor and membership management console. */
 export function OrganizationConsole() {
   const { token, role, organization: sessionOrganization } = useSharedSessionAuth();
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
@@ -144,6 +156,7 @@ export function OrganizationConsole() {
     [memberships],
   );
 
+  // Fetch org profile and memberships in parallel on mount
   useEffect(() => {
     if (!hasSession) {
       setErrorMessage("No session token found.");
@@ -236,6 +249,7 @@ export function OrganizationConsole() {
     };
   }, [hasSession, normalizedBaseUrl, token]);
 
+  /** PATCH the organization profile with all draft fields. */
   async function handleProfileSave(event: FormEvent) {
     event.preventDefault();
     if (!organizationProfile) {
@@ -251,6 +265,8 @@ export function OrganizationConsole() {
 
     setIsSavingProfile(true);
     setErrorMessage("");
+
+    // Clamp numeric fields to valid ranges before sending
     const parsedDueDays = Number(invoiceDefaultDueDaysDraft);
     const sanitizedDueDays = Number.isFinite(parsedDueDays)
       ? Math.max(1, Math.min(365, Math.round(parsedDueDays)))
@@ -322,6 +338,7 @@ export function OrganizationConsole() {
     }
   }
 
+  /** Update a single field in a membership draft without persisting to the server. */
   function updateMembershipDraft(
     membershipId: number,
     field: "role" | "status",
@@ -336,6 +353,7 @@ export function OrganizationConsole() {
     }));
   }
 
+  /** PATCH a membership's role and/or status if they differ from the server state. */
   async function handleMembershipSave(row: OrganizationMembershipRecord) {
     if (!canManageMemberships) {
       setErrorMessage("Only owners can manage organization membership roles/status.");
@@ -346,6 +364,7 @@ export function OrganizationConsole() {
     if (!draft) {
       return;
     }
+    // Only include fields that actually changed
     const patchPayload: Record<string, string> = {};
     if (draft.role !== row.role) {
       patchPayload.role = draft.role;

@@ -1,8 +1,8 @@
 .projectTableWrap {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   overflow-x: auto;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .searchField {
@@ -15,61 +15,54 @@
 
 .searchField input {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: var(--foreground);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) 10px;
+  background: var(--surface);
   color: var(--text-primary);
 }
 
 .statusMessage {
-  margin-top: 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: #f8fafc;
-  color: #334155;
-  font-size: 0.9rem;
+  composes: notice from "../../../shared/styles/notices.module.css";
+  margin-top: var(--space-md);
+  background: var(--surface-secondary);
+  color: var(--status-void-text);
 }
 
 .statusMessageSuccess {
-  border-color: #16a34a;
-  background: #dcfce7;
-  color: #166534;
+  composes: noticeSuccess from "../../../shared/styles/notices.module.css";
 }
 
 .statusMessageError {
-  border-color: #dc2626;
-  background: #fee2e2;
-  color: #991b1b;
+  composes: noticeError from "../../../shared/styles/notices.module.css";
 }
 
 .searchEmpty {
-  margin-top: 8px;
+  margin-top: var(--space-sm);
   color: var(--text-secondary);
   font-size: 0.85rem;
 }
 
 .projectFilters {
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
   margin-bottom: 10px;
 }
 
 .projectFiltersLabel {
-  color: #374151;
+  color: var(--text-primary);
   font-size: 0.85rem;
 }
 
 .projectFilterButtons {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .projectFilterButton {
-  border: 1px solid #cbd5f5;
-  border-radius: 999px;
-  padding: 6px 12px;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-pill);
+  padding: 6px var(--space-md);
   text-transform: uppercase;
   font-size: 0.75rem;
   letter-spacing: 0.12em;
@@ -79,8 +72,8 @@
 }
 
 .projectFilterButtonInactive {
-  background: #f8fafc;
-  color: #64748b;
+  background: var(--surface-secondary);
+  color: var(--text-secondary);
 }
 
 .projectFilterButtonActive {
@@ -90,7 +83,7 @@
 
 .projectFilterButtonActive.projectStatusProspect {
   background: #2563eb;
-  border-color: #1d4ed8;
+  border-color: var(--accent);
   color: #eff6ff;
 }
 
@@ -120,15 +113,15 @@
 
 .projectFilterActions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
 }
 
 .projectFilterActionButton {
-  border: 1px solid #94a3b8;
-  border-radius: 6px;
-  background: #f1f5f9;
-  color: #334155;
+  border: 1px solid var(--text-muted);
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  color: var(--status-void-text);
   font-size: 0.64rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -141,31 +134,29 @@
 }
 
 .projectFilterActionButton:hover {
-  border-color: #64748b;
-  background: #e2e8f0;
-  color: #1f2937;
+  border-color: var(--text-secondary);
+  background: var(--border);
+  color: var(--text-primary);
 }
 
 .projectTable {
-  width: 100%;
-  border-collapse: collapse;
+  composes: table from "../../../shared/styles/table.module.css";
   min-width: 720px;
-  font-size: 0.9rem;
 }
 
 .projectTable thead th {
   text-align: left;
-  padding: 10px 12px;
+  padding: 10px var(--space-md);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 0.7rem;
-  background: #eef2ff;
-  color: #1e3a8a;
+  background: var(--table-header-bg);
+  color: var(--table-header-text);
 }
 
 .projectTable tbody td {
-  padding: 10px 12px;
-  border-top: 1px solid #e2e8f0;
+  padding: 10px var(--space-md);
+  border-top: 1px solid var(--table-border);
   color: var(--text-primary);
 }
 
@@ -173,14 +164,14 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
-  padding: 8px 10px;
-  border-top: 1px solid #e5e7eb;
-  background: #f9fafb;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 10px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-secondary);
 }
 
 .projectPagination span {
-  color: #374151;
+  color: var(--text-primary);
   font-size: 0.85rem;
 }
 
@@ -190,15 +181,15 @@
 }
 
 .projectRow:nth-child(even) {
-  background: #f8fafc;
+  background: var(--table-row-alt);
 }
 
 .projectRow:hover {
-  background: #e0e7ff;
+  background: var(--table-row-hover);
 }
 
 .projectRow.projectRowActive {
-  background: #c7d2fe;
+  background: var(--table-row-active);
 }
 
 .projectCellTitle strong {
@@ -211,39 +202,37 @@
   text-transform: uppercase;
   letter-spacing: 0.12em;
   padding: 4px 10px;
-  border-radius: 999px;
-  background: #e0e7ff;
-  color: #1e3a8a;
+  border-radius: var(--radius-pill);
   font-weight: 600;
 }
 
 .projectStatusProspect {
-  background: #e0e7ff;
-  color: #1e3a8a;
+  background: #2563eb;
+  color: #eff6ff;
 }
 
 .projectStatusActive {
-  background: #22c55e;
-  color: #052e16;
+  background: #16a34a;
+  color: #f0fdf4;
 }
 
 .projectStatusOnHold {
-  background: #fef08a;
-  color: #713f12;
+  background: #eab308;
+  color: #422006;
 }
 
 .projectStatusCompleted {
-  background: #e5e7eb;
-  color: #4b5563;
+  background: #6b7280;
+  color: #f9fafb;
 }
 
 .projectStatusCancelled {
-  background: #fecaca;
-  color: #991b1b;
+  background: #dc2626;
+  color: #fee2e2;
 }
 
 .projectActionLink {
-  color: #1d4ed8;
+  color: var(--accent);
   font-weight: 600;
   text-decoration: none;
 }
@@ -252,169 +241,16 @@
   text-decoration: underline;
 }
 
-:global(html[data-theme="dark"]) .projectTableWrap {
-  background: #0f172a;
-  border-color: #1f2937;
-}
-
-:global(html[data-theme="dark"]) .searchField input {
-  background: #0b1220;
-  border-color: #334155;
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .statusMessage {
-  border-color: #334155;
-  background: #0f172a;
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .statusMessageSuccess {
-  border-color: #22c55e;
-  background: rgba(20, 83, 45, 0.45);
-  color: #bbf7d0;
-}
-
-:global(html[data-theme="dark"]) .statusMessageError {
-  border-color: #ef4444;
-  background: rgba(127, 29, 29, 0.45);
-  color: #fecaca;
-}
-
-:global(html[data-theme="dark"]) .projectFiltersLabel {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .projectFilterButton {
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .projectFilterButtonInactive {
-  background: #0b1220;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .projectFilterButtonActive {
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
-}
-
-:global(html[data-theme="dark"]) .projectFilterButtonActive.projectStatusProspect {
-  background: #1d4ed8;
-  border-color: #3b82f6;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .projectFilterButtonActive.projectStatusActive {
-  background: #15803d;
-  border-color: #22c55e;
-  color: #dcfce7;
-}
-
-:global(html[data-theme="dark"]) .projectFilterButtonActive.projectStatusOnHold {
-  background: #a16207;
-  border-color: #facc15;
-  color: #fef9c3;
-}
-
-:global(html[data-theme="dark"]) .projectFilterButtonActive.projectStatusCompleted {
-  background: #4b5563;
-  border-color: #9ca3af;
-  color: #f3f4f6;
-}
-
-:global(html[data-theme="dark"]) .projectFilterButtonActive.projectStatusCancelled {
-  background: #991b1b;
-  border-color: #ef4444;
-  color: #fee2e2;
-}
-
-:global(html[data-theme="dark"]) .projectFilterActionButton {
-  border-color: #64748b;
-  background: #1e293b;
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .projectFilterActionButton:hover {
-  border-color: #93c5fd;
-  background: #243244;
-  color: #f8fafc;
-}
-
-:global(html[data-theme="dark"]) .projectTable thead th {
-  background: #1e293b;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .projectTable tbody td {
-  border-color: #1f2937;
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .projectPagination {
-  border-top-color: #334155;
-  background: #0f172a;
-}
-
-:global(html[data-theme="dark"]) .projectPagination span {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .projectRow:nth-child(even) {
-  background: #111827;
-}
-
-:global(html[data-theme="dark"]) .projectRow:hover {
-  background: #1e293b;
-}
-
-:global(html[data-theme="dark"]) .projectRow.projectRowActive {
-  background: #334155;
-}
-
-:global(html[data-theme="dark"]) .projectStatus {
-  background: #1e293b;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .projectStatusProspect {
-  background: #1e3a8a;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .projectStatusActive {
-  background: #166534;
-  color: #bbf7d0;
-}
-
-:global(html[data-theme="dark"]) .projectStatusOnHold {
-  background: #854d0e;
-  color: #fef9c3;
-}
-
-:global(html[data-theme="dark"]) .projectStatusCompleted {
-  background: #374151;
-  color: #d1d5db;
-}
-
-:global(html[data-theme="dark"]) .projectStatusCancelled {
-  background: #7f1d1d;
-  color: #fecaca;
-}
-
-:global(html[data-theme="dark"]) .projectActionLink {
-  color: #93c5fd;
-}
-
 .overview {
   display: grid;
-  gap: 12px;
+  gap: var(--space-md);
 }
 
 .overviewHeader {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-md);
   flex-wrap: wrap;
 }
 
@@ -429,31 +265,31 @@
 
 .overviewActions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
 }
 
 .overviewGrid {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.6fr);
-  gap: 16px;
+  gap: var(--space-lg);
 }
 
 .treePanel {
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 16px;
-  background: #f8fafc;
+  padding: var(--space-lg);
+  background: var(--surface-secondary);
   display: grid;
-  gap: 12px;
+  gap: var(--space-md);
   align-content: start;
 }
 
 .treeRoot {
-  border: 1px solid #cbd5f5;
-  border-radius: 12px;
-  padding: 10px 12px;
-  background: #ffffff;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-lg);
+  padding: 10px var(--space-md);
+  background: var(--surface);
   display: grid;
   gap: 2px;
   align-self: start;
@@ -473,10 +309,10 @@
 }
 
 .projectSettingsToggle {
-  border: 1px solid #cbd5f5;
-  border-radius: 999px;
-  background: #eef2ff;
-  color: #1e3a8a;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-pill);
+  background: var(--table-header-bg);
+  color: var(--text-secondary);
   font-size: 0.7rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -488,14 +324,14 @@
 .quickStatusRow {
   margin-top: 10px;
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .quickStatusLabel {
   font-size: 0.7rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #1e3a8a;
+  color: var(--text-secondary);
   font-weight: 600;
 }
 
@@ -503,14 +339,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-lg);
   flex-wrap: wrap;
 }
 
 .quickStatusBadge {
   font-size: 0.7rem;
   letter-spacing: 0.12em;
-  padding: 5px 12px;
+  padding: 5px var(--space-md);
 }
 
 .quickStatusChangeLabel {
@@ -520,17 +356,17 @@
   letter-spacing: 0.08em;
   font-size: 0.64rem;
   font-weight: 600;
-  color: #475569;
+  color: var(--text-secondary);
   min-width: 190px;
 }
 
 .quickStatusSelect {
   min-width: 190px;
-  border: 1px solid #cbd5f5;
-  border-radius: 8px;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
   padding: 7px 10px;
-  background: #ffffff;
-  color: #1f2937;
+  background: var(--surface);
+  color: var(--text-primary);
   text-transform: none;
   letter-spacing: normal;
   font-size: 0.8rem;
@@ -554,19 +390,19 @@
 }
 
 .quickStatusSelectCancelled {
-  border-color: #94a3b8;
+  border-color: var(--text-muted);
 }
 
 .treeBranches {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--space-md);
 }
 
 .branch {
   display: grid;
-  gap: 8px;
-  border-left: 3px solid #c7d2fe;
+  gap: var(--space-sm);
+  border-left: 3px solid var(--border-accent);
   padding-left: 10px;
 }
 
@@ -574,20 +410,20 @@
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  color: #1e3a8a;
+  color: var(--text-secondary);
   font-weight: 600;
 }
 
 .branchGroup {
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .branchSubLabel {
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: #475569;
+  color: var(--text-secondary);
   font-weight: 600;
 }
 
@@ -595,12 +431,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-sm);
   min-width: 0;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 8px 10px;
-  background: #ffffff;
+  padding: var(--space-sm) 10px;
+  background: var(--surface);
 }
 
 .node a {
@@ -608,7 +444,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #1e3a8a;
+  color: var(--accent);
   font-weight: 600;
   text-decoration: none;
 }
@@ -632,69 +468,69 @@
   text-transform: uppercase;
   font-variant-numeric: tabular-nums;
   padding: 2px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .estimateCountDraft {
-  background: #e0e7ff;
-  color: #1e3a8a;
+  background: var(--status-draft-bg);
+  color: var(--status-draft-text);
 }
 
 .estimateCountSent {
-  background: #fde68a;
-  color: #92400e;
+  background: var(--status-sent-bg);
+  color: var(--status-sent-text);
 }
 
 .estimateCountApproved {
-  background: #bbf7d0;
-  color: #166534;
+  background: var(--status-approved-bg);
+  color: var(--status-approved-text);
 }
 
 .nodeCount {
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #e0e7ff;
-  color: #1e3a8a;
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: var(--surface-hover);
+  color: var(--text-secondary);
 }
 
 .metricsPanel {
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 16px;
-  background: #ffffff;
+  padding: var(--space-lg);
+  background: var(--surface);
   display: grid;
   gap: 10px;
 }
 
 .baselineCard {
-  border: 1px solid #c7d2fe;
+  border: 1px solid var(--border-accent);
   border-radius: 10px;
-  padding: 10px 12px;
-  background: #eef2ff;
+  padding: 10px var(--space-md);
+  background: var(--table-header-bg);
   display: grid;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 .baselineCardLabel {
   font-size: 0.66rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: #1e3a8a;
+  color: var(--text-secondary);
   font-weight: 700;
 }
 
 .baselineCardValue {
   font-size: 0.92rem;
-  color: #1e293b;
+  color: var(--text-primary);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .baselineCardMeta {
   font-size: 0.78rem;
-  color: #334155;
+  color: var(--status-void-text);
   font-weight: 500;
 }
 
@@ -702,15 +538,15 @@
   display: grid;
   gap: 6px;
   padding-top: 10px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--border);
 }
 
 .metricSectionTitle {
   margin: 0;
-  font-size: 0.72rem;
+  font-size: var(--font-xs);
   text-transform: uppercase;
   letter-spacing: 0.11em;
-  color: #1e3a8a;
+  color: var(--text-secondary);
   font-weight: 700;
 }
 
@@ -718,7 +554,7 @@
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  font-size: 0.9rem;
+  font-size: var(--font-base);
   color: var(--text-primary);
 }
 
@@ -729,7 +565,7 @@
 .metricsDivider {
   width: 100%;
   border: 0;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--border);
   margin: 2px 0;
 }
 
@@ -742,7 +578,7 @@
 .projectProfileForm {
   border: 1px solid var(--border);
   border-radius: 14px;
-  background: #ffffff;
+  background: var(--surface);
   padding: 14px;
   display: grid;
   gap: 10px;
@@ -751,22 +587,22 @@
 .projectStatusPills {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .projectStatusCurrentLabel {
   width: 100%;
-  font-size: 0.72rem;
+  font-size: var(--font-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #475569;
+  color: var(--text-secondary);
   font-weight: 700;
 }
 
 .projectStatusPill {
-  border: 1px solid #cbd5f5;
-  border-radius: 999px;
-  padding: 6px 12px;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-pill);
+  padding: 6px var(--space-md);
   text-transform: uppercase;
   font-size: 0.75rem;
   letter-spacing: 0.12em;
@@ -776,8 +612,8 @@
 }
 
 .projectStatusPillInactive {
-  background: #f8fafc;
-  color: #64748b;
+  background: var(--surface-secondary);
+  color: var(--text-secondary);
 }
 
 .projectStatusPillActive {
@@ -787,7 +623,7 @@
 
 .projectStatusPillActive.projectStatusProspect {
   background: #2563eb;
-  border-color: #1d4ed8;
+  border-color: var(--accent);
   color: #eff6ff;
 }
 
@@ -817,18 +653,18 @@
 
 .projectProfileError {
   margin: 0;
-  color: #b91c1c;
+  color: var(--tone-error-text);
   font-size: 0.85rem;
 }
 
 .projectProfileSubmit {
   justify-self: end;
-  border: 1px solid #1e3a8a;
+  border: 1px solid var(--accent-hover);
   border-radius: 10px;
-  background: linear-gradient(135deg, #1d4ed8, #1e40af);
-  color: #eff6ff;
-  padding: 8px 12px;
-  font-size: 0.82rem;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: var(--text-on-accent);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-sm);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -843,9 +679,9 @@
 }
 
 .projectProfileSubmit:disabled {
-  border-color: #94a3b8;
-  background: #cbd5e1;
-  color: #64748b;
+  border-color: var(--text-muted);
+  background: var(--border);
+  color: var(--text-secondary);
   cursor: not-allowed;
   box-shadow: none;
   transform: none;
@@ -860,208 +696,4 @@
   .treeBranches {
     grid-template-columns: 1fr;
   }
-}
-
-:global(html[data-theme="dark"]) .treePanel {
-  background: #0f172a;
-  border-color: #1f2937;
-}
-
-:global(html[data-theme="dark"]) .treeRoot {
-  background: #111827;
-  border-color: #1f2937;
-}
-
-:global(html[data-theme="dark"]) .branchLabel {
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .branchSubLabel {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .quickStatusLabel {
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .quickStatusChangeLabel {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .quickStatusSelect {
-  border-color: #334155;
-  background: #0b1220;
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .quickStatusSelectProspect {
-  border-color: #3b82f6;
-}
-
-:global(html[data-theme="dark"]) .quickStatusSelectActive {
-  border-color: #10b981;
-}
-
-:global(html[data-theme="dark"]) .quickStatusSelectOnHold {
-  border-color: #f97316;
-}
-
-:global(html[data-theme="dark"]) .quickStatusSelectCompleted {
-  border-color: #0ea5e9;
-}
-
-:global(html[data-theme="dark"]) .quickStatusSelectCancelled {
-  border-color: #64748b;
-}
-
-:global(html[data-theme="dark"]) .branch {
-  border-left-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .node {
-  background: #0b1220;
-  border-color: #1f2937;
-}
-
-:global(html[data-theme="dark"]) .node a {
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .projectSettingsToggle {
-  border-color: #334155;
-  background: #0f172a;
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .projectProfileForm {
-  border-color: #334155;
-  background: #0f172a;
-}
-
-:global(html[data-theme="dark"]) .projectStatusPill {
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .projectStatusPillInactive {
-  background: #0b1220;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .projectStatusPillActive {
-  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.25);
-}
-
-:global(html[data-theme="dark"]) .projectStatusPillActive.projectStatusProspect {
-  background: #1d4ed8;
-  border-color: #3b82f6;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .projectStatusPillActive.projectStatusActive {
-  background: #15803d;
-  border-color: #22c55e;
-  color: #dcfce7;
-}
-
-:global(html[data-theme="dark"]) .projectStatusPillActive.projectStatusOnHold {
-  background: #a16207;
-  border-color: #facc15;
-  color: #fef9c3;
-}
-
-:global(html[data-theme="dark"]) .projectProfileSubmit {
-  border-color: #3b82f6;
-  background: linear-gradient(135deg, #1d4ed8, #1e3a8a);
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .projectProfileSubmit:hover {
-  box-shadow: 0 10px 18px rgba(30, 64, 175, 0.38);
-}
-
-:global(html[data-theme="dark"]) .projectProfileSubmit:disabled {
-  border-color: #475569;
-  background: #1e293b;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .projectStatusPillActive.projectStatusCompleted {
-  background: #4b5563;
-  border-color: #9ca3af;
-  color: #f3f4f6;
-}
-
-:global(html[data-theme="dark"]) .projectStatusPillActive.projectStatusCancelled {
-  background: #991b1b;
-  border-color: #ef4444;
-  color: #fee2e2;
-}
-
-:global(html[data-theme="dark"]) .projectProfileError {
-  color: #fca5a5;
-}
-
-:global(html[data-theme="dark"]) .nodeCount {
-  background: #1e293b;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .estimateCountPill {
-  border: 1px solid transparent;
-}
-
-:global(html[data-theme="dark"]) .estimateCountDraft {
-  background: #1e3a8a;
-  color: #dbeafe;
-  border-color: #1d4ed8;
-}
-
-:global(html[data-theme="dark"]) .estimateCountSent {
-  background: #78350f;
-  color: #fde68a;
-  border-color: #92400e;
-}
-
-:global(html[data-theme="dark"]) .estimateCountApproved {
-  background: #14532d;
-  color: #bbf7d0;
-  border-color: #166534;
-}
-
-:global(html[data-theme="dark"]) .metricsPanel {
-  background: #0f172a;
-  border-color: #1f2937;
-}
-
-:global(html[data-theme="dark"]) .metricsDivider {
-  border-top-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .baselineCard {
-  border-color: #1d4ed8;
-  background: #172554;
-}
-
-:global(html[data-theme="dark"]) .baselineCardLabel {
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .baselineCardValue {
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .baselineCardMeta {
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .metricSection {
-  border-top-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .metricSectionTitle {
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .projectStatusCurrentLabel {
-  color: #94a3b8;
 }

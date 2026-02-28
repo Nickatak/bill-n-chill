@@ -1,8 +1,17 @@
 "use client";
 
+/**
+ * Change orders console -- the primary internal workspace for managing change
+ * orders within a project. Provides estimate-linked revision browsing,
+ * draft creation/editing, status transitions with quick-status pills, audit
+ * event history, and budget-line-anchored line-item composers.
+ */
+
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { parseAmount, formatDecimal } from "@/shared/money-format";
+import { readApiErrorMessage } from "@/shared/api/error";
 import {
   defaultApiBaseUrl,
   fetchChangeOrderPolicyContract,
@@ -58,6 +67,7 @@ type LineValidationResult = {
   issuesByLocalId: Map<number, string[]>;
 };
 
+/** Check whether a string is a valid finite numeric value. */
 function isFiniteNumericInput(value: string): boolean {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -67,6 +77,7 @@ function isFiniteNumericInput(value: string): boolean {
   return Number.isFinite(parsed);
 }
 
+/** Validate change-order line items for completeness and duplicates. */
 function validateLineItems(lines: ChangeOrderLineInput[]): LineValidationResult {
   const budgetLineCounts = new Map<string, number>();
   for (const line of lines) {
@@ -122,6 +133,7 @@ function validateLineItems(lines: ChangeOrderLineInput[]): LineValidationResult 
   };
 }
 
+/** Create a blank change-order line item with sensible defaults. */
 function emptyLine(localId: number): ChangeOrderLineInput {
   return {
     localId,
@@ -134,6 +146,7 @@ function emptyLine(localId: number): ChangeOrderLineInput {
   };
 }
 
+/** Generate a default change-order title from the project name. */
 function defaultChangeOrderTitle(projectName?: string): string {
   const trimmed = (projectName || "").trim();
   if (!trimmed) {
@@ -142,19 +155,12 @@ function defaultChangeOrderTitle(projectName?: string): string {
   return `Change Order: ${trimmed}`;
 }
 
-function toNumber(value: string): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function formatMoney(value: number): string {
-  return value.toFixed(2);
-}
-
+/** Build a human-readable label like "CO-3 v2" for a change order. */
 function coLabel(changeOrder: Pick<ChangeOrderRecord, "family_key" | "revision_number">): string {
   return `CO-${changeOrder.family_key} v${changeOrder.revision_number}`;
 }
 
+/** Build the public-facing change-order URL for a viewer link. */
 function publicChangeOrderHref(publicRef?: string): string {
   if (!publicRef) {
     return "";
@@ -162,32 +168,12 @@ function publicChangeOrderHref(publicRef?: string): string {
   return `/change-order/${publicRef}`;
 }
 
-function readApiErrorMessage(payload: ApiResponse | undefined, fallback: string): string {
-  const withStaleTransitionHint = (message: string): string => {
-    if (
-      /invalid .*status transition/i.test(message) &&
-      !/refresh/i.test(message)
-    ) {
-      return `${message} This change order may have changed from a client action on the public page. Refresh to load the latest status.`;
-    }
-    return message;
-  };
-
-  const topLevelMessage = payload?.error?.message?.trim();
-  if (topLevelMessage) {
-    return withStaleTransitionHint(topLevelMessage);
+function readApiError(payload: ApiResponse | undefined, fallback: string): string {
+  const message = readApiErrorMessage(payload, fallback);
+  if (/invalid .*status transition/i.test(message) && !/refresh/i.test(message)) {
+    return `${message} This change order may have changed from a client action on the public page. Refresh to load the latest status.`;
   }
-  const fieldEntries = Object.entries(payload?.error?.fields ?? {});
-  for (const [fieldName, fieldMessages] of fieldEntries) {
-    if (!Array.isArray(fieldMessages)) {
-      continue;
-    }
-    const firstFieldMessage = fieldMessages.find((message) => Boolean((message || "").trim()));
-    if (firstFieldMessage) {
-      return withStaleTransitionHint(`${fieldName}: ${firstFieldMessage}`);
-    }
-  }
-  return fallback;
+  return message;
 }
 
 type ChangeOrdersConsoleProps = {
@@ -246,6 +232,7 @@ const CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]>
 const CHANGE_ORDER_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
 const CO_GENERIC_BUDGET_LINE_CODES = new Set(["99-901", "99-902", "99-903"]);
 
+/** Internal change-orders workspace: estimate-linked viewer, dual composers (create + edit), and status lifecycle. */
 export function ChangeOrdersConsole({
   scopedProjectId: scopedProjectIdProp = null,
   initialOriginEstimateId: initialOriginEstimateIdProp = null,
@@ -340,7 +327,7 @@ export function ChangeOrdersConsole({
   const selectedViewerEstimateRecordId = selectedViewerEstimate?.id ?? null;
   const selectedViewerChangeOrderIdValue = selectedViewerChangeOrder?.id ?? null;
   const selectedViewerChangeOrderLineDelta = selectedViewerChangeOrder
-    ? toNumber(selectedViewerChangeOrder.line_total_delta || selectedViewerChangeOrder.amount_delta)
+    ? parseAmount(selectedViewerChangeOrder.line_total_delta || selectedViewerChangeOrder.amount_delta)
     : 0;
   const selectedViewerChangeOrderIsApproved = Boolean(
     selectedViewerChangeOrder && ["approved", "accepted"].includes(selectedViewerChangeOrder.status),
@@ -356,22 +343,22 @@ export function ChangeOrdersConsole({
   const defaultChangeOrderReason = (organizationDefaults?.change_order_default_reason || "").trim();
   const newLineDeltaTotal = useMemo(
     () =>
-      newLineItems.reduce((sum, line) => sum + toNumber(line.amountDelta), 0),
+      newLineItems.reduce((sum, line) => sum + parseAmount(line.amountDelta), 0),
     [newLineItems],
   );
   const newLineValidation = useMemo(() => validateLineItems(newLineItems), [newLineItems]);
   const editLineDeltaTotal = useMemo(
     () =>
-      editLineItems.reduce((sum, line) => sum + toNumber(line.amountDelta), 0),
+      editLineItems.reduce((sum, line) => sum + parseAmount(line.amountDelta), 0),
     [editLineItems],
   );
   const editLineValidation = useMemo(() => validateLineItems(editLineItems), [editLineItems]);
   const newLineDaysTotal = useMemo(
-    () => newLineItems.reduce((sum, line) => sum + Math.trunc(toNumber(line.daysDelta)), 0),
+    () => newLineItems.reduce((sum, line) => sum + Math.trunc(parseAmount(line.daysDelta)), 0),
     [newLineItems],
   );
   const editLineDaysTotal = useMemo(
-    () => editLineItems.reduce((sum, line) => sum + Math.trunc(toNumber(line.daysDelta)), 0),
+    () => editLineItems.reduce((sum, line) => sum + Math.trunc(parseAmount(line.daysDelta)), 0),
     [editLineItems],
   );
   const budgetLineById = useMemo(() => {
@@ -441,7 +428,7 @@ export function ChangeOrdersConsole({
     () => ({
       title: newTitle,
       reason: newReason,
-      amountDelta: formatMoney(newLineDeltaTotal),
+      amountDelta: formatDecimal(newLineDeltaTotal),
       daysDelta: String(newLineDaysTotal),
       lineItems: newLineItems,
     }),
@@ -451,7 +438,7 @@ export function ChangeOrdersConsole({
     () => ({
       title: editTitle,
       reason: editReason,
-      amountDelta: formatMoney(editLineDeltaTotal),
+      amountDelta: formatDecimal(editLineDeltaTotal),
       daysDelta: String(editLineDaysTotal),
       lineItems: editLineItems,
     }),
@@ -491,7 +478,7 @@ export function ChangeOrdersConsole({
       ) {
         return sum;
       }
-      return sum + toNumber(changeOrder.amount_delta);
+      return sum + parseAmount(changeOrder.amount_delta);
     }, 0);
     const originalBudgetTotal = originEstimateOriginalTotals[selectedViewerEstimateRecordId] ?? 0;
     const currentApprovedWorkingTotal = originalBudgetTotal + approvedRollingDelta;
@@ -500,11 +487,12 @@ export function ChangeOrdersConsole({
       : currentApprovedWorkingTotal;
     const postApprovalTotal = preApprovalTotal + selectedViewerChangeOrderLineDelta;
     return {
-      preApproval: formatMoney(preApprovalTotal),
-      postApproval: formatMoney(postApprovalTotal),
+      preApproval: formatDecimal(preApprovalTotal),
+      postApproval: formatDecimal(postApprovalTotal),
     };
   })();
 
+  /** Resolve a status value to its human-readable label. */
   function statusLabel(status: string): string {
     const label = changeOrderStatusLabels[status];
     if (label) {
@@ -516,6 +504,7 @@ export function ChangeOrdersConsole({
       .join(" ");
   }
 
+  /** Check whether a budget line is a system-reserved generic adjustment bin. */
   function isGenericBudgetLine(line: BudgetLineRecord | undefined): boolean {
     return Boolean(line?.cost_code_code && CO_GENERIC_BUDGET_LINE_CODES.has(line.cost_code_code));
   }
@@ -525,6 +514,7 @@ export function ChangeOrdersConsole({
     setActionTone(tone);
   }, []);
 
+  /** Look up the original approved budget amount for a given budget line. */
   function originalApprovedAmountForLine(budgetLineId: string): string {
     const line = budgetLineById.get(budgetLineId);
     if (!line) {
@@ -533,6 +523,7 @@ export function ChangeOrdersConsole({
     return line.budget_amount;
   }
 
+  /** Look up the cumulative approved CO delta for a given budget line. */
   function approvedChangeOrderDeltaForLine(budgetLineId: string): string {
     const line = budgetLineById.get(budgetLineId);
     if (!line) {
@@ -541,6 +532,7 @@ export function ChangeOrdersConsole({
     return line.approved_change_order_delta ?? "0.00";
   }
 
+  /** Look up the current working budget amount for a given budget line. */
   function currentWorkingAmountForLine(budgetLineId: string): string {
     const line = budgetLineById.get(budgetLineId);
     if (!line) {
@@ -584,6 +576,7 @@ export function ChangeOrdersConsole({
     return styles[key] ?? styles.editStatusDraft;
   }
 
+  /** Format an ISO datetime string into a short human-readable date+time. */
   function formatEventDateTime(dateValue: string): string {
     const parsed = new Date(dateValue);
     if (Number.isNaN(parsed.getTime())) {
@@ -598,6 +591,7 @@ export function ChangeOrdersConsole({
     }).format(parsed);
   }
 
+  /** Derive a display name for the actor of an audit event. */
   function eventActorLabel(event: AuditEventRecord): string {
     const actorDisplay = (event.created_by_display || "").trim();
     if (actorDisplay) {
@@ -613,6 +607,7 @@ export function ChangeOrdersConsole({
     return "unknown user";
   }
 
+  /** Build a link to the customer record if the actor was a customer. */
   function eventActorHref(event: AuditEventRecord): string | null {
     const actorCustomerId = Number(event.created_by_customer_id);
     if (Number.isInteger(actorCustomerId) && actorCustomerId > 0) {
@@ -621,6 +616,7 @@ export function ChangeOrdersConsole({
     return null;
   }
 
+  /** Render the actor label, optionally as a customer link. */
   function renderEventActor(event: AuditEventRecord) {
     const label = eventActorLabel(event);
     const href = eventActorHref(event);
@@ -634,6 +630,7 @@ export function ChangeOrdersConsole({
     );
   }
 
+  /** Sum approved CO deltas for a given origin estimate. */
   function approvedRollingDeltaForEstimate(estimateId: number): string {
     const total = changeOrders.reduce((sum, changeOrder) => {
       if (
@@ -642,18 +639,18 @@ export function ChangeOrdersConsole({
       ) {
         return sum;
       }
-      return sum + toNumber(changeOrder.amount_delta);
+      return sum + parseAmount(changeOrder.amount_delta);
     }, 0);
-    return formatMoney(total);
+    return formatDecimal(total);
   }
 
   function originalBudgetTotalForEstimate(estimateId: number): string {
-    return formatMoney(originEstimateOriginalTotals[estimateId] ?? 0);
+    return formatDecimal(originEstimateOriginalTotals[estimateId] ?? 0);
   }
 
   function currentApprovedBudgetTotalForEstimate(estimateId: number): string {
-    return formatMoney(
-      toNumber(originalBudgetTotalForEstimate(estimateId)) + toNumber(approvedRollingDeltaForEstimate(estimateId)),
+    return formatDecimal(
+      parseAmount(originalBudgetTotalForEstimate(estimateId)) + parseAmount(approvedRollingDeltaForEstimate(estimateId)),
     );
   }
 
@@ -664,6 +661,7 @@ export function ChangeOrdersConsole({
     return statusLabel(status);
   }
 
+  /** Derive a past-tense action label from a status audit event. */
   function statusEventActionLabel(event: AuditEventRecord): string {
     const fromStatus = event.from_status || "";
     const toStatus = event.to_status || "";
@@ -787,6 +785,7 @@ export function ChangeOrdersConsole({
     return `approved on ${dateLabel}`;
   }
 
+  /** Derive the financial-baseline status for an origin estimate. */
   function estimateFinancialBaselineStatus(
     estimate?: OriginEstimateRecord | null,
   ): FinancialBaselineStatusValue {
@@ -915,7 +914,7 @@ export function ChangeOrdersConsole({
           continue;
         }
         nextTotals[sourceEstimateId] = budget.line_items.reduce(
-          (sum, line) => sum + toNumber(line.budget_amount),
+          (sum, line) => sum + parseAmount(line.budget_amount),
           0,
         );
       }
@@ -1090,7 +1089,7 @@ export function ChangeOrdersConsole({
     if (!response.ok) {
       return {
         rows: null as ChangeOrderRecord[] | null,
-        error: readApiErrorMessage(payload, "Could not load change orders."),
+        error: readApiError(payload, "Could not load change orders."),
       };
     }
     return { rows: (payload.data as ChangeOrderRecord[]) ?? [], error: "" };
@@ -1131,7 +1130,7 @@ export function ChangeOrdersConsole({
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setFeedback(readApiErrorMessage(payload, "Could not load projects."), "error");
+        setFeedback(readApiError(payload, "Could not load projects."), "error");
         return;
       }
       const rows = (payload.data as Array<{ id: number; name: string }>) ?? [];
@@ -1189,6 +1188,7 @@ export function ChangeOrdersConsole({
     token,
   ]);
 
+  // Load the change-order workflow policy contract on auth.
   useEffect(() => {
     if (!token) {
       return;
@@ -1199,6 +1199,7 @@ export function ChangeOrdersConsole({
     return () => window.clearTimeout(run);
   }, [loadChangeOrderPolicy, token]);
 
+  // Fetch projects and related data on auth.
   useEffect(() => {
     if (!token) {
       return;
@@ -1209,6 +1210,7 @@ export function ChangeOrdersConsole({
     return () => window.clearTimeout(run);
   }, [loadProjects, token]);
 
+  // Load organization branding defaults for the composer header.
   useEffect(() => {
     if (!token) {
       return;
@@ -1219,6 +1221,7 @@ export function ChangeOrdersConsole({
     return () => window.clearTimeout(run);
   }, [loadOrganizationDefaults, token]);
 
+  // Auto-generate the draft title from the project name until the user edits it.
   useEffect(() => {
     if (newTitleManuallyEdited) {
       return;
@@ -1229,6 +1232,7 @@ export function ChangeOrdersConsole({
     return () => window.clearTimeout(run);
   }, [newTitleManuallyEdited, selectedProjectName]);
 
+  // Sync the edit form when the selected CO is no longer in the visible set.
   useEffect(() => {
     // Keep "create new" mode sticky when the user intentionally clears selection.
     if (!selectedChangeOrderId) {
@@ -1248,6 +1252,7 @@ export function ChangeOrdersConsole({
     }
   }, [hydrateEditForm, selectedChangeOrderId, viewerChangeOrders]);
 
+  // Reload budget lines and prefill new-CO starter rows when the origin estimate changes.
   useEffect(() => {
     const projectId = Number(selectedProjectId);
     if (!projectId || !selectedViewerEstimateId || !/^\d+$/.test(selectedViewerEstimateId)) {
@@ -1260,6 +1265,7 @@ export function ChangeOrdersConsole({
     })();
   }, [loadBudgetLines, prefillNewLinesFromBudgetLines, selectedProjectId, selectedViewerEstimateId]);
 
+  /** Convert local line-item state into the API payload shape. */
   function toLinePayload(lines: ChangeOrderLineInput[]) {
     return lines
       .filter((line) => line.budgetLineId.trim() !== "")
@@ -1273,6 +1279,7 @@ export function ChangeOrdersConsole({
       }));
   }
 
+  /** Patch a single field on a line item in a given line-item set. */
   function updateLine(
     setter: LineSetter,
     localId: number,
@@ -1283,6 +1290,7 @@ export function ChangeOrdersConsole({
     );
   }
 
+  /** Append a new blank line to the given line-item set. */
   function addLine(setter: LineSetter) {
     if (actionTone === "error" && actionMessage === CHANGE_ORDER_MIN_LINE_ITEMS_ERROR) {
       setFeedback("");
@@ -1292,6 +1300,7 @@ export function ChangeOrdersConsole({
     setter((current) => [...current, emptyLine(localId)]);
   }
 
+  /** Remove a line item, enforcing the minimum of one line. */
   function removeLine(
     setter: LineSetter,
     lines: ChangeOrderLineInput[],
@@ -1304,6 +1313,7 @@ export function ChangeOrdersConsole({
     setter((current) => current.filter((line) => line.localId !== localId));
   }
 
+  /** Reset the workspace to a fresh "new change order" draft. */
   function handleStartNewChangeOrder() {
     pendingScrollToCreateComposerRef.current = true;
     hydrateEditForm(undefined);
@@ -1319,6 +1329,7 @@ export function ChangeOrdersConsole({
     setFeedback("Ready for a new change order draft.", "info");
   }
 
+  // Scroll the create composer into view after switching to "new CO" mode.
   useEffect(() => {
     if (!pendingScrollToCreateComposerRef.current) {
       return;
@@ -1336,6 +1347,7 @@ export function ChangeOrdersConsole({
     });
   }, [selectedChangeOrder]);
 
+  /** Handle form submission for creating a new change order draft. */
   async function handleCreateChangeOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canMutateChangeOrders) {
@@ -1358,7 +1370,7 @@ export function ChangeOrdersConsole({
           body: JSON.stringify({
             title: newTitle,
             reason: newReason,
-            amount_delta: formatMoney(newLineDeltaTotal),
+            amount_delta: formatDecimal(newLineDeltaTotal),
             days_delta: newLineDaysTotal,
             origin_estimate: selectedViewerEstimateId ? Number(selectedViewerEstimateId) : null,
             line_items: toLinePayload(newLineItems),
@@ -1367,7 +1379,7 @@ export function ChangeOrdersConsole({
       );
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setFeedback(readApiErrorMessage(payload, "Create change order failed."), "error");
+        setFeedback(readApiError(payload, "Create change order failed."), "error");
         return;
       }
       const created = payload.data as ChangeOrderRecord;
@@ -1394,6 +1406,7 @@ export function ChangeOrdersConsole({
     }
   }
 
+  /** Clone the selected change order as a new draft revision. */
   async function handleCloneRevision() {
     if (!canMutateChangeOrders) {
       setFeedback(`Role ${role} is read-only for change order mutations.`, "error");
@@ -1418,7 +1431,7 @@ export function ChangeOrdersConsole({
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setFeedback(readApiErrorMessage(payload, "Clone revision failed."), "error");
+        setFeedback(readApiError(payload, "Clone revision failed."), "error");
         return;
       }
       const created = payload.data as ChangeOrderRecord;
@@ -1435,6 +1448,7 @@ export function ChangeOrdersConsole({
     }
   }
 
+  /** Handle form submission for saving edits to an existing draft change order. */
   async function handleUpdateChangeOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canMutateChangeOrders) {
@@ -1461,7 +1475,7 @@ export function ChangeOrdersConsole({
           body: JSON.stringify({
             title: editTitle,
             reason: editReason,
-            amount_delta: formatMoney(editLineDeltaTotal),
+            amount_delta: formatDecimal(editLineDeltaTotal),
             days_delta: editLineDaysTotal,
             status: selectedChangeOrder.status,
             line_items: toLinePayload(editLineItems),
@@ -1470,7 +1484,7 @@ export function ChangeOrdersConsole({
       );
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setFeedback(readApiErrorMessage(payload, "Save change order failed."), "error");
+        setFeedback(readApiError(payload, "Save change order failed."), "error");
         return;
       }
       const updated = payload.data as ChangeOrderRecord;
@@ -1495,6 +1509,7 @@ export function ChangeOrdersConsole({
     }
   }
 
+  /** Apply a quick status transition (or resend) to the selected viewer change order. */
   async function handleQuickUpdateStatus() {
     if (!canMutateChangeOrders) {
       setFeedback(`Role ${role} is read-only for change order mutations.`, "error");
@@ -1524,7 +1539,7 @@ export function ChangeOrdersConsole({
       );
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setFeedback(readApiErrorMessage(payload, "Status update failed."), "error");
+        setFeedback(readApiError(payload, "Status update failed."), "error");
         return;
       }
       const updated = payload.data as ChangeOrderRecord;
@@ -1552,6 +1567,7 @@ export function ChangeOrdersConsole({
     }
   }
 
+  /** Append a status note without changing the change order's current status. */
   async function handleAddChangeOrderStatusNote() {
     if (!canMutateChangeOrders) {
       setFeedback(`Role ${role} is read-only for change order mutations.`, "error");
@@ -1583,7 +1599,7 @@ export function ChangeOrdersConsole({
       );
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setFeedback(readApiErrorMessage(payload, "Status note update failed."), "error");
+        setFeedback(readApiError(payload, "Status note update failed."), "error");
         return;
       }
       const updated = payload.data as ChangeOrderRecord;
@@ -2257,7 +2273,7 @@ export function ChangeOrdersConsole({
                     </div>
                     <div className={composerStyles.summaryRow}>
                       <span className={changeOrderComposerStyles.coSummaryPrimaryLabel}>Cost delta ($)</span>
-                      <strong>{formatMoney(newLineDeltaTotal)}</strong>
+                      <strong>{formatDecimal(newLineDeltaTotal)}</strong>
                     </div>
                     <div className={composerStyles.summaryRow}>
                       <span className={changeOrderComposerStyles.coSummaryPrimaryLabel}>Time delta (days)</span>
@@ -2529,7 +2545,7 @@ export function ChangeOrdersConsole({
                     </div>
                     <div className={composerStyles.summaryRow}>
                       <span className={changeOrderComposerStyles.coSummaryPrimaryLabel}>Cost delta ($)</span>
-                      <strong>{formatMoney(editLineDeltaTotal)}</strong>
+                      <strong>{formatDecimal(editLineDeltaTotal)}</strong>
                     </div>
                     <div className={composerStyles.summaryRow}>
                       <span className={changeOrderComposerStyles.coSummaryPrimaryLabel}>Time delta (days)</span>

@@ -1,11 +1,4 @@
 .console {
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --border: #cbd5e1;
-  --surface: #f8fafc;
-  --surface-elevated: #ffffff;
-  --accent: #1d4ed8;
-
   display: grid;
   gap: 10px;
   color: var(--text-primary);
@@ -28,26 +21,24 @@
   margin: 0;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--surface);
+  background: var(--surface-secondary);
   color: var(--text-secondary);
-  padding: 8px 10px;
+  padding: var(--space-sm) 10px;
   font-size: 0.84rem;
 }
 
 .readOnlyNotice {
-  border-color: #facc15;
-  background: #fefce8;
-  color: #854d0e;
+  composes: noticeWarning from '../../../shared/styles/notices.module.css';
 }
 
 .console > form,
 .console > section {
   border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
+  border-radius: var(--radius-lg);
+  background: var(--surface-secondary);
   padding: 10px;
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .console h3 {
@@ -74,10 +65,10 @@
 .console select,
 .console textarea {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-elevated);
+  border-radius: var(--radius-md);
+  background: var(--surface);
   color: var(--text-primary);
-  padding: 8px 10px;
+  padding: var(--space-sm) 10px;
   font-size: 0.88rem;
   text-transform: none;
   letter-spacing: normal;
@@ -90,19 +81,19 @@
 }
 
 .console button {
-  border: 1px solid #93c5fd;
-  border-radius: 8px;
-  background: #dbeafe;
-  color: #1e3a8a;
-  padding: 8px 10px;
-  font-size: 0.82rem;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  background: var(--accent-light);
+  color: var(--accent-text);
+  padding: var(--space-sm) 10px;
+  font-size: var(--font-sm);
   font-weight: 700;
   cursor: pointer;
   width: fit-content;
 }
 
 .console button + button {
-  margin-left: 8px;
+  margin-left: var(--space-sm);
 }
 
 .console button:disabled {
@@ -112,29 +103,8 @@
 
 .console code {
   border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface-elevated);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
   padding: 1px 6px;
   color: var(--text-primary);
-}
-
-:global(html[data-theme="dark"]) .console {
-  --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --border: #334155;
-  --surface: #0f172a;
-  --surface-elevated: #111827;
-  --accent: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .readOnlyNotice {
-  border-color: #a16207;
-  background: #451a03;
-  color: #fcd34d;
-}
-
-:global(html[data-theme="dark"]) .console button {
-  border-color: #3b82f6;
-  background: #1e3a8a;
-  color: #dbeafe;
 }

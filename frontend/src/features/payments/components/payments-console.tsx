@@ -1,8 +1,15 @@
 "use client";
 
+/**
+ * Full payment recording console for a project's cash management lifecycle.
+ * Supports creating, editing, and allocating inbound/outbound payments with
+ * direction-aware target resolution (invoices for inbound, vendor bills for outbound).
+ */
+
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { todayDateInput } from "@/shared/date-format";
 
 import {
   defaultApiBaseUrl,
@@ -26,10 +33,6 @@ import {
 } from "../types";
 import styles from "./payments-console.module.css";
 
-function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 const PAYMENT_STATUSES_FALLBACK = ["pending", "settled", "failed", "void"];
 const PAYMENT_STATUS_LABELS_FALLBACK: Record<string, string> = {
   pending: "Pending",
@@ -50,6 +53,7 @@ const PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK: Record<string, PaymentAll
   outbound: "vendor_bill",
 };
 
+/** Return a contextual hint about the next workflow step for a given payment status. */
 function paymentNextActionHint(status: PaymentStatus): string {
   if (status === "pending") {
     return "Next: settle or mark failed once bank confirmation is known.";
@@ -66,6 +70,7 @@ function paymentNextActionHint(status: PaymentStatus): string {
   return "Use allowed transitions from the policy contract.";
 }
 
+/** Full payment lifecycle console: create, edit, transition, and allocate payments per project. */
 export function PaymentsConsole() {
   const { token, authMessage, role } = useSharedSessionAuth();
   const [statusMessage, setStatusMessage] = useState("");
@@ -94,7 +99,7 @@ export function PaymentsConsole() {
   const [newMethod, setNewMethod] = useState<PaymentMethod>("ach");
   const [newStatus, setNewStatus] = useState<PaymentStatus>("pending");
   const [newAmount, setNewAmount] = useState("0.00");
-  const [newPaymentDate, setNewPaymentDate] = useState(todayIsoDate());
+  const [newPaymentDate, setNewPaymentDate] = useState(todayDateInput());
   const [newReferenceNumber, setNewReferenceNumber] = useState("");
   const [newNotes, setNewNotes] = useState("");
 
@@ -102,7 +107,7 @@ export function PaymentsConsole() {
   const [method, setMethod] = useState<PaymentMethod>("ach");
   const [status, setStatus] = useState<PaymentStatus>("pending");
   const [amount, setAmount] = useState("0.00");
-  const [paymentDate, setPaymentDate] = useState(todayIsoDate());
+  const [paymentDate, setPaymentDate] = useState(todayDateInput());
   const [referenceNumber, setReferenceNumber] = useState("");
   const [notes, setNotes] = useState("");
   const [invoiceTargets, setInvoiceTargets] = useState<InvoiceRecord[]>([]);
@@ -130,6 +135,7 @@ export function PaymentsConsole() {
     ? paymentAllowedTransitions[selectedPayment.status] ?? []
     : [];
 
+  /** Populate the edit form fields from a selected payment record. */
   function hydratePayment(payment: PaymentRecord) {
     setDirection(payment.direction);
     setMethod(payment.method);
@@ -144,20 +150,23 @@ export function PaymentsConsole() {
     );
   }
 
+  /** Reset the create-payment form to default values. */
   function clearCreateForm() {
     setNewDirection(defaultCreateDirection);
     setNewMethod(defaultCreateMethod);
     setNewStatus(defaultCreateStatus);
     setNewAmount("0.00");
-    setNewPaymentDate(todayIsoDate());
+    setNewPaymentDate(todayDateInput());
     setNewReferenceNumber("");
     setNewNotes("");
   }
 
+  /** Resolve a display label for a payment status value. */
   function paymentStatusDisplayLabel(value: string): string {
     return paymentStatusLabels[value] ?? value;
   }
 
+  /** Fetch the payment policy contract and hydrate statuses, directions, methods, and transitions. */
   async function loadPaymentPolicy() {
     try {
       const response = await fetchPaymentPolicyContract({
@@ -223,6 +232,7 @@ export function PaymentsConsole() {
     }
   }
 
+  /** Load the project list for the project selector dropdown. */
   async function loadProjects() {
     setStatusMessage("Loading projects...");
 
@@ -252,6 +262,7 @@ export function PaymentsConsole() {
     }
   }
 
+  /** Load payments for the currently selected project. */
   async function loadPayments() {
     const projectId = Number(selectedProjectId);
     if (!projectId) {
@@ -286,6 +297,7 @@ export function PaymentsConsole() {
     }
   }
 
+  /** Submit a new payment record for the selected project. */
   async function handleCreatePayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canMutatePayments) {
@@ -331,16 +343,20 @@ export function PaymentsConsole() {
     }
   }
 
+  /** Switch the active payment selection and hydrate the edit form. */
   function handleSelectPayment(id: string) {
     setSelectedPaymentId(id);
     const selected = payments.find((payment) => String(payment.id) === id);
     if (!selected) return;
+
     hydratePayment(selected);
+
     setInvoiceTargets([]);
     setVendorBillTargets([]);
     setAllocationTargetId("");
   }
 
+  /** Persist edits to the selected payment via PATCH. */
   async function handleSavePayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canMutatePayments) {
@@ -385,6 +401,7 @@ export function PaymentsConsole() {
     }
   }
 
+  /** Load invoice or vendor bill targets for the allocation form based on payment direction. */
   async function loadAllocationTargets() {
     const projectId = Number(selectedProjectId);
     const paymentId = Number(selectedPaymentId);
@@ -439,6 +456,7 @@ export function PaymentsConsole() {
     }
   }
 
+  /** Create a payment allocation against the selected invoice or vendor bill target. */
   async function handleCreateAllocation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canMutatePayments) {
@@ -491,6 +509,7 @@ export function PaymentsConsole() {
     }
   }
 
+  /** One-tap status transition for mobile quick actions (e.g. settle, void). */
   async function handleQuickPaymentStatus(nextStatus: PaymentStatus) {
     if (!canMutatePayments) {
       setStatusMessage(`Role ${role} is read-only for payment mutations.`);
@@ -524,6 +543,7 @@ export function PaymentsConsole() {
     }
   }
 
+  // Hydrate payment policy (statuses, directions, methods, transitions) on auth.
   useEffect(() => {
     if (!token) {
       return;

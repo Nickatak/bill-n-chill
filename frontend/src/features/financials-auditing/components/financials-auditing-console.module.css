@@ -1,11 +1,4 @@
 .console {
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --border: #cbd5e1;
-  --surface: #f8fafc;
-  --surface-elevated: #ffffff;
-  --accent: #1d4ed8;
-
   display: grid;
   gap: 10px;
   color: var(--text-primary);
@@ -16,19 +9,19 @@
   margin: 0;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--surface);
+  background: var(--surface-secondary);
   color: var(--text-secondary);
-  padding: 8px 10px;
+  padding: var(--space-sm) 10px;
   font-size: 0.84rem;
 }
 
 .console > section {
   border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
+  border-radius: var(--radius-lg);
+  background: var(--surface-secondary);
   padding: 10px;
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .console h3,
@@ -56,10 +49,10 @@
 .console select,
 .console textarea {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-elevated);
+  border-radius: var(--radius-md);
+  background: var(--surface);
   color: var(--text-primary);
-  padding: 8px 10px;
+  padding: var(--space-sm) 10px;
   font-size: 0.88rem;
   text-transform: none;
   letter-spacing: normal;
@@ -72,25 +65,25 @@
 }
 
 .console button {
-  border: 1px solid #93c5fd;
-  border-radius: 8px;
-  background: #dbeafe;
-  color: #1e3a8a;
-  padding: 8px 10px;
-  font-size: 0.82rem;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  background: var(--accent-light);
+  color: var(--accent-text);
+  padding: var(--space-sm) 10px;
+  font-size: var(--font-sm);
   font-weight: 700;
   cursor: pointer;
   width: fit-content;
 }
 
 .console p button + button {
-  margin-left: 8px;
+  margin-left: var(--space-sm);
 }
 
 .auditControlsRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
   align-items: end;
 }
 
@@ -100,7 +93,7 @@
 
 .auditFilterField {
   display: grid;
-  gap: 4px;
+  gap: var(--space-xs);
   min-width: 140px;
 }
 
@@ -112,10 +105,10 @@
 
 .auditToggleButton {
   border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-elevated);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
   color: var(--text-secondary);
-  padding: 4px 10px;
+  padding: var(--space-xs) 10px;
   font-size: 0.75rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -124,15 +117,15 @@
 
 .console .auditToggleButton {
   border-color: var(--border);
-  background: var(--surface-elevated);
+  background: var(--surface);
   color: var(--text-secondary);
 }
 
 .auditToggleButtonActive,
 .console .auditToggleButtonActive {
-  border-color: #2563eb;
-  background: #dbeafe;
-  color: #1e3a8a;
+  border-color: var(--accent);
+  background: var(--accent-light);
+  color: var(--accent-text);
 }
 
 .auditSummaryRow {
@@ -143,9 +136,9 @@
 
 .auditSummaryPill {
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 4px 10px;
-  background: var(--surface-elevated);
+  border-radius: var(--radius-pill);
+  padding: var(--space-xs) 10px;
+  background: var(--surface);
   color: var(--text-secondary);
   font-size: 0.76rem;
   text-transform: uppercase;
@@ -155,8 +148,8 @@
 
 .auditGraphViewport {
   border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface-elevated);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
   overflow-x: auto;
   overflow-y: hidden;
 }
@@ -178,12 +171,12 @@
 }
 
 .auditGraphGroupHeader {
-  fill: color-mix(in srgb, #dbeafe 72%, var(--surface-elevated) 28%);
-  stroke: color-mix(in srgb, #93c5fd 70%, var(--border) 30%);
+  fill: color-mix(in srgb, var(--accent-light) 72%, var(--surface) 28%);
+  stroke: color-mix(in srgb, var(--accent-border) 70%, var(--border) 30%);
 }
 
 .auditGraphGroupLabel {
-  fill: #1e3a8a;
+  fill: var(--accent-text);
   font-size: 11px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -202,7 +195,7 @@
 }
 
 .auditGraphBranchRail {
-  stroke: color-mix(in srgb, var(--border) 80%, #cbd5e1 20%);
+  stroke: color-mix(in srgb, var(--border) 80%, var(--border) 20%);
   stroke-width: 2;
 }
 
@@ -220,7 +213,7 @@
 }
 
 .auditGraphMainLabel {
-  fill: #1e40af;
+  fill: var(--accent-hover);
   font-weight: 800;
 }
 
@@ -239,13 +232,13 @@
 }
 
 .auditGraphBranchNode {
-  fill: #dbeafe;
+  fill: var(--accent-light);
   stroke: #3b82f6;
 }
 
 .auditGraphBranchNodeActive {
-  fill: #1d4ed8;
-  stroke: #93c5fd;
+  fill: var(--accent);
+  stroke: var(--accent-border);
 }
 
 .auditGraphNodeButton {
@@ -268,8 +261,8 @@
 .auditGraphNodeButton:hover .auditBadgeEvent,
 .auditGraphNodeButton:focus-visible .auditBadgeEvent,
 .auditGraphNodeButtonActive .auditBadgeEvent {
-  border-color: #1d4ed8;
-  box-shadow: 0 0 0 2px color-mix(in srgb, #93c5fd 70%, transparent 30%);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-border) 70%, transparent 30%);
 }
 
 .auditGraphNodeMeta {
@@ -281,8 +274,8 @@
 .auditInspector {
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--surface-elevated);
-  padding: 8px 10px;
+  background: var(--surface);
+  padding: var(--space-sm) 10px;
   display: grid;
   gap: 6px;
 }
@@ -295,18 +288,18 @@
 }
 
 .auditBadge {
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 0.72rem;
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-sm);
+  font-size: var(--font-xs);
   font-weight: 700;
   border: 1px solid transparent;
   line-height: 1.2;
 }
 
 .auditBadgeEvent {
-  border-color: #93c5fd;
-  background: #eff6ff;
-  color: #1e3a8a;
+  border-color: var(--accent-border);
+  background: var(--accent-lighter);
+  color: var(--accent-text);
 }
 
 .auditBadgeObject {
@@ -316,20 +309,20 @@
 
 .auditBadgeAmount {
   border-color: #86efac;
-  background: #dcfce7;
+  background: var(--tone-success-bg);
   color: #14532d;
 }
 
 .auditBadgeNeutral {
-  border-color: #cbd5e1;
-  background: #f1f5f9;
-  color: #334155;
+  border-color: var(--tone-neutral-border);
+  background: var(--tone-neutral-bg);
+  color: var(--tone-neutral-text);
 }
 
 .auditBadgeEstimate {
   border-color: #bfdbfe;
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--accent-light);
+  color: var(--accent);
 }
 
 .auditBadgeChangeOrder {
@@ -365,13 +358,13 @@
 .auditTransitionRow {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-xs);
   flex-wrap: nowrap;
 }
 
 .auditStatusChip {
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 1px 6px;
   font-size: 0.62rem;
   line-height: 1.2;
@@ -382,15 +375,15 @@
 }
 
 .auditStatusToneDraft {
-  border-color: #93c5fd;
-  background: #dbeafe;
-  color: #1e40af;
+  border-color: var(--status-draft-border);
+  background: var(--status-draft-bg);
+  color: var(--status-draft-text);
 }
 
 .auditStatusToneSent {
-  border-color: #fcd34d;
-  background: #fef3c7;
-  color: #92400e;
+  border-color: var(--status-sent-border);
+  background: var(--status-sent-bg);
+  color: var(--status-sent-text);
 }
 
 .auditStatusTonePartial {
@@ -400,28 +393,28 @@
 }
 
 .auditStatusToneApproved {
-  border-color: #86efac;
-  background: #dcfce7;
-  color: #166534;
+  border-color: var(--status-approved-border);
+  background: var(--status-approved-bg);
+  color: var(--status-approved-text);
 }
 
 .auditStatusToneRejected {
-  border-color: #fca5a5;
-  background: #fee2e2;
-  color: #991b1b;
+  border-color: var(--status-rejected-border);
+  background: var(--status-rejected-bg);
+  color: var(--status-rejected-text);
 }
 
 .auditStatusToneOverdue {
-  border-color: #fb7185;
-  background: #ffe4e6;
-  color: #9f1239;
+  border-color: var(--status-overdue-border);
+  background: var(--status-overdue-bg);
+  color: var(--status-overdue-text);
 }
 
 .auditStatusToneVoid,
 .auditStatusToneNeutral {
-  border-color: #cbd5e1;
-  background: #e2e8f0;
-  color: #334155;
+  border-color: var(--status-void-border);
+  background: var(--status-void-bg);
+  color: var(--status-void-text);
 }
 
 .auditOpenLink {
@@ -437,11 +430,11 @@
 
 .auditEmptyState {
   margin: 0;
-  border: 1px dashed #93c5fd;
+  border: 1px dashed var(--accent-border);
   border-radius: 10px;
-  background: #eff6ff;
-  color: #1e3a8a;
-  padding: 8px 10px;
+  background: var(--accent-lighter);
+  color: var(--accent-text);
+  padding: var(--space-sm) 10px;
   font-size: 0.85rem;
 }
 
@@ -465,200 +458,4 @@
 
 .console a:hover {
   text-decoration: underline;
-}
-
-:global(html[data-theme="dark"]) .console {
-  --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --border: #334155;
-  --surface: #0f172a;
-  --surface-elevated: #111827;
-  --accent: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .console button {
-  border-color: #3b82f6;
-  background: #1e3a8a;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .auditSummaryPill {
-  border-color: #334155;
-  background: #111827;
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .auditToggleButton,
-:global(html[data-theme="dark"]) .console .auditToggleButton {
-  border-color: #334155;
-  background: #111827;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .auditToggleButtonActive,
-:global(html[data-theme="dark"]) .console .auditToggleButtonActive {
-  border-color: #3b82f6;
-  background: #1e3a8a;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .auditGraphViewport,
-:global(html[data-theme="dark"]) .auditInspector {
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .auditGraphGroupHeader {
-  fill: #172554;
-  stroke: #1d4ed8;
-}
-
-:global(html[data-theme="dark"]) .auditGraphGroupLabel {
-  fill: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .auditGraphGroupDivider {
-  stroke: #334155;
-}
-
-:global(html[data-theme="dark"]) .auditGraphMainRail {
-  stroke: #60a5fa;
-}
-
-:global(html[data-theme="dark"]) .auditGraphBranchRail {
-  stroke: #334155;
-}
-
-:global(html[data-theme="dark"]) .auditGraphBranchStart {
-  stroke: #3b82f6;
-}
-
-:global(html[data-theme="dark"]) .auditGraphMainLabel {
-  fill: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .auditGraphBranchLabel {
-  fill: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .auditGraphMainNode {
-  fill: #60a5fa;
-}
-
-:global(html[data-theme="dark"]) .auditGraphBranchNode {
-  fill: #172554;
-  stroke: #60a5fa;
-}
-
-:global(html[data-theme="dark"]) .auditGraphBranchNodeActive {
-  fill: #1d4ed8;
-  stroke: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .console .auditGraphNodeButton {
-  border: none;
-  background: transparent;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .auditBadgeEvent {
-  border-color: #1d4ed8;
-  background: #172554;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .auditBadgeAmount {
-  border-color: #166534;
-  background: #052e16;
-  color: #bbf7d0;
-}
-
-:global(html[data-theme="dark"]) .auditBadgeNeutral {
-  border-color: #334155;
-  background: #1e293b;
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .auditBadgeEstimate {
-  border-color: #1d4ed8;
-  background: #172554;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .auditBadgeChangeOrder {
-  border-color: #a16207;
-  background: #422006;
-  color: #fde68a;
-}
-
-:global(html[data-theme="dark"]) .auditBadgeInvoice {
-  border-color: #047857;
-  background: #022c22;
-  color: #a7f3d0;
-}
-
-:global(html[data-theme="dark"]) .auditBadgeVendorBill {
-  border-color: #9a3412;
-  background: #431407;
-  color: #fdba74;
-}
-
-:global(html[data-theme="dark"]) .auditBadgePayment {
-  border-color: #6d28d9;
-  background: #2e1065;
-  color: #ddd6fe;
-}
-
-:global(html[data-theme="dark"]) .auditBadgeBudget {
-  border-color: #9d174d;
-  background: #500724;
-  color: #fbcfe8;
-}
-
-:global(html[data-theme="dark"]) .auditStatusToneDraft {
-  border-color: #1d4ed8;
-  background: #172554;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .auditStatusToneSent {
-  border-color: #a16207;
-  background: #422006;
-  color: #fde68a;
-}
-
-:global(html[data-theme="dark"]) .auditStatusTonePartial {
-  border-color: #6d28d9;
-  background: #2e1065;
-  color: #ddd6fe;
-}
-
-:global(html[data-theme="dark"]) .auditStatusToneApproved {
-  border-color: #166534;
-  background: #052e16;
-  color: #bbf7d0;
-}
-
-:global(html[data-theme="dark"]) .auditStatusToneRejected {
-  border-color: #b91c1c;
-  background: #450a0a;
-  color: #fecaca;
-}
-
-:global(html[data-theme="dark"]) .auditStatusToneOverdue {
-  border-color: #be123c;
-  background: #4c0519;
-  color: #fecdd3;
-}
-
-:global(html[data-theme="dark"]) .auditStatusToneVoid,
-:global(html[data-theme="dark"]) .auditStatusToneNeutral {
-  border-color: #475569;
-  background: #1e293b;
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .auditEmptyState {
-  border-color: #1d4ed8;
-  background: #0f172a;
-  color: #bfdbfe;
 }

@@ -1,6 +1,13 @@
 "use client";
 
+/**
+ * Read-only budget analytics console scoped to a single project.
+ * Displays budget version history, top-level spend metrics, and per-line
+ * planned/committed/actual/variance breakdowns.
+ */
+
 import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { parseAmount, formatCurrency } from "@/shared/money-format";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -14,21 +21,7 @@ type BudgetAnalyticsConsoleProps = {
   initialProjectId?: string | null;
 };
 
-function toAmount(value: string): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function formatMoney(value: string | number): string {
-  const amount = typeof value === "number" ? value : toAmount(value);
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
+/** Read-only analytics dashboard showing budget versions and line-level spend variance. */
 export function BudgetAnalyticsConsole({ initialProjectId }: BudgetAnalyticsConsoleProps) {
   const { token, authMessage } = useSharedSessionAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -56,10 +49,10 @@ export function BudgetAnalyticsConsole({ initialProjectId }: BudgetAnalyticsCons
     }
     const totals = selectedBudget.line_items.reduce(
       (totals, line) => {
-        totals.planned += toAmount(line.planned_amount ?? line.budget_amount);
-        totals.committed += toAmount(line.committed_amount);
-        totals.actual += toAmount(line.actual_spend ?? line.actual_amount);
-        totals.remaining += toAmount(line.remaining_amount);
+        totals.planned += parseAmount(line.planned_amount ?? line.budget_amount);
+        totals.committed += parseAmount(line.committed_amount);
+        totals.actual += parseAmount(line.actual_spend ?? line.actual_amount);
+        totals.remaining += parseAmount(line.remaining_amount);
         return totals;
       },
       { planned: 0, committed: 0, actual: 0, remaining: 0 },
@@ -72,10 +65,12 @@ export function BudgetAnalyticsConsole({ initialProjectId }: BudgetAnalyticsCons
       : 0;
   const footerStatus = isLoading ? "Loading budget analytics..." : statusMessage;
 
+  /** Return the CSS class for positive vs. negative variance styling. */
   function varianceClass(value: number): string {
     return value < 0 ? styles.negative : styles.positive;
   }
 
+  // Fetch the scoped project and its budgets when auth and project ID are available.
   useEffect(() => {
     if (!token || !projectId) {
       return;
@@ -179,27 +174,27 @@ export function BudgetAnalyticsConsole({ initialProjectId }: BudgetAnalyticsCons
           </article>
           <article className={styles.metricCard}>
             <span className={styles.metricLabel}>Base Working Total</span>
-            <strong className={styles.metricValue}>{formatMoney(selectedBudget.base_working_total)}</strong>
+            <strong className={styles.metricValue}>{formatCurrency(parseAmount(selectedBudget.base_working_total))}</strong>
             <span className={styles.metricHint}>Budget #{selectedBudget.id}</span>
           </article>
           <article className={styles.metricCard}>
             <span className={styles.metricLabel}>Current Working Total</span>
-            <strong className={styles.metricValue}>{formatMoney(selectedBudget.current_working_total)}</strong>
+            <strong className={styles.metricValue}>{formatCurrency(parseAmount(selectedBudget.current_working_total))}</strong>
             <span className={styles.metricHint}>Estimate #{selectedBudget.source_estimate}</span>
           </article>
           <article className={styles.metricCard}>
             <span className={styles.metricLabel}>Actual Spend</span>
-            <strong className={styles.metricValue}>{formatMoney(selectedLineSummary.actual)}</strong>
+            <strong className={styles.metricValue}>{formatCurrency(selectedLineSummary.actual)}</strong>
             <span className={styles.metricHint}>
-              {spendPercent.toFixed(1)}% of planned ({formatMoney(selectedLineSummary.planned)})
+              {spendPercent.toFixed(1)}% of planned ({formatCurrency(selectedLineSummary.planned)})
             </span>
           </article>
           <article className={styles.metricCard}>
             <span className={styles.metricLabel}>Variance</span>
             <strong className={`${styles.metricValue} ${varianceClass(selectedLineSummary.variance)}`}>
-              {formatMoney(selectedLineSummary.variance)}
+              {formatCurrency(selectedLineSummary.variance)}
             </strong>
-            <span className={styles.metricHint}>Remaining: {formatMoney(selectedLineSummary.remaining)}</span>
+            <span className={styles.metricHint}>Remaining: {formatCurrency(selectedLineSummary.remaining)}</span>
           </article>
         </div>
       ) : (
@@ -234,8 +229,8 @@ export function BudgetAnalyticsConsole({ initialProjectId }: BudgetAnalyticsCons
                       #{budget.source_estimate} v{budget.source_estimate_version}
                     </Link>
                   </td>
-                  <td>{formatMoney(budget.base_working_total)}</td>
-                  <td>{formatMoney(budget.current_working_total)}</td>
+                  <td>{formatCurrency(parseAmount(budget.base_working_total))}</td>
+                  <td>{formatCurrency(parseAmount(budget.current_working_total))}</td>
                   <td>{formatDateTimeDisplay(budget.updated_at, budget.updated_at)}</td>
                   <td>
                     <button
@@ -272,8 +267,8 @@ export function BudgetAnalyticsConsole({ initialProjectId }: BudgetAnalyticsCons
             <tbody>
               {selectedBudget.line_items.length > 0 ? (
                 selectedBudget.line_items.map((line) => {
-                  const planned = toAmount(line.planned_amount ?? line.budget_amount);
-                  const actual = toAmount(line.actual_spend ?? line.actual_amount);
+                  const planned = parseAmount(line.planned_amount ?? line.budget_amount);
+                  const actual = parseAmount(line.actual_spend ?? line.actual_amount);
                   const variance = planned - actual;
                   return (
                     <tr key={line.id}>
@@ -281,11 +276,11 @@ export function BudgetAnalyticsConsole({ initialProjectId }: BudgetAnalyticsCons
                         {line.cost_code_code} - {line.cost_code_name}
                       </td>
                       <td>{line.description}</td>
-                      <td>{formatMoney(planned)}</td>
-                      <td>{formatMoney(line.committed_amount)}</td>
-                      <td>{formatMoney(actual)}</td>
-                      <td>{formatMoney(line.remaining_amount)}</td>
-                      <td className={varianceClass(variance)}>{formatMoney(variance)}</td>
+                      <td>{formatCurrency(planned)}</td>
+                      <td>{formatCurrency(parseAmount(line.committed_amount))}</td>
+                      <td>{formatCurrency(actual)}</td>
+                      <td>{formatCurrency(parseAmount(line.remaining_amount))}</td>
+                      <td className={varianceClass(variance)}>{formatCurrency(variance)}</td>
                     </tr>
                   );
                 })

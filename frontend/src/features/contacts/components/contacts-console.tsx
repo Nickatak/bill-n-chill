@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Top-level customer management page. Lists all customers with search/filter controls,
+ * provides modal-based editing of customer details, and supports inline project creation
+ * that routes the user into the new project workspace.
+ */
+
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -30,6 +36,7 @@ type ProjectCreateApiResponse = {
   };
 };
 
+/** Root console component for customer CRUD, filtering, and project creation. */
 export function ContactsConsole() {
   const { token } = useSharedSessionAuth();
   const router = useRouter();
@@ -84,6 +91,7 @@ export function ContactsConsole() {
       ? null
       : rows.find((entry) => entry.id === createProjectCustomerId) ?? null;
 
+  /** Populate editor form fields from a customer record. */
   function hydrate(customer: CustomerRow) {
     setDisplayName(customer.display_name ?? "");
     setPhone(customer.phone ?? "");
@@ -92,6 +100,7 @@ export function ContactsConsole() {
     setIsArchived(Boolean(customer.is_archived));
   }
 
+  /** Fetch the customer list from the API, optionally filtered by search text. */
   async function loadContacts(searchQuery: string) {
     setStatusMessage("Loading customers...");
     try {
@@ -123,6 +132,7 @@ export function ContactsConsole() {
     }
   }
 
+  /** Load all projects and group them by customer for the expandable project accordion. */
   async function loadProjectsIndex() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/`, {
@@ -150,6 +160,7 @@ export function ContactsConsole() {
     }
   }
 
+  // Debounce customer search so the API isn't hit on every keystroke
   useEffect(() => {
     if (!token) {
       return;
@@ -161,6 +172,7 @@ export function ContactsConsole() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, query, normalizedBaseUrl, scopedContactId, scopedCustomerId]);
 
+  // Fetch project index once on mount for the per-customer project accordion
   useEffect(() => {
     if (!token) {
       return;
@@ -169,6 +181,7 @@ export function ContactsConsole() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, normalizedBaseUrl]);
 
+  /** Open the edit modal for a customer, closing the project creator if open. */
   function openEditor(id: string) {
     const row = rows.find((entry) => String(entry.id) === id);
     if (!row) {
@@ -184,6 +197,7 @@ export function ContactsConsole() {
     setIsEditorOpen(false);
   }
 
+  /** Open the project creation modal, pre-filling name and address from the customer. */
   function openProjectCreator(customer: CustomerRow) {
     setIsEditorOpen(false);
     setCreateProjectCustomerId(customer.id);
@@ -197,10 +211,12 @@ export function ContactsConsole() {
     setIsProjectCreatorOpen(false);
   }
 
+  /** Track where a click started so we only close the modal on full backdrop clicks. */
   function handleOverlayMouseDown(event: MouseEvent<HTMLDivElement>) {
     backdropPointerStartRef.current = event.target === event.currentTarget;
   }
 
+  /** Complete the backdrop-click check and close the editor if both events hit the overlay. */
   function handleOverlayMouseUp(event: MouseEvent<HTMLDivElement>) {
     const endedOnBackdrop = event.target === event.currentTarget;
     if (backdropPointerStartRef.current && endedOnBackdrop) {
@@ -209,6 +225,7 @@ export function ContactsConsole() {
     backdropPointerStartRef.current = false;
   }
 
+  /** PATCH the customer record, update the local list, and close the editor on success. */
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const customerId = Number(editingId);
@@ -238,6 +255,7 @@ export function ContactsConsole() {
       }
 
       const updated = payload.data as CustomerRow;
+
       setRows((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
       hydrate(updated);
       setIsEditorOpen(false);
@@ -247,6 +265,7 @@ export function ContactsConsole() {
     }
   }
 
+  /** POST a new project under the selected customer, then navigate to its workspace. */
   async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const customerId = createProjectCustomerId;
@@ -310,6 +329,8 @@ export function ContactsConsole() {
 
       {statusMessage ? <p className={styles.statusMessage}>{statusMessage}</p> : null}
 
+      {/* Customer table with expandable project accordions */}
+
       <ContactsList
         rows={rows}
         filteredRows={filteredRows}
@@ -318,6 +339,8 @@ export function ContactsConsole() {
         onEdit={openEditor}
         onCreateProject={openProjectCreator}
       />
+
+      {/* Edit customer modal */}
 
       {isEditorOpen && editingCustomer ? (
         <div
@@ -350,6 +373,8 @@ export function ContactsConsole() {
           </section>
         </div>
       ) : null}
+
+      {/* Create project modal */}
 
       {isProjectCreatorOpen && createProjectCustomer ? (
         <div

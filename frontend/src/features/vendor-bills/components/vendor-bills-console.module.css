@@ -4,10 +4,10 @@
 }
 
 .impactCard {
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: #f8fafc;
-  padding: 10px 12px;
+  background: var(--surface-secondary);
+  padding: 10px var(--space-md);
 }
 
 .impactCard p {
@@ -19,28 +19,25 @@
 }
 
 .tableWrap {
-  border: 1px solid #d1d5db;
-  border-radius: 10px;
-  overflow-x: auto;
-  margin: 8px 0;
+  composes: tableWrap from '../../../shared/styles/table.module.css';
+  margin: var(--space-sm) 0;
 }
 
 .table {
-  width: 100%;
+  composes: table from '../../../shared/styles/table.module.css';
   min-width: 780px;
-  border-collapse: collapse;
 }
 
 .table th,
 .table td {
   text-align: left;
-  padding: 8px 10px;
-  border-bottom: 1px solid #e5e7eb;
-  color: #111827;
+  padding: var(--space-sm) 10px;
+  border-bottom: 1px solid var(--table-border);
+  color: var(--text-primary);
 }
 
 .table th {
-  background: #f3f4f6;
+  background: var(--table-header-bg);
   font-size: 0.75rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -49,32 +46,32 @@
 .tableStatusBadge {
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
-  padding: 3px 8px;
-  font-size: 0.72rem;
+  border-radius: var(--radius-pill);
+  padding: 3px var(--space-sm);
+  font-size: var(--font-xs);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .tableStatusPlanned {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--status-draft-bg);
+  color: var(--accent);
 }
 
 .tableStatusReceived {
   background: #fde68a;
-  color: #92400e;
+  color: var(--status-sent-text);
 }
 
 .tableStatusApproved {
   background: #bbf7d0;
-  color: #166534;
+  color: var(--status-approved-text);
 }
 
 .tableStatusScheduled {
   background: #ffedd5;
-  color: #9a3412;
+  color: var(--status-overdue-text);
 }
 
 .tableStatusPaid {
@@ -88,35 +85,35 @@
 }
 
 .table tbody tr {
-  background: #ffffff;
+  background: var(--surface);
   cursor: pointer;
   transition: background-color 120ms ease;
 }
 
 .table tbody tr:nth-child(even) {
-  background: #f8fafc;
+  background: var(--table-row-alt);
 }
 
 .table tbody tr:hover {
-  background: #eef2ff;
+  background: var(--table-row-hover);
 }
 
 .rowSelected {
-  background: #e0e7ff !important;
+  background: var(--surface-hover) !important;
 }
 
 .pagination {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
-  padding: 8px 10px;
-  border-top: 1px solid #e5e7eb;
-  background: #f9fafb;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 10px;
+  border-top: 1px solid var(--table-border);
+  background: var(--surface-secondary);
 }
 
 .pagination span {
-  color: #374151;
+  color: var(--text-primary);
   font-size: 0.85rem;
 }
 
@@ -126,10 +123,10 @@
 }
 
 .viewerStatusPanel {
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: #f8fafc;
-  padding: 10px 12px;
+  background: var(--surface-secondary);
+  padding: 10px var(--space-md);
   display: grid;
   gap: 10px;
 }
@@ -138,7 +135,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .viewerStatusHeader h3 {
@@ -146,35 +143,35 @@
 }
 
 .viewerStatusBadge {
-  border: 1px solid #d1d5db;
-  border-radius: 999px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
   padding: 2px 10px;
   font-size: 0.78rem;
-  color: #475569;
-  background: #ffffff;
+  color: var(--text-secondary);
+  background: var(--surface);
 }
 
 .viewerStatusActions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .statusFiltersLabel {
-  color: #374151;
+  color: var(--text-primary);
   font-size: 0.85rem;
 }
 
 .statusFilterButtons {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .statusFilterButton {
-  border: 1px solid #cbd5f5;
-  border-radius: 999px;
-  padding: 6px 12px;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-pill);
+  padding: 6px var(--space-md);
   text-transform: uppercase;
   font-size: 0.75rem;
   letter-spacing: 0.12em;
@@ -184,8 +181,8 @@
 }
 
 .statusFilterButtonInactive {
-  background: #f8fafc;
-  color: #64748b;
+  background: var(--surface-secondary);
+  color: var(--text-secondary);
 }
 
 .statusFilterButtonActive {
@@ -195,8 +192,8 @@
 
 .statusFilterButtonActive.statusFilterPlanned {
   background: #2563eb;
-  border-color: #1d4ed8;
-  color: #eff6ff;
+  border-color: var(--accent);
+  color: var(--accent-lighter);
 }
 
 .statusFilterButtonActive.statusFilterReceived {
@@ -230,23 +227,23 @@
 }
 
 .statusFilterPlanned {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--status-draft-bg);
+  color: var(--accent);
 }
 
 .statusFilterReceived {
   background: #fde68a;
-  color: #92400e;
+  color: var(--status-sent-text);
 }
 
 .statusFilterApproved {
   background: #bbf7d0;
-  color: #166534;
+  color: var(--status-approved-text);
 }
 
 .statusFilterScheduled {
   background: #ffedd5;
-  color: #9a3412;
+  color: var(--status-overdue-text);
 }
 
 .statusFilterPaid {
@@ -265,20 +262,20 @@
 }
 
 .statusPickerLabel {
-  color: #374151;
+  color: var(--text-primary);
   font-size: 0.85rem;
 }
 
 .statusPills {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .statusPill {
-  border: 1px solid #cbd5f5;
-  border-radius: 12px;
-  padding: 10px 16px;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-lg);
+  padding: 10px var(--space-lg);
   min-height: 44px;
   min-width: 112px;
   text-transform: uppercase;
@@ -290,8 +287,8 @@
 }
 
 .statusPillInactive {
-  background: #f8fafc;
-  color: #64748b;
+  background: var(--surface-secondary);
+  color: var(--text-secondary);
 }
 
 .statusPillActive {
@@ -301,8 +298,8 @@
 
 .statusPillActive.statusPillPlanned {
   background: #2563eb;
-  border-color: #1d4ed8;
-  color: #eff6ff;
+  border-color: var(--accent);
+  color: var(--accent-lighter);
 }
 
 .statusPillActive.statusPillReceived {
@@ -336,27 +333,27 @@
 }
 
 .statusPillPlanned {
-  border-color: #93c5fd;
-  background: #dbeafe;
-  color: #1d4ed8;
+  border-color: var(--status-draft-border);
+  background: var(--status-draft-bg);
+  color: var(--accent);
 }
 
 .statusPillReceived {
-  border-color: #fcd34d;
+  border-color: var(--status-sent-border);
   background: #fde68a;
-  color: #92400e;
+  color: var(--status-sent-text);
 }
 
 .statusPillApproved {
-  border-color: #86efac;
-  background: #dcfce7;
-  color: #166534;
+  border-color: var(--status-approved-border);
+  background: var(--status-approved-bg);
+  color: var(--status-approved-text);
 }
 
 .statusPillScheduled {
-  border-color: #fcd34d;
-  background: #fef3c7;
-  color: #92400e;
+  border-color: var(--status-sent-border);
+  background: var(--status-sent-bg);
+  color: var(--status-sent-text);
 }
 
 .statusPillPaid {
@@ -366,7 +363,7 @@
 }
 
 .statusPillVoid {
-  border-color: #d1d5db;
+  border-color: var(--status-void-border);
   background: #e5e7eb;
   color: #6b7280;
 }
@@ -387,18 +384,18 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 600;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .billForm label > input,
 .billForm label > select,
 .billForm label > textarea {
   width: 100%;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--input-border);
   border-radius: 10px;
-  background: #f8fafc;
-  color: #0f172a;
-  padding: 10px 12px;
+  background: var(--surface-secondary);
+  color: var(--text-primary);
+  padding: 10px var(--space-md);
   font-size: 0.94rem;
 }
 
@@ -410,42 +407,42 @@
 .billForm label > input:disabled,
 .billForm label > select:disabled,
 .billForm label > textarea:disabled {
-  background: #eef2f7;
-  border-color: #cbd5e1;
-  color: #64748b;
+  background: var(--input-readonly-bg);
+  border-color: var(--input-border);
+  color: var(--input-readonly-text);
   cursor: not-allowed;
   opacity: 1;
 }
 
 .formSection {
   display: grid;
-  gap: 12px;
-  border: 1px solid #c7d2fe;
-  border-radius: 12px;
-  background: linear-gradient(180deg, #f8fbff 0%, #f6f9fc 100%);
+  gap: var(--space-md);
+  border: 1px solid var(--table-row-active);
+  border-radius: var(--radius-lg);
+  background: var(--surface-secondary);
   padding: 14px;
 }
 
 .formSectionHeader {
   display: grid;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 .formSectionTitle {
   margin: 0;
-  font-size: 0.98rem;
+  font-size: var(--font-md);
 }
 
 .formSectionHint {
   margin: 0;
   font-size: 0.86rem;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .formGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 12px;
+  gap: 10px var(--space-md);
 }
 
 .fieldSpan2 {
@@ -469,13 +466,13 @@
 
 .formInlineHint {
   margin: 0;
-  color: #475569;
+  color: var(--text-secondary);
   font-size: 0.84rem;
 }
 
 .allocationsBlock {
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .allocationFieldset {
@@ -483,10 +480,10 @@
   gap: 0;
   margin: 0;
   padding: 0;
-  border: 1px solid #c7d2fe;
-  border-radius: 12px;
+  border: 1px solid var(--table-row-active);
+  border-radius: var(--radius-lg);
   overflow-x: auto;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .allocationFieldset legend {
@@ -494,18 +491,18 @@
   font-size: 0.78rem;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--text-secondary);
   font-weight: 600;
 }
 
 .allocationHeader {
   display: grid;
   grid-template-columns: 2fr 1.5fr 1fr 2fr auto;
-  gap: 8px;
+  gap: var(--space-sm);
   align-items: center;
-  padding: 10px 12px;
-  background: #eef2ff;
-  color: #1e3a8a;
+  padding: 10px var(--space-md);
+  background: var(--table-header-bg);
+  color: var(--table-header-text);
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -515,7 +512,7 @@
 
 .allocationRowWrap {
   display: grid;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 .allocationRows {
@@ -525,47 +522,47 @@
 .allocationRow {
   display: grid;
   grid-template-columns: 2fr 1.5fr 1fr 2fr auto;
-  gap: 8px;
+  gap: var(--space-sm);
   align-items: center;
-  padding: 8px 12px;
-  border-top: 1px solid #e2e8f0;
-  background: #ffffff;
+  padding: var(--space-sm) var(--space-md);
+  border-top: 1px solid var(--table-border);
+  background: var(--surface);
   min-width: 980px;
 }
 
 .allocationRows .allocationRowWrap:nth-child(even) .allocationRow {
-  background: #f4f7fc;
+  background: var(--table-row-alt);
 }
 
 .allocationRow select,
 .allocationRow input {
-  border: 1px solid #cbd5f5;
-  border-radius: 8px;
-  padding: 6px 8px;
-  background: #ffffff;
-  color: #0f172a;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  padding: 6px var(--space-sm);
+  background: var(--surface);
+  color: var(--text-primary);
   font-size: 0.85rem;
   width: 100%;
 }
 
 .allocationRow select:disabled,
 .allocationRow input:disabled {
-  background: #eef2f7;
-  border-color: #cbd5e1;
-  color: #64748b;
+  background: var(--input-readonly-bg);
+  border-color: var(--input-border);
+  color: var(--input-readonly-text);
   cursor: not-allowed;
   opacity: 1;
 }
 
 .allocationMeta {
-  margin: 0 12px 8px;
-  font-size: 0.82rem;
-  color: #475569;
+  margin: 0 var(--space-md) var(--space-sm);
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
 }
 
 .allocationTotals {
-  margin: 10px 12px 0;
-  color: #374151;
+  margin: 10px var(--space-md) 0;
+  color: var(--text-primary);
 }
 
 .unallocatedMismatch {
@@ -578,11 +575,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin: 8px 12px 12px;
+  margin: var(--space-sm) var(--space-md) var(--space-md);
 }
 
 .suggestedTotalRow span {
-  color: #1f2937;
+  color: var(--text-primary);
   font-size: 0.85rem;
 }
 
@@ -595,7 +592,7 @@
 .formDangerButton,
 .formPrimaryButton {
   border-radius: 9px;
-  padding: 8px 12px;
+  padding: var(--space-sm) var(--space-md);
   min-height: 38px;
   font-size: 0.84rem;
   font-weight: 600;
@@ -605,38 +602,38 @@
 }
 
 .formSecondaryButton {
-  border: 1px solid #93c5fd;
+  border: 1px solid var(--accent-border);
   background: #eaf2ff;
-  color: #1e40af;
+  color: var(--accent-hover);
 }
 
 .formSecondaryButton:hover:not(:disabled) {
   border-color: #60a5fa;
-  background: #dbeafe;
+  background: var(--accent-light);
   transform: translateY(-1px);
 }
 
 .formDangerButton {
-  border: 1px solid #fca5a5;
-  background: #fff1f2;
-  color: #b91c1c;
+  border: 1px solid var(--status-rejected-border);
+  background: var(--tone-error-bg);
+  color: var(--tone-error-text);
 }
 
 .formDangerButton:hover:not(:disabled) {
-  border-color: #f87171;
-  background: #ffe4e6;
+  border-color: var(--tone-error-border);
+  background: var(--tone-error-bg);
   transform: translateY(-1px);
 }
 
 .formPrimaryButton {
-  border: 1px solid #1d4ed8;
-  background: #2563eb;
-  color: #eff6ff;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--text-on-accent);
 }
 
 .formPrimaryButton:hover:not(:disabled) {
-  border-color: #1e40af;
-  background: #1d4ed8;
+  border-color: var(--accent-hover);
+  background: var(--accent);
   transform: translateY(-1px);
 }
 
@@ -663,26 +660,26 @@
   margin: 0;
   flex: 1 1 auto;
   min-width: 0;
-  border: 1px solid #fca5a5;
-  border-radius: 8px;
-  background: #fff1f2;
-  color: #b91c1c;
-  padding: 8px 10px;
+  border: 1px solid var(--status-rejected-border);
+  border-radius: var(--radius-md);
+  background: var(--tone-error-bg);
+  color: var(--tone-error-text);
+  padding: var(--space-sm) 10px;
 }
 
 .viewerErrorText {
   margin: 6px 0 0;
-  border: 1px solid #fca5a5;
-  border-radius: 8px;
-  background: #fff1f2;
-  color: #b91c1c;
-  padding: 8px 10px;
+  border: 1px solid var(--status-rejected-border);
+  border-radius: var(--radius-md);
+  background: var(--tone-error-bg);
+  color: var(--tone-error-text);
+  padding: var(--space-sm) 10px;
 }
 
 .readOnlyField {
-  background: #f3f4f6;
-  color: #4b5563;
-  border: 1px solid #d1d5db;
+  background: var(--input-readonly-bg);
+  color: var(--input-readonly-text);
+  border: 1px solid var(--border);
 }
 
 .errorText {
@@ -691,434 +688,12 @@
 }
 
 .hintText {
-  color: #1f2937;
-  margin: 10px 12px;
+  color: var(--text-primary);
+  margin: 10px var(--space-md);
 }
 
 .unsavedNotice {
   margin: 0;
   color: #b45309;
   font-weight: 600;
-}
-
-:global(html[data-theme="dark"]) .impactCard {
-  border-color: #334155;
-  background: #111827;
-}
-
-:global(html[data-theme="dark"]) .formTitle {
-  color: #f1f5f9;
-}
-
-:global(html[data-theme="dark"]) .formSection {
-  border-color: #334155;
-  background: linear-gradient(180deg, #0f172a 0%, #0b1220 100%);
-}
-
-:global(html[data-theme="dark"]) .formSectionTitle {
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .formSectionHint {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .billForm label {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .billForm label > input,
-:global(html[data-theme="dark"]) .billForm label > select,
-:global(html[data-theme="dark"]) .billForm label > textarea {
-  border-color: #334155;
-  background: #0b1220;
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .billForm label > input:disabled,
-:global(html[data-theme="dark"]) .billForm label > select:disabled,
-:global(html[data-theme="dark"]) .billForm label > textarea:disabled {
-  border-color: #334155;
-  background: #111827;
-  color: #94a3b8;
-  cursor: not-allowed;
-  opacity: 1;
-}
-
-:global(html[data-theme="dark"]) .formInlineHint {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .allocationFieldset {
-  border-color: #1f2937;
-  background: #0f172a;
-}
-
-:global(html[data-theme="dark"]) .allocationFieldset legend {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .allocationHeader {
-  background: #1e293b;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .allocationRow {
-  border-color: #1f2937;
-  background: #0f172a;
-}
-
-:global(html[data-theme="dark"]) .allocationRows .allocationRowWrap:nth-child(even) .allocationRow {
-  background: #131d31;
-}
-
-:global(html[data-theme="dark"]) .allocationRow select,
-:global(html[data-theme="dark"]) .allocationRow input {
-  border-color: #334155;
-  background: #0b1220;
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .allocationRow select:disabled,
-:global(html[data-theme="dark"]) .allocationRow input:disabled {
-  border-color: #334155;
-  background: #111827;
-  color: #94a3b8;
-  cursor: not-allowed;
-  opacity: 1;
-}
-
-:global(html[data-theme="dark"]) .formSecondaryButton {
-  border-color: #1d4ed8;
-  background: #102548;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .formSecondaryButton:hover:not(:disabled) {
-  border-color: #2563eb;
-  background: #163263;
-}
-
-:global(html[data-theme="dark"]) .formDangerButton {
-  border-color: #7f1d1d;
-  background: #341213;
-  color: #fecaca;
-}
-
-:global(html[data-theme="dark"]) .formDangerButton:hover:not(:disabled) {
-  border-color: #b91c1c;
-  background: #4a1619;
-}
-
-:global(html[data-theme="dark"]) .formPrimaryButton {
-  border-color: #2563eb;
-  background: #1d4ed8;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .formPrimaryButton:hover:not(:disabled) {
-  border-color: #3b82f6;
-  background: #1e40af;
-}
-
-:global(html[data-theme="dark"]) .tableWrap {
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .table th,
-:global(html[data-theme="dark"]) .table td {
-  border-bottom-color: #334155;
-  color: #f3f4f6;
-}
-
-:global(html[data-theme="dark"]) .table th {
-  background: #0f172a;
-}
-
-:global(html[data-theme="dark"]) .tableStatusPlanned {
-  background: #1e3a8a;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .tableStatusReceived {
-  background: #3f2f0b;
-  color: #fcd34d;
-}
-
-:global(html[data-theme="dark"]) .tableStatusApproved {
-  background: #0f3d22;
-  color: #86efac;
-}
-
-:global(html[data-theme="dark"]) .tableStatusScheduled {
-  background: #431407;
-  color: #fdba74;
-}
-
-:global(html[data-theme="dark"]) .tableStatusPaid {
-  background: #042f2e;
-  color: #99f6e4;
-}
-
-:global(html[data-theme="dark"]) .tableStatusVoid {
-  background: #334155;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .table tbody tr {
-  background: #0b1220;
-}
-
-:global(html[data-theme="dark"]) .table tbody tr:nth-child(even) {
-  background: #111827;
-}
-
-:global(html[data-theme="dark"]) .table tbody tr:hover {
-  background: #172036;
-}
-
-:global(html[data-theme="dark"]) .rowSelected {
-  background: #1e3a8a !important;
-}
-
-:global(html[data-theme="dark"]) .pagination {
-  border-top-color: #334155;
-  background: #0f172a;
-}
-
-:global(html[data-theme="dark"]) .pagination span {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .statusFiltersLabel {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .viewerStatusPanel {
-  border-color: #334155;
-  background: #111827;
-}
-
-:global(html[data-theme="dark"]) .viewerStatusBadge {
-  border-color: #334155;
-  background: #0f172a;
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .statusFilterButton {
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .statusFilterButtonInactive {
-  background: #0b1220;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .statusFilterButtonActive {
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
-}
-
-:global(html[data-theme="dark"]) .statusFilterButtonActive.statusFilterPlanned {
-  background: #1d4ed8;
-  border-color: #3b82f6;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .statusFilterButtonActive.statusFilterReceived {
-  background: #b45309;
-  border-color: #f59e0b;
-  color: #fef3c7;
-}
-
-:global(html[data-theme="dark"]) .statusFilterButtonActive.statusFilterApproved {
-  background: #15803d;
-  border-color: #22c55e;
-  color: #dcfce7;
-}
-
-:global(html[data-theme="dark"]) .statusFilterButtonActive.statusFilterScheduled {
-  background: #92400e;
-  border-color: #f59e0b;
-  color: #fef3c7;
-}
-
-:global(html[data-theme="dark"]) .statusFilterButtonActive.statusFilterPaid {
-  background: #0f766e;
-  border-color: #14b8a6;
-  color: #ccfbf1;
-}
-
-:global(html[data-theme="dark"]) .statusFilterButtonActive.statusFilterVoid {
-  background: #4b5563;
-  border-color: #9ca3af;
-  color: #f3f4f6;
-}
-
-:global(html[data-theme="dark"]) .statusFilterPlanned {
-  background: #1e3a8a;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .statusFilterReceived {
-  background: #3f2f0b;
-  color: #fcd34d;
-}
-
-:global(html[data-theme="dark"]) .statusFilterApproved {
-  background: #0f3d22;
-  color: #86efac;
-}
-
-:global(html[data-theme="dark"]) .statusFilterScheduled {
-  background: #431407;
-  color: #fdba74;
-}
-
-:global(html[data-theme="dark"]) .statusFilterPaid {
-  background: #042f2e;
-  color: #99f6e4;
-}
-
-:global(html[data-theme="dark"]) .statusFilterVoid {
-  background: #334155;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .statusPickerLabel {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .statusPill {
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .statusPillInactive {
-  background: #0b1220;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .statusPillActive {
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
-}
-
-:global(html[data-theme="dark"]) .statusPillActive.statusPillPlanned {
-  background: #1d4ed8;
-  border-color: #3b82f6;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .statusPillActive.statusPillReceived {
-  background: #b45309;
-  border-color: #f59e0b;
-  color: #fef3c7;
-}
-
-:global(html[data-theme="dark"]) .statusPillActive.statusPillApproved {
-  background: #15803d;
-  border-color: #22c55e;
-  color: #dcfce7;
-}
-
-:global(html[data-theme="dark"]) .statusPillActive.statusPillScheduled {
-  background: #92400e;
-  border-color: #f59e0b;
-  color: #fef3c7;
-}
-
-:global(html[data-theme="dark"]) .statusPillActive.statusPillPaid {
-  background: #0f766e;
-  border-color: #14b8a6;
-  color: #ccfbf1;
-}
-
-:global(html[data-theme="dark"]) .statusPillActive.statusPillVoid {
-  background: #4b5563;
-  border-color: #9ca3af;
-  color: #f3f4f6;
-}
-
-:global(html[data-theme="dark"]) .statusPillPlanned {
-  border-color: #1d4ed8;
-  background: #1e3a8a;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .statusPillReceived {
-  border-color: #92400e;
-  background: #3f2f0b;
-  color: #fcd34d;
-}
-
-:global(html[data-theme="dark"]) .statusPillApproved {
-  border-color: #166534;
-  background: #052e16;
-  color: #bbf7d0;
-}
-
-:global(html[data-theme="dark"]) .statusPillScheduled {
-  border-color: #92400e;
-  background: #451a03;
-  color: #fde68a;
-}
-
-:global(html[data-theme="dark"]) .statusPillPaid {
-  border-color: #0f766e;
-  background: #042f2e;
-  color: #99f6e4;
-}
-
-:global(html[data-theme="dark"]) .statusPillVoid {
-  border-color: #475569;
-  background: #334155;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .allocationHeader {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .allocationTotals {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .unallocatedMismatch {
-  color: #fca5a5;
-}
-
-:global(html[data-theme="dark"]) .suggestedTotalRow span {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .readOnlyField {
-  background: #0f172a;
-  color: #94a3b8;
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .allocationMeta {
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .hintText {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .errorText {
-  color: #fca5a5;
-}
-
-:global(html[data-theme="dark"]) .submitRow .submitErrorText {
-  border-color: #7f1d1d;
-  background: rgba(127, 29, 29, 0.22);
-  color: #fecaca;
-}
-
-:global(html[data-theme="dark"]) .viewerErrorText {
-  border-color: #7f1d1d;
-  background: rgba(127, 29, 29, 0.22);
-  color: #fecaca;
-}
-
-:global(html[data-theme="dark"]) .unsavedNotice {
-  color: #fbbf24;
 }

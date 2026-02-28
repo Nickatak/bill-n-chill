@@ -1,6 +1,14 @@
 "use client";
 
+/**
+ * Public-facing change-order preview for customer decision flow.
+ * Renders a read-only change-order document via a tokenized public URL and
+ * provides approve/reject controls for change orders in "pending_approval" status.
+ */
+
 import { useEffect, useMemo, useState } from "react";
+import { parseAmount, formatDecimal } from "@/shared/money-format";
+import { formatDateTimeDisplay } from "@/shared/date-format";
 import { PublicDocumentViewerShell } from "@/shared/document-viewer/public-document-viewer-shell";
 import {
   PublicDocumentFrame,
@@ -14,6 +22,7 @@ import {
 } from "@/shared/document-viewer/public-document-context";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { ApiResponse, ChangeOrderRecord } from "../types";
+import { usePrintContext } from "@/shared/hooks/use-print-context";
 import styles from "./change-order-public-preview.module.css";
 
 type ChangeOrderPublicPreviewProps = {
@@ -28,37 +37,13 @@ const STATUS_LABELS: Record<string, string> = {
   void: "Void",
 };
 
+/** Resolve a status value to its human-readable label, falling back gracefully. */
 function statusLabel(status?: string): string {
   const value = (status || "").trim();
   return STATUS_LABELS[value] || value || "Unknown";
 }
 
-function parseAmount(value?: string): number {
-  const parsed = Number(value ?? "0");
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function formatMoney(value?: string): string {
-  return parseAmount(value).toFixed(2);
-}
-
-function formatDisplayDateTime(value?: string): string {
-  if (!value) {
-    return "Unknown";
-  }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(parsed);
-}
-
+/** Build the public-facing estimate URL for a cross-reference link. */
 function publicEstimateHref(publicRef?: string): string {
   if (!publicRef) {
     return "";
@@ -66,6 +51,7 @@ function publicEstimateHref(publicRef?: string): string {
   return `/estimate/${publicRef}`;
 }
 
+/** Renders the public change-order preview and customer decision form. */
 export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPreviewProps) {
   const [statusMessage, setStatusMessage] = useState("Loading change order...");
   const [changeOrder, setChangeOrder] = useState<ChangeOrderRecord | null>(null);
@@ -76,7 +62,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [decisionReceiptName, setDecisionReceiptName] = useState("");
   const [justSubmittedDecision, setJustSubmittedDecision] = useState<"approve" | "reject" | null>(null);
-  const [printTimestamp, setPrintTimestamp] = useState("");
+  const { printTimestamp } = usePrintContext();
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const canDecide = changeOrder?.status === "pending_approval";
@@ -122,12 +108,14 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
     return organizationReason || "No reason provided.";
   }, [changeOrder?.organization_context]);
 
+  // Clear stale decision feedback when the change order is no longer actionable.
   useEffect(() => {
     if (!canDecide) {
       setDecisionMessage("");
     }
   }, [canDecide]);
 
+  // Auto-dismiss the decision confirmation banner after a short delay.
   useEffect(() => {
     if (!justSubmittedDecision) {
       return;
@@ -138,44 +126,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
     return () => window.clearTimeout(timer);
   }, [justSubmittedDecision]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    const titleBeforeMount = document.title;
-    const formatPrintedAt = () =>
-      new Intl.DateTimeFormat("en-US", {
-        month: "numeric",
-        day: "numeric",
-        year: "2-digit",
-        hour: "numeric",
-        minute: "2-digit",
-      }).format(new Date());
-
-    const setPrintContext = () => {
-      setPrintTimestamp(formatPrintedAt());
-    };
-
-    const handleBeforePrint = () => {
-      setPrintContext();
-      document.title = "";
-    };
-
-    const handleAfterPrint = () => {
-      document.title = titleBeforeMount;
-    };
-
-    setPrintContext();
-    window.addEventListener("beforeprint", handleBeforePrint);
-    window.addEventListener("afterprint", handleAfterPrint);
-
-    return () => {
-      window.removeEventListener("beforeprint", handleBeforePrint);
-      window.removeEventListener("afterprint", handleAfterPrint);
-      document.title = titleBeforeMount;
-    };
-  }, []);
-
+  // Fetch the change order record from the public token on mount.
   useEffect(() => {
     async function loadChangeOrder() {
       try {
@@ -197,12 +148,15 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
     void loadChangeOrder();
   }, [normalizedBaseUrl, publicToken]);
 
+  /** Submit the customer's approve/reject decision to the public decision endpoint. */
   async function applyDecision(decision: "approve" | "reject") {
     if (!changeOrder || !canDecide || decisionSubmitting) {
       return;
     }
+
     setDecisionSubmitting(true);
     setDecisionMessage("");
+
     try {
       const response = await fetch(
         `${normalizedBaseUrl}/public/change-orders/${publicToken}/decision/`,
@@ -223,6 +177,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
         return;
       }
       setChangeOrder(payload.data as ChangeOrderRecord);
+
       setDecisionReceiptName(deciderName.trim());
       setJustSubmittedDecision(decision);
       setDecisionMessage("");
@@ -342,7 +297,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
                   </div>
                   <div className={frameStyles.metaDetailsRow}>
                     <span>Updated</span>
-                    <span>{formatDisplayDateTime(changeOrder.updated_at)}</span>
+                    <span>{formatDateTimeDisplay(changeOrder.updated_at, "Unknown")}</span>
                   </div>
                 </section>
               </>
@@ -354,7 +309,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
               cells: [
                 `#${line.budget_line} ${line.budget_line_cost_code}`,
                 line.description || line.budget_line_description,
-                `$${formatMoney(line.amount_delta)}`,
+                `$${formatDecimal(parseAmount(line.amount_delta))}`,
                 line.days_delta,
               ],
             }))}
@@ -369,7 +324,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
                     <h4 className={frameStyles.panelTitle}>Totals</h4>
                     <div className={styles.totalRow}>
                       <span>Line delta</span>
-                      <strong>${formatMoney(changeOrder.amount_delta)}</strong>
+                      <strong>${formatDecimal(parseAmount(changeOrder.amount_delta))}</strong>
                     </div>
                     <div className={styles.totalRow}>
                       <span>Schedule delta</span>

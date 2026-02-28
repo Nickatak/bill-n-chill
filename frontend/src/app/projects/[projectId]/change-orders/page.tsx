@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { ChangeOrdersConsole } from "@/features/change-orders";
 import { redirect } from "next/navigation";
-import styles from "../../../change-orders/page.module.css";
+import { PageCard, PageShell } from "@/shared/shell";
 import { isNumericRouteId, resolveProjectParamTitle } from "@/shared/shell/route-metadata";
 
 type ProjectChangeOrdersPageProps = {
@@ -27,15 +27,13 @@ export default async function ProjectChangeOrdersPage({
     isNumericRouteId(originEstimate) ? Number(originEstimate) : null;
 
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <section className={styles.card}>
-          <ChangeOrdersConsole
-            scopedProjectId={Number(projectId)}
-            initialOriginEstimateId={initialOriginEstimateId}
-          />
-        </section>
-      </main>
-    </div>
+    <PageShell>
+      <PageCard>
+        <ChangeOrdersConsole
+          scopedProjectId={Number(projectId)}
+          initialOriginEstimateId={initialOriginEstimateId}
+        />
+      </PageCard>
+    </PageShell>
   );
 }

@@ -1,22 +1,31 @@
 "use client";
 
+/**
+ * Primary project hub that lets users browse, select, and manage projects.
+ * Shows a paginated/filterable project list, a financial snapshot with scope
+ * control and billing tree, and an inline project profile editor.
+ */
+
 import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { readApiErrorMessage } from "@/shared/api/error";
+import { formatCurrency } from "@/shared/money-format";
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { usePagination } from "@/shared/hooks/use-pagination";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
+import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import styles from "./projects-console.module.css";
 import { ProjectListStatusValue, ProjectListViewer } from "@/shared/project-list-viewer";
 import { ApiResponse, ProjectFinancialSummary, ProjectRecord } from "../types";
 
 type ProjectStatusValue = ProjectListStatusValue;
-type StatusMessageTone = "neutral" | "success" | "error";
 const PROJECT_STATUS_VALUES: ProjectStatusValue[] = ["prospect", "active", "on_hold", "completed", "cancelled"];
 
+/** Renders the main project dashboard with list, financial map, and profile editor. */
 export function ProjectsConsole() {
   const searchParams = useSearchParams();
-  const projectPageSize = 5;
   const projectStatusTransitions: Record<ProjectStatusValue, ProjectStatusValue[]> = {
     prospect: ["active", "cancelled"],
     active: ["on_hold", "completed", "cancelled"],
@@ -28,13 +37,11 @@ export function ProjectsConsole() {
   const { token, authMessage } = useSharedSessionAuth();
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
-  const [statusMessage, setStatusMessage] = useState("");
-  const [statusMessageTone, setStatusMessageTone] = useState<StatusMessageTone>("neutral");
+  const { message: statusMessage, tone: statusMessageTone, setNeutral: setNeutralStatusMessage, setSuccess: setSuccessStatusMessage, setError: setErrorStatusMessage, setMessage: setStatusMessage } = useStatusMessage();
   const [projectSearch, setProjectSearch] = useState("");
   const [projectStatusFilters, setProjectStatusFilters] = useState<ProjectStatusValue[]>(
     defaultProjectStatusFilters,
   );
-  const [currentProjectPage, setCurrentProjectPage] = useState(1);
   const [isProjectListExpanded, setIsProjectListExpanded] = useState(true);
   const [summary, setSummary] = useState<ProjectFinancialSummary | null>(null);
   const [estimateStatusCounts, setEstimateStatusCounts] = useState<{
@@ -115,13 +122,7 @@ export function ProjectsConsole() {
   const statusFilteredProjects = filteredProjects.filter((project) =>
     projectStatusFilters.includes(project.status as ProjectStatusValue),
   );
-  const totalProjectPages = Math.max(1, Math.ceil(statusFilteredProjects.length / projectPageSize));
-  const currentProjectPageSafe = Math.min(currentProjectPage, totalProjectPages);
-  const projectPageStartIndex = (currentProjectPageSafe - 1) * projectPageSize;
-  const pagedProjects = statusFilteredProjects.slice(
-    projectPageStartIndex,
-    projectPageStartIndex + projectPageSize,
-  );
+  const { pageItems: pagedProjects, currentPage: currentProjectPageSafe, totalPages: totalProjectPages, prevPage: prevProjectPage, nextPage: nextProjectPage, resetPage: resetProjectPage } = usePagination(statusFilteredProjects, 5);
   const summaryCounts = summary
     ? {
         invoices: summary.traceability.ar_invoices.records.length,
@@ -136,7 +137,7 @@ export function ProjectsConsole() {
     summary?.accepted_contract_total ?? selectedProject?.accepted_contract_total ?? acceptedEstimateTotal;
   const arOutstandingDisplay = summary?.ar_outstanding ?? "--";
   const unbilledFromAcceptedDisplay = summary
-    ? formatMoneyValue(parseMoneyValue(acceptedContractDisplay) - parseMoneyValue(arOutstandingDisplay))
+    ? formatCurrency(parseMoneyValue(acceptedContractDisplay) - parseMoneyValue(arOutstandingDisplay))
     : "--";
   const apOutstandingDisplay = summary?.ap_outstanding ?? "--";
   const apTotalDisplay = summary?.ap_total ?? "--";
@@ -156,9 +157,10 @@ export function ProjectsConsole() {
       : "Approve an estimate to activate project financials."
     : "--";
   const unspentFromAcceptedDisplay = summary
-    ? formatMoneyValue(parseMoneyValue(acceptedContractDisplay) - parseMoneyValue(apOutstandingDisplay))
+    ? formatCurrency(parseMoneyValue(acceptedContractDisplay) - parseMoneyValue(apOutstandingDisplay))
     : "--";
 
+  /** Coerces a string or number to a numeric dollar value, defaulting to 0 for unparseable input. */
   function parseMoneyValue(value: unknown): number {
     if (typeof value === "number") {
       return Number.isFinite(value) ? value : 0;
@@ -171,19 +173,12 @@ export function ProjectsConsole() {
     return Number.isFinite(parsed) ? parsed : 0;
   }
 
-  function formatMoneyValue(value: number): string {
-    return value.toLocaleString("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  }
-
+  /** Returns the display name for a project's customer, falling back to "Customer #id". */
   function formatCustomerName(project: ProjectRecord): string {
     return project.customer_display_name || `Customer #${project.customer}`;
   }
 
+  /** Maps a status value like "on_hold" to its corresponding CSS module class. */
   function projectStatusClass(statusValue: string): string {
     const key = `projectStatus${statusValue
       .split("_")
@@ -192,10 +187,12 @@ export function ProjectsConsole() {
     return styles[key] ?? "";
   }
 
+  /** Converts a snake_case status value to a human-readable label. */
   function projectStatusLabel(statusValue: string): string {
     return statusValue.replace("_", " ");
   }
 
+  /** Toggles a status value in or out of the active project list filters. */
   function toggleProjectStatusFilter(nextStatus: ProjectStatusValue) {
     setProjectStatusFilters((current) =>
       current.includes(nextStatus)
@@ -204,6 +201,7 @@ export function ProjectsConsole() {
     );
   }
 
+  /** Populates the profile form fields from a project record. */
   function hydrateForm(project: ProjectRecord) {
     setProjectName(project.name);
     setProjectStatus(project.status as ProjectStatusValue);
@@ -211,26 +209,7 @@ export function ProjectsConsole() {
     setEndDate(project.end_date_planned ?? "");
   }
 
-  function setNeutralStatusMessage(message: string) {
-    setStatusMessageTone("neutral");
-    setStatusMessage(message);
-  }
-
-  function setSuccessStatusMessage(message: string) {
-    setStatusMessageTone("success");
-    setStatusMessage(message);
-  }
-
-  function setErrorStatusMessage(message: string) {
-    setStatusMessageTone("error");
-    setStatusMessage(message);
-  }
-
-  function readApiError(payload: ApiResponse | undefined, fallback: string): string {
-    const message = payload?.error?.message?.trim();
-    return message || fallback;
-  }
-
+  /** Fetches all projects and auto-selects based on URL scope or default filters. */
   async function loadProjects() {
     setNeutralStatusMessage("Loading projects...");
     try {
@@ -296,6 +275,7 @@ export function ProjectsConsole() {
     }
   }
 
+  /** Fetches the financial summary (contract, AR, AP totals) for the selected project. */
   async function loadFinancialSummary() {
     const projectId = Number(selectedProjectId);
     if (!projectId) {
@@ -318,6 +298,7 @@ export function ProjectsConsole() {
     }
   }
 
+  /** Loads estimate counts by status for the scope-control badges. */
   async function loadEstimateStatusCounts(projectId: number) {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
@@ -344,13 +325,14 @@ export function ProjectsConsole() {
         }
       }
       setEstimateStatusCounts({ draft, sent, approved });
-      setAcceptedEstimateTotal(formatMoneyValue(acceptedTotal));
+      setAcceptedEstimateTotal(formatCurrency(acceptedTotal));
     } catch {
       setEstimateStatusCounts(null);
       setAcceptedEstimateTotal("--");
     }
   }
 
+  /** Loads change order counts by status for the scope-control badges. */
   async function loadChangeOrderStatusCounts(projectId: number) {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/change-orders/`, {
@@ -377,13 +359,14 @@ export function ProjectsConsole() {
         }
       }
       setChangeOrderStatusCounts({ draft, sent, accepted });
-      setAcceptedChangeOrderDeltaTotal(formatMoneyValue(acceptedDelta));
+      setAcceptedChangeOrderDeltaTotal(formatCurrency(acceptedDelta));
     } catch {
       setChangeOrderStatusCounts(null);
       setAcceptedChangeOrderDeltaTotal("--");
     }
   }
 
+  // Fetch the full project list whenever auth or URL scope changes.
   useEffect(() => {
     if (!token) {
       return;
@@ -392,6 +375,7 @@ export function ProjectsConsole() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, scopedProjectId, scopedCustomerId]);
 
+  // Re-load financials and scope-control counts when a different project is selected.
   useEffect(() => {
     if (!token || !selectedProjectId) {
       return;
@@ -406,10 +390,12 @@ export function ProjectsConsole() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProjectId, token]);
 
+  // Reset to page 1 whenever the user changes search text or status filters.
   useEffect(() => {
-    setCurrentProjectPage(1);
-  }, [projectSearch, projectStatusFilters]);
+    resetProjectPage();
+  }, [projectSearch, projectStatusFilters, resetProjectPage]);
 
+  // If the selected project is no longer visible after filtering, fall back to the first visible one.
   useEffect(() => {
     if (statusFilteredProjects.length === 0) {
       return;
@@ -420,9 +406,11 @@ export function ProjectsConsole() {
     if (selectedStillVisible) {
       return;
     }
+
     const fallbackProject = statusFilteredProjects[0];
     setSelectedProjectId(String(fallbackProject.id));
     hydrateForm(fallbackProject);
+
     setSummary(null);
     setEstimateStatusCounts(null);
     setChangeOrderStatusCounts(null);
@@ -430,6 +418,7 @@ export function ProjectsConsole() {
     setAcceptedChangeOrderDeltaTotal("--");
   }, [selectedProjectId, statusFilteredProjects]);
 
+  // Scroll the profile form into view when it opens, so users don't miss it off-screen.
   useEffect(() => {
     if (!isProjectProfileOpen || isSelectedProjectTerminal) {
       return;
@@ -438,6 +427,7 @@ export function ProjectsConsole() {
     if (!formEl) {
       return;
     }
+
     const rect = formEl.getBoundingClientRect();
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
     const isFullyVisible = rect.top >= 0 && rect.bottom <= viewportHeight;
@@ -446,6 +436,7 @@ export function ProjectsConsole() {
     }
   }, [isProjectProfileOpen, isSelectedProjectTerminal, selectedProjectId]);
 
+  /** Switches the selected project and resets downstream financial state. */
   function handleSelectProject(project: { id: number }) {
     if (String(project.id) === selectedProjectId) {
       return;
@@ -456,14 +447,17 @@ export function ProjectsConsole() {
     }
     setSelectedProjectId(String(project.id));
     setIsProjectProfileOpen(false);
+    hydrateForm(selected);
+
+    // Clear stale financial data so it re-loads for the new project.
     setSummary(null);
     setEstimateStatusCounts(null);
     setChangeOrderStatusCounts(null);
     setAcceptedEstimateTotal("--");
     setAcceptedChangeOrderDeltaTotal("--");
-    hydrateForm(selected);
   }
 
+  /** Toggles the project profile editor open/closed, pre-selecting the first allowed status. */
   function toggleProjectProfile() {
     setIsProjectProfileOpen((current) => {
       const nextOpen = !current;
@@ -476,6 +470,7 @@ export function ProjectsConsole() {
     });
   }
 
+  /** Validates and PATCHes the project profile form to the API. */
   async function handleSaveProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const projectId = Number(selectedProjectId);
@@ -490,6 +485,7 @@ export function ProjectsConsole() {
       return;
     }
 
+    // Validation passed -- submit the PATCH.
     setNeutralStatusMessage("Saving project profile...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/`, {
@@ -504,7 +500,7 @@ export function ProjectsConsole() {
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setErrorStatusMessage(readApiError(payload, "Save failed. Check values and auth token."));
+        setErrorStatusMessage(readApiErrorMessage(payload, "Save failed. Check values and auth token."));
         return;
       }
 
@@ -558,8 +554,8 @@ export function ProjectsConsole() {
           showPagination
           currentPage={currentProjectPageSafe}
           totalPages={totalProjectPages}
-          onPrevPage={() => setCurrentProjectPage((page) => Math.max(1, page - 1))}
-          onNextPage={() => setCurrentProjectPage((page) => Math.min(totalProjectPages, page + 1))}
+          onPrevPage={prevProjectPage}
+          onNextPage={nextProjectPage}
         />
       ) : null}
 

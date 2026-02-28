@@ -1,19 +1,12 @@
 .console {
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --border: #cbd5e1;
-  --surface: #f8fafc;
-  --surface-elevated: #ffffff;
-  --accent: #1d4ed8;
-
   display: grid;
-  gap: 12px;
+  gap: var(--space-md);
   color: var(--text-primary);
 }
 
 .header {
   display: grid;
-  gap: 6px;
+  gap: var(--space-sm);
 }
 
 .header h2 {
@@ -24,16 +17,16 @@
 .header p {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--font-base);
 }
 
 .form {
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-  padding: 12px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-secondary);
+  padding: var(--space-md);
 }
 
 .toggleRow {
@@ -42,19 +35,19 @@
   gap: 10px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--surface-elevated);
-  padding: 8px 10px;
+  background: var(--surface);
+  padding: var(--space-sm) 10px;
   cursor: pointer;
 }
 
 .toggleRow input {
-  width: 16px;
-  height: 16px;
+  width: var(--space-lg);
+  height: var(--space-lg);
   accent-color: var(--accent);
 }
 
 .toggleRow span {
-  font-size: 0.9rem;
+  font-size: var(--font-base);
 }
 
 .actions {
@@ -63,13 +56,13 @@
 }
 
 .actions button {
-  border: 1px solid #93c5fd;
-  border-radius: 8px;
-  background: #dbeafe;
-  color: #1e3a8a;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  background: var(--accent-light);
+  color: var(--accent-text);
   font-size: 0.84rem;
   font-weight: 700;
-  padding: 8px 12px;
+  padding: var(--space-sm) var(--space-md);
   cursor: pointer;
 }
 
@@ -77,23 +70,8 @@
   margin: 0;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--surface);
+  background: var(--surface-secondary);
   color: var(--text-secondary);
   font-size: 0.86rem;
-  padding: 8px 10px;
-}
-
-:global(html[data-theme="dark"]) .console {
-  --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --border: #334155;
-  --surface: #0f172a;
-  --surface-elevated: #111827;
-  --accent: #60a5fa;
-}
-
-:global(html[data-theme="dark"]) .actions button {
-  border-color: #3b82f6;
-  background: #1e3a8a;
-  color: #dbeafe;
+  padding: var(--space-sm) 10px;
 }

@@ -5,7 +5,7 @@
 
 .intro {
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .intro h2 {
@@ -19,21 +19,21 @@
 }
 
 .authMessage {
-  font-size: 0.9rem;
+  font-size: var(--font-base);
 }
 
 .statusMessage {
   margin: 0;
   border: 1px solid color-mix(in srgb, var(--border) 82%, transparent 18%);
-  border-radius: 12px;
-  padding: 10px 12px;
-  font-size: 0.9rem;
+  border-radius: var(--radius-lg);
+  padding: 10px var(--space-md);
+  font-size: var(--font-base);
   color: color-mix(in srgb, var(--text-secondary) 92%, var(--text-primary) 8%);
   background:
     linear-gradient(
       140deg,
-      color-mix(in srgb, var(--foreground) 92%, #e2e8f0 8%) 0%,
-      color-mix(in srgb, var(--foreground) 97%, #dbeafe 3%) 100%
+      color-mix(in srgb, var(--surface) 92%, var(--border) 8%) 0%,
+      color-mix(in srgb, var(--surface) 97%, var(--accent-light) 3%) 100%
     );
 }
 
@@ -44,27 +44,28 @@
 
 .controlLabel {
   display: grid;
-  gap: 5px;
+  gap: 6px;
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: var(--font-base);
+  align-self: end;
 }
 
 .controlLabel input,
 .controlLabel select {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: var(--foreground);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) 10px;
+  background: var(--surface);
   color: var(--text-primary);
 }
 
 .filterSwitchCard {
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 8px 10px;
-  background: var(--foreground);
+  padding: var(--space-sm) 10px;
+  background: var(--surface);
   display: grid;
-  gap: 6px;
+  gap: var(--space-sm);
 }
 
 .filterSwitchHeader {
@@ -75,13 +76,13 @@
 
 .filterSwitchTitle {
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: var(--font-base);
 }
 
 .filterSwitchReset {
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-sm);
   background: transparent;
   color: var(--text-secondary);
   font-size: 0.76rem;
@@ -96,11 +97,11 @@
 .filterSwitchRow {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .filterSwitchState {
-  font-size: 0.82rem;
+  font-size: var(--font-sm);
   color: var(--text-secondary);
 }
 
@@ -142,7 +143,7 @@
   color: color-mix(in srgb, var(--text-secondary) 78%, var(--text-primary) 22%);
   background: transparent;
   border-bottom: none;
-  padding-top: 4px;
+  padding-top: var(--space-xs);
   padding-bottom: 0;
 }
 
@@ -150,8 +151,8 @@
   background:
     linear-gradient(
       150deg,
-      color-mix(in srgb, var(--foreground) 94%, #e2e8f0 6%) 0%,
-      color-mix(in srgb, var(--foreground) 98%, #c7d2fe 2%) 100%
+      color-mix(in srgb, var(--surface) 94%, var(--border) 6%) 0%,
+      color-mix(in srgb, var(--surface) 98%, var(--border-accent) 2%) 100%
     );
   border-top: 1px solid color-mix(in srgb, var(--border) 78%, transparent 22%);
   border-bottom: 1px solid color-mix(in srgb, var(--border) 74%, transparent 26%);
@@ -170,7 +171,7 @@
 }
 
 .tableRowInactive {
-  box-shadow: inset 3px 0 0 #dc2626;
+  box-shadow: inset 3px 0 0 var(--tone-error-border);
 }
 
 .rowPrimary {
@@ -190,14 +191,14 @@
 
 .projectLinks {
   display: grid;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 .projectCellHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-md);
 }
 
 .projectLink {
@@ -209,7 +210,7 @@
   background: transparent;
   padding: 0;
   display: grid;
-  gap: 6px;
+  gap: var(--space-sm);
   text-align: left;
   cursor: pointer;
   color: var(--text-primary);
@@ -225,7 +226,7 @@
 .projectAccordionStatusList {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 .projectAccordionCaret {
@@ -243,23 +244,23 @@
 
 .projectStatusGroups {
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .projectStatusGroup {
   display: grid;
-  gap: 6px;
+  gap: var(--space-sm);
 }
 
 .projectStatusGroupHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .projectStatusGroup .projectLinks {
-  margin-left: 12px;
+  margin-left: var(--space-md);
   padding-left: 10px;
   border-left: 2px solid color-mix(in srgb, var(--border) 85%, transparent 15%);
 }
@@ -267,15 +268,15 @@
 .projectFilterBar {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 6px;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
 }
 
 .projectFilterChip {
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 0.72rem;
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-sm);
+  font-size: var(--font-xs);
   line-height: 1.2;
   cursor: pointer;
 }
@@ -285,7 +286,7 @@
 }
 
 .projectFilterChipDisabled {
-  background: var(--foreground);
+  background: var(--surface);
   color: var(--text-secondary);
   border-color: var(--border);
   opacity: 0.75;
@@ -293,11 +294,11 @@
 
 .projectFilterReset {
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 2px 8px;
-  background: var(--foreground);
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-sm);
+  background: var(--surface);
   color: var(--text-secondary);
-  font-size: 0.72rem;
+  font-size: var(--font-xs);
   cursor: pointer;
 }
 
@@ -313,8 +314,8 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 8px;
-  background: color-mix(in srgb, var(--foreground) 96%, #e2e8f0 4%);
+  gap: var(--space-sm);
+  background: var(--surface-secondary);
   text-decoration: none;
 }
 
@@ -330,10 +331,10 @@
 .addProjectButton {
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--foreground);
+  background: var(--surface-secondary);
   color: var(--text-primary);
   line-height: 1.1;
-  font-size: 0.82rem;
+  font-size: var(--font-sm);
   font-weight: 600;
   padding: 7px 10px;
   cursor: pointer;
@@ -347,9 +348,9 @@
 }
 
 .projectStatusPill {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 2px 7px;
-  font-size: 0.72rem;
+  font-size: var(--font-xs);
   line-height: 1.2;
   border: 1px solid transparent;
   white-space: nowrap;
@@ -357,9 +358,9 @@
 }
 
 .projectStatusHeader {
-  border-radius: 6px;
-  padding: 4px 10px;
-  font-size: 0.72rem;
+  border-radius: var(--radius-sm);
+  padding: var(--space-xs) 10px;
+  font-size: var(--font-xs);
   line-height: 1.2;
   border: 1px solid transparent;
   text-transform: uppercase;
@@ -368,33 +369,33 @@
 }
 
 .projectStatusProspect {
-  border-color: #1e3a8a;
-  color: #1e3a8a;
-  background: #e0e7ff;
+  border-color: var(--accent-border);
+  color: var(--accent-text);
+  background: var(--accent-lighter);
 }
 
 .projectStatusActive {
-  border-color: #22c55e;
-  color: #052e16;
-  background: #22c55e;
+  border-color: var(--status-approved-border);
+  color: var(--status-approved-text);
+  background: var(--status-approved-bg);
 }
 
 .projectStatusOnHold {
-  border-color: #fef08a;
-  color: #713f12;
-  background: #fef08a;
+  border-color: var(--status-sent-border);
+  color: var(--status-sent-text);
+  background: var(--status-sent-bg);
 }
 
 .projectStatusCompleted {
-  border-color: #e5e7eb;
-  color: #4b5563;
-  background: #e5e7eb;
+  border-color: var(--status-void-border);
+  color: var(--status-void-text);
+  background: var(--status-void-bg);
 }
 
 .projectStatusCancelled {
-  border-color: #fecaca;
-  color: #991b1b;
-  background: #fecaca;
+  border-color: var(--status-rejected-border);
+  color: var(--status-rejected-text);
+  background: var(--status-rejected-bg);
 }
 
 .customerActionsInline {
@@ -405,7 +406,7 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 6px 11px;
-  background: var(--foreground);
+  background: var(--surface-secondary);
   color: var(--text-primary);
   cursor: pointer;
   font-size: 0.86rem;
@@ -418,9 +419,9 @@
 
 .emptyState {
   margin: 0;
-  padding: 12px 2px;
+  padding: var(--space-md) 2px;
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--font-base);
 }
 
 .modalOverlay {
@@ -430,23 +431,26 @@
   background: rgba(15, 23, 42, 0.55);
   display: grid;
   place-items: center;
-  padding: 16px;
+  padding: var(--space-lg);
 }
 
 .modalCard {
+  position: relative;
   width: min(620px, 100%);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  background: var(--foreground);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  background: var(--surface);
   display: grid;
   gap: 10px;
 }
 
 .modalClose {
-  justify-self: end;
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 6px 10px;
   background: transparent;
   color: var(--text-secondary);
@@ -455,7 +459,7 @@
 
 .panelHeader {
   display: grid;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 .panelTitle {
@@ -466,7 +470,7 @@
 .panelSubtle {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--font-base);
 }
 
 .editorForm {
@@ -478,35 +482,35 @@
   display: grid;
   gap: 5px;
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: var(--font-base);
 }
 
 .field input {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: var(--foreground);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) 10px;
+  background: var(--input-bg);
   color: var(--text-primary);
 }
 
 .field select {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: var(--foreground);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) 10px;
+  background: var(--input-bg);
   color: var(--text-primary);
 }
 
 .projectStatusSelector {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .projectStatusSelectorButton {
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  padding: 6px var(--space-md);
   text-transform: uppercase;
   font-size: 0.75rem;
   letter-spacing: 0.12em;
@@ -516,8 +520,9 @@
 }
 
 .projectStatusSelectorButtonInactive {
-  background: var(--foreground);
+  background: var(--surface-secondary);
   color: var(--text-secondary);
+  border-color: var(--border-accent);
 }
 
 .projectStatusSelectorButtonActive {
@@ -525,11 +530,23 @@
   transform: translateY(-1px);
 }
 
+.projectStatusSelectorButtonActive.projectStatusProspect {
+  background: #2563eb;
+  border-color: var(--accent);
+  color: #eff6ff;
+}
+
+.projectStatusSelectorButtonActive.projectStatusActive {
+  background: #16a34a;
+  border-color: #15803d;
+  color: #f0fdf4;
+}
+
 .toggleField {
   display: grid;
-  gap: 6px;
+  gap: var(--space-sm);
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: var(--font-base);
 }
 
 .switchRow {
@@ -544,8 +561,8 @@
   margin: 0;
   appearance: none;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  background: #cbd5e1;
+  border-radius: var(--radius-pill);
+  background: var(--input-border);
   position: relative;
   cursor: pointer;
 }
@@ -554,8 +571,8 @@
   content: "";
   width: 16px;
   height: 16px;
-  border-radius: 999px;
-  background: #ffffff;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
   position: absolute;
   top: 2px;
   left: 2px;
@@ -563,8 +580,8 @@
 }
 
 .switchInput:checked {
-  background: #dc2626;
-  border-color: #dc2626;
+  background: var(--tone-error-border);
+  border-color: var(--tone-error-border);
 }
 
 .switchInput:checked::before {
@@ -582,31 +599,24 @@
 }
 
 .inlineWarning {
+  composes: noticeError from "../../../shared/styles/notices.module.css";
   margin: 0;
-  border: 1px solid #dc2626;
-  border-radius: 8px;
-  padding: 8px 10px;
   font-size: 0.85rem;
-  color: #991b1b;
-  background: #fef2f2;
 }
 
 .actionRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .primaryButton {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 12px;
-  color: #f9fafb;
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--accent);
+  color: var(--text-on-accent);
   cursor: pointer;
-}
-
-.primaryButton {
-  background: #111827;
 }
 
 .primaryButton:disabled {
@@ -636,89 +646,4 @@
     display: grid;
     grid-template-columns: 1fr;
   }
-}
-
-:global(html[data-theme="dark"]) .statusMessage,
-:global(html[data-theme="dark"]) .modalCard {
-  background: color-mix(in srgb, var(--foreground) 94%, #0f172a 6%);
-}
-
-:global(html[data-theme="dark"]) .table th {
-  color: color-mix(in srgb, var(--text-secondary) 84%, #cbd5e1 16%);
-}
-
-:global(html[data-theme="dark"]) .table tbody td {
-  background:
-    linear-gradient(
-      150deg,
-      color-mix(in srgb, var(--foreground) 93%, #0f172a 7%) 0%,
-      color-mix(in srgb, var(--foreground) 97%, #1e293b 3%) 100%
-    );
-  border-top-color: color-mix(in srgb, var(--border) 76%, transparent 24%);
-  border-bottom-color: color-mix(in srgb, var(--border) 72%, transparent 28%);
-}
-
-:global(html[data-theme="dark"]) .table tbody td:first-child {
-  border-left-color: color-mix(in srgb, var(--border) 76%, transparent 24%);
-}
-
-:global(html[data-theme="dark"]) .table tbody td:last-child {
-  border-right-color: color-mix(in srgb, var(--border) 76%, transparent 24%);
-}
-
-:global(html[data-theme="dark"]) .switchInput {
-  background: #475569;
-}
-
-:global(html[data-theme="dark"]) .inlineWarning {
-  border-color: #f87171;
-  color: #fecaca;
-  background: rgba(127, 29, 29, 0.3);
-}
-
-:global(html[data-theme="dark"]) .primaryButton {
-  background: #1f2937;
-}
-
-:global(html[data-theme="dark"]) .projectStatusSelectorButton {
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .projectStatusSelectorButtonInactive {
-  background: #111827;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .projectStatusSelectorButtonActive {
-  box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.26);
-}
-
-:global(html[data-theme="dark"]) .projectStatusProspect {
-  border-color: #1e3a8a;
-  background: #1e3a8a;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .projectStatusActive {
-  border-color: #166534;
-  background: #166534;
-  color: #bbf7d0;
-}
-
-:global(html[data-theme="dark"]) .projectStatusOnHold {
-  border-color: #854d0e;
-  background: #854d0e;
-  color: #fef9c3;
-}
-
-:global(html[data-theme="dark"]) .projectStatusCompleted {
-  border-color: #374151;
-  background: #374151;
-  color: #d1d5db;
-}
-
-:global(html[data-theme="dark"]) .projectStatusCancelled {
-  border-color: #7f1d1d;
-  background: #7f1d1d;
-  color: #fee2e2;
 }

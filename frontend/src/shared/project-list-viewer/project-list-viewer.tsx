@@ -1,7 +1,20 @@
+/**
+ * Collapsible project list panel with search, status filters, and pagination.
+ *
+ * Used as a sidebar/panel component on pages that need project selection
+ * (e.g. budgets, estimates, invoices). The parent page owns all data-fetching
+ * and filter state; this component is a pure presentation layer that renders
+ * the search field, status filter buttons, project table, and pagination controls.
+ */
+
 "use client";
 
 import styles from "./project-list-viewer.module.css";
 import collapseButtonStyles from "./collapse-toggle-button.module.css";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 export type ProjectListStatusValue = "prospect" | "active" | "on_hold" | "completed" | "cancelled";
 
@@ -40,6 +53,17 @@ type ProjectListViewerProps = {
   emptyMessage?: string;
 };
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+/**
+ * Render a collapsible project list with search, status filters, and pagination.
+ *
+ * When collapsed, a hint message is shown instead of the full list. When
+ * expanded, the panel displays a search input, status filter toggle buttons
+ * with per-status counts, a paginated project table, and prev/next controls.
+ */
 export function ProjectListViewer({
   title = "Project List",
   isExpanded,
@@ -67,6 +91,10 @@ export function ProjectListViewer({
   onNextPage,
   emptyMessage = "No projects match your filters.",
 }: ProjectListViewerProps) {
+  /**
+   * Map a project status value to its CSS module tone class for the
+   * inline status badge (e.g. "active" -> styles.projectStatusActive).
+   */
   function statusToneClass(statusValue: string): string {
     const key = `projectStatus${statusValue
       .split("_")
@@ -75,6 +103,11 @@ export function ProjectListViewer({
     return styles[key] ?? "";
   }
 
+  /**
+   * Map a status value to its CSS module tone class for the filter buttons.
+   * Uses an explicit switch because filter tone classes don't follow the
+   * same naming convention as the row/badge tone classes.
+   */
   function statusFilterToneClass(statusValue: ProjectListStatusValue): string {
     switch (statusValue) {
       case "prospect":
@@ -92,6 +125,10 @@ export function ProjectListViewer({
     }
   }
 
+  /**
+   * Map a project status value to its CSS module tone class for table rows
+   * (e.g. "on_hold" -> styles.projectRowStatusOnHold).
+   */
   function rowToneClass(statusValue: string): string {
     const key = `projectRowStatus${statusValue
       .split("_")
@@ -130,6 +167,7 @@ export function ProjectListViewer({
                     placeholder="Search by id, name, customer, or status"
                   />
                 </label>
+
                 <div className={styles.projectFilters}>
                   <span className={styles.projectFiltersLabel}>Project status filter</span>
                   <div className={styles.projectFilterButtons}>
@@ -222,6 +260,7 @@ export function ProjectListViewer({
                   )}
                 </tbody>
               </table>
+
               {showPagination ? (
                 <div className={styles.projectPagination}>
                   <button

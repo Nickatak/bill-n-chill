@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Public-facing estimate approval preview for customer decision flow.
+ * Renders a read-only estimate document via a tokenized public URL and
+ * provides approve/reject controls for estimates in "sent" status.
+ */
+
 import { useEffect, useMemo, useState } from "react";
 import {
   PublicDocumentFrame,
@@ -15,7 +21,9 @@ import { PublicDocumentViewerShell } from "@/shared/document-viewer/public-docum
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import styles from "./estimates-console.module.css";
 import { ApiResponse, CostCode, EstimateLineInput, EstimateRecord } from "../types";
-import { formatDateInputFromIso } from "../../../shared/date-format";
+import { formatDateDisplay, formatDateInputFromIso } from "@/shared/date-format";
+import { formatDecimal } from "@/shared/money-format";
+import { usePrintContext } from "@/shared/hooks/use-print-context";
 
 type EstimateApprovalPreviewProps = {
   publicToken: string;
@@ -30,6 +38,7 @@ const STATUS_LABELS: Record<string, string> = {
   void: "Void",
 };
 
+/** Convert API line-item records into form-compatible input shapes. */
 function mapLineItemsToInputs(estimate: EstimateRecord | null): EstimateLineInput[] {
   const items = estimate?.line_items ?? [];
   if (!items.length) {
@@ -46,6 +55,7 @@ function mapLineItemsToInputs(estimate: EstimateRecord | null): EstimateLineInpu
   }));
 }
 
+/** Extract a deduplicated cost-code lookup list from inline line-item data. */
 function mapLineCostCodes(estimate: EstimateRecord | null): CostCode[] {
   const items = estimate?.line_items ?? [];
   const byId = new Map<number, CostCode>();
@@ -64,30 +74,13 @@ function mapLineCostCodes(estimate: EstimateRecord | null): CostCode[] {
   return Array.from(byId.values());
 }
 
-function formatMoney(value: number): string {
-  return value.toFixed(2);
-}
-
-function formatDisplayDate(value: string): string {
-  if (!value) {
-    return "Not set";
-  }
-  const parsed = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(parsed);
-}
-
+/** Resolve a status value to its human-readable label, falling back gracefully. */
 function estimateStatusLabel(status?: string): string {
   const normalized = (status || "").trim();
   return STATUS_LABELS[normalized] || normalized || "Unknown";
 }
 
+/** Renders the public estimate preview and customer decision form. */
 export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreviewProps) {
   const [statusMessage, setStatusMessage] = useState("Loading estimate...");
   const [estimate, setEstimate] = useState<EstimateRecord | null>(null);
@@ -98,7 +91,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [decisionReceiptName, setDecisionReceiptName] = useState("");
   const [justSubmittedDecision, setJustSubmittedDecision] = useState<"approve" | "reject" | null>(null);
-  const [printTimestamp, setPrintTimestamp] = useState("");
+  const { printTimestamp } = usePrintContext();
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const lineItems = useMemo(() => mapLineItemsToInputs(estimate), [estimate]);
@@ -160,12 +153,14 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
         ? `${styles.decisionBannerSettled} ${styles.decisionBannerRecentlyRejected}`
         : styles.decisionBannerSettled;
 
+  // Clear stale decision feedback when the estimate is no longer actionable.
   useEffect(() => {
     if (!canDecide) {
       setDecisionMessage("");
     }
   }, [canDecide]);
 
+  // Auto-dismiss the decision confirmation banner after a short delay.
   useEffect(() => {
     if (!justSubmittedDecision) {
       return;
@@ -176,44 +171,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
     return () => window.clearTimeout(timer);
   }, [justSubmittedDecision]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    const titleBeforeMount = document.title;
-    const formatPrintedAt = () =>
-      new Intl.DateTimeFormat("en-US", {
-        month: "numeric",
-        day: "numeric",
-        year: "2-digit",
-        hour: "numeric",
-        minute: "2-digit",
-      }).format(new Date());
-
-    const setPrintContext = () => {
-      setPrintTimestamp(formatPrintedAt());
-    };
-
-    const handleBeforePrint = () => {
-      setPrintContext();
-      document.title = "";
-    };
-
-    const handleAfterPrint = () => {
-      document.title = titleBeforeMount;
-    };
-
-    setPrintContext();
-    window.addEventListener("beforeprint", handleBeforePrint);
-    window.addEventListener("afterprint", handleAfterPrint);
-
-    return () => {
-      window.removeEventListener("beforeprint", handleBeforePrint);
-      window.removeEventListener("afterprint", handleAfterPrint);
-      document.title = titleBeforeMount;
-    };
-  }, []);
-
+  // Fetch the estimate record from the public token on mount.
   useEffect(() => {
     async function loadEstimateContext() {
       try {
@@ -238,12 +196,15 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
     void loadEstimateContext();
   }, [normalizedBaseUrl, publicToken]);
 
+  /** Submit the customer's approve/reject decision to the public decision endpoint. */
   async function applyDecision(decision: "approve" | "reject") {
     if (!estimate || !canDecide || decisionSubmitting) {
       return;
     }
+
     setDecisionSubmitting(true);
     setDecisionMessage("");
+
     try {
       const response = await fetch(`${normalizedBaseUrl}/public/estimates/${publicToken}/decision/`, {
         method: "POST",
@@ -261,6 +222,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
         return;
       }
       const nextEstimate = payload.data as EstimateRecord;
+
       setEstimate(nextEstimate);
       setDecisionReceiptName(deciderName.trim());
       setJustSubmittedDecision(decision);
@@ -272,6 +234,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
     }
   }
 
+  /** Look up the display label for a cost code by its ID. */
   function findCostCodeLabel(costCodeId: string): string {
     const code = costCodes.find((candidate) => String(candidate.id) === costCodeId);
     if (!code) {
@@ -374,11 +337,11 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
                   </div>
                   <div className={frameStyles.metaDetailsRow}>
                     <span>Estimate date</span>
-                    <span>{formatDisplayDate(estimateDate)}</span>
+                    <span>{formatDateDisplay(estimateDate, "Not set")}</span>
                   </div>
                   <div className={frameStyles.metaDetailsRow}>
                     <span>Valid through</span>
-                    <span>{formatDisplayDate(validThrough)}</span>
+                    <span>{formatDateDisplay(validThrough, "Not set")}</span>
                   </div>
                 </section>
               </>
@@ -393,7 +356,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
                 findCostCodeLabel(line.costCodeId),
                 line.unit || "ea",
                 `$${Number(line.unitCost || 0).toFixed(2)}`,
-                `$${formatMoney(lineTotals[index] ?? 0)}`,
+                `$${formatDecimal(lineTotals[index] ?? 0)}`,
               ],
             }))}
             afterTable={
@@ -401,15 +364,15 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
                 <div className={frameStyles.summaryBox}>
                   <div className={frameStyles.summaryRow}>
                     <span>Subtotal</span>
-                    <span>${formatMoney(subtotal)}</span>
+                    <span>${formatDecimal(subtotal)}</span>
                   </div>
                   <div className={frameStyles.summaryRow}>
                     <span>Sales Tax ({Number(taxPercent || 0).toFixed(2)}%)</span>
-                    <span>${formatMoney(taxAmount)}</span>
+                    <span>${formatDecimal(taxAmount)}</span>
                   </div>
                   <div className={`${frameStyles.summaryRow} ${frameStyles.summaryTotal}`}>
                     <span>Total</span>
-                    <span>${formatMoney(totalAmount)}</span>
+                    <span>${formatDecimal(totalAmount)}</span>
                   </div>
                 </div>
               </div>

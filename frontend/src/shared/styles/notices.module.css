@@ -1,0 +1,37 @@
+/* Shared notice/banner styles. Compose from feature modules to avoid duplicating notice patterns. */
+
+.notice {
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  font-size: var(--font-sm);
+  line-height: 1.5;
+}
+
+.noticeNeutral {
+  composes: notice;
+  background: var(--tone-neutral-bg);
+  border-color: var(--tone-neutral-border);
+  color: var(--tone-neutral-text);
+}
+
+.noticeSuccess {
+  composes: notice;
+  background: var(--tone-success-bg);
+  border-color: var(--tone-success-border);
+  color: var(--tone-success-text);
+}
+
+.noticeError {
+  composes: notice;
+  background: var(--tone-error-bg);
+  border-color: var(--tone-error-border);
+  color: var(--tone-error-text);
+}
+
+.noticeWarning {
+  composes: notice;
+  background: var(--tone-warning-bg);
+  border-color: var(--tone-warning-border);
+  color: var(--tone-warning-text);
+}

@@ -1,3 +1,12 @@
+/**
+ * Client-side session persistence layer.
+ *
+ * Stores the authenticated session (token, email, role, org) in
+ * localStorage under a versioned key. Changes are broadcast via a
+ * custom DOM event so other tabs and the SessionAuthorizationProvider
+ * can react immediately.
+ */
+
 export const SESSION_STORAGE_KEY = "bnc-session-v1";
 export const SESSION_CHANGE_EVENT = "bnc-session-change";
 
@@ -16,6 +25,7 @@ export type ClientSession = {
   organization?: SessionOrganization;
 };
 
+/** Read the current session from localStorage. Returns null if absent, expired, or malformed. */
 export function loadClientSession(): ClientSession | null {
   if (typeof window === "undefined") {
     return null;
@@ -42,6 +52,7 @@ export function loadClientSession(): ClientSession | null {
   }
 }
 
+/** Persist a session to localStorage and notify listeners (other tabs, providers). */
 export function saveClientSession(session: ClientSession): void {
   if (typeof window === "undefined") {
     return;
@@ -50,6 +61,7 @@ export function saveClientSession(session: ClientSession): void {
   window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
 }
 
+/** Remove the session from localStorage and notify listeners. */
 export function clearClientSession(): void {
   if (typeof window === "undefined") {
     return;

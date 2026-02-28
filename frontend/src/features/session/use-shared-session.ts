@@ -1,3 +1,10 @@
+/**
+ * Reactive hook that subscribes to the session in localStorage.
+ *
+ * Uses `useSyncExternalStore` to listen for both same-tab custom events
+ * (SESSION_CHANGE_EVENT from save/clear) and cross-tab `storage` events,
+ * so the UI stays in sync regardless of where the session changes.
+ */
 "use client";
 
 import { useMemo, useSyncExternalStore } from "react";
@@ -11,6 +18,7 @@ import {
 
 const NO_SHARED_SESSION_MESSAGE = "No shared session found. Go to / and login first.";
 
+/** Subscribe to localStorage changes from both same-tab and cross-tab sources. */
 function subscribe(onStoreChange: () => void) {
   if (typeof window === "undefined") {
     return () => {};
@@ -26,6 +34,7 @@ function subscribe(onStoreChange: () => void) {
   };
 }
 
+/** Read the raw session JSON from localStorage (client-side only). */
 function getSnapshot() {
   if (typeof window === "undefined") {
     return null;
@@ -33,12 +42,18 @@ function getSnapshot() {
   return window.localStorage.getItem(SESSION_STORAGE_KEY);
 }
 
+/** Server-side snapshot — always null since localStorage doesn't exist on the server. */
 function getServerSnapshot() {
   return null;
 }
 
+/**
+ * Hook that reactively reads the session from localStorage and returns
+ * the parsed token, role, organization, and a human-readable auth message.
+ */
 export function useSharedSessionAuth() {
   const sessionSnapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+
   const session = useMemo<ClientSession | null>(() => {
     if (!sessionSnapshot) {
       return null;
@@ -58,6 +73,7 @@ export function useSharedSessionAuth() {
       return null;
     }
   }, [sessionSnapshot]);
+
   const token = session?.token ?? "";
   const role: SessionRole = session?.role || "owner";
   const organization = session?.organization ?? null;

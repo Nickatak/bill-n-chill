@@ -1,3 +1,10 @@
+/**
+ * Shared layout primitives for route pages.
+ *
+ * Provides `PageShell` (the outer page + main wrapper) and `PageCard`
+ * (a content card section). Every authenticated page route composes
+ * these to get consistent max-width, padding, and spacing.
+ */
 import type { ReactNode } from "react";
 import shell from "./page-shell.module.css";
 
@@ -14,12 +21,16 @@ type PageCardProps = {
   className?: string;
 };
 
+/** Merge class-name fragments, filtering out falsy values. */
 function joinClassNames(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
 }
 
 /**
- * Shared route-shim page wrapper: `div.page > main.main`.
+ * Outer page wrapper providing the `div.page > main.main` structure.
+ *
+ * Accepts a `narrow` flag for single-column layouts (settings, help)
+ * and optional class overrides for page-specific styling.
  */
 export function PageShell({ children, narrow = false, className = "", mainClassName = "" }: PageShellProps) {
   return (
@@ -32,7 +43,9 @@ export function PageShell({ children, narrow = false, className = "", mainClassN
 }
 
 /**
- * Shared route-shim content card wrapper.
+ * Content card section within a `PageShell`.
+ *
+ * Use `muted` for secondary/background cards that should recede visually.
  */
 export function PageCard({ children, muted = false, className = "" }: PageCardProps) {
   return (

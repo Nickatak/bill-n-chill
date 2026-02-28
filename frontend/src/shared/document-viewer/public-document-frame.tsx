@@ -1,8 +1,25 @@
+/**
+ * Structural frame for public-facing document pages (invoices, estimates, change orders).
+ *
+ * Provides the card layout shared by all public document types: a two-column
+ * header (sender/recipient on the left, document identity on the right),
+ * a titled line-items table, and optional after-table/footer slots.
+ *
+ * Also exports a `publicDocumentViewerClassNames` factory and the raw
+ * CSS module styles so consumers can merge overrides without importing the
+ * module directly.
+ */
+
 "use client";
 
 import { ReactNode } from "react";
 import styles from "./public-document-frame.module.css";
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/** Class name map consumed by `PublicDocumentViewerShell`. */
 type PublicDocumentViewerClassNames = {
   root: string;
   statusMessage: string;
@@ -15,6 +32,7 @@ type PublicDocumentViewerClassNames = {
   bannerLink: string;
 };
 
+/** A single row in the document line-items table. */
 type PublicDocumentTableRow = {
   key: string | number;
   cells: ReactNode[];
@@ -32,10 +50,26 @@ type PublicDocumentFrameProps = {
   footer?: ReactNode;
 };
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Join class name fragments, filtering out falsy values. */
 function cx(...parts: Array<string | undefined | false>) {
   return parts.filter(Boolean).join(" ");
 }
 
+// ---------------------------------------------------------------------------
+// Class name factory
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a complete `PublicDocumentViewerClassNames` map by merging the
+ * frame's base CSS module classes with optional per-document overrides.
+ *
+ * This lets each document type (invoice, estimate, change order) layer
+ * additional styling without duplicating the base class structure.
+ */
 export function publicDocumentViewerClassNames(
   overrides?: Partial<PublicDocumentViewerClassNames>,
 ): PublicDocumentViewerClassNames {
@@ -52,6 +86,20 @@ export function publicDocumentViewerClassNames(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+/**
+ * Render the standard document card frame used by all public viewer pages.
+ *
+ * Layout order:
+ * 1. Two-column header (party info + document identity)
+ * 2. Line-items section with column headers, data rows, and empty state
+ * 3. Optional after-table content (e.g. totals summary)
+ * 4. Optional after-line-section content (e.g. terms & conditions)
+ * 5. Optional footer (e.g. action buttons)
+ */
 export function PublicDocumentFrame({
   headerLeft,
   headerRight,

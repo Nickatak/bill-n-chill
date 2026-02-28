@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Public-facing invoice preview rendered via a tokenized URL.
+ * Fetches the invoice by public token and displays it in the shared document viewer shell,
+ * including sender/recipient context, line items, totals, terms, and a test payment section.
+ */
+
 import { useEffect, useMemo, useState } from "react";
 import { PublicDocumentViewerShell } from "@/shared/document-viewer/public-document-viewer-shell";
 import {
@@ -12,14 +18,18 @@ import {
   resolvePublicRecipient,
   resolvePublicSender,
 } from "@/shared/document-viewer/public-document-context";
+import { parseAmount, formatDecimal } from "@/shared/money-format";
+import { formatDateDisplay } from "@/shared/date-format";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { ApiResponse, InvoiceRecord } from "../types";
+import { usePrintContext } from "@/shared/hooks/use-print-context";
 import styles from "./invoice-public-preview.module.css";
 
 type InvoicePublicPreviewProps = {
   publicToken: string;
 };
 
+/** Maps API status values to user-facing display labels. */
 const STATUS_LABELS: Record<string, string> = {
   draft: "Draft",
   sent: "Sent",
@@ -29,40 +39,18 @@ const STATUS_LABELS: Record<string, string> = {
   void: "Void",
 };
 
-function parseAmount(value?: string): number {
-  const parsed = Number(value ?? "0");
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function formatMoney(value?: string): string {
-  return parseAmount(value).toFixed(2);
-}
-
+/** Resolve a human-readable label for an invoice status value. */
 function invoiceStatusLabel(status?: string): string {
   const normalized = (status || "").trim();
   return STATUS_LABELS[normalized] || normalized || "Unknown";
 }
 
-function formatDisplayDate(value?: string): string {
-  if (!value) {
-    return "Not set";
-  }
-  const parsed = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(parsed);
-}
-
+/** Renders the public invoice preview page for a customer accessing via tokenized URL. */
 export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps) {
   const [statusMessage, setStatusMessage] = useState("Loading invoice...");
   const [invoice, setInvoice] = useState<InvoiceRecord | null>(null);
   const [paymentTestMessage, setPaymentTestMessage] = useState("");
-  const [printTimestamp, setPrintTimestamp] = useState("");
+  const { printTimestamp } = usePrintContext();
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const sender = useMemo(
@@ -103,6 +91,7 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
     ? "Ready to pay? Jump to the payment section and submit a test payment."
     : `Invoice status: ${paymentStatusLabel}. This invoice is not awaiting payment.`;
 
+  // Fetch invoice data on mount using the public token.
   useEffect(() => {
     async function loadInvoice() {
       try {
@@ -123,44 +112,7 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
     void loadInvoice();
   }, [normalizedBaseUrl, publicToken]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    const titleBeforeMount = document.title;
-    const formatPrintedAt = () =>
-      new Intl.DateTimeFormat("en-US", {
-        month: "numeric",
-        day: "numeric",
-        year: "2-digit",
-        hour: "numeric",
-        minute: "2-digit",
-      }).format(new Date());
-
-    const setPrintContext = () => {
-      setPrintTimestamp(formatPrintedAt());
-    };
-
-    const handleBeforePrint = () => {
-      setPrintContext();
-      document.title = "";
-    };
-
-    const handleAfterPrint = () => {
-      document.title = titleBeforeMount;
-    };
-
-    setPrintContext();
-    window.addEventListener("beforeprint", handleBeforePrint);
-    window.addEventListener("afterprint", handleAfterPrint);
-
-    return () => {
-      window.removeEventListener("beforeprint", handleBeforePrint);
-      window.removeEventListener("afterprint", handleAfterPrint);
-      document.title = titleBeforeMount;
-    };
-  }, []);
-
+  /** Simulate a payment action in test mode without processing a real charge. */
   function handleTestPayment(mode: "half" | "full") {
     if (!invoice) {
       return;
@@ -168,6 +120,7 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
     const balanceDue = parseAmount(invoice.balance_due || invoice.total);
     const amount = mode === "half" ? balanceDue / 2 : balanceDue;
     const label = mode === "half" ? "Test Pay 50%" : "Test Pay Full";
+
     setPaymentTestMessage(`${label} clicked for $${amount.toFixed(2)}. Test mode only: no real charge was processed.`);
   }
 
@@ -253,11 +206,11 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
                   <h4 className={frameStyles.metaDetailsTitle}>Invoice Details</h4>
                   <div className={frameStyles.metaDetailsRow}>
                     <span>Issue date</span>
-                    <span>{formatDisplayDate(invoice.issue_date)}</span>
+                    <span>{formatDateDisplay(invoice.issue_date, "Not set")}</span>
                   </div>
                   <div className={frameStyles.metaDetailsRow}>
                     <span>Due date</span>
-                    <span>{formatDisplayDate(invoice.due_date)}</span>
+                    <span>{formatDateDisplay(invoice.due_date, "Not set")}</span>
                   </div>
                   <div className={frameStyles.metaDetailsRow}>
                     <span>Status</span>
@@ -275,8 +228,8 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
                 line.description || "No description",
                 line.budget_line_cost_code || "N/A",
                 line.unit || "ea",
-                `$${formatMoney(line.unit_price)}`,
-                `$${formatMoney(line.line_total)}`,
+                `$${formatDecimal(parseAmount(line.unit_price))}`,
+                `$${formatDecimal(parseAmount(line.line_total))}`,
               ],
             }))}
             afterTable={
@@ -284,15 +237,15 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
                 <div className={frameStyles.summaryBox}>
                   <div className={frameStyles.summaryRow}>
                     <span>Subtotal</span>
-                    <span>${formatMoney(invoice.subtotal)}</span>
+                    <span>${formatDecimal(parseAmount(invoice.subtotal))}</span>
                   </div>
                   <div className={frameStyles.summaryRow}>
                     <span>Sales Tax ({parseAmount(invoice.tax_percent).toFixed(2)}%)</span>
-                    <span>${formatMoney(invoice.tax_total)}</span>
+                    <span>${formatDecimal(parseAmount(invoice.tax_total))}</span>
                   </div>
                   <div className={`${frameStyles.summaryRow} ${frameStyles.summaryTotal}`}>
                     <span>Total</span>
-                    <span>${formatMoney(invoice.total)}</span>
+                    <span>${formatDecimal(parseAmount(invoice.total))}</span>
                   </div>
                 </div>
               </div>
@@ -333,7 +286,7 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
                 charging.
               </p>
               <p className={styles.paymentHint}>
-                Current status: {paymentStatusLabel}. Balance due: ${formatMoney(invoice.balance_due)}.
+                Current status: {paymentStatusLabel}. Balance due: ${formatDecimal(parseAmount(invoice.balance_due))}.
               </p>
               {paymentTestMessage ? <p className={styles.paymentTestMessage}>{paymentTestMessage}</p> : null}
               <div className={styles.paymentGrid}>
@@ -406,14 +359,14 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
                   className={styles.paymentSecondaryButton}
                   onClick={() => handleTestPayment("half")}
                 >
-                  Test Pay 50% (${formatMoney(String(parseAmount(invoice.balance_due || invoice.total) / 2))})
+                  Test Pay 50% (${formatDecimal(parseAmount(invoice.balance_due || invoice.total) / 2)})
                 </button>
                 <button
                   type="button"
                   className={styles.paymentPrimaryButton}
                   onClick={() => handleTestPayment("full")}
                 >
-                  Test Pay Full (${formatMoney(invoice.balance_due || invoice.total)})
+                  Test Pay Full (${formatDecimal(parseAmount(invoice.balance_due || invoice.total))})
                 </button>
               </div>
             </section>

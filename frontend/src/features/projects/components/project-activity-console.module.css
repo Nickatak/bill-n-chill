@@ -1,10 +1,4 @@
 .console {
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --border: #cbd5e1;
-  --surface: #f8fafc;
-  --surface-elevated: #ffffff;
-
   display: grid;
   gap: 10px;
   color: var(--text-primary);
@@ -15,7 +9,7 @@
   margin: 0;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--surface);
+  background: var(--surface-secondary);
   color: var(--text-secondary);
   padding: 8px 10px;
   font-size: 0.85rem;
@@ -24,7 +18,7 @@
 .intro {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--font-base);
 }
 
 .filterField {
@@ -42,8 +36,8 @@
 
 .filterField select {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-elevated);
+  border-radius: var(--radius-md);
+  background: var(--surface);
   color: var(--text-primary);
   padding: 8px 10px;
 }
@@ -53,20 +47,20 @@
 }
 
 .actions button {
-  border: 1px solid #93c5fd;
-  border-radius: 8px;
-  background: #dbeafe;
-  color: #1e3a8a;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  background: var(--accent-light);
+  color: var(--accent-text);
   padding: 8px 10px;
-  font-size: 0.82rem;
+  font-size: var(--font-sm);
   font-weight: 700;
   cursor: pointer;
 }
 
 .timelineCard {
   border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
+  border-radius: var(--radius-lg);
+  background: var(--surface-secondary);
   padding: 10px;
   display: grid;
   gap: 10px;
@@ -83,13 +77,13 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .timelineItem {
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--surface-elevated);
+  background: var(--surface);
   padding: 8px 10px;
   display: grid;
   gap: 6px;
@@ -98,16 +92,16 @@
 .timelineTopRow {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-sm);
   color: var(--text-secondary);
   font-size: 0.76rem;
 }
 
 .categoryBadge {
-  border: 1px solid #93c5fd;
-  border-radius: 999px;
-  background: #eff6ff;
-  color: #1e3a8a;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-pill);
+  background: var(--accent-lighter);
+  color: var(--accent-text);
   padding: 2px 8px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -128,8 +122,8 @@
 
 .openLink {
   justify-self: start;
-  color: #1d4ed8;
-  font-size: 0.82rem;
+  color: var(--accent);
+  font-size: var(--font-sm);
   font-weight: 700;
   text-decoration: none;
 }
@@ -140,40 +134,10 @@
 
 .emptyState {
   margin: 0;
-  border: 1px dashed #93c5fd;
+  border: 1px dashed var(--accent-border);
   border-radius: 10px;
-  background: #eff6ff;
-  color: #1e3a8a;
+  background: var(--accent-lighter);
+  color: var(--accent-text);
   padding: 8px 10px;
   font-size: 0.85rem;
-}
-
-:global(html[data-theme="dark"]) .console {
-  --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --border: #334155;
-  --surface: #0f172a;
-  --surface-elevated: #111827;
-}
-
-:global(html[data-theme="dark"]) .actions button {
-  border-color: #3b82f6;
-  background: #1e3a8a;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .categoryBadge {
-  border-color: #3b82f6;
-  background: #1e3a8a;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .openLink {
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .emptyState {
-  border-color: #1d4ed8;
-  background: #0f172a;
-  color: #bfdbfe;
 }

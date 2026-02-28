@@ -1,3 +1,14 @@
+/**
+ * Breadcrumb trail rendered below the workflow navbar.
+ *
+ * Builds a hierarchical path (Organization > Section > Page) from a
+ * static rule table. When the current route is project-scoped, the
+ * breadcrumbs inject a "Project: <name>" segment and rewrite all
+ * sibling hrefs to carry the project context (path param or query).
+ *
+ * Project names are fetched from the API on demand so the breadcrumb
+ * shows a human-readable label instead of just a numeric id.
+ */
 "use client";
 
 import { buildAuthHeaders } from "@/features/session/auth-headers";
@@ -6,6 +17,10 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import styles from "./workflow-breadcrumbs.module.css";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 type Crumb = {
   href: string;
@@ -23,16 +38,31 @@ type HierarchyRule = {
   crumbs: CrumbDef[];
 };
 
+// ---------------------------------------------------------------------------
+// Shared crumb anchors
+// ---------------------------------------------------------------------------
+
 const INTAKE_CRUMB: CrumbDef = { href: "/intake/quick-add", label: "Intake" };
 const PROJECTS_HUB_CRUMB: CrumbDef = { href: "/projects", label: "Projects" };
 const BILLING_HUB_CRUMB: CrumbDef = { href: "/invoices", label: "Billing" };
 const META_HUB_CRUMB: CrumbDef = { href: "/customers", label: "Ops / Meta" };
+
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+
+/**
+ * Top-level routes that historically accepted `?project=<id>` for
+ * project scoping before the nested `/projects/:id/...` URLs existed.
+ */
 const legacyProjectScopedPrefixes = [
   "/change-orders",
   "/invoices",
 ];
 
+/**
+ * Static rule table mapping pathnames to breadcrumb hierarchies.
+ * The first matching rule wins. If no rule matches, the breadcrumbs
+ * fall back to the Projects hub crumb.
+ */
 const hierarchyRules: HierarchyRule[] = [
   {
     when: (pathname) => pathname === "/" || pathname === "/intake/quick-add",
@@ -124,9 +154,20 @@ const hierarchyRules: HierarchyRule[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Crumb builders
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the base breadcrumb array for a given pathname.
+ *
+ * Always prepends the organization root crumb so every trail starts
+ * with the org name as a home anchor.
+ */
 function buildCrumbs(pathname: string, organizationLabel: string): Crumb[] {
   const matchingRule = hierarchyRules.find((rule) => rule.when(pathname));
   const crumbDefs = matchingRule?.crumbs ?? [PROJECTS_HUB_CRUMB];
+
   const orgRootCrumb: CrumbDef = {
     href: "/projects",
     label: organizationLabel,
@@ -140,16 +181,24 @@ function buildCrumbs(pathname: string, organizationLabel: string): Crumb[] {
   }));
 }
 
+/** Check if a pathname belongs to a legacy top-level route that uses `?project=` scoping. */
 function isLegacyProjectScopedRoute(pathname: string): boolean {
   return legacyProjectScopedPrefixes.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
 }
 
+/** Billing hub routes don't show a project crumb even when project-scoped. */
 function isBillingRoute(pathname: string): boolean {
   return pathname === "/invoices" || pathname === "/bills";
 }
 
+/**
+ * Rewrite a generic crumb href to carry the active project context.
+ *
+ * Routes that live under `/projects/:id/...` get nested paths;
+ * top-level routes that accept project scoping get a `?project=` param.
+ */
 function projectScopedHref(href: string, projectId: string): string {
   if (href === "/projects") {
     return `/projects?project=${encodeURIComponent(projectId)}`;
@@ -175,10 +224,23 @@ function projectScopedHref(href: string, projectId: string): string {
   return href;
 }
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+/**
+ * Render a breadcrumb trail reflecting the current route hierarchy.
+ *
+ * When a project is in scope (from the URL path or `?project=` query),
+ * the trail injects a project crumb and rewrites sibling hrefs so
+ * navigation stays within the project context.
+ */
 export function WorkflowBreadcrumbs() {
   const { token, organization } = useSharedSessionAuth();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  // Derive project id from either the path segment or query param.
   const pathnameValue = pathname || "/";
   const pathProjectMatch = pathnameValue.match(/^\/projects\/(\d+)(?:\/|$)/);
   const pathProjectId = pathProjectMatch?.[1] ?? null;
@@ -186,15 +248,19 @@ export function WorkflowBreadcrumbs() {
   const projectId =
     pathProjectId ??
     (queryProjectId && /^\d+$/.test(queryProjectId) ? queryProjectId : null);
+
   const organizationLabel = organization?.displayName?.trim() || "Organization";
   const [projectTitle, setProjectTitle] = useState("");
   const baseCrumbs = buildCrumbs(pathnameValue, organizationLabel);
+
   const shouldShowProjectCrumb = Boolean(
     projectId &&
       /^\d+$/.test(projectId) &&
       (Boolean(pathProjectId) || isLegacyProjectScopedRoute(pathnameValue)),
   ) && !isBillingRoute(pathnameValue);
 
+  // Fetch the project name so the breadcrumb shows "Project: Riverside Remodel"
+  // instead of "Project #42". Skipped when no project is in scope.
   useEffect(() => {
     let cancelled = false;
 
@@ -232,6 +298,8 @@ export function WorkflowBreadcrumbs() {
     };
   }, [projectId, shouldShowProjectCrumb, token]);
 
+  // When project-scoped, splice a project crumb into the trail,
+  // replacing the generic "Projects" hub crumb if present.
   const crumbs = shouldShowProjectCrumb
     ? (() => {
         const projectHubCrumb: Crumb = {

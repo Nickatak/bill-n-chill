@@ -6,8 +6,8 @@
   left: 0;
   right: 0;
   z-index: 900;
-  border-bottom: 1px solid #d1d5db;
-  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
   backdrop-filter: blur(6px);
 }
 
@@ -18,7 +18,7 @@
   align-items: center;
   gap: 4px;
   font-size: 0.85rem;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .inner a {
@@ -26,17 +26,9 @@
   text-decoration: underline;
 }
 
-:global(html[data-theme="dark"]) .bar {
-  border-bottom-color: #334155;
-  background: rgba(11, 18, 32, 0.96);
-}
-
-:global(html[data-theme="dark"]) .inner {
-  color: #e5e7eb;
-}
-
 .spacer {
   min-height: 56px;
+  background: var(--surface);
 }
 
 @media print {

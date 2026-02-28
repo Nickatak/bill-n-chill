@@ -1,26 +1,30 @@
 "use client";
 
+/**
+ * Vendor directory console. Supports paginated browsing, search/filter, CRUD for
+ * individual vendor records, duplicate-detection with override, and bulk CSV import.
+ * Vendors are canonical records reused across bills, AP workflows, and payment allocation.
+ */
+
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { usePagination } from "@/shared/hooks/use-pagination";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { ApiResponse, VendorCsvImportResult, VendorPayload, VendorRecord } from "../types";
+import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import styles from "./vendors-console.module.css";
-
-type StatusTone = "neutral" | "success" | "error";
 type ActivityFilter = "all" | "active" | "inactive";
 
+/** Full CRUD console for vendor records with search, pagination, and CSV import. */
 export function VendorsConsole() {
   const { token, authMessage } = useSharedSessionAuth();
-  const pageSize = 6;
 
   const [rows, setRows] = useState<VendorRecord[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusMessage, setStatusMessage] = useState("");
-  const [statusTone, setStatusTone] = useState<StatusTone>("neutral");
-  const [currentPage, setCurrentPage] = useState(1);
+  const { message: statusMessage, tone: statusTone, setNeutral: setNeutralStatus, setSuccess: setSuccessStatus, setError: setErrorStatus } = useStatusMessage();
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("active");
   const [includeCanonical, setIncludeCanonical] = useState(false);
 
@@ -66,10 +70,7 @@ export function VendorsConsole() {
       return true;
     });
   }, [activityFilter, includeCanonical, orderedRows]);
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
-  const currentPageSafe = Math.min(currentPage, totalPages);
-  const pageStartIndex = (currentPageSafe - 1) * pageSize;
-  const pagedRows = filteredRows.slice(pageStartIndex, pageStartIndex + pageSize);
+  const { pageItems: pagedRows, currentPage: currentPageSafe, totalPages, prevPage, nextPage, resetPage, setCurrentPage } = usePagination(filteredRows, 6);
 
   const selectedVendor = useMemo(
     () => rows.find((row) => String(row.id) === selectedId) ?? null,
@@ -80,21 +81,7 @@ export function VendorsConsole() {
   const inactiveCount = rows.length - activeCount;
   const canonicalCount = useMemo(() => rows.filter((row) => row.is_canonical).length, [rows]);
 
-  function setNeutralStatus(message: string) {
-    setStatusTone("neutral");
-    setStatusMessage(message);
-  }
-
-  function setSuccessStatus(message: string) {
-    setStatusTone("success");
-    setStatusMessage(message);
-  }
-
-  function setErrorStatus(message: string) {
-    setStatusTone("error");
-    setStatusMessage(message);
-  }
-
+  /** Reset all vendor form fields to their empty defaults. */
   function clearFormFields() {
     setName("");
     setVendorType("trade");
@@ -105,6 +92,7 @@ export function VendorsConsole() {
     setIsActive(true);
   }
 
+  /** Switch the detail panel to "create new vendor" mode. */
   function startCreateMode() {
     setSelectedId("");
     clearFormFields();
@@ -113,6 +101,7 @@ export function VendorsConsole() {
     setPendingCreatePayload(null);
   }
 
+  /** Populate the form fields from a vendor record. */
   function hydrate(item: VendorRecord) {
     setName(item.name);
     setVendorType(item.vendor_type);
@@ -123,6 +112,7 @@ export function VendorsConsole() {
     setIsActive(item.is_active);
   }
 
+  /** Fetch vendor list from the API, optionally with a search query override. */
   async function loadVendors(queryOverride?: string) {
     if (!token) {
       setErrorStatus("No shared session found. Go to / and login first.");
@@ -143,7 +133,7 @@ export function VendorsConsole() {
       }
       const items = (payload.data as VendorRecord[]) ?? [];
       setRows(items);
-      setCurrentPage(1);
+      resetPage();
       setDuplicateCandidates([]);
       setPendingCreatePayload(null);
       setImportResult(null);
@@ -161,6 +151,7 @@ export function VendorsConsole() {
     }
   }
 
+  /** Select a vendor row and populate the edit form. */
   function handleSelect(id: string) {
     setSelectedId(id);
     const item = rows.find((row) => String(row.id) === id);
@@ -171,6 +162,7 @@ export function VendorsConsole() {
     setDuplicateOverrideOnSave(false);
   }
 
+  /** POST a new vendor. Handles 409 duplicate-detection by surfacing candidates to the user. */
   async function createVendor(
     payloadBody: VendorPayload,
     options?: { duplicate_override?: boolean },
@@ -199,7 +191,7 @@ export function VendorsConsole() {
     const created = payload.data as VendorRecord;
     setRows((current) => {
       const nextRows = [...current, created];
-      setCurrentPage(Math.ceil(nextRows.length / pageSize));
+      setCurrentPage(Math.ceil(nextRows.length / 6));
       return nextRows;
     });
     setSelectedId(String(created.id));
@@ -210,6 +202,7 @@ export function VendorsConsole() {
     setSuccessStatus(`Created vendor #${created.id}.`);
   }
 
+  /** Retry the pending create with duplicate_override after user confirmation. */
   async function handleCreateAnyway() {
     if (!pendingCreatePayload) {
       setErrorStatus("No duplicate candidate payload to resolve.");
@@ -220,6 +213,7 @@ export function VendorsConsole() {
     await createVendor(pendingCreatePayload, { duplicate_override: true });
   }
 
+  /** Unified form submit handler: creates a new vendor or PATCHes the selected one. */
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const payloadBody: VendorPayload = {
@@ -273,6 +267,7 @@ export function VendorsConsole() {
     }
   }
 
+  /** Run a CSV import (preview or apply) and reload vendors on successful apply. */
   async function runCsvImport(dryRun: boolean) {
     setNeutralStatus(dryRun ? "Previewing vendor CSV import..." : "Applying vendor CSV import...");
     try {
@@ -299,6 +294,7 @@ export function VendorsConsole() {
     }
   }
 
+  // Initial data load once a session token is available
   useEffect(() => {
     if (!token) {
       return;
@@ -307,9 +303,10 @@ export function VendorsConsole() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  // Reset to page 1 when filters change so the user always sees the first matching results
   useEffect(() => {
-    setCurrentPage(1);
-  }, [activityFilter, includeCanonical]);
+    resetPage();
+  }, [activityFilter, includeCanonical, resetPage]);
 
   return (
     <section className={styles.console}>
@@ -468,7 +465,7 @@ export function VendorsConsole() {
                   <button
                     type="button"
                     className={styles.ghostButton}
-                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    onClick={prevPage}
                     disabled={currentPageSafe <= 1}
                   >
                     Prev
@@ -479,7 +476,7 @@ export function VendorsConsole() {
                   <button
                     type="button"
                     className={styles.ghostButton}
-                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                    onClick={nextPage}
                     disabled={currentPageSafe >= totalPages}
                   >
                     Next

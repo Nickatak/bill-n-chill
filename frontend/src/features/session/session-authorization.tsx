@@ -1,6 +1,16 @@
+/**
+ * Session authorization provider and hook.
+ *
+ * Wraps the app in a React context that tracks auth status. On mount
+ * (and when the token changes), it verifies the token against
+ * `GET /auth/me/`. The provider optimistically shows "authorized"
+ * while verification is in flight, and only reverts to "unauthorized"
+ * on a hard 401/403. Transient network errors preserve the authorized
+ * UI to avoid flashing the login screen on brief connectivity blips.
+ */
 "use client";
 
-import { createContext, ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { buildAuthHeaders } from "./auth-headers";
 import {
@@ -33,6 +43,10 @@ type SessionAuthorizationProviderProps = {
   children: ReactNode;
 };
 
+/**
+ * Top-level provider that verifies the session token on mount and
+ * exposes auth state to all descendants via context.
+ */
 export function SessionAuthorizationProvider({ children }: SessionAuthorizationProviderProps) {
   const { token, role, organization, authMessage } = useSharedSessionAuth();
   const [status, setStatus] = useState<AuthorizationStatus>("checking");
@@ -40,13 +54,20 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
   const verifiedTokenRef = useRef("");
   const statusRef = useRef<AuthorizationStatus>(status);
 
+  // Keep statusRef in sync so the token-change effect can read it without triggering re-runs.
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
 
+  // Verify the token against the backend whenever it changes.
   useEffect(() => {
     let cancelled = false;
 
+    /**
+     * Call GET /auth/me/ with the candidate token. On 401/403, clear
+     * the session and mark unauthorized. On transient errors, preserve
+     * the current authorized state to avoid login-screen flicker.
+     */
     async function verifyToken(candidateToken: string) {
       setIsRefreshing(true);
 
@@ -55,9 +76,11 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
           headers: buildAuthHeaders(candidateToken, { organization }),
         });
         await response.json();
+
         if (cancelled) {
           return;
         }
+
         if (!response.ok) {
           if (AUTH_FAILURE_STATUSES.has(response.status)) {
             clearClientSession();
@@ -70,6 +93,7 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
           setStatus("authorized");
           return;
         }
+
         verifiedTokenRef.current = candidateToken;
         setStatus("authorized");
       } catch {
@@ -86,6 +110,7 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
     }
 
     if (!token) {
+      // Check if localStorage has a token that hasn't propagated yet.
       let hasPendingToken = false;
       if (typeof window !== "undefined") {
         const rawSnapshot = window.localStorage.getItem(SESSION_STORAGE_KEY);
@@ -98,12 +123,14 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
           }
         }
       }
+
       if (hasPendingToken) {
         setStatus("checking");
         return () => {
           cancelled = true;
         };
       }
+
       verifiedTokenRef.current = "";
       setIsRefreshing(false);
       setStatus("unauthorized");
@@ -112,6 +139,7 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
       };
     }
 
+    // Skip re-verification if we already verified this exact token.
     if (verifiedTokenRef.current === token) {
       setStatus("authorized");
       return () => {
@@ -119,6 +147,7 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
       };
     }
 
+    // Optimistically show authorized while verification is in flight.
     if (statusRef.current !== "authorized") {
       setStatus("authorized");
     }
@@ -150,6 +179,7 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
   );
 }
 
+/** Consume the session authorization context. Must be used within SessionAuthorizationProvider. */
 export function useSessionAuthorization() {
   const context = useContext(SessionAuthorizationContext);
   if (!context) {

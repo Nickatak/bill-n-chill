@@ -1,3 +1,14 @@
+/**
+ * Document-composer adapter for invoices.
+ *
+ * Bridges the domain-specific invoice data model to the generic
+ * {@link DocumentComposerAdapter} interface so the shared composer UI can
+ * render, create, and update invoices without knowing their schema.
+ *
+ * Also provides converters for the backend policy contract and status
+ * event records into their composer-compatible shapes.
+ */
+
 import {
   ComposerLineDraft,
   ComposerMetaField,
@@ -30,6 +41,10 @@ type InvoiceFormState = {
   lineItems: InvoiceLineInput[];
 };
 
+/**
+ * Convert the backend policy contract (snake_case) to the composer's
+ * status policy shape (camelCase).
+ */
 export function toInvoiceStatusPolicy(contract: InvoicePolicyContract): ComposerStatusPolicy {
   return {
     statuses: contract.statuses,
@@ -41,6 +56,10 @@ export function toInvoiceStatusPolicy(contract: InvoicePolicyContract): Composer
   };
 }
 
+/**
+ * Convert backend status event records to the composer's status event
+ * shape, renaming snake_case fields to camelCase.
+ */
 export function toInvoiceStatusEvents(events: InvoiceStatusEvent[]): ComposerStatusEvent[] {
   return events.map((event) => ({
     id: event.id,
@@ -52,6 +71,13 @@ export function toInvoiceStatusEvents(events: InvoiceStatusEvent[]): ComposerSta
   }));
 }
 
+/**
+ * Build a fully configured document-composer adapter for invoices.
+ *
+ * The adapter tells the composer how to extract IDs, titles, meta fields,
+ * line items, and totals from an invoice, and how to serialize form
+ * state back into create/update API payloads.
+ */
 export function createInvoiceDocumentAdapter(
   statusPolicy: ComposerStatusPolicy,
   statusEvents: InvoiceStatusEvent[],
@@ -59,16 +85,24 @@ export function createInvoiceDocumentAdapter(
   return {
     kind: "invoice",
     statusPolicy,
+
+    // --- Identity & display ---
+
     getDocumentId: (document) => (document ? String(document.id) : null),
     getDocumentTitle: (document) => document?.invoice_number ?? "Draft invoice",
     getDocumentStatus: (document) => document?.status ?? statusPolicy.defaultCreateStatus,
+
     getMetaFields: (document): ComposerMetaField[] => [
       { key: "invoice_no", label: "Invoice #", value: document?.invoice_number ?? "Draft" },
       { key: "issue_date", label: "Issue Date", value: document?.issue_date ?? "Not set" },
       { key: "due_date", label: "Due Date", value: document?.due_date ?? "Not set" },
       { key: "balance_due", label: "Balance Due", value: `$${document?.balance_due ?? "0.00"}` },
     ],
+
     getStatusEvents: () => toInvoiceStatusEvents(statusEvents),
+
+    // --- Form state → composer lines / totals ---
+
     getDraftLines: (form) =>
       form.lineItems.map((line) => ({
         localId: line.localId,
@@ -77,12 +111,16 @@ export function createInvoiceDocumentAdapter(
         unit: line.unit,
         unitPrice: line.unitPrice,
       })),
+
     getTotals: (form) => ({
       subtotal: form.subtotal,
       taxPercent: Number(form.taxPercent || "0"),
       taxAmount: form.taxAmount,
       total: form.totalAmount,
     }),
+
+    // --- Form state → API payloads ---
+
     toCreatePayload: (form) => ({
       issue_date: form.issueDate,
       due_date: form.dueDate,
@@ -98,6 +136,7 @@ export function createInvoiceDocumentAdapter(
         unit_price: line.unitPrice,
       })),
     }),
+
     toUpdatePayload: (form) => ({
       issue_date: form.issueDate,
       due_date: form.dueDate,

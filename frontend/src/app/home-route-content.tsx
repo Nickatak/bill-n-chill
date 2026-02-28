@@ -1,5 +1,6 @@
 "use client";
 
+import type { HealthResult } from "@/shared/api/health";
 import { QuickAddConsole } from "@/features/intake";
 import { HomeAuthConsole } from "@/features/session/components/home-auth-console";
 import { useSessionAuthorization } from "@/features/session/session-authorization";
@@ -7,13 +8,7 @@ import homeStyles from "./page.module.css";
 import quickAddStyles from "./intake/quick-add/page.module.css";
 
 type HomeRouteContentProps = {
-  health: {
-    ok: boolean;
-    message: string;
-    appRevision?: string;
-    appBuildAt?: string;
-    dataResetAt?: string;
-  };
+  health: HealthResult;
 };
 
 export function HomeRouteContent({ health }: HomeRouteContentProps) {

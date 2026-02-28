@@ -1,3 +1,14 @@
+/**
+ * Document-composer adapter for change orders.
+ *
+ * Bridges the domain-specific change-order data model to the generic
+ * {@link DocumentComposerAdapter} interface so the shared composer UI can
+ * render, create, and update change orders without knowing their schema.
+ *
+ * Also provides converters for the backend policy contract and status
+ * event records into their composer-compatible shapes.
+ */
+
 import {
   ComposerLineDraft,
   ComposerMetaField,
@@ -37,6 +48,10 @@ type ChangeOrderFormState = {
   lineItems: ChangeOrderLineInput[];
 };
 
+/**
+ * Convert the backend policy contract (snake_case) to the composer's
+ * status policy shape (camelCase).
+ */
 export function toChangeOrderStatusPolicy(
   contract: ChangeOrderPolicyContract,
 ): ComposerStatusPolicy {
@@ -50,6 +65,10 @@ export function toChangeOrderStatusPolicy(
   };
 }
 
+/**
+ * Convert backend status event records to the composer's status event
+ * shape, renaming snake_case fields to camelCase.
+ */
 export function toChangeOrderStatusEvents(
   events: ChangeOrderStatusEvent[],
 ): ComposerStatusEvent[] {
@@ -63,6 +82,13 @@ export function toChangeOrderStatusEvents(
   }));
 }
 
+/**
+ * Build a fully configured document-composer adapter for change orders.
+ *
+ * The adapter tells the composer how to extract IDs, titles, meta fields,
+ * line items, and totals from a change order, and how to serialize form
+ * state back into create/update API payloads.
+ */
 export function createChangeOrderDocumentAdapter(
   statusPolicy: ComposerStatusPolicy,
   statusEvents: ChangeOrderStatusEvent[],
@@ -70,9 +96,13 @@ export function createChangeOrderDocumentAdapter(
   return {
     kind: "change_order",
     statusPolicy,
+
+    // --- Identity & display ---
+
     getDocumentId: (document) => (document ? String(document.id) : null),
     getDocumentTitle: (document) => document?.title ?? "Untitled change order",
     getDocumentStatus: (document) => document?.status ?? statusPolicy.defaultCreateStatus,
+
     getMetaFields: (document): ComposerMetaField[] => [
       { key: "co_id", label: "Change Order #", value: document ? `CO-${document.id}` : "Draft" },
       {
@@ -91,7 +121,11 @@ export function createChangeOrderDocumentAdapter(
         value: document?.line_total_delta ? `$${document.line_total_delta}` : "$0.00",
       },
     ],
+
     getStatusEvents: () => toChangeOrderStatusEvents(statusEvents),
+
+    // --- Form state → composer lines / totals ---
+
     getDraftLines: (form) =>
       form.lineItems.map((line) => ({
         localId: line.localId,
@@ -102,6 +136,7 @@ export function createChangeOrderDocumentAdapter(
         amountDelta: line.amountDelta,
         daysDelta: line.daysDelta,
       })),
+
     getTotals: (form) => ({
       subtotal: Number(form.amountDelta || "0"),
       total: Number(form.amountDelta || "0"),
@@ -109,6 +144,9 @@ export function createChangeOrderDocumentAdapter(
         days_delta: Number(form.daysDelta || "0"),
       },
     }),
+
+    // --- Form state → API payloads ---
+
     toCreatePayload: (form) => ({
       title: form.title,
       reason: form.reason,
@@ -123,6 +161,7 @@ export function createChangeOrderDocumentAdapter(
         days_delta: Number(line.daysDelta || "0"),
       })),
     }),
+
     toUpdatePayload: (form) => ({
       title: form.title,
       reason: form.reason,

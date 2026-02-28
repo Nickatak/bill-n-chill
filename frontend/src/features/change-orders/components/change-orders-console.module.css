@@ -2,9 +2,9 @@
   display: grid;
   gap: 14px;
   border: 1px solid #cdd9ea;
-  border-radius: 16px;
-  padding: 16px;
-  margin-bottom: 12px;
+  border-radius: var(--radius-xl);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-md);
   background:
     radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 42%),
     linear-gradient(180deg, #f8fbff 0%, #f2f6fc 100%);
@@ -21,29 +21,29 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   font-weight: 700;
-  color: #1d4ed8;
+  color: var(--accent);
 }
 
 .consoleHeading {
   margin: 0;
-  color: #0f172a;
-  font-size: 1.1rem;
+  color: var(--text-primary);
+  font-size: var(--font-lg);
 }
 
 .consoleCopy {
   margin: 0;
-  color: #475569;
-  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-size: var(--font-base);
   max-width: 68ch;
 }
 
 .primaryCreateButton {
-  border: 1px solid #1e3a8a;
+  border: 1px solid var(--accent-text);
   border-radius: 10px;
-  background: linear-gradient(135deg, #1d4ed8, #1e40af);
-  color: #eff6ff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: var(--text-on-accent);
   padding: 8px 13px;
-  font-size: 0.82rem;
+  font-size: var(--font-sm);
   font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
@@ -60,7 +60,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-md);
   margin: 2px 0 10px;
 }
 
@@ -69,7 +69,7 @@
   align-items: center;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .toolbarFeedbackMessage {
@@ -81,12 +81,12 @@
 .formContext {
   display: grid;
   gap: 2px;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .formContextLabel {
-  color: #64748b;
-  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-size: var(--font-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
@@ -95,20 +95,20 @@
 .formContextValueRow {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
 }
 
 .formContextHint {
   margin: 0;
-  color: #475569;
-  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
 }
 
 .editStatusBadge {
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid transparent;
   padding: 2px 8px;
   font-size: 0.66rem;
@@ -120,53 +120,36 @@
 }
 
 .editStatusDraft {
-  background: #dbeafe;
-  border-color: #93c5fd;
-  color: #1e3a8a;
+  composes: draft from '../../../shared/styles/status.module.css';
 }
 
 .editStatusPendingApproval {
-  background: #fef3c7;
-  border-color: #fcd34d;
-  color: #92400e;
+  composes: pendingApproval from '../../../shared/styles/status.module.css';
 }
 
 .editStatusApproved {
-  background: #dcfce7;
-  border-color: #86efac;
-  color: #166534;
+  composes: approved from '../../../shared/styles/status.module.css';
 }
 
 .editStatusRejected {
-  background: #fee2e2;
-  border-color: #fca5a5;
-  color: #991b1b;
+  composes: rejected from '../../../shared/styles/status.module.css';
 }
 
 .editStatusVoid {
-  background: #e2e8f0;
-  border-color: #cbd5e1;
-  color: #334155;
+  composes: void from '../../../shared/styles/status.module.css';
 }
 
 .roleReadOnlyNote {
+  composes: noticeWarning from '../../../shared/styles/notices.module.css';
   margin: 0 0 12px;
-  border: 1px solid #fcd34d;
-  border-radius: 10px;
-  background: #fffbeb;
-  color: #92400e;
-  padding: 9px 11px;
-  font-size: 0.88rem;
 }
 
 .viewer {
   margin: 16px 0;
-  border: 1px solid #d3deed;
+  border: 1px solid var(--border);
   border-radius: 14px;
   padding: 14px;
-  background:
-    radial-gradient(circle at 0% 0%, rgba(30, 64, 175, 0.08), transparent 28%),
-    #f8fafd;
+  background: var(--surface-secondary);
 }
 
 .viewerHeader h3 {
@@ -182,26 +165,26 @@
 
 .viewerHeader p {
   margin: 8px 0 10px;
-  color: #475569;
+  color: var(--text-secondary);
   font-size: 0.88rem;
 }
 
 .viewerGrid {
   display: grid;
-  gap: 12px;
+  gap: var(--space-md);
   align-items: start;
 }
 
 .viewerRail {
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
   align-content: start;
   grid-auto-rows: min-content;
 }
 
 .viewerRailEntry {
   display: grid;
-  gap: 4px;
+  gap: var(--space-xs);
   position: relative;
 }
 
@@ -216,19 +199,19 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   font-weight: 700;
-  color: #1e3a8a;
+  color: var(--accent-text);
 }
 
 .viewerRailSubheading {
   font-size: 0.78rem;
-  color: #475569;
+  color: var(--text-secondary);
   line-height: 1.35;
 }
 
 .viewerRailItem {
   border: 1px solid #c8d7eb;
-  border-radius: 12px;
-  background: #ffffff;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
   padding: 9px 10px 34px;
   text-align: left;
   display: grid;
@@ -245,27 +228,27 @@
 }
 
 .viewerRailItemActive {
-  border-color: #2563eb;
+  border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
-  background: #f8fbff;
+  background: var(--accent-lighter);
 }
 
 .viewerRailTitle {
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-primary);
   line-height: 1.25;
 }
 
 .viewerRailVersion {
   margin-left: 6px;
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.78rem;
   font-weight: 600;
 }
 
 .viewerRailSubtext {
   font-size: 0.8rem;
-  color: #475569;
+  color: var(--text-secondary);
   line-height: 1.35;
 }
 
@@ -273,7 +256,7 @@
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid transparent;
   padding: 2px 8px;
   font-size: 0.64rem;
@@ -283,34 +266,34 @@
 }
 
 .viewerBaselineBadgeActive {
-  background: #dcfce7;
-  border-color: #86efac;
-  color: #166534;
+  background: var(--status-approved-bg);
+  border-color: var(--status-approved-border);
+  color: var(--status-approved-text);
 }
 
 .viewerBaselineBadgeSuperseded {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-  color: #475569;
+  background: var(--surface-inset);
+  border-color: var(--border);
+  color: var(--text-secondary);
 }
 
 .viewerRailMetrics {
   font-size: 0.76rem;
-  color: #334155;
+  color: var(--status-void-text);
   line-height: 1.35;
   font-weight: 600;
 }
 
 .viewerMetricCurrent {
-  color: #166534;
+  color: var(--status-approved-text);
 }
 
 .viewerMetricOriginal {
-  color: #1e40af;
+  color: var(--accent-hover);
 }
 
 .viewerMetricDelta {
-  color: #92400e;
+  color: var(--status-sent-text);
 }
 
 .viewerCardLink {
@@ -322,14 +305,14 @@
   gap: 4px;
   height: 22px;
   padding: 0 8px;
-  border: 1px solid #93c5fd;
-  border-radius: 6px;
-  background: #dbeafe;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  background: var(--accent-light);
   font-size: 0.68rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   font-weight: 700;
-  color: #1e40af;
+  color: var(--accent-hover);
   text-decoration: none;
   z-index: 2;
   transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
@@ -345,9 +328,9 @@
 
 .viewerDetail {
   border: 1px solid #c9d8ec;
-  border-radius: 12px;
-  background: #ffffff;
-  padding: 12px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: var(--space-md);
   display: grid;
   gap: 9px;
   align-content: start;
@@ -358,7 +341,7 @@
   font-size: 0.8rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #1e3a8a;
+  color: var(--accent-text);
   font-weight: 700;
 }
 
@@ -370,8 +353,8 @@
 }
 
 .viewerMetaLabel {
-  color: #475569;
-  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
   text-transform: uppercase;
   letter-spacing: 0.07em;
   font-weight: 700;
@@ -380,7 +363,7 @@
 .viewerHint {
   margin: 0;
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .viewerBaselineHint {
@@ -394,22 +377,22 @@
 }
 
 .viewerBaselineHintActive {
-  background: #ecfdf5;
-  border-color: #86efac;
-  color: #166534;
+  background: var(--tone-success-bg);
+  border-color: var(--status-approved-border);
+  color: var(--status-approved-text);
 }
 
 .viewerBaselineHintWarning {
-  background: #fffbeb;
-  border-color: #fcd34d;
-  color: #92400e;
+  background: var(--tone-warning-bg);
+  border-color: var(--status-sent-border);
+  color: var(--status-sent-text);
 }
 
 .viewerHistoryRail {
-  padding: 8px;
+  padding: var(--space-sm);
   border: 1px solid #d6e1ef;
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--surface-secondary);
 }
 
 .viewerHistoryCardWrap {
@@ -424,10 +407,10 @@
   right: 8px;
   height: 24px;
   padding: 0 8px;
-  border: 1px solid #93c5fd;
-  border-radius: 6px;
-  background: #dbeafe;
-  color: #1e40af;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  background: var(--accent-light);
+  color: var(--accent-hover);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -453,47 +436,47 @@
 
 .viewerHistoryItem {
   border-color: #d5dce8;
-  background: #ffffff;
+  background: var(--surface);
   width: 100%;
   padding-right: 68px;
 }
 
 .viewerHistoryDraft {
-  border-color: #93c5fd;
-  background: linear-gradient(180deg, rgba(219, 234, 254, 0.5), #ffffff);
+  border-color: var(--status-draft-border);
+  background: linear-gradient(180deg, rgba(219, 234, 254, 0.5), var(--surface));
 }
 
 .viewerHistoryPendingApproval {
-  border-color: #fcd34d;
-  background: linear-gradient(180deg, rgba(254, 243, 199, 0.52), #ffffff);
+  border-color: var(--status-sent-border);
+  background: linear-gradient(180deg, rgba(254, 243, 199, 0.52), var(--surface));
 }
 
 .viewerHistoryApproved {
-  border-color: #86efac;
-  background: linear-gradient(180deg, rgba(220, 252, 231, 0.56), #ffffff);
+  border-color: var(--status-approved-border);
+  background: linear-gradient(180deg, rgba(220, 252, 231, 0.56), var(--surface));
 }
 
 .viewerHistoryRejected {
-  border-color: #fca5a5;
-  background: linear-gradient(180deg, rgba(254, 226, 226, 0.56), #ffffff);
+  border-color: var(--status-rejected-border);
+  background: linear-gradient(180deg, rgba(254, 226, 226, 0.56), var(--surface));
 }
 
 .viewerHistoryVoid {
-  border-color: #cbd5e1;
-  background: linear-gradient(180deg, rgba(226, 232, 240, 0.56), #ffffff);
+  border-color: var(--status-void-border);
+  background: linear-gradient(180deg, rgba(226, 232, 240, 0.56), var(--surface));
 }
 
 .viewerHistoryStatusText {
-  font-size: 0.72rem;
+  font-size: var(--font-xs);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   font-weight: 700;
-  color: #334155;
+  color: var(--status-void-text);
 }
 
 .viewerHistoryMetaText {
   font-size: 0.76rem;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .viewerHistoryLineDelta {
@@ -502,26 +485,26 @@
   width: fit-content;
   border-radius: 7px;
   padding: 2px 8px;
-  border: 1px solid #cbd5e1;
-  background: #f8fafc;
+  border: 1px solid var(--border);
+  background: var(--surface-secondary);
   font-weight: 700;
-  color: #334155;
+  color: var(--status-void-text);
 }
 
 .viewerHistoryLineDeltaApproved {
   font-size: 0.96rem;
   letter-spacing: 0.02em;
   border-color: #16a34a;
-  background: #dcfce7;
-  color: #166534;
+  background: var(--status-approved-bg);
+  color: var(--status-approved-text);
   box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.25);
 }
 
 .viewerHistoryItemActive {
-  border-color: #1d4ed8;
+  border-color: var(--accent);
   background:
     linear-gradient(180deg, rgba(219, 234, 254, 0.82), rgba(219, 234, 254, 0.45)),
-    #ffffff;
+    var(--surface);
   box-shadow:
     0 0 0 2px rgba(37, 99, 235, 0.22),
     inset 3px 0 0 #2563eb;
@@ -530,7 +513,7 @@
 .quickStatusPanel {
   margin-top: 2px;
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .viewerStatusActionRow {
@@ -538,10 +521,10 @@
 }
 
 .viewerStatusActionButton {
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   padding: 8px 12px;
-  font-size: 0.82rem;
+  font-size: var(--font-sm);
   font-weight: 700;
   letter-spacing: 0.01em;
   cursor: pointer;
@@ -555,15 +538,15 @@
 }
 
 .viewerStatusActionButtonPrimary {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
-  color: #eff6ff;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
 }
 
 .viewerStatusActionButtonSecondary {
-  background: #e2e8f0;
-  border-color: #cbd5e1;
-  color: #334155;
+  background: var(--border);
+  border-color: var(--border);
+  color: var(--status-void-text);
 }
 
 .viewerStatusActionButton:not(:disabled):hover,
@@ -582,7 +565,7 @@
 .quickStatusButton {
   appearance: none;
   -webkit-appearance: none;
-  border: 1px solid #cbd5f5;
+  border: 1px solid var(--border-accent);
   border-radius: 10px;
   width: 100%;
   min-height: 52px;
@@ -598,7 +581,7 @@
 
 .quickStatusButtonInactive {
   background: #1e293b;
-  border-color: #334155;
+  border-color: var(--status-void-text);
   color: #bfdbfe;
 }
 
@@ -615,8 +598,8 @@
 
 .quickStatusButtonActive.quickStatusDraft {
   background: #2563eb;
-  border-color: #1d4ed8;
-  color: #eff6ff;
+  border-color: var(--accent);
+  color: var(--accent-lighter);
 }
 
 .quickStatusButtonActive.quickStatusPendingApproval {
@@ -634,7 +617,7 @@
 .quickStatusButtonActive.quickStatusRejected {
   background: #dc2626;
   border-color: #b91c1c;
-  color: #fee2e2;
+  color: var(--status-rejected-bg);
 }
 
 .quickStatusButtonActive.quickStatusVoid {
@@ -645,10 +628,10 @@
 
 .cloneRevisionButton {
   width: fit-content;
-  border: 1px solid #1d4ed8;
+  border: 1px solid var(--accent);
   border-radius: 10px;
-  background: #eff6ff;
-  color: #1e40af;
+  background: var(--accent-lighter);
+  color: var(--accent-hover);
   padding: 7px 11px;
   font-size: 0.84rem;
   font-weight: 700;
@@ -663,19 +646,19 @@
 .reconcilePill {
   margin: 4px 0 0;
   font-size: 0.78rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 4px 9px;
   width: fit-content;
 }
 
 .reconcileGood {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--status-approved-bg);
+  color: var(--status-approved-text);
 }
 
 .reconcileBad {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--status-rejected-bg);
+  color: var(--status-rejected-text);
 }
 
 .lineTableWrap {
@@ -693,9 +676,9 @@
 .lineTableCaption {
   caption-side: top;
   text-align: left;
-  padding: 8px;
+  padding: var(--space-sm);
   font-size: 0.8rem;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .lineTable th {
@@ -703,15 +686,15 @@
   font-size: 0.69rem;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: #1e3a8a;
-  background: #eff6ff;
-  padding: 8px;
+  color: var(--table-header-text);
+  background: var(--table-header-bg);
+  padding: var(--space-sm);
 }
 
 .lineTable td {
-  padding: 8px;
-  border-top: 1px solid #e2e8f0;
-  color: #0f172a;
+  padding: var(--space-sm);
+  border-top: 1px solid var(--table-border);
+  color: var(--text-primary);
   font-size: 0.86rem;
 }
 
@@ -723,19 +706,19 @@
 .viewerEventList {
   list-style: none;
   margin: 0;
-  padding: 8px;
+  padding: var(--space-sm);
   border: 1px solid #d7e2f1;
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--surface-secondary);
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .viewerEventItem {
   display: grid;
   gap: 2px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border);
 }
 
 .viewerEventItem:last-child {
@@ -745,7 +728,7 @@
 
 .viewerEventAction {
   width: fit-content;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 2px 8px;
   font-size: 0.68rem;
   letter-spacing: 0.1em;
@@ -754,8 +737,8 @@
 }
 
 .statusEventCreated {
-  background: #dbeafe;
-  color: #1e40af;
+  background: var(--accent-light);
+  color: var(--accent-hover);
 }
 
 .statusEventResent {
@@ -769,13 +752,13 @@
 }
 
 .statusEventApproved {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--status-approved-bg);
+  color: var(--status-approved-text);
 }
 
 .statusEventRejected {
   background: #fecaca;
-  color: #991b1b;
+  color: var(--status-rejected-text);
 }
 
 .statusEventVoid {
@@ -784,22 +767,22 @@
 }
 
 .statusEventReturnedDraft {
-  background: #dbeafe;
-  color: #1e40af;
+  background: var(--accent-light);
+  color: var(--accent-hover);
 }
 
 .statusEventNeutral {
-  background: #e2e8f0;
-  color: #334155;
+  background: var(--status-void-bg);
+  color: var(--status-void-text);
 }
 
 .viewerEventMeta {
   font-size: 0.76rem;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .eventActorLink {
-  color: #1d4ed8;
+  color: var(--accent);
   text-decoration: none;
   font-weight: 600;
 }
@@ -811,17 +794,17 @@
 
 .viewerEventNote {
   font-size: 0.76rem;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .workflowSheet {
   margin: 14px 0;
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
 }
 
 .changeOrderComposerSection {
   display: grid;
-  gap: 16px;
+  gap: var(--space-lg);
   min-width: 0;
 }
 
@@ -840,20 +823,20 @@
 }
 
 .editSheetLocked .lockableControl:disabled {
-  background: #e2e8f0;
-  border-color: #cbd5e1;
-  color: #64748b;
+  background: var(--input-disabled-bg);
+  border-color: var(--input-disabled-border);
+  color: var(--input-disabled-text);
   cursor: not-allowed;
 }
 
 .editSheetLocked .lockableControl:disabled::placeholder {
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .editSheetLocked .coReadValue {
-  background: #e2e8f0;
-  border-color: #cbd5e1;
-  color: #64748b;
+  background: var(--input-disabled-bg);
+  border-color: var(--input-disabled-border);
+  color: var(--input-disabled-text);
 }
 
 .coMetaField {
@@ -878,29 +861,29 @@
 
 .coLineSectionIntro h3 {
   margin: 0;
-  font-size: 0.9rem;
-  color: #0f172a;
+  font-size: var(--font-base);
+  color: var(--text-primary);
 }
 
 .coLineSectionIntro p {
   margin: 0;
   font-size: 0.83rem;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .coLineLegend {
   font-size: 0.79rem;
-  color: #334155;
+  color: var(--status-void-text);
 }
 
 .coLineHeader {
   display: grid;
   grid-template-columns: 0.85fr 1.2fr 1.2fr 1.45fr 1fr 0.9fr 0.9fr 0.7fr;
-  gap: 8px;
+  gap: var(--space-sm);
   align-items: center;
   padding: 10px;
-  background: #eef2ff;
-  color: #1e3a8a;
+  background: var(--table-header-bg);
+  color: var(--table-header-text);
   font-size: 0.69rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -910,10 +893,10 @@
 .coLineRow {
   display: grid;
   grid-template-columns: 0.85fr 1.2fr 1.2fr 1.45fr 1fr 0.9fr 0.9fr 0.7fr;
-  gap: 8px;
+  gap: var(--space-sm);
   align-items: center;
   padding: 9px 10px;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .coLineHeader > span,
@@ -936,7 +919,7 @@
 .coLineIssue {
   margin: 0;
   padding: 0 10px 9px;
-  color: #991b1b;
+  color: var(--status-rejected-text);
   font-size: 0.78rem;
   line-height: 1.4;
   background: #fff7f7;
@@ -946,11 +929,11 @@
   display: inline-flex;
   align-items: center;
   min-height: 36px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   padding: 6px 8px;
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--surface-secondary);
+  color: var(--text-primary);
   font-size: 0.84rem;
   font-variant-numeric: tabular-nums;
 }
@@ -987,9 +970,9 @@
 }
 
 .coSummarySecondaryValue {
-  font-size: 0.82rem;
+  font-size: var(--font-sm);
   font-variant-numeric: tabular-nums;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .coSheetFooterActions {
@@ -1007,7 +990,7 @@
   width: 100%;
   justify-content: flex-end;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
 }
 
@@ -1018,7 +1001,7 @@
 }
 
 .coFooterErrorHint {
-  color: #991b1b;
+  color: var(--tone-error-text);
 }
 
 .coSheetFooter button.coFooterSecondaryButton,
@@ -1027,7 +1010,7 @@
   min-width: 150px;
   min-height: 0;
   padding: 8px 12px;
-  font-size: 0.9rem;
+  font-size: var(--font-base);
   font-weight: 700;
   line-height: 1.2;
   display: inline-flex;
@@ -1044,9 +1027,9 @@
 }
 
 .coSheetFooter button.coFooterPrimaryButton:disabled {
-  background: #94a3b8;
-  border-color: #94a3b8;
-  color: #e2e8f0;
+  background: var(--text-muted);
+  border-color: var(--text-muted);
+  color: var(--border);
   cursor: not-allowed;
   box-shadow: none;
   opacity: 0.85;
@@ -1089,7 +1072,7 @@
 
 @media (max-width: 640px) {
   .consoleTop {
-    padding: 12px;
+    padding: var(--space-md);
   }
 
   .consoleHeading {
@@ -1130,7 +1113,7 @@
 
   .quickStatusPills {
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: var(--space-sm);
   }
 
   .quickStatusButton {
@@ -1145,487 +1128,6 @@
 
   .viewerEventMeta,
   .viewerEventNote {
-    font-size: 0.72rem;
+    font-size: var(--font-xs);
   }
-}
-
-:global(html[data-theme="dark"]) .consoleTop {
-  border-color: #334155;
-  background:
-    radial-gradient(circle at top right, rgba(96, 165, 250, 0.22), transparent 42%),
-    linear-gradient(180deg, #0f172a 0%, #111827 100%);
-}
-
-:global(html[data-theme="dark"]) .consoleEyebrow {
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .consoleHeading {
-  color: #f8fafc;
-}
-
-:global(html[data-theme="dark"]) .consoleCopy {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .primaryCreateButton {
-  border-color: #3b82f6;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .formContext {
-  color: #f8fafc;
-}
-
-:global(html[data-theme="dark"]) .formContextLabel {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .formContextHint {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .roleReadOnlyNote {
-  border-color: #92400e;
-  background: #451a03;
-  color: #fcd34d;
-}
-
-:global(html[data-theme="dark"]) .viewer {
-  background:
-    radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.22), transparent 28%),
-    #0f172a;
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .viewerHeader p {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .viewerRailItem,
-:global(html[data-theme="dark"]) .viewerDetail {
-  background: #111827;
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .viewerSectionHeading {
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .viewerRailItem:hover {
-  border-color: #3b82f6;
-  box-shadow: 0 8px 16px rgba(2, 6, 23, 0.5);
-}
-
-:global(html[data-theme="dark"]) .viewerRailItemActive {
-  border-color: #60a5fa;
-  background: #0b1220;
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
-}
-
-:global(html[data-theme="dark"]) .viewerRailTitle {
-  color: #f8fafc;
-}
-
-:global(html[data-theme="dark"]) .viewerRailHeading {
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .viewerRailSubheading {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .viewerRailVersion {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .viewerRailSubtext {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .viewerBaselineBadgeActive {
-  background: #14532d;
-  border-color: #22c55e;
-  color: #bbf7d0;
-}
-
-:global(html[data-theme="dark"]) .viewerBaselineBadgeSuperseded {
-  background: #1e293b;
-  border-color: #334155;
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .viewerRailMetrics {
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .viewerMetricCurrent {
-  color: #86efac;
-}
-
-:global(html[data-theme="dark"]) .viewerMetricOriginal {
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .viewerMetricDelta {
-  color: #fcd34d;
-}
-
-:global(html[data-theme="dark"]) .viewerCardLink {
-  border-color: #1d4ed8;
-  background: #1e3a8a;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .viewerCardLink:hover,
-:global(html[data-theme="dark"]) .viewerCardLink:focus-visible {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.42);
-}
-
-:global(html[data-theme="dark"]) .viewerStatusActionButton {
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .viewerStatusActionButtonPrimary {
-  background: #2563eb;
-  border-color: #3b82f6;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .viewerStatusActionButtonSecondary {
-  background: #1f2937;
-  border-color: #334155;
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .viewerHistoryRail {
-  background: #0b1220;
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .viewerHistoryPublicLink {
-  border-color: #1d4ed8;
-  background: #1e3a8a;
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .viewerHistoryPublicLink:hover,
-:global(html[data-theme="dark"]) .viewerHistoryPublicLink:focus-visible {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.4);
-  background: #1d4ed8;
-}
-
-:global(html[data-theme="dark"]) .viewerHistoryItem {
-  border-color: #475569;
-}
-
-:global(html[data-theme="dark"]) .viewerHistoryItemActive {
-  border-color: #60a5fa;
-  background:
-    linear-gradient(180deg, rgba(30, 58, 138, 0.38), rgba(30, 58, 138, 0.14)),
-    #0b1220;
-  box-shadow:
-    0 0 0 2px rgba(96, 165, 250, 0.26),
-    inset 3px 0 0 #60a5fa;
-}
-
-:global(html[data-theme="dark"]) .viewerMetaLabel {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .viewerHint {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .viewerBaselineHintActive {
-  background: #14532d;
-  border-color: #22c55e;
-  color: #dcfce7;
-}
-
-:global(html[data-theme="dark"]) .viewerBaselineHintWarning {
-  background: #451a03;
-  border-color: #92400e;
-  color: #fcd34d;
-}
-
-:global(html[data-theme="dark"]) .editStatusDraft {
-  background: #1d4ed8;
-  border-color: #60a5fa;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .editStatusPendingApproval {
-  background: #b45309;
-  border-color: #f59e0b;
-  color: #fef3c7;
-}
-
-:global(html[data-theme="dark"]) .editStatusApproved {
-  background: #15803d;
-  border-color: #22c55e;
-  color: #dcfce7;
-}
-
-:global(html[data-theme="dark"]) .editStatusRejected {
-  background: #991b1b;
-  border-color: #ef4444;
-  color: #fee2e2;
-}
-
-:global(html[data-theme="dark"]) .editStatusVoid {
-  background: #4b5563;
-  border-color: #9ca3af;
-  color: #f3f4f6;
-}
-
-:global(html[data-theme="dark"]) .viewerHistoryDraft {
-  border-color: #3b82f6;
-  background: linear-gradient(180deg, rgba(29, 78, 216, 0.24), #0b1220);
-}
-
-:global(html[data-theme="dark"]) .viewerHistoryPendingApproval {
-  border-color: #f59e0b;
-  background: linear-gradient(180deg, rgba(180, 83, 9, 0.24), #0b1220);
-}
-
-:global(html[data-theme="dark"]) .viewerHistoryApproved {
-  border-color: #22c55e;
-  background: linear-gradient(180deg, rgba(21, 128, 61, 0.24), #0b1220);
-}
-
-:global(html[data-theme="dark"]) .viewerHistoryRejected {
-  border-color: #ef4444;
-  background: linear-gradient(180deg, rgba(153, 27, 27, 0.24), #0b1220);
-}
-
-:global(html[data-theme="dark"]) .viewerHistoryVoid {
-  border-color: #64748b;
-  background: linear-gradient(180deg, rgba(51, 65, 85, 0.3), #0b1220);
-}
-
-:global(html[data-theme="dark"]) .viewerHistoryStatusText {
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .viewerHistoryMetaText {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .viewerHistoryLineDelta {
-  border-color: #334155;
-  background: #111827;
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .viewerHistoryLineDeltaApproved {
-  border-color: #22c55e;
-  background: #14532d;
-  color: #dcfce7;
-  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.32);
-}
-
-:global(html[data-theme="dark"]) .viewerEventList {
-  border-color: #334155;
-  background: #0b1220;
-}
-
-:global(html[data-theme="dark"]) .viewerEventItem {
-  border-bottom-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .viewerEventMeta {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .eventActorLink {
-  color: #93c5fd;
-}
-
-:global(html[data-theme="dark"]) .viewerEventNote {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .statusEventNeutral {
-  background: #334155;
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .statusEventSent {
-  background: #a16207;
-  color: #fef3c7;
-}
-
-:global(html[data-theme="dark"]) .statusEventResent {
-  background: #a16207;
-  color: #fef3c7;
-}
-
-:global(html[data-theme="dark"]) .statusEventRejected {
-  background: #7f1d1d;
-  color: #fecaca;
-}
-
-:global(html[data-theme="dark"]) .coSheetFooter button.coFooterPrimaryButton:disabled {
-  background: #334155;
-  border-color: #475569;
-  color: #94a3b8;
-  opacity: 1;
-}
-
-:global(html[data-theme="dark"]) .coLineSectionIntro h3 {
-  color: #f8fafc;
-}
-
-:global(html[data-theme="dark"]) .coLineSectionIntro p {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .coLineLegend {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .quickStatusPanel {
-  margin-top: 2px;
-}
-
-:global(html[data-theme="dark"]) .quickStatusButton {
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .quickStatusButtonInactive {
-  background: #0b1220;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .quickStatusButtonActive.quickStatusDraft {
-  background: #1d4ed8;
-  border-color: #3b82f6;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .quickStatusButtonActive.quickStatusPendingApproval {
-  background: #b45309;
-  border-color: #f59e0b;
-  color: #fef3c7;
-}
-
-:global(html[data-theme="dark"]) .quickStatusButtonActive.quickStatusApproved {
-  background: #15803d;
-  border-color: #22c55e;
-  color: #dcfce7;
-}
-
-:global(html[data-theme="dark"]) .quickStatusButtonActive.quickStatusRejected {
-  background: #991b1b;
-  border-color: #ef4444;
-  color: #fee2e2;
-}
-
-:global(html[data-theme="dark"]) .quickStatusButtonActive.quickStatusVoid {
-  background: #4b5563;
-  border-color: #9ca3af;
-  color: #f3f4f6;
-}
-
-:global(html[data-theme="dark"]) .cloneRevisionButton {
-  border-color: #3b82f6;
-  background: #0b1220;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .lineTableWrap {
-  border-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .lineTable th {
-  background: #1e293b;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .lineTable td {
-  color: #e2e8f0;
-  border-top-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .lineTableCaption {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .coLineRowGroup {
-  border-top-color: #334155;
-}
-
-:global(html[data-theme="dark"]) .coLineRowAlt {
-  background: #1a2334;
-}
-
-:global(html[data-theme="dark"]) .coLineRowInvalid {
-  border-left-color: #f87171;
-}
-
-:global(html[data-theme="dark"]) .coLineIssue {
-  background: #2a1216;
-  color: #fecaca;
-}
-
-:global(html[data-theme="dark"]) .createSheet,
-:global(html[data-theme="dark"]) .editSheet {
-  border-color: #334155;
-  box-shadow: 0 14px 26px rgba(2, 6, 23, 0.35);
-}
-
-:global(html[data-theme="dark"]) .editSheetLocked .lockableControl:disabled {
-  background: #0f172a;
-  border-color: #334155;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .editSheetLocked .lockableControl:disabled::placeholder {
-  color: #64748b;
-}
-
-:global(html[data-theme="dark"]) .editSheetLocked .coReadValue {
-  background: #0f172a;
-  border-color: #334155;
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .coFooterErrorHint {
-  color: #fecaca;
-}
-
-:global(html[data-theme="dark"]) .coLineHeader {
-  background: #1e293b;
-  color: #bfdbfe;
-}
-
-:global(html[data-theme="dark"]) .coLineRow {
-  background: #0f172a;
-}
-
-:global(html[data-theme="dark"]) .coLineRowAlt {
-  background: #131d31;
-}
-
-:global(html[data-theme="dark"]) .coReadValue {
-  background: #0b1220;
-  border-color: #334155;
-  color: #dbeafe;
-}
-
-:global(html[data-theme="dark"]) .coSummarySecondaryValue {
-  color: #94a3b8;
-}
-
-:global(html[data-theme="dark"]) .reconcileGood {
-  background: #14532d;
-  color: #dcfce7;
-}
-
-:global(html[data-theme="dark"]) .reconcileBad {
-  background: #7f1d1d;
-  color: #fee2e2;
 }

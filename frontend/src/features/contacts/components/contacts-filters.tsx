@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Filter controls for the customer list: free-text search, project ownership toggle,
+ * and archived-customer visibility toggle. Fully controlled by the parent console.
+ */
+
 import styles from "./contacts-console.module.css";
 
 type ActivityFilter = "all" | "active";
@@ -14,6 +19,7 @@ type ContactsFiltersProps = {
   onProjectFilterChange: (value: ProjectFilter) => void;
 };
 
+/** Renders search input and toggle switches for project and activity filters. */
 export function ContactsFilters({
   query,
   onQueryChange,
@@ -27,14 +33,19 @@ export function ContactsFilters({
 
   return (
     <div className={styles.controlsRow}>
+      {/* Free-text search */}
+
       <label className={styles.controlLabel}>
-        Search
+        <span>Search</span>
         <input
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder="Name, phone, email, or address"
         />
       </label>
+
+      {/* Project ownership toggle */}
+
       <div className={styles.filterSwitchCard}>
         <div className={styles.filterSwitchHeader}>
           <span className={styles.filterSwitchTitle}>Projects</span>
@@ -66,6 +77,9 @@ export function ContactsFilters({
           {withProjectOnly ? "Showing customers with projects only" : "Showing all customers"}
         </p>
       </div>
+
+      {/* Archived customer visibility toggle */}
+
       <div className={styles.filterSwitchCard}>
         <div className={styles.filterSwitchHeader}>
           <span className={styles.filterSwitchTitle}>Customer visibility</span>

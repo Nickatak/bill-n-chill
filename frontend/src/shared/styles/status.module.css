@@ -1,0 +1,91 @@
+/* Shared status badge/pill styles. Compose from feature modules to avoid duplicating status colors. */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.draft {
+  composes: badge;
+  background: var(--status-draft-bg);
+  border-color: var(--status-draft-border);
+  color: var(--status-draft-text);
+}
+
+.sent {
+  composes: badge;
+  background: var(--status-sent-bg);
+  border-color: var(--status-sent-border);
+  color: var(--status-sent-text);
+}
+
+.pendingApproval {
+  composes: badge;
+  background: var(--status-sent-bg);
+  border-color: var(--status-sent-border);
+  color: var(--status-sent-text);
+}
+
+.approved {
+  composes: badge;
+  background: var(--status-approved-bg);
+  border-color: var(--status-approved-border);
+  color: var(--status-approved-text);
+}
+
+.rejected {
+  composes: badge;
+  background: var(--status-rejected-bg);
+  border-color: var(--status-rejected-border);
+  color: var(--status-rejected-text);
+}
+
+.void {
+  composes: badge;
+  background: var(--status-void-bg);
+  border-color: var(--status-void-border);
+  color: var(--status-void-text);
+}
+
+.archived {
+  composes: badge;
+  background: var(--status-void-bg);
+  border-color: var(--status-void-border);
+  color: var(--status-void-text);
+}
+
+.inactive {
+  composes: badge;
+  background: var(--status-void-bg);
+  border-color: var(--status-void-border);
+  color: var(--status-void-text);
+}
+
+.paid {
+  composes: badge;
+  background: var(--status-paid-bg);
+  border-color: var(--status-paid-border);
+  color: var(--status-paid-text);
+}
+
+.partiallyPaid {
+  composes: badge;
+  background: var(--status-approved-bg);
+  border-color: var(--status-approved-border);
+  color: var(--status-approved-text);
+}
+
+.overdue {
+  composes: badge;
+  background: var(--status-overdue-bg);
+  border-color: var(--status-overdue-border);
+  color: var(--status-overdue-text);
+}

@@ -1,6 +1,14 @@
+/**
+ * Estimate document composer sheet used for both creating and editing estimates.
+ * Delegates layout to the shared DocumentComposer and renders header, meta,
+ * line-item table, totals, terms, and footer sections via slot renderers.
+ */
+
 import Link from "next/link";
 import { FormEvent } from "react";
 
+import { formatDateDisplay } from "@/shared/date-format";
+import { formatDecimal } from "@/shared/money-format";
 import composerStyles from "@/shared/document-composer/composer-foundation.module.css";
 import { CostCode, EstimateLineInput, ProjectRecord } from "../types";
 import { CostCodeCombobox } from "@/shared/components/cost-code-combobox";
@@ -85,10 +93,10 @@ const ESTIMATE_COMPOSER_FALLBACK_POLICY = {
   terminalStatuses: ["approved", "void"],
 };
 
-function formatMoney(value: number): string {
-  return value.toFixed(2);
-}
-
+/**
+ * Composable estimate sheet supporting draft creation, draft editing, and
+ * read-only review. Uses DocumentComposer slots for layout consistency.
+ */
 export function EstimateSheet({
   project,
   organizationDefaults = null,
@@ -145,21 +153,7 @@ export function EstimateSheet({
   const senderAddressLines = senderBranding.senderAddressLines;
   const senderLogoUrl = senderBranding.logoUrl;
 
-  function formatDisplayDate(value: string): string {
-    if (!value) {
-      return "Not set";
-    }
-    const parsed = new Date(`${value}T00:00:00`);
-    if (Number.isNaN(parsed.getTime())) {
-      return value;
-    }
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(parsed);
-  }
-
+  /** Look up the display label for a cost code by its ID. */
   function findCostCodeLabel(costCodeId: string): string {
     const code = costCodes.find((candidate) => String(candidate.id) === costCodeId);
     if (!code) {
@@ -168,6 +162,7 @@ export function EstimateSheet({
     return `${code.code} - ${code.name}`;
   }
 
+  /** Render a column header that doubles as a sort toggle when editing is allowed. */
   function renderSortableHeader(label: string, key: LineSortKey) {
     if (showReadOnlyText) {
       return <span>{label}</span>;
@@ -300,7 +295,7 @@ export function EstimateSheet({
                 <div className={composerStyles.metaLine}>
                   <span>Estimate date</span>
                   {showReadOnlyText ? (
-                    <span className={composerStyles.staticMetaValue}>{formatDisplayDate(estimateDate)}</span>
+                    <span className={composerStyles.staticMetaValue}>{formatDateDisplay(estimateDate, "Not set")}</span>
                   ) : (
                     <input
                       className={composerStyles.fieldInput}
@@ -314,7 +309,7 @@ export function EstimateSheet({
                 <div className={`${composerStyles.metaLine} ${composerStyles.metaLineLast}`}>
                   <span>Valid through</span>
                   {showReadOnlyText ? (
-                    <span className={composerStyles.staticMetaValue}>{formatDisplayDate(validThrough)}</span>
+                    <span className={composerStyles.staticMetaValue}>{formatDateDisplay(validThrough, "Not set")}</span>
                   ) : (
                     <input
                       className={composerStyles.fieldInput}
@@ -436,7 +431,7 @@ export function EstimateSheet({
                   <div className={composerStyles.lineCell}>
                     {showReadOnlyText ? (
                       <span className={composerStyles.staticCellValue}>
-                        ${formatMoney(Number(line.unitCost || 0) * (1 + Number(line.markupPercent || 0) / 100))}
+                        ${formatDecimal(Number(line.unitCost || 0) * (1 + Number(line.markupPercent || 0) / 100))}
                       </span>
                     ) : (
                       <input
@@ -475,7 +470,7 @@ export function EstimateSheet({
                     </div>
                   ) : null}
                   <div className={composerStyles.lineCell}>
-                    <div className={composerStyles.amountCell}>${formatMoney(lineTotals[index] || 0)}</div>
+                    <div className={composerStyles.amountCell}>${formatDecimal(lineTotals[index] || 0)}</div>
                   </div>
                   {!readOnly ? (
                     <div className={composerStyles.lineCell}>
@@ -542,7 +537,7 @@ export function EstimateSheet({
             <div className={composerStyles.summary}>
               <div className={composerStyles.summaryRow}>
                 <span>Subtotal</span>
-                <span>${formatMoney(subtotal)}</span>
+                <span>${formatDecimal(subtotal)}</span>
               </div>
               <div className={composerStyles.summaryRow}>
                 <span>{showReadOnlyText ? `Sales Tax (${taxPercent}%)` : "Sales Tax"}</span>
@@ -561,12 +556,12 @@ export function EstimateSheet({
                       <span className={composerStyles.summaryTaxSuffix}>%</span>
                     </span>
                   )}
-                  <span className={composerStyles.summaryTaxAmount}>${formatMoney(taxAmount)}</span>
+                  <span className={composerStyles.summaryTaxAmount}>${formatDecimal(taxAmount)}</span>
                 </div>
               </div>
               <div className={`${composerStyles.summaryRow} ${composerStyles.summaryTotal}`}>
                 <span>Total</span>
-                <span>${formatMoney(totalAmount)}</span>
+                <span>${formatDecimal(totalAmount)}</span>
               </div>
             </div>
           </>

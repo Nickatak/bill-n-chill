@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Displays a filterable timeline of financial audit and workflow events for a
+ * single project. Used on the project activity page to give users a unified
+ * chronological view of everything that has happened on a project.
+ */
+
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -14,6 +20,7 @@ type ProjectActivityConsoleProps = {
   projectId: number;
 };
 
+/** Renders a filterable timeline of audit and workflow events for one project. */
 export function ProjectActivityConsole({ projectId }: ProjectActivityConsoleProps) {
   const { token, authMessage } = useSharedSessionAuth();
   const [statusMessage, setStatusMessage] = useState("");
@@ -22,6 +29,7 @@ export function ProjectActivityConsole({ projectId }: ProjectActivityConsoleProp
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
 
+  /** Fetches timeline events from the API, optionally filtered by category. */
   async function loadTimeline(nextCategory: "all" | "financial" | "workflow") {
     if (!token) {
       return;
@@ -47,6 +55,7 @@ export function ProjectActivityConsole({ projectId }: ProjectActivityConsoleProp
     }
   }
 
+  // Load timeline on mount and when the project changes.
   useEffect(() => {
     if (!token) {
       return;

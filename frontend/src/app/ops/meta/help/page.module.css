@@ -1,14 +1,14 @@
 .jobGrid {
-  margin-top: 12px;
+  margin-top: var(--space-md);
   display: grid;
-  gap: 12px;
+  gap: var(--space-md);
 }
 
 .jobCard {
   border: 1px solid #c7d6ea;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: #f8fbff;
-  padding: 12px;
+  padding: var(--space-md);
   display: grid;
   gap: 10px;
 }
@@ -16,14 +16,14 @@
 .jobTitle {
   margin: 0;
   font-size: 1rem;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .jobProfile {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--font-base);
   line-height: 1.45;
-  color: #334155;
+  color: var(--status-void-text);
 }
 
 .jobSection {
@@ -36,7 +36,7 @@
   font-size: 0.84rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #1e40af;
+  color: var(--accent-hover);
 }
 
 .textList {
@@ -44,7 +44,7 @@
   padding-left: 18px;
   display: grid;
   gap: 5px;
-  color: #334155;
+  color: var(--status-void-text);
   font-size: 0.88rem;
   line-height: 1.4;
 }
@@ -52,7 +52,7 @@
 .linkRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .gapList {
@@ -60,13 +60,13 @@
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .gapItem {
   border: 1px solid #c7d6ea;
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
   padding: 10px 12px;
   color: #1e293b;
   font-size: 0.88rem;
@@ -77,24 +77,4 @@
   .jobGrid {
     grid-template-columns: 1fr 1fr;
   }
-}
-
-:global(html[data-theme="dark"]) .jobCard,
-:global(html[data-theme="dark"]) .gapItem {
-  border-color: #334155;
-  background: #0f1a2d;
-}
-
-:global(html[data-theme="dark"]) .jobTitle {
-  color: #e2e8f0;
-}
-
-:global(html[data-theme="dark"]) .jobProfile,
-:global(html[data-theme="dark"]) .textList,
-:global(html[data-theme="dark"]) .gapItem {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .jobSection h4 {
-  color: #93c5fd;
 }

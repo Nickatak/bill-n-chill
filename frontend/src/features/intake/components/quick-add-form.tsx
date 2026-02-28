@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Presentational form for customer quick-add intake.
+ * Renders customer and optional project fields; all behavior lives in the controller hook.
+ */
+
 import { FormEventHandler, RefObject } from "react";
 
 import { LeadFieldErrors } from "../hooks/use-quick-add-controller";
@@ -25,6 +30,7 @@ type QuickAddFormProps = {
   onSubmit: FormEventHandler<HTMLFormElement>;
 };
 
+/** Stateless intake form: renders customer/project fields and emits submit events to the controller. */
 export function QuickAddForm({
   fullNameRef,
   fullName,

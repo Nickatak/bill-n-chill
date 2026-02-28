@@ -1,10 +1,19 @@
 "use client";
 
+/**
+ * Primary invoice management console.
+ * Combines project selection, invoice list with status filtering, status lifecycle management
+ * (transitions, notes, history), and a document-composer workspace for creating/editing drafts.
+ */
+
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { usePagination } from "@/shared/hooks/use-pagination";
 import Link from "next/link";
-import { formatDateDisplay, formatDateTimeDisplay } from "@/shared/date-format";
+import { formatDateDisplay, formatDateTimeDisplay, todayDateInput, futureDateInput } from "@/shared/date-format";
+import { parseAmount, formatDecimal } from "@/shared/money-format";
+import { readApiErrorMessage } from "@/shared/api/error";
 import { ProjectListStatusValue, ProjectListViewer } from "@/shared/project-list-viewer";
 import {
   defaultApiBaseUrl,
@@ -31,12 +40,11 @@ import {
   InvoiceFormState,
   toInvoiceStatusPolicy,
 } from "../document-adapter";
+import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import styles from "./invoices-console.module.css";
 import composerStyles from "@/shared/document-composer/composer-foundation.module.css";
 import invoiceComposerStyles from "@/shared/document-composer/invoice-composer.module.css";
 import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
-
-type StatusTone = "neutral" | "success" | "error";
 type ProjectStatusValue = ProjectListStatusValue;
 type ProjectBudgetRecord = {
   id: number;
@@ -100,16 +108,7 @@ const DEFAULT_PROJECT_STATUS_FILTERS: ProjectStatusValue[] = ["active", "prospec
 const PROJECT_STATUS_VALUES: ProjectStatusValue[] = ["prospect", "active", "on_hold", "completed", "cancelled"];
 const GENERIC_BUDGET_COST_CODES = new Set(["99-901", "99-902", "99-903"]);
 
-function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function dueDateIsoDate(daysFromNow = 30) {
-  const current = new Date();
-  current.setDate(current.getDate() + daysFromNow);
-  return current.toISOString().slice(0, 10);
-}
-
+/** Compute a due date by adding dueDays to a given issue date. */
 function dueDateFromIssueDate(issueDate: string, dueDays: number) {
   const base = issueDate ? new Date(`${issueDate}T00:00:00`) : new Date();
   const safeDueDays = Number.isFinite(dueDays) ? Math.max(1, Math.min(365, Math.round(dueDays))) : 30;
@@ -117,15 +116,7 @@ function dueDateFromIssueDate(issueDate: string, dueDays: number) {
   return base.toISOString().slice(0, 10);
 }
 
-function parseAmount(value: string): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function formatMoney(value: number): string {
-  return value.toFixed(2);
-}
-
+/** Normalize a number to a two-decimal string, returning a fallback for non-finite values. */
 function normalizeDecimalInput(value: number, fallback = "0"): string {
   if (!Number.isFinite(value)) {
     return fallback;
@@ -133,6 +124,7 @@ function normalizeDecimalInput(value: number, fallback = "0"): string {
   return value.toFixed(2);
 }
 
+/** Create a blank scope line item with sensible defaults for the composer workspace. */
 function emptyLine(localId: number, defaultBudgetLineId = ""): InvoiceLineInput {
   return {
     localId,
@@ -147,10 +139,12 @@ function emptyLine(localId: number, defaultBudgetLineId = ""): InvoiceLineInput 
   };
 }
 
+/** Resolve a display label for an invoice status using the static fallback map. */
 function invoiceStatusLabel(status: string): string {
   return INVOICE_STATUS_LABELS_FALLBACK[status] ?? status;
 }
 
+/** Build the public-facing route for a customer to view their invoice. */
 function publicInvoiceHref(publicRef?: string): string {
   if (!publicRef) {
     return "";
@@ -158,6 +152,7 @@ function publicInvoiceHref(publicRef?: string): string {
   return `/invoice/${publicRef}`;
 }
 
+/** Return a contextual hint about the next workflow action for a given invoice status. */
 function invoiceNextActionHint(status: string): string {
   if (status === "draft") {
     return "Next: send the invoice to move it into billable AR tracking.";
@@ -180,6 +175,7 @@ function invoiceNextActionHint(status: string): string {
   return "Select a status transition as needed.";
 }
 
+/** Map an invoice status to its CSS module class for badge coloring. */
 function invoiceStatusClass(status: string): string {
   if (status === "draft") {
     return styles.statusDraft;
@@ -202,6 +198,7 @@ function invoiceStatusClass(status: string): string {
   return "";
 }
 
+/** Map an invoice status to its tone class for inline status accents. */
 function invoiceStatusToneClass(status: string): string {
   if (status === "draft") {
     return styles.statusToneDraft;
@@ -224,6 +221,7 @@ function invoiceStatusToneClass(status: string): string {
   return "";
 }
 
+/** Map an invoice status to its card-level CSS class for list card border/accent. */
 function invoiceCardStatusClass(status: string): string {
   if (status === "draft") {
     return styles.invoiceCardStatusDraft;
@@ -246,6 +244,7 @@ function invoiceCardStatusClass(status: string): string {
   return "";
 }
 
+/** Predict the next sequential invoice number (INV-XXXX) for pre-filling the workspace. */
 function nextInvoiceNumberPreview(rows: InvoiceRecord[]): string {
   const usedNumbers = new Set<number>();
   let digitWidth = 4;
@@ -267,6 +266,7 @@ function nextInvoiceNumberPreview(rows: InvoiceRecord[]): string {
   return `INV-${String(nextNumber).padStart(digitWidth, "0")}`;
 }
 
+/** Derive a human-readable action label for a status history event row. */
 function invoiceStatusEventActionLabel(
   event: InvoiceStatusEventRecord,
   statusLabel: (status: string) => string,
@@ -292,6 +292,7 @@ function invoiceStatusEventActionLabel(
   return `${statusLabel(event.from_status)} to ${statusLabel(event.to_status)}`;
 }
 
+/** Map a status event to its visual tone class for the history timeline. */
 function invoiceStatusEventToneClass(event: InvoiceStatusEventRecord): string {
   if (event.action_type === "resend" || (event.from_status === "sent" && event.to_status === "sent")) {
     return styles.statusToneSent;
@@ -302,6 +303,7 @@ function invoiceStatusEventToneClass(event: InvoiceStatusEventRecord): string {
   return invoiceStatusToneClass(event.to_status);
 }
 
+/** Pick the most likely next status to pre-select in the status picker for an invoice. */
 function resolvePreferredStatusSelection(
   invoice: InvoiceRecord | null,
   transitions: Record<string, string[]>,
@@ -317,23 +319,19 @@ function resolvePreferredStatusSelection(
 }
 
 function readApiError(payload: ApiResponse | undefined, fallback: string): string {
-  const message = payload?.error?.message?.trim();
-  if (!message) {
-    return fallback;
-  }
-  if (
-    /invalid .*status transition/i.test(message) &&
-    !/refresh/i.test(message)
-  ) {
+  const message = readApiErrorMessage(payload, fallback);
+  if (/invalid .*status transition/i.test(message) && !/refresh/i.test(message)) {
     return `${message} This invoice may have changed from a client action on the public page. Refresh to load the latest status.`;
   }
   return message;
 }
 
+/** Convert a snake_case project status to a display-friendly label. */
 function projectStatusLabel(statusValue: string): string {
   return statusValue.replace("_", " ");
 }
 
+/** Primary invoice management console with project selection, invoice viewer, and composer workspace. */
 export function InvoicesConsole() {
   const { token, authMessage, role } = useSharedSessionAuth();
   const canMutateInvoices = hasAnyRole(role, ["owner", "pm", "bookkeeping"]);
@@ -346,13 +344,11 @@ export function InvoicesConsole() {
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
 
-  const [statusMessage, setStatusMessage] = useState("");
-  const [statusTone, setStatusTone] = useState<StatusTone>("neutral");
+  const { message: statusMessage, tone: statusTone, setNeutral: setNeutralStatus, setSuccess: setSuccessStatus, setError: setErrorStatus, setMessage: setStatusMessage, clear: clearStatus } = useStatusMessage();
   const [projectSearch, setProjectSearch] = useState("");
   const [projectStatusFilters, setProjectStatusFilters] = useState<ProjectStatusValue[]>(
     DEFAULT_PROJECT_STATUS_FILTERS,
   );
-  const [currentProjectPage, setCurrentProjectPage] = useState(1);
   const [isProjectListExpanded, setIsProjectListExpanded] = useState(true);
   const [isInvoiceViewerExpanded, setIsInvoiceViewerExpanded] = useState(true);
   const [hasAutoSelectedProjectWithInvoices, setHasAutoSelectedProjectWithInvoices] = useState(false);
@@ -381,8 +377,8 @@ export function InvoicesConsole() {
   const [statusNote, setStatusNote] = useState("");
   const [organizationInvoiceDefaults, setOrganizationInvoiceDefaults] = useState<OrganizationInvoiceDefaults | null>(null);
 
-  const [issueDate, setIssueDate] = useState(todayIsoDate());
-  const [dueDate, setDueDate] = useState(dueDateIsoDate());
+  const [issueDate, setIssueDate] = useState(todayDateInput());
+  const [dueDate, setDueDate] = useState(futureDateInput());
   const [taxPercent, setTaxPercent] = useState("0");
   const [lineItems, setLineItems] = useState<InvoiceLineInput[]>([emptyLine(1)]);
   const [nextLineId, setNextLineId] = useState(2);
@@ -410,7 +406,6 @@ export function InvoicesConsole() {
     }
     return [...next.entries()];
   }, [budgetLineOptions]);
-  const projectPageSize = 5;
   const projectNeedle = projectSearch.trim().toLowerCase();
   const filteredProjects = !projectNeedle
     ? projects
@@ -438,10 +433,7 @@ export function InvoicesConsole() {
   const statusFilteredProjects = filteredProjects.filter((project) =>
     projectStatusFilters.includes(project.status as ProjectStatusValue),
   );
-  const totalProjectPages = Math.max(1, Math.ceil(statusFilteredProjects.length / projectPageSize));
-  const currentProjectPageSafe = Math.min(currentProjectPage, totalProjectPages);
-  const projectPageStart = (currentProjectPageSafe - 1) * projectPageSize;
-  const pagedProjects = statusFilteredProjects.slice(projectPageStart, projectPageStart + projectPageSize);
+  const { pageItems: pagedProjects, currentPage: currentProjectPageSafe, totalPages: totalProjectPages, prevPage: prevProjectPage, nextPage: nextProjectPage, resetPage: resetProjectPage } = usePagination(statusFilteredProjects, 5);
   const filteredInvoices = useMemo(() => {
     if (!invoiceStatusFilters.length) {
       return [];
@@ -519,21 +511,6 @@ export function InvoicesConsole() {
     [invoiceStatusLabels],
   );
 
-  const setNeutralStatus = useCallback((message: string) => {
-    setStatusTone("neutral");
-    setStatusMessage(message);
-  }, []);
-
-  const setSuccessStatus = useCallback((message: string) => {
-    setStatusTone("success");
-    setStatusMessage(message);
-  }, []);
-
-  const setErrorStatus = useCallback((message: string) => {
-    setStatusTone("error");
-    setStatusMessage(message);
-  }, []);
-
   const loadDependencies = useCallback(
     async (options?: { keepStatusOnSuccess?: boolean }) => {
       if (!token) {
@@ -586,7 +563,7 @@ export function InvoicesConsole() {
         setErrorStatus("Could not reach dependency endpoints.");
       }
     },
-    [issueDate, normalizedBaseUrl, scopedProjectId, setErrorStatus, setNeutralStatus, token],
+    [issueDate, normalizedBaseUrl, scopedProjectId, setErrorStatus, setNeutralStatus, setStatusMessage, token],
   );
 
   const loadInvoicePolicy = useCallback(async () => {
@@ -666,7 +643,7 @@ export function InvoicesConsole() {
         setErrorStatus("Could not reach invoice endpoint.");
       }
     },
-    [normalizedBaseUrl, selectedProjectId, setErrorStatus, token],
+    [normalizedBaseUrl, selectedProjectId, setErrorStatus, setStatusMessage, token],
   );
 
   const loadBudgetLineOptions = useCallback(
@@ -781,6 +758,7 @@ export function InvoicesConsole() {
     [normalizedBaseUrl, token],
   );
 
+  // Hydrate invoice policy (statuses, transitions, labels) from the backend on auth.
   useEffect(() => {
     if (!token) {
       return;
@@ -788,6 +766,7 @@ export function InvoicesConsole() {
     void loadInvoicePolicy();
   }, [loadInvoicePolicy, token]);
 
+  // Load projects and organization defaults on auth.
   useEffect(() => {
     if (!token) {
       return;
@@ -795,6 +774,7 @@ export function InvoicesConsole() {
     void loadDependencies();
   }, [loadDependencies, token]);
 
+  // Reload invoices and budget line options whenever the selected project changes.
   useEffect(() => {
     const projectId = Number(selectedProjectId);
     if (!token || !projectId) {
@@ -807,6 +787,7 @@ export function InvoicesConsole() {
     void loadBudgetLineOptions(projectId);
   }, [loadBudgetLineOptions, loadInvoices, selectedProjectId, token]);
 
+  // Auto-select the first project that has invoices when the default project is empty.
   useEffect(() => {
     if (!token || scopedProjectId || hasAutoSelectedProjectWithInvoices) {
       return;
@@ -868,10 +849,12 @@ export function InvoicesConsole() {
     token,
   ]);
 
+  // Reset pagination when search or status filters change.
   useEffect(() => {
-    setCurrentProjectPage(1);
-  }, [projectSearch, projectStatusFilters]);
+    resetProjectPage();
+  }, [projectSearch, projectStatusFilters, resetProjectPage]);
 
+  // Ensure selected project is still visible after filter changes; fall back to first match.
   useEffect(() => {
     if (statusFilteredProjects.length === 0) {
       return;
@@ -886,6 +869,7 @@ export function InvoicesConsole() {
     setSelectedProjectId(String(fallbackProject.id));
   }, [selectedProjectId, statusFilteredProjects]);
 
+  // Pre-select the most likely next status when the selected invoice changes.
   useEffect(() => {
     if (!selectedInvoice) {
       setSelectedStatus("draft");
@@ -899,6 +883,7 @@ export function InvoicesConsole() {
     setStatusNote("");
   }, [invoiceAllowedStatusTransitions, nextStatusOptions, selectedInvoice]);
 
+  // Ensure selected invoice is still visible after status filter changes.
   useEffect(() => {
     if (!filteredInvoices.length) {
       setSelectedInvoiceId("");
@@ -915,6 +900,7 @@ export function InvoicesConsole() {
     setSelectedStatus(resolvePreferredStatusSelection(fallbackInvoice, invoiceAllowedStatusTransitions));
   }, [filteredInvoices, invoiceAllowedStatusTransitions, selectedInvoiceId]);
 
+  // Load status history events whenever the selected invoice changes.
   useEffect(() => {
     const invoiceId = Number(selectedInvoiceId);
     if (!invoiceId) {
@@ -925,6 +911,7 @@ export function InvoicesConsole() {
     void loadInvoiceStatusEvents(invoiceId);
   }, [loadInvoiceStatusEvents, selectedInvoiceId]);
 
+  // Backfill orphaned scope lines with a valid budget line when options change.
   useEffect(() => {
     const defaultBudgetLineId = budgetLineOptions[0] ? String(budgetLineOptions[0].id) : "";
     if (!defaultBudgetLineId) {
@@ -943,16 +930,17 @@ export function InvoicesConsole() {
     );
   }, [budgetLineById, budgetLineOptions]);
 
+  /** Append a new blank line item to the workspace draft. */
   function addLineItem() {
     if (statusTone === "error" && statusMessage === INVOICE_MIN_LINE_ITEMS_ERROR) {
-      setStatusMessage("");
-      setStatusTone("neutral");
+      clearStatus();
     }
     const defaultBudgetLineId = budgetLineOptions[0] ? String(budgetLineOptions[0].id) : "";
     setLineItems((current) => [...current, emptyLine(nextLineId, defaultBudgetLineId)]);
     setNextLineId((value) => value + 1);
   }
 
+  /** Remove a line item by local ID, enforcing the minimum-one-line constraint. */
   function removeLineItem(localId: number) {
     if (lineItems.length <= 1) {
       setErrorStatus(INVOICE_MIN_LINE_ITEMS_ERROR);
@@ -961,6 +949,7 @@ export function InvoicesConsole() {
     setLineItems((current) => current.filter((line) => line.localId !== localId));
   }
 
+  /** Update a single field on a line item; auto-populates defaults when changing budget line. */
   function updateLineItem(localId: number, key: keyof Omit<InvoiceLineInput, "localId">, value: string) {
     setLineItems((current) =>
       current.map((line) => {
@@ -984,6 +973,7 @@ export function InvoicesConsole() {
     );
   }
 
+  /** Toggle a status value in the invoice list filter pill bar. */
   function toggleInvoiceStatusFilter(statusValue: string) {
     setInvoiceStatusFilters((current) =>
       current.includes(statusValue)
@@ -992,6 +982,7 @@ export function InvoicesConsole() {
     );
   }
 
+  /** Toggle a project status value in the project list filter. */
   function toggleProjectStatusFilter(statusValue: ProjectStatusValue) {
     setProjectStatusFilters((current) =>
       current.includes(statusValue)
@@ -1036,8 +1027,8 @@ export function InvoicesConsole() {
   const loadInvoiceIntoWorkspace = useCallback(
     (invoice: InvoiceRecord) => {
       const workspaceLines = invoiceToWorkspaceLines(invoice);
-      setIssueDate(invoice.issue_date || todayIsoDate());
-      setDueDate(invoice.due_date || dueDateIsoDate());
+      setIssueDate(invoice.issue_date || todayDateInput());
+      setDueDate(invoice.due_date || futureDateInput());
       setTaxPercent(invoice.tax_percent || "0");
       setLineItems(workspaceLines);
       setNextLineId(workspaceLines.length + 1);
@@ -1053,6 +1044,7 @@ export function InvoicesConsole() {
     [invoiceToWorkspaceLines],
   );
 
+  /** Switch the active project, triggering invoice and budget line reloads. */
   function handleSelectProject(project: { id: number }) {
     if (String(project.id) === selectedProjectId) {
       return;
@@ -1060,15 +1052,17 @@ export function InvoicesConsole() {
     setSelectedProjectId(String(project.id));
   }
 
+  /** Select an invoice from the list and load it into the composer workspace. */
   function handleSelectInvoice(invoice: InvoiceRecord) {
     setSelectedInvoiceId(String(invoice.id));
     setSelectedStatus(resolvePreferredStatusSelection(invoice, invoiceAllowedStatusTransitions));
     loadInvoiceIntoWorkspace(invoice);
   }
 
+  /** Reset the composer workspace to a fresh new-draft state. */
   function resetCreateDraft() {
     const defaultBudgetLineId = budgetLineOptions[0] ? String(budgetLineOptions[0].id) : "";
-    const nextIssueDate = todayIsoDate();
+    const nextIssueDate = todayDateInput();
     const dueDays = organizationInvoiceDefaults?.invoice_default_due_days ?? 30;
     setIssueDate(nextIssueDate);
     setDueDate(dueDateFromIssueDate(nextIssueDate, dueDays));
@@ -1080,6 +1074,7 @@ export function InvoicesConsole() {
     setWorkspaceContext("New invoice draft");
   }
 
+  /** Clear the workspace and scroll to the composer for a new invoice draft. */
   function handleStartNewInvoiceDraft() {
     resetCreateDraft();
     setSuccessStatus("Started a new invoice draft.");
@@ -1088,6 +1083,7 @@ export function InvoicesConsole() {
     });
   }
 
+  /** Create a new invoice or save an existing draft, depending on workspace context. */
   async function handleCreateInvoice(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canMutateInvoices) {
@@ -1179,6 +1175,7 @@ export function InvoicesConsole() {
     }
   }
 
+  /** Transition the selected invoice to a new status, with optional status note. */
   async function handleUpdateInvoiceStatus() {
     if (!canMutateInvoices) {
       setErrorStatus(`Role ${role} is read-only for invoice mutations.`);
@@ -1231,6 +1228,7 @@ export function InvoicesConsole() {
     }
   }
 
+  /** Append a note to the selected invoice's status history without changing status. */
   async function handleAddInvoiceStatusNote() {
     if (!canMutateInvoices) {
       setErrorStatus(`Role ${role} is read-only for invoice mutations.`);
@@ -1273,6 +1271,7 @@ export function InvoicesConsole() {
     }
   }
 
+  /** Clone the selected invoice's line items into a fresh draft with a new invoice number. */
   function handleDuplicateInvoiceIntoDraft() {
     if (!selectedInvoice) {
       setErrorStatus("Select an invoice first.");
@@ -1281,7 +1280,7 @@ export function InvoicesConsole() {
 
     const nextDraftLines = invoiceToWorkspaceLines(selectedInvoice);
 
-    const nextIssueDate = todayIsoDate();
+    const nextIssueDate = todayDateInput();
     setIssueDate(nextIssueDate);
     setDueDate(dueDateFromIssueDate(
       nextIssueDate,
@@ -1365,11 +1364,11 @@ export function InvoicesConsole() {
           </article>
           <article className={styles.statCard}>
             <span>Total invoiced</span>
-            <strong>${formatMoney(balanceSummary.total)}</strong>
+            <strong>${formatDecimal(balanceSummary.total)}</strong>
           </article>
           <article className={styles.statCard}>
             <span>Balance due</span>
-            <strong>${formatMoney(balanceSummary.balanceDue)}</strong>
+            <strong>${formatDecimal(balanceSummary.balanceDue)}</strong>
           </article>
         </div>
       </section>
@@ -1417,8 +1416,8 @@ export function InvoicesConsole() {
             showPagination
             currentPage={currentProjectPageSafe}
             totalPages={totalProjectPages}
-            onPrevPage={() => setCurrentProjectPage((page) => Math.max(1, page - 1))}
-            onNextPage={() => setCurrentProjectPage((page) => Math.min(totalProjectPages, page + 1))}
+            onPrevPage={prevProjectPage}
+            onNextPage={nextProjectPage}
           />
 
           <section className={`${styles.panel} ${styles.viewerPanel}`}>
@@ -1938,7 +1937,7 @@ export function InvoicesConsole() {
                                 disabled={workspaceIsLocked}
                               />
                               <span className={`${composerStyles.amountCell} ${invoiceComposerStyles.invoiceReadAmount}`}>
-                                ${formatMoney(lineAmount)}
+                                ${formatDecimal(lineAmount)}
                               </span>
                               <div className={invoiceComposerStyles.invoiceLineActionsCell}>
                                 {!workspaceIsLocked ? (
@@ -1977,7 +1976,7 @@ export function InvoicesConsole() {
                           <div className={composerStyles.summary}>
                             <div className={composerStyles.summaryRow}>
                               <span>Subtotal</span>
-                              <strong>${formatMoney(draftLineSubtotal)}</strong>
+                              <strong>${formatDecimal(draftLineSubtotal)}</strong>
                             </div>
                             <div className={composerStyles.summaryRow}>
                               <span>Sales Tax</span>
@@ -1993,13 +1992,13 @@ export function InvoicesConsole() {
                                   <span className={composerStyles.summaryTaxSuffix}>%</span>
                                 </label>
                                 <span className={composerStyles.summaryTaxAmount}>
-                                  ${formatMoney(draftTaxTotal)}
+                                  ${formatDecimal(draftTaxTotal)}
                                 </span>
                               </span>
                             </div>
                             <div className={`${composerStyles.summaryRow} ${composerStyles.summaryTotal}`}>
                               <span>Total</span>
-                              <strong>${formatMoney(draftTotal)}</strong>
+                              <strong>${formatDecimal(draftTotal)}</strong>
                             </div>
                           </div>
                           {canMutateInvoices ? (

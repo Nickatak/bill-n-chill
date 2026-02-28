@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
+import type { HealthResult } from "@/shared/api/health";
 import {
   clearClientSession,
   loadClientSession,
@@ -31,17 +32,16 @@ type LoginResponse = {
 };
 
 type HomeAuthConsoleProps = {
-  health: {
-    ok: boolean;
-    message: string;
-    appRevision?: string;
-    appBuildAt?: string;
-    dataResetAt?: string;
-  };
+  health: HealthResult;
 };
 
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
+/**
+ * Format an ISO timestamp string for display in the health banner.
+ * Returns "unknown" if the value is absent, or the raw string if it
+ * can't be parsed as a valid date.
+ */
 function formatTimestamp(value?: string): string {
   if (!value) {
     return "unknown";
@@ -53,6 +53,12 @@ function formatTimestamp(value?: string): string {
   return parsed.toLocaleString();
 }
 
+/**
+ * Map the login endpoint's snake_case organization payload to the
+ * client-side SessionOrganization shape. Returns undefined if any
+ * required field (id, display_name, slug) is missing, so downstream
+ * code never sees a partially-populated org.
+ */
 function toSessionOrganization(
   raw:
     | {
@@ -80,6 +86,11 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
   const [isChecking, setIsChecking] = useState(false);
   const [message, setMessage] = useState("Sign in to open your dashboard.");
 
+  /**
+   * Rewrite Django's generic login error messages into user-friendly
+   * copy. Falls back to a safe default if the message is empty or
+   * matches the backend's generic "Login failed." response.
+   */
   function normalizeLoginError(message?: string): string {
     const normalized = (message ?? "").trim().toLowerCase();
     if (!normalized || normalized === "login failed." || normalized === "login failed") {
@@ -88,6 +99,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
     return message ?? "Invalid username/password combination.";
   }
 
+  // Pre-fill the email field from a previously-saved session in localStorage.
   useEffect(() => {
     function init() {
       const session = loadClientSession();
@@ -98,22 +110,32 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
     void init();
   }, []);
 
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+  /**
+   * Form submission handler for the login form. POSTs credentials to
+   * the Django auth endpoint, persists the session (token, email, role,
+   * org) to localStorage on success, and updates component state to
+   * reflect the outcome.
+   */
+  async function handleLogin(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
+
     setIsChecking(true);
     setMessage("Signing in...");
     setMessageTone("neutral");
+
     try {
       const response = await fetch(`${defaultApiBaseUrl}/auth/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
+
       const payload: LoginResponse = await response.json();
       const nextToken = payload.data?.token ?? "";
       const nextEmail = payload.data?.user?.email ?? email;
       const nextRole = payload.data?.user?.role ?? "owner";
       const nextOrganization = toSessionOrganization(payload.data?.organization);
+
       if (!response.ok || !nextToken) {
         setMessage(normalizeLoginError(payload.error?.message));
         setMessageTone("error");
@@ -127,6 +149,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
         role: nextRole,
         organization: nextOrganization,
       });
+
       setPassword("");
       setIsAuthenticated(true);
       setMessage(
@@ -143,8 +166,10 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
     }
   }
 
+  /** Clear the persisted session from localStorage and reset to the login view. */
   function handleSignOut() {
     clearClientSession();
+
     setPassword("");
     setIsAuthenticated(false);
     setMessage("Signed out.");

@@ -1,3 +1,14 @@
+/**
+ * Document-composer adapter for estimates.
+ *
+ * Bridges the domain-specific estimate data model to the generic
+ * {@link DocumentComposerAdapter} interface so the shared composer UI can
+ * render, create, and update estimates without knowing their schema.
+ *
+ * Also provides converters for the backend policy contract and status
+ * event records into their composer-compatible shapes.
+ */
+
 import {
   ComposerLineDraft,
   ComposerMetaField,
@@ -23,6 +34,10 @@ type EstimateFormState = {
   lineItems: EstimateLineInput[];
 };
 
+/**
+ * Convert the backend policy contract (snake_case) to the composer's
+ * status policy shape (camelCase).
+ */
 export function toEstimateStatusPolicy(contract: EstimatePolicyContract): ComposerStatusPolicy {
   return {
     statuses: contract.statuses,
@@ -34,6 +49,10 @@ export function toEstimateStatusPolicy(contract: EstimatePolicyContract): Compos
   };
 }
 
+/**
+ * Convert backend status event records to the composer's status event
+ * shape, renaming snake_case fields to camelCase.
+ */
 export function toEstimateStatusEvents(
   events: EstimateStatusEventRecord[],
 ): ComposerStatusEvent[] {
@@ -47,6 +66,13 @@ export function toEstimateStatusEvents(
   }));
 }
 
+/**
+ * Build a fully configured document-composer adapter for estimates.
+ *
+ * The adapter tells the composer how to extract IDs, titles, meta fields,
+ * line items, and totals from an estimate, and how to serialize form
+ * state back into create/update API payloads.
+ */
 export function createEstimateDocumentAdapter(
   statusPolicy: ComposerStatusPolicy,
   statusEvents: EstimateStatusEventRecord[],
@@ -54,15 +80,23 @@ export function createEstimateDocumentAdapter(
   return {
     kind: "estimate",
     statusPolicy,
+
+    // --- Identity & display ---
+
     getDocumentId: (document) => (document ? String(document.id) : null),
     getDocumentTitle: (document) => document?.title ?? "Untitled estimate",
     getDocumentStatus: (document) => document?.status ?? statusPolicy.defaultCreateStatus,
+
     getMetaFields: (document): ComposerMetaField[] => [
       { key: "estimate_id", label: "Estimate #", value: document ? `#${document.id}` : "Draft" },
       { key: "version", label: "Version", value: document ? `v${document.version}` : "v1" },
       { key: "valid_through", label: "Valid Through", value: document?.valid_through || "Not set" },
     ],
+
     getStatusEvents: () => toEstimateStatusEvents(statusEvents),
+
+    // --- Form state → composer lines / totals ---
+
     getDraftLines: (form) =>
       form.lineItems.map((line) => ({
         localId: line.localId,
@@ -73,12 +107,16 @@ export function createEstimateDocumentAdapter(
         unitPrice: line.unitCost,
         markupPercent: line.markupPercent,
       })),
+
     getTotals: (form) => ({
       subtotal: form.subtotal,
       taxPercent: Number(form.taxPercent || "0"),
       taxAmount: form.taxAmount,
       total: form.totalAmount,
     }),
+
+    // --- Form state → API payloads ---
+
     toCreatePayload: (form) => ({
       title: form.title,
       valid_through: form.validThrough,
@@ -92,6 +130,7 @@ export function createEstimateDocumentAdapter(
         markup_percent: line.markupPercent,
       })),
     }),
+
     toUpdatePayload: (form) => ({
       title: form.title,
       valid_through: form.validThrough,

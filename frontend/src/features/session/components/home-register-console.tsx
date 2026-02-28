@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import type { HealthResult } from "@/shared/api/health";
 import {
   saveClientSession,
   type SessionOrganization,
@@ -33,17 +34,16 @@ type RegisterResponse = {
 };
 
 type HomeRegisterConsoleProps = {
-  health: {
-    ok: boolean;
-    message: string;
-    appRevision?: string;
-    appBuildAt?: string;
-    dataResetAt?: string;
-  };
+  health: HealthResult;
 };
 
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
+/**
+ * Format an ISO timestamp string for display in the health banner.
+ * Returns "unknown" if the value is absent, or the raw string if it
+ * can't be parsed as a valid date.
+ */
 function formatTimestamp(value?: string): string {
   if (!value) {
     return "unknown";
@@ -55,6 +55,11 @@ function formatTimestamp(value?: string): string {
   return parsed.toLocaleString();
 }
 
+/**
+ * Map the register endpoint's snake_case organization payload to the
+ * client-side SessionOrganization shape. Returns undefined if any
+ * required field (id, display_name, slug) is missing.
+ */
 function toSessionOrganization(
   raw:
     | {
@@ -82,6 +87,11 @@ export function HomeRegisterConsole({ health }: HomeRegisterConsoleProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("Create an account to start using the dashboard.");
 
+  /**
+   * Extract the most relevant error message from Django's register
+   * response. Checks structured error, field-level errors (email,
+   * password), and non-field errors in priority order.
+   */
   function normalizeRegisterError(payload?: RegisterResponse): string {
     if (!payload) {
       return "Registration failed.";
@@ -101,8 +111,14 @@ export function HomeRegisterConsole({ health }: HomeRegisterConsoleProps) {
     return "Registration failed.";
   }
 
-  async function handleRegister(event: FormEvent<HTMLFormElement>) {
+  /**
+   * Form submission handler for registration. POSTs credentials to
+   * the Django register endpoint, persists the new session to
+   * localStorage on success, and redirects to home.
+   */
+  async function handleRegister(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
+
     setIsSubmitting(true);
     setMessage("Creating account...");
     setMessageTone("neutral");
@@ -113,6 +129,7 @@ export function HomeRegisterConsole({ health }: HomeRegisterConsoleProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
+
       const payload: RegisterResponse = await response.json();
       const token = payload.data?.token ?? "";
       const nextEmail = payload.data?.user?.email ?? email;
@@ -132,6 +149,7 @@ export function HomeRegisterConsole({ health }: HomeRegisterConsoleProps) {
         role: nextRole,
         organization: nextOrganization,
       });
+
       setMessage("Account created. Redirecting...");
       setMessageTone("neutral");
       router.push("/");

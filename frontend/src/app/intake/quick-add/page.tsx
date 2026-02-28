@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { QuickAddConsole } from "@/features/intake";
-import styles from "./page.module.css";
+import { PageCard, PageShell } from "@/shared/shell";
 
 export const metadata: Metadata = {
   title: "Quick Add Customer",
@@ -8,12 +8,10 @@ export const metadata: Metadata = {
 
 export default function QuickAddPage() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <section className={styles.card}>
-          <QuickAddConsole />
-        </section>
-      </main>
-    </div>
+    <PageShell>
+      <PageCard>
+        <QuickAddConsole />
+      </PageCard>
+    </PageShell>
   );
 }

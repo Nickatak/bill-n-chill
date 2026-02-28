@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { EstimatesConsole } from "@/features/estimates";
 import { redirect } from "next/navigation";
-import styles from "./page.module.css";
+import { PageCard, PageShell } from "@/shared/shell";
 import { isNumericRouteId, resolveProjectParamTitle } from "@/shared/shell/route-metadata";
 
 type ProjectEstimatesPageProps = {
@@ -27,12 +27,10 @@ export default async function ProjectEstimatesPage({
   const estimateKey = isNumericRouteId(estimate) ? estimate : "all";
 
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <section className={styles.card}>
-          <EstimatesConsole scopedProjectId={Number(projectId)} key={`${projectId}-${estimateKey}`} />
-        </section>
-      </main>
-    </div>
+    <PageShell>
+      <PageCard>
+        <EstimatesConsole scopedProjectId={Number(projectId)} key={`${projectId}-${estimateKey}`} />
+      </PageCard>
+    </PageShell>
   );
 }

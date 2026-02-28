@@ -1,3 +1,12 @@
+/**
+ * Top-level controller hook for the quick-add customer intake form.
+ *
+ * Owns all form field state and composes the auth-status and business-workflow
+ * hooks into a single {@link QuickAddControllerApi} object. The page component
+ * consumes this API and threads it down to child components — no child ever
+ * reaches into the controller's internals directly.
+ */
+
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -21,9 +30,19 @@ export type {
   DuplicateResolution,
 };
 
+/**
+ * Initialize and return the full quick-add controller API.
+ *
+ * Manages form field state (name, phone, address, etc.), derives the auth
+ * status message, and delegates submission / duplicate-resolution logic to
+ * the business-workflow hook. The returned object is the single source of
+ * truth for every quick-add UI component.
+ */
 export function useQuickAddController({ token, baseAuthMessage }: UseQuickAddControllerArgs) {
   const fullNameRef = useRef<HTMLInputElement>(null);
   const normalizedBaseUrl = useMemo(() => normalizeApiBaseUrl(defaultApiBaseUrl), []);
+
+  // --- Form field state ---
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -34,9 +53,12 @@ export function useQuickAddController({ token, baseAuthMessage }: UseQuickAddCon
   const [projectStatus, setProjectStatus] = useState("prospect");
   const [fieldErrors, setFieldErrors] = useState<LeadFieldErrors>({});
 
+  // Auto-focus the first field on mount so the user can start typing immediately.
   useEffect(() => {
     fullNameRef.current?.focus();
   }, []);
+
+  // --- Composed hooks ---
 
   const authMessage = useQuickAddAuthStatus({
     token,
@@ -62,20 +84,24 @@ export function useQuickAddController({ token, baseAuthMessage }: UseQuickAddCon
     setFieldErrors,
   });
 
-  // Explicit parent API object consumed by the composition owner and child components.
+  // --- Public API surface ---
+
   const controllerApi: QuickAddControllerApi = {
     fullNameRef,
     authMessage,
+
     leadMessage: workflow.leadMessage,
     leadMessageTone: workflow.leadMessageTone,
     conversionMessage: workflow.conversionMessage,
     conversionMessageTone: workflow.conversionMessageTone,
+
     lastSubmissionIntent: workflow.lastSubmissionIntent,
     lastDuplicateResolution: workflow.lastDuplicateResolution,
     lastConvertedCustomerId: workflow.lastConvertedCustomerId,
     lastConvertedCustomerName: workflow.lastConvertedCustomerName,
     lastConvertedProjectId: workflow.lastConvertedProjectId,
     lastConvertedProjectName: workflow.lastConvertedProjectName,
+
     fullName,
     setFullName,
     phone,
@@ -91,11 +117,13 @@ export function useQuickAddController({ token, baseAuthMessage }: UseQuickAddCon
     projectStatus,
     setProjectStatus,
     fieldErrors,
+
     duplicateCandidates: workflow.duplicateCandidates,
     duplicateMatchPayload: workflow.duplicateMatchPayload,
     duplicateResolutionIntent: workflow.duplicateResolutionIntent,
     selectedDuplicateId: workflow.selectedDuplicateId,
     setSelectedDuplicateId: workflow.setSelectedDuplicateId,
+
     lastLead: workflow.lastLead,
     handleQuickAdd: workflow.handleQuickAdd,
     resolveDuplicate: workflow.resolveDuplicate,

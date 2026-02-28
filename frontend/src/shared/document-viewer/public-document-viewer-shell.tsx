@@ -1,9 +1,23 @@
+/**
+ * Layout shell for public document viewer pages.
+ *
+ * Wraps the document content with an optional status message and a
+ * configurable banner (e.g. "Awaiting your approval" or "Payment received").
+ * Accepts a full classNames map so each document type can apply its own
+ * CSS module styles while sharing the same structural markup.
+ */
+
 "use client";
 
 import { ReactNode } from "react";
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 type BannerTone = "pending" | "complete";
 
+/** Configuration for the optional status banner shown above the document. */
 type BannerConfig = {
   tone: BannerTone;
   eyebrow: string;
@@ -13,6 +27,7 @@ type BannerConfig = {
   stateClassName?: string;
 };
 
+/** CSS module class names the shell requires from each consumer. */
 type PublicDocumentViewerShellClassNames = {
   root: string;
   statusMessage: string;
@@ -32,10 +47,27 @@ type PublicDocumentViewerShellProps = {
   children: ReactNode;
 };
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Join class name fragments, filtering out falsy values. */
 function joinClassNames(...parts: Array<string | undefined | false>): string {
   return parts.filter(Boolean).join(" ");
 }
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+/**
+ * Render the outer shell of a public document viewer page.
+ *
+ * The shell provides three visual layers:
+ * 1. An optional single-line status message (e.g. loading/error feedback)
+ * 2. An optional tone-colored banner for workflow state indication
+ * 3. The document content itself (passed as children)
+ */
 export function PublicDocumentViewerShell({
   classNames,
   statusMessage,

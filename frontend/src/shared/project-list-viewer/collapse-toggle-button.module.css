@@ -30,7 +30,7 @@
 
 .collapseButton:focus-visible {
   outline: none;
-  border-color: #93c5fd;
+  border-color: var(--accent-border);
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.32);
 }
 

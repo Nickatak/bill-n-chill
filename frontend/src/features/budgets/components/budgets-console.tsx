@@ -1,6 +1,13 @@
 "use client";
 
+/**
+ * Budget baseline console for converting approved estimates into budgets
+ * and inspecting budget-line breakdowns. Scoped to a single project and
+ * provides the estimate-to-budget conversion workflow.
+ */
+
 import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { parseAmount, formatCurrency } from "@/shared/money-format";
 import { useEffect, useState } from "react";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
@@ -11,6 +18,7 @@ type BudgetsConsoleProps = {
   scopedProjectId: string;
 };
 
+/** Budget baseline workspace: estimate conversion, budget selection, and line-level inspection. */
 export function BudgetsConsole({ scopedProjectId }: BudgetsConsoleProps) {
   const { token } = useSharedSessionAuth();
   const [statusMessage, setStatusMessage] = useState("");
@@ -40,9 +48,9 @@ export function BudgetsConsole({ scopedProjectId }: BudgetsConsoleProps) {
   const selectedBudgetTotals = selectedBudget
     ? selectedBudget.line_items.reduce(
         (totals, line) => {
-          totals.budget += toAmount(line.budget_amount);
-          totals.committed += toAmount(line.committed_amount);
-          totals.actual += toAmount(line.actual_amount);
+          totals.budget += parseAmount(line.budget_amount);
+          totals.committed += parseAmount(line.committed_amount);
+          totals.actual += parseAmount(line.actual_amount);
           return totals;
         },
         { budget: 0, committed: 0, actual: 0 },
@@ -52,6 +60,7 @@ export function BudgetsConsole({ scopedProjectId }: BudgetsConsoleProps) {
     ? selectedBudgetTotals.budget - selectedBudgetTotals.actual
     : 0;
 
+  /** Map internal budget status values to user-facing labels. */
   function formatBudgetStatus(status: string): string {
     if (status === "superseded") {
       return "voided";
@@ -59,20 +68,7 @@ export function BudgetsConsole({ scopedProjectId }: BudgetsConsoleProps) {
     return status;
   }
 
-  function toAmount(value: string): number {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-
-  function formatMoney(value: number): string {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
-  }
-
+  /** Ensure the scoped project is loaded into local state, fetching if needed. */
   async function ensureScopedProjectLoaded() {
     if (project?.id === projectId) {
       return true;
@@ -108,6 +104,7 @@ export function BudgetsConsole({ scopedProjectId }: BudgetsConsoleProps) {
     }
   }
 
+  /** Load approved estimates and existing budgets to determine conversion candidates. */
   async function loadConversionCandidates() {
     const scopedReady = await ensureScopedProjectLoaded();
     if (!scopedReady) {
@@ -159,6 +156,7 @@ export function BudgetsConsole({ scopedProjectId }: BudgetsConsoleProps) {
     }
   }
 
+  // Kick off the initial data load once auth is available.
   useEffect(() => {
     if (!token) {
       return;
@@ -170,6 +168,7 @@ export function BudgetsConsole({ scopedProjectId }: BudgetsConsoleProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, scopedProjectId]);
 
+  /** Convert the selected approved estimate into a budget record. */
   async function handleConvertToBudget() {
     if (conversionCandidates.length === 0) {
       if (approvedEstimates.length === 0) {
@@ -226,6 +225,7 @@ export function BudgetsConsole({ scopedProjectId }: BudgetsConsoleProps) {
     }
   }
 
+  /** Update the selected budget for line-level inspection. */
   function handleBudgetSelection(budgetId: string) {
     setSelectedBudgetId(budgetId);
   }
@@ -315,15 +315,15 @@ export function BudgetsConsole({ scopedProjectId }: BudgetsConsoleProps) {
           <div className={styles.summaryGrid}>
             <div className={styles.metricCard}>
               <span className={styles.metricLabel}>Budget Total</span>
-              <span className={styles.metricValue}>{formatMoney(selectedBudgetTotals?.budget ?? 0)}</span>
+              <span className={styles.metricValue}>{formatCurrency(selectedBudgetTotals?.budget ?? 0)}</span>
             </div>
             <div className={styles.metricCard}>
               <span className={styles.metricLabel}>Committed Total</span>
-              <span className={styles.metricValue}>{formatMoney(selectedBudgetTotals?.committed ?? 0)}</span>
+              <span className={styles.metricValue}>{formatCurrency(selectedBudgetTotals?.committed ?? 0)}</span>
             </div>
             <div className={styles.metricCard}>
               <span className={styles.metricLabel}>Actual Total</span>
-              <span className={styles.metricValue}>{formatMoney(selectedBudgetTotals?.actual ?? 0)}</span>
+              <span className={styles.metricValue}>{formatCurrency(selectedBudgetTotals?.actual ?? 0)}</span>
             </div>
             <div className={styles.metricCard}>
               <span className={styles.metricLabel}>Variance</span>
@@ -332,7 +332,7 @@ export function BudgetsConsole({ scopedProjectId }: BudgetsConsoleProps) {
                   selectedBudgetVariance < 0 ? styles.negative : styles.positive
                 }`}
               >
-                {formatMoney(selectedBudgetVariance)}
+                {formatCurrency(selectedBudgetVariance)}
               </span>
             </div>
           </div>
@@ -352,20 +352,20 @@ export function BudgetsConsole({ scopedProjectId }: BudgetsConsoleProps) {
             </thead>
             <tbody>
               {selectedBudget.line_items.map((line) => {
-                const budgetAmount = toAmount(line.budget_amount);
-                const committedAmount = toAmount(line.committed_amount);
-                const actualAmount = toAmount(line.actual_amount);
+                const budgetAmount = parseAmount(line.budget_amount);
+                const committedAmount = parseAmount(line.committed_amount);
+                const actualAmount = parseAmount(line.actual_amount);
                 const variance = budgetAmount - actualAmount;
                 return (
                   <tr key={line.id}>
                     <td>#{line.id}</td>
                     <td>{line.cost_code_code}</td>
                     <td>{line.description}</td>
-                    <td>{formatMoney(budgetAmount)}</td>
-                    <td>{formatMoney(committedAmount)}</td>
-                    <td>{formatMoney(actualAmount)}</td>
+                    <td>{formatCurrency(budgetAmount)}</td>
+                    <td>{formatCurrency(committedAmount)}</td>
+                    <td>{formatCurrency(actualAmount)}</td>
                     <td className={variance < 0 ? styles.negative : styles.positive}>
-                      {formatMoney(variance)}
+                      {formatCurrency(variance)}
                     </td>
                   </tr>
                 );

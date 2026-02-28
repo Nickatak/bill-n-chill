@@ -1,3 +1,12 @@
+/**
+ * Business-workflow hook for the quick-add customer intake form.
+ *
+ * Encapsulates the submit-validate-respond cycle including duplicate
+ * detection and resolution. The controller hook owns field state; this hook
+ * owns submission orchestration, API calls, and the feedback messages that
+ * result from them.
+ */
+
 "use client";
 
 import { FormEvent, RefObject, useState } from "react";
@@ -39,6 +48,17 @@ type UseQuickAddBusinessWorkflowArgs = {
   setFieldErrors: (errors: LeadFieldErrors) => void;
 };
 
+/**
+ * Manage the full submission lifecycle for the quick-add form.
+ *
+ * Handles three flows:
+ *  1. Normal create (customer only, or customer + project)
+ *  2. Duplicate detected — parks the submission and exposes candidates
+ *  3. Duplicate resolved — replays the parked submission with a resolution
+ *
+ * Returns reactive state for messages, duplicate UI, and last-success data
+ * so the controller can surface them to the form.
+ */
 export function useQuickAddBusinessWorkflow({
   token,
   normalizedBaseUrl,
@@ -57,14 +77,20 @@ export function useQuickAddBusinessWorkflow({
   setNotes,
   setFieldErrors,
 }: UseQuickAddBusinessWorkflowArgs) {
+  // --- User-facing feedback messages ---
+
   const [leadMessage, setLeadMessage] = useState("");
   const [leadMessageTone, setLeadMessageTone] = useState<QuickAddMessageTone>("neutral");
   const [conversionMessage, setConversionMessage] = useState("");
   const [conversionMessageTone, setConversionMessageTone] = useState<QuickAddMessageTone>("neutral");
 
+  // --- Duplicate-detection state ---
+
   const [duplicateCandidates, setDuplicateCandidates] = useState<DuplicateCustomerCandidate[]>([]);
   const [selectedDuplicateId, setSelectedDuplicateId] = useState<string>("");
   const [pendingSubmission, setPendingSubmission] = useState<PendingSubmission | null>(null);
+
+  // --- Last-success state (shown in the confirmation banner) ---
 
   const [lastLead, setLastLead] = useState<CustomerIntakeRecord | null>(null);
   const [lastSubmissionIntent, setLastSubmissionIntent] = useState<SubmitIntent | null>(null);
@@ -74,6 +100,10 @@ export function useQuickAddBusinessWorkflow({
   const [lastConvertedProjectId, setLastConvertedProjectId] = useState<number | null>(null);
   const [lastConvertedProjectName, setLastConvertedProjectName] = useState("");
 
+  /**
+   * Reset all "last successful submission" state so a new submission starts
+   * with a clean slate and does not flash stale confirmation data.
+   */
   function clearLastSuccessState() {
     setLastLead(null);
     setLastSubmissionIntent(null);
@@ -84,6 +114,14 @@ export function useQuickAddBusinessWorkflow({
     setLastConvertedProjectName("");
   }
 
+  /**
+   * Send the intake payload to the API and handle every possible outcome:
+   * duplicate conflict (409), other errors, or success.
+   *
+   * On success, updates confirmation state and resets the form for the next
+   * entry. On failure, preserves the entered values so the user can fix and
+   * retry without re-typing.
+   */
   async function submitQuickAdd(
     body: CustomerIntakePayload,
     submission: PendingSubmission,
@@ -102,6 +140,8 @@ export function useQuickAddBusinessWorkflow({
     });
     const payload: ApiResponse = await response.json();
 
+    // --- Duplicate conflict — park the submission and show candidates ---
+
     if (response.status === 409 && payload.error?.code === "duplicate_detected") {
       const data = payload.data as DuplicateData;
       const candidates = data.duplicate_candidates ?? [];
@@ -113,11 +153,15 @@ export function useQuickAddBusinessWorkflow({
       return;
     }
 
+    // --- Other API errors ---
+
     if (!response.ok) {
       setLeadMessage(payload.error?.message ?? "Quick Add failed. Check token and required fields.");
       setLeadMessageTone("error");
       return;
     }
+
+    // --- Success path — extract results and update confirmation state ---
 
     const result = payload.data as QuickAddResult;
     const resolution = payload.meta?.duplicate_resolution ?? "none";
@@ -132,6 +176,7 @@ export function useQuickAddBusinessWorkflow({
     setDuplicateCandidates([]);
     setSelectedDuplicateId("");
     setPendingSubmission(null);
+
     setLastLead(lead);
     setLastSubmissionIntent(submission.intent);
     setLastDuplicateResolution(resolution);
@@ -142,6 +187,7 @@ export function useQuickAddBusinessWorkflow({
     setConversionMessage("");
     setConversionMessageTone("neutral");
 
+    // Determine the user-facing success or partial-failure message.
     if (submission.intent === "customer_and_project") {
       if (customerId !== null && projectId !== null) {
         setLeadMessage("Customer + project created.");
@@ -162,6 +208,7 @@ export function useQuickAddBusinessWorkflow({
 
     const saveSucceeded =
       customerId !== null && (submission.intent === "customer_only" || projectId !== null);
+
     if (!saveSucceeded) {
       setConversionMessage(
         submission.intent === "customer_and_project"
@@ -183,9 +230,16 @@ export function useQuickAddBusinessWorkflow({
     }
   }
 
+  /**
+   * Form submit handler — validates fields, builds the payload, and kicks
+   * off the API submission. The submitter button's value determines whether
+   * this is a "customer only" or "customer + project" intent.
+   */
   async function handleQuickAdd(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    // Determine intent from the submitter button value (the form has two
+    // submit buttons with different values).
     const nativeEvent = event.nativeEvent as SubmitEvent;
     const submitter = nativeEvent.submitter as HTMLButtonElement | null;
     const submitterValue = submitter?.value ?? "customer_and_project";
@@ -193,6 +247,7 @@ export function useQuickAddBusinessWorkflow({
       submitterValue === "customer_only" ? "customer_only" : "customer_and_project";
 
     clearLastSuccessState();
+
     setLeadMessage(
       intent === "customer_only"
         ? "Creating customer..."
@@ -227,6 +282,7 @@ export function useQuickAddBusinessWorkflow({
 
     const nextErrors = validateLeadFields(payload, { intent, projectName });
     setFieldErrors(nextErrors);
+
     if (Object.keys(nextErrors).length > 0) {
       setLeadMessage("Fix the required fields and submit again.");
       setLeadMessageTone("error");
@@ -241,6 +297,13 @@ export function useQuickAddBusinessWorkflow({
     }
   }
 
+  /**
+   * Resolve a previously detected duplicate by replaying the parked
+   * submission with the chosen resolution strategy.
+   *
+   * Supports "create_anyway" (ignore the duplicate) or merge/link
+   * strategies that require a target customer ID.
+   */
   async function resolveDuplicate(resolution: DuplicateResolution, targetId?: number) {
     if (!pendingSubmission) {
       setLeadMessage("No pending duplicate payload to resolve.");
@@ -278,17 +341,20 @@ export function useQuickAddBusinessWorkflow({
     leadMessageTone,
     conversionMessage,
     conversionMessageTone,
+
     lastSubmissionIntent,
     lastDuplicateResolution,
     lastConvertedCustomerId,
     lastConvertedCustomerName,
     lastConvertedProjectId,
     lastConvertedProjectName,
+
     duplicateCandidates,
     duplicateMatchPayload: pendingSubmission?.payload ?? null,
     duplicateResolutionIntent: pendingSubmission?.intent ?? null,
     selectedDuplicateId,
     setSelectedDuplicateId,
+
     lastLead,
     handleQuickAdd,
     resolveDuplicate,
