@@ -9,7 +9,7 @@ Track implementation-complete feature slices without duplicating full API/domain
 ## Current Status
 
 - Current Feature: `Complete`
-- Completed Features: `28/28`
+- Completed Features: `33/33`
 - State: all MVP v1 slices listed below are shipped.
 
 ## How To Use This File
@@ -19,7 +19,6 @@ Track implementation-complete feature slices without duplicating full API/domain
   - API contracts: `docs/api.md`
   - Domain/lifecycle rules: `docs/domain-model.md`
   - Frontend feature ownership: `frontend/src/features/*/FEATURE_MAP.md`
-  - Current implementation notes: `work/for_me.md`
 
 ## Completed Slices
 
@@ -47,30 +46,35 @@ Track implementation-complete feature slices without duplicating full API/domain
 
 12. `CO-01` Change order creation and lifecycle
 13. `CO-02` Change order financial propagation
-14. `INV-01` Invoice composition and send
-15. `INV-02` Unapproved scope billing protection
+14. `CO-03` Change order decision snapshots
+15. `INV-01` Invoice composition and send
+16. `INV-02` Unapproved scope billing protection
 
 ### Phase 4: AP and Payments
 
-16. `VEN-01` Vendor directory
-17. `AP-01` Vendor bill intake and lifecycle
-18. `PAY-01` Payment recording (inbound/outbound)
-19. `PAY-02` Payment allocation engine
+17. `VEN-01` Vendor directory
+18. `AP-01` Vendor bill intake and lifecycle
+19. `PAY-01` Payment recording (inbound/outbound)
+20. `PAY-02` Payment allocation engine
 
 ### Phase 5: Financial Visibility and Accounting
 
-20. `FIN-01` Project financial summary
-21. `FIN-02` Drill-down traceability
-22. `ACC-01` Accounting export bridge
-23. `ACC-02` QuickBooks sync foundation
+21. `FIN-01` Project financial summary
+22. `FIN-02` Drill-down traceability
+23. `RPT-01` Reporting pack (portfolio + change-impact)
+24. `RPT-02` Attention feed
+25. `ACC-01` Accounting export bridge
+26. `ACC-02` QuickBooks sync foundation
 
 ### Phase 6: UX, Quality, and Operational Readiness
 
-24. `UX-01` Mobile-first core action UX
-25. `UX-02` Desktop deep-work UX
-26. `UX-03` Theme system (light + dark)
-27. `QA-01` Audit trail coverage
-28. `QA-02` Regression test baseline
+27. `OPS-ORG-01` Organization management and RBAC console
+28. `NAV-01` Search + quick jump
+29. `UX-01` Mobile-first core action UX
+30. `UX-02` Desktop deep-work UX
+31. `UX-03` Theme system (light + dark)
+32. `QA-01` Financial audit trail
+33. `QA-02` Project timeline / activity center
 
 ## Workflow IA Note
 

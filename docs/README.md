@@ -80,22 +80,18 @@ Stable service names for overrides:
 - `backend`
 - `db`
 
-## Documentation Roadmap
+## Documentation
 
 - `docs/setup.md`: local setup instructions.
 - `docs/architecture.md`: detailed system boundaries and conventions.
 - `docs/api.md`: endpoint reference and API standards.
 - `docs/contributing.md`: workflow, branching, testing, and code style.
-- `docs/mvp-v1.md`: initial MVP scope, acceptance criteria, and phased delivery.
 - `docs/domain-model.md`: core entities, lifecycles, and API direction for construction billing workflows.
 - `docs/feature-list.md`: compact implementation ledger for shipped feature slices.
-- `docs/phase-2-operational-hardening-and-product-development.md`: next-phase plan for operational hardening and UX/use-case product development.
-- `docs/quick-add-ux-v2.md`: Quick Add Customer v2 UX goals, interaction rules, and acceptance checks.
-- `docs/pre-alpha-friend-testing-checklist.md`: controlled friend-testing launch checklist for pre-alpha feedback rounds.
+- `docs/meta/mvp-v1.md`: initial MVP scope, acceptance criteria, and phased delivery.
+- `docs/phase-2-operational-hardening-and-product-development.md`: next-phase plan for operational hardening and product development.
+- `docs/quick-add-ux-v2.md`: Quick Add Customer v2 UX goals and acceptance checks.
 
 ## Notes
 
 This file is intentionally lightweight and practical; detailed behavior/contracts live in `docs/`.
-
-Current implementation notes are tracked in:
-- `work/for_me.md`

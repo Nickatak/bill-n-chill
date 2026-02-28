@@ -121,6 +121,8 @@ Key fields:
 - `invoice_default_terms`
 - `invoice_default_footer`
 - `invoice_default_notes`
+- `estimate_default_terms`
+- `change_order_default_reason`
 - `created_by`
 
 Policy:
@@ -392,8 +394,7 @@ Key fields:
 Formal scope/price/time change affecting contract and budget.
 
 Current scope:
-- Internal-facing workflow object (not yet customer-facing like Estimate public approval loop).
-- Future direction is to add a customer delivery/decision loop without coupling it to core financial propagation rules.
+- Supports both internal authoring/revision workflows and public customer review/decision flows via tokenized public routes.
 
 Key fields:
 - `id`

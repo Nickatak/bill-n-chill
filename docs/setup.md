@@ -114,14 +114,20 @@ make local-run-frontend
 make docker-up
 ```
 
-Expected URLs:
+Expected URLs (key surfaces):
 
-- Backend API: `http://localhost:8000/api/v1/health/`
+- Backend health: `http://localhost:8000/api/v1/health/`
 - Frontend app: `http://localhost:3000`
-- Intake quick-add page: `http://localhost:3000/intake/quick-add`
-- Projects page: `http://localhost:3000/projects`
-- Cost codes page: `http://localhost:3000/cost-codes`
-- Estimates page: `http://localhost:3000/estimates`
+- Intake: `http://localhost:3000/intake/quick-add`
+- Projects: `http://localhost:3000/projects`
+- Estimates: `http://localhost:3000/estimates`
+- Change Orders: `http://localhost:3000/change-orders`
+- Invoices: `http://localhost:3000/invoices`
+- Vendor Bills: `http://localhost:3000/vendor-bills`
+- Payments: `http://localhost:3000/payments`
+- Organization: `http://localhost:3000/ops/organization`
+
+For the full API route map see `docs/api.md`. For the full frontend route map see `frontend/ARCHITECTURE_MAP.md`.
 
 ## One-Command Demo Seed (Bob Bathroom Remodel)
 

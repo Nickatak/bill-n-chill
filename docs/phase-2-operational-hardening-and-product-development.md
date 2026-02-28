@@ -5,7 +5,6 @@ Last reviewed: 2026-02-28
 ## Status Snapshot
 
 - This remains an active planning/iteration document.
-- For execution-level day-to-day notes, use `work/for_me.md`.
 
 ## Objective
 
