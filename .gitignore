@@ -33,6 +33,7 @@ backend/db.sqlite3
 
 # Editor / local workspace
 .vscode/
+.claude/
 
 # Local AI working directory (kept out of repo)
 work/*
