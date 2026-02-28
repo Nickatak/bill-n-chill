@@ -36,29 +36,6 @@
   gap: 8px;
 }
 
-.controlBar .panelToggleButton {
-  border: 1px solid #5f7ea6;
-  border-radius: 8px;
-  background: #1b2a42;
-  color: #eaf2ff;
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-weight: 700;
-  padding: 5px 11px;
-  line-height: 1.1;
-  min-height: 0;
-  display: inline-flex;
-  align-items: center;
-  cursor: pointer;
-}
-
-.controlBar .panelToggleButton:hover {
-  border-color: #8bb5e6;
-  background: #274369;
-  color: #ffffff;
-}
-
 .countBadge {
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -382,18 +359,6 @@
   color: #dbe7ff;
 }
 
-:global(html[data-theme="dark"]) .controlBar .panelToggleButton {
-  border-color: #5f7ea6;
-  background: #1b2a42;
-  color: #eaf2ff;
-}
-
-:global(html[data-theme="dark"]) .controlBar .panelToggleButton:hover {
-  border-color: #8bb5e6;
-  background: #274369;
-  color: #ffffff;
-}
-
 :global(html[data-theme="dark"]) .controlBar .projectFilterActionButton:hover {
   border-color: #7aa2d6;
   background: #243a5f;
@@ -475,8 +440,7 @@
   }
 
   .projectFilterButton,
-  .projectFilterActionButton,
-  .panelToggleButton {
+  .projectFilterActionButton {
     font-size: 0.7rem;
   }
 }

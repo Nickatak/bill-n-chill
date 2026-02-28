@@ -26,6 +26,7 @@ import {
   ProjectRecord,
 } from "../types";
 import { EstimateSheet, OrganizationDocumentDefaults } from "./estimate-sheet";
+import collapseButtonStyles from "@/shared/collapse-toggle-button.module.css";
 
 type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amount";
 type EstimateStatusValue = string;
@@ -77,6 +78,7 @@ const ESTIMATE_QUICK_ACTION_BY_STATUS_FALLBACK: Record<string, "change_order" | 
 };
 const ESTIMATE_SYSTEM_ONLY_STATUSES = new Set<EstimateStatusValue>(["archived"]);
 const ESTIMATE_VALIDATION_DELTA_DAYS_FALLBACK = 30;
+const ESTIMATE_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
 
 function todayDateInputValue(): string {
   return new Date().toISOString().slice(0, 10);
@@ -227,6 +229,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const estimateStatusFiltersRef = useRef<EstimateStatusValue[]>(
     ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK,
   );
+  const estimateComposerRef = useRef<HTMLDivElement | null>(null);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const scopedProjectId = scopedProjectIdProp;
@@ -659,6 +662,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setFormErrorMessage("");
     setFormSuccessMessage("");
     setFormSuccessHref("");
+    requestAnimationFrame(() => {
+      estimateComposerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   function handleSelectFamilyLatest(title: string, latest: EstimateRecord) {
@@ -903,12 +909,18 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   }, [projects, scopedProjectId, selectedProjectId]);
 
   function addLineItem() {
+    if (formErrorMessage === ESTIMATE_MIN_LINE_ITEMS_ERROR) {
+      setFormErrorMessage("");
+    }
     const defaultCostCodeId = costCodes[0] ? String(costCodes[0].id) : "";
     setLineItems((current) => [...current, emptyLine(nextLineId, defaultCostCodeId)]);
     setNextLineId((value) => value + 1);
   }
 
   function duplicateLineItem(localId: number) {
+    if (formErrorMessage === ESTIMATE_MIN_LINE_ITEMS_ERROR) {
+      setFormErrorMessage("");
+    }
     const target = lineItems.find((line) => line.localId === localId);
     if (!target) {
       return;
@@ -937,10 +949,13 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   }
 
   function removeLineItem(localId: number) {
+    if (lineItems.length <= 1) {
+      setFormErrorMessage(ESTIMATE_MIN_LINE_ITEMS_ERROR);
+      setFormSuccessMessage("");
+      setFormSuccessHref("");
+      return;
+    }
     setLineItems((current) => {
-      if (current.length <= 1) {
-        return current;
-      }
       return current.filter((line) => line.localId !== localId);
     });
   }
@@ -1247,6 +1262,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setShowDuplicatePanel(false);
       setStatusEvents([]);
       setActionMessage("");
+      requestAnimationFrame(() => {
+        estimateComposerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
     } catch {
       setActionMessage("Could not reach duplicate endpoint.");
     }
@@ -1438,11 +1456,11 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
           </h3>
           <button
             type="button"
-            className={styles.lifecycleToggleButton}
+            className={collapseButtonStyles.collapseButton}
             onClick={() => setIsViewerExpanded((current) => !current)}
             aria-expanded={isViewerExpanded}
           >
-            {isViewerExpanded ? "Hide Viewer" : "Show Viewer"}
+            {isViewerExpanded ? "Collapse" : "Expand"}
           </button>
         </div>
 
@@ -1758,6 +1776,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                   {canSubmitStatusUpdate ? (
                     <button
                       type="button"
+                      className={`${styles.lifecycleActionButton} ${styles.lifecycleActionButtonPrimary}`}
                       onClick={handleUpdateEstimateStatus}
                       disabled={!canSubmitStatusUpdate}
                     >
@@ -1766,6 +1785,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                   ) : null}
                   <button
                     type="button"
+                    className={styles.lifecycleActionButton}
                     onClick={handleAddEstimateStatusNote}
                     disabled={!canSubmitStatusNote}
                   >
@@ -1839,27 +1859,28 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
               </span>
             </div>
             <p className={styles.workspaceToolbarHint}>
-              Add New Estimate opens a fresh draft workspace. Duplicate creates a new draft from the selected estimate.
+              Create New Estimate opens a fresh draft workspace. Duplicate creates a new draft from the selected estimate.
             </p>
           </div>
-        </div>
-        <div className={`${styles.lifecycleActions} ${styles.composerPrepActions}`}>
-          <button type="button" onClick={startNewEstimate}>
-            Add New Estimate
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (!selectedEstimate) {
-                setActionMessage("Select an existing estimate version before duplicating.");
-                return;
-              }
-              setDuplicateTitle(`${selectedEstimate.title || "Estimate"} Copy`);
-              setShowDuplicatePanel((current) => !current);
-            }}
-          >
-            Duplicate as New Estimate
-          </button>
+          <div className={`${styles.lifecycleActions} ${styles.composerPrepActions} ${styles.workspaceToolbarActions}`}>
+            <button type="button" className={styles.secondaryButton} onClick={startNewEstimate}>
+              Create New Estimate
+            </button>
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              onClick={() => {
+                if (!selectedEstimate) {
+                  setActionMessage("Select an existing estimate version before duplicating.");
+                  return;
+                }
+                setDuplicateTitle(`${selectedEstimate.title || "Estimate"} Copy`);
+                setShowDuplicatePanel((current) => !current);
+              }}
+            >
+              Duplicate as New Estimate
+            </button>
+          </div>
         </div>
         {actionMessage ? <p className={`${styles.actionError} ${styles.composerPrepMessage}`}>{actionMessage}</p> : null}
         {showDuplicatePanel ? (
@@ -1936,41 +1957,43 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         ) : null}
       </section>
 
-      <EstimateSheet
-        project={selectedProject}
-        organizationDefaults={organizationDefaults}
-        estimateId={selectedEstimateId}
-        estimateTitle={estimateTitle}
-        estimateDate={estimateDate}
-        validThrough={validThrough}
-        termsText={termsText}
-        taxPercent={taxPercent}
-        lineItems={lineItems}
-        lineTotals={lineTotals}
-        subtotal={subtotal}
-        taxAmount={taxAmount}
-        totalAmount={totalAmount}
-        costCodes={costCodes}
-        canSubmit={canCreateEstimate}
-        isSubmitting={isSubmitting}
-        isEditingDraft={isEditingDraft}
-        readOnly={isReadOnly}
-        formErrorMessage={formErrorMessage}
-        formSuccessMessage={formSuccessMessage}
-        formSuccessHref={formSuccessHref}
-        lineSortKey={lineSortKey}
-        lineSortDirection={lineSortDirection}
-        onTitleChange={handleEstimateTitleChange}
-        onValidThroughChange={setValidThrough}
-        onTaxPercentChange={setTaxPercent}
-        onLineItemChange={updateLineItem}
-        onAddLineItem={addLineItem}
-        onMoveLineItem={moveLineItem}
-        onDuplicateLineItem={duplicateLineItem}
-        onRemoveLineItem={removeLineItem}
-        onSortLineItems={handleSortLineItems}
-        onSubmit={handleCreateEstimate}
-      />
+      <div ref={estimateComposerRef}>
+        <EstimateSheet
+          project={selectedProject}
+          organizationDefaults={organizationDefaults}
+          estimateId={selectedEstimateId}
+          estimateTitle={estimateTitle}
+          estimateDate={estimateDate}
+          validThrough={validThrough}
+          termsText={termsText}
+          taxPercent={taxPercent}
+          lineItems={lineItems}
+          lineTotals={lineTotals}
+          subtotal={subtotal}
+          taxAmount={taxAmount}
+          totalAmount={totalAmount}
+          costCodes={costCodes}
+          canSubmit={canCreateEstimate}
+          isSubmitting={isSubmitting}
+          isEditingDraft={isEditingDraft}
+          readOnly={isReadOnly}
+          formErrorMessage={formErrorMessage}
+          formSuccessMessage={formSuccessMessage}
+          formSuccessHref={formSuccessHref}
+          lineSortKey={lineSortKey}
+          lineSortDirection={lineSortDirection}
+          onTitleChange={handleEstimateTitleChange}
+          onValidThroughChange={setValidThrough}
+          onTaxPercentChange={setTaxPercent}
+          onLineItemChange={updateLineItem}
+          onAddLineItem={addLineItem}
+          onMoveLineItem={moveLineItem}
+          onDuplicateLineItem={duplicateLineItem}
+          onRemoveLineItem={removeLineItem}
+          onSortLineItems={handleSortLineItems}
+          onSubmit={handleCreateEstimate}
+        />
+      </div>
     </section>
   );
 }

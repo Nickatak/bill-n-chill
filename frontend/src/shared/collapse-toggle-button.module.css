@@ -1,0 +1,51 @@
+.collapseButton {
+  border: 1px solid #5f7ea6;
+  border-radius: 8px;
+  background: #1b2a42;
+  color: #eaf2ff;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  padding: 5px 11px;
+  line-height: 1.1;
+  min-height: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.collapseButton:hover {
+  border-color: #8bb5e6;
+  background: #274369;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.collapseButton:focus-visible {
+  outline: none;
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.32);
+}
+
+.collapseButton:active {
+  transform: translateY(0);
+}
+
+.collapseButton:disabled {
+  opacity: 0.7;
+  cursor: default;
+  transform: none;
+}
+
+@media (max-width: 640px) {
+  .collapseButton {
+    width: 100%;
+  }
+}

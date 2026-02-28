@@ -1,7 +1,7 @@
 "use client";
 
 import { buildAuthHeaders } from "@/features/session/auth-headers";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   defaultApiBaseUrl,
@@ -20,6 +20,7 @@ import styles from "./change-orders-console.module.css";
 import composerStyles from "@/shared/document-composer/composer-foundation.module.css";
 import changeOrderComposerStyles from "@/shared/document-composer/change-order-composer.module.css";
 import { DocumentComposer } from "@/shared/document-composer";
+import collapseButtonStyles from "@/shared/collapse-toggle-button.module.css";
 import {
   resolveOrganizationBranding,
   type OrganizationBrandingDefaults,
@@ -242,6 +243,7 @@ const CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]>
   rejected: ["void"],
   void: [],
 };
+const CHANGE_ORDER_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
 const CO_GENERIC_BUDGET_LINE_CODES = new Set(["99-901", "99-902", "99-903"]);
 
 export function ChangeOrdersConsole({
@@ -284,6 +286,8 @@ export function ChangeOrdersConsole({
   const [changeOrderAllowedTransitions, setChangeOrderAllowedTransitions] = useState<
     Record<string, string[]>
   >(CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK);
+  const createComposerRef = useRef<HTMLDivElement | null>(null);
+  const pendingScrollToCreateComposerRef = useRef(false);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const canMutateChangeOrders = hasAnyRole(role, ["owner", "pm"]);
@@ -1270,6 +1274,9 @@ export function ChangeOrdersConsole({
   }
 
   function addLine(setter: LineSetter) {
+    if (actionTone === "error" && actionMessage === CHANGE_ORDER_MIN_LINE_ITEMS_ERROR) {
+      setFeedback("");
+    }
     const localId = nextLineLocalId;
     setNextLineLocalId((current) => current + 1);
     setter((current) => [...current, emptyLine(localId)]);
@@ -1277,12 +1284,18 @@ export function ChangeOrdersConsole({
 
   function removeLine(
     setter: LineSetter,
+    lines: ChangeOrderLineInput[],
     localId: number,
   ) {
-    setter((current) => (current.length > 1 ? current.filter((line) => line.localId !== localId) : current));
+    if (lines.length <= 1) {
+      setFeedback(CHANGE_ORDER_MIN_LINE_ITEMS_ERROR, "error");
+      return;
+    }
+    setter((current) => current.filter((line) => line.localId !== localId));
   }
 
   function handleStartNewChangeOrder() {
+    pendingScrollToCreateComposerRef.current = true;
     hydrateEditForm(undefined);
     setNewTitleManuallyEdited(false);
     setNewTitle(defaultChangeOrderTitle(selectedProjectName));
@@ -1295,6 +1308,23 @@ export function ChangeOrdersConsole({
     }
     setFeedback("Ready for a new change order draft.", "info");
   }
+
+  useEffect(() => {
+    if (!pendingScrollToCreateComposerRef.current) {
+      return;
+    }
+    if (selectedChangeOrder) {
+      return;
+    }
+    const target = createComposerRef.current;
+    if (!target) {
+      return;
+    }
+    pendingScrollToCreateComposerRef.current = false;
+    requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [selectedChangeOrder]);
 
   async function handleCreateChangeOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1603,11 +1633,11 @@ export function ChangeOrdersConsole({
             <h3>Estimate-linked Revisions</h3>
             <button
               type="button"
-              className={styles.viewerToggleButton}
+              className={collapseButtonStyles.collapseButton}
               onClick={() => setIsViewerExpanded((current) => !current)}
               aria-expanded={isViewerExpanded}
             >
-              {isViewerExpanded ? "Hide Viewer" : "Show Viewer"}
+              {isViewerExpanded ? "Collapse" : "Expand"}
             </button>
           </div>
           <p>
@@ -1987,7 +2017,8 @@ export function ChangeOrdersConsole({
       </div>
 
       {!selectedChangeOrder ? (
-        <DocumentComposer
+        <div ref={createComposerRef}>
+          <DocumentComposer
           adapter={changeOrderComposerAdapter}
           document={null}
           formState={createChangeOrderComposerFormState}
@@ -2034,7 +2065,7 @@ export function ChangeOrdersConsole({
 
                 <div className={composerStyles.partyGrid}>
                   <label className={`${composerStyles.inlineField} ${changeOrderComposerStyles.coMetaField}`}>
-                    Title
+                    <span className={changeOrderComposerStyles.coMetaLabel}>Title</span>
                     <input
                       className={`${composerStyles.fieldInput} ${changeOrderComposerStyles.coMetaInput}`}
                       value={newTitle}
@@ -2045,28 +2076,8 @@ export function ChangeOrdersConsole({
                       required
                     />
                   </label>
-                  <label className={`${composerStyles.inlineField} ${changeOrderComposerStyles.coMetaField}`}>
-                    Origin estimate (from selector)
-                    <span className={composerStyles.staticFieldValue}>
-                      {selectedViewerEstimate
-                        ? `#${selectedViewerEstimate.id} v${selectedViewerEstimate.version} ${selectedViewerEstimate.title}`
-                        : "No approved origin estimate selected"}
-                    </span>
-                    {selectedViewerEstimate &&
-                    estimateFinancialBaselineStatus(selectedViewerEstimate) !== "none" ? (
-                      <span
-                        className={`${changeOrderComposerStyles.viewerBaselineBadge} ${
-                          estimateFinancialBaselineStatus(selectedViewerEstimate) === "active"
-                            ? changeOrderComposerStyles.viewerBaselineBadgeActive
-                            : changeOrderComposerStyles.viewerBaselineBadgeSuperseded
-                        }`}
-                      >
-                        {financialBaselineLabel(estimateFinancialBaselineStatus(selectedViewerEstimate))}
-                      </span>
-                    ) : null}
-                  </label>
                   <label className={`${composerStyles.inlineField} ${changeOrderComposerStyles.coMetaField} ${changeOrderComposerStyles.coFieldWide}`}>
-                    Reason
+                    <span className={changeOrderComposerStyles.coMetaLabel}>Reason</span>
                     <textarea
                       className={`${composerStyles.fieldInput} ${changeOrderComposerStyles.coMetaInput}`}
                       value={newReason}
@@ -2196,8 +2207,7 @@ export function ChangeOrdersConsole({
                           <button
                             type="button"
                             className={composerStyles.smallButton}
-                            onClick={() => removeLine(setNewLineItems, line.localId)}
-                            disabled={newLineItems.length <= 1}
+                            onClick={() => removeLine(setNewLineItems, newLineItems, line.localId)}
                           >
                             Remove
                           </button>
@@ -2270,7 +2280,8 @@ export function ChangeOrdersConsole({
               </>
             ),
           }}
-        />
+          />
+        </div>
       ) : null}
 
       {selectedChangeOrder ? (
@@ -2319,7 +2330,7 @@ export function ChangeOrdersConsole({
 
                 <div className={composerStyles.partyGrid}>
                   <label className={`${composerStyles.inlineField} ${changeOrderComposerStyles.coMetaField}`}>
-                    Title
+                    <span className={changeOrderComposerStyles.coMetaLabel}>Title</span>
                     <input
                       className={`${composerStyles.fieldInput} ${changeOrderComposerStyles.coMetaInput} ${changeOrderComposerStyles.lockableControl}`}
                       value={editTitle}
@@ -2329,7 +2340,7 @@ export function ChangeOrdersConsole({
                     />
                   </label>
                   <label className={`${composerStyles.inlineField} ${changeOrderComposerStyles.coMetaField} ${changeOrderComposerStyles.coFieldWide}`}>
-                    Reason
+                    <span className={changeOrderComposerStyles.coMetaLabel}>Reason</span>
                     <textarea
                       className={`${composerStyles.fieldInput} ${changeOrderComposerStyles.coMetaInput} ${changeOrderComposerStyles.lockableControl}`}
                       value={editReason}
@@ -2465,8 +2476,7 @@ export function ChangeOrdersConsole({
                             <button
                               type="button"
                               className={composerStyles.smallButton}
-                              onClick={() => removeLine(setEditLineItems, line.localId)}
-                              disabled={editLineItems.length <= 1}
+                              onClick={() => removeLine(setEditLineItems, editLineItems, line.localId)}
                             >
                               Remove
                             </button>

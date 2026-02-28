@@ -38,6 +38,14 @@
   min-width: 0;
 }
 
+.coMetaLabel {
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #1e3a8a;
+  font-weight: 700;
+}
+
 .coMetaInput {
   width: 100%;
   min-width: 0;
@@ -81,7 +89,7 @@
 
 .coLineSectionIntro h3 {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   color: #0f172a;
 }
 
@@ -100,11 +108,11 @@
   display: grid;
   grid-template-columns: 0.85fr 1.2fr 1.2fr 1.45fr 1fr 0.9fr 0.9fr 0.7fr;
   gap: 8px;
-  align-items: center;
+  align-items: stretch;
   padding: 10px;
   background: #eef2ff;
   color: #1e3a8a;
-  font-size: 0.69rem;
+  font-size: 0.76rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
@@ -114,7 +122,7 @@
   display: grid;
   grid-template-columns: 0.85fr 1.2fr 1.2fr 1.45fr 1fr 0.9fr 0.9fr 0.7fr;
   gap: 8px;
-  align-items: center;
+  align-items: stretch;
   padding: 9px 10px;
   background: #ffffff;
 }
@@ -122,6 +130,17 @@
 .coLineHeader > span,
 .coLineRow > * {
   min-width: 0;
+  position: relative;
+}
+
+.coLineHeader > span + span,
+.coLineRow > * + * {
+  padding-left: 12px;
+  box-shadow: -1px 0 0 #dbe5f3;
+}
+
+.coLineHeader > span + span {
+  box-shadow: -1px 0 0 #5f7cab;
 }
 
 .coLineRowGroup {
@@ -265,6 +284,10 @@
   color: #cbd5e1;
 }
 
+:global(html[data-theme="dark"]) .coMetaLabel {
+  color: #93c5fd;
+}
+
 :global(html[data-theme="dark"]) .coLineRowGroup {
   border-top-color: #334155;
 }
@@ -289,19 +312,21 @@
 }
 
 :global(html[data-theme="dark"]) .editSheetLocked .lockableControl:disabled {
-  background: #0f172a;
-  border-color: #334155;
-  color: #94a3b8;
+  background: var(--composer-readonly-bg, #2a3448);
+  border-color: var(--composer-readonly-border, #5b6d8b);
+  color: var(--composer-readonly-text, #d6deea);
+  -webkit-text-fill-color: var(--composer-readonly-text, #d6deea);
 }
 
 :global(html[data-theme="dark"]) .editSheetLocked .lockableControl:disabled::placeholder {
-  color: #64748b;
+  color: var(--composer-readonly-text, #d6deea);
+  -webkit-text-fill-color: var(--composer-readonly-text, #d6deea);
 }
 
 :global(html[data-theme="dark"]) .editSheetLocked .coReadValue {
-  background: #0f172a;
-  border-color: #334155;
-  color: #94a3b8;
+  background: var(--composer-readonly-bg, #2a3448);
+  border-color: var(--composer-readonly-border, #5b6d8b);
+  color: var(--composer-readonly-text, #d6deea);
 }
 
 :global(html[data-theme="dark"]) .coFooterErrorHint {
@@ -313,6 +338,10 @@
   color: #bfdbfe;
 }
 
+:global(html[data-theme="dark"]) .coLineHeader > span + span {
+  box-shadow: -1px 0 0 #5f7cab;
+}
+
 :global(html[data-theme="dark"]) .coLineRow {
   background: #0f172a;
 }
@@ -321,10 +350,14 @@
   background: #131d31;
 }
 
+:global(html[data-theme="dark"]) .coLineRow > * + * {
+  box-shadow: -1px 0 0 #334155;
+}
+
 :global(html[data-theme="dark"]) .coReadValue {
-  background: #0b1220;
-  border-color: #334155;
-  color: #dbeafe;
+  background: var(--composer-readonly-bg, #2a3448);
+  border-color: var(--composer-readonly-border, #5b6d8b);
+  color: var(--composer-readonly-text, #d6deea);
 }
 
 :global(html[data-theme="dark"]) .coSummarySecondaryValue {

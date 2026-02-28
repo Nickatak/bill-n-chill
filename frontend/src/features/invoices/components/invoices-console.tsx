@@ -1,7 +1,7 @@
 "use client";
 
 import { buildAuthHeaders } from "@/features/session/auth-headers";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { formatDateDisplay, formatDateTimeDisplay } from "@/shared/date-format";
@@ -34,6 +34,7 @@ import {
 import styles from "./invoices-console.module.css";
 import composerStyles from "@/shared/document-composer/composer-foundation.module.css";
 import invoiceComposerStyles from "@/shared/document-composer/invoice-composer.module.css";
+import collapseButtonStyles from "@/shared/collapse-toggle-button.module.css";
 
 type StatusTone = "neutral" | "success" | "error";
 type ProjectStatusValue = ProjectListStatusValue;
@@ -94,6 +95,7 @@ const INVOICE_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
 
 const INVOICE_DEFAULT_STATUS_FILTERS_FALLBACK = ["draft", "sent", "partially_paid", "overdue"];
 const INVOICE_TERMINAL_STATUSES_FALLBACK = ["paid", "void"];
+const INVOICE_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
 const DEFAULT_PROJECT_STATUS_FILTERS: ProjectStatusValue[] = ["active", "prospect"];
 const PROJECT_STATUS_VALUES: ProjectStatusValue[] = ["prospect", "active", "on_hold", "completed", "cancelled"];
 const GENERIC_BUDGET_COST_CODES = new Set(["99-901", "99-902", "99-903"]);
@@ -395,6 +397,7 @@ export function InvoicesConsole() {
   const [workspaceSourceInvoiceId, setWorkspaceSourceInvoiceId] = useState<number | null>(null);
   const [editingDraftInvoiceId, setEditingDraftInvoiceId] = useState<number | null>(null);
   const [workspaceContext, setWorkspaceContext] = useState("New invoice draft");
+  const invoiceComposerRef = useRef<HTMLDivElement | null>(null);
 
   const selectedInvoice = useMemo(
     () => invoices.find((invoice) => String(invoice.id) === selectedInvoiceId) ?? null,
@@ -486,7 +489,6 @@ export function InvoicesConsole() {
   }, [invoices]);
   const nextDraftInvoiceNumber = useMemo(() => nextInvoiceNumberPreview(invoices), [invoices]);
   const workspaceInvoiceNumber = workspaceSourceInvoice?.invoice_number ?? nextDraftInvoiceNumber;
-  const workspaceIsEditingDraft = editingDraftInvoiceId !== null;
   const workspaceIsLockedByStatus = workspaceSourceInvoice ? workspaceSourceInvoice.status !== "draft" : false;
   const workspaceIsLocked = !canEditInvoiceWorkspace || workspaceIsLockedByStatus;
   const workspaceBadgeLabel = !workspaceSourceInvoice
@@ -950,18 +952,21 @@ export function InvoicesConsole() {
   }, [budgetLineById, budgetLineOptions]);
 
   function addLineItem() {
+    if (statusTone === "error" && statusMessage === INVOICE_MIN_LINE_ITEMS_ERROR) {
+      setStatusMessage("");
+      setStatusTone("neutral");
+    }
     const defaultBudgetLineId = budgetLineOptions[0] ? String(budgetLineOptions[0].id) : "";
     setLineItems((current) => [...current, emptyLine(nextLineId, defaultBudgetLineId)]);
     setNextLineId((value) => value + 1);
   }
 
   function removeLineItem(localId: number) {
-    setLineItems((current) => {
-      if (current.length <= 1) {
-        return current;
-      }
-      return current.filter((line) => line.localId !== localId);
-    });
+    if (lineItems.length <= 1) {
+      setErrorStatus(INVOICE_MIN_LINE_ITEMS_ERROR);
+      return;
+    }
+    setLineItems((current) => current.filter((line) => line.localId !== localId));
   }
 
   function updateLineItem(localId: number, key: keyof Omit<InvoiceLineInput, "localId">, value: string) {
@@ -1086,6 +1091,9 @@ export function InvoicesConsole() {
   function handleStartNewInvoiceDraft() {
     resetCreateDraft();
     setSuccessStatus("Started a new invoice draft.");
+    requestAnimationFrame(() => {
+      invoiceComposerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   async function handleCreateInvoice(event: FormEvent<HTMLFormElement>) {
@@ -1294,6 +1302,9 @@ export function InvoicesConsole() {
     setEditingDraftInvoiceId(null);
     setWorkspaceContext(`Draft from ${selectedInvoice.invoice_number}`);
     setSuccessStatus(`Loaded ${selectedInvoice.invoice_number} into a new draft. A new invoice # is assigned on create.`);
+    requestAnimationFrame(() => {
+      invoiceComposerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   const selectedProject = projects.find((project) => String(project.id) === selectedProjectId) ?? null;
@@ -1344,6 +1355,8 @@ export function InvoicesConsole() {
     () => createInvoiceDocumentAdapter(invoiceComposerStatusPolicy, []),
     [invoiceComposerStatusPolicy],
   );
+  const statusMessageAtComposer =
+    statusTone === "success" && /^(Created|Saved|Started|Loaded)\b/i.test(statusMessage);
 
   return (
     <section className={styles.console}>
@@ -1371,7 +1384,7 @@ export function InvoicesConsole() {
 
       {!token ? <p className={styles.authNotice}>{authMessage}</p> : null}
 
-      {statusMessage ? (
+      {statusMessage && !statusMessageAtComposer ? (
         <p
           className={`${styles.statusBanner} ${
             statusTone === "success"
@@ -1425,7 +1438,7 @@ export function InvoicesConsole() {
                   </span>
                   <button
                     type="button"
-                    className={styles.panelToggleButton}
+                    className={collapseButtonStyles.collapseButton}
                     onClick={() => setIsInvoiceViewerExpanded((current) => !current)}
                     aria-expanded={isInvoiceViewerExpanded}
                   >
@@ -1714,17 +1727,18 @@ export function InvoicesConsole() {
                   </p>
                 </div>
               ) : null}
-              <DocumentComposer
-                adapter={invoiceComposerAdapter}
-                document={null}
-                formState={invoiceDraftFormState}
-                className={`${composerStyles.sheet} ${invoiceComposerStyles.invoiceComposerSheet} ${workspaceIsLocked ? invoiceComposerStyles.invoiceComposerSheetLocked : ""}`}
-                sectionClassName={invoiceComposerStyles.invoiceComposerSection}
-                onSubmit={handleCreateInvoice}
-                sections={[{ slot: "context" }]}
-                renderers={{
-                  context: () => (
-                    <>
+              <div ref={invoiceComposerRef}>
+                <DocumentComposer
+                  adapter={invoiceComposerAdapter}
+                  document={null}
+                  formState={invoiceDraftFormState}
+                  className={`${composerStyles.sheet} ${invoiceComposerStyles.invoiceComposerSheet} ${workspaceIsLocked ? invoiceComposerStyles.invoiceComposerSheetLocked : ""}`}
+                  sectionClassName={invoiceComposerStyles.invoiceComposerSection}
+                  onSubmit={handleCreateInvoice}
+                  sections={[{ slot: "context" }]}
+                  renderers={{
+                    context: () => (
+                      <>
                       <div className={composerStyles.sheetHeader}>
                         <div className={invoiceComposerStyles.invoicePartyStack}>
                           <div className={composerStyles.fromBlock}>
@@ -1778,22 +1792,20 @@ export function InvoicesConsole() {
                           <div className={composerStyles.metaLine}>
                             <span>Invoice #</span>
                             <div className={invoiceComposerStyles.invoiceNumberContext}>
-                              <strong className={invoiceComposerStyles.invoiceMetaStrong}>{workspaceInvoiceNumber}</strong>
-                              <span
-                                className={`${invoiceComposerStyles.invoiceNumberIndicator} ${
-                                  workspaceIsEditingDraft
-                                    ? invoiceComposerStyles.invoiceNumberIndicatorEditing
-                                    : workspaceSourceInvoice
-                                      ? invoiceComposerStyles.invoiceNumberIndicatorLocked
-                                      : invoiceComposerStyles.invoiceNumberIndicatorGenerated
-                                }`}
-                              >
-                                {workspaceIsEditingDraft
-                                  ? "Editing existing draft"
-                                  : workspaceSourceInvoice
-                                    ? `Read-only ${statusLabel(workspaceSourceInvoice.status)}`
-                                    : "Number assigned on create"}
-                              </span>
+                              <input
+                                className={`${composerStyles.fieldInput} ${invoiceComposerStyles.invoiceNumberInput}`}
+                                value={workspaceInvoiceNumber}
+                                readOnly
+                                disabled
+                                aria-label="Invoice number"
+                              />
+                              {!workspaceSourceInvoice ? (
+                                <span
+                                  className={`${invoiceComposerStyles.invoiceNumberIndicator} ${invoiceComposerStyles.invoiceNumberIndicatorGenerated}`}
+                                >
+                                  New
+                                </span>
+                              ) : null}
                             </div>
                           </div>
                           <label className={composerStyles.inlineField}>
@@ -1942,7 +1954,6 @@ export function InvoicesConsole() {
                                     type="button"
                                     className={composerStyles.smallButton}
                                     onClick={() => removeLineItem(line.localId)}
-                                    disabled={lineItems.length <= 1}
                                   >
                                     Remove
                                   </button>
@@ -2000,29 +2011,37 @@ export function InvoicesConsole() {
                             </div>
                           </div>
                           {canMutateInvoices ? (
-                            <div className={invoiceComposerStyles.invoiceCreateActions}>
-                              <button
-                                type="submit"
-                                className={`${composerStyles.primaryButton} ${invoiceComposerStyles.invoiceCreatePrimary}`}
-                                disabled={workspaceIsLocked || (!editingDraftInvoiceId && !selectedProjectId)}
-                              >
-                                {workspaceIsLocked ? "Locked" : editingDraftInvoiceId ? "Save Draft" : "Create Invoice"}
-                              </button>
-                            </div>
+                            <>
+                              <div className={invoiceComposerStyles.invoiceCreateActions}>
+                                <button
+                                  type="submit"
+                                  className={`${composerStyles.primaryButton} ${invoiceComposerStyles.invoiceCreatePrimary}`}
+                                  disabled={workspaceIsLocked || (!editingDraftInvoiceId && !selectedProjectId)}
+                                >
+                                  {workspaceIsLocked ? "Locked" : editingDraftInvoiceId ? "Save Draft" : "Create Invoice"}
+                                </button>
+                              </div>
+                              {statusMessageAtComposer ? (
+                                <p className={`${composerStyles.actionSuccess} ${invoiceComposerStyles.invoiceCreateStatusMessage}`}>
+                                  {statusMessage}
+                                </p>
+                              ) : null}
+                            </>
                           ) : null}
                         </div>
                       </div>
-                    </>
-                  ),
-                  header: () => null,
-                  meta: () => null,
-                  line_items: () => null,
-                  totals: () => null,
-                  status: () => null,
-                  status_events: () => null,
-                  footer: () => null,
-                }}
-              />
+                      </>
+                    ),
+                    header: () => null,
+                    meta: () => null,
+                    line_items: () => null,
+                    totals: () => null,
+                    status: () => null,
+                    status_events: () => null,
+                    footer: () => null,
+                  }}
+                />
+              </div>
 
           </div>
         </>

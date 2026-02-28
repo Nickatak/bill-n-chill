@@ -631,7 +631,7 @@ export function ProjectsConsole() {
                   <div className={styles.branchGroup}>
                     <span className={styles.branchSubLabel}>Receivables</span>
                     <div className={styles.node}>
-                      <Link href="/invoices">Invoices (WIP)</Link>
+                      <Link href="/invoices">Invoices</Link>
                       <span className={styles.nodeCount}>
                         {summaryCounts ? summaryCounts.invoices : "--"}
                       </span>
@@ -731,7 +731,7 @@ export function ProjectsConsole() {
                   <strong>{apOutstandingDisplay}</strong>
                 </div>
                 <div className={styles.metricRow}>
-                  <span>Not Yet Expensed (Accepted - AP Outstanding)</span>
+                  <span>Not Yet Expensed</span>
                   <strong>{unspentFromAcceptedDisplay}</strong>
                 </div>
               </section>
@@ -784,7 +784,11 @@ export function ProjectsConsole() {
               Planned end date cannot be before planned start date.
             </p>
           ) : null}
-          <button type="submit" disabled={!hasSelectedProject || hasInvalidDateRange}>
+          <button
+            type="submit"
+            className={styles.projectProfileSubmit}
+            disabled={!hasSelectedProject || hasInvalidDateRange}
+          >
             Save Project Profile
           </button>
         </form>

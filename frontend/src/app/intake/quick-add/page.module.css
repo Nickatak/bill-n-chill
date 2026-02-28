@@ -86,7 +86,6 @@
 }
 
 .card button {
-  border: 1px solid var(--border);
   border-radius: 10px;
   background: #111827;
   color: #f9fafb;

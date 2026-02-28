@@ -133,8 +133,7 @@ export function EstimateSheet({
   const titleReadOnly = readOnly || isExistingEstimate;
   const mailingLines = rawBillingAddress
     ? rawBillingAddress
-        .replace(/\s*,\s*/g, "\n")
-        .split("\n")
+        .split(/\r?\n/)
         .map((line) => line.trim())
         .filter(Boolean)
     : ["Customer address"];
@@ -220,19 +219,30 @@ export function EstimateSheet({
       renderers={{
         header: () => (
           <div className={composerStyles.sheetHeader}>
-            <div className={composerStyles.fromBlock}>
-              <span className={composerStyles.blockLabel}>From</span>
-              <p className={composerStyles.blockText}>{senderName || "Your Company"}</p>
-              {senderEmail ? <p className={composerStyles.blockMuted}>{senderEmail}</p> : null}
-              {senderAddressLines.length ? (
-                senderAddressLines.map((line, index) => (
+            <div className={composerStyles.partyStack}>
+              <div className={composerStyles.fromBlock}>
+                <span className={composerStyles.blockLabel}>From</span>
+                <p className={composerStyles.blockText}>{senderName || "Your Company"}</p>
+                {senderEmail ? <p className={composerStyles.blockMuted}>{senderEmail}</p> : null}
+                {senderAddressLines.length ? (
+                  senderAddressLines.map((line, index) => (
+                    <p key={`${line}-${index}`} className={composerStyles.blockMuted}>
+                      {line}
+                    </p>
+                  ))
+                ) : (
+                  <p className={composerStyles.blockMuted}>Set sender address in Organization settings.</p>
+                )}
+              </div>
+              <div className={composerStyles.toBlock}>
+                <span className={composerStyles.blockLabel}>To</span>
+                <p className={composerStyles.blockText}>{customerName}</p>
+                {mailingLines.map((line, index) => (
                   <p key={`${line}-${index}`} className={composerStyles.blockMuted}>
                     {line}
                   </p>
-                ))
-              ) : (
-                <p className={composerStyles.blockMuted}>Set sender address in Organization settings.</p>
-              )}
+                ))}
+              </div>
             </div>
             <div className={composerStyles.headerRight}>
               <div className={composerStyles.logoBox}>
@@ -260,17 +270,7 @@ export function EstimateSheet({
         ),
         meta: () => (
           <>
-            <div className={composerStyles.partyGrid}>
-              <div className={composerStyles.toBlock}>
-                <span className={composerStyles.blockLabel}>To</span>
-                <p className={composerStyles.blockText}>{customerName}</p>
-                {mailingLines.map((line, index) => (
-                  <p key={`${line}-${index}`} className={composerStyles.blockMuted}>
-                    {line}
-                  </p>
-                ))}
-              </div>
-
+            <div className={composerStyles.metaOnlyRow}>
               <div className={composerStyles.metaBlock}>
                 {titlePresentation !== "header" ? (
                   <>
@@ -311,7 +311,7 @@ export function EstimateSheet({
                     />
                   )}
                 </div>
-                <div className={composerStyles.metaLine}>
+                <div className={`${composerStyles.metaLine} ${composerStyles.metaLineLast}`}>
                   <span>Valid through</span>
                   {showReadOnlyText ? (
                     <span className={composerStyles.staticMetaValue}>{formatDisplayDate(validThrough)}</span>
@@ -610,8 +610,8 @@ export function EstimateSheet({
 
             <div className={composerStyles.footer}>
               <span>{senderName || "Your Company"}</span>
-              <span>{senderEmail || "billing@example.com"}</span>
-              <span>{senderAddressLines[0] || "Set address in Organization settings"}</span>
+              <span>{senderEmail || "Help email not set"}</span>
+              <span>{estimateId ? `Estimate #${estimateId}` : "Draft estimate"}</span>
             </div>
           </>
         ),

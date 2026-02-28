@@ -180,17 +180,6 @@
   gap: 10px;
 }
 
-.viewerToggleButton {
-  border: 1px solid #bfcee3;
-  border-radius: 10px;
-  background: #ffffff;
-  color: #334155;
-  padding: 6px 10px;
-  font-size: 0.76rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
 .viewerHeader p {
   margin: 8px 0 10px;
   color: #475569;
@@ -1139,10 +1128,6 @@
     flex-direction: column;
   }
 
-  .viewerToggleButton {
-    width: 100%;
-  }
-
   .quickStatusPills {
     grid-template-columns: 1fr;
     gap: 8px;
@@ -1214,12 +1199,6 @@
 }
 
 :global(html[data-theme="dark"]) .viewerHeader p {
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .viewerToggleButton {
-  background: #111827;
-  border-color: #334155;
   color: #cbd5e1;
 }
 

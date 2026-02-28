@@ -1,6 +1,7 @@
 "use client";
 
 import styles from "./project-list-viewer.module.css";
+import collapseButtonStyles from "./collapse-toggle-button.module.css";
 
 export type ProjectListStatusValue = "prospect" | "active" | "on_hold" | "completed" | "cancelled";
 
@@ -107,7 +108,7 @@ export function ProjectListViewer({
           <div className={styles.panelHeaderActions}>
             <button
               type="button"
-              className={styles.panelToggleButton}
+              className={collapseButtonStyles.collapseButton}
               onClick={onToggleExpanded}
               aria-expanded={isExpanded}
             >

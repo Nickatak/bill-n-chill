@@ -383,28 +383,6 @@
   gap: 8px;
 }
 
-.panelToggleButton {
-  border: 1px solid #94a3b8;
-  border-radius: 6px;
-  background: #f1f5f9;
-  color: #334155;
-  font-size: 0.64rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 2px 7px;
-  line-height: 1.1;
-  min-height: 0;
-  display: inline-flex;
-  align-items: center;
-  cursor: pointer;
-}
-
-.panelToggleButton:hover {
-  border-color: #64748b;
-  background: #e2e8f0;
-  color: #1f2937;
-}
-
 .countBadge {
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -1539,7 +1517,6 @@
 
   .primaryButton,
   .secondaryButton,
-  .panelToggleButton,
   .quickStatusButton {
     width: 100%;
   }
@@ -1597,18 +1574,6 @@
   border-color: #334155;
   background: #0f172a;
   color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .panelToggleButton {
-  border-color: #334155;
-  background: #0f172a;
-  color: #cbd5e1;
-}
-
-:global(html[data-theme="dark"]) .panelToggleButton:hover {
-  border-color: #475569;
-  background: #17233a;
-  color: #e2e8f0;
 }
 
 :global(html[data-theme="dark"]) .projectFilterActionButton:hover {

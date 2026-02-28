@@ -49,7 +49,7 @@
 
 .bannerEyebrow {
   margin: 0;
-  font-size: 0.72rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -116,7 +116,7 @@
 
 .partyLabel {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 1rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--accent);
@@ -170,7 +170,7 @@
 
 .identityEyebrow {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 1rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--accent);
@@ -256,10 +256,10 @@
 
 .metaDetailsTitle {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 1rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--accent);
   font-weight: 700;
 }
 
@@ -283,7 +283,7 @@
 
 .lineHeading {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: #93c5fd;
@@ -310,7 +310,7 @@
 }
 
 .table th {
-  font-size: 0.82rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -345,7 +345,7 @@
 
 .panelTitle {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-secondary);
@@ -384,7 +384,7 @@
 
 .terms h4 {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: #93c5fd;
