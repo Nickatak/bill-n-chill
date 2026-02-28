@@ -148,7 +148,7 @@ export function ThemeToggle() {
           className={`themeControlButton ${isOrganizationPath ? "isActive" : ""}`}
           title={`Organization slug: ${organization.slug}`}
         >
-          {organization.displayName} Organization (WIP)
+          {organization.displayName} Organization
         </Link>
       ) : null}
       {hasSession && isPublicDocument ? (
