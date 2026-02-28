@@ -330,14 +330,6 @@ function readApiError(payload: ApiResponse | undefined, fallback: string): strin
   return message;
 }
 
-function projectStatusClass(statusValue: string): string {
-  const key = `projectStatus${statusValue
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join("")}`;
-  return styles[key] ?? "";
-}
-
 function projectStatusLabel(statusValue: string): string {
   return statusValue.replace("_", " ");
 }

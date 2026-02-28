@@ -19,7 +19,6 @@ const DEFAULT_SECTIONS: ComposerSectionConfig[] = [
 export function DocumentComposer<TDocument, TLine extends ComposerLineDraft, TFormState>({
   adapter,
   document,
-  formState: _formState,
   className = "",
   sectionClassName = "",
   onSubmit,

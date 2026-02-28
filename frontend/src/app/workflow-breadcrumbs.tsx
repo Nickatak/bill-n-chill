@@ -50,13 +50,13 @@ const hierarchyRules: HierarchyRule[] = [
     when: (pathname) => /^\/projects\/\d+\/budgets\/analytics$/.test(pathname),
     crumbs: [
       PROJECTS_HUB_CRUMB,
-      { href: "/budgets/analytics", label: "Budgets (WIP)" },
-      { href: "/budgets/analytics", label: "Analytics (WIP)" },
+      { href: "/budgets/analytics", label: "Budgets" },
+      { href: "/budgets/analytics", label: "Analytics" },
     ],
   },
   {
     when: (pathname) => /^\/projects\/\d+\/activity$/.test(pathname),
-    crumbs: [PROJECTS_HUB_CRUMB, { href: "/activity", label: "Activity (WIP)" }],
+    crumbs: [PROJECTS_HUB_CRUMB, { href: "/activity", label: "Activity" }],
   },
   {
     when: (pathname) => pathname === "/change-orders" || /^\/projects\/\d+\/change-orders$/.test(pathname),
@@ -72,15 +72,10 @@ const hierarchyRules: HierarchyRule[] = [
     crumbs: [BILLING_HUB_CRUMB, { href: "/bills", label: "Bills" }],
   },
   {
-    when: (pathname) =>
-      /^\/projects\/\d+\/expenses$/.test(pathname),
-    crumbs: [PROJECTS_HUB_CRUMB, { href: "/projects", label: "Expenses (WIP)" }],
-  },
-  {
     when: (pathname) => pathname === "/ops/organization",
     crumbs: [
       META_HUB_CRUMB,
-      { href: "/ops/organization", label: "Organization (WIP)" },
+      { href: "/ops/organization", label: "Organization" },
     ],
   },
   {
@@ -91,7 +86,7 @@ const hierarchyRules: HierarchyRule[] = [
     when: (pathname) => pathname === "/vendors",
     crumbs: [
       META_HUB_CRUMB,
-      { href: "/vendors", label: "Vendors (WIP)" },
+      { href: "/vendors", label: "Vendors" },
     ],
   },
   {
@@ -105,26 +100,26 @@ const hierarchyRules: HierarchyRule[] = [
     when: (pathname) => pathname === "/financials-auditing",
     crumbs: [
       PROJECTS_HUB_CRUMB,
-      { href: "/financials-auditing", label: "Financials & Accounting (WIP)" },
+      { href: "/financials-auditing", label: "Financials & Accounting" },
     ],
   },
   {
     when: (pathname) => pathname === "/settings/intake",
     crumbs: [
       META_HUB_CRUMB,
-      { href: "/settings/intake", label: "Settings (WIP)" },
+      { href: "/settings/intake", label: "Settings" },
     ],
   },
   {
     when: (pathname) => pathname === "/ops/meta/help",
     crumbs: [
       META_HUB_CRUMB,
-      { href: "/ops/meta/help", label: "Help (WIP)" },
+      { href: "/ops/meta/help", label: "Help" },
     ],
   },
   {
     when: (pathname) => pathname.startsWith("/settings/"),
-    crumbs: [META_HUB_CRUMB, { href: "/settings/intake", label: "Settings (WIP)" }],
+    crumbs: [META_HUB_CRUMB, { href: "/settings/intake", label: "Settings" }],
   },
 ];
 

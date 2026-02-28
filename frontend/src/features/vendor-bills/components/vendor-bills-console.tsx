@@ -115,14 +115,6 @@ function defaultBillStatusFilters(statuses: string[]): string[] {
   return withoutVoid.length ? withoutVoid : statuses;
 }
 
-function projectStatusClass(statusValue: string): string {
-  const key = `projectStatus${statusValue
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join("")}`;
-  return invoiceStyles[key] ?? "";
-}
-
 function projectStatusLabel(statusValue: string): string {
   return statusValue.replace("_", " ");
 }

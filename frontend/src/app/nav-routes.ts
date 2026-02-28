@@ -1,6 +1,7 @@
 export type NavRoute = {
   href: string;
   label: string;
+  kind?: "billing_menu";
   exact?: string[];
   startsWith?: string[];
 };
@@ -20,15 +21,17 @@ export const workflowRoutes: NavRoute[] = [
     href: "/projects",
     label: "3 Projects",
     exact: ["/projects"],
+    startsWith: ["/projects/"],
   },
   {
-    href: "/billing",
-    label: "4 Billing (WIP)",
-    exact: ["/invoices"],
+    href: "/invoices",
+    label: "4 Billing",
+    kind: "billing_menu",
+    exact: ["/invoices", "/bills"],
   },
   {
     href: "/financials-auditing",
-    label: "5 Financials & Accounting (WIP)",
+    label: "5 Financials & Accounting",
     exact: ["/financials-auditing"],
   },
 ];
@@ -36,9 +39,9 @@ export const workflowRoutes: NavRoute[] = [
 export const opsMetaRoutes: NavRoute[] = [
   { href: "/customers", label: "Customers", exact: ["/customers"] },
   { href: "/cost-codes", label: "Cost Codes", exact: ["/cost-codes"] },
-  { href: "/vendors", label: "Vendors (WIP)", exact: ["/vendors"] },
-  { href: "/settings/intake", label: "Settings (WIP)", exact: ["/settings/intake"] },
-  { href: "/ops/meta/help", label: "Help (WIP)", exact: ["/ops/meta/help"] },
+  { href: "/vendors", label: "Vendors", exact: ["/vendors"] },
+  { href: "/settings/intake", label: "Settings", exact: ["/settings/intake"] },
+  { href: "/ops/meta/help", label: "Help", exact: ["/ops/meta/help"] },
 ];
 
 export function isRouteActive(pathname: string, route: NavRoute): boolean {

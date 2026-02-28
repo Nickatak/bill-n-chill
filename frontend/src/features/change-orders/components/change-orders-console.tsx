@@ -337,6 +337,14 @@ export function ChangeOrdersConsole({
     viewerChangeOrders.find((changeOrder) => String(changeOrder.id) === selectedChangeOrderId) ??
     viewerChangeOrders[0] ??
     null;
+  const selectedViewerEstimateRecordId = selectedViewerEstimate?.id ?? null;
+  const selectedViewerChangeOrderIdValue = selectedViewerChangeOrder?.id ?? null;
+  const selectedViewerChangeOrderLineDelta = selectedViewerChangeOrder
+    ? toNumber(selectedViewerChangeOrder.line_total_delta || selectedViewerChangeOrder.amount_delta)
+    : 0;
+  const selectedViewerChangeOrderIsApproved = Boolean(
+    selectedViewerChangeOrder && ["approved", "accepted"].includes(selectedViewerChangeOrder.status),
+  );
   const scopedProjectLabel = selectedProjectId
     ? `Project #${selectedProjectId}${selectedProjectName ? ` · ${selectedProjectName}` : ""}`
     : "No project selected";
@@ -472,34 +480,30 @@ export function ChangeOrdersConsole({
         return right.id - left.id;
       });
   }, [projectAuditEvents, selectedViewerChangeOrder]);
-  const selectedViewerWorkingTotals = useMemo(() => {
-    if (!selectedViewerEstimate || !selectedViewerChangeOrder) {
+  const selectedViewerWorkingTotals = (() => {
+    if (!selectedViewerEstimateRecordId || !selectedViewerChangeOrderIdValue) {
       return { preApproval: "0.00", postApproval: "0.00" };
     }
     const approvedRollingDelta = changeOrders.reduce((sum, changeOrder) => {
       if (
-        changeOrder.origin_estimate !== selectedViewerEstimate.id ||
+        changeOrder.origin_estimate !== selectedViewerEstimateRecordId ||
         !["approved", "accepted"].includes(changeOrder.status)
       ) {
         return sum;
       }
       return sum + toNumber(changeOrder.amount_delta);
     }, 0);
-    const originalBudgetTotal = originEstimateOriginalTotals[selectedViewerEstimate.id] ?? 0;
+    const originalBudgetTotal = originEstimateOriginalTotals[selectedViewerEstimateRecordId] ?? 0;
     const currentApprovedWorkingTotal = originalBudgetTotal + approvedRollingDelta;
-    const selectedLineDelta = toNumber(
-      selectedViewerChangeOrder.line_total_delta || selectedViewerChangeOrder.amount_delta,
-    );
-    const isSelectedApproved = ["approved", "accepted"].includes(selectedViewerChangeOrder.status);
-    const preApprovalTotal = isSelectedApproved
-      ? currentApprovedWorkingTotal - selectedLineDelta
+    const preApprovalTotal = selectedViewerChangeOrderIsApproved
+      ? currentApprovedWorkingTotal - selectedViewerChangeOrderLineDelta
       : currentApprovedWorkingTotal;
-    const postApprovalTotal = preApprovalTotal + selectedLineDelta;
+    const postApprovalTotal = preApprovalTotal + selectedViewerChangeOrderLineDelta;
     return {
       preApproval: formatMoney(preApprovalTotal),
       postApproval: formatMoney(postApprovalTotal),
     };
-  }, [changeOrders, originEstimateOriginalTotals, selectedViewerChangeOrder, selectedViewerEstimate]);
+  })();
 
   function statusLabel(status: string): string {
     const label = changeOrderStatusLabels[status];
@@ -1219,7 +1223,10 @@ export function ChangeOrdersConsole({
     if (newTitleManuallyEdited) {
       return;
     }
-    setNewTitle(defaultChangeOrderTitle(selectedProjectName));
+    const run = window.setTimeout(() => {
+      setNewTitle(defaultChangeOrderTitle(selectedProjectName));
+    }, 0);
+    return () => window.clearTimeout(run);
   }, [newTitleManuallyEdited, selectedProjectName]);
 
   useEffect(() => {
@@ -1234,7 +1241,10 @@ export function ChangeOrdersConsole({
       (changeOrder) => String(changeOrder.id) === selectedChangeOrderId,
     );
     if (!selectedStillVisible) {
-      hydrateEditForm(viewerChangeOrders[0]);
+      const run = window.setTimeout(() => {
+        hydrateEditForm(viewerChangeOrders[0]);
+      }, 0);
+      return () => window.clearTimeout(run);
     }
   }, [hydrateEditForm, selectedChangeOrderId, viewerChangeOrders]);
 

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { EstimatesConsole } from "@/features/estimates";
 import { redirect } from "next/navigation";
-import styles from "../../../estimates/page.module.css";
+import styles from "./page.module.css";
+import { isNumericRouteId, resolveProjectParamTitle } from "@/app/route-metadata";
 
 type ProjectEstimatesPageProps = {
   params: Promise<{ projectId: string }>;
@@ -10,10 +11,7 @@ type ProjectEstimatesPageProps = {
 
 export async function generateMetadata({ params }: ProjectEstimatesPageProps): Promise<Metadata> {
   const { projectId } = await params;
-  if (/^\d+$/.test(projectId)) {
-    return { title: `Project #${projectId} Estimates` };
-  }
-  return { title: "Project Estimates" };
+  return { title: resolveProjectParamTitle(projectId, "Estimates", "Project Estimates") };
 }
 
 export default async function ProjectEstimatesPage({
@@ -22,11 +20,11 @@ export default async function ProjectEstimatesPage({
 }: ProjectEstimatesPageProps) {
   const { projectId } = await params;
   const { estimate } = await searchParams;
-  if (!/^\d+$/.test(projectId)) {
+  if (!isNumericRouteId(projectId)) {
     redirect("/projects");
   }
 
-  const estimateKey = estimate && /^\d+$/.test(estimate) ? estimate : "all";
+  const estimateKey = isNumericRouteId(estimate) ? estimate : "all";
 
   return (
     <div className={styles.page}>

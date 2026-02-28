@@ -618,12 +618,12 @@ export function ProjectsConsole() {
                       href={`/projects/${selectedProject.id}/budgets/analytics`}
                       prefetch={false}
                     >
-                      Budget Analytics (WIP)
+                      Budget Analytics
                     </Link>
                     <span className={styles.nodeCount}>Auto</span>
                   </div>
                   <div className={styles.node}>
-                    <Link href={`/projects/${selectedProject.id}/activity`}>Activity Timeline (WIP)</Link>
+                    <Link href={`/projects/${selectedProject.id}/activity`}>Activity Timeline</Link>
                   </div>
                 </div>
                 <div className={styles.branch}>
@@ -638,7 +638,7 @@ export function ProjectsConsole() {
                     </div>
                     <div className={styles.node}>
                       <Link href={`/financials-auditing?project=${selectedProject.id}`}>
-                        Payments In (AR) (WIP)
+                        Payments In (AR)
                       </Link>
                       <span className={styles.nodeCount}>
                         {summaryCounts ? summaryCounts.arPayments : "--"}
@@ -648,17 +648,14 @@ export function ProjectsConsole() {
                   <div className={styles.branchGroup}>
                     <span className={styles.branchSubLabel}>Payables</span>
                     <div className={styles.node}>
-                      <Link href={`/bills?project=${selectedProject.id}`}>Bills (WIP)</Link>
+                      <Link href={`/bills?project=${selectedProject.id}`}>Bills</Link>
                       <span className={styles.nodeCount}>
                         {summaryCounts ? summaryCounts.vendorBills : "--"}
                       </span>
                     </div>
                     <div className={styles.node}>
-                      <Link href={`/projects/${selectedProject.id}/expenses`}>Expenses (WIP)</Link>
-                    </div>
-                    <div className={styles.node}>
                       <Link href={`/financials-auditing?project=${selectedProject.id}`}>
-                        Payments Out (AP) (WIP)
+                        Payments Out (AP)
                       </Link>
                       <span className={styles.nodeCount}>
                         {summaryCounts ? summaryCounts.apPayments : "--"}
@@ -696,11 +693,11 @@ export function ProjectsConsole() {
                   <strong>{invoicedDisplay}</strong>
                 </div>
                 <div className={styles.metricRow}>
-                  <span>Inbound payments to date (WIP)</span>
+                  <span>Inbound payments to date</span>
                   <strong>{paidDisplay}</strong>
                 </div>
                 <div className={styles.metricRow}>
-                  <span>Inbound credit (WIP)</span>
+                  <span>Inbound credit</span>
                   <strong>{inboundCreditDisplay}</strong>
                 </div>
                 <div className={styles.metricRow}>
@@ -715,7 +712,7 @@ export function ProjectsConsole() {
               <section className={styles.metricSection}>
                 <h4 className={styles.metricSectionTitle}>Expenses</h4>
                 <div className={styles.metricRow}>
-                  <span>Bills to date (WIP)</span>
+                  <span>Bills to date</span>
                   <strong>{apTotalDisplay}</strong>
                 </div>
                 <div className={styles.metricRow}>
@@ -723,7 +720,7 @@ export function ProjectsConsole() {
                   <strong>{apPaidDisplay}</strong>
                 </div>
                 <div className={styles.metricRow}>
-                  <span>Outbound credit (WIP)</span>
+                  <span>Outbound credit</span>
                   <strong>{outboundCreditDisplay}</strong>
                 </div>
                 <div className={styles.metricRow}>

@@ -11,7 +11,8 @@ export function WorkflowNavbar() {
   const projectId = pathProjectMatch?.[1] ?? null;
   const billingButtonRef = useRef<HTMLButtonElement>(null);
   const billingMenuRef = useRef<HTMLDivElement>(null);
-  const [isBillingOpen, setIsBillingOpen] = useState(false);
+  const [billingMenuOpenPathname, setBillingMenuOpenPathname] = useState<string | null>(null);
+  const isBillingOpen = billingMenuOpenPathname === pathname;
   const [billingMenuPosition, setBillingMenuPosition] = useState({ top: 0, left: 0 });
   const isInvoicesPath = pathname === "/invoices";
   const isBillsPath = pathname === "/bills";
@@ -36,10 +37,6 @@ export function WorkflowNavbar() {
   }
 
   useEffect(() => {
-    setIsBillingOpen(false);
-  }, [pathname]);
-
-  useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
       const target = event.target as Node | null;
       if (!target) {
@@ -51,7 +48,7 @@ export function WorkflowNavbar() {
       ) {
         return;
       }
-      setIsBillingOpen(false);
+      setBillingMenuOpenPathname(null);
     }
 
     window.addEventListener("pointerdown", handlePointerDown);
@@ -77,7 +74,7 @@ export function WorkflowNavbar() {
   }, [isBillingOpen]);
 
   function closeBillingMenu() {
-    setIsBillingOpen(false);
+    setBillingMenuOpenPathname(null);
   }
 
   return (
@@ -85,7 +82,7 @@ export function WorkflowNavbar() {
       <div className="workflowNavInner">
         <div className="workflowNavScroll">
           {workflowRoutes.map((route) => {
-            if (route.href === "/billing") {
+            if (route.kind === "billing_menu") {
               const billsHref = projectId
                 ? `/bills?project=${encodeURIComponent(projectId)}`
                 : "/bills";
@@ -99,7 +96,11 @@ export function WorkflowNavbar() {
                     }`}
                     aria-haspopup="menu"
                     aria-expanded={isBillingOpen}
-                    onClick={() => setIsBillingOpen((current) => !current)}
+                    onClick={() =>
+                      setBillingMenuOpenPathname((current) =>
+                        current === pathname ? null : pathname,
+                      )
+                    }
                   >
                     {route.label}
                   </button>
@@ -128,7 +129,7 @@ export function WorkflowNavbar() {
                         role="menuitem"
                         onClick={closeBillingMenu}
                       >
-                        Bills (WIP)
+                        Bills
                       </Link>
                     </div>
                   ) : null}

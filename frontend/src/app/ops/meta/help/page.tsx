@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import shell from "@/app/wip-shell.module.css";
+import shell from "@/app/page-shell.module.css";
+import { PageCard, PageShell } from "@/app/page-shell";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = {
@@ -122,26 +123,25 @@ const prioritizedGaps = [
 
 export default function OpsMetaHelpPage() {
   return (
-    <div className={shell.page}>
-      <main className={`${shell.main} ${shell.mainNarrow}`}>
-        <header className={shell.hero}>
-          <div className={shell.heroTop}>
-            <p className={shell.eyebrow}>Ops / Meta</p>
-            <h1 className={shell.title}>Field Guide: ICP Usage Walkthroughs</h1>
-            <p className={shell.copy}>
-              This page intentionally documents the product as if I were an ideal customer profile:
-              owner-operator / PM running residential project financials. I ran four imaginary job
-              types through current workflows and captured what worked plus unresolved edge cases.
-            </p>
-          </div>
-          <div className={shell.heroMetaRow}>
-            <span className={shell.metaPill}>4 scenario walkthroughs</span>
-            <span className={shell.metaPill}>ICP viewpoint</span>
-            <span className={shell.metaPill}>Explicit edge-case backlog</span>
-          </div>
-        </header>
+    <PageShell narrow>
+      <header className={shell.hero}>
+        <div className={shell.heroTop}>
+          <p className={shell.eyebrow}>Ops / Meta</p>
+          <h1 className={shell.title}>Field Guide: ICP Usage Walkthroughs</h1>
+          <p className={shell.copy}>
+            This page intentionally documents the product as if I were an ideal customer profile:
+            owner-operator / PM running residential project financials. I ran four imaginary job
+            types through current workflows and captured what worked plus unresolved edge cases.
+          </p>
+        </div>
+        <div className={shell.heroMetaRow}>
+          <span className={shell.metaPill}>4 scenario walkthroughs</span>
+          <span className={shell.metaPill}>ICP viewpoint</span>
+          <span className={shell.metaPill}>Explicit edge-case backlog</span>
+        </div>
+      </header>
 
-        <section className={shell.card}>
+      <PageCard>
           <h2 className={shell.sectionTitle}>Scenario Walkthroughs</h2>
           <p className={shell.sectionCopy}>
             Each scenario includes how I used the system, what felt strong, and where current
@@ -190,9 +190,9 @@ export default function OpsMetaHelpPage() {
               </article>
             ))}
           </div>
-        </section>
+      </PageCard>
 
-        <section className={`${shell.card} ${shell.cardMuted}`}>
+      <PageCard muted>
           <h2 className={shell.sectionTitle}>Cross-Scenario Gaps To Prioritize</h2>
           <p className={shell.sectionCopy}>
             These came up repeatedly across multiple job types and are likely highest leverage for
@@ -205,8 +205,7 @@ export default function OpsMetaHelpPage() {
               </li>
             ))}
           </ul>
-        </section>
-      </main>
-    </div>
+      </PageCard>
+    </PageShell>
   );
 }
