@@ -7,7 +7,7 @@ import { clearClientSession } from "@/features/session/client-session";
 import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { isRouteActive, opsMetaRoutes } from "./nav-routes";
+import { isRouteActive, opsMetaRoutes } from "../nav-routes";
 import styles from "./app-toolbar.module.css";
 
 const THEME_KEY = "bnc-theme";

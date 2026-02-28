@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { isRouteActive, workflowRoutes } from "./nav-routes";
+import { isRouteActive, workflowRoutes } from "../nav-routes";
 import styles from "./workflow-navbar.module.css";
-import toolbar from "./app-toolbar.module.css";
+import toolbar from "../app-toolbar/app-toolbar.module.css";
 
 export function WorkflowNavbar() {
   const pathname = usePathname() ?? "";
