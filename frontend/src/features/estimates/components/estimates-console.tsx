@@ -26,7 +26,7 @@ import {
   ProjectRecord,
 } from "../types";
 import { EstimateSheet, OrganizationDocumentDefaults } from "./estimate-sheet";
-import collapseButtonStyles from "@/shared/collapse-toggle-button.module.css";
+import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
 
 type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amount";
 type EstimateStatusValue = string;

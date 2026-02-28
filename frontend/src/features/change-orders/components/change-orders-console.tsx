@@ -20,7 +20,7 @@ import styles from "./change-orders-console.module.css";
 import composerStyles from "@/shared/document-composer/composer-foundation.module.css";
 import changeOrderComposerStyles from "@/shared/document-composer/change-order-composer.module.css";
 import { DocumentComposer } from "@/shared/document-composer";
-import collapseButtonStyles from "@/shared/collapse-toggle-button.module.css";
+import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
 import {
   resolveOrganizationBranding,
   type OrganizationBrandingDefaults,

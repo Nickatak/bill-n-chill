@@ -34,7 +34,7 @@ import {
 import styles from "./invoices-console.module.css";
 import composerStyles from "@/shared/document-composer/composer-foundation.module.css";
 import invoiceComposerStyles from "@/shared/document-composer/invoice-composer.module.css";
-import collapseButtonStyles from "@/shared/collapse-toggle-button.module.css";
+import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
 
 type StatusTone = "neutral" | "success" | "error";
 type ProjectStatusValue = ProjectListStatusValue;
