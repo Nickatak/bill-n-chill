@@ -120,7 +120,7 @@ export function WorkflowNavbar() {
                         role="menuitem"
                         onClick={closeBillingMenu}
                       >
-                        Invoices (WIP)
+                        Invoices
                       </Link>
                       <Link
                         href={billsHref}
