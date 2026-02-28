@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { EstimatesConsole } from "@/features/estimates";
 import { redirect } from "next/navigation";
 import styles from "./page.module.css";
-import { isNumericRouteId, resolveProjectParamTitle } from "@/app/route-metadata";
+import { isNumericRouteId, resolveProjectParamTitle } from "@/shared/shell/route-metadata";
 
 type ProjectEstimatesPageProps = {
   params: Promise<{ projectId: string }>;

@@ -1,0 +1,235 @@
+/* App toolbar: fixed top-right bar with org link, quick jump, ops menu, theme, logout. */
+
+.controls {
+  position: fixed;
+  top: 0;
+  right: 12px;
+  height: 48px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.button {
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111827;
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.buttonActive {
+  border-color: #111827;
+  background: #111827;
+  color: #ffffff;
+}
+
+.themeToggle {
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111827;
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.logout {
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111827;
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* -- Dropdown menus (ops/meta, quick jump) -- */
+
+.menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.menu summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.menuList {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 1200;
+  min-width: 180px;
+  display: grid;
+  gap: 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 8px;
+}
+
+.menuItem {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  color: #111827;
+  background: #ffffff;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.menuItem:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+  transform: translateY(-1px);
+}
+
+.menuItemActive:hover {
+  transform: none;
+}
+
+.menuItemActive {
+  border-color: #111827;
+  background: #111827;
+  color: #ffffff;
+}
+
+/* -- Quick Jump -- */
+
+.quickJumpButton {
+  min-width: 110px;
+  justify-content: center;
+}
+
+.quickJumpList {
+  min-width: 300px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.quickJumpInputWrap {
+  display: grid;
+  gap: 4px;
+}
+
+.quickJumpLabel {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+.quickJumpInput {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.quickJumpHint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.quickJumpSubLabel {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.76rem;
+  color: #475569;
+}
+
+/* -- Dark theme -- */
+
+:global(html[data-theme="dark"]) .button {
+  border-color: #334155;
+  background: #111827;
+  color: #f3f4f6;
+}
+
+:global(html[data-theme="dark"]) .buttonActive {
+  border-color: #e5e7eb;
+  background: #e5e7eb;
+  color: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .themeToggle {
+  border-color: #334155;
+  background: #111827;
+  color: #f3f4f6;
+}
+
+:global(html[data-theme="dark"]) .logout {
+  border-color: #334155;
+  background: #111827;
+  color: #f3f4f6;
+}
+
+:global(html[data-theme="dark"]) .menuList {
+  border-color: #334155;
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .menuItem {
+  border-color: #334155;
+  color: #e5e7eb;
+  background: #111827;
+}
+
+:global(html[data-theme="dark"]) .menuItem:hover {
+  border-color: #64748b;
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .menuItemActive {
+  border-color: #e5e7eb;
+  background: #e5e7eb;
+  color: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .quickJumpLabel {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .quickJumpInput {
+  border-color: #334155;
+  background: #0f172a;
+  color: #e5e7eb;
+}
+
+:global(html[data-theme="dark"]) .quickJumpHint {
+  color: #94a3b8;
+}
+
+:global(html[data-theme="dark"]) .quickJumpSubLabel {
+  color: #94a3b8;
+}
+
+@media print {
+  .controls {
+    display: none !important;
+  }
+}

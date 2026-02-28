@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import shell from "@/app/page-shell.module.css";
-import { PageCard, PageShell } from "@/app/page-shell";
+import shell from "@/shared/shell/page-shell.module.css";
+import { PageCard, PageShell } from "@/shared/shell";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = {

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ChangeOrdersConsole } from "@/features/change-orders";
 import { redirect } from "next/navigation";
 import styles from "../../../change-orders/page.module.css";
-import { isNumericRouteId, resolveProjectParamTitle } from "@/app/route-metadata";
+import { isNumericRouteId, resolveProjectParamTitle } from "@/shared/shell/route-metadata";
 
 type ProjectChangeOrdersPageProps = {
   params: Promise<{ projectId: string }>;

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { VendorBillsConsole } from "@/features/vendor-bills";
-import { PageCard, PageShell } from "@/app/page-shell";
-import { resolveProjectQueryTitle } from "@/app/route-metadata";
+import { PageCard, PageShell } from "@/shared/shell";
+import { resolveProjectQueryTitle } from "@/shared/shell/route-metadata";
 
 type BillsPageMetadataProps = {
   searchParams: Promise<{ project?: string }>;

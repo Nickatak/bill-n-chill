@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { PageCard, PageShell } from "@/app/page-shell";
+import { PageCard, PageShell } from "@/shared/shell";
 import { InvoicePublicPreview } from "@/features/invoices/components/invoice-public-preview";
 import {
   composePublicDocumentMetadataTitle,
   parsePublicTokenFromRef,
   resolvePublicInvoiceMetadataTitle,
-} from "@/app/public-route-metadata";
+} from "@/shared/shell/public-route-metadata";
 
 type InvoiceReviewPageProps = {
   params: Promise<{ publicRef: string }>;

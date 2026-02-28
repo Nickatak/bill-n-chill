@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { FinancialsAuditingConsole } from "@/features/financials-auditing";
 import { PaymentsConsole } from "@/features/payments";
-import shell from "@/app/page-shell.module.css";
-import { PageCard, PageShell } from "@/app/page-shell";
+import shell from "@/shared/shell/page-shell.module.css";
+import { PageCard, PageShell } from "@/shared/shell";
 
 export const metadata: Metadata = {
   title: "Financials and Accounting",

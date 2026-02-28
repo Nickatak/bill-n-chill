@@ -2,9 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SessionAuthorizationProvider } from "@/features/session/session-authorization";
 import "./globals.css";
-import { AuthGate } from "./auth-gate";
-import { ThemeToggle } from "./theme-toggle";
-import { WorkflowShell } from "./workflow-shell";
+import { AuthGate, AppToolbar, WorkflowShell } from "@/shared/shell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -54,7 +52,7 @@ export default function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <SessionAuthorizationProvider>
-          <ThemeToggle />
+          <AppToolbar />
           <WorkflowShell />
           <AuthGate>{children}</AuthGate>
         </SessionAuthorizationProvider>

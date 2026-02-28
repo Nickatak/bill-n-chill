@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSharedSessionAuth } from "@/features/session/use-shared-session";
+import styles from "./workflow-breadcrumbs.module.css";
 
 type Crumb = {
   href: string;
@@ -255,23 +256,23 @@ export function WorkflowBreadcrumbs() {
     : baseCrumbs;
 
   return (
-    <nav className="workflowBreadcrumbs" aria-label="Breadcrumb">
-      <div className="workflowBreadcrumbsInner">
+    <nav className={styles.breadcrumbs} aria-label="Breadcrumb">
+      <div className={styles.inner}>
         {crumbs.map((crumb, index) => {
           const href = projectId ? projectScopedHref(crumb.href, projectId) : crumb.href;
           const key = `${crumb.href}-${crumb.label}`;
           return (
-            <span key={key} className="workflowBreadcrumbItem">
+            <span key={key} className={styles.item}>
               {crumb.isCurrent ? (
-                <span className="workflowBreadcrumbCurrent" aria-current="page">
+                <span className={styles.current} aria-current="page">
                   {crumb.label}
                 </span>
               ) : (
-                <Link href={href} className="workflowBreadcrumbLink">
+                <Link href={href} className={styles.link}>
                   {crumb.label}
                 </Link>
               )}
-              {index < crumbs.length - 1 ? <span className="workflowBreadcrumbSeparator">/</span> : null}
+              {index < crumbs.length - 1 ? <span className={styles.separator}>/</span> : null}
             </span>
           );
         })}

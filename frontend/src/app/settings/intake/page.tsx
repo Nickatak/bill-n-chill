@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { IntakeSettingsConsole } from "@/features/settings-intake";
-import shell from "@/app/page-shell.module.css";
-import { PageCard, PageShell } from "@/app/page-shell";
+import shell from "@/shared/shell/page-shell.module.css";
+import { PageCard, PageShell } from "@/shared/shell";
 
 export const metadata: Metadata = {
   title: "Intake Settings",

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { InvoicesConsole } from "@/features/invoices";
-import { PageCard, PageShell } from "@/app/page-shell";
-import { resolveProjectQueryTitle } from "@/app/route-metadata";
+import { PageCard, PageShell } from "@/shared/shell";
+import { resolveProjectQueryTitle } from "@/shared/shell/route-metadata";
 
 type InvoicesPageMetadataProps = {
   searchParams: Promise<{ project?: string }>;

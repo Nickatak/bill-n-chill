@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { WorkflowNavbar } from "./workflow-navbar";
 import { WorkflowBreadcrumbs } from "./workflow-breadcrumbs";
+import styles from "./auth-hint.module.css";
 
 export function WorkflowShell() {
   const pathname = usePathname();
@@ -19,9 +20,9 @@ export function WorkflowShell() {
   if (isChecking && !isAuthorized) {
     return (
       <>
-        <div className="workflowShellSpacer" />
-        <div className="authHintBar" role="status" aria-live="polite">
-          <div className="authHintInner">Checking session...</div>
+        <div className={styles.spacer} />
+        <div className={styles.bar} role="status" aria-live="polite">
+          <div className={styles.inner}>Checking session...</div>
         </div>
       </>
     );
@@ -30,9 +31,9 @@ export function WorkflowShell() {
   if (!isAuthorized) {
     return (
       <>
-        <div className="workflowShellSpacer" />
-        <div className="authHintBar" role="note" aria-label="Authentication hint">
-          <div className="authHintInner">
+        <div className={styles.spacer} />
+        <div className={styles.bar} role="note" aria-label="Authentication hint">
+          <div className={styles.inner}>
             Sign in on <Link href="/">Home</Link> to unlock workflow actions.
           </div>
         </div>
@@ -42,7 +43,7 @@ export function WorkflowShell() {
 
   return (
     <>
-      <div className="workflowShellSpacer" />
+      <div className={styles.spacer} />
       <WorkflowNavbar />
       <WorkflowBreadcrumbs />
     </>

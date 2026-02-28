@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { ProjectActivityConsole } from "@/features/projects/components/project-activity-console";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import shell from "@/app/page-shell.module.css";
-import { PageCard, PageShell } from "@/app/page-shell";
-import { isNumericRouteId, resolveProjectParamTitle } from "@/app/route-metadata";
+import shell from "@/shared/shell/page-shell.module.css";
+import { PageCard, PageShell } from "@/shared/shell";
+import { isNumericRouteId, resolveProjectParamTitle } from "@/shared/shell/route-metadata";
 
 type ProjectActivityPageProps = {
   params: Promise<{ projectId: string }>;

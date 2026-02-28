@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-import shell from "@/app/page-shell.module.css";
+import shell from "@/shared/shell/page-shell.module.css";
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { hasAnyRole } from "@/features/session/rbac";
 import { useSharedSessionAuth } from "@/features/session/use-shared-session";

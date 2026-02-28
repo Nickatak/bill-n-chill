@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { EstimateApprovalPreview } from "@/features/estimates/components/estimate-approval-preview";
 import { notFound } from "next/navigation";
-import { PageCard, PageShell } from "@/app/page-shell";
+import { PageCard, PageShell } from "@/shared/shell";
 import {
   composePublicDocumentMetadataTitle,
   parsePublicTokenFromRef,
   resolvePublicEstimateMetadataTitle,
-} from "@/app/public-route-metadata";
+} from "@/shared/shell/public-route-metadata";
 
 type EstimateReviewPageProps = {
   params: Promise<{ publicRef: string }>;

@@ -1,0 +1,65 @@
+/* Workflow breadcrumbs: contextual navigation trail below navbar. */
+
+.breadcrumbs {
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+.inner {
+  min-height: 34px;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.link {
+  color: #334155;
+  font-size: 0.82rem;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.current {
+  color: #0f172a;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.separator {
+  color: #94a3b8;
+  font-size: 0.78rem;
+}
+
+:global(html[data-theme="dark"]) .breadcrumbs {
+  border-bottom-color: #1f2937;
+  background: #0b1220;
+}
+
+:global(html[data-theme="dark"]) .link {
+  color: #cbd5e1;
+}
+
+:global(html[data-theme="dark"]) .current {
+  color: #f1f5f9;
+}
+
+:global(html[data-theme="dark"]) .separator {
+  color: #64748b;
+}
+
+@media print {
+  .breadcrumbs {
+    display: none !important;
+  }
+}

@@ -1,0 +1,124 @@
+/* Workflow navbar: fixed top nav pill row with billing dropdown. */
+
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 900;
+  border-bottom: 1px solid #d1d5db;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(6px);
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 6px 12px;
+}
+
+.scroll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.link {
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  color: #111827;
+  background: #ffffff;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.link:hover {
+  border-color: #94a3b8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+}
+
+.linkActive:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.linkActive {
+  border-color: #111827;
+  background: #111827;
+  color: #ffffff;
+}
+
+.dropdownMenu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.dropdownSummary {
+  appearance: none;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111827;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: inherit;
+}
+
+.dropdownSummary::-webkit-details-marker {
+  display: none;
+}
+
+.dropdownList {
+  margin-top: 0;
+  min-width: 220px;
+}
+
+.dropdownListFloating {
+  position: fixed;
+  z-index: 1250;
+  left: 0;
+  top: 0;
+  right: auto;
+  width: 240px;
+}
+
+:global(html[data-theme="dark"]) .nav {
+  border-bottom-color: #334155;
+  background: rgba(11, 18, 32, 0.96);
+}
+
+:global(html[data-theme="dark"]) .link {
+  border-color: #334155;
+  color: #e5e7eb;
+  background: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .link:hover {
+  border-color: #64748b;
+  box-shadow: 0 6px 12px rgba(2, 6, 23, 0.45);
+}
+
+:global(html[data-theme="dark"]) .linkActive {
+  border-color: #e5e7eb;
+  background: #e5e7eb;
+  color: #0f172a;
+}
+
+@media print {
+  .nav {
+    display: none !important;
+  }
+}

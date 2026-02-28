@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { isRouteActive, workflowRoutes } from "./nav-routes";
+import styles from "./workflow-navbar.module.css";
+import toolbar from "./app-toolbar.module.css";
 
 export function WorkflowNavbar() {
   const pathname = usePathname() ?? "";
@@ -78,21 +80,21 @@ export function WorkflowNavbar() {
   }
 
   return (
-    <nav className="workflowNav" aria-label="MVP workflow order">
-      <div className="workflowNavInner">
-        <div className="workflowNavScroll">
+    <nav className={styles.nav} aria-label="MVP workflow order">
+      <div className={styles.inner}>
+        <div className={styles.scroll}>
           {workflowRoutes.map((route) => {
             if (route.kind === "billing_menu") {
               const billsHref = projectId
                 ? `/bills?project=${encodeURIComponent(projectId)}`
                 : "/bills";
               return (
-                <div key={route.href} className="workflowDropdownMenu">
+                <div key={route.href} className={styles.dropdownMenu}>
                   <button
                     type="button"
                     ref={billingButtonRef}
-                    className={`workflowLink workflowDropdownSummary ${
-                      isBillingPath ? "isActive" : ""
+                    className={`${styles.link} ${styles.dropdownSummary} ${
+                      isBillingPath ? styles.linkActive : ""
                     }`}
                     aria-haspopup="menu"
                     aria-expanded={isBillingOpen}
@@ -107,7 +109,7 @@ export function WorkflowNavbar() {
                   {isBillingOpen ? (
                     <div
                       ref={billingMenuRef}
-                      className="nonWorkflowList workflowDropdownList workflowDropdownListFloating"
+                      className={`${toolbar.menuList} ${styles.dropdownList} ${styles.dropdownListFloating}`}
                       role="menu"
                       aria-label="Billing routes"
                       style={{
@@ -117,7 +119,7 @@ export function WorkflowNavbar() {
                     >
                       <Link
                         href="/invoices"
-                        className={`nonWorkflowItem ${isInvoicesPath ? "isActive" : ""}`}
+                        className={`${toolbar.menuItem} ${isInvoicesPath ? toolbar.menuItemActive : ""}`}
                         role="menuitem"
                         onClick={closeBillingMenu}
                       >
@@ -125,7 +127,7 @@ export function WorkflowNavbar() {
                       </Link>
                       <Link
                         href={billsHref}
-                        className={`nonWorkflowItem ${isBillsPath ? "isActive" : ""}`}
+                        className={`${toolbar.menuItem} ${isBillsPath ? toolbar.menuItemActive : ""}`}
                         role="menuitem"
                         onClick={closeBillingMenu}
                       >
@@ -142,7 +144,7 @@ export function WorkflowNavbar() {
               <Link
                 key={route.href}
                 href={route.href}
-                className={`workflowLink ${isActive ? "isActive" : ""}`}
+                className={`${styles.link} ${isActive ? styles.linkActive : ""}`}
               >
                 {route.label}
               </Link>

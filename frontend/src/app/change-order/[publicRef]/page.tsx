@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { PageCard, PageShell } from "@/app/page-shell";
+import { PageCard, PageShell } from "@/shared/shell";
 import { ChangeOrderPublicPreview } from "@/features/change-orders/components/change-order-public-preview";
 import {
   composePublicDocumentMetadataTitle,
   parsePublicTokenFromRef,
   resolvePublicChangeOrderMetadataTitle,
-} from "@/app/public-route-metadata";
+} from "@/shared/shell/public-route-metadata";
 
 type ChangeOrderPublicPageProps = {
   params: Promise<{ publicRef: string }>;

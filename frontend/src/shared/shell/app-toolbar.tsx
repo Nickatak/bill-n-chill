@@ -8,6 +8,7 @@ import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { isRouteActive, opsMetaRoutes } from "./nav-routes";
+import styles from "./app-toolbar.module.css";
 
 const THEME_KEY = "bnc-theme";
 type ThemeMode = "light" | "dark";
@@ -33,7 +34,7 @@ function applyTheme(theme: ThemeMode) {
   }
 }
 
-export function ThemeToggle() {
+export function AppToolbar() {
   const pathname = usePathname() ?? "";
   const router = useRouter();
   const { token, organization } = useSharedSessionAuth();
@@ -141,64 +142,64 @@ export function ThemeToggle() {
   }, []);
 
   return (
-    <div className="themeControls">
+    <div className={styles.controls}>
       {hasSession && !isPublicDocument && organization ? (
         <Link
           href="/ops/organization"
-          className={`themeControlButton ${isOrganizationPath ? "isActive" : ""}`}
+          className={`${styles.button} ${isOrganizationPath ? styles.buttonActive : ""}`}
           title={`Organization slug: ${organization.slug}`}
         >
           {organization.displayName} Organization
         </Link>
       ) : null}
       {hasSession && isPublicDocument ? (
-        <Link href="/" className="themeControlButton">
+        <Link href="/" className={styles.button}>
           Home
         </Link>
       ) : null}
       {hasSession && !isPublicDocument ? (
-        <details ref={quickJumpMenuRef} className="nonWorkflowMenu quickJumpMenu">
-          <summary className="themeControlButton">Quick Jump</summary>
-          <div className="nonWorkflowList quickJumpList" role="menu" aria-label="Global quick jump">
-            <label className="quickJumpInputWrap">
-              <span className="quickJumpLabel">Search</span>
+        <details ref={quickJumpMenuRef} className={styles.menu}>
+          <summary className={`${styles.button} ${styles.quickJumpButton}`}>Quick Jump</summary>
+          <div className={`${styles.menuList} ${styles.quickJumpList}`} role="menu" aria-label="Global quick jump">
+            <label className={styles.quickJumpInputWrap}>
+              <span className={styles.quickJumpLabel}>Search</span>
               <input
-                className="quickJumpInput"
+                className={styles.quickJumpInput}
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Project, CO, invoice, bill, payment..."
               />
             </label>
-            {searchLoading ? <p className="quickJumpHint">Searching...</p> : null}
+            {searchLoading ? <p className={styles.quickJumpHint}>Searching...</p> : null}
             {!searchLoading && searchQuery.trim().length >= 2 && searchResults.length === 0 ? (
-              <p className="quickJumpHint">No matches.</p>
+              <p className={styles.quickJumpHint}>No matches.</p>
             ) : null}
             {searchResults.map((item) => (
               <Link
                 key={`${item.kind}-${item.record_id}`}
                 href={item.ui_href}
-                className="nonWorkflowItem"
+                className={styles.menuItem}
                 role="menuitem"
                 onClick={closeMenus}
               >
                 <strong>{item.label}</strong>
-                <span className="quickJumpSubLabel">{item.sub_label}</span>
+                <span className={styles.quickJumpSubLabel}>{item.sub_label}</span>
               </Link>
             ))}
           </div>
         </details>
       ) : null}
       {hasSession && !isPublicDocument ? (
-        <details ref={opsMetaMenuRef} className="nonWorkflowMenu">
-          <summary className={`themeControlButton ${hasActiveOpsMeta ? "isActive" : ""}`}>
+        <details ref={opsMetaMenuRef} className={styles.menu}>
+          <summary className={`${styles.button} ${hasActiveOpsMeta ? styles.buttonActive : ""}`}>
             Ops / Meta
           </summary>
-          <div className="nonWorkflowList" role="menu" aria-label="Ops and metadata tools">
+          <div className={styles.menuList} role="menu" aria-label="Ops and metadata tools">
             {opsMetaRoutes.map((route) => (
               <Link
                 key={route.href}
                 href={route.href}
-                className={`nonWorkflowItem ${isRouteActive(pathname, route) ? "isActive" : ""}`}
+                className={`${styles.menuItem} ${isRouteActive(pathname, route) ? styles.menuItemActive : ""}`}
                 role="menuitem"
                 onClick={closeMenus}
               >
@@ -209,15 +210,15 @@ export function ThemeToggle() {
         </details>
       ) : null}
       {hasSession || isPublicDocument ? (
-        <button type="button" className="themeControlButton" onClick={printPage}>
+        <button type="button" className={styles.button} onClick={printPage}>
           Print
         </button>
       ) : null}
-      <button type="button" className="themeToggle" onClick={toggleTheme} aria-label="Toggle theme">
+      <button type="button" className={styles.themeToggle} onClick={toggleTheme} aria-label="Toggle theme">
         Toggle theme
       </button>
       {hasSession ? (
-        <button type="button" className="themeLogout" onClick={logout}>
+        <button type="button" className={styles.logout} onClick={logout}>
           Logout
         </button>
       ) : null}
