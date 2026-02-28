@@ -61,17 +61,17 @@ Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> M
 ### Frontend Shape
 
 - Route layer:
-  - `frontend/src/app/*`: Next.js App Router pages, route shells, auth-gated entry, and public-document routes.
+  - `frontend/src/app/*`: Next.js App Router pages and route-specific content.
 - Feature layer:
   - `frontend/src/features/*`: workflow-domain UI modules (intake, estimates, change orders, invoices, bills, payments, etc.).
   - Each feature owns local components, state orchestration, and API interaction hooks/helpers.
 - Shared layer:
+  - `frontend/src/shared/shell`: app shell — auth gate, toolbar, navbar, breadcrumbs, page layout wrappers, route metadata helpers. All styles are CSS modules.
   - `frontend/src/shared/components`: cross-feature UI primitives.
   - `frontend/src/shared/document-composer`: shared authoring patterns for financial docs.
   - `frontend/src/shared/document-viewer`: shared read/public preview rendering patterns.
-- Session/navigation shell:
+- Session:
   - `frontend/src/features/session/*`: token/session management and auth bootstrap checks.
-  - `frontend/src/app/workflow-*` + `theme-toggle.tsx`: global nav, breadcrumbs, and shell controls.
 
 ### Key Runtime Flows
 
