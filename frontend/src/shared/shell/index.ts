@@ -1,5 +1,6 @@
 export { AuthGate } from "./auth-gate";
 export { AppToolbar } from "./app-toolbar";
+export { MobileDrawer } from "./mobile-drawer";
 export { WorkflowShell } from "./workflow-shell";
 export { WorkflowNavbar } from "./workflow-navbar";
 export { WorkflowBreadcrumbs } from "./workflow-breadcrumbs";

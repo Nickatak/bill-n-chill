@@ -95,6 +95,12 @@
   width: 240px;
 }
 
+@media (max-width: 700px) {
+  .nav {
+    display: none;
+  }
+}
+
 @media print {
   .nav {
     display: none !important;

@@ -41,6 +41,12 @@
   font-size: 0.78rem;
 }
 
+@media (max-width: 700px) {
+  .breadcrumbs {
+    display: none;
+  }
+}
+
 @media print {
   .breadcrumbs {
     display: none !important;
