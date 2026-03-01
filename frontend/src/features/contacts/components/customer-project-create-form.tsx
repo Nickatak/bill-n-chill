@@ -54,7 +54,7 @@ export function CustomerProjectCreateForm({
         <input
           value={projectSiteAddress}
           onChange={(event) => onProjectSiteAddressChange(event.target.value)}
-          placeholder="Optional"
+          required
         />
       </label>
       {/* Status selector — only prospect and active are valid for new projects */}

@@ -344,6 +344,17 @@ def customer_project_create_view(request, customer_id: int):
 
     project_name = (payload.get("name") or "").strip() or f"{customer.display_name} Project"
     site_address = (payload.get("site_address") or "").strip() or customer.billing_address
+    if not site_address:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Site address is required.",
+                    "fields": {"site_address": ["Site address is required."]},
+                }
+            },
+            status=400,
+        )
     requested_status = payload.get("status", Project.Status.PROSPECT)
     initial_contract_value = payload.get("initial_contract_value")
     if initial_contract_value is None:

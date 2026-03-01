@@ -102,7 +102,7 @@ export function ContactsConsole() {
 
   /** Fetch the customer list from the API, optionally filtered by search text. */
   async function loadContacts(searchQuery: string) {
-    setStatusMessage("Loading customers...");
+    setStatusMessage("");
     try {
       const params = new URLSearchParams();
       if (searchQuery.trim()) {
@@ -126,7 +126,7 @@ export function ContactsConsole() {
         setEditingId(String(scopedCustomer.id));
         hydrate(scopedCustomer);
       }
-      setStatusMessage(`Loaded ${items.length} customer(s).`);
+      setStatusMessage("");
     } catch {
       setStatusMessage("Could not reach customers endpoint.");
     }
@@ -234,7 +234,7 @@ export function ContactsConsole() {
       return;
     }
 
-    setStatusMessage("Saving customer...");
+    setStatusMessage("");
 
     try {
       const response = await fetch(`${normalizedBaseUrl}/customers/${customerId}/`, {
@@ -274,7 +274,7 @@ export function ContactsConsole() {
       return;
     }
 
-    setStatusMessage("Creating project...");
+    setStatusMessage("");
     try {
       const response = await fetch(`${normalizedBaseUrl}/customers/${customerId}/projects/`, {
         method: "POST",

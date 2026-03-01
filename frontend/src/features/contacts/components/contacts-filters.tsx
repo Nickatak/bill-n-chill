@@ -1,10 +1,11 @@
 "use client";
 
 /**
- * Filter controls for the customer list: free-text search, project ownership toggle,
- * and archived-customer visibility toggle. Fully controlled by the parent console.
+ * Compact filter bar for the customer list: free-text search and inline
+ * segmented controls for activity and project ownership filtering.
  */
 
+import segmented from "../../../shared/styles/segmented.module.css";
 import styles from "./contacts-console.module.css";
 
 type ActivityFilter = "all" | "active";
@@ -19,7 +20,7 @@ type ContactsFiltersProps = {
   onProjectFilterChange: (value: ProjectFilter) => void;
 };
 
-/** Renders search input and toggle switches for project and activity filters. */
+/** Renders search input and inline segmented controls for activity/project filters. */
 export function ContactsFilters({
   query,
   onQueryChange,
@@ -28,90 +29,47 @@ export function ContactsFilters({
   projectFilter,
   onProjectFilterChange,
 }: ContactsFiltersProps) {
-  const includeArchived = activityFilter === "all";
-  const withProjectOnly = projectFilter === "with_project";
-
   return (
     <div className={styles.controlsRow}>
-      {/* Free-text search */}
-
-      <label className={styles.controlLabel}>
-        <span>Search</span>
-        <input
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Name, phone, email, or address"
-        />
-      </label>
-
-      {/* Project ownership toggle */}
-
-      <div className={styles.filterSwitchCard}>
-        <div className={styles.filterSwitchHeader}>
-          <span className={styles.filterSwitchTitle}>Projects</span>
-        </div>
-        <label className={styles.filterSwitchRow}>
-          <span
-            className={`${styles.filterSwitchState} ${
-              !withProjectOnly ? styles.filterSwitchStateSelected : ""
-            }`}
+      <input
+        className={styles.searchInput}
+        value={query}
+        onChange={(event) => onQueryChange(event.target.value)}
+        placeholder="Search by name, phone, email, or address"
+      />
+      <div className={styles.filterControls}>
+        <div className={segmented.group}>
+          <button
+            type="button"
+            className={`${segmented.option} ${activityFilter === "active" ? segmented.optionActive : ""}`}
+            onClick={() => onActivityFilterChange("active")}
+          >
+            Active
+          </button>
+          <button
+            type="button"
+            className={`${segmented.option} ${activityFilter === "all" ? segmented.optionActive : ""}`}
+            onClick={() => onActivityFilterChange("all")}
           >
             All
-          </span>
-          <input
-            className={styles.switchInput}
-            type="checkbox"
-            checked={withProjectOnly}
-            onChange={(event) => onProjectFilterChange(event.target.checked ? "with_project" : "all")}
-            aria-label="Toggle project filter between all customers and customers with projects only"
-          />
-          <span
-            className={`${styles.filterSwitchState} ${
-              withProjectOnly ? styles.filterSwitchStateSelected : ""
-            }`}
-          >
-            With projects
-          </span>
-        </label>
-        <p className={styles.filterSwitchSummary}>
-          {withProjectOnly ? "Showing customers with projects only" : "Showing all customers"}
-        </p>
-      </div>
-
-      {/* Archived customer visibility toggle */}
-
-      <div className={styles.filterSwitchCard}>
-        <div className={styles.filterSwitchHeader}>
-          <span className={styles.filterSwitchTitle}>Customer visibility</span>
+          </button>
         </div>
-        <label className={styles.filterSwitchRow}>
-          <span
-            className={`${styles.filterSwitchState} ${
-              !includeArchived ? styles.filterSwitchStateSelected : ""
-            }`}
+        <div className={segmented.group}>
+          <button
+            type="button"
+            className={`${segmented.option} ${projectFilter === "all" ? segmented.optionActive : ""}`}
+            onClick={() => onProjectFilterChange("all")}
           >
-            Active only
-          </span>
-          <input
-            className={styles.switchInput}
-            type="checkbox"
-            checked={includeArchived}
-            onChange={(event) => onActivityFilterChange(event.target.checked ? "all" : "active")}
-            aria-label="Toggle customer visibility between active-only and including archived customers"
-          />
-          <span
-            className={`${styles.filterSwitchState} ${
-              includeArchived ? styles.filterSwitchStateSelected : ""
-            }`}
+            All
+          </button>
+          <button
+            type="button"
+            className={`${segmented.option} ${projectFilter === "with_project" ? segmented.optionActive : ""}`}
+            onClick={() => onProjectFilterChange("with_project")}
           >
-            Include archived
-          </span>
-        </label>
-        <p className={styles.filterSwitchSummary}>
-          {includeArchived
-            ? "Showing active and archived customers"
-            : "Showing active customers only"}
-        </p>
+            With Projects
+          </button>
+        </div>
       </div>
     </div>
   );

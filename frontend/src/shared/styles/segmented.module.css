@@ -1,0 +1,31 @@
+/* Shared segmented control styles. Compose from feature modules for inline toggle groups. */
+
+.group {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.option {
+  appearance: none;
+  border: none;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: var(--font-sm);
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-secondary);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.option:hover:not(.optionActive) {
+  background: var(--surface-secondary);
+  color: var(--text-primary);
+}
+
+.optionActive {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}

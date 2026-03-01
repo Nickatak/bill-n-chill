@@ -1,15 +1,16 @@
 "use client";
 
 /**
- * Customer table with an expandable per-row project accordion. Each customer row
- * shows contact info, an edit button, and a collapsible project list grouped by
- * status with per-customer status chip filters.
+ * Customer list with an expandable per-row project accordion. Uses a div-based
+ * grid layout that renders as a 3-column table on desktop and stacked cards
+ * on mobile.
  */
 
 import { useState } from "react";
 import Link from "next/link";
 
 import type { ProjectRecord } from "@/features/projects/types";
+import { formatPhone } from "@/shared/phone-format";
 
 import { CustomerRow } from "../types";
 import styles from "./contacts-console.module.css";
@@ -47,25 +48,15 @@ function projectStatusSummaryLabel(status: ProjectStatusKey, count: number): str
 
 /** Map a project status to its CSS module class for color-coding. */
 function projectStatusClass(status: string): string {
-  if (status === "prospect") {
-    return styles.projectStatusProspect;
-  }
-  if (status === "active") {
-    return styles.projectStatusActive;
-  }
-  if (status === "on_hold") {
-    return styles.projectStatusOnHold;
-  }
-  if (status === "completed") {
-    return styles.projectStatusCompleted;
-  }
-  if (status === "cancelled") {
-    return styles.projectStatusCancelled;
-  }
+  if (status === "prospect") return styles.projectStatusProspect;
+  if (status === "active") return styles.projectStatusActive;
+  if (status === "on_hold") return styles.projectStatusOnHold;
+  if (status === "completed") return styles.projectStatusCompleted;
+  if (status === "cancelled") return styles.projectStatusCancelled;
   return "";
 }
 
-/** Customer table with expandable project accordions and per-customer status filters. */
+/** Customer list with expandable project accordions and per-customer status filters. */
 export function ContactsList({
   rows,
   filteredRows,
@@ -84,189 +75,221 @@ export function ContactsList({
     : null;
 
   return (
-    <section className={styles.tableWrap}>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th>Customer</th>
-            <th>Phone / Email</th>
-            <th>Projects</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredRows.map((row) => {
-            const projects = projectsByCustomer[row.id] ?? [];
-            const isInactive = Boolean(row.is_archived);
-            const isExpanded = visibleOpenCustomerId === row.id;
-            const projectCountsByStatus = PROJECT_STATUS_ORDER.reduce(
-              (acc, status) => {
-                acc[status] = projects.filter((project) => project.status === status).length;
-                return acc;
-              },
-              {
-                prospect: 0,
-                active: 0,
-                on_hold: 0,
-                completed: 0,
-                cancelled: 0,
-              } as Record<ProjectStatusKey, number>,
-            );
-            const summaryStatuses = PROJECT_STATUS_ORDER.filter(
-              (status) => projectCountsByStatus[status] > 0,
-            );
-            const customerStatusFilters = projectStatusFiltersByCustomer[row.id] ?? ALL_PROJECT_STATUS_FILTERS;
-            const visibleProjects = projects.filter(
-              (project) => customerStatusFilters[project.status as ProjectStatusKey] ?? true,
-            );
-            const groupedProjects = PROJECT_STATUS_ORDER.map((status: ProjectStatusKey) => ({
-              status,
-              projects: visibleProjects.filter((project) => project.status === status),
-            })).filter((group) => group.projects.length > 0);
-            const hasAnyFilteredOutStatus = PROJECT_STATUS_ORDER.some(
-              (status) => !customerStatusFilters[status],
-            );
-            return (
-              <tr key={row.id} className={isInactive ? styles.tableRowInactive : ""}>
-                <td>
-                  <p className={styles.rowPrimary}>{row.display_name}</p>
-                  <p className={styles.rowSecondary}>{row.billing_address || "no billing address"}</p>
-                  <div className={styles.customerActionsInline}>
-                    <button
-                      type="button"
-                      className={styles.secondaryButton}
-                      onClick={() => onEdit(String(row.id))}
-                    >
-                      Edit
-                    </button>
-                  </div>
-                </td>
-                <td>
-                  <p className={styles.rowPrimary}>{row.phone || row.email || "no phone/email"}</p>
-                  {row.phone && row.email ? <p className={styles.rowSecondary}>{row.email}</p> : null}
-                </td>
-                <td>
-                  <div className={styles.projectCellHeader}>
-                    <button
-                      type="button"
-                      className={styles.projectAccordionToggle}
-                      aria-expanded={isExpanded}
-                      aria-controls={`customer-projects-${row.id}`}
-                      onClick={() =>
-                        setOpenCustomerId((current) => (current === row.id ? null : row.id))
-                      }
-                    >
-                      <span className={styles.projectAccordionStatusList}>
-                        {summaryStatuses.map((status) => (
-                          <span
-                            key={`${row.id}-${status}-summary`}
-                            className={`${styles.projectStatusPill} ${projectStatusClass(status)}`}
-                            title={`${projectStatusSummaryLabel(status, projectCountsByStatus[status])} project${
-                              projectCountsByStatus[status] === 1 ? "" : "s"
-                            }`}
-                          >
-                            {projectStatusSummaryLabel(status, projectCountsByStatus[status])}
-                          </span>
-                        ))}
-                      </span>
-                      <span className={styles.projectAccordionCaret}>
-                        {isExpanded ? "Hide projects" : "Show projects"}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.addProjectButton}
-                      aria-label={`Add new project for ${row.display_name}`}
-                      onClick={() => onCreateProject(row)}
-                    >
-                      Add New Project
-                    </button>
-                  </div>
-                  {isExpanded ? (
-                    <div id={`customer-projects-${row.id}`} className={styles.projectAccordionBody}>
-                      <div className={styles.projectFilterBar}>
-                        {PROJECT_STATUS_ORDER.map((status) => {
-                          const count = projectCountsByStatus[status];
-                          const enabled = customerStatusFilters[status];
-                          return (
-                            <button
-                              key={`${row.id}-${status}`}
-                              type="button"
-                              className={`${styles.projectFilterChip} ${
-                                enabled ? styles.projectFilterChipEnabled : styles.projectFilterChipDisabled
-                              } ${enabled ? projectStatusClass(status) : ""}`}
-                              aria-pressed={enabled}
-                              onClick={() =>
-                                setProjectStatusFiltersByCustomer((current) => ({
-                                  ...current,
-                                  [row.id]: {
-                                    ...(current[row.id] ?? ALL_PROJECT_STATUS_FILTERS),
-                                    [status]: !((current[row.id] ?? ALL_PROJECT_STATUS_FILTERS)[status]),
-                                  },
-                                }))
-                              }
-                            >
-                              {projectStatusLabel(status)} ({count})
-                            </button>
-                          );
-                        })}
-                        {hasAnyFilteredOutStatus ? (
+    <section>
+      {/* Header row — hidden on mobile */}
+      <div className={styles.gridHeader}>
+        <span>Customer</span>
+        <span>Phone / Email</span>
+        <span>Projects</span>
+      </div>
+
+      {/* Customer rows */}
+      <div className={styles.gridBody}>
+        {filteredRows.map((row) => {
+          const projects = projectsByCustomer[row.id] ?? [];
+          const isInactive = Boolean(row.is_archived);
+          const isExpanded = visibleOpenCustomerId === row.id;
+          const projectCountsByStatus = PROJECT_STATUS_ORDER.reduce(
+            (acc, status) => {
+              acc[status] = projects.filter((project) => project.status === status).length;
+              return acc;
+            },
+            {
+              prospect: 0,
+              active: 0,
+              on_hold: 0,
+              completed: 0,
+              cancelled: 0,
+            } as Record<ProjectStatusKey, number>,
+          );
+          const summaryStatuses = PROJECT_STATUS_ORDER.filter(
+            (status) => projectCountsByStatus[status] > 0,
+          );
+          const customerStatusFilters =
+            projectStatusFiltersByCustomer[row.id] ?? ALL_PROJECT_STATUS_FILTERS;
+          const visibleProjects = projects.filter(
+            (project) => customerStatusFilters[project.status as ProjectStatusKey] ?? true,
+          );
+          const groupedProjects = PROJECT_STATUS_ORDER.map((status: ProjectStatusKey) => ({
+            status,
+            projects: visibleProjects.filter((project) => project.status === status),
+          })).filter((group) => group.projects.length > 0);
+          const hasAnyFilteredOutStatus = PROJECT_STATUS_ORDER.some(
+            (status) => !customerStatusFilters[status],
+          );
+
+          return (
+            <div
+              key={row.id}
+              className={`${styles.gridRow} ${isInactive ? styles.gridRowInactive : ""}`}
+            >
+              {/* Customer info cell */}
+              <div className={styles.gridCellCustomer}>
+                <button
+                  type="button"
+                  className={styles.customerNameLink}
+                  onClick={() => onEdit(String(row.id))}
+                >
+                  {row.display_name}
+                </button>
+                <p className={styles.rowSecondary}>
+                  {row.billing_address || "no billing address"}
+                </p>
+                {/* Phone/email inline on mobile */}
+                <p className={styles.mobileContact}>
+                  {row.phone ? formatPhone(row.phone) : row.email || "no phone/email"}
+                  {row.phone && row.email ? ` · ${row.email}` : ""}
+                </p>
+              </div>
+
+              {/* Phone / Email cell — desktop only */}
+              <div className={styles.gridCellContact}>
+                <p className={styles.rowPrimary}>
+                  {row.phone ? formatPhone(row.phone) : row.email || "no phone/email"}
+                </p>
+                {row.phone && row.email ? (
+                  <p className={styles.rowSecondary}>{row.email}</p>
+                ) : null}
+              </div>
+
+              {/* Projects cell */}
+              <div className={styles.gridCellProjects}>
+                <div className={styles.projectCellHeader}>
+                  <button
+                    type="button"
+                    className={styles.projectAccordionToggle}
+                    aria-expanded={isExpanded}
+                    aria-controls={`customer-projects-${row.id}`}
+                    onClick={() =>
+                      setOpenCustomerId((current) =>
+                        current === row.id ? null : row.id,
+                      )
+                    }
+                  >
+                    <span className={styles.projectAccordionStatusList}>
+                      {summaryStatuses.map((status) => (
+                        <span
+                          key={`${row.id}-${status}-summary`}
+                          className={`${styles.projectStatusPill} ${projectStatusClass(status)}`}
+                          title={`${projectStatusSummaryLabel(status, projectCountsByStatus[status])} project${
+                            projectCountsByStatus[status] === 1 ? "" : "s"
+                          }`}
+                        >
+                          {projectStatusSummaryLabel(status, projectCountsByStatus[status])}
+                        </span>
+                      ))}
+                    </span>
+                    <span className={styles.projectAccordionCaret}>
+                      {isExpanded ? "Hide projects" : "Show projects"}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.addProjectButton}
+                    aria-label={`Add new project for ${row.display_name}`}
+                    onClick={() => onCreateProject(row)}
+                  >
+                    Add New Project
+                  </button>
+                </div>
+                {isExpanded ? (
+                  <div
+                    id={`customer-projects-${row.id}`}
+                    className={styles.projectAccordionBody}
+                  >
+                    <div className={styles.projectFilterBar}>
+                      {PROJECT_STATUS_ORDER.map((status) => {
+                        const count = projectCountsByStatus[status];
+                        const enabled = customerStatusFilters[status];
+                        return (
                           <button
+                            key={`${row.id}-${status}`}
                             type="button"
-                            className={styles.projectFilterReset}
+                            className={`${styles.projectFilterChip} ${
+                              enabled
+                                ? styles.projectFilterChipEnabled
+                                : styles.projectFilterChipDisabled
+                            } ${enabled ? projectStatusClass(status) : ""}`}
+                            aria-pressed={enabled}
                             onClick={() =>
                               setProjectStatusFiltersByCustomer((current) => ({
                                 ...current,
-                                [row.id]: ALL_PROJECT_STATUS_FILTERS,
+                                [row.id]: {
+                                  ...(current[row.id] ?? ALL_PROJECT_STATUS_FILTERS),
+                                  [status]: !(
+                                    (current[row.id] ?? ALL_PROJECT_STATUS_FILTERS)[status]
+                                  ),
+                                },
                               }))
                             }
                           >
-                            Show all
+                            {projectStatusLabel(status)} ({count})
                           </button>
-                        ) : null}
-                      </div>
-                      {visibleProjects.length > 0 ? (
-                        <div className={styles.projectStatusGroups}>
-                          {groupedProjects.map((group) => (
-                            <section key={group.status} className={styles.projectStatusGroup}>
-                              <header className={styles.projectStatusGroupHeader}>
-                                <span
-                                  className={`${styles.projectStatusHeader} ${projectStatusClass(group.status)}`}
-                                >
-                                  {projectStatusLabel(group.status)}
-                                </span>
-                                <span className={styles.rowSecondary}>
-                                  {group.projects.length} project{group.projects.length === 1 ? "" : "s"}
-                                </span>
-                              </header>
-                              <div className={styles.projectLinks}>
-                                {group.projects.map((project) => (
-                                  <Link
-                                    key={project.id}
-                                    href={`/projects?project=${project.id}`}
-                                    className={styles.projectAccordionLink}
-                                  >
-                                    <span className={styles.projectLinkLabel}>
-                                      #{project.id} {project.name}
-                                    </span>
-                                  </Link>
-                                ))}
-                              </div>
-                            </section>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className={styles.rowSecondary}>
-                          {projects.length > 0 ? "No visible projects for current filters" : "No projects yet"}
-                        </span>
-                      )}
+                        );
+                      })}
+                      {hasAnyFilteredOutStatus ? (
+                        <button
+                          type="button"
+                          className={styles.projectFilterReset}
+                          onClick={() =>
+                            setProjectStatusFiltersByCustomer((current) => ({
+                              ...current,
+                              [row.id]: ALL_PROJECT_STATUS_FILTERS,
+                            }))
+                          }
+                        >
+                          Show all
+                        </button>
+                      ) : null}
                     </div>
-                  ) : null}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                    {visibleProjects.length > 0 ? (
+                      <div className={styles.projectStatusGroups}>
+                        {groupedProjects.map((group) => (
+                          <section
+                            key={group.status}
+                            className={styles.projectStatusGroup}
+                          >
+                            <header className={styles.projectStatusGroupHeader}>
+                              <span
+                                className={`${styles.projectStatusHeader} ${projectStatusClass(group.status)}`}
+                              >
+                                {projectStatusLabel(group.status)}
+                              </span>
+                              <span className={styles.rowSecondary}>
+                                {group.projects.length} project
+                                {group.projects.length === 1 ? "" : "s"}
+                              </span>
+                            </header>
+                            <div className={styles.projectLinks}>
+                              {group.projects.map((project) => (
+                                <Link
+                                  key={project.id}
+                                  href={`/projects?project=${project.id}`}
+                                  className={styles.projectAccordionLink}
+                                >
+                                  <span className={styles.projectLinkLabel}>
+                                    #{project.id} {project.name}
+                                  </span>
+                                </Link>
+                              ))}
+                            </div>
+                          </section>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className={styles.rowSecondary}>
+                        {projects.length > 0
+                          ? "No visible projects for current filters"
+                          : "No projects yet"}
+                      </span>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
       {filteredRows.length === 0 ? (
         <p className={styles.emptyState}>
