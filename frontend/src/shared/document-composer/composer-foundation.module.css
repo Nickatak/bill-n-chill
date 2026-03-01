@@ -560,8 +560,8 @@
 
 .removeButton:hover,
 .removeButton:focus-visible {
-  background: var(--status-rejected-bg);
-  border-color: var(--status-rejected-border);
+  background: var(--status-red-bg);
+  border-color: var(--status-red-border);
   outline: none;
 }
 
@@ -907,33 +907,33 @@
 }
 
 .statusPillActive.statusDraft {
-  background: var(--status-draft-bg);
-  border-color: var(--status-draft-border);
-  color: var(--status-draft-text);
+  background: var(--status-blue-bg);
+  border-color: var(--status-blue-border);
+  color: var(--status-blue-text);
 }
 
 .statusPillActive.statusSent {
-  background: var(--status-sent-bg);
-  border-color: var(--status-sent-border);
-  color: var(--status-sent-text);
+  background: var(--status-amber-bg);
+  border-color: var(--status-amber-border);
+  color: var(--status-amber-text);
 }
 
 .statusPillActive.statusApproved {
-  background: var(--status-approved-bg);
-  border-color: var(--status-approved-border);
-  color: var(--status-approved-text);
+  background: var(--status-green-bg);
+  border-color: var(--status-green-border);
+  color: var(--status-green-text);
 }
 
 .statusPillActive.statusRejected {
-  background: var(--status-rejected-bg);
-  border-color: var(--status-rejected-border);
-  color: var(--status-rejected-text);
+  background: var(--status-red-bg);
+  border-color: var(--status-red-border);
+  color: var(--status-red-text);
 }
 
 .statusPillActive.statusArchived {
-  background: var(--status-void-bg);
-  border-color: var(--status-void-border);
-  color: var(--status-void-text);
+  background: var(--status-gray-bg);
+  border-color: var(--status-gray-border);
+  color: var(--status-gray-text);
 }
 
 .statusNote {

@@ -16,7 +16,7 @@ export type LeadFieldErrors = {
 export type SubmitIntent = "customer_only" | "customer_and_project";
 export type QuickAddMessageTone = "neutral" | "info" | "success" | "error";
 
-export type DuplicateResolution = "use_existing" | "create_anyway";
+export type DuplicateResolution = "use_existing";
 
 export type PendingSubmission = {
   payload: CustomerIntakePayload;

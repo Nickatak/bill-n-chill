@@ -369,33 +369,33 @@
 }
 
 .projectStatusProspect {
-  border-color: var(--accent-border);
-  color: var(--accent-text);
-  background: var(--accent-lighter);
+  border-color: var(--status-blue-border);
+  color: var(--status-blue-text);
+  background: var(--status-blue-bg);
 }
 
 .projectStatusActive {
-  border-color: var(--status-approved-border);
-  color: var(--status-approved-text);
-  background: var(--status-approved-bg);
+  border-color: var(--status-green-border);
+  color: var(--status-green-text);
+  background: var(--status-green-bg);
 }
 
 .projectStatusOnHold {
-  border-color: var(--status-sent-border);
-  color: var(--status-sent-text);
-  background: var(--status-sent-bg);
+  border-color: var(--status-amber-border);
+  color: var(--status-amber-text);
+  background: var(--status-amber-bg);
 }
 
 .projectStatusCompleted {
-  border-color: var(--status-void-border);
-  color: var(--status-void-text);
-  background: var(--status-void-bg);
+  border-color: var(--status-gray-border);
+  color: var(--status-gray-text);
+  background: var(--status-gray-bg);
 }
 
 .projectStatusCancelled {
-  border-color: var(--status-rejected-border);
-  color: var(--status-rejected-text);
-  background: var(--status-rejected-bg);
+  border-color: var(--status-red-border);
+  color: var(--status-red-text);
+  background: var(--status-red-bg);
 }
 
 .customerActionsInline {
@@ -531,15 +531,15 @@
 }
 
 .projectStatusSelectorButtonActive.projectStatusProspect {
-  background: #2563eb;
+  background: var(--status-blue-solid);
   border-color: var(--accent);
-  color: #eff6ff;
+  color: var(--status-blue-solid-text);
 }
 
 .projectStatusSelectorButtonActive.projectStatusActive {
-  background: #16a34a;
-  border-color: #15803d;
-  color: #f0fdf4;
+  background: var(--status-green-solid);
+  border-color: var(--status-green-solid);
+  color: var(--status-green-solid-text);
 }
 
 .toggleField {

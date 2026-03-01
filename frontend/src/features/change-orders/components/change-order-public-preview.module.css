@@ -5,13 +5,13 @@
 }
 
 .decisionBannerRecentlyApproved {
-  border-color: var(--status-approved-border);
-  background: #f0fdf4;
+  border-color: var(--status-green-border);
+  background: var(--status-green-bg);
   box-shadow: none;
 }
 
 .decisionBannerRecentlyRejected {
-  border-color: var(--status-rejected-border);
+  border-color: var(--status-red-border);
   background: #fef2f2;
   box-shadow: none;
 }

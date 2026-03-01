@@ -443,6 +443,40 @@ def quick_add_customer_intake_view(request):
     serializer.is_valid(raise_exception=True)
     payload = serializer.validated_data
 
+    project_address = (payload.get("project_address") or "").strip()
+
+    if create_project and not project_address:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Project address is required when creating a project.",
+                    "fields": {
+                        "project_address": [
+                            "Project address is required when creating a project."
+                        ]
+                    },
+                }
+            },
+            status=400,
+        )
+
+    if create_project and not project_name:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Project name is required when creating a project.",
+                    "fields": {
+                        "project_name": [
+                            "Project name is required when creating a project."
+                        ]
+                    },
+                }
+            },
+            status=400,
+        )
+
     if create_project and project_status not in ALLOWED_PROJECT_CREATE_STATUSES:
         return Response(
             {
@@ -466,23 +500,19 @@ def quick_add_customer_intake_view(request):
     )
     duplicate_ids = {customer.id for customer in duplicates}
 
-    if duplicates and duplicate_resolution not in {
-        "use_existing",
-        "create_anyway",
-    }:
+    if duplicates and duplicate_resolution != "use_existing":
         candidates = [_build_customer_duplicate_candidate(customer) for customer in duplicates]
         return Response(
             {
                 "error": {
                     "code": "duplicate_detected",
-                    "message": "Possible duplicate customers found.",
+                    "message": "A customer with this phone or email already exists.",
                     "fields": {},
                 },
                 "data": {
                     "duplicate_candidates": candidates,
                     "allowed_resolutions": [
                         "use_existing",
-                        "create_anyway",
                     ],
                 },
             },
@@ -642,9 +672,7 @@ def quick_add_customer_intake_view(request):
                 "project": ProjectSerializer(project).data if project else None,
             },
             "meta": {
-                "duplicate_resolution": "create_anyway"
-                if duplicate_resolution == "create_anyway"
-                else duplicate_resolution or "none",
+                "duplicate_resolution": duplicate_resolution or "none",
                 "conversion_status": "converted" if project else "not_requested",
                 "customer_created": customer_created,
             },

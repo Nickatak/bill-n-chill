@@ -84,7 +84,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
   const [password, setPassword] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
-  const [message, setMessage] = useState("Sign in to open your dashboard.");
+  const [message, setMessage] = useState("");
 
   /**
    * Rewrite Django's generic login error messages into user-friendly
@@ -180,8 +180,6 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
     return (
       <section className={styles.shell}>
         <div className={styles.card}>
-          <h2 className={styles.title}>Sign in</h2>
-          <p className={styles.text}>Home doubles as your dashboard once authenticated.</p>
           <div className={styles.warning} role="note" aria-label="Environment warning">
             <p className={styles.warningTitle}>Under Construction</p>
             <p className={styles.warningText}>
@@ -224,10 +222,14 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
               Need an account? <Link href="/register">Create one</Link>.
             </p>
           </form>
-          <p className={`${styles.message} ${messageTone === "error" ? styles.messageError : ""}`}>
-            {message}
-          </p>
-          <p className={health.ok ? styles.healthOk : styles.healthBad}>API Health: {health.message}</p>
+          {message && (
+            <p className={`${styles.message} ${messageTone === "error" ? styles.messageError : ""}`}>
+              {message}
+            </p>
+          )}
+          {!health.ok && (
+            <p className={styles.healthBad}>API Health: {health.message}</p>
+          )}
         </div>
       </section>
     );
@@ -238,10 +240,14 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
       <div className={styles.card}>
         <h2 className={styles.title}>Session ready</h2>
         <p className={styles.text}>Signed in as {email || "user"}. Redirecting to Intake...</p>
-        <p className={`${styles.message} ${messageTone === "error" ? styles.messageError : ""}`}>
-          {message}
-        </p>
-        <p className={health.ok ? styles.healthOk : styles.healthBad}>API Health: {health.message}</p>
+        {message && (
+          <p className={`${styles.message} ${messageTone === "error" ? styles.messageError : ""}`}>
+            {message}
+          </p>
+        )}
+        {!health.ok && (
+          <p className={styles.healthBad}>API Health: {health.message}</p>
+        )}
         <div className={styles.buttonRow}>
           <button className={styles.buttonSecondary} type="button" onClick={handleSignOut}>
             Sign out

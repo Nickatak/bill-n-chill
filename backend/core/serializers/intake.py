@@ -27,7 +27,7 @@ def _is_valid_phone(value: str) -> bool:
 class CustomerIntakeQuickAddSerializer(serializers.Serializer):
     full_name = serializers.CharField(max_length=255)
     phone = serializers.CharField(required=False, allow_blank=True, max_length=50)
-    project_address = serializers.CharField(max_length=255)
+    project_address = serializers.CharField(required=False, allow_blank=True, max_length=255)
     email = serializers.CharField(required=False, allow_blank=True, max_length=255)
     initial_contract_value = serializers.DecimalField(
         max_digits=12,

@@ -82,21 +82,21 @@
 }
 
 .invoiceNumberIndicatorGenerated {
-  background: var(--status-draft-bg);
-  border-color: var(--status-draft-border);
+  background: var(--status-blue-bg);
+  border-color: var(--status-blue-border);
   color: var(--accent-hover);
 }
 
 .invoiceNumberIndicatorEditing {
-  background: var(--status-void-bg);
-  border-color: var(--status-void-border);
-  color: var(--status-void-text);
+  background: var(--status-gray-bg);
+  border-color: var(--status-gray-border);
+  color: var(--status-gray-text);
 }
 
 .invoiceNumberIndicatorLocked {
-  background: var(--status-rejected-bg);
-  border-color: var(--status-rejected-border);
-  color: var(--status-rejected-text);
+  background: var(--status-red-bg);
+  border-color: var(--status-red-border);
+  color: var(--status-red-text);
 }
 
 .invoiceLogoImage {

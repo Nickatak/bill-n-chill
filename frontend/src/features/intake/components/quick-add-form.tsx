@@ -82,19 +82,7 @@ export function QuickAddForm({
         {fieldErrors.phone ? <p className={styles.errorText}>{fieldErrors.phone}</p> : null}
       </label>
 
-      <label className={styles.field}>
-        Project address
-        <input
-          name="project_address"
-          value={projectAddress}
-          onChange={(event) => onProjectAddressChange(event.target.value)}
-          autoComplete="street-address"
-          required
-        />
-        {fieldErrors.project_address ? (
-          <p className={styles.errorText}>{fieldErrors.project_address}</p>
-        ) : null}
-      </label>
+      <hr className={`${styles.sectionDivider} ${styles.fullRow}`} />
 
       <label className={styles.field}>
         Project name
@@ -107,21 +95,38 @@ export function QuickAddForm({
         {fieldErrors.project_name ? <p className={styles.errorText}>{fieldErrors.project_name}</p> : null}
       </label>
 
+      <label className={styles.field}>
+        Project address
+        <input
+          name="project_address"
+          value={projectAddress}
+          onChange={(event) => onProjectAddressChange(event.target.value)}
+          autoComplete="street-address"
+        />
+        {fieldErrors.project_address ? (
+          <p className={styles.errorText}>{fieldErrors.project_address}</p>
+        ) : null}
+      </label>
+
       <details className={`${styles.optionalDetails} ${styles.fullRow}`}>
         <summary>Optional details</summary>
         <div className={styles.optionalBody}>
           <label className={styles.field}>
-            Initial contract value
-            <input
-              name="initial_contract_value"
-              value={initialContractValue}
-              onChange={(event) => onInitialContractValueChange(event.target.value)}
-              type="number"
-              inputMode="decimal"
-              min="0"
-              step="0.01"
-              placeholder="25000.00"
-            />
+            Ballpark
+            <div className={styles.currencyInput}>
+              <span className={styles.currencyPrefix}>$</span>
+              <input
+                data-nested
+                name="initial_contract_value"
+                value={initialContractValue}
+                onChange={(event) => onInitialContractValueChange(event.target.value)}
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                placeholder="25,000"
+              />
+            </div>
           </label>
           <label className={styles.field}>
             Project status
@@ -152,7 +157,7 @@ export function QuickAddForm({
               </button>
             </div>
           </label>
-          <label className={styles.field}>
+          <label className={`${styles.field} ${styles.fullRow}`}>
             Notes
             <textarea
               name="notes"

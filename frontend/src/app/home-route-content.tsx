@@ -30,7 +30,7 @@ export function HomeRouteContent({ health }: HomeRouteContentProps) {
     return (
       <div className={homeStyles.page}>
         <main className={homeStyles.main}>
-          <h1 className={homeStyles.title}>bill-n-chill</h1>
+          <h1 className={homeStyles.title}>Bill n&apos; Chill</h1>
           <p className={homeStyles.subtitle}>Checking session...</p>
         </main>
       </div>
@@ -40,8 +40,7 @@ export function HomeRouteContent({ health }: HomeRouteContentProps) {
   return (
     <div className={homeStyles.page}>
       <main className={homeStyles.main}>
-        <h1 className={homeStyles.title}>bill-n-chill</h1>
-        <p className={homeStyles.subtitle}>Sign in to continue.</p>
+        <h1 className={homeStyles.title}>Bill n&apos; Chill</h1>
         <HomeAuthConsole health={health} />
       </main>
     </div>

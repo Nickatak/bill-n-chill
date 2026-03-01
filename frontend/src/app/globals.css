@@ -27,40 +27,56 @@
   --text-muted: #94a3b8;
   --text-on-accent: #eff6ff;
 
-  /* --- Status: Draft --- */
-  --status-draft-bg: #dbeafe;
-  --status-draft-border: #93c5fd;
-  --status-draft-text: #1e3a8a;
+  /* --- Status palette (badge: pastel bg, saturated text) --- */
+  --status-blue-bg: #dbeafe;
+  --status-blue-border: #93c5fd;
+  --status-blue-text: #1e3a8a;
 
-  /* --- Status: Sent / Pending Approval --- */
-  --status-sent-bg: #fef3c7;
-  --status-sent-border: #fcd34d;
-  --status-sent-text: #92400e;
+  --status-amber-bg: #fef3c7;
+  --status-amber-border: #fcd34d;
+  --status-amber-text: #92400e;
 
-  /* --- Status: Approved --- */
-  --status-approved-bg: #dcfce7;
-  --status-approved-border: #86efac;
-  --status-approved-text: #166534;
+  --status-green-bg: #dcfce7;
+  --status-green-border: #86efac;
+  --status-green-text: #166534;
 
-  /* --- Status: Rejected --- */
-  --status-rejected-bg: #fee2e2;
-  --status-rejected-border: #fca5a5;
-  --status-rejected-text: #991b1b;
+  --status-red-bg: #fee2e2;
+  --status-red-border: #fca5a5;
+  --status-red-text: #991b1b;
 
-  /* --- Status: Void / Inactive / Archived --- */
-  --status-void-bg: #e2e8f0;
-  --status-void-border: #cbd5e1;
-  --status-void-text: #334155;
+  --status-gray-bg: #e2e8f0;
+  --status-gray-border: #cbd5e1;
+  --status-gray-text: #334155;
 
-  /* --- Status: Paid --- */
-  --status-paid-bg: #d1fae5;
-  --status-paid-border: #6ee7b7;
-  --status-paid-text: #065f46;
+  --status-emerald-bg: #d1fae5;
+  --status-emerald-border: #6ee7b7;
+  --status-emerald-text: #065f46;
 
-  /* --- Status: Overdue --- */
-  --status-overdue-bg: #fff7ed;
-  --status-overdue-border: #fdba74;
-  --status-overdue-text: #9a3412;
+  --status-orange-bg: #fff7ed;
+  --status-orange-border: #fdba74;
+  --status-orange-text: #9a3412;
+
+  --status-violet-bg: #ede9fe;
+  --status-violet-border: #c4b5fd;
+  --status-violet-text: #5b21b6;
+
+  /* --- Status palette (solid: saturated bg, light text — mode-invariant) --- */
+  --status-blue-solid: #2563eb;
+  --status-blue-solid-text: #eff6ff;
+  --status-amber-solid: #d97706;
+  --status-amber-solid-text: #fffbeb;
+  --status-green-solid: #16a34a;
+  --status-green-solid-text: #f0fdf4;
+  --status-red-solid: #dc2626;
+  --status-red-solid-text: #fee2e2;
+  --status-gray-solid: #6b7280;
+  --status-gray-solid-text: #f9fafb;
+  --status-emerald-solid: #0f766e;
+  --status-emerald-solid-text: #ecfeff;
+  --status-orange-solid: #ea580c;
+  --status-orange-solid-text: #fff7ed;
+  --status-violet-solid: #7c3aed;
+  --status-violet-solid-text: #f5f3ff;
 
   /* --- Semantic Tones --- */
   --tone-success-bg: #dcfce7;
@@ -147,40 +163,38 @@ html[data-theme="dark"] {
   --text-muted: #71717a;
   --text-on-accent: #dbeafe;
 
-  /* --- Status: Draft --- */
-  --status-draft-bg: #1d4ed8;
-  --status-draft-border: #3b82f6;
-  --status-draft-text: #dbeafe;
+  /* --- Status palette (badge) --- */
+  --status-blue-bg: #1d4ed8;
+  --status-blue-border: #3b82f6;
+  --status-blue-text: #dbeafe;
 
-  /* --- Status: Sent / Pending Approval --- */
-  --status-sent-bg: #b45309;
-  --status-sent-border: #f59e0b;
-  --status-sent-text: #fef3c7;
+  --status-amber-bg: #b45309;
+  --status-amber-border: #f59e0b;
+  --status-amber-text: #fef3c7;
 
-  /* --- Status: Approved --- */
-  --status-approved-bg: #15803d;
-  --status-approved-border: #22c55e;
-  --status-approved-text: #dcfce7;
+  --status-green-bg: #15803d;
+  --status-green-border: #22c55e;
+  --status-green-text: #dcfce7;
 
-  /* --- Status: Rejected --- */
-  --status-rejected-bg: #991b1b;
-  --status-rejected-border: #ef4444;
-  --status-rejected-text: #fee2e2;
+  --status-red-bg: #991b1b;
+  --status-red-border: #ef4444;
+  --status-red-text: #fee2e2;
 
-  /* --- Status: Void / Inactive / Archived --- */
-  --status-void-bg: #4b5563;
-  --status-void-border: #9ca3af;
-  --status-void-text: #f3f4f6;
+  --status-gray-bg: #4b5563;
+  --status-gray-border: #9ca3af;
+  --status-gray-text: #f3f4f6;
 
-  /* --- Status: Paid --- */
-  --status-paid-bg: #065f46;
-  --status-paid-border: #10b981;
-  --status-paid-text: #d1fae5;
+  --status-emerald-bg: #065f46;
+  --status-emerald-border: #10b981;
+  --status-emerald-text: #d1fae5;
 
-  /* --- Status: Overdue --- */
-  --status-overdue-bg: #9a3412;
-  --status-overdue-border: #f97316;
-  --status-overdue-text: #fff7ed;
+  --status-orange-bg: #9a3412;
+  --status-orange-border: #f97316;
+  --status-orange-text: #fff7ed;
+
+  --status-violet-bg: #5b21b6;
+  --status-violet-border: #a78bfa;
+  --status-violet-text: #ede9fe;
 
   /* --- Semantic Tones --- */
   --tone-success-bg: #14532d;

@@ -85,7 +85,7 @@ export function HomeRegisterConsole({ health }: HomeRegisterConsoleProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState("Create an account to start using the dashboard.");
+  const [message, setMessage] = useState("");
 
   /**
    * Extract the most relevant error message from Django's register
@@ -164,8 +164,6 @@ export function HomeRegisterConsole({ health }: HomeRegisterConsoleProps) {
   return (
     <section className={styles.shell}>
       <div className={styles.card}>
-        <h2 className={styles.title}>Create account</h2>
-        <p className={styles.text}>Quick registration for temporary access.</p>
         <div className={styles.warning} role="note" aria-label="Environment warning">
           <p className={styles.warningTitle}>Under Construction</p>
           <p className={styles.warningText}>
@@ -209,10 +207,14 @@ export function HomeRegisterConsole({ health }: HomeRegisterConsoleProps) {
             Already have an account? <Link href="/">Sign in</Link>.
           </p>
         </form>
-        <p className={`${styles.message} ${messageTone === "error" ? styles.messageError : ""}`}>
-          {message}
-        </p>
-        <p className={health.ok ? styles.healthOk : styles.healthBad}>API Health: {health.message}</p>
+        {message && (
+          <p className={`${styles.message} ${messageTone === "error" ? styles.messageError : ""}`}>
+            {message}
+          </p>
+        )}
+        {!health.ok && (
+          <p className={styles.healthBad}>API Health: {health.message}</p>
+        )}
       </div>
     </section>
   );

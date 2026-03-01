@@ -36,9 +36,10 @@ export function QuickAddConsole() {
       return statusMessage;
     }
 
-    if (hasCustomerLink && hasProjectLink) {
-      return (
-        <>
+    return (
+      <>
+        <span>{statusMessage}</span>
+        {hasCustomerLink ? (
           <Link
             className={styles.formStatusLink}
             href={`/customers?customer=${controllerApi.lastConvertedCustomerId}`}
@@ -46,9 +47,11 @@ export function QuickAddConsole() {
             Customer #{controllerApi.lastConvertedCustomerId}
             {controllerApi.lastConvertedCustomerName
               ? ` (${controllerApi.lastConvertedCustomerName})`
-              : ""}
+              : ""}{" "}
+            &rarr;
           </Link>
-          {" and "}
+        ) : null}
+        {hasProjectLink ? (
           <Link
             className={styles.formStatusLink}
             href={`/projects?project=${controllerApi.lastConvertedProjectId}`}
@@ -56,48 +59,12 @@ export function QuickAddConsole() {
             Project #{controllerApi.lastConvertedProjectId}
             {controllerApi.lastConvertedProjectName
               ? ` (${controllerApi.lastConvertedProjectName})`
-              : ""}
+              : ""}{" "}
+            &rarr;
           </Link>
-          {" created."}
-        </>
-      );
-    }
-
-    if (hasCustomerLink) {
-      return (
-        <>
-          <Link
-            className={styles.formStatusLink}
-            href={`/customers?customer=${controllerApi.lastConvertedCustomerId}`}
-          >
-            Customer #{controllerApi.lastConvertedCustomerId}
-            {controllerApi.lastConvertedCustomerName
-              ? ` (${controllerApi.lastConvertedCustomerName})`
-              : ""}
-          </Link>
-          {" created."}
-        </>
-      );
-    }
-
-    if (hasProjectLink) {
-      return (
-        <>
-          <Link
-            className={styles.formStatusLink}
-            href={`/projects?project=${controllerApi.lastConvertedProjectId}`}
-          >
-            Project #{controllerApi.lastConvertedProjectId}
-            {controllerApi.lastConvertedProjectName
-              ? ` (${controllerApi.lastConvertedProjectName})`
-              : ""}
-          </Link>
-          {" created."}
-        </>
-      );
-    }
-
-    return statusMessage;
+        ) : null}
+      </>
+    );
   }
 
   // Scroll to status area when a new message or duplicate panel appears.
@@ -120,18 +87,9 @@ export function QuickAddConsole() {
   return (
     <section className={styles.section}>
       <h2>Quick Add Customer</h2>
-      <div className={styles.introCard}>
-        <p className={styles.introLead}>
-          Add a customer in under a minute, then optionally start a project in the same step.
-        </p>
-        <p className={styles.introMeta}>
-          If we find a possible match, we will ask before creating anything so your customer list stays clean.
-        </p>
-      </div>
-      {controllerApi.authMessage ? <p>{controllerApi.authMessage}</p> : null}
       <div ref={statusAnchorRef} />
       {statusMessage ? (
-        <p
+        <div
           role={statusTone === "error" ? "alert" : "status"}
           aria-live={statusLiveMode}
           className={`${styles.formStatus} ${
@@ -143,8 +101,17 @@ export function QuickAddConsole() {
           }`}
         >
           {renderStatusMessageContent()}
-        </p>
+        </div>
       ) : null}
+      <div className={styles.introCard}>
+        <p className={styles.introLead}>
+          Add a customer in under a minute, then optionally start a project in the same step.
+        </p>
+        <p className={styles.introMeta}>
+          If we find a possible match, we will ask before creating anything so your customer list stays clean.
+        </p>
+      </div>
+      {controllerApi.authMessage ? <p>{controllerApi.authMessage}</p> : null}
 
       <DuplicateResolutionPanel
         duplicateCandidates={controllerApi.duplicateCandidates}

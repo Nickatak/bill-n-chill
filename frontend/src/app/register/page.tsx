@@ -13,8 +13,7 @@ export default async function RegisterPage() {
   return (
     <div className={homeStyles.page}>
       <main className={homeStyles.main}>
-        <h1 className={homeStyles.title}>bill-n-chill</h1>
-        <p className={homeStyles.subtitle}>Create a temporary account for this preview environment.</p>
+        <h1 className={homeStyles.title}>Bill n&apos; Chill</h1>
         <HomeRegisterConsole health={health} />
       </main>
     </div>

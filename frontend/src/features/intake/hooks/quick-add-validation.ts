@@ -48,14 +48,14 @@ export function validateLeadFields(
     }
   }
 
-  if (!payload.project_address.trim()) {
-    nextErrors.project_address = "Project address is required.";
-  }
-
-  // Project name is only required when the user explicitly chose to create
-  // both a customer and a project in a single submission.
-  if (intent === "customer_and_project" && !projectName.trim()) {
-    nextErrors.project_name = "Project name is required when creating project + customer.";
+  // Project fields are only required when creating both customer and project.
+  if (intent === "customer_and_project") {
+    if (!projectName.trim()) {
+      nextErrors.project_name = "Project name is required when creating a project.";
+    }
+    if (!payload.project_address.trim()) {
+      nextErrors.project_address = "Project address is required when creating a project.";
+    }
   }
 
   return nextErrors;

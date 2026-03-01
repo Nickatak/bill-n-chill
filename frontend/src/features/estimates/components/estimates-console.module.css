@@ -291,7 +291,7 @@
 }
 
 .actionSuccess a {
-  color: var(--status-approved-text);
+  color: var(--status-green-text);
   font-weight: 700;
   text-decoration: underline;
 }
@@ -381,7 +381,7 @@
 }
 
 .staticMetaValue {
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
   font-size: var(--font-base);
   font-weight: 500;
 }
@@ -546,7 +546,7 @@
 .removeButton {
   border: 1px solid transparent;
   background: transparent;
-  color: #dc2626;
+  color: var(--status-red-solid);
   padding: 6px 8px;
   cursor: pointer;
   font-size: 0.8rem;
@@ -863,33 +863,33 @@
 }
 
 .statusPillActive.statusDraft {
-  background: #2563eb;
+  background: var(--status-blue-solid);
   border-color: var(--accent);
   color: var(--accent-lighter);
 }
 
 .statusPillActive.statusSent {
-  background: #d97706;
+  background: var(--status-amber-solid);
   border-color: #b45309;
-  color: #fffbeb;
+  color: var(--status-amber-solid-text);
 }
 
 .statusPillActive.statusApproved {
-  background: #16a34a;
-  border-color: #15803d;
-  color: #f0fdf4;
+  background: var(--status-green-solid);
+  border-color: var(--status-green-solid);
+  color: var(--status-green-solid-text);
 }
 
 .statusPillActive.statusRejected {
-  background: #dc2626;
+  background: var(--status-red-solid);
   border-color: #b91c1c;
-  color: var(--status-rejected-bg);
+  color: var(--status-red-bg);
 }
 
 .statusPillActive.statusArchived {
-  background: #6b7280;
+  background: var(--status-gray-solid);
   border-color: #4b5563;
-  color: #f9fafb;
+  color: var(--status-gray-solid-text);
 }
 
 .statusNote {
@@ -1067,7 +1067,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--status-approved-text);
+  color: var(--status-green-text);
 }
 
 .versionBaselineJumpButton {
@@ -1125,7 +1125,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface-secondary);
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
   padding: 6px 10px;
   font-size: 0.78rem;
   cursor: pointer;
@@ -1207,7 +1207,7 @@
   display: block;
   margin-top: auto;
   font-size: 0.8rem;
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
   font-weight: 500;
 }
 
@@ -1347,7 +1347,7 @@
   display: block;
   margin-top: 4px;
   font-size: 0.76rem;
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
   font-weight: 500;
 }
 
@@ -1465,8 +1465,8 @@
 }
 
 .financialBaselineActive {
-  background: var(--status-approved-bg);
-  color: var(--status-approved-text);
+  background: var(--status-green-bg);
+  color: var(--status-green-text);
 }
 
 .financialBaselineSuperseded {
@@ -1512,7 +1512,7 @@
 
 .statusCreated {
   composes: badge from '../../../shared/styles/status.module.css';
-  background: var(--status-void-bg);
+  background: var(--status-gray-bg);
   color: var(--text-secondary);
 }
 
@@ -1627,13 +1627,13 @@
 }
 
 .decisionBannerRecentlyApproved {
-  border-color: var(--status-approved-border);
-  background: #f0fdf4;
+  border-color: var(--status-green-border);
+  background: var(--status-green-bg);
   box-shadow: none;
 }
 
 .decisionBannerRecentlyRejected {
-  border-color: var(--status-rejected-border);
+  border-color: var(--status-red-border);
   background: #fef2f2;
   box-shadow: none;
 }

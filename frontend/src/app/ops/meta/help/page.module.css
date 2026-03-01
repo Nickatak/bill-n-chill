@@ -23,7 +23,7 @@
   margin: 0;
   font-size: var(--font-base);
   line-height: 1.45;
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
 }
 
 .jobSection {
@@ -44,7 +44,7 @@
   padding-left: 18px;
   display: grid;
   gap: 5px;
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
   font-size: 0.88rem;
   line-height: 1.4;
 }

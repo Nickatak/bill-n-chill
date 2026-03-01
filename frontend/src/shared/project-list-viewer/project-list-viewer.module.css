@@ -111,24 +111,24 @@
 .controlBar .projectFilterButton.projectFilterToneActive {
   background-color: #166534;
   border-color: #4ade80;
-  color: #f0fdf4;
+  color: var(--status-green-solid-text);
 }
 
 .controlBar .projectFilterButton.projectFilterToneOnHold {
   background-color: #92400e;
   border-color: #fbbf24;
-  color: #fffbeb;
+  color: var(--status-amber-solid-text);
 }
 
 .controlBar .projectFilterButton.projectFilterToneCompleted {
-  background-color: var(--status-void-text);
+  background-color: var(--status-gray-text);
   border-color: var(--input-border);
   color: var(--surface-secondary);
 }
 
 .controlBar .projectFilterButton.projectFilterToneCancelled {
-  background-color: var(--status-rejected-text);
-  border-color: var(--status-rejected-border);
+  background-color: var(--status-red-text);
+  border-color: var(--status-red-border);
   color: #fff1f2;
 }
 
@@ -265,28 +265,28 @@
 }
 
 .projectStatusProspect {
-  background: var(--surface-hover);
-  color: var(--accent-text);
+  background: var(--status-blue-bg);
+  color: var(--status-blue-text);
 }
 
 .projectStatusActive {
-  background: #22c55e;
+  background: var(--status-green-solid);
   color: #052e16;
 }
 
 .projectStatusOnHold {
-  background: #fef08a;
+  background: var(--status-amber-bg);
   color: #713f12;
 }
 
 .projectStatusCompleted {
-  background: #e5e7eb;
+  background: var(--status-gray-bg);
   color: #4b5563;
 }
 
 .projectStatusCancelled {
-  background: #fecaca;
-  color: var(--status-rejected-text);
+  background: var(--status-red-bg);
+  color: var(--status-red-text);
 }
 
 .projectEmptyCell {

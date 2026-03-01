@@ -190,7 +190,7 @@
 }
 
 .auditGraphMainRail {
-  stroke: #2563eb;
+  stroke: var(--status-blue-solid);
   stroke-width: 3;
 }
 
@@ -223,7 +223,7 @@
 }
 
 .auditGraphMainNode {
-  fill: #2563eb;
+  fill: var(--status-blue-solid);
 }
 
 .auditGraphBranchNode,
@@ -344,9 +344,9 @@
 }
 
 .auditBadgePayment {
-  border-color: #c4b5fd;
-  background: #ede9fe;
-  color: #5b21b6;
+  border-color: var(--status-violet-border);
+  background: var(--status-violet-bg);
+  color: var(--status-violet-text);
 }
 
 .auditBadgeBudget {
@@ -375,46 +375,46 @@
 }
 
 .auditStatusToneDraft {
-  border-color: var(--status-draft-border);
-  background: var(--status-draft-bg);
-  color: var(--status-draft-text);
+  border-color: var(--status-blue-border);
+  background: var(--status-blue-bg);
+  color: var(--status-blue-text);
 }
 
 .auditStatusToneSent {
-  border-color: var(--status-sent-border);
-  background: var(--status-sent-bg);
-  color: var(--status-sent-text);
+  border-color: var(--status-amber-border);
+  background: var(--status-amber-bg);
+  color: var(--status-amber-text);
 }
 
 .auditStatusTonePartial {
-  border-color: #c4b5fd;
-  background: #ede9fe;
-  color: #5b21b6;
+  border-color: var(--status-violet-border);
+  background: var(--status-violet-bg);
+  color: var(--status-violet-text);
 }
 
 .auditStatusToneApproved {
-  border-color: var(--status-approved-border);
-  background: var(--status-approved-bg);
-  color: var(--status-approved-text);
+  border-color: var(--status-green-border);
+  background: var(--status-green-bg);
+  color: var(--status-green-text);
 }
 
 .auditStatusToneRejected {
-  border-color: var(--status-rejected-border);
-  background: var(--status-rejected-bg);
-  color: var(--status-rejected-text);
+  border-color: var(--status-red-border);
+  background: var(--status-red-bg);
+  color: var(--status-red-text);
 }
 
 .auditStatusToneOverdue {
-  border-color: var(--status-overdue-border);
-  background: var(--status-overdue-bg);
-  color: var(--status-overdue-text);
+  border-color: var(--status-orange-border);
+  background: var(--status-orange-bg);
+  color: var(--status-orange-text);
 }
 
 .auditStatusToneVoid,
 .auditStatusToneNeutral {
-  border-color: var(--status-void-border);
-  background: var(--status-void-bg);
-  color: var(--status-void-text);
+  border-color: var(--status-gray-border);
+  background: var(--status-gray-bg);
+  color: var(--status-gray-text);
 }
 
 .auditOpenLink {

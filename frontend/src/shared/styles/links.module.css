@@ -1,0 +1,17 @@
+/* Shared inline link styles. Compose from feature modules for consistent link treatment. */
+
+.subtle {
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--accent-text);
+}
+
+.subtle:hover {
+  color: var(--accent);
+}
+
+.subtle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 2px;
+}

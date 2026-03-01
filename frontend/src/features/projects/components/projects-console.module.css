@@ -25,7 +25,7 @@
   composes: notice from "../../../shared/styles/notices.module.css";
   margin-top: var(--space-md);
   background: var(--surface-secondary);
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
 }
 
 .statusMessageSuccess {
@@ -82,31 +82,31 @@
 }
 
 .projectFilterButtonActive.projectStatusProspect {
-  background: #2563eb;
+  background: var(--status-blue-solid);
   border-color: var(--accent);
-  color: #eff6ff;
+  color: var(--status-blue-solid-text);
 }
 
 .projectFilterButtonActive.projectStatusActive {
-  background: #16a34a;
-  border-color: #15803d;
-  color: #f0fdf4;
+  background: var(--status-green-solid);
+  border-color: var(--status-green-solid);
+  color: var(--status-green-solid-text);
 }
 
 .projectFilterButtonActive.projectStatusOnHold {
-  background: #eab308;
-  border-color: #ca8a04;
-  color: #422006;
+  background: var(--status-amber-solid);
+  border-color: var(--status-amber-solid);
+  color: var(--status-amber-solid-text);
 }
 
 .projectFilterButtonActive.projectStatusCompleted {
-  background: #6b7280;
+  background: var(--status-gray-solid);
   border-color: #4b5563;
-  color: #f9fafb;
+  color: var(--status-gray-solid-text);
 }
 
 .projectFilterButtonActive.projectStatusCancelled {
-  background: #dc2626;
+  background: var(--status-red-solid);
   border-color: #b91c1c;
   color: #fee2e2;
 }
@@ -121,7 +121,7 @@
   border: 1px solid var(--text-muted);
   border-radius: var(--radius-sm);
   background: var(--surface-inset);
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
   font-size: 0.64rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -207,27 +207,27 @@
 }
 
 .projectStatusProspect {
-  background: #2563eb;
-  color: #eff6ff;
+  background: var(--status-blue-solid);
+  color: var(--status-blue-solid-text);
 }
 
 .projectStatusActive {
-  background: #16a34a;
-  color: #f0fdf4;
+  background: var(--status-green-solid);
+  color: var(--status-green-solid-text);
 }
 
 .projectStatusOnHold {
-  background: #eab308;
-  color: #422006;
+  background: var(--status-amber-solid);
+  color: var(--status-amber-solid-text);
 }
 
 .projectStatusCompleted {
-  background: #6b7280;
-  color: #f9fafb;
+  background: var(--status-gray-solid);
+  color: var(--status-gray-solid-text);
 }
 
 .projectStatusCancelled {
-  background: #dc2626;
+  background: var(--status-red-solid);
   color: #fee2e2;
 }
 
@@ -472,18 +472,18 @@
 }
 
 .estimateCountDraft {
-  background: var(--status-draft-bg);
-  color: var(--status-draft-text);
+  background: var(--status-blue-bg);
+  color: var(--status-blue-text);
 }
 
 .estimateCountSent {
-  background: var(--status-sent-bg);
-  color: var(--status-sent-text);
+  background: var(--status-amber-bg);
+  color: var(--status-amber-text);
 }
 
 .estimateCountApproved {
-  background: var(--status-approved-bg);
-  color: var(--status-approved-text);
+  background: var(--status-green-bg);
+  color: var(--status-green-text);
 }
 
 .nodeCount {
@@ -530,7 +530,7 @@
 
 .baselineCardMeta {
   font-size: 0.78rem;
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
   font-weight: 500;
 }
 
@@ -622,31 +622,31 @@
 }
 
 .projectStatusPillActive.projectStatusProspect {
-  background: #2563eb;
+  background: var(--status-blue-solid);
   border-color: var(--accent);
-  color: #eff6ff;
+  color: var(--status-blue-solid-text);
 }
 
 .projectStatusPillActive.projectStatusActive {
-  background: #16a34a;
-  border-color: #15803d;
-  color: #f0fdf4;
+  background: var(--status-green-solid);
+  border-color: var(--status-green-solid);
+  color: var(--status-green-solid-text);
 }
 
 .projectStatusPillActive.projectStatusOnHold {
-  background: #eab308;
-  border-color: #ca8a04;
-  color: #422006;
+  background: var(--status-amber-solid);
+  border-color: var(--status-amber-solid);
+  color: var(--status-amber-solid-text);
 }
 
 .projectStatusPillActive.projectStatusCompleted {
-  background: #6b7280;
+  background: var(--status-gray-solid);
   border-color: #4b5563;
-  color: #f9fafb;
+  color: var(--status-gray-solid-text);
 }
 
 .projectStatusPillActive.projectStatusCancelled {
-  background: #dc2626;
+  background: var(--status-red-solid);
   border-color: #b91c1c;
   color: #fee2e2;
 }

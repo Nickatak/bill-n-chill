@@ -59,7 +59,7 @@
   font-weight: 500;
 }
 
-.card input,
+.card input:not([data-nested]),
 .card textarea,
 .card select {
   border: 1px solid var(--input-border);

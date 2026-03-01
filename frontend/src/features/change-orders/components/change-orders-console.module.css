@@ -266,9 +266,9 @@
 }
 
 .viewerBaselineBadgeActive {
-  background: var(--status-approved-bg);
-  border-color: var(--status-approved-border);
-  color: var(--status-approved-text);
+  background: var(--status-green-bg);
+  border-color: var(--status-green-border);
+  color: var(--status-green-text);
 }
 
 .viewerBaselineBadgeSuperseded {
@@ -279,13 +279,13 @@
 
 .viewerRailMetrics {
   font-size: 0.76rem;
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
   line-height: 1.35;
   font-weight: 600;
 }
 
 .viewerMetricCurrent {
-  color: var(--status-approved-text);
+  color: var(--status-green-text);
 }
 
 .viewerMetricOriginal {
@@ -293,7 +293,7 @@
 }
 
 .viewerMetricDelta {
-  color: var(--status-sent-text);
+  color: var(--status-amber-text);
 }
 
 .viewerCardLink {
@@ -378,14 +378,14 @@
 
 .viewerBaselineHintActive {
   background: var(--tone-success-bg);
-  border-color: var(--status-approved-border);
-  color: var(--status-approved-text);
+  border-color: var(--status-green-border);
+  color: var(--status-green-text);
 }
 
 .viewerBaselineHintWarning {
   background: var(--tone-warning-bg);
-  border-color: var(--status-sent-border);
-  color: var(--status-sent-text);
+  border-color: var(--status-amber-border);
+  color: var(--status-amber-text);
 }
 
 .viewerHistoryRail {
@@ -442,27 +442,27 @@
 }
 
 .viewerHistoryDraft {
-  border-color: var(--status-draft-border);
+  border-color: var(--status-blue-border);
   background: linear-gradient(180deg, rgba(219, 234, 254, 0.5), var(--surface));
 }
 
 .viewerHistoryPendingApproval {
-  border-color: var(--status-sent-border);
+  border-color: var(--status-amber-border);
   background: linear-gradient(180deg, rgba(254, 243, 199, 0.52), var(--surface));
 }
 
 .viewerHistoryApproved {
-  border-color: var(--status-approved-border);
+  border-color: var(--status-green-border);
   background: linear-gradient(180deg, rgba(220, 252, 231, 0.56), var(--surface));
 }
 
 .viewerHistoryRejected {
-  border-color: var(--status-rejected-border);
+  border-color: var(--status-red-border);
   background: linear-gradient(180deg, rgba(254, 226, 226, 0.56), var(--surface));
 }
 
 .viewerHistoryVoid {
-  border-color: var(--status-void-border);
+  border-color: var(--status-gray-border);
   background: linear-gradient(180deg, rgba(226, 232, 240, 0.56), var(--surface));
 }
 
@@ -471,7 +471,7 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   font-weight: 700;
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
 }
 
 .viewerHistoryMetaText {
@@ -488,15 +488,15 @@
   border: 1px solid var(--border);
   background: var(--surface-secondary);
   font-weight: 700;
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
 }
 
 .viewerHistoryLineDeltaApproved {
   font-size: 0.96rem;
   letter-spacing: 0.02em;
-  border-color: #16a34a;
-  background: var(--status-approved-bg);
-  color: var(--status-approved-text);
+  border-color: var(--status-green-solid);
+  background: var(--status-green-bg);
+  color: var(--status-green-text);
   box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.25);
 }
 
@@ -507,7 +507,7 @@
     var(--surface);
   box-shadow:
     0 0 0 2px rgba(37, 99, 235, 0.22),
-    inset 3px 0 0 #2563eb;
+    inset 3px 0 0 var(--status-blue-solid);
 }
 
 .quickStatusPanel {
@@ -546,7 +546,7 @@
 .viewerStatusActionButtonSecondary {
   background: var(--border);
   border-color: var(--border);
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
 }
 
 .viewerStatusActionButton:not(:disabled):hover,
@@ -581,7 +581,7 @@
 
 .quickStatusButtonInactive {
   background: #1e293b;
-  border-color: var(--status-void-text);
+  border-color: var(--status-gray-text);
   color: #bfdbfe;
 }
 
@@ -597,33 +597,33 @@
 }
 
 .quickStatusButtonActive.quickStatusDraft {
-  background: #2563eb;
+  background: var(--status-blue-solid);
   border-color: var(--accent);
   color: var(--accent-lighter);
 }
 
 .quickStatusButtonActive.quickStatusPendingApproval {
-  background: #d97706;
+  background: var(--status-amber-solid);
   border-color: #b45309;
-  color: #fffbeb;
+  color: var(--status-amber-solid-text);
 }
 
 .quickStatusButtonActive.quickStatusApproved {
-  background: #16a34a;
-  border-color: #15803d;
-  color: #f0fdf4;
+  background: var(--status-green-solid);
+  border-color: var(--status-green-solid);
+  color: var(--status-green-solid-text);
 }
 
 .quickStatusButtonActive.quickStatusRejected {
-  background: #dc2626;
+  background: var(--status-red-solid);
   border-color: #b91c1c;
-  color: var(--status-rejected-bg);
+  color: var(--status-red-bg);
 }
 
 .quickStatusButtonActive.quickStatusVoid {
-  background: #6b7280;
+  background: var(--status-gray-solid);
   border-color: #4b5563;
-  color: #f9fafb;
+  color: var(--status-gray-solid-text);
 }
 
 .cloneRevisionButton {
@@ -652,13 +652,13 @@
 }
 
 .reconcileGood {
-  background: var(--status-approved-bg);
-  color: var(--status-approved-text);
+  background: var(--status-green-bg);
+  color: var(--status-green-text);
 }
 
 .reconcileBad {
-  background: var(--status-rejected-bg);
-  color: var(--status-rejected-text);
+  background: var(--status-red-bg);
+  color: var(--status-red-text);
 }
 
 .lineTableWrap {
@@ -752,17 +752,17 @@
 }
 
 .statusEventApproved {
-  background: var(--status-approved-bg);
-  color: var(--status-approved-text);
+  background: var(--status-green-bg);
+  color: var(--status-green-text);
 }
 
 .statusEventRejected {
-  background: #fecaca;
-  color: var(--status-rejected-text);
+  background: var(--status-red-bg);
+  color: var(--status-red-text);
 }
 
 .statusEventVoid {
-  background: #e5e7eb;
+  background: var(--status-gray-bg);
   color: #374151;
 }
 
@@ -772,8 +772,8 @@
 }
 
 .statusEventNeutral {
-  background: var(--status-void-bg);
-  color: var(--status-void-text);
+  background: var(--status-gray-bg);
+  color: var(--status-gray-text);
 }
 
 .viewerEventMeta {
@@ -873,7 +873,7 @@
 
 .coLineLegend {
   font-size: 0.79rem;
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
 }
 
 .coLineHeader {
@@ -913,13 +913,13 @@
 }
 
 .coLineRowInvalid {
-  border-left: 3px solid #dc2626;
+  border-left: 3px solid var(--status-red-solid);
 }
 
 .coLineIssue {
   margin: 0;
   padding: 0 10px 9px;
-  color: var(--status-rejected-text);
+  color: var(--status-red-text);
   font-size: 0.78rem;
   line-height: 1.4;
   background: #fff7f7;

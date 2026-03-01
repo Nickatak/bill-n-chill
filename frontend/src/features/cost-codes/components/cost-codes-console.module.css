@@ -296,15 +296,15 @@
 }
 
 .itemStatusActive {
-  background: var(--status-approved-bg);
-  border-color: var(--status-approved-border);
-  color: var(--status-approved-text);
+  background: var(--status-green-bg);
+  border-color: var(--status-green-border);
+  color: var(--status-green-text);
 }
 
 .itemStatusArchived {
-  background: var(--status-void-bg);
-  border-color: var(--status-void-border);
-  color: var(--status-void-text);
+  background: var(--status-gray-bg);
+  border-color: var(--status-gray-border);
+  color: var(--status-gray-text);
 }
 
 .itemName {

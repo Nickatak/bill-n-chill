@@ -30,7 +30,7 @@
 
 .scope {
   margin: 0;
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
 }
 
 .summaryGrid {

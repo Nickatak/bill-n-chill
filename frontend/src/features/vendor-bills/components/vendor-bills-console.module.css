@@ -55,33 +55,33 @@
 }
 
 .tableStatusPlanned {
-  background: var(--status-draft-bg);
+  background: var(--status-blue-bg);
   color: var(--accent);
 }
 
 .tableStatusReceived {
   background: #fde68a;
-  color: var(--status-sent-text);
+  color: var(--status-amber-text);
 }
 
 .tableStatusApproved {
   background: #bbf7d0;
-  color: var(--status-approved-text);
+  color: var(--status-green-text);
 }
 
 .tableStatusScheduled {
   background: #ffedd5;
-  color: var(--status-overdue-text);
+  color: var(--status-orange-text);
 }
 
 .tableStatusPaid {
   background: #ccfbf1;
-  color: #0f766e;
+  color: var(--status-emerald-solid);
 }
 
 .tableStatusVoid {
-  background: #e5e7eb;
-  color: #6b7280;
+  background: var(--status-gray-bg);
+  color: var(--status-gray-solid);
 }
 
 .table tbody tr {
@@ -191,69 +191,69 @@
 }
 
 .statusFilterButtonActive.statusFilterPlanned {
-  background: #2563eb;
+  background: var(--status-blue-solid);
   border-color: var(--accent);
   color: var(--accent-lighter);
 }
 
 .statusFilterButtonActive.statusFilterReceived {
-  background: #d97706;
+  background: var(--status-amber-solid);
   border-color: #b45309;
-  color: #fffbeb;
+  color: var(--status-amber-solid-text);
 }
 
 .statusFilterButtonActive.statusFilterApproved {
-  background: #16a34a;
-  border-color: #15803d;
-  color: #f0fdf4;
+  background: var(--status-green-solid);
+  border-color: var(--status-green-solid);
+  color: var(--status-green-solid-text);
 }
 
 .statusFilterButtonActive.statusFilterScheduled {
-  background: #ca8a04;
+  background: var(--status-amber-solid);
   border-color: #a16207;
-  color: #fffbeb;
+  color: var(--status-amber-solid-text);
 }
 
 .statusFilterButtonActive.statusFilterPaid {
-  background: #0f766e;
-  border-color: #0f766e;
-  color: #ecfeff;
+  background: var(--status-emerald-solid);
+  border-color: var(--status-emerald-solid);
+  color: var(--status-emerald-solid-text);
 }
 
 .statusFilterButtonActive.statusFilterVoid {
-  background: #6b7280;
+  background: var(--status-gray-solid);
   border-color: #4b5563;
-  color: #f9fafb;
+  color: var(--status-gray-solid-text);
 }
 
 .statusFilterPlanned {
-  background: var(--status-draft-bg);
+  background: var(--status-blue-bg);
   color: var(--accent);
 }
 
 .statusFilterReceived {
   background: #fde68a;
-  color: var(--status-sent-text);
+  color: var(--status-amber-text);
 }
 
 .statusFilterApproved {
   background: #bbf7d0;
-  color: var(--status-approved-text);
+  color: var(--status-green-text);
 }
 
 .statusFilterScheduled {
   background: #ffedd5;
-  color: var(--status-overdue-text);
+  color: var(--status-orange-text);
 }
 
 .statusFilterPaid {
   background: #ccfbf1;
-  color: #0f766e;
+  color: var(--status-emerald-solid);
 }
 
 .statusFilterVoid {
-  background: #e5e7eb;
-  color: #6b7280;
+  background: var(--status-gray-bg);
+  color: var(--status-gray-solid);
 }
 
 .statusPicker {
@@ -297,75 +297,75 @@
 }
 
 .statusPillActive.statusPillPlanned {
-  background: #2563eb;
+  background: var(--status-blue-solid);
   border-color: var(--accent);
   color: var(--accent-lighter);
 }
 
 .statusPillActive.statusPillReceived {
-  background: #d97706;
+  background: var(--status-amber-solid);
   border-color: #b45309;
-  color: #fffbeb;
+  color: var(--status-amber-solid-text);
 }
 
 .statusPillActive.statusPillApproved {
-  background: #16a34a;
-  border-color: #15803d;
-  color: #f0fdf4;
+  background: var(--status-green-solid);
+  border-color: var(--status-green-solid);
+  color: var(--status-green-solid-text);
 }
 
 .statusPillActive.statusPillScheduled {
-  background: #ca8a04;
+  background: var(--status-amber-solid);
   border-color: #a16207;
-  color: #fffbeb;
+  color: var(--status-amber-solid-text);
 }
 
 .statusPillActive.statusPillPaid {
-  background: #0f766e;
-  border-color: #0f766e;
-  color: #ecfeff;
+  background: var(--status-emerald-solid);
+  border-color: var(--status-emerald-solid);
+  color: var(--status-emerald-solid-text);
 }
 
 .statusPillActive.statusPillVoid {
-  background: #6b7280;
+  background: var(--status-gray-solid);
   border-color: #4b5563;
-  color: #f9fafb;
+  color: var(--status-gray-solid-text);
 }
 
 .statusPillPlanned {
-  border-color: var(--status-draft-border);
-  background: var(--status-draft-bg);
+  border-color: var(--status-blue-border);
+  background: var(--status-blue-bg);
   color: var(--accent);
 }
 
 .statusPillReceived {
-  border-color: var(--status-sent-border);
+  border-color: var(--status-amber-border);
   background: #fde68a;
-  color: var(--status-sent-text);
+  color: var(--status-amber-text);
 }
 
 .statusPillApproved {
-  border-color: var(--status-approved-border);
-  background: var(--status-approved-bg);
-  color: var(--status-approved-text);
+  border-color: var(--status-green-border);
+  background: var(--status-green-bg);
+  color: var(--status-green-text);
 }
 
 .statusPillScheduled {
-  border-color: var(--status-sent-border);
-  background: var(--status-sent-bg);
-  color: var(--status-sent-text);
+  border-color: var(--status-amber-border);
+  background: var(--status-amber-bg);
+  color: var(--status-amber-text);
 }
 
 .statusPillPaid {
   border-color: #5eead4;
   background: #ccfbf1;
-  color: #0f766e;
+  color: var(--status-emerald-solid);
 }
 
 .statusPillVoid {
-  border-color: var(--status-void-border);
-  background: #e5e7eb;
-  color: #6b7280;
+  border-color: var(--status-gray-border);
+  background: var(--status-gray-bg);
+  color: var(--status-gray-solid);
 }
 
 .billForm {
@@ -614,7 +614,7 @@
 }
 
 .formDangerButton {
-  border: 1px solid var(--status-rejected-border);
+  border: 1px solid var(--status-red-border);
   background: var(--tone-error-bg);
   color: var(--tone-error-text);
 }
@@ -660,7 +660,7 @@
   margin: 0;
   flex: 1 1 auto;
   min-width: 0;
-  border: 1px solid var(--status-rejected-border);
+  border: 1px solid var(--status-red-border);
   border-radius: var(--radius-md);
   background: var(--tone-error-bg);
   color: var(--tone-error-text);
@@ -669,7 +669,7 @@
 
 .viewerErrorText {
   margin: 6px 0 0;
-  border: 1px solid var(--status-rejected-border);
+  border: 1px solid var(--status-red-border);
   border-radius: var(--radius-md);
   background: var(--tone-error-bg);
   color: var(--tone-error-text);

@@ -149,33 +149,33 @@
 }
 
 .projectFilterButtonActive.projectStatusProspect {
-  background: #2563eb;
+  background: var(--status-blue-solid);
   border-color: var(--accent);
   color: var(--accent-lighter);
 }
 
 .projectFilterButtonActive.projectStatusActive {
-  background: #16a34a;
-  border-color: #15803d;
-  color: #f0fdf4;
+  background: var(--status-green-solid);
+  border-color: var(--status-green-solid);
+  color: var(--status-green-solid-text);
 }
 
 .projectFilterButtonActive.projectStatusOnHold {
-  background: #eab308;
-  border-color: #ca8a04;
-  color: #422006;
+  background: var(--status-amber-solid);
+  border-color: var(--status-amber-solid);
+  color: var(--status-amber-solid-text);
 }
 
 .projectFilterButtonActive.projectStatusCompleted {
-  background: #6b7280;
+  background: var(--status-gray-solid);
   border-color: #4b5563;
-  color: #f9fafb;
+  color: var(--status-gray-solid-text);
 }
 
 .projectFilterButtonActive.projectStatusCancelled {
-  background: #dc2626;
+  background: var(--status-red-solid);
   border-color: #b91c1c;
-  color: var(--status-rejected-bg);
+  color: var(--status-red-bg);
 }
 
 .projectFilterActions {
@@ -188,7 +188,7 @@
   border: 1px solid var(--text-muted);
   border-radius: var(--radius-sm);
   background: var(--surface-inset);
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
   font-size: 0.64rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -265,28 +265,28 @@
 }
 
 .projectStatusProspect {
-  background: var(--surface-hover);
-  color: var(--accent-text);
+  background: var(--status-blue-bg);
+  color: var(--status-blue-text);
 }
 
 .projectStatusActive {
-  background: #22c55e;
+  background: var(--status-green-solid);
   color: #052e16;
 }
 
 .projectStatusOnHold {
-  background: #fef08a;
+  background: var(--status-amber-bg);
   color: #713f12;
 }
 
 .projectStatusCompleted {
-  background: #e5e7eb;
+  background: var(--status-gray-bg);
   color: #4b5563;
 }
 
 .projectStatusCancelled {
-  background: #fecaca;
-  color: var(--status-rejected-text);
+  background: var(--status-red-bg);
+  color: var(--status-red-text);
 }
 
 .projectEmptyCell {
@@ -453,27 +453,27 @@
 }
 
 .invoiceCardStatusDraft {
-  border-color: var(--status-draft-border);
+  border-color: var(--status-blue-border);
   background: linear-gradient(180deg, rgba(219, 234, 254, 0.85), rgba(239, 246, 255, 0.75));
 }
 
 .invoiceCardStatusSent {
-  border-color: var(--status-sent-border);
+  border-color: var(--status-amber-border);
   background: linear-gradient(180deg, rgba(254, 243, 199, 0.9), rgba(255, 251, 235, 0.8));
 }
 
 .invoiceCardStatusPartial {
-  border-color: #c4b5fd;
+  border-color: var(--status-violet-border);
   background: linear-gradient(180deg, rgba(237, 233, 254, 0.85), rgba(245, 243, 255, 0.78));
 }
 
 .invoiceCardStatusPaid {
-  border-color: var(--status-approved-border);
+  border-color: var(--status-green-border);
   background: linear-gradient(180deg, rgba(220, 252, 231, 0.88), rgba(240, 253, 244, 0.78));
 }
 
 .invoiceCardStatusOverdue {
-  border-color: var(--status-rejected-border);
+  border-color: var(--status-red-border);
   background: linear-gradient(180deg, rgba(254, 226, 226, 0.88), rgba(255, 241, 242, 0.8));
 }
 
@@ -753,7 +753,7 @@
 
 .organizationProfileMeta span {
   font-size: 0.78rem;
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
   line-height: 1.35;
 }
 
@@ -816,7 +816,7 @@
 .organizationTemplateBlock p {
   margin: 0;
   white-space: pre-wrap;
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
   font-size: 0.84rem;
   line-height: 1.45;
 }
@@ -865,7 +865,7 @@
 
 .invoiceTemplateBlock p {
   margin: 0;
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
   font-size: 0.86rem;
   line-height: 1.45;
 }
@@ -894,21 +894,21 @@
 }
 
 .invoiceNumberIndicatorGenerated {
-  background: var(--status-draft-bg);
-  border-color: var(--status-draft-border);
+  background: var(--status-blue-bg);
+  border-color: var(--status-blue-border);
   color: var(--accent-hover);
 }
 
 .invoiceNumberIndicatorEditing {
-  background: var(--status-void-bg);
-  border-color: var(--status-void-border);
-  color: var(--status-void-text);
+  background: var(--status-gray-bg);
+  border-color: var(--status-gray-border);
+  color: var(--status-gray-text);
 }
 
 .invoiceNumberIndicatorLocked {
-  background: var(--status-rejected-bg);
-  border-color: var(--status-rejected-border);
-  color: var(--status-rejected-text);
+  background: var(--status-red-bg);
+  border-color: var(--status-red-border);
+  color: var(--status-red-text);
 }
 
 .invoiceLogoImage {
@@ -1155,7 +1155,7 @@
 }
 
 .ghostDangerButton {
-  border: 1px solid #fecaca;
+  border: 1px solid var(--status-red-bg);
   background: #fff1f2;
   color: #b91c1c;
   padding: 5px 9px;
@@ -1356,45 +1356,45 @@
 }
 
 .statusToneDraft {
-  background: var(--status-draft-bg);
+  background: var(--status-blue-bg);
   color: var(--accent-hover);
-  border-color: var(--status-draft-border);
+  border-color: var(--status-blue-border);
 }
 
 .statusToneSent {
-  background: var(--status-sent-bg);
-  color: var(--status-sent-text);
-  border-color: var(--status-sent-border);
+  background: var(--status-amber-bg);
+  color: var(--status-amber-text);
+  border-color: var(--status-amber-border);
 }
 
 .statusTonePartial {
-  background: #ede9fe;
-  color: #5b21b6;
-  border-color: #c4b5fd;
+  background: var(--status-violet-bg);
+  color: var(--status-violet-text);
+  border-color: var(--status-violet-border);
 }
 
 .statusTonePaid {
-  background: var(--status-approved-bg);
-  color: var(--status-approved-text);
-  border-color: var(--status-approved-border);
+  background: var(--status-green-bg);
+  color: var(--status-green-text);
+  border-color: var(--status-green-border);
 }
 
 .statusToneOverdue {
-  background: var(--status-rejected-bg);
-  color: var(--status-rejected-text);
-  border-color: var(--status-rejected-border);
+  background: var(--status-red-bg);
+  color: var(--status-red-text);
+  border-color: var(--status-red-border);
 }
 
 .statusToneVoid {
-  background: var(--status-void-bg);
-  color: var(--status-void-text);
-  border-color: var(--status-void-border);
+  background: var(--status-gray-bg);
+  color: var(--status-gray-text);
+  border-color: var(--status-gray-border);
 }
 
 .statusToneNotate {
-  background: var(--status-void-bg);
-  color: var(--status-void-text);
-  border-color: var(--status-void-border);
+  background: var(--status-gray-bg);
+  color: var(--status-gray-text);
+  border-color: var(--status-gray-border);
 }
 
 .statusBadge {
@@ -1417,9 +1417,9 @@
 }
 
 .statusPartial {
-  background: #ede9fe;
-  color: #5b21b6;
-  border-color: #c4b5fd;
+  background: var(--status-violet-bg);
+  color: var(--status-violet-text);
+  border-color: var(--status-violet-border);
 }
 
 .statusPaid {

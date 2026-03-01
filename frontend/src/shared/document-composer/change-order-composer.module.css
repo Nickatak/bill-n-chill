@@ -70,15 +70,15 @@
 }
 
 .viewerBaselineBadgeActive {
-  background: var(--status-approved-bg);
-  border-color: var(--status-approved-border);
-  color: var(--status-approved-text);
+  background: var(--status-green-bg);
+  border-color: var(--status-green-border);
+  color: var(--status-green-text);
 }
 
 .viewerBaselineBadgeSuperseded {
-  background: var(--status-void-bg);
-  border-color: var(--status-void-border);
-  color: var(--status-void-text);
+  background: var(--status-gray-bg);
+  border-color: var(--status-gray-border);
+  color: var(--status-gray-text);
 }
 
 .coLineSectionIntro {
@@ -101,7 +101,7 @@
 
 .coLineLegend {
   font-size: 0.79rem;
-  color: var(--status-void-text);
+  color: var(--status-gray-text);
 }
 
 .coLineHeader {

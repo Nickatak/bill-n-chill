@@ -56,5 +56,5 @@
 }
 
 .danger:hover {
-  background: var(--status-rejected-bg);
+  background: var(--status-red-bg);
 }

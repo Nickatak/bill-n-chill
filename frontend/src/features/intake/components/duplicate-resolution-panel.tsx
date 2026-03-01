@@ -2,10 +2,14 @@
 
 /**
  * Duplicate resolution UI shown during quick-add when existing customer matches are detected.
- * Lets the user pick an existing customer or override and create a new one anyway.
+ *
+ * Intent-aware:
+ * - customer_and_project: lets user pick an existing customer to attach the project to.
+ * - customer_only: shows a link to the existing customer (no creation action needed).
  */
 
 import { KeyboardEvent } from "react";
+import Link from "next/link";
 
 import { CustomerIntakePayload, DuplicateCustomerCandidate } from "../types";
 import { DuplicateResolution, SubmitIntent } from "../hooks/quick-add-controller.types";
@@ -78,25 +82,9 @@ export function DuplicateResolutionPanel({
 
   const isProjectFlow = duplicateResolutionIntent === "customer_and_project";
 
-  const resolveActionLabel = isProjectFlow
-    ? "Create Project for This Customer"
-    : "Use This Customer";
-  const createAnywayLabel = isProjectFlow
-    ? "Create New Customer + Project Instead"
-    : "Create New Customer Instead";
-  const helperText = isProjectFlow
-    ? "Use an existing customer for this project, or continue by creating a new customer and project."
-    : "Use an existing customer, or continue by creating a new one.";
-
   return (
     <section className={styles.duplicatePanel} aria-label="Duplicate resolution">
-      <div className={styles.duplicateHeader}>
-        <h3 className={styles.duplicateTitle}>Potential Matches Found</h3>
-        <span className={styles.duplicateCount}>
-          {duplicateCandidates.length} possible {duplicateCandidates.length === 1 ? "match" : "matches"}
-        </span>
-      </div>
-      <p className={styles.duplicateHint}>{helperText}</p>
+      <h3 className={styles.duplicateTitle}>Customer already exists</h3>
       <div className={styles.duplicateList}>
         {duplicateCandidates.map((candidate) => {
           const isSelected = selectedDuplicateId === String(candidate.id);
@@ -115,32 +103,38 @@ export function DuplicateResolutionPanel({
             }
           }
 
+          const cardClassName = [
+            styles.duplicateCard,
+            isProjectFlow ? styles.duplicateCardInteractive : "",
+            isSelected ? styles.duplicateCardSelected : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
+
           return (
             <article
               key={candidate.id}
-              className={`${styles.duplicateCard} ${isSelected ? styles.duplicateCardSelected : ""}`}
-              role="button"
-              tabIndex={0}
-              aria-pressed={isSelected}
-              onClick={selectCandidate}
-              onKeyDown={onCardKeyDown}
+              className={cardClassName}
+              {...(isProjectFlow
+                ? {
+                    role: "button" as const,
+                    tabIndex: 0,
+                    "aria-pressed": isSelected,
+                    onClick: selectCandidate,
+                    onKeyDown: onCardKeyDown,
+                  }
+                : {})}
             >
               <div className={styles.duplicateCardTopRow}>
                 <span className={styles.duplicateCardTitleWrap}>
-                  <span className={styles.duplicateCardTitle}>
+                  <Link
+                    className={styles.duplicateCardTitle}
+                    href={`/customers?customer=${candidate.id}`}
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     #{candidate.id} {candidate.display_name}
-                  </span>
+                  </Link>
                 </span>
-                <button
-                  type="button"
-                  className={styles.duplicateResolveButton}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onResolve("use_existing", candidate.id);
-                  }}
-                >
-                  {resolveActionLabel}
-                </button>
               </div>
               <div className={styles.duplicateCardSelect}>
                 <span
@@ -188,17 +182,29 @@ export function DuplicateResolutionPanel({
                   </span>
                 </span>
               </div>
+              {isProjectFlow ? (
+                <button
+                  type="button"
+                  className={styles.duplicateResolveButton}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onResolve("use_existing", candidate.id);
+                  }}
+                >
+                  Use Customer + Start Project
+                </button>
+              ) : (
+                <Link
+                  className={styles.duplicateViewLink}
+                  href={`/customers?customer=${candidate.id}`}
+                >
+                  View customer &rarr;
+                </Link>
+              )}
             </article>
           );
         })}
       </div>
-      <button
-        type="button"
-        className={styles.duplicateCreateAnywayButton}
-        onClick={() => onResolve("create_anyway")}
-      >
-        {createAnywayLabel}
-      </button>
     </section>
   );
 }

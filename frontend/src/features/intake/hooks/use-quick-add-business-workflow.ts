@@ -148,8 +148,8 @@ export function useQuickAddBusinessWorkflow({
       setDuplicateCandidates(candidates);
       setSelectedDuplicateId(candidates[0] ? String(candidates[0].id) : "");
       setPendingSubmission(submission);
-      setLeadMessage("Possible duplicate found. Choose a resolution below.");
-      setLeadMessageTone("info");
+      setLeadMessage("");
+      setLeadMessageTone("neutral");
       return;
     }
 
@@ -247,13 +247,8 @@ export function useQuickAddBusinessWorkflow({
       submitterValue === "customer_only" ? "customer_only" : "customer_and_project";
 
     clearLastSuccessState();
-
-    setLeadMessage(
-      intent === "customer_only"
-        ? "Creating customer..."
-        : "Creating customer + project...",
-    );
-    setLeadMessageTone("info");
+    setLeadMessage("");
+    setLeadMessageTone("neutral");
     setConversionMessage("");
     setConversionMessageTone("neutral");
 
@@ -312,13 +307,6 @@ export function useQuickAddBusinessWorkflow({
     }
 
     try {
-      if (resolution === "create_anyway") {
-        await submitQuickAdd(pendingSubmission.payload, pendingSubmission, {
-          duplicate_resolution: resolution,
-        });
-        return;
-      }
-
       const resolvedTargetId = targetId ?? Number(selectedDuplicateId);
       if (!resolvedTargetId) {
         setLeadMessage("Select a duplicate candidate first.");
