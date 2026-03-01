@@ -1,10 +1,10 @@
 /**
- * Collapsible project list panel with search, status filters, and pagination.
+ * Collapsible project list panel with search, status filters, and card grid.
  *
  * Used as a sidebar/panel component on pages that need project selection
- * (e.g. budgets, estimates, invoices). The parent page owns all data-fetching
+ * (e.g. projects, invoices, bills). The parent page owns all data-fetching
  * and filter state; this component is a pure presentation layer that renders
- * the search field, status filter buttons, project table, and pagination controls.
+ * the search field, status filter buttons, and a scrollable card grid.
  */
 
 "use client";
@@ -41,15 +41,10 @@ type ProjectListViewerProps = {
   onToggleStatusFilter: (status: ProjectListStatusValue) => void;
   onShowAllStatuses: () => void;
   onResetStatuses: () => void;
-  pagedProjects: ProjectListEntry[];
+  projects: ProjectListEntry[];
   selectedProjectId: string;
   onSelectProject: (project: ProjectListEntry) => void;
   statusLabel: (status: string) => string;
-  showPagination: boolean;
-  currentPage: number;
-  totalPages: number;
-  onPrevPage: () => void;
-  onNextPage: () => void;
   emptyMessage?: string;
 };
 
@@ -58,11 +53,11 @@ type ProjectListViewerProps = {
 // ---------------------------------------------------------------------------
 
 /**
- * Render a collapsible project list with search, status filters, and pagination.
+ * Render a collapsible project list with search, status filters, and card grid.
  *
  * When collapsed, a hint message is shown instead of the full list. When
  * expanded, the panel displays a search input, status filter toggle buttons
- * with per-status counts, a paginated project table, and prev/next controls.
+ * with per-status counts, and a scrollable grid of project cards.
  */
 export function ProjectListViewer({
   title = "Project List",
@@ -80,15 +75,10 @@ export function ProjectListViewer({
   onToggleStatusFilter,
   onShowAllStatuses,
   onResetStatuses,
-  pagedProjects,
+  projects,
   selectedProjectId,
   onSelectProject,
   statusLabel,
-  showPagination,
-  currentPage,
-  totalPages,
-  onPrevPage,
-  onNextPage,
   emptyMessage = "No projects match your filters.",
 }: ProjectListViewerProps) {
   /**
@@ -105,8 +95,6 @@ export function ProjectListViewer({
 
   /**
    * Map a status value to its CSS module tone class for the filter buttons.
-   * Uses an explicit switch because filter tone classes don't follow the
-   * same naming convention as the row/badge tone classes.
    */
   function statusFilterToneClass(statusValue: ProjectListStatusValue): string {
     switch (statusValue) {
@@ -123,18 +111,6 @@ export function ProjectListViewer({
       default:
         return "";
     }
-  }
-
-  /**
-   * Map a project status value to its CSS module tone class for table rows
-   * (e.g. "on_hold" -> styles.projectRowStatusOnHold).
-   */
-  function rowToneClass(statusValue: string): string {
-    const key = `projectRowStatus${statusValue
-      .split("_")
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join("")}`;
-    return styles[key] ?? "";
   }
 
   return (
@@ -214,76 +190,43 @@ export function ProjectListViewer({
               <p className={styles.inlineHint}>{contextHint}</p>
             )}
 
-            <div className={styles.projectTableWrap}>
-              <table className={styles.projectTable}>
-                <thead>
-                  <tr>
-                    <th>Project</th>
-                    <th>Customer</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pagedProjects.length ? (
-                    pagedProjects.map((project) => {
-                      const isActive = String(project.id) === selectedProjectId;
-                      return (
-                        <tr
-                          key={project.id}
-                          className={`${styles.projectRow} ${rowToneClass(project.status)} ${
-                            isActive ? styles.projectRowActive : ""
-                          }`}
-                          onClick={() => onSelectProject(project)}
-                        >
-                          <td className={styles.projectCellTitle}>
-                            <strong>#{project.id}</strong> {project.name}
-                          </td>
-                          <td>{project.customer_display_name}</td>
-                          <td>
-                            {project.status ? (
-                              <span className={`${styles.projectStatus} ${statusToneClass(project.status)}`}>
-                                {statusLabel(project.status)}
-                              </span>
-                            ) : (
-                              <span className={styles.projectStatus}>Unknown</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={3} className={styles.projectEmptyCell}>
-                        {emptyMessage}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-
-              {showPagination ? (
-                <div className={styles.projectPagination}>
-                  <button
-                    type="button"
-                    className={styles.projectPagerButton}
-                    onClick={onPrevPage}
-                    disabled={currentPage <= 1}
-                  >
-                    Prev
-                  </button>
-                  <span>
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <button
-                    type="button"
-                    className={styles.projectPagerButton}
-                    onClick={onNextPage}
-                    disabled={currentPage >= totalPages}
-                  >
-                    Next
-                  </button>
-                </div>
-              ) : null}
+            <div className={styles.projectCardGrid}>
+              {projects.length > 0 ? (
+                projects.map((project) => {
+                  const isActive = String(project.id) === selectedProjectId;
+                  return (
+                    <div
+                      key={project.id}
+                      className={`${styles.projectCard} ${isActive ? styles.projectCardActive : ""}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onSelectProject(project)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onSelectProject(project);
+                        }
+                      }}
+                    >
+                      <span className={styles.projectCardTitle}>
+                        #{project.id} {project.name}
+                      </span>
+                      <span className={styles.projectCardMeta}>
+                        <span className={styles.projectCardCustomer}>
+                          {project.customer_display_name}
+                        </span>
+                        {project.status ? (
+                          <span className={`${styles.projectStatus} ${statusToneClass(project.status)}`}>
+                            {statusLabel(project.status)}
+                          </span>
+                        ) : null}
+                      </span>
+                    </div>
+                  );
+                })
+              ) : (
+                <span className={styles.projectEmptyMessage}>{emptyMessage}</span>
+              )}
             </div>
           </>
         ) : (

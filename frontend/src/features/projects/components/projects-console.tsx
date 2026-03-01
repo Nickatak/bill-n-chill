@@ -12,7 +12,6 @@ import { formatCurrency } from "@/shared/money-format";
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { usePagination } from "@/shared/hooks/use-pagination";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
@@ -122,7 +121,6 @@ export function ProjectsConsole() {
   const statusFilteredProjects = filteredProjects.filter((project) =>
     projectStatusFilters.includes(project.status as ProjectStatusValue),
   );
-  const { pageItems: pagedProjects, currentPage: currentProjectPageSafe, totalPages: totalProjectPages, prevPage: prevProjectPage, nextPage: nextProjectPage, resetPage: resetProjectPage } = usePagination(statusFilteredProjects, 5);
   const summaryCounts = summary
     ? {
         invoices: summary.traceability.ar_invoices.records.length,
@@ -390,11 +388,6 @@ export function ProjectsConsole() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProjectId, token]);
 
-  // Reset to page 1 whenever the user changes search text or status filters.
-  useEffect(() => {
-    resetProjectPage();
-  }, [projectSearch, projectStatusFilters, resetProjectPage]);
-
   // If the selected project is no longer visible after filtering, fall back to the first visible one.
   useEffect(() => {
     if (statusFilteredProjects.length === 0) {
@@ -542,7 +535,7 @@ export function ProjectsConsole() {
             setProjectStatusFilters(["active", "on_hold", "prospect", "completed", "cancelled"])
           }
           onResetStatuses={() => setProjectStatusFilters(defaultProjectStatusFilters)}
-          pagedProjects={pagedProjects.map((project) => ({
+          projects={statusFilteredProjects.map((project) => ({
             id: project.id,
             name: project.name,
             customer_display_name: formatCustomerName(project),
@@ -551,11 +544,6 @@ export function ProjectsConsole() {
           selectedProjectId={selectedProjectId}
           onSelectProject={handleSelectProject}
           statusLabel={projectStatusLabel}
-          showPagination
-          currentPage={currentProjectPageSafe}
-          totalPages={totalProjectPages}
-          onPrevPage={prevProjectPage}
-          onNextPage={nextProjectPage}
         />
       ) : null}
 

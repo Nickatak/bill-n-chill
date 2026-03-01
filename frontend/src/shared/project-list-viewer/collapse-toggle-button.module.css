@@ -1,8 +1,8 @@
 .collapseButton {
-  border: 1px solid #5f7ea6;
-  border-radius: 8px;
-  background: #1b2a42;
-  color: #eaf2ff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-secondary);
+  color: var(--text-primary);
   font-size: 0.68rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -22,9 +22,8 @@
 }
 
 .collapseButton:hover {
-  border-color: #8bb5e6;
-  background: #274369;
-  color: #ffffff;
+  border-color: color-mix(in srgb, var(--text-primary) 35%, var(--border) 65%);
+  color: var(--text-primary);
   transform: translateY(-1px);
 }
 

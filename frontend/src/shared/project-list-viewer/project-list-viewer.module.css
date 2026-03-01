@@ -1,3 +1,5 @@
+/* Project list viewer: collapsible panel with search, status filters, and card grid. */
+
 .controlBar {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -31,20 +33,13 @@
   gap: var(--space-sm);
 }
 
-.countBadge {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  padding: 2px 10px;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  background: var(--surface-secondary);
-}
-
 .inlineHint {
   margin: 0;
   color: var(--text-secondary);
   font-size: 0.86rem;
 }
+
+/* ── Search ── */
 
 .searchField {
   display: grid;
@@ -68,6 +63,8 @@
   font-size: 0.92rem;
 }
 
+/* ── Status filters ── */
+
 .projectFilters {
   display: grid;
   gap: var(--space-sm);
@@ -85,8 +82,8 @@
   gap: var(--space-sm);
 }
 
-.controlBar .projectFilterButton {
-  border: 1px solid #6b7f99;
+.projectFilterButton {
+  border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   padding: var(--radius-sm) var(--space-md);
   text-transform: uppercase;
@@ -94,52 +91,51 @@
   letter-spacing: 0.12em;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+  transition: transform 150ms ease, box-shadow 150ms ease;
   display: inline-flex;
   align-items: center;
   gap: var(--space-sm);
-  color: var(--accent-lighter);
-  background: #1b2a42;
+  background: var(--surface-secondary);
+  color: var(--text-secondary);
 }
 
-.controlBar .projectFilterButton.projectFilterToneProspect {
-  background-color: var(--accent-text);
-  border-color: #60a5fa;
-  color: var(--accent-lighter);
+.projectFilterButtonInactive {
+  opacity: 0.75;
 }
 
-.controlBar .projectFilterButton.projectFilterToneActive {
-  background-color: #166534;
-  border-color: #4ade80;
+.projectFilterButtonActive {
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+}
+
+.projectFilterButtonActive.projectFilterToneProspect {
+  background: var(--status-blue-solid);
+  border-color: var(--status-blue-solid);
+  color: var(--status-blue-solid-text);
+}
+
+.projectFilterButtonActive.projectFilterToneActive {
+  background: var(--status-green-solid);
+  border-color: var(--status-green-solid);
   color: var(--status-green-solid-text);
 }
 
-.controlBar .projectFilterButton.projectFilterToneOnHold {
-  background-color: #92400e;
-  border-color: #fbbf24;
+.projectFilterButtonActive.projectFilterToneOnHold {
+  background: var(--status-amber-solid);
+  border-color: var(--status-amber-solid);
   color: var(--status-amber-solid-text);
 }
 
-.controlBar .projectFilterButton.projectFilterToneCompleted {
-  background-color: var(--status-gray-text);
-  border-color: var(--input-border);
-  color: var(--surface-secondary);
+.projectFilterButtonActive.projectFilterToneCompleted {
+  background: var(--status-gray-solid);
+  border-color: var(--status-gray-border);
+  color: var(--status-gray-solid-text);
 }
 
-.controlBar .projectFilterButton.projectFilterToneCancelled {
-  background-color: var(--status-red-text);
+.projectFilterButtonActive.projectFilterToneCancelled {
+  background: var(--status-red-solid);
   border-color: var(--status-red-border);
-  color: #fff1f2;
-}
-
-.controlBar .projectFilterButtonInactive {
-  filter: saturate(0.55) brightness(0.84);
-  opacity: 0.8;
-}
-
-.controlBar .projectFilterButtonActive {
-  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.12);
-  transform: translateY(-1px);
+  color: var(--status-red-solid-text);
 }
 
 .projectFilterCount {
@@ -158,11 +154,11 @@
   flex-wrap: wrap;
 }
 
-.controlBar .projectFilterActionButton {
-  border: 1px solid #4f6280;
+.projectFilterActionButton {
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: #1b2a42;
-  color: #dbe7ff;
+  background: var(--surface-secondary);
+  color: var(--text-secondary);
   font-size: 0.68rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -175,181 +171,132 @@
   cursor: pointer;
 }
 
-.controlBar .projectFilterActionButton:hover {
-  border-color: #7aa2d6;
-  background: #243a5f;
-  color: #eef6ff;
+.projectFilterActionButton:hover {
+  border-color: color-mix(in srgb, var(--text-primary) 35%, var(--border) 65%);
+  color: var(--text-primary);
 }
 
-.controlBar .projectFilterActionButton:disabled {
+.projectFilterActionButton:disabled {
   opacity: 0.6;
   cursor: default;
 }
 
-.projectTableWrap {
+/* ── Card grid ── */
+
+.projectCardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  max-height: 340px;
+  overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  padding: var(--space-sm);
   background: var(--surface-secondary);
 }
 
-.projectTable {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.projectTable thead th {
-  text-align: left;
-  padding: 10px var(--space-md);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.7rem;
-  background: var(--accent);
-  color: #f0f7ff;
-  border-bottom: 1px solid var(--accent-hover);
-}
-
-.projectTable tbody td {
-  padding: 10px var(--space-md);
-  border-top: 1px solid var(--border);
-  color: var(--text-primary);
-}
-
-.projectRow {
+.projectCard {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--surface);
   cursor: pointer;
-  transition: background 0.2s ease;
+  display: grid;
+  gap: 4px;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 
-.projectRowStatusProspect {
-  background: rgba(37, 99, 235, 0.16);
+.projectCard:hover {
+  border-color: color-mix(in srgb, var(--text-primary) 30%, var(--border) 70%);
 }
 
-.projectRowStatusActive {
-  background: rgba(22, 163, 74, 0.24);
+.projectCardActive {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
-.projectRowStatusOnHold {
-  background: rgba(217, 119, 6, 0.18);
-}
-
-.projectRowStatusCompleted {
-  background: rgba(107, 114, 128, 0.24);
-}
-
-.projectRowStatusCancelled {
-  background: rgba(220, 38, 38, 0.24);
-}
-
-.projectRow:hover {
-  filter: brightness(1.06) saturate(1.04);
-}
-
-.projectRow.projectRowActive {
-  box-shadow: inset 0 0 0 2px rgba(96, 165, 250, 0.64);
-  filter: brightness(1.09) saturate(1.06);
-}
-
-.projectCellTitle strong {
+.projectCardTitle {
+  font-size: 0.88rem;
   font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
+.projectCardMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.projectCardCustomer {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* ── Status pills (in cards) ── */
 
 .projectStatus {
-  font-size: 0.7rem;
+  font-size: 0.64rem;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  padding: var(--space-xs) 10px;
+  letter-spacing: 0.1em;
+  padding: 2px 7px;
   border-radius: var(--radius-pill);
-  font-weight: 600;
-  background: var(--surface-hover);
-  color: var(--accent-text);
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .projectStatusProspect {
-  background: var(--status-blue-bg);
-  color: var(--status-blue-text);
+  background: var(--status-blue-solid);
+  color: var(--status-blue-solid-text);
 }
 
 .projectStatusActive {
   background: var(--status-green-solid);
-  color: #052e16;
+  color: var(--status-green-solid-text);
 }
 
 .projectStatusOnHold {
-  background: var(--status-amber-bg);
-  color: #713f12;
+  background: var(--status-amber-solid);
+  color: var(--status-amber-solid-text);
 }
 
 .projectStatusCompleted {
-  background: var(--status-gray-bg);
-  color: #4b5563;
+  background: var(--status-gray-solid);
+  color: var(--status-gray-solid-text);
 }
 
 .projectStatusCancelled {
-  background: var(--status-red-bg);
-  color: var(--status-red-text);
+  background: var(--status-red-solid);
+  color: var(--status-red-solid-text);
 }
 
-.projectEmptyCell {
+.projectEmptyMessage {
   text-align: center;
   color: var(--text-secondary);
+  font-size: 0.86rem;
+  padding: var(--space-md);
+  grid-column: 1 / -1;
 }
 
-.projectPagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-sm);
-  padding: var(--space-sm) 10px;
-  border-top: 1px solid var(--border);
-  background: var(--surface);
-}
+@media (max-width: 700px) {
+  .projectCardGrid {
+    grid-template-columns: 1fr;
+  }
 
-.projectPagination span {
-  color: #e3eeff;
-  font-weight: 600;
-  font-size: 0.85rem;
-}
-
-.controlBar .projectPagerButton {
-  border: 1px solid #4f6280;
-  border-radius: 10px;
-  background: #1b2a42;
-  color: #dbe7ff;
-  font-size: var(--font-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-weight: 700;
-  padding: var(--radius-sm) 11px;
-  line-height: 1.1;
-  display: inline-flex;
-  align-items: center;
-  cursor: pointer;
-}
-
-.controlBar .projectPagerButton:hover {
-  border-color: #7aa2d6;
-  background: #2a4367;
-  color: var(--surface);
-}
-
-.controlBar .projectPagerButton:disabled {
-  opacity: 0.7;
-  color: #9fb3d1;
-  border-color: #3d5270;
-  background: #152238;
-  cursor: default;
-}
-
-@media (max-width: 900px) {
   .panelHeaderActions,
   .projectFilterButtons,
   .projectFilterActions {
     width: 100%;
     justify-content: flex-start;
-  }
-
-  .projectFilterButton,
-  .projectFilterActionButton {
-    font-size: 0.7rem;
   }
 }

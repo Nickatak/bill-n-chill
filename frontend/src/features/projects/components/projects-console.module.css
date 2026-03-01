@@ -1,26 +1,3 @@
-.projectTableWrap {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow-x: auto;
-  background: var(--surface);
-}
-
-.searchField {
-  display: grid;
-  gap: 6px;
-  margin-bottom: 10px;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-}
-
-.searchField input {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: var(--space-sm) 10px;
-  background: var(--surface);
-  color: var(--text-primary);
-}
-
 .statusMessage {
   composes: notice from "../../../shared/styles/notices.module.css";
   margin-top: var(--space-md);
@@ -34,167 +11,6 @@
 
 .statusMessageError {
   composes: noticeError from "../../../shared/styles/notices.module.css";
-}
-
-.searchEmpty {
-  margin-top: var(--space-sm);
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-}
-
-.projectFilters {
-  display: grid;
-  gap: var(--space-sm);
-  margin-bottom: 10px;
-}
-
-.projectFiltersLabel {
-  color: var(--text-primary);
-  font-size: 0.85rem;
-}
-
-.projectFilterButtons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-}
-
-.projectFilterButton {
-  border: 1px solid var(--border-accent);
-  border-radius: var(--radius-pill);
-  padding: 6px var(--space-md);
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  letter-spacing: 0.12em;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.projectFilterButtonInactive {
-  background: var(--surface-secondary);
-  color: var(--text-secondary);
-}
-
-.projectFilterButtonActive {
-  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.12);
-  transform: translateY(-1px);
-}
-
-.projectFilterButtonActive.projectStatusProspect {
-  background: var(--status-blue-solid);
-  border-color: var(--accent);
-  color: var(--status-blue-solid-text);
-}
-
-.projectFilterButtonActive.projectStatusActive {
-  background: var(--status-green-solid);
-  border-color: var(--status-green-solid);
-  color: var(--status-green-solid-text);
-}
-
-.projectFilterButtonActive.projectStatusOnHold {
-  background: var(--status-amber-solid);
-  border-color: var(--status-amber-solid);
-  color: var(--status-amber-solid-text);
-}
-
-.projectFilterButtonActive.projectStatusCompleted {
-  background: var(--status-gray-solid);
-  border-color: #4b5563;
-  color: var(--status-gray-solid-text);
-}
-
-.projectFilterButtonActive.projectStatusCancelled {
-  background: var(--status-red-solid);
-  border-color: #b91c1c;
-  color: #fee2e2;
-}
-
-.projectFilterActions {
-  display: flex;
-  gap: var(--space-sm);
-  flex-wrap: wrap;
-}
-
-.projectFilterActionButton {
-  border: 1px solid var(--text-muted);
-  border-radius: var(--radius-sm);
-  background: var(--surface-inset);
-  color: var(--status-gray-text);
-  font-size: 0.64rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 2px 7px;
-  line-height: 1.1;
-  min-height: 0;
-  display: inline-flex;
-  align-items: center;
-  cursor: pointer;
-}
-
-.projectFilterActionButton:hover {
-  border-color: var(--text-secondary);
-  background: var(--border);
-  color: var(--text-primary);
-}
-
-.projectTable {
-  composes: table from "../../../shared/styles/table.module.css";
-  min-width: 720px;
-}
-
-.projectTable thead th {
-  text-align: left;
-  padding: 10px var(--space-md);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.7rem;
-  background: var(--table-header-bg);
-  color: var(--table-header-text);
-}
-
-.projectTable tbody td {
-  padding: 10px var(--space-md);
-  border-top: 1px solid var(--table-border);
-  color: var(--text-primary);
-}
-
-.projectPagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-sm);
-  padding: var(--space-sm) 10px;
-  border-top: 1px solid var(--border);
-  background: var(--surface-secondary);
-}
-
-.projectPagination span {
-  color: var(--text-primary);
-  font-size: 0.85rem;
-}
-
-.projectRow {
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-.projectRow:nth-child(even) {
-  background: var(--table-row-alt);
-}
-
-.projectRow:hover {
-  background: var(--table-row-hover);
-}
-
-.projectRow.projectRowActive {
-  background: var(--table-row-active);
-}
-
-.projectCellTitle strong {
-  font-weight: 600;
-  color: var(--text-primary);
 }
 
 .projectStatus {
@@ -228,17 +44,7 @@
 
 .projectStatusCancelled {
   background: var(--status-red-solid);
-  color: #fee2e2;
-}
-
-.projectActionLink {
-  color: var(--accent);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.projectActionLink:hover {
-  text-decoration: underline;
+  color: var(--status-red-solid-text);
 }
 
 .overview {
@@ -374,23 +180,23 @@
 }
 
 .quickStatusSelectProspect {
-  border-color: #60a5fa;
+  border-color: var(--status-blue-border);
 }
 
 .quickStatusSelectActive {
-  border-color: #34d399;
+  border-color: var(--status-green-border);
 }
 
 .quickStatusSelectOnHold {
-  border-color: #fb923c;
+  border-color: var(--status-amber-border);
 }
 
 .quickStatusSelectCompleted {
-  border-color: #38bdf8;
+  border-color: var(--status-gray-border);
 }
 
 .quickStatusSelectCancelled {
-  border-color: var(--text-muted);
+  border-color: var(--status-red-border);
 }
 
 .treeBranches {
@@ -641,14 +447,14 @@
 
 .projectStatusPillActive.projectStatusCompleted {
   background: var(--status-gray-solid);
-  border-color: #4b5563;
+  border-color: var(--status-gray-border);
   color: var(--status-gray-solid-text);
 }
 
 .projectStatusPillActive.projectStatusCancelled {
   background: var(--status-red-solid);
-  border-color: #b91c1c;
-  color: #fee2e2;
+  border-color: var(--status-red-border);
+  color: var(--status-red-solid-text);
 }
 
 .projectProfileError {
