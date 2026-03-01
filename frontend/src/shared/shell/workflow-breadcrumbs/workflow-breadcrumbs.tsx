@@ -78,16 +78,8 @@ const hierarchyRules: HierarchyRule[] = [
     crumbs: [PROJECTS_HUB_CRUMB, { href: "/estimates", label: "Estimates" }],
   },
   {
-    when: (pathname) => /^\/projects\/\d+\/budgets\/analytics$/.test(pathname),
-    crumbs: [
-      PROJECTS_HUB_CRUMB,
-      { href: "/budgets/analytics", label: "Budgets" },
-      { href: "/budgets/analytics", label: "Analytics" },
-    ],
-  },
-  {
-    when: (pathname) => /^\/projects\/\d+\/activity$/.test(pathname),
-    crumbs: [PROJECTS_HUB_CRUMB, { href: "/activity", label: "Activity" }],
+    when: (pathname) => /^\/projects\/\d+\/audit-trail$/.test(pathname),
+    crumbs: [PROJECTS_HUB_CRUMB, { href: "/audit-trail", label: "Audit Trail" }],
   },
   {
     when: (pathname) => pathname === "/change-orders" || /^\/projects\/\d+\/change-orders$/.test(pathname),
@@ -206,9 +198,6 @@ function projectScopedHref(href: string, projectId: string): string {
   if (href === "/estimates") {
     return `/projects/${encodeURIComponent(projectId)}/estimates`;
   }
-  if (href === "/budgets/analytics") {
-    return `/projects/${encodeURIComponent(projectId)}/budgets/analytics`;
-  }
   if (href === "/change-orders") {
     return `/projects/${encodeURIComponent(projectId)}/change-orders`;
   }
@@ -218,8 +207,8 @@ function projectScopedHref(href: string, projectId: string): string {
   if (href === "/bills") {
     return `/bills?project=${encodeURIComponent(projectId)}`;
   }
-  if (href === "/activity") {
-    return `/projects/${encodeURIComponent(projectId)}/activity`;
+  if (href === "/audit-trail") {
+    return `/projects/${encodeURIComponent(projectId)}/audit-trail`;
   }
   return href;
 }

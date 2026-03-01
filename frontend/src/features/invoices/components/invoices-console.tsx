@@ -9,7 +9,6 @@
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { usePagination } from "@/shared/hooks/use-pagination";
 import Link from "next/link";
 import { formatDateDisplay, formatDateTimeDisplay, todayDateInput, futureDateInput } from "@/shared/date-format";
 import { parseAmount, formatDecimal } from "@/shared/money-format";
@@ -433,7 +432,6 @@ export function InvoicesConsole() {
   const statusFilteredProjects = filteredProjects.filter((project) =>
     projectStatusFilters.includes(project.status as ProjectStatusValue),
   );
-  const { pageItems: pagedProjects, currentPage: currentProjectPageSafe, totalPages: totalProjectPages, prevPage: prevProjectPage, nextPage: nextProjectPage, resetPage: resetProjectPage } = usePagination(statusFilteredProjects, 5);
   const filteredInvoices = useMemo(() => {
     if (!invoiceStatusFilters.length) {
       return [];
@@ -848,11 +846,6 @@ export function InvoicesConsole() {
     statusFilteredProjects,
     token,
   ]);
-
-  // Reset pagination when search or status filters change.
-  useEffect(() => {
-    resetProjectPage();
-  }, [projectSearch, projectStatusFilters, resetProjectPage]);
 
   // Ensure selected project is still visible after filter changes; fall back to first match.
   useEffect(() => {
@@ -1409,15 +1402,10 @@ export function InvoicesConsole() {
               setProjectStatusFilters(["active", "on_hold", "prospect", "completed", "cancelled"])
             }
             onResetStatuses={() => setProjectStatusFilters(DEFAULT_PROJECT_STATUS_FILTERS)}
-            pagedProjects={pagedProjects}
+            projects={statusFilteredProjects}
             selectedProjectId={selectedProjectId}
             onSelectProject={handleSelectProject}
             statusLabel={projectStatusLabel}
-            showPagination
-            currentPage={currentProjectPageSafe}
-            totalPages={totalProjectPages}
-            onPrevPage={prevProjectPage}
-            onNextPage={nextProjectPage}
           />
 
           <section className={`${styles.panel} ${styles.viewerPanel}`}>

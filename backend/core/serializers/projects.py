@@ -19,8 +19,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             "status",
             "contract_value_original",
             "contract_value_current",
-            "start_date_planned",
-            "end_date_planned",
             "created_at",
         ]
 
@@ -41,8 +39,6 @@ class ProjectProfileSerializer(serializers.ModelSerializer):
             "status",
             "contract_value_original",
             "contract_value_current",
-            "start_date_planned",
-            "end_date_planned",
             "created_at",
         ]
         read_only_fields = [

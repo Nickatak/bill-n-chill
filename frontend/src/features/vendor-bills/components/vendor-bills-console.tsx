@@ -10,7 +10,6 @@
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { usePagination } from "@/shared/hooks/use-pagination";
 import { formatDateDisplay, todayDateInput, futureDateInput } from "@/shared/date-format";
 import { readApiErrorMessage } from "@/shared/api/error";
 import { ProjectListStatusValue, ProjectListViewer } from "@/shared/project-list-viewer";
@@ -228,7 +227,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     : filteredProjects.filter((project) =>
         projectStatusFilters.includes((project.status as ProjectStatusValue) ?? "active"),
       );
-  const { pageItems: pagedProjects, currentPage: currentProjectPageSafe, totalPages: totalProjectPages, prevPage: prevProjectPage, nextPage: nextProjectPage, resetPage: resetProjectPage } = usePagination(statusFilteredProjects, 5);
   const filteredVendorBills = vendorBills.filter((bill) => {
     if (billStatusFilters.length === 0 || !billStatusFilters.includes(bill.status)) {
       return false;
@@ -1123,11 +1121,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, selectedProjectId]);
 
-  // Reset to page 1 when search or filters change.
-  useEffect(() => {
-    resetProjectPage();
-  }, [projectSearch, projectStatusFilters, resetProjectPage]);
-
   // If the selected project is filtered out, fall back to the first visible project.
   useEffect(() => {
     if (!statusFilteredProjects.length) {
@@ -1223,7 +1216,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
             setProjectStatusFilters(["active", "on_hold", "prospect", "completed", "cancelled"])
           }
           onResetStatuses={() => setProjectStatusFilters(DEFAULT_PROJECT_STATUS_FILTERS)}
-          pagedProjects={pagedProjects.map((project) => ({
+          projects={statusFilteredProjects.map((project) => ({
             id: project.id,
             name: project.name,
             customer_display_name: project.customer_display_name,
@@ -1232,11 +1225,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
           selectedProjectId={selectedProjectId}
           onSelectProject={handleSelectProject}
           statusLabel={projectStatusLabel}
-          showPagination={!isProjectScoped}
-          currentPage={currentProjectPageSafe}
-          totalPages={totalProjectPages}
-          onPrevPage={prevProjectPage}
-          onNextPage={nextProjectPage}
         />
       ) : (
         <p>Create or load a project before entering bills.</p>

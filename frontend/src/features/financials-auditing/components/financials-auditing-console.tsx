@@ -146,7 +146,7 @@ function toAuditRoute(projectId: number, objectType: string, objectId: number): 
     return `/invoices?project=${projectId}`;
   }
   if (objectType === "budget") {
-    return `/projects/${projectId}/budgets/analytics`;
+    return `/projects?project=${projectId}`;
   }
   return `/financials-auditing?project=${projectId}`;
 }

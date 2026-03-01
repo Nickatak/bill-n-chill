@@ -342,8 +342,6 @@ Resolution fields accepted by `POST /api/v1/customers/quick-add/`:
     - `name`
     - `status`
     - `site_address`
-    - `start_date_planned`
-    - `end_date_planned`
   - Guardrails:
     - `contract_value_original` is immutable after create
     - `contract_value_current` is system-derived and cannot be set directly

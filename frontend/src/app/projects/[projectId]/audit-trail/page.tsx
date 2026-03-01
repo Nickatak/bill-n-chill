@@ -6,16 +6,16 @@ import shell from "@/shared/shell/page-shell.module.css";
 import { PageCard, PageShell } from "@/shared/shell";
 import { isNumericRouteId, resolveProjectParamTitle } from "@/shared/shell/route-metadata";
 
-type ProjectActivityPageProps = {
+type ProjectAuditTrailPageProps = {
   params: Promise<{ projectId: string }>;
 };
 
-export async function generateMetadata({ params }: ProjectActivityPageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: ProjectAuditTrailPageProps): Promise<Metadata> {
   const { projectId } = await params;
-  return { title: resolveProjectParamTitle(projectId, "Activity", "Project Activity") };
+  return { title: resolveProjectParamTitle(projectId, "Audit Trail", "Project Audit Trail") };
 }
 
-export default async function ProjectActivityPage({ params }: ProjectActivityPageProps) {
+export default async function ProjectAuditTrailPage({ params }: ProjectAuditTrailPageProps) {
   const { projectId } = await params;
   if (!isNumericRouteId(projectId)) {
     redirect("/projects");
@@ -26,9 +26,9 @@ export default async function ProjectActivityPage({ params }: ProjectActivityPag
       <header className={shell.hero}>
         <div className={shell.heroTop}>
           <p className={shell.eyebrow}>Projects</p>
-          <h1 className={shell.title}>Project Activity</h1>
+          <h1 className={shell.title}>Audit Trail</h1>
           <p className={shell.copy}>
-            Read-only activity timeline that combines workflow transitions and finance-linked
+            Read-only audit trail combining workflow transitions and finance-linked
             audit events for a single project.
           </p>
         </div>

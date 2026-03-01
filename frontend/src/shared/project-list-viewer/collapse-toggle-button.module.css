@@ -43,8 +43,8 @@
   transform: none;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 700px) {
   .collapseButton {
-    width: 100%;
+    display: none;
   }
 }

@@ -261,24 +261,16 @@ class Command(BaseCommand):
                     "status": status,
                     "contract_value_original": Decimal("1000.00") + Decimal(str(idx * 100)),
                     "contract_value_current": Decimal("1100.00") + Decimal(str(idx * 100)),
-                    "start_date_planned": today + timedelta(days=idx),
-                    "end_date_planned": today + timedelta(days=idx + 21),
                 },
             )
             scoped_project.status = status
             scoped_project.contract_value_original = Decimal("1000.00") + Decimal(str(idx * 100))
             scoped_project.contract_value_current = Decimal("1100.00") + Decimal(str(idx * 100))
-            if not scoped_project.start_date_planned:
-                scoped_project.start_date_planned = today + timedelta(days=idx)
-            if not scoped_project.end_date_planned:
-                scoped_project.end_date_planned = today + timedelta(days=idx + 21)
             scoped_project.save(
                 update_fields=[
                     "status",
                     "contract_value_original",
                     "contract_value_current",
-                    "start_date_planned",
-                    "end_date_planned",
                     "updated_at",
                 ]
             )
@@ -293,24 +285,16 @@ class Command(BaseCommand):
                 "status": Project.Status.ACTIVE,
                 "contract_value_original": Decimal("1000.00"),
                 "contract_value_current": Decimal("1200.00"),
-                "start_date_planned": today,
-                "end_date_planned": today + timedelta(days=30),
             },
         )
         project.status = Project.Status.ACTIVE
         project.contract_value_original = Decimal("1000.00")
         project.contract_value_current = Decimal("1200.00")
-        if not project.start_date_planned:
-            project.start_date_planned = today
-        if not project.end_date_planned:
-            project.end_date_planned = today + timedelta(days=30)
         project.save(
             update_fields=[
                 "status",
                 "contract_value_original",
                 "contract_value_current",
-                "start_date_planned",
-                "end_date_planned",
                 "updated_at",
             ]
         )

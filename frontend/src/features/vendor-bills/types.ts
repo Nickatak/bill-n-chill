@@ -8,8 +8,6 @@ export type ProjectRecord = {
   name: string;
   customer_display_name: string;
   status?: string;
-  start_date_planned?: string | null;
-  end_date_planned?: string | null;
 };
 
 export type VendorRecord = {

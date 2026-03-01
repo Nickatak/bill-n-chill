@@ -115,16 +115,36 @@
 }
 
 .projectSettingsToggle {
-  border: 1px solid var(--border-accent);
-  border-radius: var(--radius-pill);
-  background: var(--table-header-bg);
-  color: var(--text-secondary);
-  font-size: 0.7rem;
-  letter-spacing: 0.12em;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-secondary);
+  color: var(--text-primary);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  font-weight: 600;
-  padding: 4px 10px;
+  font-weight: 700;
+  padding: 5px 11px;
+  line-height: 1.1;
+  min-height: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.projectSettingsToggle:hover {
+  border-color: color-mix(in srgb, var(--text-primary) 35%, var(--border) 65%);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.projectSettingsToggle:active {
+  transform: translateY(0);
 }
 
 .quickStatusRow {
@@ -208,6 +228,7 @@
 .branch {
   display: grid;
   gap: var(--space-sm);
+  align-content: start;
   border-left: 3px solid var(--border-accent);
   padding-left: 10px;
 }
@@ -381,13 +402,31 @@
   color: var(--text-secondary);
 }
 
-.projectProfileForm {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--surface);
-  padding: 14px;
+.projectEditForm {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
   display: grid;
   gap: 10px;
+}
+
+.projectEditForm label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.projectEditForm label > input {
+  width: 100%;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  background: var(--surface-secondary);
+  color: var(--text-primary);
+  padding: 10px var(--space-md);
+  font-size: 0.94rem;
 }
 
 .projectStatusPills {
@@ -457,13 +496,7 @@
   color: var(--status-red-solid-text);
 }
 
-.projectProfileError {
-  margin: 0;
-  color: var(--tone-error-text);
-  font-size: 0.85rem;
-}
-
-.projectProfileSubmit {
+.projectEditSubmit {
   justify-self: end;
   border: 1px solid var(--accent-hover);
   border-radius: 10px;
@@ -478,13 +511,13 @@
   transition: transform 140ms ease, box-shadow 140ms ease, filter 140ms ease;
 }
 
-.projectProfileSubmit:hover {
+.projectEditSubmit:hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 18px rgba(29, 78, 216, 0.28);
   filter: saturate(1.08);
 }
 
-.projectProfileSubmit:disabled {
+.projectEditSubmit:disabled {
   border-color: var(--text-muted);
   background: var(--border);
   color: var(--text-secondary);

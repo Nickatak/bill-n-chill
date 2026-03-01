@@ -283,8 +283,6 @@ Key fields:
 - `status` (`prospect`, `active`, `on_hold`, `completed`, `cancelled`)
 - `contract_value_original`
 - `contract_value_current`
-- `start_date_planned`
-- `end_date_planned`
 
 ### Estimating and Scope
 

@@ -11,7 +11,7 @@ class Project(models.Model):
     Business workflow:
     - Starts as a project shell (often via lead conversion).
     - Tracks site/service address separately from customer billing address.
-    - Tracks contract baseline/current values and planning dates.
+    - Tracks contract baseline/current values.
     - Owns downstream estimates, budgets, change orders, and invoices.
 
     Status intent:
@@ -71,8 +71,6 @@ class Project(models.Model):
         decimal_places=2,
         default=0,
     )
-    start_date_planned = models.DateField(null=True, blank=True)
-    end_date_planned = models.DateField(null=True, blank=True)
     created_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -101,15 +99,6 @@ class Project(models.Model):
                 errors.setdefault("status", []).append(
                     "Cannot set project to active or on hold while customer is archived."
                 )
-
-        if (
-            self.start_date_planned
-            and self.end_date_planned
-            and self.end_date_planned < self.start_date_planned
-        ):
-            errors.setdefault("end_date_planned", []).append(
-                "Planned end date must be on or after planned start date."
-            )
 
         if self.pk:
             previous_status = (

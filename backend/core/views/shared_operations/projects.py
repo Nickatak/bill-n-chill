@@ -419,19 +419,6 @@ def project_detail_view(request, project_id: int):
             },
             status=400,
         )
-    next_start_date = serializer.validated_data.get("start_date_planned", project.start_date_planned)
-    next_end_date = serializer.validated_data.get("end_date_planned", project.end_date_planned)
-    if next_start_date and next_end_date and next_end_date < next_start_date:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "end_date_planned cannot be before start_date_planned.",
-                    "fields": {"end_date_planned": ["Planned end date must be on or after planned start date."]},
-                }
-            },
-            status=400,
-        )
     try:
         serializer.save()
     except DjangoValidationError as exc:
