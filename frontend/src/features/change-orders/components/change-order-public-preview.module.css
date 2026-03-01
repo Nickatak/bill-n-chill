@@ -1,21 +1,6 @@
 .decisionBannerAwaiting {
 }
 
-.decisionBannerSettled {
-}
-
-.decisionBannerRecentlyApproved {
-  border-color: var(--status-green-border);
-  background: var(--status-green-bg);
-  box-shadow: none;
-}
-
-.decisionBannerRecentlyRejected {
-  border-color: var(--status-red-border);
-  background: #fef2f2;
-  box-shadow: none;
-}
-
 .reasonBody {
   margin: 0 !important;
   padding: 0;

@@ -4,7 +4,7 @@
  * Change orders console -- the primary internal workspace for managing change
  * orders within a project. Provides estimate-linked revision browsing,
  * draft creation/editing, status transitions with quick-status pills, audit
- * event history, and budget-line-anchored line-item composers.
+ * event history, and budget-line-anchored line-item creators.
  */
 
 import { buildAuthHeaders } from "@/features/session/auth-headers";
@@ -26,14 +26,14 @@ import {
   ChangeOrderRecord,
 } from "../types";
 import styles from "./change-orders-console.module.css";
-import composerStyles from "@/shared/document-composer/composer-foundation.module.css";
-import changeOrderComposerStyles from "@/shared/document-composer/change-order-composer.module.css";
-import { DocumentComposer } from "@/shared/document-composer";
+import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
+import changeOrderCreatorStyles from "@/shared/document-creator/change-order-creator.module.css";
+import { DocumentCreator } from "@/shared/document-creator";
 import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
 import {
   resolveOrganizationBranding,
   type OrganizationBrandingDefaults,
-} from "@/shared/document-composer";
+} from "@/shared/document-creator";
 import {
   createChangeOrderDocumentAdapter,
   ChangeOrderFormState,
@@ -232,7 +232,7 @@ const CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]>
 const CHANGE_ORDER_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
 const CO_GENERIC_BUDGET_LINE_CODES = new Set(["99-901", "99-902", "99-903"]);
 
-/** Internal change-orders workspace: estimate-linked viewer, dual composers (create + edit), and status lifecycle. */
+/** Internal change-orders workspace: estimate-linked viewer, dual creators (create + edit), and status lifecycle. */
 export function ChangeOrdersConsole({
   scopedProjectId: scopedProjectIdProp = null,
   initialOriginEstimateId: initialOriginEstimateIdProp = null,
@@ -273,8 +273,8 @@ export function ChangeOrdersConsole({
   const [changeOrderAllowedTransitions, setChangeOrderAllowedTransitions] = useState<
     Record<string, string[]>
   >(CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK);
-  const createComposerRef = useRef<HTMLDivElement | null>(null);
-  const pendingScrollToCreateComposerRef = useRef(false);
+  const createCreatorRef = useRef<HTMLDivElement | null>(null);
+  const pendingScrollToCreateCreatorRef = useRef(false);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const canMutateChangeOrders = hasAnyRole(role, ["owner", "pm"]);
@@ -412,7 +412,7 @@ export function ChangeOrdersConsole({
   const originalEstimateTotal = selectedViewerEstimate
     ? originalBudgetTotalForEstimate(selectedViewerEstimate.id)
     : null;
-  const changeOrderComposerStatusPolicy = useMemo(
+  const changeOrderCreatorStatusPolicy = useMemo(
     () =>
       toChangeOrderStatusPolicy({
         policy_version: "ui-fallback",
@@ -424,7 +424,7 @@ export function ChangeOrdersConsole({
       }),
     [changeOrderAllowedTransitions, changeOrderStatusLabels],
   );
-  const createChangeOrderComposerFormState: ChangeOrderFormState = useMemo(
+  const createChangeOrderCreatorFormState: ChangeOrderFormState = useMemo(
     () => ({
       title: newTitle,
       reason: newReason,
@@ -434,7 +434,7 @@ export function ChangeOrdersConsole({
     }),
     [newLineDaysTotal, newLineDeltaTotal, newLineItems, newReason, newTitle],
   );
-  const editChangeOrderComposerFormState: ChangeOrderFormState = useMemo(
+  const editChangeOrderCreatorFormState: ChangeOrderFormState = useMemo(
     () => ({
       title: editTitle,
       reason: editReason,
@@ -444,9 +444,9 @@ export function ChangeOrdersConsole({
     }),
     [editLineDaysTotal, editLineDeltaTotal, editLineItems, editReason, editTitle],
   );
-  const changeOrderComposerAdapter = useMemo(
-    () => createChangeOrderDocumentAdapter(changeOrderComposerStatusPolicy, []),
-    [changeOrderComposerStatusPolicy],
+  const changeOrderCreatorAdapter = useMemo(
+    () => createChangeOrderDocumentAdapter(changeOrderCreatorStatusPolicy, []),
+    [changeOrderCreatorStatusPolicy],
   );
   const selectedChangeOrderStatusEvents = useMemo(() => {
     if (!selectedViewerChangeOrder) {
@@ -1210,7 +1210,7 @@ export function ChangeOrdersConsole({
     return () => window.clearTimeout(run);
   }, [loadProjects, token]);
 
-  // Load organization branding defaults for the composer header.
+  // Load organization branding defaults for the creator header.
   useEffect(() => {
     if (!token) {
       return;
@@ -1315,7 +1315,7 @@ export function ChangeOrdersConsole({
 
   /** Reset the workspace to a fresh "new change order" draft. */
   function handleStartNewChangeOrder() {
-    pendingScrollToCreateComposerRef.current = true;
+    pendingScrollToCreateCreatorRef.current = true;
     hydrateEditForm(undefined);
     setNewTitleManuallyEdited(false);
     setNewTitle(defaultChangeOrderTitle(selectedProjectName));
@@ -1329,19 +1329,19 @@ export function ChangeOrdersConsole({
     setFeedback("Ready for a new change order draft.", "info");
   }
 
-  // Scroll the create composer into view after switching to "new CO" mode.
+  // Scroll the create creator into view after switching to "new CO" mode.
   useEffect(() => {
-    if (!pendingScrollToCreateComposerRef.current) {
+    if (!pendingScrollToCreateCreatorRef.current) {
       return;
     }
     if (selectedChangeOrder) {
       return;
     }
-    const target = createComposerRef.current;
+    const target = createCreatorRef.current;
     if (!target) {
       return;
     }
-    pendingScrollToCreateComposerRef.current = false;
+    pendingScrollToCreateCreatorRef.current = false;
     requestAnimationFrame(() => {
       target.scrollIntoView({ behavior: "smooth", block: "start" });
     });
@@ -1629,8 +1629,8 @@ export function ChangeOrdersConsole({
         <p
           className={
             actionTone === "error"
-              ? composerStyles.actionError
-              : composerStyles.inlineHint
+              ? creatorStyles.actionError
+              : creatorStyles.inlineHint
           }
         >
           {actionMessage}
@@ -1716,10 +1716,10 @@ export function ChangeOrdersConsole({
                       </span>
                       {baselineStatus !== "none" ? (
                         <span
-                          className={`${changeOrderComposerStyles.viewerBaselineBadge} ${
+                          className={`${changeOrderCreatorStyles.viewerBaselineBadge} ${
                             baselineStatus === "active"
-                              ? changeOrderComposerStyles.viewerBaselineBadgeActive
-                              : changeOrderComposerStyles.viewerBaselineBadgeSuperseded
+                              ? changeOrderCreatorStyles.viewerBaselineBadgeActive
+                              : changeOrderCreatorStyles.viewerBaselineBadgeSuperseded
                           }`}
                         >
                           {financialBaselineLabel(baselineStatus)}
@@ -1829,7 +1829,7 @@ export function ChangeOrdersConsole({
                       <>
                         {quickStatusOptions.length > 0 ? (
                           <div className={styles.quickStatusPanel}>
-                            <span className={composerStyles.lifecycleFieldLabel}>Next status</span>
+                            <span className={creatorStyles.lifecycleFieldLabel}>Next status</span>
                             <div className={styles.quickStatusPills}>
                               {quickStatusOptions.map((status) => {
                                 const isSelected = quickStatus === status;
@@ -1850,7 +1850,7 @@ export function ChangeOrdersConsole({
                                 );
                               })}
                             </div>
-                            <div className={`${composerStyles.lifecycleActions} ${styles.viewerStatusActionRow}`}>
+                            <div className={`${creatorStyles.lifecycleActions} ${styles.viewerStatusActionRow}`}>
                               <button
                                 type="button"
                                 className={`${styles.viewerStatusActionButton} ${styles.viewerStatusActionButtonPrimary}`}
@@ -1868,10 +1868,10 @@ export function ChangeOrdersConsole({
                                 Add CO Status Note
                               </button>
                             </div>
-                            <label className={composerStyles.lifecycleField}>
+                            <label className={creatorStyles.lifecycleField}>
                               Status note
                               <textarea
-                                className={composerStyles.statusNote}
+                                className={creatorStyles.statusNote}
                                 value={quickStatusNote}
                                 onChange={(event) => setQuickStatusNote(event.target.value)}
                                 placeholder="Optional note for this status action or history-only note."
@@ -1881,17 +1881,17 @@ export function ChangeOrdersConsole({
                           </div>
                         ) : (
                           <div className={styles.quickStatusPanel}>
-                            <label className={composerStyles.lifecycleField}>
+                            <label className={creatorStyles.lifecycleField}>
                               Status note
                               <textarea
-                                className={composerStyles.statusNote}
+                                className={creatorStyles.statusNote}
                                 value={quickStatusNote}
                                 onChange={(event) => setQuickStatusNote(event.target.value)}
                                 placeholder="Add a note without changing status."
                                 rows={3}
                               />
                             </label>
-                            <div className={`${composerStyles.lifecycleActions} ${styles.viewerStatusActionRow}`}>
+                            <div className={`${creatorStyles.lifecycleActions} ${styles.viewerStatusActionRow}`}>
                               <button
                                 type="button"
                                 className={`${styles.viewerStatusActionButton} ${styles.viewerStatusActionButtonSecondary}`}
@@ -2035,7 +2035,7 @@ export function ChangeOrdersConsole({
             Add New Change Order
           </button>
           {actionMessage && actionTone === "success" ? (
-            <p className={`${composerStyles.actionSuccess} ${styles.toolbarFeedbackMessage}`}>
+            <p className={`${creatorStyles.actionSuccess} ${styles.toolbarFeedbackMessage}`}>
               {actionMessage}
             </p>
           ) : null}
@@ -2043,57 +2043,54 @@ export function ChangeOrdersConsole({
       </div>
 
       {!selectedChangeOrder ? (
-        <div ref={createComposerRef}>
-          <DocumentComposer
-          adapter={changeOrderComposerAdapter}
+        <div ref={createCreatorRef}>
+          <DocumentCreator
+          adapter={changeOrderCreatorAdapter}
           document={null}
-          formState={createChangeOrderComposerFormState}
-          className={`${composerStyles.sheet} ${changeOrderComposerStyles.workflowSheet} ${changeOrderComposerStyles.createSheet}`}
-          sectionClassName={changeOrderComposerStyles.changeOrderComposerSection}
+          formState={createChangeOrderCreatorFormState}
+          className={`${creatorStyles.sheet} ${changeOrderCreatorStyles.workflowSheet} ${changeOrderCreatorStyles.createSheet}`}
+          sectionClassName={changeOrderCreatorStyles.changeOrderCreatorSection}
           onSubmit={handleCreateChangeOrder}
           sections={[{ slot: "context" }]}
           renderers={{
             context: () => (
               <>
-                <div className={composerStyles.sheetHeader}>
-                  <div className={composerStyles.fromBlock}>
-                    <span className={composerStyles.blockLabel}>From</span>
-                    <p className={composerStyles.blockText}>{senderName || "Your Company"}</p>
-                    {senderEmail ? (
-                      <p className={composerStyles.blockMuted}>{senderEmail}</p>
-                    ) : null}
+                <div className={creatorStyles.sheetHeader}>
+                  <div className={creatorStyles.fromBlock}>
+                    <span className={creatorStyles.blockLabel}>From</span>
+                    <p className={creatorStyles.blockText}>{senderName || "Your Company"}</p>
                     {senderAddressLines.length ? (
                       senderAddressLines.map((line, index) => (
-                        <p key={`${line}-${index}`} className={composerStyles.blockMuted}>
+                        <p key={`${line}-${index}`} className={creatorStyles.blockMuted}>
                           {line}
                         </p>
                       ))
                     ) : (
-                      <p className={composerStyles.blockMuted}>
+                      <p className={creatorStyles.blockMuted}>
                         Set sender address in Organization settings.
                       </p>
                     )}
-                    <p className={composerStyles.blockMuted}>Prepared for approved estimate scope changes</p>
+                    <p className={creatorStyles.blockMuted}>Prepared for approved estimate scope changes</p>
                   </div>
-                  <div className={composerStyles.headerRight}>
-                    <div className={composerStyles.logoBox}>
+                  <div className={creatorStyles.headerRight}>
+                    <div className={creatorStyles.logoBox}>
                       {senderLogoUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={senderLogoUrl} alt="Organization logo" className={composerStyles.logoImage} />
+                        <img src={senderLogoUrl} alt="Organization logo" className={creatorStyles.logoImage} />
                       ) : (
                         "Logo"
                       )}
                     </div>
-                    <div className={composerStyles.sheetTitle}>Change Order</div>
-                    <div className={composerStyles.blockMuted}>Project #{selectedProjectId || "—"}</div>
+                    <div className={creatorStyles.sheetTitle}>Change Order</div>
+                    <div className={creatorStyles.blockMuted}>Project #{selectedProjectId || "—"}</div>
                   </div>
                 </div>
 
-                <div className={composerStyles.partyGrid}>
-                  <label className={`${composerStyles.inlineField} ${changeOrderComposerStyles.coMetaField}`}>
-                    <span className={changeOrderComposerStyles.coMetaLabel}>Title</span>
+                <div className={creatorStyles.partyGrid}>
+                  <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField}`}>
+                    <span className={changeOrderCreatorStyles.coMetaLabel}>Title</span>
                     <input
-                      className={`${composerStyles.fieldInput} ${changeOrderComposerStyles.coMetaInput}`}
+                      className={`${creatorStyles.fieldInput} ${changeOrderCreatorStyles.coMetaInput}`}
                       value={newTitle}
                       onChange={(event) => {
                         setNewTitle(event.target.value);
@@ -2102,10 +2099,10 @@ export function ChangeOrdersConsole({
                       required
                     />
                   </label>
-                  <label className={`${composerStyles.inlineField} ${changeOrderComposerStyles.coMetaField} ${changeOrderComposerStyles.coFieldWide}`}>
-                    <span className={changeOrderComposerStyles.coMetaLabel}>Reason</span>
+                  <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField} ${changeOrderCreatorStyles.coFieldWide}`}>
+                    <span className={changeOrderCreatorStyles.coMetaLabel}>Reason</span>
                     <textarea
-                      className={`${composerStyles.fieldInput} ${changeOrderComposerStyles.coMetaInput}`}
+                      className={`${creatorStyles.fieldInput} ${changeOrderCreatorStyles.coMetaInput}`}
                       value={newReason}
                       onChange={(event) => setNewReason(event.target.value)}
                       rows={3}
@@ -2114,22 +2111,22 @@ export function ChangeOrdersConsole({
                   </label>
                 </div>
 
-                <div className={changeOrderComposerStyles.coLineSectionIntro}>
+                <div className={changeOrderCreatorStyles.coLineSectionIntro}>
                   <h3>Line Items</h3>
                   <p>
                     {selectedViewerEstimate
                       ? `Starter rows come from estimate-derived lines for origin estimate #${selectedViewerEstimate.id} v${selectedViewerEstimate.version}.`
                       : "Starter rows come from estimate-derived lines once an origin estimate is selected."}
                   </p>
-                  <p className={changeOrderComposerStyles.coLineLegend}>
+                  <p className={changeOrderCreatorStyles.coLineLegend}>
                     Original approved line item amount is the approved baseline for the line before
                     approved CO deltas. CO Delta is a flat USD change (not a percent). Schedule Delta is
                     calendar days.
                   </p>
                 </div>
 
-                <div className={composerStyles.lineTable}>
-                  <div className={changeOrderComposerStyles.coLineHeader}>
+                <div className={creatorStyles.lineTable}>
+                  <div className={changeOrderCreatorStyles.coLineHeader}>
                     <span>Type</span>
                     <span>Adjustment reason</span>
                     <span>Budget line</span>
@@ -2147,14 +2144,14 @@ export function ChangeOrdersConsole({
                         : !isGenericBudgetLine(budgetLine),
                     );
                     return (
-                      <div key={line.localId} className={changeOrderComposerStyles.coLineRowGroup}>
+                      <div key={line.localId} className={changeOrderCreatorStyles.coLineRowGroup}>
                         <div
-                          className={`${changeOrderComposerStyles.coLineRow} ${index % 2 === 1 ? changeOrderComposerStyles.coLineRowAlt : ""} ${
-                            rowIssues.length ? changeOrderComposerStyles.coLineRowInvalid : ""
+                          className={`${changeOrderCreatorStyles.coLineRow} ${index % 2 === 1 ? changeOrderCreatorStyles.coLineRowAlt : ""} ${
+                            rowIssues.length ? changeOrderCreatorStyles.coLineRowInvalid : ""
                           }`}
                         >
                           <select
-                            className={composerStyles.lineSelect}
+                            className={creatorStyles.lineSelect}
                             value={line.lineType}
                             onChange={(event) => {
                               const nextLineType = event.target.value as "scope" | "adjustment";
@@ -2175,7 +2172,7 @@ export function ChangeOrdersConsole({
                             <option value="adjustment">Adjustment</option>
                           </select>
                           <input
-                            className={composerStyles.lineInput}
+                            className={creatorStyles.lineInput}
                             value={line.adjustmentReason}
                             placeholder={line.lineType === "adjustment" ? "Required reason" : "Not used for scope"}
                             onChange={(event) =>
@@ -2184,7 +2181,7 @@ export function ChangeOrdersConsole({
                             disabled={line.lineType !== "adjustment"}
                           />
                           <select
-                            className={composerStyles.lineSelect}
+                            className={creatorStyles.lineSelect}
                             value={line.budgetLineId}
                             onChange={(event) =>
                               updateLine(setNewLineItems, line.localId, { budgetLineId: event.target.value })
@@ -2200,7 +2197,7 @@ export function ChangeOrdersConsole({
                             ))}
                           </select>
                           <input
-                            className={composerStyles.lineInput}
+                            className={creatorStyles.lineInput}
                             value={line.description}
                             placeholder={
                               line.lineType === "adjustment"
@@ -2211,9 +2208,9 @@ export function ChangeOrdersConsole({
                               updateLine(setNewLineItems, line.localId, { description: event.target.value })
                             }
                           />
-                          <span className={changeOrderComposerStyles.coReadValue}>${originalApprovedAmountForLine(line.budgetLineId)}</span>
+                          <span className={changeOrderCreatorStyles.coReadValue}>${originalApprovedAmountForLine(line.budgetLineId)}</span>
                           <input
-                            className={composerStyles.lineInput}
+                            className={creatorStyles.lineInput}
                             value={line.amountDelta}
                             placeholder="0.00 (USD)"
                             onChange={(event) =>
@@ -2222,7 +2219,7 @@ export function ChangeOrdersConsole({
                             inputMode="decimal"
                           />
                           <input
-                            className={composerStyles.lineInput}
+                            className={creatorStyles.lineInput}
                             value={line.daysDelta}
                             placeholder="0 days"
                             onChange={(event) =>
@@ -2232,14 +2229,14 @@ export function ChangeOrdersConsole({
                           />
                           <button
                             type="button"
-                            className={composerStyles.smallButton}
+                            className={creatorStyles.smallButton}
                             onClick={() => removeLine(setNewLineItems, newLineItems, line.localId)}
                           >
                             Remove
                           </button>
                         </div>
                         {rowIssues.length ? (
-                          <p className={changeOrderComposerStyles.coLineIssue}>
+                          <p className={changeOrderCreatorStyles.coLineIssue}>
                             Row {index + 1}: {rowIssues.join(" ")}
                           </p>
                         ) : null}
@@ -2247,55 +2244,55 @@ export function ChangeOrdersConsole({
                     );
                   })}
                 </div>
-                <div className={changeOrderComposerStyles.coLineActions}>
+                <div className={changeOrderCreatorStyles.coLineActions}>
                   <button
                     type="button"
-                    className={`${composerStyles.secondaryButton} ${changeOrderComposerStyles.coLineAddButton}`}
+                    className={`${creatorStyles.secondaryButton} ${changeOrderCreatorStyles.coLineAddButton}`}
                     onClick={() => addLine(setNewLineItems)}
                   >
                     Add Line Item
                   </button>
                 </div>
 
-                <div className={changeOrderComposerStyles.coSheetFooter}>
-                  <div className={`${composerStyles.summary} ${changeOrderComposerStyles.coSummaryCard}`}>
-                    <div className={composerStyles.summaryRow}>
+                <div className={changeOrderCreatorStyles.coSheetFooter}>
+                  <div className={`${creatorStyles.summary} ${changeOrderCreatorStyles.coSummaryCard}`}>
+                    <div className={creatorStyles.summaryRow}>
                       <span>Original total</span>
-                      <span className={changeOrderComposerStyles.coSummarySecondaryValue}>
+                      <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
                         {originalEstimateTotal ? `$${originalEstimateTotal}` : "—"}
                       </span>
                     </div>
-                    <div className={composerStyles.summaryRow}>
+                    <div className={creatorStyles.summaryRow}>
                       <span>Current total (accepted)</span>
-                      <span className={changeOrderComposerStyles.coSummarySecondaryValue}>
+                      <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
                         {currentAcceptedTotal ? `$${currentAcceptedTotal}` : "—"}
                       </span>
                     </div>
-                    <div className={composerStyles.summaryRow}>
-                      <span className={changeOrderComposerStyles.coSummaryPrimaryLabel}>Cost delta ($)</span>
+                    <div className={creatorStyles.summaryRow}>
+                      <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Cost delta ($)</span>
                       <strong>{formatDecimal(newLineDeltaTotal)}</strong>
                     </div>
-                    <div className={composerStyles.summaryRow}>
-                      <span className={changeOrderComposerStyles.coSummaryPrimaryLabel}>Time delta (days)</span>
+                    <div className={creatorStyles.summaryRow}>
+                      <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Time delta (days)</span>
                       <strong>{newLineDaysTotal}</strong>
                     </div>
                   </div>
-                  <div className={changeOrderComposerStyles.coSheetFooterActions}>
+                  <div className={changeOrderCreatorStyles.coSheetFooterActions}>
                     {!selectedViewerEstimateId ? (
-                      <p className={`${composerStyles.inlineHint} ${changeOrderComposerStyles.coFooterHint}`}>
+                      <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint}`}>
                         Select an approved origin estimate from the history selector before creating a change
                         order.
                       </p>
                     ) : null}
                     {selectedViewerEstimateId && newLineValidation.issues.length ? (
-                      <p className={`${composerStyles.inlineHint} ${changeOrderComposerStyles.coFooterHint} ${changeOrderComposerStyles.coFooterErrorHint}`}>
+                      <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint} ${changeOrderCreatorStyles.coFooterErrorHint}`}>
                         Line-level issues are highlighted inline. Fix them before creating this draft.
                       </p>
                     ) : null}
-                    <div className={changeOrderComposerStyles.coActionButtonRow}>
+                    <div className={changeOrderCreatorStyles.coActionButtonRow}>
                       <button
                         type="submit"
-                        className={`${composerStyles.primaryButton} ${changeOrderComposerStyles.coFooterPrimaryButton}`}
+                        className={`${creatorStyles.primaryButton} ${changeOrderCreatorStyles.coFooterPrimaryButton}`}
                         disabled={isCreateSubmitDisabled}
                       >
                         Create Change Order
@@ -2311,64 +2308,61 @@ export function ChangeOrdersConsole({
       ) : null}
 
       {selectedChangeOrder ? (
-        <DocumentComposer
-          adapter={changeOrderComposerAdapter}
+        <DocumentCreator
+          adapter={changeOrderCreatorAdapter}
           document={selectedChangeOrder}
-          formState={editChangeOrderComposerFormState}
-          className={`${composerStyles.sheet} ${changeOrderComposerStyles.workflowSheet} ${changeOrderComposerStyles.editSheet} ${!isSelectedChangeOrderEditable ? changeOrderComposerStyles.editSheetLocked : ""}`}
-          sectionClassName={changeOrderComposerStyles.changeOrderComposerSection}
+          formState={editChangeOrderCreatorFormState}
+          className={`${creatorStyles.sheet} ${changeOrderCreatorStyles.workflowSheet} ${changeOrderCreatorStyles.editSheet} ${!isSelectedChangeOrderEditable ? changeOrderCreatorStyles.editSheetLocked : ""}`}
+          sectionClassName={changeOrderCreatorStyles.changeOrderCreatorSection}
           onSubmit={handleUpdateChangeOrder}
           sections={[{ slot: "context" }]}
           renderers={{
             context: () => (
               <>
-                <div className={composerStyles.sheetHeader}>
-                  <div className={composerStyles.fromBlock}>
-                    <span className={composerStyles.blockLabel}>From</span>
-                    <p className={composerStyles.blockText}>{senderName || "Your Company"}</p>
-                    {senderEmail ? (
-                      <p className={composerStyles.blockMuted}>{senderEmail}</p>
-                    ) : null}
+                <div className={creatorStyles.sheetHeader}>
+                  <div className={creatorStyles.fromBlock}>
+                    <span className={creatorStyles.blockLabel}>From</span>
+                    <p className={creatorStyles.blockText}>{senderName || "Your Company"}</p>
                     {senderAddressLines.length ? (
                       senderAddressLines.map((line, index) => (
-                        <p key={`${line}-${index}`} className={composerStyles.blockMuted}>
+                        <p key={`${line}-${index}`} className={creatorStyles.blockMuted}>
                           {line}
                         </p>
                       ))
                     ) : (
-                      <p className={composerStyles.blockMuted}>
+                      <p className={creatorStyles.blockMuted}>
                         Set sender address in Organization settings.
                       </p>
                     )}
                   </div>
-                  <div className={composerStyles.headerRight}>
-                    <div className={composerStyles.logoBox}>
+                  <div className={creatorStyles.headerRight}>
+                    <div className={creatorStyles.logoBox}>
                       {senderLogoUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={senderLogoUrl} alt="Organization logo" className={composerStyles.logoImage} />
+                        <img src={senderLogoUrl} alt="Organization logo" className={creatorStyles.logoImage} />
                       ) : (
                         "Logo"
                       )}
                     </div>
-                    <div className={composerStyles.sheetTitle}>Change Order Revision</div>
+                    <div className={creatorStyles.sheetTitle}>Change Order Revision</div>
                   </div>
                 </div>
 
-                <div className={composerStyles.partyGrid}>
-                  <label className={`${composerStyles.inlineField} ${changeOrderComposerStyles.coMetaField}`}>
-                    <span className={changeOrderComposerStyles.coMetaLabel}>Title</span>
+                <div className={creatorStyles.partyGrid}>
+                  <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField}`}>
+                    <span className={changeOrderCreatorStyles.coMetaLabel}>Title</span>
                     <input
-                      className={`${composerStyles.fieldInput} ${changeOrderComposerStyles.coMetaInput} ${changeOrderComposerStyles.lockableControl}`}
+                      className={`${creatorStyles.fieldInput} ${changeOrderCreatorStyles.coMetaInput} ${changeOrderCreatorStyles.lockableControl}`}
                       value={editTitle}
                       onChange={(event) => setEditTitle(event.target.value)}
                       disabled={!isSelectedChangeOrderEditable}
                       required
                     />
                   </label>
-                  <label className={`${composerStyles.inlineField} ${changeOrderComposerStyles.coMetaField} ${changeOrderComposerStyles.coFieldWide}`}>
-                    <span className={changeOrderComposerStyles.coMetaLabel}>Reason</span>
+                  <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField} ${changeOrderCreatorStyles.coFieldWide}`}>
+                    <span className={changeOrderCreatorStyles.coMetaLabel}>Reason</span>
                     <textarea
-                      className={`${composerStyles.fieldInput} ${changeOrderComposerStyles.coMetaInput} ${changeOrderComposerStyles.lockableControl}`}
+                      className={`${creatorStyles.fieldInput} ${changeOrderCreatorStyles.coMetaInput} ${changeOrderCreatorStyles.lockableControl}`}
                       value={editReason}
                       onChange={(event) => setEditReason(event.target.value)}
                       rows={3}
@@ -2378,21 +2372,21 @@ export function ChangeOrdersConsole({
                   </label>
                 </div>
 
-                <div className={changeOrderComposerStyles.coLineSectionIntro}>
+                <div className={changeOrderCreatorStyles.coLineSectionIntro}>
                   <h3>Line Items</h3>
                   <p>
                     These rows are budget-line anchored. Update flat USD deltas and schedule days for this
                     revision.
                   </p>
-                  <p className={changeOrderComposerStyles.coLineLegend}>
+                  <p className={changeOrderCreatorStyles.coLineLegend}>
                     Original approved line item amount is the approved baseline for the line before
                     approved CO deltas. CO Delta is a flat USD change (not a percent). Schedule Delta is
                     calendar days.
                   </p>
                 </div>
 
-                <div className={composerStyles.lineTable}>
-                  <div className={changeOrderComposerStyles.coLineHeader}>
+                <div className={creatorStyles.lineTable}>
+                  <div className={changeOrderCreatorStyles.coLineHeader}>
                     <span>Type</span>
                     <span>Adjustment reason</span>
                     <span>Budget line</span>
@@ -2410,14 +2404,14 @@ export function ChangeOrdersConsole({
                         : !isGenericBudgetLine(budgetLine),
                     );
                     return (
-                      <div key={line.localId} className={changeOrderComposerStyles.coLineRowGroup}>
+                      <div key={line.localId} className={changeOrderCreatorStyles.coLineRowGroup}>
                         <div
-                          className={`${changeOrderComposerStyles.coLineRow} ${index % 2 === 1 ? changeOrderComposerStyles.coLineRowAlt : ""} ${
-                            rowIssues.length ? changeOrderComposerStyles.coLineRowInvalid : ""
+                          className={`${changeOrderCreatorStyles.coLineRow} ${index % 2 === 1 ? changeOrderCreatorStyles.coLineRowAlt : ""} ${
+                            rowIssues.length ? changeOrderCreatorStyles.coLineRowInvalid : ""
                           }`}
                         >
                           <select
-                            className={`${composerStyles.lineSelect} ${changeOrderComposerStyles.lockableControl}`}
+                            className={`${creatorStyles.lineSelect} ${changeOrderCreatorStyles.lockableControl}`}
                             value={line.lineType}
                             onChange={(event) => {
                               const nextLineType = event.target.value as "scope" | "adjustment";
@@ -2439,7 +2433,7 @@ export function ChangeOrdersConsole({
                             <option value="adjustment">Adjustment</option>
                           </select>
                           <input
-                            className={`${composerStyles.lineInput} ${changeOrderComposerStyles.lockableControl}`}
+                            className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
                             value={line.adjustmentReason}
                             placeholder={line.lineType === "adjustment" ? "Required reason" : "Not used for scope"}
                             onChange={(event) =>
@@ -2448,7 +2442,7 @@ export function ChangeOrdersConsole({
                             disabled={!isSelectedChangeOrderEditable || line.lineType !== "adjustment"}
                           />
                           <select
-                            className={`${composerStyles.lineSelect} ${changeOrderComposerStyles.lockableControl}`}
+                            className={`${creatorStyles.lineSelect} ${changeOrderCreatorStyles.lockableControl}`}
                             value={line.budgetLineId}
                             onChange={(event) =>
                               updateLine(setEditLineItems, line.localId, { budgetLineId: event.target.value })
@@ -2465,7 +2459,7 @@ export function ChangeOrdersConsole({
                             ))}
                           </select>
                           <input
-                            className={`${composerStyles.lineInput} ${changeOrderComposerStyles.lockableControl}`}
+                            className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
                             value={line.description}
                             placeholder={
                               line.lineType === "adjustment"
@@ -2477,9 +2471,9 @@ export function ChangeOrdersConsole({
                             }
                             disabled={!isSelectedChangeOrderEditable}
                           />
-                          <span className={changeOrderComposerStyles.coReadValue}>${originalApprovedAmountForLine(line.budgetLineId)}</span>
+                          <span className={changeOrderCreatorStyles.coReadValue}>${originalApprovedAmountForLine(line.budgetLineId)}</span>
                           <input
-                            className={`${composerStyles.lineInput} ${changeOrderComposerStyles.lockableControl}`}
+                            className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
                             value={line.amountDelta}
                             placeholder="0.00 (USD)"
                             onChange={(event) =>
@@ -2489,7 +2483,7 @@ export function ChangeOrdersConsole({
                             disabled={!isSelectedChangeOrderEditable}
                           />
                           <input
-                            className={`${composerStyles.lineInput} ${changeOrderComposerStyles.lockableControl}`}
+                            className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
                             value={line.daysDelta}
                             placeholder="0 days"
                             onChange={(event) =>
@@ -2501,7 +2495,7 @@ export function ChangeOrdersConsole({
                           {isSelectedChangeOrderEditable ? (
                             <button
                               type="button"
-                              className={composerStyles.smallButton}
+                              className={creatorStyles.smallButton}
                               onClick={() => removeLine(setEditLineItems, editLineItems, line.localId)}
                             >
                               Remove
@@ -2509,7 +2503,7 @@ export function ChangeOrdersConsole({
                           ) : null}
                         </div>
                         {rowIssues.length ? (
-                          <p className={changeOrderComposerStyles.coLineIssue}>
+                          <p className={changeOrderCreatorStyles.coLineIssue}>
                             Row {index + 1}: {rowIssues.join(" ")}
                           </p>
                         ) : null}
@@ -2518,10 +2512,10 @@ export function ChangeOrdersConsole({
                   })}
                 </div>
                 {isSelectedChangeOrderEditable ? (
-                  <div className={changeOrderComposerStyles.coLineActions}>
+                  <div className={changeOrderCreatorStyles.coLineActions}>
                     <button
                       type="button"
-                      className={`${composerStyles.secondaryButton} ${changeOrderComposerStyles.coLineAddButton}`}
+                      className={`${creatorStyles.secondaryButton} ${changeOrderCreatorStyles.coLineAddButton}`}
                       onClick={() => addLine(setEditLineItems)}
                     >
                       Add Line Item
@@ -2529,50 +2523,50 @@ export function ChangeOrdersConsole({
                   </div>
                 ) : null}
 
-                <div className={changeOrderComposerStyles.coSheetFooter}>
-                  <div className={`${composerStyles.summary} ${changeOrderComposerStyles.coSummaryCard}`}>
-                    <div className={composerStyles.summaryRow}>
+                <div className={changeOrderCreatorStyles.coSheetFooter}>
+                  <div className={`${creatorStyles.summary} ${changeOrderCreatorStyles.coSummaryCard}`}>
+                    <div className={creatorStyles.summaryRow}>
                       <span>Original total</span>
-                      <span className={changeOrderComposerStyles.coSummarySecondaryValue}>
+                      <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
                         {originalEstimateTotal ? `$${originalEstimateTotal}` : "—"}
                       </span>
                     </div>
-                    <div className={composerStyles.summaryRow}>
+                    <div className={creatorStyles.summaryRow}>
                       <span>Current total (accepted)</span>
-                      <span className={changeOrderComposerStyles.coSummarySecondaryValue}>
+                      <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
                         {currentAcceptedTotal ? `$${currentAcceptedTotal}` : "—"}
                       </span>
                     </div>
-                    <div className={composerStyles.summaryRow}>
-                      <span className={changeOrderComposerStyles.coSummaryPrimaryLabel}>Cost delta ($)</span>
+                    <div className={creatorStyles.summaryRow}>
+                      <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Cost delta ($)</span>
                       <strong>{formatDecimal(editLineDeltaTotal)}</strong>
                     </div>
-                    <div className={composerStyles.summaryRow}>
-                      <span className={changeOrderComposerStyles.coSummaryPrimaryLabel}>Time delta (days)</span>
+                    <div className={creatorStyles.summaryRow}>
+                      <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Time delta (days)</span>
                       <strong>{editLineDaysTotal}</strong>
                     </div>
                   </div>
-                  <div className={changeOrderComposerStyles.coSheetFooterActions}>
+                  <div className={changeOrderCreatorStyles.coSheetFooterActions}>
                     {isSelectedChangeOrderEditable && editLineValidation.issues.length ? (
-                      <p className={`${composerStyles.inlineHint} ${changeOrderComposerStyles.coFooterHint} ${changeOrderComposerStyles.coFooterErrorHint}`}>
+                      <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint} ${changeOrderCreatorStyles.coFooterErrorHint}`}>
                         Line-level issues are highlighted inline. Fix them before saving this revision.
                       </p>
                     ) : null}
                     {selectedChangeOrder && !selectedChangeOrder.is_latest_revision ? (
-                      <p className={`${composerStyles.inlineHint} ${changeOrderComposerStyles.coFooterHint} ${changeOrderComposerStyles.coFooterErrorHint}`}>
+                      <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint} ${changeOrderCreatorStyles.coFooterErrorHint}`}>
                         This revision is historical and read-only. Save/update actions are available on the latest revision only.
                       </p>
                     ) : null}
                     {selectedChangeOrder && selectedChangeOrder.status !== "draft" ? (
-                      <p className={`${composerStyles.inlineHint} ${changeOrderComposerStyles.coFooterHint} ${changeOrderComposerStyles.coFooterErrorHint}`}>
+                      <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint} ${changeOrderCreatorStyles.coFooterErrorHint}`}>
                         This revision is no longer in Draft. Content fields are locked after send/decision. Clone a new revision to edit.
                       </p>
                     ) : null}
                     {isSelectedChangeOrderEditable ? (
-                      <div className={changeOrderComposerStyles.coActionButtonRow}>
+                      <div className={changeOrderCreatorStyles.coActionButtonRow}>
                         <button
                           type="submit"
-                          className={`${composerStyles.primaryButton} ${changeOrderComposerStyles.coFooterPrimaryButton}`}
+                          className={`${creatorStyles.primaryButton} ${changeOrderCreatorStyles.coFooterPrimaryButton}`}
                           disabled={isEditSubmitDisabled}
                         >
                           Save Change Order

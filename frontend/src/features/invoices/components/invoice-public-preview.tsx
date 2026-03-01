@@ -149,9 +149,6 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
                 <section className={frameStyles.partyBlock}>
                   <p className={frameStyles.partyLabel}>From</p>
                   <p className={frameStyles.partyPrimary}>{sender.senderName || sender.companyName}</p>
-                  {sender.senderEmail ? (
-                    <p className={frameStyles.partySecondary}>{sender.senderEmail}</p>
-                  ) : null}
                   {sender.senderAddressLines.length ? (
                     sender.senderAddressLines.map((line, index) => (
                       <p key={`${line}-${index}`} className={frameStyles.partySecondary}>

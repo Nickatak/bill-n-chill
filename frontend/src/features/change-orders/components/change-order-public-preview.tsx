@@ -66,7 +66,8 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const canDecide = changeOrder?.status === "pending_approval";
-  const showDecisionSection = canDecide;
+  const hasDecision = changeOrder?.status === "approved" || changeOrder?.status === "rejected";
+  const showDecisionSection = canDecide || hasDecision;
   const decisionStatusLabel = statusLabel(changeOrder?.status);
   const nonPendingDecisionMessage =
     changeOrder?.status === "approved"
@@ -85,12 +86,6 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
     }
     return "Decision received: Rejected. Your response has been recorded.";
   }, [decisionReceiptName, justSubmittedDecision]);
-  const settledBannerClassName =
-    justSubmittedDecision === "approve"
-      ? `${styles.decisionBannerSettled} ${styles.decisionBannerRecentlyApproved}`
-      : justSubmittedDecision === "reject"
-        ? `${styles.decisionBannerSettled} ${styles.decisionBannerRecentlyRejected}`
-        : styles.decisionBannerSettled;
   const sender = useMemo(
     () => resolvePublicSender(changeOrder?.organization_context),
     [changeOrder?.organization_context],
@@ -114,17 +109,6 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
       setDecisionMessage("");
     }
   }, [canDecide]);
-
-  // Auto-dismiss the decision confirmation banner after a short delay.
-  useEffect(() => {
-    if (!justSubmittedDecision) {
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      setJustSubmittedDecision(null);
-    }, 9000);
-    return () => window.clearTimeout(timer);
-  }, [justSubmittedDecision]);
 
   // Fetch the change order record from the public token on mount.
   useEffect(() => {
@@ -193,16 +177,14 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
       classNames={publicDocumentViewerClassNames()}
       statusMessage={statusMessage}
       banner={
-        changeOrder
+        changeOrder && canDecide
           ? {
-              tone: canDecide ? "pending" : "complete",
+              tone: "pending" as const,
               eyebrow: "Decision",
-              text: canDecide
-                ? "Ready to sign? Jump to the decision section and submit your response."
-                : decisionFeedbackMessage ?? nonPendingDecisionMessage,
-              linkHref: canDecide ? "#change-order-decision" : undefined,
-              linkLabel: canDecide ? "Review & Sign" : undefined,
-              stateClassName: canDecide ? styles.decisionBannerAwaiting : settledBannerClassName,
+              text: "Ready to sign? Jump to the decision section and submit your response.",
+              linkHref: "#change-order-decision",
+              linkLabel: "Review & Sign",
+              stateClassName: styles.decisionBannerAwaiting,
             }
           : undefined
       }
@@ -215,9 +197,6 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
                 <section className={frameStyles.partyBlock}>
                   <p className={frameStyles.partyLabel}>From</p>
                   <p className={frameStyles.partyPrimary}>{sender.senderName || sender.companyName}</p>
-                  {sender.senderEmail ? (
-                    <p className={frameStyles.partySecondary}>{sender.senderEmail}</p>
-                  ) : null}
                   {sender.senderAddressLines.length ? (
                     sender.senderAddressLines.map((line, index) => (
                       <p key={`sender-${line}-${index}`} className={frameStyles.partySecondary}>
@@ -361,53 +340,59 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
           {showDecisionSection ? (
             <section id="change-order-decision" className={`${styles.decisionCard} ${styles.publicDecisionSection}`}>
               <h3>Decision</h3>
-              {decisionMessage ? <p className={styles.decisionMessage}>{decisionMessage}</p> : null}
-              <label className={styles.field}>
-                Your name (optional)
-                <input
-                  value={deciderName}
-                  onChange={(event) => setDeciderName(event.target.value)}
-                  placeholder="Homeowner name"
-                  disabled={decisionSubmitting}
-                />
-              </label>
-              <label className={styles.field}>
-                Your email (optional)
-                <input
-                  value={deciderEmail}
-                  onChange={(event) => setDeciderEmail(event.target.value)}
-                  placeholder="owner@example.com"
-                  disabled={decisionSubmitting}
-                />
-              </label>
-              <label className={styles.field}>
-                Note (optional)
-                <textarea
-                  value={decisionNote}
-                  onChange={(event) => setDecisionNote(event.target.value)}
-                  rows={3}
-                  placeholder="Optional decision note."
-                  disabled={decisionSubmitting}
-                />
-              </label>
-              <div className={styles.decisionActions}>
-                <button
-                  type="button"
-                  className={styles.primaryButton}
-                  onClick={() => void applyDecision("approve")}
-                  disabled={decisionSubmitting}
-                >
-                  Approve Change Order
-                </button>
-                <button
-                  type="button"
-                  className={styles.secondaryButton}
-                  onClick={() => void applyDecision("reject")}
-                  disabled={decisionSubmitting}
-                >
-                  Reject Change Order
-                </button>
-              </div>
+              {canDecide ? (
+                <>
+                  {decisionMessage ? <p className={styles.decisionMessage}>{decisionMessage}</p> : null}
+                  <label className={styles.field}>
+                    Your name (optional)
+                    <input
+                      value={deciderName}
+                      onChange={(event) => setDeciderName(event.target.value)}
+                      placeholder="Homeowner name"
+                      disabled={decisionSubmitting}
+                    />
+                  </label>
+                  <label className={styles.field}>
+                    Your email (optional)
+                    <input
+                      value={deciderEmail}
+                      onChange={(event) => setDeciderEmail(event.target.value)}
+                      placeholder="owner@example.com"
+                      disabled={decisionSubmitting}
+                    />
+                  </label>
+                  <label className={styles.field}>
+                    Note (optional)
+                    <textarea
+                      value={decisionNote}
+                      onChange={(event) => setDecisionNote(event.target.value)}
+                      rows={3}
+                      placeholder="Optional decision note."
+                      disabled={decisionSubmitting}
+                    />
+                  </label>
+                  <div className={styles.decisionActions}>
+                    <button
+                      type="button"
+                      className={styles.primaryButton}
+                      onClick={() => void applyDecision("approve")}
+                      disabled={decisionSubmitting}
+                    >
+                      Approve Change Order
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => void applyDecision("reject")}
+                      disabled={decisionSubmitting}
+                    >
+                      Reject Change Order
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className={styles.decisionMessage}>{decisionFeedbackMessage ?? nonPendingDecisionMessage}</p>
+              )}
             </section>
           ) : null}
         </>

@@ -1,21 +1,21 @@
 /**
- * Document-composer adapter for invoices.
+ * Document-creator adapter for invoices.
  *
  * Bridges the domain-specific invoice data model to the generic
- * {@link DocumentComposerAdapter} interface so the shared composer UI can
+ * {@link DocumentCreatorAdapter} interface so the shared creator UI can
  * render, create, and update invoices without knowing their schema.
  *
  * Also provides converters for the backend policy contract and status
- * event records into their composer-compatible shapes.
+ * event records into their creator-compatible shapes.
  */
 
 import {
-  ComposerLineDraft,
-  ComposerMetaField,
-  ComposerStatusEvent,
-  ComposerStatusPolicy,
-  DocumentComposerAdapter,
-} from "@/shared/document-composer/types";
+  CreatorLineDraft,
+  CreatorMetaField,
+  CreatorStatusEvent,
+  CreatorStatusPolicy,
+  DocumentCreatorAdapter,
+} from "@/shared/document-creator/types";
 import {
   InvoiceLineInput,
   InvoicePolicyContract,
@@ -42,10 +42,10 @@ type InvoiceFormState = {
 };
 
 /**
- * Convert the backend policy contract (snake_case) to the composer's
+ * Convert the backend policy contract (snake_case) to the creator's
  * status policy shape (camelCase).
  */
-export function toInvoiceStatusPolicy(contract: InvoicePolicyContract): ComposerStatusPolicy {
+export function toInvoiceStatusPolicy(contract: InvoicePolicyContract): CreatorStatusPolicy {
   return {
     statuses: contract.statuses,
     statusLabels: contract.status_labels,
@@ -57,10 +57,10 @@ export function toInvoiceStatusPolicy(contract: InvoicePolicyContract): Composer
 }
 
 /**
- * Convert backend status event records to the composer's status event
+ * Convert backend status event records to the creator's status event
  * shape, renaming snake_case fields to camelCase.
  */
-export function toInvoiceStatusEvents(events: InvoiceStatusEvent[]): ComposerStatusEvent[] {
+export function toInvoiceStatusEvents(events: InvoiceStatusEvent[]): CreatorStatusEvent[] {
   return events.map((event) => ({
     id: event.id,
     fromStatus: event.from_status,
@@ -72,16 +72,16 @@ export function toInvoiceStatusEvents(events: InvoiceStatusEvent[]): ComposerSta
 }
 
 /**
- * Build a fully configured document-composer adapter for invoices.
+ * Build a fully configured document-creator adapter for invoices.
  *
- * The adapter tells the composer how to extract IDs, titles, meta fields,
+ * The adapter tells the creator how to extract IDs, titles, meta fields,
  * line items, and totals from an invoice, and how to serialize form
  * state back into create/update API payloads.
  */
 export function createInvoiceDocumentAdapter(
-  statusPolicy: ComposerStatusPolicy,
+  statusPolicy: CreatorStatusPolicy,
   statusEvents: InvoiceStatusEvent[],
-): DocumentComposerAdapter<InvoiceRecord, ComposerLineDraft, InvoiceFormState> {
+): DocumentCreatorAdapter<InvoiceRecord, CreatorLineDraft, InvoiceFormState> {
   return {
     kind: "invoice",
     statusPolicy,
@@ -92,7 +92,7 @@ export function createInvoiceDocumentAdapter(
     getDocumentTitle: (document) => document?.invoice_number ?? "Draft invoice",
     getDocumentStatus: (document) => document?.status ?? statusPolicy.defaultCreateStatus,
 
-    getMetaFields: (document): ComposerMetaField[] => [
+    getMetaFields: (document): CreatorMetaField[] => [
       { key: "invoice_no", label: "Invoice #", value: document?.invoice_number ?? "Draft" },
       { key: "issue_date", label: "Issue Date", value: document?.issue_date ?? "Not set" },
       { key: "due_date", label: "Due Date", value: document?.due_date ?? "Not set" },
@@ -101,7 +101,7 @@ export function createInvoiceDocumentAdapter(
 
     getStatusEvents: () => toInvoiceStatusEvents(statusEvents),
 
-    // --- Form state → composer lines / totals ---
+    // --- Form state → creator lines / totals ---
 
     getDraftLines: (form) =>
       form.lineItems.map((line) => ({

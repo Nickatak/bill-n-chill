@@ -1,6 +1,6 @@
 /**
- * Estimate document composer sheet used for both creating and editing estimates.
- * Delegates layout to the shared DocumentComposer and renders header, meta,
+ * Estimate document creator sheet used for both creating and editing estimates.
+ * Delegates layout to the shared DocumentCreator and renders header, meta,
  * line-item table, totals, terms, and footer sections via slot renderers.
  */
 
@@ -9,14 +9,14 @@ import { FormEvent } from "react";
 
 import { formatDateDisplay } from "@/shared/date-format";
 import { formatDecimal } from "@/shared/money-format";
-import composerStyles from "@/shared/document-composer/composer-foundation.module.css";
+import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import { CostCode, EstimateLineInput, ProjectRecord } from "../types";
 import { CostCodeCombobox } from "@/shared/components/cost-code-combobox";
-import { DocumentComposer } from "@/shared/document-composer";
+import { DocumentCreator } from "@/shared/document-creator";
 import {
   resolveOrganizationBranding,
   type OrganizationBrandingDefaults,
-} from "@/shared/document-composer";
+} from "@/shared/document-creator";
 import {
   createEstimateDocumentAdapter,
   EstimateFormState,
@@ -95,7 +95,7 @@ const ESTIMATE_COMPOSER_FALLBACK_POLICY = {
 
 /**
  * Composable estimate sheet supporting draft creation, draft editing, and
- * read-only review. Uses DocumentComposer slots for layout consistency.
+ * read-only review. Uses DocumentCreator slots for layout consistency.
  */
 export function EstimateSheet({
   project,
@@ -164,21 +164,20 @@ export function EstimateSheet({
 
   /** Render a column header that doubles as a sort toggle when editing is allowed. */
   function renderSortableHeader(label: string, key: LineSortKey) {
-    if (showReadOnlyText) {
+    if (readOnly) {
       return <span>{label}</span>;
     }
     const isActive = lineSortKey === key;
     return (
       <button
         type="button"
-        className={`${composerStyles.lineHeaderButton} ${
-          isActive ? composerStyles.lineHeaderButtonActive : ""
-        } ${readOnly ? composerStyles.actionDisabled : ""}`}
+        className={`${creatorStyles.lineHeaderButton} ${
+          isActive ? creatorStyles.lineHeaderButtonActive : ""
+        }`}
         onClick={() => onSortLineItems(key)}
-        disabled={readOnly}
       >
         <span>{label}</span>
-        <span className={composerStyles.sortIndicator}>{isActive ? sortIndicator : "↕"}</span>
+        <span className={creatorStyles.sortIndicator}>{isActive ? sortIndicator : "↕"}</span>
       </button>
     );
   }
@@ -196,12 +195,12 @@ export function EstimateSheet({
   const adapter = createEstimateDocumentAdapter(ESTIMATE_COMPOSER_FALLBACK_POLICY, []);
 
   return (
-    <DocumentComposer
+    <DocumentCreator
       adapter={adapter}
       document={null}
       formState={draftFormState}
-      className={`${composerStyles.sheet} ${readOnly ? composerStyles.sheetReadOnly : ""}`}
-      sectionClassName={composerStyles.sheetSection}
+      className={`${creatorStyles.sheet} ${readOnly ? creatorStyles.sheetReadOnly : ""}`}
+      sectionClassName={creatorStyles.sheetSection}
       onSubmit={onSubmit}
       sections={[
         { slot: "header" },
@@ -213,38 +212,37 @@ export function EstimateSheet({
       ]}
       renderers={{
         header: () => (
-          <div className={composerStyles.sheetHeader}>
-            <div className={composerStyles.partyStack}>
-              <div className={composerStyles.fromBlock}>
-                <span className={composerStyles.blockLabel}>From</span>
-                <p className={composerStyles.blockText}>{senderName || "Your Company"}</p>
-                {senderEmail ? <p className={composerStyles.blockMuted}>{senderEmail}</p> : null}
+          <div className={creatorStyles.sheetHeader}>
+            <div className={creatorStyles.partyStack}>
+              <div className={creatorStyles.fromBlock}>
+                <span className={creatorStyles.blockLabel}>From</span>
+                <p className={creatorStyles.blockText}>{senderName || "Your Company"}</p>
                 {senderAddressLines.length ? (
                   senderAddressLines.map((line, index) => (
-                    <p key={`${line}-${index}`} className={composerStyles.blockMuted}>
+                    <p key={`${line}-${index}`} className={creatorStyles.blockMuted}>
                       {line}
                     </p>
                   ))
                 ) : (
-                  <p className={composerStyles.blockMuted}>Set sender address in Organization settings.</p>
+                  <p className={creatorStyles.blockMuted}>Set sender address in Organization settings.</p>
                 )}
               </div>
-              <div className={composerStyles.toBlock}>
-                <span className={composerStyles.blockLabel}>To</span>
-                <p className={composerStyles.blockText}>{customerName}</p>
+              <div className={creatorStyles.toBlock}>
+                <span className={creatorStyles.blockLabel}>To</span>
+                <p className={creatorStyles.blockText}>{customerName}</p>
                 {mailingLines.map((line, index) => (
-                  <p key={`${line}-${index}`} className={composerStyles.blockMuted}>
+                  <p key={`${line}-${index}`} className={creatorStyles.blockMuted}>
                     {line}
                   </p>
                 ))}
               </div>
             </div>
-            <div className={composerStyles.headerRight}>
-              <div className={composerStyles.logoBox}>
+            <div className={creatorStyles.headerRight}>
+              <div className={creatorStyles.logoBox}>
                 {/* TODO(nick): Replace temporary logo URL link with uploaded logo image rendering. */}
                 {senderLogoUrl ? (
                   <a
-                    className={composerStyles.logoUrlLink}
+                    className={creatorStyles.logoUrlLink}
                     href={senderLogoUrl}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -256,27 +254,27 @@ export function EstimateSheet({
                 )}
               </div>
               {titlePresentation === "header" ? (
-                <div className={composerStyles.sheetTitleValue}>{estimateTitle || "Untitled"}</div>
+                <div className={creatorStyles.sheetTitleValue}>{estimateTitle || "Untitled"}</div>
               ) : (
-                <div className={composerStyles.sheetTitle}>Estimate</div>
+                <div className={creatorStyles.sheetTitle}>Estimate</div>
               )}
             </div>
           </div>
         ),
         meta: () => (
           <>
-            <div className={composerStyles.metaOnlyRow}>
-              <div className={composerStyles.metaBlock}>
+            <div className={creatorStyles.metaOnlyRow}>
+              <div className={creatorStyles.metaBlock}>
                 {titlePresentation !== "header" ? (
                   <>
-                    <div className={composerStyles.metaTitle}>Estimate Details</div>
-                    <label className={composerStyles.inlineField}>
+                    <div className={creatorStyles.metaTitle}>Estimate Details</div>
+                    <label className={creatorStyles.inlineField}>
                       Estimate title
                       {showReadOnlyText ? (
-                        <span className={composerStyles.staticFieldInlineValue}>{estimateTitle || "Untitled"}</span>
+                        <span className={creatorStyles.staticFieldInlineValue}>{estimateTitle || "Untitled"}</span>
                       ) : (
                         <input
-                          className={composerStyles.fieldInput}
+                          className={creatorStyles.fieldInput}
                           value={estimateTitle}
                           onChange={(event) => onTitleChange(event.target.value)}
                           placeholder="Enter estimate title"
@@ -288,17 +286,17 @@ export function EstimateSheet({
                     </label>
                   </>
                 ) : null}
-                <div className={composerStyles.metaLine}>
+                <div className={creatorStyles.metaLine}>
                   <span>Estimate #</span>
                   <span>{estimateId ? `#${estimateId}` : "Draft"}</span>
                 </div>
-                <div className={composerStyles.metaLine}>
+                <div className={creatorStyles.metaLine}>
                   <span>Estimate date</span>
                   {showReadOnlyText ? (
-                    <span className={composerStyles.staticMetaValue}>{formatDateDisplay(estimateDate, "Not set")}</span>
+                    <span className={creatorStyles.staticMetaValue}>{formatDateDisplay(estimateDate, "Not set")}</span>
                   ) : (
                     <input
-                      className={composerStyles.fieldInput}
+                      className={creatorStyles.fieldInput}
                       type="date"
                       value={estimateDate}
                       disabled
@@ -306,13 +304,13 @@ export function EstimateSheet({
                     />
                   )}
                 </div>
-                <div className={`${composerStyles.metaLine} ${composerStyles.metaLineLast}`}>
+                <div className={`${creatorStyles.metaLine} ${creatorStyles.metaLineLast}`}>
                   <span>Valid through</span>
                   {showReadOnlyText ? (
-                    <span className={composerStyles.staticMetaValue}>{formatDateDisplay(validThrough, "Not set")}</span>
+                    <span className={creatorStyles.staticMetaValue}>{formatDateDisplay(validThrough, "Not set")}</span>
                   ) : (
                     <input
-                      className={composerStyles.fieldInput}
+                      className={creatorStyles.fieldInput}
                       type="date"
                       value={validThrough}
                       onChange={(event) => onValidThroughChange(event.target.value)}
@@ -324,7 +322,7 @@ export function EstimateSheet({
               </div>
             </div>
             {costCodes.length === 0 ? (
-              <p className={composerStyles.inlineHint}>
+              <p className={creatorStyles.inlineHint}>
                 Cost codes are required for line items. Create them on the Cost Codes page.
               </p>
             ) : null}
@@ -332,31 +330,31 @@ export function EstimateSheet({
         ),
         line_items: () => (
           <>
-            <div className={composerStyles.lineTable}>
+            <div className={creatorStyles.lineTable}>
               <div
-                className={`${composerStyles.lineHeader} ${readOnly ? composerStyles.lineHeaderReadOnly : ""} ${
-                  readOnly && !showMarkupColumn ? composerStyles.lineHeaderNoMarkup : ""
+                className={`${creatorStyles.lineHeader} ${readOnly ? creatorStyles.lineHeaderReadOnly : ""} ${
+                  readOnly && !showMarkupColumn ? creatorStyles.lineHeaderNoMarkup : ""
                 }`}
               >
-                <div className={composerStyles.lineHeaderCell}>{renderSortableHeader("Qty", "quantity")}</div>
-                <div className={composerStyles.lineHeaderCell}>
+                <div className={creatorStyles.lineHeaderCell}>{renderSortableHeader("Qty", "quantity")}</div>
+                <div className={creatorStyles.lineHeaderCell}>
                   <span>Description</span>
                 </div>
-                <div className={composerStyles.lineHeaderCell}>{renderSortableHeader("Cost Code", "costCode")}</div>
-                <div className={composerStyles.lineHeaderCell}>
+                <div className={creatorStyles.lineHeaderCell}>{renderSortableHeader("Cost Code", "costCode")}</div>
+                <div className={creatorStyles.lineHeaderCell}>
                   <span>Unit</span>
                 </div>
-                <div className={composerStyles.lineHeaderCell}>
+                <div className={creatorStyles.lineHeaderCell}>
                   {renderSortableHeader("Unit Price", "unitCost")}
                 </div>
                 {showMarkupColumn ? (
-                  <div className={composerStyles.lineHeaderCell}>
+                  <div className={creatorStyles.lineHeaderCell}>
                     {renderSortableHeader("Markup", "markupPercent")}
                   </div>
                 ) : null}
-                <div className={composerStyles.lineHeaderCell}>{renderSortableHeader("Amount", "amount")}</div>
+                <div className={creatorStyles.lineHeaderCell}>{renderSortableHeader("Amount", "amount")}</div>
                 {!readOnly ? (
-                  <div className={composerStyles.lineHeaderCell}>
+                  <div className={creatorStyles.lineHeaderCell}>
                     <span>Actions</span>
                   </div>
                 ) : null}
@@ -364,16 +362,16 @@ export function EstimateSheet({
               {lineItems.map((line, index) => (
                 <div
                   key={line.localId}
-                  className={`${composerStyles.lineRow} ${readOnly ? composerStyles.lineRowReadOnly : ""} ${
-                    readOnly && !showMarkupColumn ? composerStyles.lineRowNoMarkup : ""
+                  className={`${creatorStyles.lineRow} ${readOnly ? creatorStyles.lineRowReadOnly : ""} ${
+                    readOnly && !showMarkupColumn ? creatorStyles.lineRowNoMarkup : ""
                   }`}
                 >
-                  <div className={composerStyles.lineCell}>
+                  <div className={creatorStyles.lineCell}>
                     {showReadOnlyText ? (
-                      <span className={composerStyles.staticCellValue}>{line.quantity || "0"}</span>
+                      <span className={creatorStyles.staticCellValue}>{line.quantity || "0"}</span>
                     ) : (
                       <input
-                        className={composerStyles.lineInput}
+                        className={creatorStyles.lineInput}
                         aria-label="Quantity"
                         value={line.quantity}
                         onChange={(event) => onLineItemChange(line.localId, "quantity", event.target.value)}
@@ -384,12 +382,12 @@ export function EstimateSheet({
                       />
                     )}
                   </div>
-                  <div className={composerStyles.lineCell}>
+                  <div className={creatorStyles.lineCell}>
                     {showReadOnlyText ? (
-                      <span className={composerStyles.staticCellValue}>{line.description || "No description"}</span>
+                      <span className={creatorStyles.staticCellValue}>{line.description || "No description"}</span>
                     ) : (
                       <input
-                        className={composerStyles.lineInput}
+                        className={creatorStyles.lineInput}
                         aria-label="Description"
                         value={line.description}
                         onChange={(event) => onLineItemChange(line.localId, "description", event.target.value)}
@@ -399,9 +397,9 @@ export function EstimateSheet({
                       />
                     )}
                   </div>
-                  <div className={composerStyles.lineCell}>
+                  <div className={creatorStyles.lineCell}>
                     {showReadOnlyText ? (
-                      <span className={composerStyles.staticCellValue}>{findCostCodeLabel(line.costCodeId)}</span>
+                      <span className={creatorStyles.staticCellValue}>{findCostCodeLabel(line.costCodeId)}</span>
                     ) : (
                       <CostCodeCombobox
                         costCodes={costCodes}
@@ -413,12 +411,12 @@ export function EstimateSheet({
                       />
                     )}
                   </div>
-                  <div className={composerStyles.lineCell}>
+                  <div className={creatorStyles.lineCell}>
                     {showReadOnlyText ? (
-                      <span className={composerStyles.staticCellValue}>{line.unit || "ea"}</span>
+                      <span className={creatorStyles.staticCellValue}>{line.unit || "ea"}</span>
                     ) : (
                       <input
-                        className={composerStyles.lineInput}
+                        className={creatorStyles.lineInput}
                         aria-label="Unit"
                         value={line.unit}
                         onChange={(event) => onLineItemChange(line.localId, "unit", event.target.value)}
@@ -428,14 +426,14 @@ export function EstimateSheet({
                       />
                     )}
                   </div>
-                  <div className={composerStyles.lineCell}>
+                  <div className={creatorStyles.lineCell}>
                     {showReadOnlyText ? (
-                      <span className={composerStyles.staticCellValue}>
+                      <span className={creatorStyles.staticCellValue}>
                         ${formatDecimal(Number(line.unitCost || 0) * (1 + Number(line.markupPercent || 0) / 100))}
                       </span>
                     ) : (
                       <input
-                        className={composerStyles.lineInput}
+                        className={creatorStyles.lineInput}
                         aria-label="Unit cost"
                         value={line.unitCost}
                         onChange={(event) => onLineItemChange(line.localId, "unitCost", event.target.value)}
@@ -447,13 +445,13 @@ export function EstimateSheet({
                     )}
                   </div>
                   {showMarkupColumn ? (
-                    <div className={composerStyles.lineCell}>
+                    <div className={creatorStyles.lineCell}>
                       {showReadOnlyText ? (
-                        <span className={composerStyles.staticCellValue}>{line.markupPercent || "0"}%</span>
+                        <span className={creatorStyles.staticCellValue}>{line.markupPercent || "0"}%</span>
                       ) : (
-                        <div className={composerStyles.percentField}>
+                        <div className={creatorStyles.percentField}>
                           <input
-                            className={composerStyles.lineInput}
+                            className={creatorStyles.lineInput}
                             aria-label="Markup percent"
                             value={line.markupPercent}
                             onChange={(event) =>
@@ -464,21 +462,21 @@ export function EstimateSheet({
                             aria-disabled={readOnly}
                             required
                           />
-                          <span className={composerStyles.percentSuffix}>%</span>
+                          <span className={creatorStyles.percentSuffix}>%</span>
                         </div>
                       )}
                     </div>
                   ) : null}
-                  <div className={composerStyles.lineCell}>
-                    <div className={composerStyles.amountCell}>${formatDecimal(lineTotals[index] || 0)}</div>
+                  <div className={creatorStyles.lineCell}>
+                    <div className={creatorStyles.amountCell}>${formatDecimal(lineTotals[index] || 0)}</div>
                   </div>
                   {!readOnly ? (
-                    <div className={composerStyles.lineCell}>
-                      <div className={composerStyles.lineActionsCell}>
+                    <div className={creatorStyles.lineCell}>
+                      <div className={creatorStyles.lineActionsCell}>
                         <button
                           type="button"
-                          className={`${composerStyles.smallButton} ${
-                            readOnly || index === 0 ? composerStyles.actionDisabled : ""
+                          className={`${creatorStyles.smallButton} ${
+                            readOnly || index === 0 ? creatorStyles.actionDisabled : ""
                           }`}
                           onClick={() => onMoveLineItem(line.localId, "up")}
                           disabled={readOnly || index === 0}
@@ -487,8 +485,8 @@ export function EstimateSheet({
                         </button>
                         <button
                           type="button"
-                          className={`${composerStyles.smallButton} ${
-                            readOnly || index === lineItems.length - 1 ? composerStyles.actionDisabled : ""
+                          className={`${creatorStyles.smallButton} ${
+                            readOnly || index === lineItems.length - 1 ? creatorStyles.actionDisabled : ""
                           }`}
                           onClick={() => onMoveLineItem(line.localId, "down")}
                           disabled={readOnly || index === lineItems.length - 1}
@@ -497,7 +495,7 @@ export function EstimateSheet({
                         </button>
                         <button
                           type="button"
-                          className={`${composerStyles.smallButton} ${readOnly ? composerStyles.actionDisabled : ""}`}
+                          className={`${creatorStyles.smallButton} ${readOnly ? creatorStyles.actionDisabled : ""}`}
                           onClick={() => onDuplicateLineItem(line.localId)}
                           disabled={readOnly}
                         >
@@ -505,7 +503,7 @@ export function EstimateSheet({
                         </button>
                         <button
                           type="button"
-                          className={`${composerStyles.removeButton} ${readOnly ? composerStyles.actionDisabled : ""}`}
+                          className={`${creatorStyles.removeButton} ${readOnly ? creatorStyles.actionDisabled : ""}`}
                           onClick={() => onRemoveLineItem(line.localId)}
                           disabled={readOnly}
                         >
@@ -519,10 +517,10 @@ export function EstimateSheet({
             </div>
 
             {!showReadOnlyText ? (
-              <div className={composerStyles.lineActions}>
+              <div className={creatorStyles.lineActions}>
                 <button
                   type="button"
-                  className={`${composerStyles.secondaryButton} ${readOnly ? composerStyles.actionDisabled : ""}`}
+                  className={`${creatorStyles.secondaryButton} ${readOnly ? creatorStyles.actionDisabled : ""}`}
                   onClick={onAddLineItem}
                   disabled={readOnly}
                 >
@@ -534,18 +532,18 @@ export function EstimateSheet({
         ),
         totals: () => (
           <>
-            <div className={composerStyles.summary}>
-              <div className={composerStyles.summaryRow}>
+            <div className={creatorStyles.summary}>
+              <div className={creatorStyles.summaryRow}>
                 <span>Subtotal</span>
                 <span>${formatDecimal(subtotal)}</span>
               </div>
-              <div className={composerStyles.summaryRow}>
+              <div className={creatorStyles.summaryRow}>
                 <span>{showReadOnlyText ? `Sales Tax (${taxPercent}%)` : "Sales Tax"}</span>
-                <div className={composerStyles.summaryTaxLine}>
+                <div className={creatorStyles.summaryTaxLine}>
                   {showReadOnlyText ? null : (
-                    <span className={composerStyles.summaryTaxRate}>
+                    <span className={creatorStyles.summaryTaxRate}>
                       <input
-                        className={composerStyles.summaryTaxInput}
+                        className={creatorStyles.summaryTaxInput}
                         value={taxPercent}
                         onChange={(event) => onTaxPercentChange(event.target.value)}
                         inputMode="decimal"
@@ -553,13 +551,13 @@ export function EstimateSheet({
                         disabled={readOnly}
                         aria-disabled={readOnly}
                       />
-                      <span className={composerStyles.summaryTaxSuffix}>%</span>
+                      <span className={creatorStyles.summaryTaxSuffix}>%</span>
                     </span>
                   )}
-                  <span className={composerStyles.summaryTaxAmount}>${formatDecimal(taxAmount)}</span>
+                  <span className={creatorStyles.summaryTaxAmount}>${formatDecimal(taxAmount)}</span>
                 </div>
               </div>
-              <div className={`${composerStyles.summaryRow} ${composerStyles.summaryTotal}`}>
+              <div className={`${creatorStyles.summaryRow} ${creatorStyles.summaryTotal}`}>
                 <span>Total</span>
                 <span>${formatDecimal(totalAmount)}</span>
               </div>
@@ -568,10 +566,10 @@ export function EstimateSheet({
         ),
         context: () =>
           !readOnly ? (
-            <div className={composerStyles.finalizeActions}>
-              {formErrorMessage ? <p className={composerStyles.actionError}>{formErrorMessage}</p> : null}
+            <div className={creatorStyles.finalizeActions}>
+              {formErrorMessage ? <p className={creatorStyles.actionError}>{formErrorMessage}</p> : null}
               {!formErrorMessage && formSuccessMessage ? (
-                <p className={composerStyles.actionSuccess}>
+                <p className={creatorStyles.actionSuccess}>
                   {formSuccessMessage}{" "}
                   {formSuccessHref ? (
                     <Link href={formSuccessHref} target="_blank" rel="noopener noreferrer">
@@ -580,7 +578,7 @@ export function EstimateSheet({
                   ) : null}
                 </p>
               ) : null}
-              <button type="submit" className={composerStyles.primaryButton} disabled={!canSubmit || isSubmitting}>
+              <button type="submit" className={creatorStyles.primaryButton} disabled={!canSubmit || isSubmitting}>
                 {isSubmitting
                   ? isEditingDraft
                     ? "Saving..."
@@ -593,7 +591,7 @@ export function EstimateSheet({
           ) : null,
         footer: () => (
           <>
-            <div className={composerStyles.terms}>
+            <div className={creatorStyles.terms}>
               <h4>Terms and Conditions</h4>
               {(termsText || organizationDefaults?.estimate_default_terms || "Not set")
                 .split("\n")
@@ -603,7 +601,7 @@ export function EstimateSheet({
                 ))}
             </div>
 
-            <div className={composerStyles.footer}>
+            <div className={creatorStyles.footer}>
               <span>{senderName || "Your Company"}</span>
               <span>{senderEmail || "Help email not set"}</span>
               <span>{estimateId ? `Estimate #${estimateId}` : "Draft estimate"}</span>

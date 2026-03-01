@@ -3,7 +3,7 @@
 /**
  * Primary invoice management console.
  * Combines project selection, invoice list with status filtering, status lifecycle management
- * (transitions, notes, history), and a document-composer workspace for creating/editing drafts.
+ * (transitions, notes, history), and a document-creator workspace for creating/editing drafts.
  */
 
 import { buildAuthHeaders } from "@/features/session/auth-headers";
@@ -30,10 +30,10 @@ import {
   OrganizationInvoiceDefaults,
   ProjectRecord,
 } from "../types";
-import { DocumentComposer } from "@/shared/document-composer";
+import { DocumentCreator } from "@/shared/document-creator";
 import {
   resolveOrganizationBranding,
-} from "@/shared/document-composer";
+} from "@/shared/document-creator";
 import {
   createInvoiceDocumentAdapter,
   InvoiceFormState,
@@ -41,8 +41,8 @@ import {
 } from "../document-adapter";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import styles from "./invoices-console.module.css";
-import composerStyles from "@/shared/document-composer/composer-foundation.module.css";
-import invoiceComposerStyles from "@/shared/document-composer/invoice-composer.module.css";
+import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
+import invoiceCreatorStyles from "@/shared/document-creator/invoice-creator.module.css";
 import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
 type ProjectStatusValue = ProjectListStatusValue;
 type ProjectBudgetRecord = {
@@ -123,7 +123,7 @@ function normalizeDecimalInput(value: number, fallback = "0"): string {
   return value.toFixed(2);
 }
 
-/** Create a blank scope line item with sensible defaults for the composer workspace. */
+/** Create a blank scope line item with sensible defaults for the creator workspace. */
 function emptyLine(localId: number, defaultBudgetLineId = ""): InvoiceLineInput {
   return {
     localId,
@@ -330,7 +330,7 @@ function projectStatusLabel(statusValue: string): string {
   return statusValue.replace("_", " ");
 }
 
-/** Primary invoice management console with project selection, invoice viewer, and composer workspace. */
+/** Primary invoice management console with project selection, invoice viewer, and creator workspace. */
 export function InvoicesConsole() {
   const { token, authMessage, role } = useSharedSessionAuth();
   const canMutateInvoices = hasAnyRole(role, ["owner", "pm", "bookkeeping"]);
@@ -384,7 +384,7 @@ export function InvoicesConsole() {
   const [workspaceSourceInvoiceId, setWorkspaceSourceInvoiceId] = useState<number | null>(null);
   const [editingDraftInvoiceId, setEditingDraftInvoiceId] = useState<number | null>(null);
   const [workspaceContext, setWorkspaceContext] = useState("New invoice draft");
-  const invoiceComposerRef = useRef<HTMLDivElement | null>(null);
+  const invoiceCreatorRef = useRef<HTMLDivElement | null>(null);
 
   const selectedInvoice = useMemo(
     () => invoices.find((invoice) => String(invoice.id) === selectedInvoiceId) ?? null,
@@ -1045,14 +1045,14 @@ export function InvoicesConsole() {
     setSelectedProjectId(String(project.id));
   }
 
-  /** Select an invoice from the list and load it into the composer workspace. */
+  /** Select an invoice from the list and load it into the creator workspace. */
   function handleSelectInvoice(invoice: InvoiceRecord) {
     setSelectedInvoiceId(String(invoice.id));
     setSelectedStatus(resolvePreferredStatusSelection(invoice, invoiceAllowedStatusTransitions));
     loadInvoiceIntoWorkspace(invoice);
   }
 
-  /** Reset the composer workspace to a fresh new-draft state. */
+  /** Reset the creator workspace to a fresh new-draft state. */
   function resetCreateDraft() {
     const defaultBudgetLineId = budgetLineOptions[0] ? String(budgetLineOptions[0].id) : "";
     const nextIssueDate = todayDateInput();
@@ -1067,12 +1067,12 @@ export function InvoicesConsole() {
     setWorkspaceContext("New invoice draft");
   }
 
-  /** Clear the workspace and scroll to the composer for a new invoice draft. */
+  /** Clear the workspace and scroll to the creator for a new invoice draft. */
   function handleStartNewInvoiceDraft() {
     resetCreateDraft();
     setSuccessStatus("Started a new invoice draft.");
     requestAnimationFrame(() => {
-      invoiceComposerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      invoiceCreatorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
 
@@ -1109,7 +1109,7 @@ export function InvoicesConsole() {
           setErrorStatus("Draft context is stale. Re-select the invoice and try again.");
           return;
         }
-        const updatePayload = invoiceComposerAdapter.toUpdatePayload(invoiceDraftFormState, currentDraft);
+        const updatePayload = invoiceCreatorAdapter.toUpdatePayload(invoiceDraftFormState, currentDraft);
         const response = await fetch(`${normalizedBaseUrl}/invoices/${editingDraftInvoiceId}/`, {
           method: "PATCH",
           headers: buildAuthHeaders(token, { contentType: "application/json" }),
@@ -1144,7 +1144,7 @@ export function InvoicesConsole() {
 
     setNeutralStatus("Creating invoice...");
     try {
-      const createPayload = invoiceComposerAdapter.toCreatePayload(invoiceDraftFormState);
+      const createPayload = invoiceCreatorAdapter.toCreatePayload(invoiceDraftFormState);
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/invoices/`, {
         method: "POST",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
@@ -1287,7 +1287,7 @@ export function InvoicesConsole() {
     setWorkspaceContext(`Draft from ${selectedInvoice.invoice_number}`);
     setSuccessStatus(`Loaded ${selectedInvoice.invoice_number} into a new draft. A new invoice # is assigned on create.`);
     requestAnimationFrame(() => {
-      invoiceComposerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      invoiceCreatorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
 
@@ -1300,7 +1300,7 @@ export function InvoicesConsole() {
   const senderEmail = organizationBranding.senderEmail;
   const senderAddressLines = organizationBranding.senderAddressLines;
   const senderLogoUrl = organizationBranding.logoUrl;
-  const invoiceComposerStatusPolicy = useMemo(
+  const invoiceCreatorStatusPolicy = useMemo(
     () =>
       toInvoiceStatusPolicy({
         policy_version: "ui-fallback",
@@ -1335,11 +1335,11 @@ export function InvoicesConsole() {
       taxPercent,
     ],
   );
-  const invoiceComposerAdapter = useMemo(
-    () => createInvoiceDocumentAdapter(invoiceComposerStatusPolicy, []),
-    [invoiceComposerStatusPolicy],
+  const invoiceCreatorAdapter = useMemo(
+    () => createInvoiceDocumentAdapter(invoiceCreatorStatusPolicy, []),
+    [invoiceCreatorStatusPolicy],
   );
-  const statusMessageAtComposer =
+  const statusMessageAtCreator =
     statusTone === "success" && /^(Created|Saved|Started|Loaded)\b/i.test(statusMessage);
 
   return (
@@ -1368,7 +1368,7 @@ export function InvoicesConsole() {
 
       {!token ? <p className={styles.authNotice}>{authMessage}</p> : null}
 
-      {statusMessage && !statusMessageAtComposer ? (
+      {statusMessage && !statusMessageAtCreator ? (
         <p
           className={`${styles.statusBanner} ${
             statusTone === "success"
@@ -1635,7 +1635,7 @@ export function InvoicesConsole() {
                             value={statusNote}
                             onChange={(event) => setStatusNote(event.target.value)}
                             placeholder="Optional note for this status action or history-only note."
-                            className={invoiceComposerStyles.invoiceLockableControl}
+                            className={invoiceCreatorStyles.invoiceLockableControl}
                           />
                         </label>
 
@@ -1706,73 +1706,70 @@ export function InvoicesConsole() {
                   </p>
                 </div>
               ) : null}
-              <div ref={invoiceComposerRef}>
-                <DocumentComposer
-                  adapter={invoiceComposerAdapter}
+              <div ref={invoiceCreatorRef}>
+                <DocumentCreator
+                  adapter={invoiceCreatorAdapter}
                   document={null}
                   formState={invoiceDraftFormState}
-                  className={`${composerStyles.sheet} ${invoiceComposerStyles.invoiceComposerSheet} ${workspaceIsLocked ? invoiceComposerStyles.invoiceComposerSheetLocked : ""}`}
-                  sectionClassName={invoiceComposerStyles.invoiceComposerSection}
+                  className={`${creatorStyles.sheet} ${invoiceCreatorStyles.invoiceCreatorSheet} ${workspaceIsLocked ? invoiceCreatorStyles.invoiceCreatorSheetLocked : ""}`}
+                  sectionClassName={invoiceCreatorStyles.invoiceCreatorSection}
                   onSubmit={handleCreateInvoice}
                   sections={[{ slot: "context" }]}
                   renderers={{
                     context: () => (
                       <>
-                      <div className={composerStyles.sheetHeader}>
-                        <div className={invoiceComposerStyles.invoicePartyStack}>
-                          <div className={composerStyles.fromBlock}>
-                            <span className={composerStyles.blockLabel}>From</span>
-                            <p className={composerStyles.blockText}>
+                      <div className={creatorStyles.sheetHeader}>
+                        <div className={invoiceCreatorStyles.invoicePartyStack}>
+                          <div className={creatorStyles.fromBlock}>
+                            <span className={creatorStyles.blockLabel}>From</span>
+                            <p className={creatorStyles.blockText}>
                               {senderDisplayName}
                             </p>
-                            {senderEmail ? (
-                              <p className={composerStyles.blockMuted}>{senderEmail}</p>
-                            ) : null}
                             {senderAddressLines.length
                               ? senderAddressLines.map((line, index) => (
-                                  <p key={`${line}-${index}`} className={composerStyles.blockMuted}>
+                                  <p key={`${line}-${index}`} className={creatorStyles.blockMuted}>
                                     {line}
                                   </p>
                                 ))
                               : (
-                                <p className={composerStyles.blockMuted}>
+                                <p className={creatorStyles.blockMuted}>
                                   Set sender address in Organization settings.
                                 </p>
                               )}
                           </div>
-                          <div className={composerStyles.toBlock}>
-                            <span className={composerStyles.blockLabel}>To</span>
-                            <p className={composerStyles.blockText}>
+                          <div className={creatorStyles.toBlock}>
+                            <span className={creatorStyles.blockLabel}>To</span>
+                            <p className={creatorStyles.blockText}>
                               {selectedProject?.customer_display_name || "Select project"}
                             </p>
-                            <p className={composerStyles.blockMuted}>
+                            <p className={creatorStyles.blockMuted}>
                               {selectedProject
                                 ? `#${selectedProject.id} ${selectedProject.name}`
                                 : "Choose a project from the project list"}
                             </p>
                           </div>
                         </div>
-                        <div className={composerStyles.headerRight}>
-                          <div className={composerStyles.logoBox}>
+                        <div className={creatorStyles.headerRight}>
+                          <div className={creatorStyles.logoBox}>
                             {senderLogoUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={senderLogoUrl} alt="Organization logo" className={invoiceComposerStyles.invoiceLogoImage} />
+                              <img src={senderLogoUrl} alt="Organization logo" className={invoiceCreatorStyles.invoiceLogoImage} />
                             ) : (
                               "Logo"
                             )}
                           </div>
-                          <div className={composerStyles.sheetTitle}>Invoice</div>
+                          <div className={creatorStyles.sheetTitle}>Invoice</div>
                         </div>
                       </div>
 
-                      <div className={invoiceComposerStyles.invoiceMetaLayout}>
-                        <div className={invoiceComposerStyles.invoiceDetailCard}>
-                          <span className={invoiceComposerStyles.invoiceMetaCardLabel}>Invoice Details</span>
-                          <div className={composerStyles.metaLine}>
+                      <div className={invoiceCreatorStyles.invoiceMetaLayout}>
+                        <div className={invoiceCreatorStyles.invoiceDetailCard}>
+                          <span className={invoiceCreatorStyles.invoiceMetaCardLabel}>Invoice Details</span>
+                          <div className={creatorStyles.metaLine}>
                             <span>Invoice #</span>
-                            <div className={invoiceComposerStyles.invoiceNumberContext}>
+                            <div className={invoiceCreatorStyles.invoiceNumberContext}>
                               <input
-                                className={`${composerStyles.fieldInput} ${invoiceComposerStyles.invoiceNumberInput}`}
+                                className={`${creatorStyles.fieldInput} ${invoiceCreatorStyles.invoiceNumberInput}`}
                                 value={workspaceInvoiceNumber}
                                 readOnly
                                 disabled
@@ -1780,17 +1777,17 @@ export function InvoicesConsole() {
                               />
                               {!workspaceSourceInvoice ? (
                                 <span
-                                  className={`${invoiceComposerStyles.invoiceNumberIndicator} ${invoiceComposerStyles.invoiceNumberIndicatorGenerated}`}
+                                  className={`${invoiceCreatorStyles.invoiceNumberIndicator} ${invoiceCreatorStyles.invoiceNumberIndicatorGenerated}`}
                                 >
                                   New
                                 </span>
                               ) : null}
                             </div>
                           </div>
-                          <label className={composerStyles.inlineField}>
+                          <label className={creatorStyles.inlineField}>
                             Issue date
                             <input
-                              className={`${composerStyles.fieldInput} ${invoiceComposerStyles.invoiceLockableControl}`}
+                              className={`${creatorStyles.fieldInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
                               type="date"
                               value={issueDate}
                               onChange={(event) => setIssueDate(event.target.value)}
@@ -1798,10 +1795,10 @@ export function InvoicesConsole() {
                               disabled={workspaceIsLocked}
                             />
                           </label>
-                          <label className={composerStyles.inlineField}>
+                          <label className={creatorStyles.inlineField}>
                             Due date
                             <input
-                              className={`${composerStyles.fieldInput} ${invoiceComposerStyles.invoiceLockableControl}`}
+                              className={`${creatorStyles.fieldInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
                               type="date"
                               value={dueDate}
                               onChange={(event) => setDueDate(event.target.value)}
@@ -1812,18 +1809,18 @@ export function InvoicesConsole() {
                         </div>
                       </div>
 
-                      <div className={invoiceComposerStyles.invoiceLineSectionIntro}>
+                      <div className={invoiceCreatorStyles.invoiceLineSectionIntro}>
                         <h3>Line Items</h3>
                       </div>
                       {budgetLineOptions.length === 0 ? (
-                        <p className={composerStyles.inlineHint}>
+                        <p className={creatorStyles.inlineHint}>
                           Scope lines require an active project budget line. Convert an approved estimate to budget or
                           use adjustment lines with a reason. Internal generic lines are not billable here.
                         </p>
                       ) : null}
 
-                      <div className={composerStyles.lineTable}>
-                        <div className={invoiceComposerStyles.invoiceLineHeader}>
+                      <div className={creatorStyles.lineTable}>
+                        <div className={invoiceCreatorStyles.invoiceLineHeader}>
                           <span>Type</span>
                           <span>Scope source / Reason</span>
                           <span>Qty</span>
@@ -1838,10 +1835,10 @@ export function InvoicesConsole() {
                           return (
                             <div
                               key={line.localId}
-                              className={`${invoiceComposerStyles.invoiceLineRow} ${index % 2 === 1 ? invoiceComposerStyles.invoiceLineRowAlt : ""}`}
+                              className={`${invoiceCreatorStyles.invoiceLineRow} ${index % 2 === 1 ? invoiceCreatorStyles.invoiceLineRowAlt : ""}`}
                             >
                               <select
-                                className={`${composerStyles.lineInput} ${invoiceComposerStyles.invoiceLockableControl}`}
+                                className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
                                 value={line.lineType}
                                 onChange={(event) =>
                                   updateLineItem(
@@ -1857,7 +1854,7 @@ export function InvoicesConsole() {
                               </select>
                               {line.lineType === "scope" ? (
                                 <select
-                                  className={`${composerStyles.lineInput} ${invoiceComposerStyles.invoiceLockableControl}`}
+                                  className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
                                   value={line.budgetLineId}
                                   onChange={(event) =>
                                     updateLineItem(line.localId, "budgetLineId", event.target.value)
@@ -1878,7 +1875,7 @@ export function InvoicesConsole() {
                                 </select>
                               ) : (
                                 <input
-                                  className={`${composerStyles.lineInput} ${invoiceComposerStyles.invoiceLockableControl}`}
+                                  className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
                                   value={line.adjustmentReason}
                                   onChange={(event) =>
                                     updateLineItem(line.localId, "adjustmentReason", event.target.value)
@@ -1889,7 +1886,7 @@ export function InvoicesConsole() {
                                 />
                               )}
                               <input
-                                className={`${composerStyles.lineInput} ${invoiceComposerStyles.invoiceLockableControl}`}
+                                className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
                                 value={line.quantity}
                                 onChange={(event) =>
                                   updateLineItem(line.localId, "quantity", event.target.value)
@@ -1899,7 +1896,7 @@ export function InvoicesConsole() {
                                 disabled={workspaceIsLocked}
                               />
                               <input
-                                className={`${composerStyles.lineInput} ${invoiceComposerStyles.invoiceLockableControl}`}
+                                className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
                                 value={line.description}
                                 onChange={(event) =>
                                   updateLineItem(line.localId, "description", event.target.value)
@@ -1908,14 +1905,14 @@ export function InvoicesConsole() {
                                 disabled={workspaceIsLocked}
                               />
                               <input
-                                className={`${composerStyles.lineInput} ${invoiceComposerStyles.invoiceLockableControl}`}
+                                className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
                                 value={line.unit}
                                 onChange={(event) => updateLineItem(line.localId, "unit", event.target.value)}
                                 required
                                 disabled={workspaceIsLocked}
                               />
                               <input
-                                className={`${composerStyles.lineInput} ${invoiceComposerStyles.invoiceLockableControl}`}
+                                className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
                                 value={line.unitPrice}
                                 onChange={(event) =>
                                   updateLineItem(line.localId, "unitPrice", event.target.value)
@@ -1924,14 +1921,14 @@ export function InvoicesConsole() {
                                 required
                                 disabled={workspaceIsLocked}
                               />
-                              <span className={`${composerStyles.amountCell} ${invoiceComposerStyles.invoiceReadAmount}`}>
+                              <span className={`${creatorStyles.amountCell} ${invoiceCreatorStyles.invoiceReadAmount}`}>
                                 ${formatDecimal(lineAmount)}
                               </span>
-                              <div className={invoiceComposerStyles.invoiceLineActionsCell}>
+                              <div className={invoiceCreatorStyles.invoiceLineActionsCell}>
                                 {!workspaceIsLocked ? (
                                   <button
                                     type="button"
-                                    className={composerStyles.smallButton}
+                                    className={creatorStyles.smallButton}
                                     onClick={() => removeLineItem(line.localId)}
                                   >
                                     Remove
@@ -1944,10 +1941,10 @@ export function InvoicesConsole() {
                       </div>
 
                       {!workspaceIsLocked ? (
-                        <div className={invoiceComposerStyles.invoiceLineActions}>
+                        <div className={invoiceCreatorStyles.invoiceLineActions}>
                           <button
                             type="button"
-                            className={composerStyles.secondaryButton}
+                            className={creatorStyles.secondaryButton}
                             onClick={addLineItem}
                           >
                             Add Line Item
@@ -1956,52 +1953,52 @@ export function InvoicesConsole() {
                       ) : null}
 
                       {!selectedProjectId ? (
-                        <p className={composerStyles.inlineHint}>Select a project before creating an invoice.</p>
+                        <p className={creatorStyles.inlineHint}>Select a project before creating an invoice.</p>
                       ) : null}
 
-                      <div className={invoiceComposerStyles.invoiceSheetFooter}>
-                        <div className={invoiceComposerStyles.invoiceTotalsColumn}>
-                          <div className={composerStyles.summary}>
-                            <div className={composerStyles.summaryRow}>
+                      <div className={invoiceCreatorStyles.invoiceSheetFooter}>
+                        <div className={invoiceCreatorStyles.invoiceTotalsColumn}>
+                          <div className={creatorStyles.summary}>
+                            <div className={creatorStyles.summaryRow}>
                               <span>Subtotal</span>
                               <strong>${formatDecimal(draftLineSubtotal)}</strong>
                             </div>
-                            <div className={composerStyles.summaryRow}>
+                            <div className={creatorStyles.summaryRow}>
                               <span>Sales Tax</span>
-                              <span className={composerStyles.summaryTaxLine}>
-                                <label className={composerStyles.summaryTaxRate}>
+                              <span className={creatorStyles.summaryTaxLine}>
+                                <label className={creatorStyles.summaryTaxRate}>
                                   <input
-                                    className={`${composerStyles.summaryTaxInput} ${invoiceComposerStyles.invoiceLockableControl}`}
+                                    className={`${creatorStyles.summaryTaxInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
                                     value={taxPercent}
                                     onChange={(event) => setTaxPercent(event.target.value)}
                                     inputMode="decimal"
                                     disabled={workspaceIsLocked}
                                   />
-                                  <span className={composerStyles.summaryTaxSuffix}>%</span>
+                                  <span className={creatorStyles.summaryTaxSuffix}>%</span>
                                 </label>
-                                <span className={composerStyles.summaryTaxAmount}>
+                                <span className={creatorStyles.summaryTaxAmount}>
                                   ${formatDecimal(draftTaxTotal)}
                                 </span>
                               </span>
                             </div>
-                            <div className={`${composerStyles.summaryRow} ${composerStyles.summaryTotal}`}>
+                            <div className={`${creatorStyles.summaryRow} ${creatorStyles.summaryTotal}`}>
                               <span>Total</span>
                               <strong>${formatDecimal(draftTotal)}</strong>
                             </div>
                           </div>
                           {canMutateInvoices ? (
                             <>
-                              <div className={invoiceComposerStyles.invoiceCreateActions}>
+                              <div className={invoiceCreatorStyles.invoiceCreateActions}>
                                 <button
                                   type="submit"
-                                  className={`${composerStyles.primaryButton} ${invoiceComposerStyles.invoiceCreatePrimary}`}
+                                  className={`${creatorStyles.primaryButton} ${invoiceCreatorStyles.invoiceCreatePrimary}`}
                                   disabled={workspaceIsLocked || (!editingDraftInvoiceId && !selectedProjectId)}
                                 >
                                   {workspaceIsLocked ? "Locked" : editingDraftInvoiceId ? "Save Draft" : "Create Invoice"}
                                 </button>
                               </div>
-                              {statusMessageAtComposer ? (
-                                <p className={`${composerStyles.actionSuccess} ${invoiceComposerStyles.invoiceCreateStatusMessage}`}>
+                              {statusMessageAtCreator ? (
+                                <p className={`${creatorStyles.actionSuccess} ${invoiceCreatorStyles.invoiceCreateStatusMessage}`}>
                                   {statusMessage}
                                 </p>
                               ) : null}

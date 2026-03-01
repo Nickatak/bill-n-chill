@@ -1,21 +1,21 @@
 /**
- * Document-composer adapter for estimates.
+ * Document-creator adapter for estimates.
  *
  * Bridges the domain-specific estimate data model to the generic
- * {@link DocumentComposerAdapter} interface so the shared composer UI can
+ * {@link DocumentCreatorAdapter} interface so the shared creator UI can
  * render, create, and update estimates without knowing their schema.
  *
  * Also provides converters for the backend policy contract and status
- * event records into their composer-compatible shapes.
+ * event records into their creator-compatible shapes.
  */
 
 import {
-  ComposerLineDraft,
-  ComposerMetaField,
-  ComposerStatusEvent,
-  ComposerStatusPolicy,
-  DocumentComposerAdapter,
-} from "@/shared/document-composer/types";
+  CreatorLineDraft,
+  CreatorMetaField,
+  CreatorStatusEvent,
+  CreatorStatusPolicy,
+  DocumentCreatorAdapter,
+} from "@/shared/document-creator/types";
 import {
   EstimateLineInput,
   EstimatePolicyContract,
@@ -35,10 +35,10 @@ type EstimateFormState = {
 };
 
 /**
- * Convert the backend policy contract (snake_case) to the composer's
+ * Convert the backend policy contract (snake_case) to the creator's
  * status policy shape (camelCase).
  */
-export function toEstimateStatusPolicy(contract: EstimatePolicyContract): ComposerStatusPolicy {
+export function toEstimateStatusPolicy(contract: EstimatePolicyContract): CreatorStatusPolicy {
   return {
     statuses: contract.statuses,
     statusLabels: contract.status_labels,
@@ -50,12 +50,12 @@ export function toEstimateStatusPolicy(contract: EstimatePolicyContract): Compos
 }
 
 /**
- * Convert backend status event records to the composer's status event
+ * Convert backend status event records to the creator's status event
  * shape, renaming snake_case fields to camelCase.
  */
 export function toEstimateStatusEvents(
   events: EstimateStatusEventRecord[],
-): ComposerStatusEvent[] {
+): CreatorStatusEvent[] {
   return events.map((event) => ({
     id: event.id,
     fromStatus: event.from_status,
@@ -67,16 +67,16 @@ export function toEstimateStatusEvents(
 }
 
 /**
- * Build a fully configured document-composer adapter for estimates.
+ * Build a fully configured document-creator adapter for estimates.
  *
- * The adapter tells the composer how to extract IDs, titles, meta fields,
+ * The adapter tells the creator how to extract IDs, titles, meta fields,
  * line items, and totals from an estimate, and how to serialize form
  * state back into create/update API payloads.
  */
 export function createEstimateDocumentAdapter(
-  statusPolicy: ComposerStatusPolicy,
+  statusPolicy: CreatorStatusPolicy,
   statusEvents: EstimateStatusEventRecord[],
-): DocumentComposerAdapter<EstimateRecord, ComposerLineDraft, EstimateFormState> {
+): DocumentCreatorAdapter<EstimateRecord, CreatorLineDraft, EstimateFormState> {
   return {
     kind: "estimate",
     statusPolicy,
@@ -87,7 +87,7 @@ export function createEstimateDocumentAdapter(
     getDocumentTitle: (document) => document?.title ?? "Untitled estimate",
     getDocumentStatus: (document) => document?.status ?? statusPolicy.defaultCreateStatus,
 
-    getMetaFields: (document): ComposerMetaField[] => [
+    getMetaFields: (document): CreatorMetaField[] => [
       { key: "estimate_id", label: "Estimate #", value: document ? `#${document.id}` : "Draft" },
       { key: "version", label: "Version", value: document ? `v${document.version}` : "v1" },
       { key: "valid_through", label: "Valid Through", value: document?.valid_through || "Not set" },
@@ -95,7 +95,7 @@ export function createEstimateDocumentAdapter(
 
     getStatusEvents: () => toEstimateStatusEvents(statusEvents),
 
-    // --- Form state → composer lines / totals ---
+    // --- Form state → creator lines / totals ---
 
     getDraftLines: (form) =>
       form.lineItems.map((line) => ({

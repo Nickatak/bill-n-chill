@@ -1,4 +1,4 @@
-import type { OrganizationBrandingDefaults } from "@/shared/document-composer";
+import type { OrganizationBrandingDefaults } from "@/shared/document-creator";
 
 export type UserData = { token?: string; email?: string };
 

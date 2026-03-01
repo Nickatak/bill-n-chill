@@ -1,5 +1,5 @@
 /**
- * Generic document composer component.
+ * Generic document creator component.
  *
  * Renders a slot-based form layout shared by all financial document editors
  * (invoices, estimates, change orders). Each document type provides its own
@@ -7,15 +7,15 @@
  * visibility gating, and action-button bar.
  */
 
-import styles from "./document-composer.module.css";
+import styles from "./document-creator.module.css";
 import {
-  ComposerLineDraft,
-  ComposerSectionConfig,
-  DocumentComposerProps,
+  CreatorLineDraft,
+  CreatorSectionConfig,
+  DocumentCreatorProps,
 } from "./types";
 
 /** Default section ordering when no custom layout is provided. */
-const DEFAULT_SECTIONS: ComposerSectionConfig[] = [
+const DEFAULT_SECTIONS: CreatorSectionConfig[] = [
   { slot: "header" },
   { slot: "meta" },
   { slot: "line_items" },
@@ -27,14 +27,14 @@ const DEFAULT_SECTIONS: ComposerSectionConfig[] = [
 ];
 
 /**
- * Render a slot-driven document composer form.
+ * Render a slot-driven document creator form.
  *
  * Iterates the section list, delegates rendering to the matching renderer
  * for each slot, and appends an action-button bar when actions are provided.
  * Sections whose renderer returns null or whose `visible` flag is false are
  * silently skipped, so feature-specific sections can be toggled per document type.
  */
-export function DocumentComposer<TDocument, TLine extends ComposerLineDraft, TFormState>({
+export function DocumentCreator<TDocument, TLine extends CreatorLineDraft, TFormState>({
   adapter,
   document,
   className = "",
@@ -43,7 +43,7 @@ export function DocumentComposer<TDocument, TLine extends ComposerLineDraft, TFo
   sections = DEFAULT_SECTIONS,
   actions = [],
   renderers = {},
-}: DocumentComposerProps<TDocument, TLine, TFormState>) {
+}: DocumentCreatorProps<TDocument, TLine, TFormState>) {
   const context = {
     kind: adapter.kind,
     document,

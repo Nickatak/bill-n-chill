@@ -283,6 +283,11 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const workspaceContext = selectedEstimate
     ? `${selectedEstimate.title || "Untitled"} · #${selectedEstimate.id} v${selectedEstimate.version}`
     : "New estimate draft";
+  const workspaceContextLabel = !selectedEstimate
+    ? "Creating"
+    : isEditingDraft
+      ? "Editing"
+      : "Viewing";
   const workspaceBadgeLabel = !selectedEstimate
     ? "NEW ESTIMATE"
     : isEditingDraft
@@ -1519,7 +1524,15 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                       <button
                         type="button"
                         className={styles.versionBaselineJumpButton}
-                        onClick={() => handleSelectEstimate(activeFinancialEstimate)}
+                        onClick={() => {
+                          handleSelectEstimate(activeFinancialEstimate);
+                          const title = (activeFinancialEstimate.title || "").trim() || "Untitled";
+                          requestAnimationFrame(() => {
+                            document
+                              .querySelector(`[data-family-title="${CSS.escape(title)}"]`)
+                              ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                          });
+                        }}
                       >
                         Jump to Active Estimate
                       </button>
@@ -1550,45 +1563,13 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                   return (
                     <div
                       key={family.title}
+                      data-family-title={family.title}
                       className={`${styles.familyGroup} ${
                         isFamilyActive ? styles.familyGroupActive : ""
                       }`}
                     >
                       <div className={styles.familyRow}>
-                        <div className={styles.versionCardWrap}>
-                          {quickActionKind === "change_order" && selectedProjectId ? (
-                            <Link
-                              href={`/projects/${selectedProjectId}/change-orders?origin_estimate=${latest.id}`}
-                              className={styles.familyActionLink}
-                              aria-label={`${quickActionTitle} (estimate #${latest.id})`}
-                              title={quickActionTitle}
-                            >
-                              To CO&apos;s <span aria-hidden="true">↗</span>
-                            </Link>
-                          ) : null}
-                          {quickActionKind === "revision" ? (
-                            <button
-                              type="button"
-                              className={styles.familyActionButton}
-                              aria-label={`${quickActionTitle} (estimate #${latest.id})`}
-                              title={quickActionTitle}
-                              onClick={() => void handleFamilyCardQuickAction(latest)}
-                            >
-                              Duplicate
-                            </button>
-                          ) : null}
-                          {latest.public_ref ? (
-                            <Link
-                              href={publicEstimateHref(latest.public_ref)}
-                              className={styles.publicEstimateLinkIcon}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              aria-label={`Open public view for estimate #${latest.id}`}
-                              title="Open public view"
-                            >
-                              Public
-                            </Link>
-                          ) : null}
+                        <div className={styles.familyMainColumn}>
                           <button
                             type="button"
                             className={`${styles.familyMain} ${
@@ -1625,6 +1606,48 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                               ) : null}
                             </div>
                           </button>
+                          {isViewingHistory || (!isViewingHistory && latest.public_ref) || quickActionKind ? (
+                            <div className={styles.familyFooter}>
+                              {isViewingHistory ? (
+                                <span className={styles.historyNotice}>
+                                  Viewing v{selectedInFamily?.version}
+                                </span>
+                              ) : null}
+                              {quickActionKind === "change_order" && selectedProjectId ? (
+                                <Link
+                                  href={`/projects/${selectedProjectId}/change-orders?origin_estimate=${latest.id}`}
+                                  className={styles.familyActionLink}
+                                  aria-label={`${quickActionTitle} (estimate #${latest.id})`}
+                                  title={quickActionTitle}
+                                >
+                                  To CO&apos;s ↗
+                                </Link>
+                              ) : null}
+                              {quickActionKind === "revision" ? (
+                                <button
+                                  type="button"
+                                  className={styles.familyActionButton}
+                                  aria-label={`${quickActionTitle} (estimate #${latest.id})`}
+                                  title={quickActionTitle}
+                                  onClick={() => void handleFamilyCardQuickAction(latest)}
+                                >
+                                  Duplicate
+                                </button>
+                              ) : null}
+                              {!isViewingHistory && latest.public_ref ? (
+                                <Link
+                                  href={publicEstimateHref(latest.public_ref)}
+                                  className={`${styles.familyActionLink} ${styles.familyFooterEnd}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  aria-label={`Open public view for estimate #${latest.id}`}
+                                  title="Open public view"
+                                >
+                                  Public ↗
+                                </Link>
+                              ) : null}
+                            </div>
+                          ) : null}
                         </div>
                         {isHistoryOpen && history.length > 0 ? (
                           <div className={styles.historyRow}>
@@ -1634,19 +1657,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                               const financialBaselineStatus =
                                 estimateFinancialBaselineStatus(estimate);
                               return (
-                                <div key={estimate.id} className={styles.versionCardWrap}>
-                                  {estimate.public_ref ? (
-                                    <Link
-                                      href={publicEstimateHref(estimate.public_ref)}
-                                      className={styles.publicEstimateLinkIcon}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      aria-label={`Open public view for estimate #${estimate.id}`}
-                                      title="Open public view"
-                                    >
-                                      Public
-                                    </Link>
-                                  ) : null}
+                                <div key={estimate.id} className={styles.historyCardColumn}>
                                   <button
                                     type="button"
                                     className={`${styles.historyCard} ${
@@ -1680,17 +1691,22 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                                       {formatEstimateLastActionDate(estimate)}
                                     </span>
                                   </button>
+                                  {isSelected && estimate.public_ref ? (
+                                    <Link
+                                      href={publicEstimateHref(estimate.public_ref)}
+                                      className={styles.historyPublicLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      aria-label={`Open public view for estimate #${estimate.id}`}
+                                      title="Open public view"
+                                    >
+                                      Public ↗
+                                    </Link>
+                                  ) : null}
                                 </div>
                               );
                             })}
                           </div>
-                        ) : null}
-                      </div>
-                      <div className={styles.familyFooter}>
-                        {isViewingHistory ? (
-                          <span className={styles.historyNotice}>
-                            Viewing v{selectedInFamily?.version}
-                          </span>
                         ) : null}
                       </div>
                     </div>
@@ -1849,7 +1865,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       <section className={styles.composerPrep}>
         <div className={styles.workspaceToolbar}>
           <div className={styles.workspaceContext}>
-            <span className={styles.workspaceContextLabel}>Editing</span>
+            <span className={styles.workspaceContextLabel}>{workspaceContextLabel}</span>
             <div className={styles.workspaceContextValueRow}>
               <strong>{workspaceContext}</strong>
               <span className={`${styles.versionStatus} ${workspaceBadgeClass}`}>

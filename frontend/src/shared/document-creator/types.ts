@@ -2,7 +2,7 @@ import type { FormEvent, ReactNode } from "react";
 
 export type DocumentKind = "estimate" | "change_order" | "invoice";
 
-export type ComposerStatusPolicy = {
+export type CreatorStatusPolicy = {
   statuses: string[];
   statusLabels: Record<string, string>;
   defaultCreateStatus: string;
@@ -11,7 +11,7 @@ export type ComposerStatusPolicy = {
   terminalStatuses: string[];
 };
 
-export type ComposerStatusEvent = {
+export type CreatorStatusEvent = {
   id: number | string;
   fromStatus: string | null;
   toStatus: string;
@@ -21,7 +21,7 @@ export type ComposerStatusEvent = {
   canonicalAction?: string;
 };
 
-export type ComposerLineDraft = {
+export type CreatorLineDraft = {
   localId: number;
   description: string;
   quantity: string;
@@ -33,7 +33,7 @@ export type ComposerLineDraft = {
   daysDelta?: string;
 };
 
-export type ComposerTotals = {
+export type CreatorTotals = {
   subtotal: number;
   taxPercent?: number;
   taxAmount?: number;
@@ -41,7 +41,7 @@ export type ComposerTotals = {
   metadata?: Record<string, number | string>;
 };
 
-export type ComposerMetaField = {
+export type CreatorMetaField = {
   key: string;
   label: string;
   value: string;
@@ -49,7 +49,7 @@ export type ComposerMetaField = {
   tone?: "default" | "muted" | "positive" | "warning" | "danger";
 };
 
-export type ComposerAction = {
+export type CreatorAction = {
   id: string;
   label: string;
   disabled?: boolean;
@@ -65,7 +65,7 @@ export type OrganizationBrandingDefaults = {
   invoice_sender_address: string;
 };
 
-export type ComposerSectionSlot =
+export type CreatorSectionSlot =
   | "header"
   | "meta"
   | "line_items"
@@ -75,44 +75,44 @@ export type ComposerSectionSlot =
   | "context"
   | "footer";
 
-export type ComposerSectionConfig = {
-  slot: ComposerSectionSlot;
+export type CreatorSectionConfig = {
+  slot: CreatorSectionSlot;
   title?: string;
   visible?: boolean;
 };
 
-export type ComposerRenderContext<TDocument> = {
+export type CreatorRenderContext<TDocument> = {
   kind: DocumentKind;
   document: TDocument | null;
 };
 
-export type ComposerRenderers<TDocument> = Partial<
-  Record<ComposerSectionSlot, (context: ComposerRenderContext<TDocument>) => ReactNode>
+export type CreatorRenderers<TDocument> = Partial<
+  Record<CreatorSectionSlot, (context: CreatorRenderContext<TDocument>) => ReactNode>
 >;
 
-export type DocumentComposerAdapter<TDocument, TLine extends ComposerLineDraft, TFormState> = {
+export type DocumentCreatorAdapter<TDocument, TLine extends CreatorLineDraft, TFormState> = {
   kind: DocumentKind;
-  statusPolicy: ComposerStatusPolicy;
+  statusPolicy: CreatorStatusPolicy;
   getDocumentId: (document: TDocument | null) => string | null;
   getDocumentTitle: (document: TDocument | null) => string;
   getDocumentStatus: (document: TDocument | null) => string;
-  getMetaFields: (document: TDocument | null) => ComposerMetaField[];
-  getStatusEvents: (document: TDocument | null) => ComposerStatusEvent[];
+  getMetaFields: (document: TDocument | null) => CreatorMetaField[];
+  getStatusEvents: (document: TDocument | null) => CreatorStatusEvent[];
   getDraftLines: (form: TFormState) => TLine[];
-  getTotals: (form: TFormState) => ComposerTotals;
+  getTotals: (form: TFormState) => CreatorTotals;
   toCreatePayload: (form: TFormState) => Record<string, unknown>;
   toUpdatePayload: (form: TFormState, current: TDocument) => Record<string, unknown>;
 };
 
-export type DocumentComposerProps<TDocument, TLine extends ComposerLineDraft, TFormState> = {
-  adapter: DocumentComposerAdapter<TDocument, TLine, TFormState>;
+export type DocumentCreatorProps<TDocument, TLine extends CreatorLineDraft, TFormState> = {
+  adapter: DocumentCreatorAdapter<TDocument, TLine, TFormState>;
   document: TDocument | null;
   formState: TFormState;
   readOnly?: boolean;
   className?: string;
   sectionClassName?: string;
   onSubmit?: (event: FormEvent<HTMLFormElement>) => void;
-  sections?: ComposerSectionConfig[];
-  actions?: ComposerAction[];
-  renderers?: ComposerRenderers<TDocument>;
+  sections?: CreatorSectionConfig[];
+  actions?: CreatorAction[];
+  renderers?: CreatorRenderers<TDocument>;
 };

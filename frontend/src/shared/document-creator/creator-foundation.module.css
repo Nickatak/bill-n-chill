@@ -698,7 +698,7 @@
 }
 
 .sheetReadOnly .summaryTotal {
-  background: var(--surface-inset);
+  background: var(--table-header-bg);
   border-top-color: var(--input-border);
 }
 

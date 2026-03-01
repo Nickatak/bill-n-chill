@@ -127,7 +127,8 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
   const taxAmount = subtotal * (Number(taxPercent) / 100);
   const totalAmount = subtotal + taxAmount;
   const canDecide = estimate?.status === "sent";
-  const showDecisionSection = canDecide;
+  const hasDecision = estimate?.status === "approved" || estimate?.status === "rejected";
+  const showDecisionSection = canDecide || hasDecision;
   const decisionStatusLabel = estimateStatusLabel(estimate?.status);
   const nonPendingDecisionMessage =
     estimate?.status === "approved"
@@ -146,30 +147,12 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
     }
     return "Decision received: Rejected. Your response has been recorded.";
   }, [decisionReceiptName, justSubmittedDecision]);
-  const settledBannerClassName =
-    justSubmittedDecision === "approve"
-      ? `${styles.decisionBannerSettled} ${styles.decisionBannerRecentlyApproved}`
-      : justSubmittedDecision === "reject"
-        ? `${styles.decisionBannerSettled} ${styles.decisionBannerRecentlyRejected}`
-        : styles.decisionBannerSettled;
-
   // Clear stale decision feedback when the estimate is no longer actionable.
   useEffect(() => {
     if (!canDecide) {
       setDecisionMessage("");
     }
   }, [canDecide]);
-
-  // Auto-dismiss the decision confirmation banner after a short delay.
-  useEffect(() => {
-    if (!justSubmittedDecision) {
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      setJustSubmittedDecision(null);
-    }, 9000);
-    return () => window.clearTimeout(timer);
-  }, [justSubmittedDecision]);
 
   // Fetch the estimate record from the public token on mount.
   useEffect(() => {
@@ -248,16 +231,14 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
       classNames={publicDocumentViewerClassNames()}
       statusMessage={statusMessage}
       banner={
-        estimate
+        estimate && canDecide
           ? {
-              tone: canDecide ? "pending" : "complete",
+              tone: "pending" as const,
               eyebrow: "Decision",
-              text: canDecide
-                ? "Ready to sign? Jump to the decision section and submit your response."
-                : decisionFeedbackMessage ?? nonPendingDecisionMessage,
-              linkHref: canDecide ? "#estimate-decision" : undefined,
-              linkLabel: canDecide ? "Review & Sign" : undefined,
-              stateClassName: canDecide ? styles.decisionBannerAwaiting : settledBannerClassName,
+              text: "Ready to sign? Jump to the decision section and submit your response.",
+              linkHref: "#estimate-decision",
+              linkLabel: "Review & Sign",
+              stateClassName: styles.decisionBannerAwaiting,
             }
           : undefined
       }
@@ -270,9 +251,6 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
                 <section className={frameStyles.partyBlock}>
                   <p className={frameStyles.partyLabel}>From</p>
                   <p className={frameStyles.partyPrimary}>{sender.senderName || sender.companyName}</p>
-                  {sender.senderEmail ? (
-                    <p className={frameStyles.partySecondary}>{sender.senderEmail}</p>
-                  ) : null}
                   {sender.senderAddressLines.length ? (
                     sender.senderAddressLines.map((line, index) => (
                       <p key={`sender-${line}-${index}`} className={frameStyles.partySecondary}>
@@ -459,7 +437,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
                   </div>
                 </>
               ) : (
-                <p className={styles.inlineHint}>{nonPendingDecisionMessage}</p>
+                <p className={styles.inlineHint}>{decisionFeedbackMessage ?? nonPendingDecisionMessage}</p>
               )}
             </div>
           ) : null}

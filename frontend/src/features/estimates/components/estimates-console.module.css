@@ -501,7 +501,7 @@
   top: 0;
   bottom: 0;
   width: 1px;
-  background: #4d688f;
+  background: var(--border-accent);
   pointer-events: none;
 }
 
@@ -865,12 +865,12 @@
 .statusPillActive.statusDraft {
   background: var(--status-blue-solid);
   border-color: var(--accent);
-  color: var(--accent-lighter);
+  color: var(--status-blue-solid-text);
 }
 
 .statusPillActive.statusSent {
   background: var(--status-amber-solid);
-  border-color: #b45309;
+  border-color: var(--status-amber-border);
   color: var(--status-amber-solid-text);
 }
 
@@ -882,13 +882,13 @@
 
 .statusPillActive.statusRejected {
   background: var(--status-red-solid);
-  border-color: #b91c1c;
-  color: var(--status-red-bg);
+  border-color: var(--status-red-border);
+  color: var(--status-red-solid-text);
 }
 
 .statusPillActive.statusArchived {
   background: var(--status-gray-solid);
-  border-color: #4b5563;
+  border-color: var(--status-gray-border);
   color: var(--status-gray-solid-text);
 }
 
@@ -1073,8 +1073,8 @@
 .versionBaselineJumpButton {
   border: 1px solid var(--accent-border);
   border-radius: var(--radius-md);
-  background: var(--accent-light);
-  color: var(--accent-hover);
+  background: var(--surface-secondary);
+  color: var(--accent-text);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1085,8 +1085,8 @@
 
 .versionBaselineJumpButton:hover,
 .versionBaselineJumpButton:focus-visible {
-  background: #bfdbfe;
-  border-color: #60a5fa;
+  background: var(--accent-light);
+  border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
   outline: none;
 }
@@ -1153,9 +1153,17 @@
 
 .familyRow {
   display: flex;
-  align-items: stretch;
+  align-items: flex-start;
   gap: 12px;
   overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.familyMainColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .familyMain {
@@ -1165,9 +1173,10 @@
   gap: 18px;
   min-width: 240px;
   min-height: 86px;
-  border: 0;
-  padding: 0;
-  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--surface);
   text-align: left;
   cursor: pointer;
 }
@@ -1182,7 +1191,7 @@
 }
 
 .familyMainActive {
-  border: 1px solid #3b82f6;
+  border: 1px solid var(--accent);
   border-radius: 10px;
   padding: 12px 14px;
   background: var(--accent-lighter);
@@ -1214,11 +1223,14 @@
 .familyFooter {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
   border-top: 1px solid var(--border);
   padding-top: 8px;
+}
+
+.familyFooterEnd {
+  margin-left: auto;
 }
 
 .historyNotice {
@@ -1229,18 +1241,38 @@
   font-weight: 600;
 }
 
-.familyActionLink,
+
+.familyActionLink {
+  color: var(--accent-text);
+  text-decoration: none;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.familyActionLink:hover,
+.familyActionLink:focus-visible {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  outline: none;
+}
+
 .familyActionButton {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
   height: 26px;
   padding: 0 10px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--accent-border);
-  background: var(--accent-light);
-  color: var(--accent-hover);
-  text-decoration: none;
+  border: 1px solid var(--border-accent);
+  background: var(--surface-secondary);
+  color: var(--accent-text);
+  font-family: inherit;
   font-size: 0.66rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1255,31 +1287,31 @@
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
-.familyActionButton {
-  font-family: inherit;
-}
-
-.familyActionLink:hover,
-.familyActionLink:focus-visible,
 .familyActionButton:hover,
 .familyActionButton:focus-visible {
-  background: #bfdbfe;
-  border-color: #60a5fa;
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.35);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
   transform: translateY(-1px);
   outline: none;
 }
 
 .historyRow {
   display: flex;
-  align-items: stretch;
+  align-items: flex-start;
   gap: 10px;
   padding-bottom: 4px;
 }
 
-.versionCardWrap {
-  position: relative;
-  display: block;
+.historyCardColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.historyPublicLink {
+  composes: familyActionLink;
+  align-self: flex-end;
 }
 
 .historyCard {
@@ -1293,7 +1325,7 @@
 }
 
 .historyCardActive {
-  border-color: #3b82f6;
+  border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
   background: var(--accent-lighter);
 }
@@ -1351,54 +1383,6 @@
   font-weight: 500;
 }
 
-.publicEstimateLinkIcon {
-  position: absolute;
-  top: 6px;
-  right: 8px;
-  height: 24px;
-  padding: 0 8px;
-  border: 1px solid var(--accent-border);
-  border-radius: var(--radius-sm);
-  background: var(--accent-light);
-  color: var(--accent-hover);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.63rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  text-decoration: none;
-  font-weight: 700;
-  line-height: 1;
-  z-index: 2;
-  cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-}
-
-.publicEstimateLinkIcon:hover,
-.publicEstimateLinkIcon:focus-visible {
-  transform: translateY(-1px);
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.35);
-  background: #bfdbfe;
-  border-color: #60a5fa;
-  outline: none;
-}
-
-.versionCardWrap .familyMain {
-  padding-right: 112px;
-}
-
-.versionCardWrap .historyCard {
-  padding-right: 62px;
-}
-
-.versionCardWrap .versionRight {
-  padding-right: 2px;
-}
-
-.versionCardWrap .historyMetaRow {
-  padding-right: 0;
-}
 
 .historyEmpty {
   font-size: 0.85rem;
@@ -1450,8 +1434,6 @@
   letter-spacing: 0.12em;
   padding: 4px 8px;
   border-radius: var(--radius-pill);
-  background: var(--surface-hover);
-  color: var(--accent-text);
   font-weight: 600;
 }
 
@@ -1621,21 +1603,6 @@
 }
 
 .decisionBannerAwaiting {
-}
-
-.decisionBannerSettled {
-}
-
-.decisionBannerRecentlyApproved {
-  border-color: var(--status-green-border);
-  background: var(--status-green-bg);
-  box-shadow: none;
-}
-
-.decisionBannerRecentlyRejected {
-  border-color: var(--status-red-border);
-  background: #fef2f2;
-  box-shadow: none;
 }
 
 @media print {

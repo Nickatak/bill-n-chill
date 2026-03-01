@@ -1,21 +1,21 @@
 /**
- * Document-composer adapter for change orders.
+ * Document-creator adapter for change orders.
  *
  * Bridges the domain-specific change-order data model to the generic
- * {@link DocumentComposerAdapter} interface so the shared composer UI can
+ * {@link DocumentCreatorAdapter} interface so the shared creator UI can
  * render, create, and update change orders without knowing their schema.
  *
  * Also provides converters for the backend policy contract and status
- * event records into their composer-compatible shapes.
+ * event records into their creator-compatible shapes.
  */
 
 import {
-  ComposerLineDraft,
-  ComposerMetaField,
-  ComposerStatusEvent,
-  ComposerStatusPolicy,
-  DocumentComposerAdapter,
-} from "@/shared/document-composer/types";
+  CreatorLineDraft,
+  CreatorMetaField,
+  CreatorStatusEvent,
+  CreatorStatusPolicy,
+  DocumentCreatorAdapter,
+} from "@/shared/document-creator/types";
 import {
   ChangeOrderPolicyContract,
   ChangeOrderRecord,
@@ -49,12 +49,12 @@ type ChangeOrderFormState = {
 };
 
 /**
- * Convert the backend policy contract (snake_case) to the composer's
+ * Convert the backend policy contract (snake_case) to the creator's
  * status policy shape (camelCase).
  */
 export function toChangeOrderStatusPolicy(
   contract: ChangeOrderPolicyContract,
-): ComposerStatusPolicy {
+): CreatorStatusPolicy {
   return {
     statuses: contract.statuses,
     statusLabels: contract.status_labels,
@@ -66,12 +66,12 @@ export function toChangeOrderStatusPolicy(
 }
 
 /**
- * Convert backend status event records to the composer's status event
+ * Convert backend status event records to the creator's status event
  * shape, renaming snake_case fields to camelCase.
  */
 export function toChangeOrderStatusEvents(
   events: ChangeOrderStatusEvent[],
-): ComposerStatusEvent[] {
+): CreatorStatusEvent[] {
   return events.map((event) => ({
     id: event.id,
     fromStatus: event.from_status,
@@ -83,16 +83,16 @@ export function toChangeOrderStatusEvents(
 }
 
 /**
- * Build a fully configured document-composer adapter for change orders.
+ * Build a fully configured document-creator adapter for change orders.
  *
- * The adapter tells the composer how to extract IDs, titles, meta fields,
+ * The adapter tells the creator how to extract IDs, titles, meta fields,
  * line items, and totals from a change order, and how to serialize form
  * state back into create/update API payloads.
  */
 export function createChangeOrderDocumentAdapter(
-  statusPolicy: ComposerStatusPolicy,
+  statusPolicy: CreatorStatusPolicy,
   statusEvents: ChangeOrderStatusEvent[],
-): DocumentComposerAdapter<ChangeOrderRecord, ComposerLineDraft, ChangeOrderFormState> {
+): DocumentCreatorAdapter<ChangeOrderRecord, CreatorLineDraft, ChangeOrderFormState> {
   return {
     kind: "change_order",
     statusPolicy,
@@ -103,7 +103,7 @@ export function createChangeOrderDocumentAdapter(
     getDocumentTitle: (document) => document?.title ?? "Untitled change order",
     getDocumentStatus: (document) => document?.status ?? statusPolicy.defaultCreateStatus,
 
-    getMetaFields: (document): ComposerMetaField[] => [
+    getMetaFields: (document): CreatorMetaField[] => [
       { key: "co_id", label: "Change Order #", value: document ? `CO-${document.id}` : "Draft" },
       {
         key: "revision",
@@ -124,7 +124,7 @@ export function createChangeOrderDocumentAdapter(
 
     getStatusEvents: () => toChangeOrderStatusEvents(statusEvents),
 
-    // --- Form state → composer lines / totals ---
+    // --- Form state → creator lines / totals ---
 
     getDraftLines: (form) =>
       form.lineItems.map((line) => ({
