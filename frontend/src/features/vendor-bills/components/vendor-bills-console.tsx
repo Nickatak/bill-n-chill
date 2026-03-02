@@ -916,6 +916,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   function handleSelectVendorBill(id: string) {
     setSelectedVendorBillId(id);
     setViewerErrorMessage("");
+    setStatusMessage("");
     // Reset accordion sections to defaults on selection change
     setIsStatusSectionOpen(true);
     setIsAllocationsSectionOpen(false);

@@ -4,7 +4,6 @@
  * line-item table, totals, terms, and footer sections via slot renderers.
  */
 
-import Link from "next/link";
 import { FormEvent } from "react";
 
 import { formatDateDisplay } from "@/shared/date-format";
@@ -50,7 +49,6 @@ type EstimateSheetProps = {
   readOnly: boolean;
   formErrorMessage?: string;
   formSuccessMessage?: string;
-  formSuccessHref?: string;
   readOnlyPresentation?: "inputs" | "text";
   showMarkupColumn?: boolean;
   titlePresentation?: "field" | "header";
@@ -118,7 +116,6 @@ export function EstimateSheet({
   readOnly,
   formErrorMessage = "",
   formSuccessMessage = "",
-  formSuccessHref = "",
   readOnlyPresentation = "inputs",
   showMarkupColumn = true,
   titlePresentation = "field",
@@ -569,14 +566,7 @@ export function EstimateSheet({
             <div className={creatorStyles.finalizeActions}>
               {formErrorMessage ? <p className={creatorStyles.actionError}>{formErrorMessage}</p> : null}
               {!formErrorMessage && formSuccessMessage ? (
-                <p className={creatorStyles.actionSuccess}>
-                  {formSuccessMessage}{" "}
-                  {formSuccessHref ? (
-                    <Link href={formSuccessHref} target="_blank" rel="noopener noreferrer">
-                      Open client-facing estimate
-                    </Link>
-                  ) : null}
-                </p>
+                <p className={creatorStyles.actionSuccess}>{formSuccessMessage}</p>
               ) : null}
               <button type="submit" className={creatorStyles.primaryButton} disabled={!canSubmit || isSubmitting}>
                 {isSubmitting

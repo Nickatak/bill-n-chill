@@ -27,8 +27,7 @@
 }
 
 .spacer {
-  min-height: 56px;
-  background: var(--surface);
+  min-height: 49px;
 }
 
 @media print {

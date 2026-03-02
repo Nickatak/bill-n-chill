@@ -857,6 +857,7 @@ export function ChangeOrdersConsole({
     }
 
     setSelectedChangeOrderId(String(changeOrder.id));
+    setFeedback("");
     setEditTitle(changeOrder.title);
     setEditReason(changeOrder.reason);
     setEditTermsText(changeOrder.terms_text || "");
@@ -2170,11 +2171,6 @@ export function ChangeOrdersConsole({
                       ? `Starter rows come from estimate-derived lines for origin estimate #${selectedViewerEstimate.id} v${selectedViewerEstimate.version}.`
                       : "Starter rows come from estimate-derived lines once an origin estimate is selected."}
                   </p>
-                  <p className={changeOrderCreatorStyles.coLineLegend}>
-                    Original approved line item amount is the approved baseline for the line before
-                    approved CO deltas. CO Delta is a flat USD change (not a percent). Schedule Delta is
-                    calendar days.
-                  </p>
                 </div>
 
                 <div className={creatorStyles.lineTable}>
@@ -2452,11 +2448,6 @@ export function ChangeOrdersConsole({
                     These rows are budget-line anchored. Update flat USD deltas and schedule days for this
                     revision.
                   </p>
-                  <p className={changeOrderCreatorStyles.coLineLegend}>
-                    Original approved line item amount is the approved baseline for the line before
-                    approved CO deltas. CO Delta is a flat USD change (not a percent). Schedule Delta is
-                    calendar days.
-                  </p>
                 </div>
 
                 <div className={creatorStyles.lineTable}>
@@ -2631,6 +2622,12 @@ export function ChangeOrdersConsole({
                         <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint} ${changeOrderCreatorStyles.coFooterErrorHint}`}>
                           This revision is historical and read-only. Save/update actions are available on the latest revision only.
                         </p>
+                      ) : null}
+                      {actionMessage && actionTone === "success" ? (
+                        <p className={creatorStyles.actionSuccess}>{actionMessage}</p>
+                      ) : null}
+                      {actionMessage && actionTone === "error" ? (
+                        <p className={creatorStyles.actionError}>{actionMessage}</p>
                       ) : null}
                       {isSelectedChangeOrderEditable ? (
                         <div className={changeOrderCreatorStyles.coActionButtonRow}>

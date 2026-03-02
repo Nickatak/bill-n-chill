@@ -115,8 +115,6 @@ export type ApiResponse = {
     duplicated_from?: number;
     conversion_status?: string;
     budget_conversion_status?: string;
-    active_financial_estimate_id?: number | null;
-    activation_required?: boolean;
   };
   error?: {
     code?: string;

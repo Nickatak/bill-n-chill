@@ -727,6 +727,7 @@
 .terms {
   border-top: 1px solid var(--border);
   padding-top: var(--space-lg);
+  padding-bottom: var(--space-lg);
   color: var(--text-secondary);
   display: grid;
   gap: 6px;
@@ -757,6 +758,8 @@
 }
 
 .footer {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-lg);
   display: flex;
   justify-content: space-between;
   flex-wrap: wrap;

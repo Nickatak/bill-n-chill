@@ -152,7 +152,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const { token } = useSharedSessionAuth();
   const [formErrorMessage, setFormErrorMessage] = useState("");
   const [formSuccessMessage, setFormSuccessMessage] = useState("");
-  const [formSuccessHref, setFormSuccessHref] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [actionTone, setActionTone] = useState<"error" | "success" | "info">("info");
   const [isActivatingBaseline, setIsActivatingBaseline] = useState(false);
@@ -198,6 +197,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const duplicateDialogRef = useRef<HTMLDialogElement | null>(null);
   const [duplicateTitle, setDuplicateTitle] = useState("");
   const [isViewerExpanded, setIsViewerExpanded] = useState(true);
+  const [hideSuperseded, setHideSuperseded] = useState(true);
   const [defaultEstimateStatusFilters, setDefaultEstimateStatusFilters] = useState<string[]>(
     ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK,
   );
@@ -582,9 +582,12 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       if (!latest?.status) {
         return false;
       }
+      if (hideSuperseded && latest.financial_baseline_status === "superseded") {
+        return false;
+      }
       return estimateStatusFilters.includes(latest.status as EstimateStatusValue);
     });
-  }, [estimateFamilies, estimateStatusFilters]);
+  }, [estimateFamilies, estimateStatusFilters, hideSuperseded]);
 
   function publicEstimateHref(publicRef?: string): string {
     if (!publicRef) {
@@ -621,7 +624,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setLineSortDirection("asc");
     setFormErrorMessage("");
     setFormSuccessMessage("");
-    setFormSuccessHref("");
+    setActionMessage("");
     setFamilyCollisionPrompt(null);
     setConfirmedFamilyTitleKey("");
     loadEstimateIntoForm(estimate);
@@ -675,7 +678,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setActionMessage("");
     setFormErrorMessage("");
     setFormSuccessMessage("");
-    setFormSuccessHref("");
     setCreatorFlashCount((c) => c + 1);
   }
 
@@ -823,7 +825,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     }
     setFormErrorMessage("");
     setFormSuccessMessage("");
-    setFormSuccessHref("");
     if (!options?.quiet) {
       setActionMessage("");
     }
@@ -972,8 +973,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     if (lineItems.length <= 1) {
       setFormErrorMessage(ESTIMATE_MIN_LINE_ITEMS_ERROR);
       setFormSuccessMessage("");
-      setFormSuccessHref("");
-      return;
+        return;
     }
     setLineItems((current) => {
       return current.filter((line) => line.localId !== localId);
@@ -987,7 +987,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   ) {
     setFormErrorMessage("");
     setFormSuccessMessage("");
-    setFormSuccessHref("");
     setLineItems((current) =>
       current.map((line) => (line.localId === localId ? { ...line, [key]: value } : line)),
     );
@@ -1110,8 +1109,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setStatusEvents([]);
       setFormErrorMessage("");
       setFormSuccessMessage(`Created estimate #${created.id} v${created.version}.`);
-      setFormSuccessHref("");
-      loadEstimateIntoForm(created);
+        loadEstimateIntoForm(created);
       setFamilyCollisionPrompt(null);
       setConfirmedFamilyTitleKey("");
       setCreatorFlashCount((c) => c + 1);
@@ -1128,7 +1126,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     event.preventDefault();
     setFormErrorMessage("");
     setFormSuccessMessage("");
-    setFormSuccessHref("");
     if (submitGuard.current) {
       return;
     }
@@ -1190,7 +1187,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         loadEstimateIntoForm(updated);
         setFormErrorMessage("");
         setFormSuccessMessage(`Saved draft estimate #${updated.id}.`);
-        setFormSuccessHref(updated.public_ref ? publicEstimateHref(updated.public_ref) : "");
         setCreatorFlashCount((c) => c + 1);
       } catch {
         setFormErrorMessage("Could not reach estimate update endpoint.");
@@ -1315,26 +1311,25 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         return;
       }
       const updated = payload.data as EstimateRecord;
+      const scrollY = window.scrollY;
+      const budgetConversionStatus = payload.meta?.budget_conversion_status;
+      const didSupersede = budgetConversionStatus === "superseded_and_converted";
       setEstimates((current) =>
-        current.map((estimate) => (estimate.id === updated.id ? updated : estimate)),
+        current.map((estimate) => {
+          if (estimate.id === updated.id) return updated;
+          if (didSupersede && estimate.is_active_financial_baseline) {
+            return { ...estimate, is_active_financial_baseline: false, financial_baseline_status: "superseded" as const };
+          }
+          return estimate;
+        }),
       );
+      requestAnimationFrame(() => window.scrollTo({ top: scrollY }));
       const updatedNextStatuses = estimateAllowedStatusTransitions[updated.status] ?? [];
       setSelectedStatus(updatedNextStatuses[0] ?? updated.status);
       setStatusNote("");
       await loadStatusEvents({ estimateId: updated.id, quiet: true });
-      const budgetConversionStatus = payload.meta?.budget_conversion_status;
-      if (payload.meta?.activation_required) {
-        const activeId = payload.meta.active_financial_estimate_id;
-        setActionMessage(
-          activeId
-            ? `Estimate approved. Active estimate remains #${activeId}. Set this estimate as active to supersede it.`
-            : "Estimate approved. Set this estimate as the active estimate.",
-        );
-        setActionTone("info");
-        return;
-      }
-      if (budgetConversionStatus === "converted" || budgetConversionStatus === "already_converted") {
-        setActionMessage("Estimate approved and set as the active estimate.");
+      if (budgetConversionStatus === "converted" || didSupersede || budgetConversionStatus === "already_converted") {
+        setActionMessage("Estimate approved and set as the active estimate. History updated.");
         setActionTone("success");
         return;
       }
@@ -1372,9 +1367,11 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         return;
       }
       const updated = payload.data as EstimateRecord;
+      const scrollY = window.scrollY;
       setEstimates((current) =>
         current.map((estimate) => (estimate.id === updated.id ? updated : estimate)),
       );
+      requestAnimationFrame(() => window.scrollTo({ top: scrollY }));
       const updatedNextStatuses = estimateAllowedStatusTransitions[updated.status] ?? [];
       setSelectedStatus(updatedNextStatuses[0] ?? updated.status);
       setStatusNote("");
@@ -1423,15 +1420,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         quiet: true,
       });
       await loadStatusEvents({ estimateId, quiet: true });
-      if (conversionStatus === "superseded_and_converted") {
-        setActionMessage("Active estimate switched to this estimate.");
-        return;
-      }
-      if (conversionStatus === "already_converted") {
-        setActionMessage("This estimate is already the active estimate.");
-        return;
-      }
-      setActionMessage("Active estimate set to this estimate.");
+      setActionMessage("");
     } catch {
       setActionMessage("Could not reach estimate conversion endpoint.");
     } finally {
@@ -1537,6 +1526,14 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                 >
                   Reset Filters
                 </button>
+                <button
+                  type="button"
+                  className={`${styles.versionFilterActionButton} ${!hideSuperseded ? styles.versionFilterActionButtonActive : ""}`}
+                  aria-pressed={!hideSuperseded}
+                  onClick={() => setHideSuperseded((current) => !current)}
+                >
+                  {hideSuperseded ? "Show Superseded" : "Hide Superseded"}
+                </button>
               </div>
             </div>
 
@@ -1572,11 +1569,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                     )}
                   </div>
                 </div>
-              ) : (
-                <p className={`${styles.inlineHint} ${styles.versionBaselineEmpty}`}>
-                  No active estimate is set for this project yet.
-                </p>
-              )}
+              ) : null}
               {visibleEstimateFamilies.length > 0 ? (
                 visibleEstimateFamilies.map((family) => {
                   const latest = family.items[family.items.length - 1];
@@ -1748,7 +1741,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
               ) : estimateFamilies.length > 0 ? (
                 <p className={styles.inlineHint}>No estimate families match the selected status filters.</p>
               ) : (
-                <p className={styles.inlineHint}>No estimates yet. Create an estimate to get started.</p>
+                <p className={styles.inlineHint}>No estimates yet. Use the workspace above to create one.</p>
               )}
             </div>
 
@@ -1757,7 +1750,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                 {canActivateSelectedFinancialBaseline ? (
                   <div className={styles.financialActivationPanel}>
                     <span className={styles.financialActivationLabel}>Active Estimate</span>
-                    <p className={styles.inlineHint}>
+                    <p className={styles.financialActivationHint}>
                       {selectedFinancialBaselineStatus === "superseded"
                         ? "This estimate was previously active and is now superseded."
                         : "This approved estimate is not currently the active estimate for this project."}{" "}
@@ -2028,7 +2021,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
           readOnly={isReadOnly}
           formErrorMessage={formErrorMessage}
           formSuccessMessage={formSuccessMessage}
-          formSuccessHref={formSuccessHref}
           lineSortKey={lineSortKey}
           lineSortDirection={lineSortDirection}
           onTitleChange={handleEstimateTitleChange}

@@ -1016,8 +1016,12 @@
   background: var(--surface);
   max-width: 440px;
   width: 90vw;
-  display: grid;
+  margin: auto;
   gap: 12px;
+}
+
+.duplicateDialog[open] {
+  display: grid;
 }
 
 .duplicateDialog::backdrop {
@@ -1083,9 +1087,9 @@
 }
 
 .versionBaselineBanner {
-  border: 1px solid var(--accent-light);
+  border: 1px solid var(--status-green-border);
   border-radius: 10px;
-  background: var(--accent-lighter);
+  background: var(--tone-success-bg);
   padding: 9px 11px;
   display: flex;
   align-items: center;
@@ -1103,7 +1107,7 @@
   font-size: 0.66rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--accent-text);
+  color: var(--status-green-text);
   font-weight: 700;
 }
 
@@ -1128,10 +1132,10 @@
 }
 
 .versionBaselineJumpButton {
-  border: 1px solid var(--accent-border);
+  border: 1px solid var(--status-green-border);
   border-radius: var(--radius-md);
-  background: var(--surface-secondary);
-  color: var(--accent-text);
+  background: var(--tone-success-bg);
+  color: var(--status-green-text);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1142,9 +1146,9 @@
 
 .versionBaselineJumpButton:hover,
 .versionBaselineJumpButton:focus-visible {
-  background: var(--accent-light);
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+  background: var(--tone-success-bg);
+  border-color: var(--status-green-text);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--status-green-border) 25%, transparent);
   outline: none;
 }
 
@@ -1181,8 +1185,8 @@
 .versionFilterActionButton {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--surface-secondary);
-  color: var(--status-gray-text);
+  background: var(--surface);
+  color: var(--text-primary);
   padding: 6px 10px;
   font-size: 0.78rem;
   cursor: pointer;
@@ -1191,6 +1195,12 @@
 .versionFilterActionButton:hover {
   background: var(--table-header-bg);
   border-color: var(--border-accent);
+  color: var(--accent-text);
+}
+
+.versionFilterActionButtonActive {
+  background: var(--accent-lighter);
+  border-color: var(--accent-border);
   color: var(--accent-text);
 }
 
@@ -1509,8 +1519,8 @@
 }
 
 .financialBaselineSuperseded {
-  background: var(--surface-inset);
-  color: var(--text-secondary);
+  background: var(--status-gray-bg);
+  color: var(--status-gray-text);
 }
 
 .financialBaselineNone {
@@ -1556,28 +1566,35 @@
 }
 
 .financialActivationPanel {
-  border: 1px solid var(--border-accent);
+  border: 1px solid var(--status-green-border);
   border-radius: 10px;
   padding: 10px 12px;
-  background: var(--accent-lighter);
+  background: var(--tone-success-bg);
+  color: var(--text-primary);
   display: grid;
   gap: 8px;
+}
+
+.financialActivationHint {
+  margin: 0;
+  font-size: var(--font-base);
+  color: var(--text-primary);
 }
 
 .financialActivationLabel {
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: var(--accent-text);
+  color: var(--status-green-text);
   font-weight: 700;
 }
 
 .financialActivationButton {
   justify-self: start;
-  border: 1px solid var(--accent);
+  border: 1px solid var(--status-green-solid);
   border-radius: var(--radius-md);
-  background: var(--accent);
-  color: var(--text-on-accent);
+  background: var(--status-green-solid);
+  color: var(--status-green-solid-text);
   font-size: 0.78rem;
   letter-spacing: 0.04em;
   font-weight: 700;

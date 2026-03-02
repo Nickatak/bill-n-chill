@@ -155,14 +155,9 @@ def public_estimate_decision_view(request, public_token: str):
                 estimate=estimate,
                 user=estimate.created_by,
                 note=f"Budget auto-converted from publicly approved estimate #{estimate.id}.",
-                allow_supersede=False,
+                allow_supersede=True,
             )
             budget_conversion_meta["budget_conversion_status"] = conversion_status
-            if conversion_status == "requires_supersede":
-                budget_conversion_meta["active_financial_estimate_id"] = (
-                    budget_row.source_estimate_id if budget_row else None
-                )
-                budget_conversion_meta["activation_required"] = True
 
     actor_user_ids = _organization_user_ids(estimate.created_by)
     serialized = _serialize_estimate(estimate=estimate, actor_user_ids=actor_user_ids)
@@ -326,7 +321,7 @@ def _sync_project_contract_baseline_if_unset(*, estimate):
 
 def _activate_project_from_estimate_approval(*, estimate, actor, note: str):
     project = estimate.project
-    if project.status != Project.Status.PROSPECT:
+    if project.status not in (Project.Status.PROSPECT, Project.Status.ON_HOLD):
         return False
     if not Project.is_transition_allowed(project.status, Project.Status.ACTIVE):
         return False
@@ -860,14 +855,9 @@ def estimate_detail_view(request, estimate_id: int):
                 estimate=estimate,
                 user=request.user,
                 note=f"Budget auto-converted from approved estimate #{estimate.id}.",
-                allow_supersede=False,
+                allow_supersede=True,
             )
             budget_conversion_meta["budget_conversion_status"] = conversion_status
-            if conversion_status == "requires_supersede":
-                budget_conversion_meta["active_financial_estimate_id"] = (
-                    budget_row.source_estimate_id if budget_row else None
-                )
-                budget_conversion_meta["activation_required"] = True
 
     estimate.refresh_from_db()
     response_payload = {"data": _serialize_estimate(estimate=estimate, actor_user_ids=actor_user_ids)}
