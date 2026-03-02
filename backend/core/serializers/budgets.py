@@ -14,6 +14,8 @@ class BudgetLineSerializer(serializers.ModelSerializer):
     approved_change_order_delta = serializers.SerializerMethodField()
     current_working_amount = serializers.SerializerMethodField()
     remaining_amount = serializers.SerializerMethodField()
+    billed_to_date = serializers.SerializerMethodField()
+    remaining_billable = serializers.SerializerMethodField()
 
     class Meta:
         model = BudgetLine
@@ -31,6 +33,8 @@ class BudgetLineSerializer(serializers.ModelSerializer):
             "approved_change_order_delta",
             "current_working_amount",
             "remaining_amount",
+            "billed_to_date",
+            "remaining_billable",
             "committed_amount",
             "actual_amount",
             "created_at",
@@ -72,6 +76,17 @@ class BudgetLineSerializer(serializers.ModelSerializer):
         co_delta_map = self.context.get("line_approved_co_delta_map", {})
         planned_amount = (obj.budget_amount or Decimal("0")) + co_delta_map.get(obj.id, Decimal("0"))
         return self._money_str(planned_amount - actual_spend)
+
+    def get_billed_to_date(self, obj):
+        billed_map = self.context.get("line_billed_to_date_map", {})
+        return self._money_str(billed_map.get(obj.id, Decimal("0")))
+
+    def get_remaining_billable(self, obj):
+        co_delta_map = self.context.get("line_approved_co_delta_map", {})
+        current_working = (obj.budget_amount or Decimal("0")) + co_delta_map.get(obj.id, Decimal("0"))
+        billed_map = self.context.get("line_billed_to_date_map", {})
+        billed = billed_map.get(obj.id, Decimal("0"))
+        return self._money_str(current_working - billed)
 
 
 class BudgetSerializer(serializers.ModelSerializer):

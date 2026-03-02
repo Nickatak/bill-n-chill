@@ -67,6 +67,7 @@ type ProjectBudgetRecord = {
     cost_code_code: string;
     description: string;
     budget_amount?: string;
+    remaining_billable?: string;
   }>;
 };
 type BudgetLineOption = {
@@ -78,6 +79,7 @@ type BudgetLineOption = {
   groupLabel: string;
   defaultQuantity: string;
   defaultUnitPrice: string;
+  remainingBillable: string;
 };
 
 const INVOICE_STATUSES_FALLBACK = ["draft", "sent", "partially_paid", "paid", "void"];
@@ -717,6 +719,7 @@ export function InvoicesConsole() {
               groupLabel,
               defaultQuantity,
               defaultUnitPrice,
+              remainingBillable: normalizeDecimalInput(parseAmount(String(line.remaining_billable ?? "0")), "0"),
             };
           })
             .filter((line) => !GENERIC_BUDGET_COST_CODES.has(line.costCodeCode))
@@ -956,8 +959,9 @@ export function InvoicesConsole() {
           return {
             ...line,
             budgetLineId: value,
-            quantity: selectedOption.defaultQuantity,
-            unitPrice: selectedOption.defaultUnitPrice,
+            description: selectedOption.description,
+            quantity: "1",
+            unitPrice: selectedOption.remainingBillable,
           };
         }
         return { ...line, [key]: value };
@@ -1057,17 +1061,39 @@ export function InvoicesConsole() {
     loadInvoiceIntoWorkspace(invoice);
   }
 
-  /** Reset the creator workspace to a fresh new-draft state. */
+  /** Reset the creator workspace to a fresh new-draft state.
+   *  Pre-populates line items from the active budget with remaining billable amounts. */
   function resetCreateDraft() {
-    const defaultBudgetLineId = budgetLineOptions[0] ? String(budgetLineOptions[0].id) : "";
     const nextIssueDate = todayDateInput();
     const dueDays = organizationInvoiceDefaults?.invoice_default_due_days ?? 30;
     setIssueDate(nextIssueDate);
     setDueDate(dueDateFromIssueDate(nextIssueDate, dueDays));
     setTaxPercent("0");
     setTermsText(organizationInvoiceDefaults?.invoice_default_terms || "");
-    setLineItems([emptyLine(1, defaultBudgetLineId)]);
-    setNextLineId(2);
+
+    const billableLines = budgetLineOptions
+      .filter((opt) => parseAmount(opt.remainingBillable) > 0)
+      .map((opt, idx) => ({
+        localId: idx + 1,
+        lineType: "scope" as const,
+        budgetLineId: String(opt.id),
+        adjustmentReason: "",
+        internalNote: "",
+        description: opt.description,
+        quantity: "1",
+        unit: "ea",
+        unitPrice: opt.remainingBillable,
+      }));
+
+    if (billableLines.length > 0) {
+      setLineItems(billableLines);
+      setNextLineId(billableLines.length + 1);
+    } else {
+      const defaultBudgetLineId = budgetLineOptions[0] ? String(budgetLineOptions[0].id) : "";
+      setLineItems([emptyLine(1, defaultBudgetLineId)]);
+      setNextLineId(2);
+    }
+
     setWorkspaceSourceInvoiceId(null);
     setEditingDraftInvoiceId(null);
     setWorkspaceContext("New invoice draft");

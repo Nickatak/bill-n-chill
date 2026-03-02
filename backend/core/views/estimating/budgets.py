@@ -7,7 +7,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import Budget, BudgetLine, ChangeOrder, ChangeOrderLine, VendorBill, VendorBillAllocation
+from core.models import Budget, BudgetLine, ChangeOrder, ChangeOrderLine, Invoice, InvoiceLine, VendorBill, VendorBillAllocation
 from core.serializers import BudgetLineSerializer, BudgetLineUpdateSerializer, BudgetSerializer
 from core.views.helpers import _organization_user_ids, _role_gate_error_payload, _validate_project_for_user
 
@@ -36,6 +36,7 @@ def project_budgets_view(request, project_id: int):
 
     line_actual_spend_map = {}
     line_approved_co_delta_map = {}
+    line_billed_to_date_map = {}
     if line_ids:
         spend_rows = (
             VendorBillAllocation.objects.filter(
@@ -63,6 +64,20 @@ def project_budgets_view(request, project_id: int):
         line_approved_co_delta_map = {
             row["budget_line_id"]: row["total"] or Decimal("0") for row in approved_co_rows
         }
+        billable_statuses = (Invoice.Status.SENT, Invoice.Status.PARTIALLY_PAID, Invoice.Status.PAID)
+        billed_rows = (
+            InvoiceLine.objects.filter(
+                budget_line_id__in=line_ids,
+                invoice__project=project,
+                invoice__created_by_id__in=actor_user_ids,
+                invoice__status__in=billable_statuses,
+            )
+            .values("budget_line_id")
+            .annotate(total=Sum("line_total"))
+        )
+        line_billed_to_date_map = {
+            row["budget_line_id"]: row["total"] or Decimal("0") for row in billed_rows
+        }
 
     serializer = BudgetSerializer(
         budgets,
@@ -70,6 +85,7 @@ def project_budgets_view(request, project_id: int):
         context={
             "line_actual_spend_map": line_actual_spend_map,
             "line_approved_co_delta_map": line_approved_co_delta_map,
+            "line_billed_to_date_map": line_billed_to_date_map,
         },
     )
     return Response({"data": serializer.data})
@@ -141,6 +157,16 @@ def budget_line_detail_view(request, budget_id: int, line_id: int):
         ).aggregate(total=Sum("amount"))["total"]
         or Decimal("0")
     )
+    billable_statuses = (Invoice.Status.SENT, Invoice.Status.PARTIALLY_PAID, Invoice.Status.PAID)
+    billed_total = (
+        InvoiceLine.objects.filter(
+            budget_line_id=line.id,
+            invoice__project=budget.project,
+            invoice__created_by_id__in=actor_user_ids,
+            invoice__status__in=billable_statuses,
+        ).aggregate(total=Sum("line_total"))["total"]
+        or Decimal("0")
+    )
     serializer = BudgetLineSerializer(
         line,
         context={
@@ -156,6 +182,7 @@ def budget_line_detail_view(request, budget_id: int, line_id: int):
                     or Decimal("0")
                 )
             },
+            "line_billed_to_date_map": {line.id: billed_total},
         },
     )
     return Response({"data": serializer.data})
