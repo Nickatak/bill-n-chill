@@ -590,8 +590,12 @@ class Command(BaseCommand):
             bill_number="VB-100",
             defaults={
                 "status": VendorBill.Status.PAID,
+                "received_date": today - timedelta(days=2),
                 "issue_date": today,
                 "due_date": today + timedelta(days=30),
+                "subtotal": Decimal("450.00"),
+                "tax_amount": Decimal("36.00"),
+                "shipping_amount": Decimal("14.00"),
                 "total": Decimal("500.00"),
                 "balance_due": Decimal("0.00"),
                 "notes": "Tile material supplier bill.",
@@ -599,14 +603,18 @@ class Command(BaseCommand):
             },
         )
         vendor_bill.status = VendorBill.Status.PAID
+        vendor_bill.received_date = today - timedelta(days=2)
         vendor_bill.issue_date = today
         vendor_bill.due_date = today + timedelta(days=30)
+        vendor_bill.subtotal = Decimal("450.00")
+        vendor_bill.tax_amount = Decimal("36.00")
+        vendor_bill.shipping_amount = Decimal("14.00")
         vendor_bill.total = Decimal("500.00")
         vendor_bill.balance_due = Decimal("0.00")
         vendor_bill.notes = "Tile material supplier bill."
         vendor_bill.created_by = user
         vendor_bill.save(
-            update_fields=["status", "issue_date", "due_date", "total", "balance_due", "notes", "created_by", "updated_at"]
+            update_fields=["status", "received_date", "issue_date", "due_date", "subtotal", "tax_amount", "shipping_amount", "total", "balance_due", "notes", "created_by", "updated_at"]
         )
         self._sync_vendor_bill_allocations(
             vendor_bill=vendor_bill,
@@ -862,6 +870,17 @@ class Command(BaseCommand):
                     "created_by",
                     "updated_at",
                 ]
+            )
+            InvoiceLine.objects.get_or_create(
+                invoice=scoped_invoice,
+                description=f"Service line ({status})",
+                defaults={
+                    "cost_code": code_tile,
+                    "quantity": Decimal("1.00"),
+                    "unit": "ea",
+                    "unit_price": Decimal("300.00"),
+                    "line_total": Decimal("300.00"),
+                },
             )
 
         for idx, (status, _) in enumerate(VendorBill.Status.choices, start=1):

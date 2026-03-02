@@ -80,28 +80,26 @@ type BudgetLineOption = {
   defaultUnitPrice: string;
 };
 
-const INVOICE_STATUSES_FALLBACK = ["draft", "sent", "partially_paid", "paid", "overdue", "void"];
+const INVOICE_STATUSES_FALLBACK = ["draft", "sent", "partially_paid", "paid", "void"];
 
 const INVOICE_STATUS_LABELS_FALLBACK: Record<string, string> = {
   draft: "Draft",
   sent: "Sent",
   partially_paid: "Partially Paid",
   paid: "Paid",
-  overdue: "Overdue",
   void: "Void",
 };
 
 const INVOICE_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
   draft: ["sent", "void"],
-  sent: ["partially_paid", "paid", "overdue", "void"],
-  partially_paid: ["sent", "paid", "overdue", "void"],
-  paid: ["void"],
-  overdue: ["partially_paid", "paid", "void"],
+  sent: ["partially_paid", "paid", "void"],
+  partially_paid: ["paid"],
+  paid: [],
   void: [],
 };
 
-const INVOICE_DEFAULT_STATUS_FILTERS_FALLBACK = ["draft", "sent", "partially_paid", "overdue"];
-const INVOICE_TERMINAL_STATUSES_FALLBACK = ["paid", "void"];
+const INVOICE_DEFAULT_STATUS_FILTERS_FALLBACK = ["draft", "sent", "partially_paid"];
+const INVOICE_TERMINAL_STATUSES_FALLBACK = ["paid", "partially_paid", "void"];
 const INVOICE_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
 const DEFAULT_PROJECT_STATUS_FILTERS: ProjectStatusValue[] = ["active", "prospect"];
 const PROJECT_STATUS_VALUES: ProjectStatusValue[] = ["prospect", "active", "on_hold", "completed", "cancelled"];
@@ -162,9 +160,6 @@ function invoiceNextActionHint(status: string): string {
   if (status === "partially_paid") {
     return "Next: allocate remaining payment and close the outstanding balance.";
   }
-  if (status === "overdue") {
-    return "Next: follow up with customer and record payment once received.";
-  }
   if (status === "paid") {
     return "Invoice is fully settled.";
   }
@@ -188,9 +183,6 @@ function invoiceStatusClass(status: string): string {
   if (status === "paid") {
     return styles.statusPaid;
   }
-  if (status === "overdue") {
-    return styles.statusOverdue;
-  }
   if (status === "void") {
     return styles.statusVoid;
   }
@@ -211,9 +203,6 @@ function invoiceStatusToneClass(status: string): string {
   if (status === "paid") {
     return styles.statusTonePaid;
   }
-  if (status === "overdue") {
-    return styles.statusToneOverdue;
-  }
   if (status === "void") {
     return styles.statusToneVoid;
   }
@@ -233,9 +222,6 @@ function invoiceCardStatusClass(status: string): string {
   }
   if (status === "paid") {
     return styles.invoiceCardStatusPaid;
-  }
-  if (status === "overdue") {
-    return styles.invoiceCardStatusOverdue;
   }
   if (status === "void") {
     return styles.invoiceCardStatusVoid;
@@ -350,6 +336,13 @@ export function InvoicesConsole() {
   );
   const [isProjectListExpanded, setIsProjectListExpanded] = useState(true);
   const [isInvoiceViewerExpanded, setIsInvoiceViewerExpanded] = useState(true);
+  const [isStatusSectionOpen, setIsStatusSectionOpen] = useState(true);
+  const [isHistorySectionOpen, setIsHistorySectionOpen] = useState(false);
+  const [isLineItemsSectionOpen, setIsLineItemsSectionOpen] = useState(false);
+  const [viewerActionMessage, setViewerActionMessage] = useState("");
+  const [viewerActionTone, setViewerActionTone] = useState<"success" | "error">("success");
+  const [showAllEvents, setShowAllEvents] = useState(false);
+  const [invoiceSearch, setInvoiceSearch] = useState("");
   const [hasAutoSelectedProjectWithInvoices, setHasAutoSelectedProjectWithInvoices] = useState(false);
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -379,12 +372,26 @@ export function InvoicesConsole() {
   const [issueDate, setIssueDate] = useState(todayDateInput());
   const [dueDate, setDueDate] = useState(futureDateInput());
   const [taxPercent, setTaxPercent] = useState("0");
+  const [termsText, setTermsText] = useState("");
   const [lineItems, setLineItems] = useState<InvoiceLineInput[]>([emptyLine(1)]);
   const [nextLineId, setNextLineId] = useState(2);
   const [workspaceSourceInvoiceId, setWorkspaceSourceInvoiceId] = useState<number | null>(null);
   const [editingDraftInvoiceId, setEditingDraftInvoiceId] = useState<number | null>(null);
   const [workspaceContext, setWorkspaceContext] = useState("New invoice draft");
   const invoiceCreatorRef = useRef<HTMLDivElement | null>(null);
+  const [creatorFlashCount, setCreatorFlashCount] = useState(0);
+
+  useEffect(() => {
+    if (creatorFlashCount === 0) return;
+    const el = invoiceCreatorRef.current;
+    if (!el) return;
+    el.classList.remove(creatorStyles.sheetFlash);
+    void el.offsetWidth;
+    el.classList.add(creatorStyles.sheetFlash);
+    const cleanup = () => el.classList.remove(creatorStyles.sheetFlash);
+    el.addEventListener("animationend", cleanup, { once: true });
+    return () => el.removeEventListener("animationend", cleanup);
+  }, [creatorFlashCount]);
 
   const selectedInvoice = useMemo(
     () => invoices.find((invoice) => String(invoice.id) === selectedInvoiceId) ?? null,
@@ -438,6 +445,21 @@ export function InvoicesConsole() {
     }
     return invoices.filter((invoice) => invoiceStatusFilters.includes(invoice.status));
   }, [invoiceStatusFilters, invoices]);
+  const invoiceNeedle = invoiceSearch.trim().toLowerCase();
+  const searchedInvoices = useMemo(() => {
+    if (!invoiceNeedle) return filteredInvoices;
+    return filteredInvoices.filter((invoice) => {
+      const haystack = [
+        invoice.invoice_number,
+        invoice.status,
+        invoice.total,
+        invoice.balance_due,
+        invoice.issue_date,
+        invoice.due_date,
+      ].join(" ").toLowerCase();
+      return haystack.includes(invoiceNeedle);
+    });
+  }, [filteredInvoices, invoiceNeedle]);
   const nextStatusOptions = useMemo(() => {
     if (!selectedInvoice) {
       return [] as string[];
@@ -449,19 +471,6 @@ export function InvoicesConsole() {
     return nextStatuses;
   }, [invoiceAllowedStatusTransitions, selectedInvoice]);
 
-  const invoiceCounts = useMemo(() => {
-    const byStatus = new Map<string, number>();
-    for (const row of invoices) {
-      byStatus.set(row.status, (byStatus.get(row.status) ?? 0) + 1);
-    }
-    return {
-      total: invoices.length,
-      draft: byStatus.get("draft") ?? 0,
-      sent: byStatus.get("sent") ?? 0,
-      overdue: byStatus.get("overdue") ?? 0,
-      paid: byStatus.get("paid") ?? 0,
-    };
-  }, [invoices]);
   const invoiceStatusTotals = useMemo(() => {
     const totals = new Map<string, number>();
     for (const row of invoices) {
@@ -474,7 +483,7 @@ export function InvoicesConsole() {
   const workspaceIsLockedByStatus = workspaceSourceInvoice ? workspaceSourceInvoice.status !== "draft" : false;
   const workspaceIsLocked = !canEditInvoiceWorkspace || workspaceIsLockedByStatus;
   const workspaceBadgeLabel = !workspaceSourceInvoice
-    ? "NEW INVOICE"
+    ? "CREATING"
     : workspaceIsLocked
       ? "READ-ONLY"
       : "EDITING";
@@ -483,17 +492,6 @@ export function InvoicesConsole() {
     : workspaceIsLocked
       ? invoiceStatusClass(workspaceSourceInvoice.status)
       : styles.statusDraft;
-
-  const balanceSummary = useMemo(() => {
-    return invoices.reduce(
-      (acc, row) => {
-        acc.total += parseAmount(row.total);
-        acc.balanceDue += parseAmount(row.balance_due);
-        return acc;
-      },
-      { total: 0, balanceDue: 0 },
-    );
-  }, [invoices]);
 
   const draftLineSubtotal = useMemo(() => {
     return lineItems.reduce((sum, line) => sum + parseAmount(line.quantity) * parseAmount(line.unitPrice), 0);
@@ -539,6 +537,7 @@ export function InvoicesConsole() {
         if (orgRes.ok && organizationData) {
           setOrganizationInvoiceDefaults(organizationData);
           setDueDate(dueDateFromIssueDate(issueDate, organizationData.invoice_default_due_days || 30));
+          setTermsText((current) => current || organizationData.invoice_default_terms || "");
         }
 
         setSelectedProjectId((current) => {
@@ -1023,6 +1022,7 @@ export function InvoicesConsole() {
       setIssueDate(invoice.issue_date || todayDateInput());
       setDueDate(invoice.due_date || futureDateInput());
       setTaxPercent(invoice.tax_percent || "0");
+      setTermsText(invoice.terms_text || "");
       setLineItems(workspaceLines);
       setNextLineId(workspaceLines.length + 1);
       setWorkspaceSourceInvoiceId(invoice.id);
@@ -1043,12 +1043,17 @@ export function InvoicesConsole() {
       return;
     }
     setSelectedProjectId(String(project.id));
+    setInvoiceSearch("");
   }
 
   /** Select an invoice from the list and load it into the creator workspace. */
   function handleSelectInvoice(invoice: InvoiceRecord) {
     setSelectedInvoiceId(String(invoice.id));
     setSelectedStatus(resolvePreferredStatusSelection(invoice, invoiceAllowedStatusTransitions));
+    setIsHistorySectionOpen(false);
+    setIsLineItemsSectionOpen(false);
+    setShowAllEvents(false);
+    setViewerActionMessage("");
     loadInvoiceIntoWorkspace(invoice);
   }
 
@@ -1060,6 +1065,7 @@ export function InvoicesConsole() {
     setIssueDate(nextIssueDate);
     setDueDate(dueDateFromIssueDate(nextIssueDate, dueDays));
     setTaxPercent("0");
+    setTermsText(organizationInvoiceDefaults?.invoice_default_terms || "");
     setLineItems([emptyLine(1, defaultBudgetLineId)]);
     setNextLineId(2);
     setWorkspaceSourceInvoiceId(null);
@@ -1067,13 +1073,10 @@ export function InvoicesConsole() {
     setWorkspaceContext("New invoice draft");
   }
 
-  /** Clear the workspace and scroll to the creator for a new invoice draft. */
+  /** Clear the workspace and start a new invoice draft. */
   function handleStartNewInvoiceDraft() {
     resetCreateDraft();
     setSuccessStatus("Started a new invoice draft.");
-    requestAnimationFrame(() => {
-      invoiceCreatorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
   }
 
   /** Create a new invoice or save an existing draft, depending on workspace context. */
@@ -1129,6 +1132,7 @@ export function InvoicesConsole() {
         setSelectedStatus(resolvePreferredStatusSelection(updated, invoiceAllowedStatusTransitions));
         setWorkspaceContext(`Editing ${updated.invoice_number}`);
         setSuccessStatus(`Saved ${updated.invoice_number} draft.`);
+        setCreatorFlashCount((c) => c + 1);
         return;
       } catch {
         setErrorStatus("Could not reach invoice update endpoint.");
@@ -1161,8 +1165,9 @@ export function InvoicesConsole() {
       await loadInvoices(projectId);
       setSelectedInvoiceId(String(created.id));
       setSelectedStatus(created.status);
-      resetCreateDraft();
+      loadInvoiceIntoWorkspace(created);
       setSuccessStatus(`Created ${created.invoice_number} (${statusLabel(created.status)}).`);
+      setCreatorFlashCount((c) => c + 1);
     } catch {
       setErrorStatus("Could not reach invoice create endpoint.");
     }
@@ -1215,9 +1220,15 @@ export function InvoicesConsole() {
       setSelectedStatus(updated.status);
       setStatusNote("");
       await loadInvoiceStatusEvents(updated.id);
-      setSuccessStatus(`Updated ${updated.invoice_number} to ${statusLabel(updated.status)}.`);
+      const msg = `Updated ${updated.invoice_number} to ${statusLabel(updated.status)}. History updated.`;
+      setSuccessStatus(msg);
+      setViewerActionMessage(msg);
+      setViewerActionTone("success");
     } catch {
-      setErrorStatus("Could not reach invoice status endpoint.");
+      const msg = "Could not reach invoice status endpoint.";
+      setErrorStatus(msg);
+      setViewerActionMessage(msg);
+      setViewerActionTone("error");
     }
   }
 
@@ -1258,9 +1269,15 @@ export function InvoicesConsole() {
       setSelectedStatus(updated.status);
       setStatusNote("");
       await loadInvoiceStatusEvents(updated.id);
-      setSuccessStatus(`Added status note on ${updated.invoice_number}.`);
+      const msg = `Added status note on ${updated.invoice_number}. History updated.`;
+      setSuccessStatus(msg);
+      setViewerActionMessage(msg);
+      setViewerActionTone("success");
     } catch {
-      setErrorStatus("Could not reach invoice status note endpoint.");
+      const msg = "Could not reach invoice status note endpoint.";
+      setErrorStatus(msg);
+      setViewerActionMessage(msg);
+      setViewerActionTone("error");
     }
   }
 
@@ -1280,15 +1297,14 @@ export function InvoicesConsole() {
       organizationInvoiceDefaults?.invoice_default_due_days ?? 30,
     ));
     setTaxPercent(selectedInvoice.tax_percent || "0");
+    setTermsText(selectedInvoice.terms_text || "");
     setLineItems(nextDraftLines);
     setNextLineId(nextDraftLines.length + 1);
     setWorkspaceSourceInvoiceId(null);
     setEditingDraftInvoiceId(null);
     setWorkspaceContext(`Draft from ${selectedInvoice.invoice_number}`);
-    setSuccessStatus(`Loaded ${selectedInvoice.invoice_number} into a new draft. A new invoice # is assigned on create.`);
-    requestAnimationFrame(() => {
-      invoiceCreatorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+    setSuccessStatus(`Draft created from ${selectedInvoice.invoice_number}.`);
+    setCreatorFlashCount((c) => c + 1);
   }
 
   const selectedProject = projects.find((project) => String(project.id) === selectedProjectId) ?? null;
@@ -1320,6 +1336,7 @@ export function InvoicesConsole() {
       issueDate,
       dueDate,
       taxPercent,
+      termsText,
       subtotal: draftLineSubtotal,
       taxAmount: draftTaxTotal,
       totalAmount: draftTotal,
@@ -1333,6 +1350,7 @@ export function InvoicesConsole() {
       issueDate,
       lineItems,
       taxPercent,
+      termsText,
     ],
   );
   const invoiceCreatorAdapter = useMemo(
@@ -1344,28 +1362,6 @@ export function InvoicesConsole() {
 
   return (
     <section className={styles.console}>
-      <section className={styles.quickView} aria-label="Billing quick view">
-        <h2 className={styles.quickViewTitle}>Billing Quick View</h2>
-        <div className={styles.statsGrid}>
-          <article className={styles.statCard}>
-            <span>Total invoices</span>
-            <strong>{invoiceCounts.total}</strong>
-          </article>
-          <article className={styles.statCard}>
-            <span>Awaiting action</span>
-            <strong>{invoiceCounts.draft + invoiceCounts.sent + invoiceCounts.overdue}</strong>
-          </article>
-          <article className={styles.statCard}>
-            <span>Total invoiced</span>
-            <strong>${formatDecimal(balanceSummary.total)}</strong>
-          </article>
-          <article className={styles.statCard}>
-            <span>Balance due</span>
-            <strong>${formatDecimal(balanceSummary.balanceDue)}</strong>
-          </article>
-        </div>
-      </section>
-
       {!token ? <p className={styles.authNotice}>{authMessage}</p> : null}
 
       {statusMessage && !statusMessageAtCreator ? (
@@ -1410,29 +1406,27 @@ export function InvoicesConsole() {
 
           <section className={`${styles.panel} ${styles.viewerPanel}`}>
               <div className={styles.panelHeader}>
-                <h3>Project Invoices</h3>
-                <div className={styles.panelHeaderActions}>
-                  <span className={styles.countBadge}>
-                    {filteredInvoices.length}/{invoices.length}
-                  </span>
-                  <button
-                    type="button"
-                    className={collapseButtonStyles.collapseButton}
-                    onClick={() => setIsInvoiceViewerExpanded((current) => !current)}
-                    aria-expanded={isInvoiceViewerExpanded}
-                  >
-                    {isInvoiceViewerExpanded ? "Collapse" : "Expand"}
-                  </button>
-                </div>
+                <h3>{selectedProject ? `Invoices for: ${selectedProject.name}` : "Invoices"}</h3>
+                <button
+                  type="button"
+                  className={collapseButtonStyles.collapseButton}
+                  onClick={() => setIsInvoiceViewerExpanded((current) => !current)}
+                  aria-expanded={isInvoiceViewerExpanded}
+                >
+                  {isInvoiceViewerExpanded ? "Collapse" : "Expand"}
+                </button>
               </div>
 
               {isInvoiceViewerExpanded ? (
                 <>
-              {selectedProject ? (
-                <p className={styles.inlineHint}>
-                  {selectedProject.name} · {selectedProject.customer_display_name}
-                </p>
-              ) : null}
+
+              <input
+                className={styles.invoiceSearchInput}
+                type="text"
+                placeholder="Search invoices..."
+                value={invoiceSearch}
+                onChange={(e) => setInvoiceSearch(e.target.value)}
+              />
 
               <div className={styles.statusFilters}>
                 {invoiceStatuses.map((status) => {
@@ -1456,8 +1450,8 @@ export function InvoicesConsole() {
               </div>
 
               <div className={styles.invoiceRail}>
-                {filteredInvoices.length ? (
-                  filteredInvoices.map((invoice) => {
+                {searchedInvoices.length ? (
+                  searchedInvoices.map((invoice) => {
                     const isSelected = String(invoice.id) === selectedInvoiceId;
                     return (
                       <article
@@ -1466,9 +1460,10 @@ export function InvoicesConsole() {
                           isSelected ? styles.invoiceCardSelected : ""
                         }`}
                         onClick={() => {
-                          handleSelectInvoice(invoice);
+                          if (!isSelected) handleSelectInvoice(invoice);
                         }}
                         onKeyDown={(event) => {
+                          if (isSelected) return;
                           if (event.key === "Enter" || event.key === " ") {
                             event.preventDefault();
                             handleSelectInvoice(invoice);
@@ -1494,181 +1489,234 @@ export function InvoicesConsole() {
                               onClick={(event) => event.stopPropagation()}
                               onKeyDown={(event) => event.stopPropagation()}
                             >
-                              Public
+                              Public ↗
                             </a>
                           ) : null}
                         </div>
                         <div className={styles.invoiceMetaGrid}>
-                          <span>Total ${invoice.total}</span>
-                          <span>Due ${invoice.balance_due}</span>
-                          <span>Issue {formatDateDisplay(invoice.issue_date)}</span>
-                          <span>Due {formatDateDisplay(invoice.due_date)}</span>
+                          <span><span className={styles.invoiceMetaLabel}>Total</span> ${invoice.total}</span>
+                          <span><span className={styles.invoiceMetaLabel}>Due</span> ${invoice.balance_due}</span>
+                          <span><span className={styles.invoiceMetaLabel}>Issued</span> {formatDateDisplay(invoice.issue_date)}</span>
+                          <span><span className={styles.invoiceMetaLabel}>Due</span> {formatDateDisplay(invoice.due_date)}</span>
                         </div>
+
+                        {isSelected && selectedInvoice ? (
+                          <div className={styles.invoiceExpandedSections}>
+                            {/* Status & Actions */}
+                            <div className={styles.invoiceViewerSection}>
+                              <button
+                                type="button"
+                                className={styles.invoiceViewerSectionToggle}
+                                onClick={(e) => { e.stopPropagation(); setIsStatusSectionOpen((v) => !v); }}
+                                aria-expanded={isStatusSectionOpen}
+                              >
+                                <h4>Status &amp; Actions</h4>
+                                <span className={styles.invoiceViewerSectionArrow}>▼</span>
+                              </button>
+                              {isStatusSectionOpen ? (
+                                <div className={styles.invoiceViewerSectionContent}>
+                                  <p className={styles.inlineHint}>{invoiceNextActionHint(selectedInvoice.status)}</p>
+                                  {canMutateInvoices ? (
+                                    <>
+                                      {nextStatusOptions.length > 0 ? (
+                                        <>
+                                          <span className={styles.lifecycleFieldLabel}>Next status</span>
+                                          <div className={styles.invoiceQuickStatusPills}>
+                                            {nextStatusOptions.map((status) => {
+                                              const isActive = selectedStatus === status;
+                                              return (
+                                                <button
+                                                  key={status}
+                                                  type="button"
+                                                  className={`${styles.invoiceQuickStatusButton} ${
+                                                    isActive
+                                                      ? `${styles.invoiceQuickStatusButtonActive} ${invoiceStatusToneClass(status)}`
+                                                      : styles.invoiceQuickStatusButtonInactive
+                                                  }`}
+                                                  onClick={(e) => { e.stopPropagation(); setSelectedStatus(status); }}
+                                                  aria-pressed={isActive}
+                                                >
+                                                  {selectedInvoice.status === "sent" && status === "sent"
+                                                    ? "Re-send"
+                                                    : statusLabel(status)}
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <p className={styles.inlineHint}>No next statuses available.</p>
+                                      )}
+                                      <label className={styles.invoiceViewerField} onClick={(e) => e.stopPropagation()}>
+                                        Status note
+                                        <textarea
+                                          value={statusNote}
+                                          onChange={(e) => setStatusNote(e.target.value)}
+                                          placeholder="Optional note for this status action or history-only note."
+                                          rows={2}
+                                        />
+                                      </label>
+                                      {viewerActionMessage ? (
+                                        <p
+                                          className={viewerActionTone === "error" ? styles.invoiceViewerActionError : styles.invoiceViewerActionSuccess}
+                                          role="status"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          {viewerActionMessage}
+                                        </p>
+                                      ) : null}
+                                      <div className={styles.invoiceViewerActionRow}>
+                                        {nextStatusOptions.length > 0 ? (
+                                          <button
+                                            type="button"
+                                            className={`${styles.invoiceViewerActionButton} ${styles.invoiceViewerActionButtonPrimary}`}
+                                            onClick={(e) => { e.stopPropagation(); handleUpdateInvoiceStatus(); }}
+                                          >
+                                            Update Status
+                                          </button>
+                                        ) : null}
+                                        <button
+                                          type="button"
+                                          className={`${styles.invoiceViewerActionButton} ${styles.invoiceViewerActionButtonSecondary}`}
+                                          onClick={(e) => { e.stopPropagation(); handleAddInvoiceStatusNote(); }}
+                                          disabled={!statusNote.trim()}
+                                        >
+                                          Add Status Note
+                                        </button>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <p className={styles.inlineHint}>Status actions are read-only for your role.</p>
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
+
+                            {/* History */}
+                            <div className={styles.invoiceViewerSection}>
+                              <button
+                                type="button"
+                                className={styles.invoiceViewerSectionToggle}
+                                onClick={(e) => { e.stopPropagation(); setIsHistorySectionOpen((v) => !v); }}
+                                aria-expanded={isHistorySectionOpen}
+                              >
+                                <h4>History ({selectedInvoiceStatusEvents.length})</h4>
+                                <span className={styles.invoiceViewerSectionArrow}>▼</span>
+                              </button>
+                              {isHistorySectionOpen ? (
+                                <div className={styles.invoiceViewerSectionContent}>
+                                  {selectedInvoiceStatusEvents.length > 0 ? (
+                                    <>
+                                      <ul className={styles.invoiceViewerEventList}>
+                                        {(showAllEvents
+                                          ? selectedInvoiceStatusEvents
+                                          : selectedInvoiceStatusEvents.slice(0, 4)
+                                        ).map((event) => (
+                                          <li key={event.id} className={styles.invoiceViewerEventItem}>
+                                            <span className={`${styles.invoiceViewerEventAction} ${invoiceStatusEventToneClass(event)}`}>
+                                              {invoiceStatusEventActionLabel(event, statusLabel)}
+                                            </span>
+                                            <span className={styles.invoiceViewerEventMeta}>
+                                              {formatDateTimeDisplay(event.changed_at, "--")} by{" "}
+                                              {event.changed_by_customer_id ? (
+                                                <Link
+                                                  href={`/customers?customer=${event.changed_by_customer_id}`}
+                                                  className={styles.statusActorLink}
+                                                  onClick={(e) => e.stopPropagation()}
+                                                >
+                                                  {event.changed_by_display || `Customer #${event.changed_by_customer_id}`}
+                                                </Link>
+                                              ) : (
+                                                event.changed_by_display || event.changed_by_email || `User #${event.changed_by}`
+                                              )}
+                                            </span>
+                                            {event.note ? (
+                                              <span className={styles.invoiceViewerEventNote}>{event.note}</span>
+                                            ) : null}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                      {selectedInvoiceStatusEvents.length > 4 ? (
+                                        <button
+                                          type="button"
+                                          className={styles.invoiceShowAllToggle}
+                                          onClick={(e) => { e.stopPropagation(); setShowAllEvents((v) => !v); }}
+                                        >
+                                          {showAllEvents
+                                            ? "Show less"
+                                            : `Show all ${selectedInvoiceStatusEvents.length} events`}
+                                        </button>
+                                      ) : null}
+                                    </>
+                                  ) : (
+                                    <p className={styles.inlineHint}>
+                                      {statusEventsLoading ? "Loading status history..." : "No status history yet."}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
+
+                            {/* Line Items */}
+                            <div className={styles.invoiceViewerSection}>
+                              <button
+                                type="button"
+                                className={styles.invoiceViewerSectionToggle}
+                                onClick={(e) => { e.stopPropagation(); setIsLineItemsSectionOpen((v) => !v); }}
+                                aria-expanded={isLineItemsSectionOpen}
+                              >
+                                <h4>Line Items ({invoice.line_items?.length ?? 0})</h4>
+                                <span className={styles.invoiceViewerSectionArrow}>▼</span>
+                              </button>
+                              {isLineItemsSectionOpen ? (
+                                <div className={styles.invoiceViewerSectionContent}>
+                                  {(invoice.line_items?.length ?? 0) > 0 ? (
+                                    <div className={styles.invoiceLineTableWrap}>
+                                      <table className={styles.invoiceLineTable}>
+                                        <thead>
+                                          <tr>
+                                            <th>Description</th>
+                                            <th>Qty</th>
+                                            <th>Unit</th>
+                                            <th>Unit Price</th>
+                                            <th>Line Total</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {invoice.line_items!.map((line) => (
+                                            <tr key={line.id}>
+                                              <td>{line.description || line.budget_line_description || "—"}</td>
+                                              <td>{line.quantity}</td>
+                                              <td>{line.unit}</td>
+                                              <td>${line.unit_price}</td>
+                                              <td>${line.line_total}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  ) : (
+                                    <p className={styles.inlineHint}>No line items.</p>
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        ) : null}
                       </article>
                     );
                   })
                 ) : (
                   <p className={styles.emptyState}>
                     {invoices.length
-                      ? "No invoices match the selected status filters."
+                      ? invoiceNeedle
+                        ? "No invoices match your search."
+                        : "No invoices match the selected status filters."
                       : "No invoices yet for this project."}
                   </p>
                 )}
               </div>
 
-              <div className={styles.viewerStatusPanel}>
-                <div className={styles.panelHeader}>
-                  <h3>Invoice Status</h3>
-                  <span className={styles.countBadge}>
-                    {selectedInvoice ? selectedInvoice.invoice_number : "No selection"}
-                  </span>
-                </div>
-
-                {selectedInvoice ? (
-                  <>
-                    {!canMutateInvoices ? (
-                      <p className={styles.inlineHint}>
-                        Status and duplication actions are read-only for your role.
-                      </p>
-                    ) : null}
-
-                    <div className={styles.selectedInvoiceSummary}>
-                      <span className={`${styles.statusBadge} ${invoiceStatusClass(selectedInvoice.status)}`}>
-                        {statusLabel(selectedInvoice.status)}
-                      </span>
-                      <p>{invoiceNextActionHint(selectedInvoice.status)}</p>
-                    </div>
-
-                    <section className={styles.statusHistoryBlock}>
-                      <div className={styles.statusHistoryHeader}>
-                        <h4>Status History</h4>
-                        <span>
-                          {statusEventsLoading
-                            ? "Loading..."
-                            : `${selectedInvoiceStatusEvents.length} event${
-                                selectedInvoiceStatusEvents.length === 1 ? "" : "s"
-                              }`}
-                        </span>
-                      </div>
-                      {selectedInvoiceStatusEvents.length ? (
-                        <div className={styles.statusHistoryTableWrap}>
-                          <table className={styles.statusHistoryTable}>
-                            <thead>
-                              <tr>
-                                <th>When</th>
-                                <th>Action</th>
-                                <th>By</th>
-                                <th>Note</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {selectedInvoiceStatusEvents.map((event) => (
-                                <tr key={event.id}>
-                                  <td>{formatDateTimeDisplay(event.changed_at, "--")}</td>
-                                  <td>
-                                    <span
-                                      className={`${styles.statusHistoryActionBadge} ${invoiceStatusEventToneClass(event)}`}
-                                    >
-                                      {invoiceStatusEventActionLabel(event, statusLabel)}
-                                    </span>
-                                  </td>
-                                  <td>
-                                    {event.changed_by_customer_id ? (
-                                      <Link
-                                        href={`/customers?customer=${event.changed_by_customer_id}`}
-                                        className={styles.statusActorLink}
-                                      >
-                                        {event.changed_by_display || `Customer #${event.changed_by_customer_id}`}
-                                      </Link>
-                                    ) : (
-                                      event.changed_by_display ||
-                                      event.changed_by_email ||
-                                      `User #${event.changed_by}`
-                                    )}
-                                  </td>
-                                  <td>{event.note || "--"}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <p className={styles.inlineHint}>
-                          {statusEventsLoading ? "Loading status history..." : "No status history yet."}
-                        </p>
-                      )}
-                    </section>
-
-                    {canMutateInvoices ? (
-                      <>
-                        <div className={styles.statusPicker}>
-                          <span className={styles.lifecycleFieldLabel}>Next status</span>
-                          <div className={styles.statusPills}>
-                            {nextStatusOptions.map((status) => {
-                              const isSelected = selectedStatus === status;
-                              return (
-                                <button
-                                  key={status}
-                                  type="button"
-                                  className={`${styles.statusPill} ${
-                                    isSelected
-                                      ? `${styles.statusPillActive} ${invoiceStatusToneClass(status)}`
-                                      : styles.statusPillInactive
-                                  }`}
-                                  onClick={() => setSelectedStatus(status)}
-                                  aria-pressed={isSelected}
-                                >
-                                  {selectedInvoice.status === "sent" && status === "sent"
-                                    ? "Re-send"
-                                    : statusLabel(status)}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                        {!nextStatusOptions.length ? (
-                          <p className={styles.inlineHint}>No next statuses available for this invoice.</p>
-                        ) : null}
-                        <label className={styles.field}>
-                          <span>Status note</span>
-                          <textarea
-                            value={statusNote}
-                            onChange={(event) => setStatusNote(event.target.value)}
-                            placeholder="Optional note for this status action or history-only note."
-                            className={invoiceCreatorStyles.invoiceLockableControl}
-                          />
-                        </label>
-
-                        <div className={styles.buttonRow}>
-                          {nextStatusOptions.length ? (
-                            <button
-                              type="button"
-                              className={styles.secondaryButton}
-                              onClick={handleUpdateInvoiceStatus}
-                            >
-                              {selectedInvoice.status === "draft" && selectedStatus === "sent"
-                                ? "Send Invoice"
-                                : selectedInvoice.status === "sent" && selectedStatus === "sent"
-                                  ? "Re-send Invoice"
-                                  : "Apply Status"}
-                            </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            className={styles.secondaryButton}
-                            onClick={handleAddInvoiceStatusNote}
-                            disabled={!statusNote.trim()}
-                          >
-                            Add Status Note
-                          </button>
-                        </div>
-                      </>
-                    ) : null}
-                  </>
-                ) : (
-                  <p className={styles.emptyState}>Select an invoice from the project rail to manage status history and transitions.</p>
-                )}
-              </div>
                 </>
               ) : (
                 <p className={styles.inlineHint}>Invoice viewer collapsed. Expand to review status history and send actions.</p>
@@ -1679,7 +1727,9 @@ export function InvoicesConsole() {
               {canMutateInvoices ? (
                 <div className={styles.workspaceToolbar}>
                   <div className={styles.workspaceContext}>
-                    <span className={styles.workspaceContextLabel}>Editing</span>
+                    <span className={styles.workspaceContextLabel}>
+                      {!workspaceSourceInvoice ? "Creating" : workspaceIsLocked ? "Viewing" : "Editing"}
+                    </span>
                     <div className={styles.workspaceContextValueRow}>
                       <strong>{workspaceContext}</strong>
                       <span className={`${styles.statusBadge} ${workspaceBadgeClass}`}>{workspaceBadgeLabel}</span>
@@ -1688,18 +1738,20 @@ export function InvoicesConsole() {
                   <div className={styles.workspaceToolbarActions}>
                     <button
                       type="button"
-                      className={styles.secondaryButton}
+                      className={styles.toolbarActionButton}
                       onClick={handleStartNewInvoiceDraft}
                     >
-                      Start New Draft
+                      {editingDraftInvoiceId ? "Create New Invoice" : "Reset"}
                     </button>
-                    <button
-                      type="button"
-                      className={styles.secondaryButton}
-                      onClick={handleDuplicateInvoiceIntoDraft}
-                    >
-                      Duplicate as New Invoice
-                    </button>
+                    {editingDraftInvoiceId ? (
+                      <button
+                        type="button"
+                        className={styles.toolbarActionButton}
+                        onClick={handleDuplicateInvoiceIntoDraft}
+                      >
+                        Duplicate as New Invoice
+                      </button>
+                    ) : null}
                   </div>
                   <p className={styles.workspaceToolbarHint}>
                     Invoices do not use revision families. Duplicate always creates a new invoice #.
@@ -1711,7 +1763,7 @@ export function InvoicesConsole() {
                   adapter={invoiceCreatorAdapter}
                   document={null}
                   formState={invoiceDraftFormState}
-                  className={`${creatorStyles.sheet} ${invoiceCreatorStyles.invoiceCreatorSheet} ${workspaceIsLocked ? invoiceCreatorStyles.invoiceCreatorSheetLocked : ""}`}
+                  className={`${creatorStyles.sheet} ${invoiceCreatorStyles.invoiceCreatorSheet} ${workspaceIsLocked ? `${invoiceCreatorStyles.invoiceCreatorSheetLocked} ${creatorStyles.sheetReadOnly}` : ""}`}
                   sectionClassName={invoiceCreatorStyles.invoiceCreatorSection}
                   onSubmit={handleCreateInvoice}
                   sections={[{ slot: "context" }]}
@@ -1773,6 +1825,7 @@ export function InvoicesConsole() {
                                 value={workspaceInvoiceNumber}
                                 readOnly
                                 disabled
+                                autoComplete="one-time-code"
                                 aria-label="Invoice number"
                               />
                               {!workspaceSourceInvoice ? (
@@ -1986,25 +2039,41 @@ export function InvoicesConsole() {
                               <strong>${formatDecimal(draftTotal)}</strong>
                             </div>
                           </div>
-                          {canMutateInvoices ? (
+                          {canMutateInvoices && !workspaceIsLocked ? (
                             <>
-                              <div className={invoiceCreatorStyles.invoiceCreateActions}>
-                                <button
-                                  type="submit"
-                                  className={`${creatorStyles.primaryButton} ${invoiceCreatorStyles.invoiceCreatePrimary}`}
-                                  disabled={workspaceIsLocked || (!editingDraftInvoiceId && !selectedProjectId)}
-                                >
-                                  {workspaceIsLocked ? "Locked" : editingDraftInvoiceId ? "Save Draft" : "Create Invoice"}
-                                </button>
-                              </div>
                               {statusMessageAtCreator ? (
                                 <p className={`${creatorStyles.actionSuccess} ${invoiceCreatorStyles.invoiceCreateStatusMessage}`}>
                                   {statusMessage}
                                 </p>
                               ) : null}
+                              <div className={invoiceCreatorStyles.invoiceCreateActions}>
+                                <button
+                                  type="submit"
+                                  className={`${creatorStyles.primaryButton} ${invoiceCreatorStyles.invoiceCreatePrimary}`}
+                                  disabled={!editingDraftInvoiceId && !selectedProjectId}
+                                >
+                                  {editingDraftInvoiceId ? "Save Draft" : "Create Invoice"}
+                                </button>
+                              </div>
                             </>
                           ) : null}
                         </div>
+                      </div>
+
+                      <div className={creatorStyles.terms}>
+                        <h4>Terms and Conditions</h4>
+                        {(termsText || organizationInvoiceDefaults?.invoice_default_terms || "Not set")
+                          .split("\n")
+                          .filter((line) => line.trim())
+                          .map((line, index) => (
+                            <p key={`${line}-${index}`}>{line}</p>
+                          ))}
+                      </div>
+
+                      <div className={creatorStyles.footer}>
+                        <span>{senderDisplayName || "Your Company"}</span>
+                        <span>{senderEmail || "Help email not set"}</span>
+                        <span>{workspaceInvoiceNumber ? `Invoice ${workspaceInvoiceNumber}` : "New Invoice Draft"}</span>
                       </div>
                       </>
                     ),

@@ -167,7 +167,6 @@ def public_invoice_decision_view(request, public_token: str):
     if current_status not in {
         Invoice.Status.SENT,
         Invoice.Status.PARTIALLY_PAID,
-        Invoice.Status.OVERDUE,
     }:
         return Response(
             {
@@ -544,7 +543,7 @@ def invoice_detail_view(request, invoice_id: int):
       - `_comment_*` keys in this example are documentation-only (not accepted API fields).
       - JSON map:
         {
-          "status": "draft|sent|partially_paid|paid|overdue|void (optional)",
+          "status": "draft|sent|partially_paid|paid|void (optional)",
           "issue_date": "YYYY-MM-DD (optional)",
           "due_date": "YYYY-MM-DD (optional, must be >= issue_date)",
           "tax_percent": "decimal (optional)",

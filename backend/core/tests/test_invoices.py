@@ -236,7 +236,7 @@ class InvoiceTests(TestCase):
         self.assertEqual(payload["status_labels"], expected_labels)
         self.assertEqual(payload["allowed_status_transitions"], expected_transitions)
         self.assertEqual(payload["default_create_status"], Invoice.Status.DRAFT)
-        self.assertTrue(str(payload["policy_version"]).startswith("2026-02-25.invoices."))
+        self.assertTrue(str(payload["policy_version"]).startswith("2026-03-01.invoices."))
 
     def test_invoice_create_calculates_totals_and_lines(self):
         response = self.client.post(
@@ -946,3 +946,82 @@ class InvoiceTests(TestCase):
         invoice.save()
         invoice.refresh_from_db()
         self.assertEqual(str(invoice.balance_due), "0.00")
+
+    def test_invoice_paid_cannot_transition_to_void(self):
+        """Paid is a terminal state — voiding a paid invoice is not allowed."""
+        invoice_id = self._create_invoice()
+        self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status": "paid"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        response = self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status": "void"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("transition", response.json()["error"]["message"].lower())
+
+    def test_invoice_partially_paid_cannot_transition_to_void(self):
+        """Partially paid is a terminal state — voiding is not allowed."""
+        invoice_id = self._create_invoice()
+        self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status": "partially_paid"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        response = self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status": "void"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("transition", response.json()["error"]["message"].lower())
+
+    def test_invoice_partially_paid_cannot_transition_back_to_sent(self):
+        """Once partially paid, an invoice cannot go back to sent."""
+        invoice_id = self._create_invoice()
+        self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status": "partially_paid"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        response = self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("transition", response.json()["error"]["message"].lower())
+
+    def test_invoice_overdue_is_not_a_valid_status(self):
+        """Overdue was removed from the status enum — it is now a computed condition."""
+        self.assertFalse(
+            any(status == "overdue" for status, _label in Invoice.Status.choices),
+            "overdue should not be in Invoice.Status choices",
+        )

@@ -187,7 +187,7 @@ export function AppToolbar() {
           className={`${styles.button} ${isOrganizationPath ? styles.buttonActive : ""}`}
           title={`Organization slug: ${organization.slug}`}
         >
-          {organization.displayName} Organization
+          {organization.displayName} Organization (WIP)
         </Link>
       ) : null}
       {hasSession && isPublicDocument ? (

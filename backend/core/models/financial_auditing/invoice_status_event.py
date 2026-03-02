@@ -9,7 +9,6 @@ INVOICE_STATUS_CHOICES = [
     ("sent", "Sent"),
     ("partially_paid", "Partially Paid"),
     ("paid", "Paid"),
-    ("overdue", "Overdue"),
     ("void", "Void"),
 ]
 

@@ -2,7 +2,13 @@
 
 from core.models import VendorBill
 
-VENDOR_BILL_POLICY_VERSION = "2026-02-23.vendor_bills.v1"
+VENDOR_BILL_POLICY_VERSION = "2026-03-01.vendor_bills.v2"
+
+# Compound transitions the view layer supports beyond the model's atomic map.
+# received → scheduled is a shortcut that atomically walks through approved.
+COMPOUND_TRANSITIONS = {
+    VendorBill.Status.RECEIVED: [VendorBill.Status.SCHEDULED],
+}
 
 
 def _status_order() -> list[str]:
@@ -18,6 +24,10 @@ def get_vendor_bill_policy_contract() -> dict:
     allowed_status_transitions = {}
     for status in statuses:
         next_statuses = list(VendorBill.ALLOWED_STATUS_TRANSITIONS.get(status, set()))
+        # Merge any compound transitions so the UI shows them as available.
+        for compound_target in COMPOUND_TRANSITIONS.get(status, []):
+            if compound_target not in next_statuses:
+                next_statuses.append(compound_target)
         next_statuses.sort(key=lambda value: status_index.get(value, 999))
         allowed_status_transitions[status] = next_statuses
 

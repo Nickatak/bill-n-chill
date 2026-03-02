@@ -198,6 +198,11 @@ export function HomeRegisterConsole({ health }: HomeRegisterConsoleProps) {
               required
             />
           </label>
+          {message && (
+            <p className={`${styles.message} ${messageTone === "error" ? styles.messageError : ""}`}>
+              {message}
+            </p>
+          )}
           <div className={styles.buttonRow}>
             <button className={styles.button} type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Creating..." : "Create account"}
@@ -207,11 +212,6 @@ export function HomeRegisterConsole({ health }: HomeRegisterConsoleProps) {
             Already have an account? <Link href="/">Sign in</Link>.
           </p>
         </form>
-        {message && (
-          <p className={`${styles.message} ${messageTone === "error" ? styles.messageError : ""}`}>
-            {message}
-          </p>
-        )}
         {!health.ok && (
           <p className={styles.healthBad}>API Health: {health.message}</p>
         )}

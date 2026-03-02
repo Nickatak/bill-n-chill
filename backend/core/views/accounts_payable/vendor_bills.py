@@ -132,9 +132,13 @@ def _record_vendor_bill_status_snapshot(*, vendor_bill, capture_status, previous
             "vendor_id": vendor_bill.vendor_id,
             "bill_number": vendor_bill.bill_number,
             "status": vendor_bill.status,
+            "received_date": vendor_bill.received_date.isoformat() if vendor_bill.received_date else None,
             "issue_date": vendor_bill.issue_date.isoformat() if vendor_bill.issue_date else None,
             "due_date": vendor_bill.due_date.isoformat() if vendor_bill.due_date else None,
             "scheduled_for": vendor_bill.scheduled_for.isoformat() if vendor_bill.scheduled_for else None,
+            "subtotal": str(vendor_bill.subtotal),
+            "tax_amount": str(vendor_bill.tax_amount),
+            "shipping_amount": str(vendor_bill.shipping_amount),
             "total": str(vendor_bill.total),
             "balance_due": str(vendor_bill.balance_due),
             "notes": vendor_bill.notes,
@@ -399,7 +403,11 @@ def project_vendor_bills_view(request, project_id: int):
             status=409,
         )
 
+    subtotal = quantize_money(data.get("subtotal", 0))
+    tax_amount = quantize_money(data.get("tax_amount", 0))
+    shipping_amount = quantize_money(data.get("shipping_amount", 0))
     total = quantize_money(data["total"])
+    received_date = data.get("received_date")
     scheduled_for = data.get("scheduled_for")
     allocations = data.get("allocations", [])
     if allocations:
@@ -439,9 +447,13 @@ def project_vendor_bills_view(request, project_id: int):
             vendor=vendor,
             bill_number=data["bill_number"],
             status=requested_status,
+            received_date=received_date,
             issue_date=issue_date,
             due_date=due_date,
             scheduled_for=scheduled_for,
+            subtotal=subtotal,
+            tax_amount=tax_amount,
+            shipping_amount=shipping_amount,
             total=total,
             balance_due=total,
             notes=data.get("notes", ""),
@@ -630,7 +642,16 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
     previous_status = vendor_bill.status
     next_status = data.get("status", previous_status)
     status_changing = "status" in data
-    if status_changing and not VendorBill.is_transition_allowed(
+
+    # Compound transition: received → scheduled is allowed as a shortcut that
+    # atomically walks through the approved intermediate (received → approved → scheduled).
+    compound_received_to_scheduled = (
+        status_changing
+        and previous_status == VendorBill.Status.RECEIVED
+        and next_status == VendorBill.Status.SCHEDULED
+    )
+
+    if status_changing and not compound_received_to_scheduled and not VendorBill.is_transition_allowed(
         current_status=previous_status,
         next_status=next_status,
     ):
@@ -747,6 +768,9 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
     if "bill_number" in data:
         vendor_bill.bill_number = data["bill_number"]
         update_fields.append("bill_number")
+    if "received_date" in data:
+        vendor_bill.received_date = data["received_date"]
+        update_fields.append("received_date")
     if "issue_date" in data:
         vendor_bill.issue_date = data["issue_date"]
         update_fields.append("issue_date")
@@ -756,6 +780,15 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
     if "scheduled_for" in data:
         vendor_bill.scheduled_for = data["scheduled_for"]
         update_fields.append("scheduled_for")
+    if "subtotal" in data:
+        vendor_bill.subtotal = quantize_money(data["subtotal"])
+        update_fields.append("subtotal")
+    if "tax_amount" in data:
+        vendor_bill.tax_amount = quantize_money(data["tax_amount"])
+        update_fields.append("tax_amount")
+    if "shipping_amount" in data:
+        vendor_bill.shipping_amount = quantize_money(data["shipping_amount"])
+        update_fields.append("shipping_amount")
     if "total" in data:
         vendor_bill.total = data["total"]
         update_fields.append("total")
@@ -771,44 +804,100 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
         update_fields.append("balance_due")
 
     with transaction.atomic():
-        if len(update_fields) > 1:
-            vendor_bill.save(update_fields=update_fields)
-            if previous_status != next_status or "total" in data:
-                _record_financial_audit_event(
-                    project=vendor_bill.project,
-                    event_type=FinancialAuditEvent.EventType.VENDOR_BILL_UPDATED,
-                    object_type="vendor_bill",
-                    object_id=vendor_bill.id,
-                    from_status=previous_status,
-                    to_status=next_status,
-                    amount=candidate_total,
-                    note="Vendor bill updated.",
-                    created_by=request.user,
-                    metadata={
-                        "bill_number": vendor_bill.bill_number,
-                        "status_changed": previous_status != next_status,
-                    },
-                )
-        if allocations is not None:
-            _sync_vendor_bill_allocations(vendor_bill=vendor_bill, allocations=allocations)
-        if (
-            status_changing
-            and previous_status != next_status
-            and next_status
-            in {
-                VendorBill.Status.RECEIVED,
-                VendorBill.Status.APPROVED,
-                VendorBill.Status.SCHEDULED,
-                VendorBill.Status.PAID,
-                VendorBill.Status.VOID,
-            }
-        ):
+        if compound_received_to_scheduled:
+            # Step 1: received → approved (intermediate)
+            vendor_bill.status = VendorBill.Status.APPROVED
+            intermediate_update_fields = [f for f in update_fields if f != "status"] + ["status"]
+            vendor_bill.save(update_fields=intermediate_update_fields)
+            _record_financial_audit_event(
+                project=vendor_bill.project,
+                event_type=FinancialAuditEvent.EventType.VENDOR_BILL_UPDATED,
+                object_type="vendor_bill",
+                object_id=vendor_bill.id,
+                from_status=previous_status,
+                to_status=VendorBill.Status.APPROVED,
+                amount=candidate_total,
+                note="Vendor bill approved (compound received → scheduled).",
+                created_by=request.user,
+                metadata={
+                    "bill_number": vendor_bill.bill_number,
+                    "status_changed": True,
+                    "compound_transition": True,
+                },
+            )
             _record_vendor_bill_status_snapshot(
                 vendor_bill=vendor_bill,
-                capture_status=next_status,
+                capture_status=VendorBill.Status.APPROVED,
                 previous_status=previous_status,
                 acted_by=request.user,
             )
+            if allocations is not None:
+                _sync_vendor_bill_allocations(vendor_bill=vendor_bill, allocations=allocations)
+
+            # Step 2: approved → scheduled (final)
+            vendor_bill.status = VendorBill.Status.SCHEDULED
+            vendor_bill.save(update_fields=["status", "updated_at"])
+            _record_financial_audit_event(
+                project=vendor_bill.project,
+                event_type=FinancialAuditEvent.EventType.VENDOR_BILL_UPDATED,
+                object_type="vendor_bill",
+                object_id=vendor_bill.id,
+                from_status=VendorBill.Status.APPROVED,
+                to_status=VendorBill.Status.SCHEDULED,
+                amount=candidate_total,
+                note="Vendor bill scheduled (compound received → scheduled).",
+                created_by=request.user,
+                metadata={
+                    "bill_number": vendor_bill.bill_number,
+                    "status_changed": True,
+                    "compound_transition": True,
+                },
+            )
+            _record_vendor_bill_status_snapshot(
+                vendor_bill=vendor_bill,
+                capture_status=VendorBill.Status.SCHEDULED,
+                previous_status=VendorBill.Status.APPROVED,
+                acted_by=request.user,
+            )
+        else:
+            if len(update_fields) > 1:
+                vendor_bill.save(update_fields=update_fields)
+                if previous_status != next_status or "total" in data:
+                    _record_financial_audit_event(
+                        project=vendor_bill.project,
+                        event_type=FinancialAuditEvent.EventType.VENDOR_BILL_UPDATED,
+                        object_type="vendor_bill",
+                        object_id=vendor_bill.id,
+                        from_status=previous_status,
+                        to_status=next_status,
+                        amount=candidate_total,
+                        note="Vendor bill updated.",
+                        created_by=request.user,
+                        metadata={
+                            "bill_number": vendor_bill.bill_number,
+                            "status_changed": previous_status != next_status,
+                        },
+                    )
+            if allocations is not None:
+                _sync_vendor_bill_allocations(vendor_bill=vendor_bill, allocations=allocations)
+            if (
+                status_changing
+                and previous_status != next_status
+                and next_status
+                in {
+                    VendorBill.Status.RECEIVED,
+                    VendorBill.Status.APPROVED,
+                    VendorBill.Status.SCHEDULED,
+                    VendorBill.Status.PAID,
+                    VendorBill.Status.VOID,
+                }
+            ):
+                _record_vendor_bill_status_snapshot(
+                    vendor_bill=vendor_bill,
+                    capture_status=next_status,
+                    previous_status=previous_status,
+                    acted_by=request.user,
+                )
 
     vendor_bill = (
         VendorBill.objects.select_related("project", "vendor")

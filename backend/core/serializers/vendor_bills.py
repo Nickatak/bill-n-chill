@@ -37,9 +37,13 @@ class VendorBillSerializer(serializers.ModelSerializer):
             "vendor_name",
             "bill_number",
             "status",
+            "received_date",
             "issue_date",
             "due_date",
             "scheduled_for",
+            "subtotal",
+            "tax_amount",
+            "shipping_amount",
             "total",
             "balance_due",
             "allocations",
@@ -65,9 +69,13 @@ class VendorBillWriteSerializer(serializers.Serializer):
         choices=[*VendorBill.Status.choices, ("draft", "Draft (legacy)")],
         required=False,
     )
+    received_date = serializers.DateField(required=False, allow_null=True)
     issue_date = serializers.DateField(required=False)
     due_date = serializers.DateField(required=False)
     scheduled_for = serializers.DateField(required=False, allow_null=True)
+    subtotal = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
+    tax_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
+    shipping_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
     total = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
     notes = serializers.CharField(max_length=5000, required=False, allow_blank=True)
     allocations = serializers.ListField(

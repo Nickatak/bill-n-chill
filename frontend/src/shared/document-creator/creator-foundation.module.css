@@ -1,3 +1,19 @@
+@keyframes creatorFlash {
+  0% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent),
+      0 0 18px 2px color-mix(in srgb, var(--accent) 20%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent,
+      0 0 0 0 transparent;
+  }
+}
+
+.sheetFlash {
+  animation: creatorFlash 700ms ease-out;
+  border-radius: 18px;
+}
+
 .sheet {
   border: 1px solid var(--border);
   border-radius: 18px;

@@ -47,7 +47,7 @@ export const workflowRoutes: NavRoute[] = [
   },
   {
     href: "/financials-auditing",
-    label: "5 Financials & Accounting",
+    label: "5 Financials & Accounting (WIP)",
     exact: ["/financials-auditing"],
   },
 ];
@@ -59,10 +59,10 @@ export const workflowRoutes: NavRoute[] = [
  */
 export const opsMetaRoutes: NavRoute[] = [
   { href: "/customers", label: "Customers", exact: ["/customers"] },
-  { href: "/cost-codes", label: "Cost Codes", exact: ["/cost-codes"] },
-  { href: "/vendors", label: "Vendors", exact: ["/vendors"] },
-  { href: "/settings/intake", label: "Settings", exact: ["/settings/intake"] },
-  { href: "/ops/meta/help", label: "Help", exact: ["/ops/meta/help"] },
+  { href: "/cost-codes", label: "Cost Codes (WIP)", exact: ["/cost-codes"] },
+  { href: "/vendors", label: "Vendors (WIP)", exact: ["/vendors"] },
+  { href: "/settings/intake", label: "Settings (WIP)", exact: ["/settings/intake"] },
+  { href: "/ops/meta/help", label: "Help (WIP)", exact: ["/ops/meta/help"] },
 ];
 
 /**

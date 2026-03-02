@@ -45,9 +45,9 @@
 }
 
 .paymentInput:disabled {
-  background: var(--surface-inset);
-  color: var(--input-readonly-text);
-  border-color: #dbe3f0;
+  background: var(--input-disabled-bg);
+  color: var(--input-disabled-text);
+  border-color: var(--input-disabled-border);
   opacity: 1;
   cursor: default;
 }

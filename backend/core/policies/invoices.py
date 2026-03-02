@@ -2,7 +2,7 @@
 
 from core.models import Invoice
 
-INVOICE_POLICY_VERSION = "2026-02-27.invoices.v2"
+INVOICE_POLICY_VERSION = "2026-03-01.invoices.v3"
 
 
 def _status_order() -> list[str]:
@@ -34,7 +34,6 @@ def get_invoice_policy_contract() -> dict:
             Invoice.Status.DRAFT,
             Invoice.Status.SENT,
             Invoice.Status.PARTIALLY_PAID,
-            Invoice.Status.OVERDUE,
         ],
         "allowed_status_transitions": allowed_status_transitions,
         "terminal_statuses": terminal_statuses,
@@ -43,7 +42,6 @@ def get_invoice_policy_contract() -> dict:
                 Invoice.Status.SENT,
                 Invoice.Status.PARTIALLY_PAID,
                 Invoice.Status.PAID,
-                Invoice.Status.OVERDUE,
             ],
             "scope_override_event_required_for_out_of_scope_billable": True,
         },

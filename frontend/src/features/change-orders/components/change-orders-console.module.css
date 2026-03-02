@@ -1,13 +1,13 @@
 .consoleTop {
   display: grid;
   gap: 14px;
-  border: 1px solid #cdd9ea;
+  border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   padding: var(--space-lg);
   margin-bottom: var(--space-md);
   background:
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 42%),
-    linear-gradient(180deg, #f8fbff 0%, #f2f6fc 100%);
+    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 12%, transparent), transparent 42%),
+    var(--surface-secondary);
 }
 
 .consoleIntro {
@@ -38,22 +38,19 @@
 }
 
 .primaryCreateButton {
-  border: 1px solid var(--accent-text);
+  border: 1px solid var(--accent);
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  background: var(--accent);
   color: var(--text-on-accent);
-  padding: 8px 13px;
+  padding: 8px 14px;
   font-size: var(--font-sm);
   font-weight: 700;
-  letter-spacing: 0.02em;
   cursor: pointer;
-  transition: transform 140ms ease, box-shadow 140ms ease, filter 140ms ease;
 }
 
 .primaryCreateButton:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 18px rgba(29, 78, 216, 0.28);
-  filter: saturate(1.08);
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .formToolbar {
@@ -68,8 +65,8 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex-wrap: wrap;
   gap: var(--space-sm);
+  flex-shrink: 0;
 }
 
 .toolbarFeedbackMessage {
@@ -185,7 +182,6 @@
 .viewerRailEntry {
   display: grid;
   gap: var(--space-xs);
-  position: relative;
 }
 
 .viewerRailHeader {
@@ -209,10 +205,10 @@
 }
 
 .viewerRailItem {
-  border: 1px solid #c8d7eb;
+  border: 1px solid var(--border-accent);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  padding: 9px 10px 34px;
+  padding: 9px 10px;
   text-align: left;
   display: grid;
   gap: 6px;
@@ -222,15 +218,20 @@
 }
 
 .viewerRailItem:hover {
-  border-color: #60a5fa;
+  border-color: var(--accent);
   transform: translateY(-1px);
-  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 16px color-mix(in srgb, var(--foreground) 8%, transparent);
 }
 
 .viewerRailItemActive {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
   background: var(--accent-lighter);
+}
+
+.viewerRailItemActiveBaseline {
+  border-color: var(--status-green-border);
+  box-shadow: inset 3px 0 0 var(--status-green-solid);
 }
 
 .viewerRailTitle {
@@ -297,37 +298,31 @@
 }
 
 .viewerCardLink {
-  position: absolute;
-  right: 10px;
-  bottom: 8px;
   display: inline-flex;
   align-items: center;
+  justify-self: end;
   gap: 4px;
-  height: 22px;
-  padding: 0 8px;
-  border: 1px solid var(--accent-border);
-  border-radius: var(--radius-sm);
-  background: var(--accent-light);
-  font-size: 0.68rem;
-  letter-spacing: 0.06em;
+  color: var(--accent-text);
+  text-decoration: none;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
-  color: var(--accent-hover);
-  text-decoration: none;
-  z-index: 2;
-  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s ease;
 }
 
 .viewerCardLink:hover,
 .viewerCardLink:focus-visible {
-  transform: translateY(-1px);
-  border-color: #60a5fa;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.24);
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
   outline: none;
 }
 
 .viewerDetail {
-  border: 1px solid #c9d8ec;
+  border: 1px solid var(--border-accent);
   border-radius: var(--radius-lg);
   background: var(--surface);
   padding: var(--space-md);
@@ -390,80 +385,70 @@
 
 .viewerHistoryRail {
   padding: var(--space-sm);
-  border: 1px solid #d6e1ef;
+  border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface-secondary);
 }
 
 .viewerHistoryCardWrap {
-  position: relative;
-  display: block;
+  display: grid;
   width: 100%;
 }
 
 .viewerHistoryPublicLink {
-  position: absolute;
-  top: 6px;
-  right: 8px;
-  height: 24px;
-  padding: 0 8px;
-  border: 1px solid var(--accent-border);
-  border-radius: var(--radius-sm);
-  background: var(--accent-light);
-  color: var(--accent-hover);
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  font-size: 0.63rem;
+  justify-self: end;
+  gap: 4px;
+  margin-top: 4px;
+  color: var(--accent-text);
+  text-decoration: none;
+  font-size: 0.66rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  text-decoration: none;
   font-weight: 700;
   line-height: 1;
-  z-index: 2;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  transition: color 0.15s ease;
 }
 
 .viewerHistoryPublicLink:hover,
 .viewerHistoryPublicLink:focus-visible {
-  transform: translateY(-1px);
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.35);
-  background: #bfdbfe;
-  border-color: #60a5fa;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
   outline: none;
 }
 
 .viewerHistoryItem {
-  border-color: #d5dce8;
+  border-color: var(--border);
   background: var(--surface);
   width: 100%;
-  padding-right: 68px;
 }
 
 .viewerHistoryDraft {
   border-color: var(--status-blue-border);
-  background: linear-gradient(180deg, rgba(219, 234, 254, 0.5), var(--surface));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--status-blue-bg) 50%, transparent), var(--surface));
 }
 
 .viewerHistoryPendingApproval {
   border-color: var(--status-amber-border);
-  background: linear-gradient(180deg, rgba(254, 243, 199, 0.52), var(--surface));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--status-amber-bg) 52%, transparent), var(--surface));
 }
 
 .viewerHistoryApproved {
   border-color: var(--status-green-border);
-  background: linear-gradient(180deg, rgba(220, 252, 231, 0.56), var(--surface));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--status-green-bg) 56%, transparent), var(--surface));
 }
 
 .viewerHistoryRejected {
   border-color: var(--status-red-border);
-  background: linear-gradient(180deg, rgba(254, 226, 226, 0.56), var(--surface));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--status-red-bg) 56%, transparent), var(--surface));
 }
 
 .viewerHistoryVoid {
   border-color: var(--status-gray-border);
-  background: linear-gradient(180deg, rgba(226, 232, 240, 0.56), var(--surface));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--status-gray-bg) 56%, transparent), var(--surface));
 }
 
 .viewerHistoryStatusText {
@@ -497,17 +482,13 @@
   border-color: var(--status-green-solid);
   background: var(--status-green-bg);
   color: var(--status-green-text);
-  box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.25);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--status-green-solid) 25%, transparent);
 }
 
 .viewerHistoryItemActive {
-  border-color: var(--accent);
-  background:
-    linear-gradient(180deg, rgba(219, 234, 254, 0.82), rgba(219, 234, 254, 0.45)),
-    var(--surface);
   box-shadow:
-    0 0 0 2px rgba(37, 99, 235, 0.22),
-    inset 3px 0 0 var(--status-blue-solid);
+    0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent),
+    inset 4px 0 0 var(--accent);
 }
 
 .quickStatusPanel {
@@ -557,85 +538,87 @@
 }
 
 .quickStatusPills {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .quickStatusButton {
   appearance: none;
   -webkit-appearance: none;
   border: 1px solid var(--border-accent);
-  border-radius: 10px;
-  width: 100%;
-  min-height: 52px;
-  padding: 10px 12px;
-  font-size: 0.74rem;
-  letter-spacing: 0.1em;
+  border-radius: var(--radius-pill);
+  padding: 5px 12px;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: background-color 120ms ease, border-color 120ms ease;
   text-align: center;
+  white-space: nowrap;
 }
 
 .quickStatusButtonInactive {
-  background: #1e293b;
-  border-color: var(--status-gray-text);
-  color: #bfdbfe;
+  background: var(--surface-secondary);
+  border-color: var(--border);
+  color: var(--text-secondary);
 }
 
 .quickStatusButton:disabled {
   opacity: 0.55;
   cursor: default;
-  transform: none;
 }
 
 .quickStatusButtonActive {
-  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.14);
-  transform: none;
+  box-shadow: none;
 }
 
 .quickStatusButtonActive.quickStatusDraft {
-  background: var(--status-blue-solid);
-  border-color: var(--accent);
-  color: var(--accent-lighter);
+  background: var(--status-blue-bg);
+  border-color: var(--status-blue-border);
+  color: var(--status-blue-text);
 }
 
 .quickStatusButtonActive.quickStatusPendingApproval {
-  background: var(--status-amber-solid);
-  border-color: #b45309;
-  color: var(--status-amber-solid-text);
+  background: var(--status-amber-bg);
+  border-color: var(--status-amber-border);
+  color: var(--status-amber-text);
 }
 
 .quickStatusButtonActive.quickStatusApproved {
-  background: var(--status-green-solid);
-  border-color: var(--status-green-solid);
-  color: var(--status-green-solid-text);
+  background: var(--status-green-bg);
+  border-color: var(--status-green-border);
+  color: var(--status-green-text);
 }
 
 .quickStatusButtonActive.quickStatusRejected {
-  background: var(--status-red-solid);
-  border-color: #b91c1c;
-  color: var(--status-red-bg);
+  background: var(--status-red-bg);
+  border-color: var(--status-red-border);
+  color: var(--status-red-text);
 }
 
 .quickStatusButtonActive.quickStatusVoid {
-  background: var(--status-gray-solid);
-  border-color: #4b5563;
-  color: var(--status-gray-solid-text);
+  background: var(--status-gray-bg);
+  border-color: var(--status-gray-border);
+  color: var(--status-gray-text);
 }
 
 .cloneRevisionButton {
   width: fit-content;
   border: 1px solid var(--accent);
   border-radius: 10px;
-  background: var(--accent-lighter);
-  color: var(--accent-hover);
-  padding: 7px 11px;
-  font-size: 0.84rem;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  padding: 8px 14px;
+  font-size: var(--font-sm);
   font-weight: 700;
   cursor: pointer;
+}
+
+.cloneRevisionButton:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .cloneRevisionButton:disabled {
@@ -662,7 +645,7 @@
 }
 
 .lineTableWrap {
-  border: 1px solid #d7e2f1;
+  border: 1px solid var(--border);
   border-radius: 10px;
   overflow: auto;
 }
@@ -707,7 +690,7 @@
   list-style: none;
   margin: 0;
   padding: var(--space-sm);
-  border: 1px solid #d7e2f1;
+  border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface-secondary);
   display: grid;
@@ -742,13 +725,13 @@
 }
 
 .statusEventResent {
-  background: #fde68a;
-  color: #78350f;
+  background: var(--status-amber-bg);
+  color: var(--status-amber-text);
 }
 
 .statusEventSent {
-  background: #fde68a;
-  color: #78350f;
+  background: var(--status-amber-bg);
+  color: var(--status-amber-text);
 }
 
 .statusEventApproved {
@@ -763,7 +746,7 @@
 
 .statusEventVoid {
   background: var(--status-gray-bg);
-  color: #374151;
+  color: var(--status-gray-text);
 }
 
 .statusEventReturnedDraft {
@@ -797,276 +780,95 @@
   color: var(--text-secondary);
 }
 
-.workflowSheet {
-  margin: 14px 0;
-  border-radius: var(--radius-xl);
-}
-
-.changeOrderComposerSection {
+.viewerSection {
   display: grid;
-  gap: var(--space-lg);
-  min-width: 0;
-}
-
-.createSheet {
-  border: 1px solid #bfdbfe;
-  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.12);
-}
-
-.editSheet {
-  border: 1px solid #d4dbe8;
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
-}
-
-.lockableControl {
-  min-width: 0;
-}
-
-.editSheetLocked .lockableControl:disabled {
-  background: var(--input-disabled-bg);
-  border-color: var(--input-disabled-border);
-  color: var(--input-disabled-text);
-  cursor: not-allowed;
-}
-
-.editSheetLocked .lockableControl:disabled::placeholder {
-  color: var(--text-muted);
-}
-
-.editSheetLocked .coReadValue {
-  background: var(--input-disabled-bg);
-  border-color: var(--input-disabled-border);
-  color: var(--input-disabled-text);
-}
-
-.coMetaField {
-  min-width: 0;
-}
-
-.coMetaInput {
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.coFieldWide {
-  grid-column: 1 / -1;
-}
-
-.coLineSectionIntro {
-  display: grid;
-  gap: 6px;
-  margin: 2px 0 0;
-}
-
-.coLineSectionIntro h3 {
-  margin: 0;
-  font-size: var(--font-base);
-  color: var(--text-primary);
-}
-
-.coLineSectionIntro p {
-  margin: 0;
-  font-size: 0.83rem;
-  color: var(--text-secondary);
-}
-
-.coLineLegend {
-  font-size: 0.79rem;
-  color: var(--status-gray-text);
-}
-
-.coLineHeader {
-  display: grid;
-  grid-template-columns: 0.85fr 1.2fr 1.2fr 1.45fr 1fr 0.9fr 0.9fr 0.7fr;
   gap: var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: var(--space-sm);
+  background: var(--surface-secondary);
+}
+
+.viewerSectionToggle {
+  display: flex;
   align-items: center;
-  padding: 10px;
-  background: var(--table-header-bg);
-  color: var(--table-header-text);
-  font-size: 0.69rem;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.viewerSectionToggle h4 {
+  margin: 0;
+  font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  color: var(--accent-text);
   font-weight: 700;
 }
 
-.coLineRow {
-  display: grid;
-  grid-template-columns: 0.85fr 1.2fr 1.2fr 1.45fr 1fr 0.9fr 0.9fr 0.7fr;
-  gap: var(--space-sm);
-  align-items: center;
-  padding: 9px 10px;
-  background: var(--surface);
-}
-
-.coLineHeader > span,
-.coLineRow > * {
-  min-width: 0;
-}
-
-.coLineRowGroup {
-  border-top: 1px solid #dbe5f3;
-}
-
-.coLineRowAlt {
-  background: #f7faff;
-}
-
-.coLineRowInvalid {
-  border-left: 3px solid var(--status-red-solid);
-}
-
-.coLineIssue {
-  margin: 0;
-  padding: 0 10px 9px;
-  color: var(--status-red-text);
-  font-size: 0.78rem;
-  line-height: 1.4;
-  background: #fff7f7;
-}
-
-.coReadValue {
-  display: inline-flex;
-  align-items: center;
-  min-height: 36px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 6px 8px;
-  background: var(--surface-secondary);
-  color: var(--text-primary);
-  font-size: 0.84rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.coLineActions {
-  display: flex;
-  justify-content: flex-start;
-  margin-top: 10px;
-}
-
-.coLineAddButton {
-  border-radius: 10px;
-}
-
-.coSheetFooter {
-  display: grid;
-  grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
-  grid-template-areas: "summary actions";
-  align-items: stretch;
-  gap: 14px;
-  border-top: 1px solid #dbe5f3;
-  padding-top: 14px;
-  margin-top: 6px;
-}
-
-.coSummaryCard {
-  grid-area: summary;
-  height: 100%;
-  width: 100%;
-}
-
-.coSummaryPrimaryLabel {
-  white-space: nowrap;
-}
-
-.coSummarySecondaryValue {
-  font-size: var(--font-sm);
-  font-variant-numeric: tabular-nums;
+.viewerSectionToggle .viewerSectionArrow {
+  font-size: 0.7rem;
   color: var(--text-secondary);
+  transition: transform 140ms ease;
 }
 
-.coSheetFooterActions {
-  grid-area: actions;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: flex-end;
-  min-width: 0;
-  gap: 10px;
+.viewerSectionToggle[aria-expanded="true"] .viewerSectionArrow {
+  transform: rotate(180deg);
 }
 
-.coActionButtonRow {
-  display: flex;
-  width: 100%;
-  justify-content: flex-end;
-  align-items: center;
+.viewerSectionContent {
+  display: grid;
   gap: var(--space-sm);
-  flex-wrap: wrap;
 }
 
-.coFooterHint {
-  margin: 0;
-  max-width: 54ch;
-  text-align: right;
+.showAllToggle {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 2px 0;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  text-align: left;
 }
 
-.coFooterErrorHint {
-  color: var(--tone-error-text);
+.showAllToggle:hover {
+  text-decoration: underline;
 }
 
-.coSheetFooter button.coFooterSecondaryButton,
-.coSheetFooter button.coFooterPrimaryButton {
-  width: fit-content;
-  min-width: 150px;
-  min-height: 0;
-  padding: 8px 12px;
-  font-size: var(--font-base);
+.budgetToggle {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-secondary);
+  padding: 3px 8px;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   font-weight: 700;
-  line-height: 1.2;
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 120ms ease;
 }
 
-.coSheetFooter button.coFooterSecondaryButton {
-  border-radius: 10px;
-}
-
-.coSheetFooter button.coFooterPrimaryButton {
-  border-radius: 10px;
-}
-
-.coSheetFooter button.coFooterPrimaryButton:disabled {
-  background: var(--text-muted);
-  border-color: var(--text-muted);
-  color: var(--border);
-  cursor: not-allowed;
-  box-shadow: none;
-  opacity: 0.85;
+.budgetToggle:hover {
+  border-color: var(--accent);
+  color: var(--accent-text);
 }
 
 @media (min-width: 980px) {
   .viewerGrid {
     grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
-  }
-}
-
-@media (max-width: 900px) {
-  .coSheetFooter {
-    grid-template-areas:
-      "summary"
-      "actions";
-    align-items: stretch;
-    grid-template-columns: 1fr;
-  }
-
-  .coSheetFooterActions {
-    align-items: stretch;
-    justify-content: flex-start;
-  }
-
-  .coActionButtonRow {
-    justify-content: stretch;
-    flex-direction: column;
-  }
-
-  .coSheetFooter button.coFooterPrimaryButton,
-  .coSheetFooter button.coFooterSecondaryButton {
-    width: 100%;
-  }
-
-  .coFooterHint {
-    text-align: left;
   }
 }
 
@@ -1109,16 +911,6 @@
   .viewerHeaderRow {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .quickStatusPills {
-    grid-template-columns: 1fr;
-    gap: var(--space-sm);
-  }
-
-  .quickStatusButton {
-    min-height: 46px;
-    font-size: 0.7rem;
   }
 
   .viewerHistoryMetaText {

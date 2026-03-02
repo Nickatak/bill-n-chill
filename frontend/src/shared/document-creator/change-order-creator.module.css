@@ -11,12 +11,12 @@
 
 .createSheet {
   border: 1px solid var(--accent-light);
-  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .editSheet {
   border: 1px solid var(--border);
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 20px color-mix(in srgb, var(--foreground) 8%, transparent);
 }
 
 .lockableControl {
@@ -140,7 +140,7 @@
 }
 
 .coLineHeader > span + span {
-  box-shadow: -1px 0 0 #5f7cab;
+  box-shadow: -1px 0 0 var(--border-accent);
 }
 
 .coLineRowGroup {
@@ -188,19 +188,23 @@
 }
 
 .coSheetFooter {
-  display: grid;
-  grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
-  grid-template-areas: "summary actions";
-  align-items: stretch;
-  gap: 14px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
   border-top: 1px solid var(--border);
   padding-top: 14px;
   margin-top: 6px;
+  margin-bottom: 10px;
+}
+
+.coTotalsColumn {
+  display: grid;
+  gap: var(--space-md);
+  justify-items: stretch;
+  width: min(320px, 100%);
 }
 
 .coSummaryCard {
-  grid-area: summary;
-  height: 100%;
   width: 100%;
 }
 
@@ -215,13 +219,9 @@
 }
 
 .coSheetFooterActions {
-  grid-area: actions;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: flex-end;
-  min-width: 0;
+  display: grid;
   gap: 10px;
+  min-width: 0;
 }
 
 .coActionButtonRow {
@@ -273,18 +273,7 @@
 }
 
 @media (max-width: 980px) {
-  .coSheetFooter {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "summary"
-      "actions";
-  }
-
-  .coSheetFooterActions,
-  .coFooterHint,
-  .coActionButtonRow {
-    align-items: flex-start;
-    justify-content: flex-start;
-    text-align: left;
+  .coTotalsColumn {
+    width: 100%;
   }
 }

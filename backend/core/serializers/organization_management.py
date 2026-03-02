@@ -23,6 +23,7 @@ class OrganizationProfileSerializer(serializers.ModelSerializer):
             "invoice_default_terms",
             "estimate_default_terms",
             "change_order_default_reason",
+            "change_order_default_terms",
             "invoice_default_footer",
             "invoice_default_notes",
             "created_at",
@@ -93,6 +94,7 @@ class OrganizationProfileUpdateSerializer(serializers.Serializer):
     invoice_default_terms = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
     estimate_default_terms = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
     change_order_default_reason = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
+    change_order_default_terms = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
     invoice_default_footer = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
     invoice_default_notes = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
 

@@ -632,8 +632,8 @@ export function ProjectsConsole() {
               </div>
             </div>
             <div className={styles.metricsPanel}>
-              <div className={styles.baselineCard}>
-                <span className={styles.baselineCardLabel}>Active Estimate</span>
+              <div className={`${styles.baselineCard} ${summary?.active_budget_id ? styles.baselineActive : styles.baselineInactive}`}>
+                <span className={styles.baselineCardLabel}>Project Baseline</span>
                 <strong className={styles.baselineCardValue}>{activeFinancialEstimateDisplay}</strong>
                 <span className={styles.baselineCardMeta}>{activeFinancialBudgetDisplay}</span>
               </div>

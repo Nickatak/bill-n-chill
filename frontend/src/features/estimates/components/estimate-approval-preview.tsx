@@ -6,7 +6,7 @@
  * provides approve/reject controls for estimates in "sent" status.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   PublicDocumentFrame,
   publicDocumentFrameStyles as frameStyles,
@@ -19,6 +19,7 @@ import {
 } from "@/shared/document-viewer/public-document-context";
 import { PublicDocumentViewerShell } from "@/shared/document-viewer/public-document-viewer-shell";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
+import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import styles from "./estimates-console.module.css";
 import { ApiResponse, CostCode, EstimateLineInput, EstimateRecord } from "../types";
 import { formatDateDisplay, formatDateInputFromIso } from "@/shared/date-format";
@@ -91,7 +92,21 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [decisionReceiptName, setDecisionReceiptName] = useState("");
   const [justSubmittedDecision, setJustSubmittedDecision] = useState<"approve" | "reject" | null>(null);
+  const decisionSectionRef = useRef<HTMLDivElement | null>(null);
+  const [decisionFlashCount, setDecisionFlashCount] = useState(0);
   const { printTimestamp } = usePrintContext();
+
+  useEffect(() => {
+    if (decisionFlashCount === 0) return;
+    const el = decisionSectionRef.current;
+    if (!el) return;
+    el.classList.remove(creatorStyles.sheetFlash);
+    void el.offsetWidth;
+    el.classList.add(creatorStyles.sheetFlash);
+    const cleanup = () => el.classList.remove(creatorStyles.sheetFlash);
+    el.addEventListener("animationend", cleanup, { once: true });
+    return () => el.removeEventListener("animationend", cleanup);
+  }, [decisionFlashCount]);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const lineItems = useMemo(() => mapLineItemsToInputs(estimate), [estimate]);
@@ -133,9 +148,9 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
   const nonPendingDecisionMessage =
     estimate?.status === "approved"
       ? decisionReceiptName.trim()
-        ? `Decision status: ${decisionStatusLabel}. Thank you for your approval, ${decisionReceiptName.trim()}.`
-        : `Decision status: ${decisionStatusLabel}.`
-      : `Decision status: ${decisionStatusLabel}. This estimate is not awaiting response.`;
+        ? `Status: ${decisionStatusLabel}. Approved by ${decisionReceiptName.trim()}.`
+        : `Status: ${decisionStatusLabel}.`
+      : `Status: ${decisionStatusLabel}.`;
   const decisionFeedbackMessage = useMemo(() => {
     if (!justSubmittedDecision) {
       return null;
@@ -210,6 +225,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
       setDecisionReceiptName(deciderName.trim());
       setJustSubmittedDecision(decision);
       setDecisionMessage("");
+      setDecisionFlashCount((c) => c + 1);
     } catch {
       setDecisionMessage("Could not reach estimate decision endpoint.");
     } finally {
@@ -381,7 +397,15 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
             }
           />
           {showDecisionSection ? (
-            <div id="estimate-decision" className={`${styles.lifecycle} ${styles.publicDecisionSection}`}>
+            <div
+              ref={decisionSectionRef}
+              id="estimate-decision"
+              className={`${styles.lifecycle} ${styles.publicDecisionSection} ${
+                hasDecision && estimate?.status === "approved" ? styles.lifecycleApproved
+                : hasDecision && estimate?.status === "rejected" ? styles.lifecycleRejected
+                : ""
+              }`}
+            >
               <h3>Decision</h3>
               {canDecide && decisionMessage ? <p className={styles.inlineHint}>{decisionMessage}</p> : null}
               {canDecide ? (
@@ -437,7 +461,11 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
                   </div>
                 </>
               ) : (
-                <p className={styles.inlineHint}>{decisionFeedbackMessage ?? nonPendingDecisionMessage}</p>
+                <p className={`${styles.inlineHint} ${
+                  estimate?.status === "approved" ? styles.decisionFeedbackApproved
+                  : estimate?.status === "rejected" ? styles.decisionFeedbackRejected
+                  : ""
+                }`}>{decisionFeedbackMessage ?? nonPendingDecisionMessage}</p>
               )}
             </div>
           ) : null}

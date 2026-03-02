@@ -33,7 +33,7 @@ class VendorBill(models.Model):
         Status.RECEIVED: {Status.APPROVED, Status.VOID},
         Status.APPROVED: {Status.SCHEDULED, Status.PAID, Status.VOID},
         Status.SCHEDULED: {Status.PAID, Status.VOID},
-        Status.PAID: {Status.VOID},
+        Status.PAID: set(),
         Status.VOID: set(),
     }
 
@@ -53,9 +53,17 @@ class VendorBill(models.Model):
         choices=Status.choices,
         default=Status.PLANNED,
     )
+    received_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Date the bill was physically received. Distinct from vendor issue date.",
+    )
     issue_date = models.DateField()
     due_date = models.DateField()
     scheduled_for = models.DateField(null=True, blank=True)
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    shipping_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     balance_due = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     notes = models.TextField(blank=True)

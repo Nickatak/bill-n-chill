@@ -5,7 +5,7 @@
  * Renders customer and optional project fields; all behavior lives in the controller hook.
  */
 
-import { FormEventHandler, RefObject } from "react";
+import { FormEventHandler, ReactNode, RefObject } from "react";
 
 import { LeadFieldErrors } from "../hooks/use-quick-add-controller";
 import styles from "./quick-add-console.module.css";
@@ -28,6 +28,7 @@ type QuickAddFormProps = {
   onNotesChange: (value: string) => void;
   fieldErrors: LeadFieldErrors;
   onSubmit: FormEventHandler<HTMLFormElement>;
+  statusSlot?: ReactNode;
 };
 
 /** Stateless intake form: renders customer/project fields and emits submit events to the controller. */
@@ -49,11 +50,12 @@ export function QuickAddForm({
   onNotesChange,
   fieldErrors,
   onSubmit,
+  statusSlot,
 }: QuickAddFormProps) {
   // Presentational form only: renders fields and emits events; behavior stays in the controller hook.
   return (
     <form className={styles.formGrid} onSubmit={onSubmit}>
-      <label className={styles.field}>
+      <label className={`${styles.field} ${fieldErrors.full_name ? styles.fieldError : ""}`}>
         Full name
         <input
           ref={fullNameRef}
@@ -66,7 +68,7 @@ export function QuickAddForm({
         {fieldErrors.full_name ? <p className={styles.errorText}>{fieldErrors.full_name}</p> : null}
       </label>
 
-      <label className={styles.field}>
+      <label className={`${styles.field} ${fieldErrors.phone ? styles.fieldError : ""}`}>
         Phone (or email)
         <input
           name="phone"
@@ -84,7 +86,7 @@ export function QuickAddForm({
 
       <hr className={`${styles.sectionDivider} ${styles.fullRow}`} />
 
-      <label className={styles.field}>
+      <label className={`${styles.field} ${fieldErrors.project_name ? styles.fieldError : ""}`}>
         Project name
         <input
           name="project_name"
@@ -95,7 +97,7 @@ export function QuickAddForm({
         {fieldErrors.project_name ? <p className={styles.errorText}>{fieldErrors.project_name}</p> : null}
       </label>
 
-      <label className={styles.field}>
+      <label className={`${styles.field} ${fieldErrors.project_address ? styles.fieldError : ""}`}>
         Project address
         <input
           name="project_address"
@@ -170,6 +172,7 @@ export function QuickAddForm({
       </details>
 
       <div className={`${styles.stickyActions} ${styles.fullRow}`}>
+        {statusSlot}
         <div className={styles.inlineActions}>
           <button className={styles.actionPrimary} type="submit" value="customer_and_project">
             Save Customer + Start Project

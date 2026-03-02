@@ -62,6 +62,7 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
             "amount_delta",
             "days_delta",
             "reason",
+            "terms_text",
             "origin_estimate",
             "previous_change_order",
             "requested_by",
@@ -119,5 +120,6 @@ class ChangeOrderWriteSerializer(serializers.Serializer):
     amount_delta = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
     days_delta = serializers.IntegerField(required=False)
     reason = serializers.CharField(max_length=5000, required=False, allow_blank=True)
+    terms_text = serializers.CharField(max_length=10000, required=False, allow_blank=True)
     line_items = ChangeOrderLineInputSerializer(many=True, required=False)
     origin_estimate = serializers.IntegerField(required=False, allow_null=True)

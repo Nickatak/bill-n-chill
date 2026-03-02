@@ -177,6 +177,13 @@ def organization_profile_view(request):
             changed_fields.append("change_order_default_reason")
             update_fields.append("change_order_default_reason")
 
+    if "change_order_default_terms" in incoming:
+        change_order_default_terms = str(incoming.get("change_order_default_terms") or "").strip()
+        if change_order_default_terms != organization.change_order_default_terms:
+            organization.change_order_default_terms = change_order_default_terms
+            changed_fields.append("change_order_default_terms")
+            update_fields.append("change_order_default_terms")
+
     if "invoice_default_footer" in incoming:
         default_footer = str(incoming.get("invoice_default_footer") or "").strip()
         if default_footer != organization.invoice_default_footer:

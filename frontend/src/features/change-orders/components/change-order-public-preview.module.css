@@ -47,22 +47,40 @@
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--surface);
-  padding: 14px 16px;
+  padding: 16px;
   display: grid;
-  gap: 10px;
+  gap: 12px;
+  transition: border-color 200ms ease, background 200ms ease;
 }
 
 .decisionCard h3 {
   margin: 0;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
+.decisionCardApproved {
+  border-color: var(--status-green-border);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--status-green-bg) 40%, transparent), var(--surface));
+}
+
+.decisionCardRejected {
+  border-color: var(--status-red-border);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--status-red-bg) 40%, transparent), var(--surface));
 }
 
 .decisionMessage {
   margin: 0;
   color: var(--text-secondary);
+}
+
+.decisionFeedbackApproved {
+  color: var(--status-green-text);
+  font-weight: 600;
+}
+
+.decisionFeedbackRejected {
+  color: var(--status-red-text);
+  font-weight: 600;
 }
 
 .field {

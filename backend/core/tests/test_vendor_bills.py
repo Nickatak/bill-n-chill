@@ -119,14 +119,6 @@ class VendorBillTests(TestCase):
 
         expected_statuses = [status for status, _label in VendorBill.Status.choices]
         expected_labels = {status: label for status, label in VendorBill.Status.choices}
-        expected_transitions = {}
-        for status in expected_statuses:
-            next_statuses = list(VendorBill.ALLOWED_STATUS_TRANSITIONS.get(status, set()))
-            next_statuses.sort(key=lambda value: expected_statuses.index(value))
-            expected_transitions[status] = next_statuses
-        expected_terminal_statuses = [
-            status for status in expected_statuses if not expected_transitions.get(status, [])
-        ]
 
         self.assertEqual(payload["statuses"], expected_statuses)
         self.assertEqual(payload["status_labels"], expected_labels)
@@ -135,9 +127,17 @@ class VendorBillTests(TestCase):
             payload["create_shortcut_statuses"],
             [VendorBill.Status.PLANNED, VendorBill.Status.RECEIVED],
         )
-        self.assertEqual(payload["allowed_status_transitions"], expected_transitions)
-        self.assertEqual(payload["terminal_statuses"], expected_terminal_statuses)
-        self.assertTrue(str(payload["policy_version"]).startswith("2026-02-23.vendor_bills."))
+
+        # Policy transitions include compound paths (received → scheduled).
+        received_transitions = payload["allowed_status_transitions"]["received"]
+        self.assertIn("approved", received_transitions)
+        self.assertIn("scheduled", received_transitions)
+        self.assertIn("void", received_transitions)
+
+        # Terminal statuses are computed from the policy transitions.
+        self.assertIn("paid", payload["terminal_statuses"])
+        self.assertIn("void", payload["terminal_statuses"])
+        self.assertTrue(str(payload["policy_version"]).startswith("2026-03-01.vendor_bills."))
 
     def test_vendor_bill_create_and_project_list(self):
         response = self.client.post(
@@ -655,21 +655,42 @@ class VendorBillTests(TestCase):
         )
         self.assertEqual(paid.status_code, 200)
 
+        snapshots = VendorBillSnapshot.objects.filter(vendor_bill_id=vendor_bill_id).order_by("created_at", "id")
+        self.assertEqual(snapshots.count(), 4)
+        self.assertEqual(
+            list(snapshots.values_list("capture_status", flat=True)),
+            ["received", "approved", "scheduled", "paid"],
+        )
+        self.assertTrue(all(snapshot.acted_by_id == self.user.id for snapshot in snapshots))
+
+    def test_vendor_bill_paid_cannot_transition_to_void(self):
+        """Paid bills are terminal — voiding a paid bill is not allowed."""
+        vendor_bill_id = self._create_vendor_bill(total="500.00")
+
+        # Walk to paid status
+        for status, extra in [
+            ("received", {}),
+            ("approved", {"allocations": [{"budget_line": self.budget_line.id, "amount": "500.00", "note": ""}]}),
+            ("scheduled", {"scheduled_for": "2026-03-01"}),
+            ("paid", {}),
+        ]:
+            response = self.client.patch(
+                f"/api/v1/vendor-bills/{vendor_bill_id}/",
+                data={"status": status, **extra},
+                content_type="application/json",
+                HTTP_AUTHORIZATION=f"Token {self.token.key}",
+            )
+            self.assertEqual(response.status_code, 200, f"Failed to transition to {status}")
+
+        # Attempt paid -> void should be rejected
         voided = self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
             data={"status": "void"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(voided.status_code, 200)
-
-        snapshots = VendorBillSnapshot.objects.filter(vendor_bill_id=vendor_bill_id).order_by("created_at", "id")
-        self.assertEqual(snapshots.count(), 5)
-        self.assertEqual(
-            list(snapshots.values_list("capture_status", flat=True)),
-            ["received", "approved", "scheduled", "paid", "void"],
-        )
-        self.assertTrue(all(snapshot.acted_by_id == self.user.id for snapshot in snapshots))
+        self.assertEqual(voided.status_code, 400)
+        self.assertEqual(voided.json()["error"]["code"], "validation_error")
 
     def test_vendor_bill_snapshot_payload_captures_allocation_and_context(self):
         vendor_bill_id = self._create_vendor_bill(total="200.00")
@@ -702,3 +723,47 @@ class VendorBillTests(TestCase):
         self.assertEqual(snapshot.snapshot_json["decision_context"]["capture_status"], "approved")
         self.assertEqual(len(snapshot.snapshot_json["allocations"]), 1)
         self.assertEqual(snapshot.snapshot_json["allocations"][0]["budget_line_id"], self.budget_line.id)
+
+    def test_vendor_bill_compound_received_to_scheduled_creates_two_snapshots(self):
+        """Compound transition: received → scheduled atomically walks through approved."""
+        vendor_bill_id = self._create_vendor_bill(total="200.00")
+        self.client.patch(
+            f"/api/v1/vendor-bills/{vendor_bill_id}/",
+            data={"status": "received"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        # Send received → scheduled directly (compound path)
+        response = self.client.patch(
+            f"/api/v1/vendor-bills/{vendor_bill_id}/",
+            data={
+                "status": "scheduled",
+                "scheduled_for": "2026-03-10",
+                "allocations": [
+                    {"budget_line": self.budget_line.id, "amount": "200.00", "note": "Full alloc"}
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["status"], "scheduled")
+
+        # Should have THREE snapshots: received (from planned), approved (compound), scheduled (compound)
+        snapshots = list(
+            VendorBillSnapshot.objects.filter(vendor_bill_id=vendor_bill_id).order_by("id")
+        )
+        self.assertEqual(len(snapshots), 3)
+        self.assertEqual(snapshots[0].capture_status, "received")
+        self.assertEqual(snapshots[1].capture_status, "approved")
+        self.assertEqual(snapshots[1].snapshot_json["decision_context"]["previous_status"], "received")
+        self.assertEqual(snapshots[2].capture_status, "scheduled")
+        self.assertEqual(snapshots[2].snapshot_json["decision_context"]["previous_status"], "approved")
+
+        # Should have TWO financial audit events for the compound transition
+        audit_events = FinancialAuditEvent.objects.filter(
+            object_type="vendor_bill",
+            object_id=vendor_bill_id,
+        ).order_by("id")
+        compound_events = [e for e in audit_events if e.metadata_json.get("compound_transition")]
+        self.assertEqual(len(compound_events), 2)

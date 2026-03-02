@@ -304,6 +304,11 @@ def project_change_orders_view(request, project_id: int):
         if "reason" in data
         else (organization.change_order_default_reason or "").strip()
     )
+    terms_text = (
+        str(data["terms_text"]).strip()
+        if "terms_text" in data
+        else (organization.change_order_default_terms or "").strip()
+    )
 
     fields = {}
     if "title" not in data:
@@ -377,6 +382,7 @@ def project_change_orders_view(request, project_id: int):
                 amount_delta=data["amount_delta"],
                 days_delta=data.get("days_delta", 0),
                 reason=reason_text,
+                terms_text=terms_text,
                 origin_estimate=origin_estimate,
                 requested_by=request.user,
             )
@@ -598,6 +604,9 @@ def change_order_detail_view(request, change_order_id: int):
     if "reason" in data:
         change_order.reason = data["reason"]
         update_fields.append("reason")
+    if "terms_text" in data:
+        change_order.terms_text = data["terms_text"]
+        update_fields.append("terms_text")
     if "status" in data:
         change_order.status = data["status"]
         update_fields.append("status")
@@ -756,6 +765,7 @@ def change_order_clone_revision_view(request, change_order_id: int):
             amount_delta=change_order.amount_delta,
             days_delta=change_order.days_delta,
             reason=change_order.reason,
+            terms_text=change_order.terms_text,
             origin_estimate=change_order.origin_estimate,
             previous_change_order=change_order,
             requested_by=request.user,
@@ -954,6 +964,7 @@ def _record_change_order_decision_snapshot(
             "amount_delta": str(change_order.amount_delta),
             "days_delta": change_order.days_delta,
             "reason": change_order.reason,
+            "terms_text": change_order.terms_text,
             "origin_estimate_id": change_order.origin_estimate_id,
             "origin_estimate_version": origin_estimate_version,
             "previous_change_order_id": change_order.previous_change_order_id,

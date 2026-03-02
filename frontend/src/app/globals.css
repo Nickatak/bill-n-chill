@@ -227,7 +227,7 @@ html[data-theme="dark"] {
   --input-text: #fafafa;
   --input-readonly-bg: #18181b;
   --input-readonly-text: #a1a1aa;
-  --input-disabled-bg: #09090b;
+  --input-disabled-bg: #18181b;
   --input-disabled-text: #71717a;
   --input-disabled-border: #27272a;
 }

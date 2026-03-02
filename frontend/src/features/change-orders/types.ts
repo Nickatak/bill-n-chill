@@ -51,6 +51,7 @@ export type ChangeOrderRecord = {
   amount_delta: string;
   days_delta: number;
   reason: string;
+  terms_text: string;
   origin_estimate: number | null;
   origin_estimate_version?: number | null;
   previous_change_order: number | null;

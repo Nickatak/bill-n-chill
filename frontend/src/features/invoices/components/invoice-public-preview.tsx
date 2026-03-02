@@ -35,7 +35,6 @@ const STATUS_LABELS: Record<string, string> = {
   sent: "Sent",
   partially_paid: "Partially Paid",
   paid: "Paid",
-  overdue: "Overdue",
   void: "Void",
 };
 
@@ -84,12 +83,12 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
     return organizationTerms || (invoice?.terms_text || "").trim() || "No terms specified.";
   }, [invoice?.organization_context, invoice?.terms_text]);
   const paymentEligible =
-    invoice?.status === "sent" || invoice?.status === "partially_paid" || invoice?.status === "overdue";
+    invoice?.status === "sent" || invoice?.status === "partially_paid";
   const showPaymentSection = paymentEligible;
   const paymentStatusLabel = invoiceStatusLabel(invoice?.status);
   const paymentBannerMessage = paymentEligible
     ? "Ready to pay? Jump to the payment section and submit a test payment."
-    : `Invoice status: ${paymentStatusLabel}. This invoice is not awaiting payment.`;
+    : `Status: ${paymentStatusLabel}.`;
 
   // Fetch invoice data on mount using the public token.
   useEffect(() => {

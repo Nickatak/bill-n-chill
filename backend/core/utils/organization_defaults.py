@@ -14,6 +14,10 @@ DEFAULT_ESTIMATE_TERMS = (
 DEFAULT_CHANGE_ORDER_REASON = (
     "Scope adjustment requested after baseline approval due to field conditions or owner request."
 )
+DEFAULT_CHANGE_ORDER_TERMS = (
+    "Change order pricing is based on current labor and material rates. "
+    "Approved changes are final and will be reflected in the next billing cycle."
+)
 DEFAULT_INVOICE_FOOTER = "Thank you for your business."
 DEFAULT_INVOICE_NOTES = "Please include invoice number with your payment."
 
@@ -32,6 +36,7 @@ def build_invoice_profile_defaults(*, display_name: str, owner_email: str = "") 
         "invoice_default_terms": DEFAULT_INVOICE_TERMS,
         "estimate_default_terms": DEFAULT_ESTIMATE_TERMS,
         "change_order_default_reason": DEFAULT_CHANGE_ORDER_REASON,
+        "change_order_default_terms": DEFAULT_CHANGE_ORDER_TERMS,
         "invoice_default_footer": DEFAULT_INVOICE_FOOTER,
         "invoice_default_notes": DEFAULT_INVOICE_NOTES,
     }
@@ -86,6 +91,11 @@ def apply_missing_invoice_profile_defaults(*, organization, owner_email: str = "
     if not current_change_order_reason:
         organization.change_order_default_reason = defaults["change_order_default_reason"]
         changed_fields.append("change_order_default_reason")
+
+    current_change_order_terms = (organization.change_order_default_terms or "").strip()
+    if not current_change_order_terms:
+        organization.change_order_default_terms = defaults["change_order_default_terms"]
+        changed_fields.append("change_order_default_terms")
 
     current_footer = (organization.invoice_default_footer or "").strip()
     if not current_footer:

@@ -29,9 +29,13 @@ export type VendorBillRecord = {
   vendor_name: string;
   bill_number: string;
   status: VendorBillStatus;
+  received_date: string | null;
   issue_date: string;
   due_date: string;
   scheduled_for: string | null;
+  subtotal: string;
+  tax_amount: string;
+  shipping_amount: string;
   total: string;
   balance_due: string;
   allocations?: VendorBillAllocationRecord[];
@@ -62,9 +66,13 @@ export type VendorBillPayload = {
   vendor: number;
   bill_number: string;
   status?: VendorBillStatus;
+  received_date?: string | null;
   issue_date: string;
   due_date: string;
   scheduled_for?: string | null;
+  subtotal?: string;
+  tax_amount?: string;
+  shipping_amount?: string;
   total: string;
   notes: string;
   allocations?: VendorBillAllocationInput[];

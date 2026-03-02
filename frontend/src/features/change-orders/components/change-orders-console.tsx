@@ -211,6 +211,7 @@ type AuditEventRecord = {
 
 type OrganizationDocumentDefaults = OrganizationBrandingDefaults & {
   change_order_default_reason: string;
+  change_order_default_terms: string;
 };
 
 const CHANGE_ORDER_STATUS_LABELS_FALLBACK: Record<string, string> = {
@@ -260,13 +261,20 @@ export function ChangeOrdersConsole({
   const [newTitle, setNewTitle] = useState("Change Order");
   const [newTitleManuallyEdited, setNewTitleManuallyEdited] = useState(false);
   const [newReason, setNewReason] = useState("");
+  const [newTermsText, setNewTermsText] = useState("");
   const [newLineItems, setNewLineItems] = useState<ChangeOrderLineInput[]>([emptyLine(1)]);
 
   const [editTitle, setEditTitle] = useState("");
   const [editReason, setEditReason] = useState("");
+  const [editTermsText, setEditTermsText] = useState("");
   const [editLineItems, setEditLineItems] = useState<ChangeOrderLineInput[]>([emptyLine(1)]);
   const [quickStatus, setQuickStatus] = useState("pending_approval");
   const [quickStatusNote, setQuickStatusNote] = useState("");
+  const [isStatusSectionOpen, setIsStatusSectionOpen] = useState(true);
+  const [isHistorySectionOpen, setIsHistorySectionOpen] = useState(false);
+  const [isLineItemsSectionOpen, setIsLineItemsSectionOpen] = useState(true);
+  const [showAllEvents, setShowAllEvents] = useState(false);
+  const [showBudgetColumns, setShowBudgetColumns] = useState(false);
   const [changeOrderStatusLabels, setChangeOrderStatusLabels] = useState<
     Record<string, string>
   >(CHANGE_ORDER_STATUS_LABELS_FALLBACK);
@@ -274,7 +282,33 @@ export function ChangeOrdersConsole({
     Record<string, string[]>
   >(CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK);
   const createCreatorRef = useRef<HTMLDivElement | null>(null);
-  const pendingScrollToCreateCreatorRef = useRef(false);
+  const editCreatorRef = useRef<HTMLDivElement | null>(null);
+  const [createFlashCount, setCreateFlashCount] = useState(0);
+  const [editFlashCount, setEditFlashCount] = useState(0);
+
+  useEffect(() => {
+    if (createFlashCount === 0) return;
+    const el = createCreatorRef.current;
+    if (!el) return;
+    el.classList.remove(creatorStyles.sheetFlash);
+    void el.offsetWidth;
+    el.classList.add(creatorStyles.sheetFlash);
+    const cleanup = () => el.classList.remove(creatorStyles.sheetFlash);
+    el.addEventListener("animationend", cleanup, { once: true });
+    return () => el.removeEventListener("animationend", cleanup);
+  }, [createFlashCount]);
+
+  useEffect(() => {
+    if (editFlashCount === 0) return;
+    const el = editCreatorRef.current;
+    if (!el) return;
+    el.classList.remove(creatorStyles.sheetFlash);
+    void el.offsetWidth;
+    el.classList.add(creatorStyles.sheetFlash);
+    const cleanup = () => el.classList.remove(creatorStyles.sheetFlash);
+    el.addEventListener("animationend", cleanup, { once: true });
+    return () => el.removeEventListener("animationend", cleanup);
+  }, [editFlashCount]);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const canMutateChangeOrders = hasAnyRole(role, ["owner", "pm"]);
@@ -332,15 +366,13 @@ export function ChangeOrdersConsole({
   const selectedViewerChangeOrderIsApproved = Boolean(
     selectedViewerChangeOrder && ["approved", "accepted"].includes(selectedViewerChangeOrder.status),
   );
-  const scopedProjectLabel = selectedProjectId
-    ? `Project #${selectedProjectId}${selectedProjectName ? ` · ${selectedProjectName}` : ""}`
-    : "No project selected";
   const senderBranding = resolveOrganizationBranding(organizationDefaults);
   const senderName = senderBranding.senderDisplayName;
   const senderEmail = senderBranding.senderEmail;
   const senderAddressLines = senderBranding.senderAddressLines;
   const senderLogoUrl = senderBranding.logoUrl;
   const defaultChangeOrderReason = (organizationDefaults?.change_order_default_reason || "").trim();
+  const defaultChangeOrderTerms = (organizationDefaults?.change_order_default_terms || "").trim();
   const newLineDeltaTotal = useMemo(
     () =>
       newLineItems.reduce((sum, line) => sum + parseAmount(line.amountDelta), 0),
@@ -394,7 +426,7 @@ export function ChangeOrdersConsole({
     ? `${coLabel(selectedChangeOrder)} · ${selectedChangeOrder.title || "Untitled"}`
     : "New change order draft";
   const workspaceBadgeLabel = !selectedChangeOrder
-    ? "NEW CHANGE ORDER"
+    ? "CREATING"
     : isSelectedChangeOrderEditable
       ? "EDITING"
       : "READ-ONLY";
@@ -549,9 +581,9 @@ export function ChangeOrdersConsole({
     return styles[key] ?? "";
   }
 
-  function quickStatusControlLabel(status: string): string {
+  function quickStatusControlLabel(status: string, currentStatus?: string): string {
     if (status === "pending_approval" || status === "sent") {
-      return "Sent";
+      return currentStatus === status ? "Re-send" : "Send";
     }
     if (status === "void") {
       return "Void";
@@ -816,6 +848,7 @@ export function ChangeOrdersConsole({
       setSelectedChangeOrderId("");
       setEditTitle("");
       setEditReason("");
+      setEditTermsText("");
       setEditLineItems([emptyLine(1)]);
       setNextLineLocalId(2);
       setQuickStatus(changeOrderAllowedTransitions.draft?.[0] ?? "pending_approval");
@@ -826,6 +859,7 @@ export function ChangeOrdersConsole({
     setSelectedChangeOrderId(String(changeOrder.id));
     setEditTitle(changeOrder.title);
     setEditReason(changeOrder.reason);
+    setEditTermsText(changeOrder.terms_text || "");
     const hydratedLines: ChangeOrderLineInput[] =
       changeOrder.line_items.length > 0
         ? changeOrder.line_items.map((line, index) => ({
@@ -853,6 +887,7 @@ export function ChangeOrdersConsole({
       setQuickStatus(nextQuickStatuses[0] ?? changeOrder.status);
     }
     setQuickStatusNote("");
+    setShowAllEvents(false);
   }, [changeOrderAllowedTransitions]);
 
   const loadChangeOrderPolicy = useCallback(async () => {
@@ -1113,6 +1148,7 @@ export function ChangeOrdersConsole({
       if (organizationData) {
         setOrganizationDefaults(organizationData);
         setNewReason((current) => current || organizationData.change_order_default_reason || "");
+        setNewTermsText((current) => current || organizationData.change_order_default_terms || "");
       }
     } catch {
       // Branding defaults are best-effort; change order workflows can continue.
@@ -1315,11 +1351,11 @@ export function ChangeOrdersConsole({
 
   /** Reset the workspace to a fresh "new change order" draft. */
   function handleStartNewChangeOrder() {
-    pendingScrollToCreateCreatorRef.current = true;
     hydrateEditForm(undefined);
     setNewTitleManuallyEdited(false);
     setNewTitle(defaultChangeOrderTitle(selectedProjectName));
     setNewReason(defaultChangeOrderReason);
+    setNewTermsText(defaultChangeOrderTerms);
     if (budgetLines.length > 0) {
       prefillNewLinesFromBudgetLines(budgetLines);
     } else {
@@ -1328,24 +1364,6 @@ export function ChangeOrdersConsole({
     }
     setFeedback("Ready for a new change order draft.", "info");
   }
-
-  // Scroll the create creator into view after switching to "new CO" mode.
-  useEffect(() => {
-    if (!pendingScrollToCreateCreatorRef.current) {
-      return;
-    }
-    if (selectedChangeOrder) {
-      return;
-    }
-    const target = createCreatorRef.current;
-    if (!target) {
-      return;
-    }
-    pendingScrollToCreateCreatorRef.current = false;
-    requestAnimationFrame(() => {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  }, [selectedChangeOrder]);
 
   /** Handle form submission for creating a new change order draft. */
   async function handleCreateChangeOrder(event: FormEvent<HTMLFormElement>) {
@@ -1370,6 +1388,7 @@ export function ChangeOrdersConsole({
           body: JSON.stringify({
             title: newTitle,
             reason: newReason,
+            terms_text: newTermsText,
             amount_delta: formatDecimal(newLineDeltaTotal),
             days_delta: newLineDaysTotal,
             origin_estimate: selectedViewerEstimateId ? Number(selectedViewerEstimateId) : null,
@@ -1385,6 +1404,7 @@ export function ChangeOrdersConsole({
       const created = payload.data as ChangeOrderRecord;
 
       const { rows } = await fetchProjectChangeOrders(projectId);
+
       if (rows) {
         setChangeOrders(rows);
         const persisted = rows.find((row) => row.id === created.id);
@@ -1395,12 +1415,14 @@ export function ChangeOrdersConsole({
         hydrateEditForm(created);
         await loadProjectAuditEvents(projectId);
       }
-      setFeedback(`Created change order ${coLabel(created)} (${statusLabel(created.status)}).`, "success");
+      setFeedback(`Created change order #${created.id}.`, "success");
       setNewLineItems([emptyLine(1)]);
       setNextLineLocalId(2);
       setNewTitleManuallyEdited(false);
       setNewTitle(defaultChangeOrderTitle(selectedProjectName));
       setNewReason(defaultChangeOrderReason);
+      setNewTermsText(defaultChangeOrderTerms);
+      setCreateFlashCount((c) => c + 1);
     } catch {
       setFeedback("Could not reach change order create endpoint.", "error");
     }
@@ -1436,13 +1458,15 @@ export function ChangeOrdersConsole({
       }
       const created = payload.data as ChangeOrderRecord;
       const { rows } = await fetchProjectChangeOrders(projectId);
+
       if (rows) {
         setChangeOrders(rows);
         const persisted = rows.find((row) => row.id === created.id);
         hydrateEditForm(persisted ?? created);
         await loadProjectAuditEvents(projectId);
       }
-      setFeedback(`Created ${coLabel(created)} in Draft.`, "success");
+      setFeedback("");
+      setEditFlashCount((c) => c + 1);
     } catch {
       setFeedback("Could not reach clone revision endpoint.", "error");
     }
@@ -1475,6 +1499,7 @@ export function ChangeOrdersConsole({
           body: JSON.stringify({
             title: editTitle,
             reason: editReason,
+            terms_text: editTermsText,
             amount_delta: formatDecimal(editLineDeltaTotal),
             days_delta: editLineDaysTotal,
             status: selectedChangeOrder.status,
@@ -1557,9 +1582,9 @@ export function ChangeOrdersConsole({
         await loadProjectAuditEvents(projectId);
       }
       if (isResend) {
-        setFeedback(`Re-sent ${coLabel(updated)} for approval.`, "success");
+        setFeedback(`Re-sent ${coLabel(updated)} for approval. History updated.`, "success");
       } else {
-        setFeedback(`Updated ${coLabel(updated)} to ${statusLabel(updated.status)}.`, "success");
+        setFeedback(`Updated ${coLabel(updated)} to ${statusLabel(updated.status)}. History updated.`, "success");
       }
       setQuickStatusNote("");
     } catch {
@@ -1617,7 +1642,7 @@ export function ChangeOrdersConsole({
         await loadProjectAuditEvents(projectId);
       }
       setQuickStatusNote("");
-      setFeedback(`Added status note on ${coLabel(updated)}.`, "success");
+      setFeedback(`Added status note on ${coLabel(updated)}. History updated.`, "success");
     } catch {
       setFeedback("Could not reach change order detail endpoint.", "error");
     }
@@ -1642,24 +1667,14 @@ export function ChangeOrdersConsole({
         </p>
       ) : null}
 
-      <section className={styles.consoleTop}>
-        <div className={styles.consoleIntro}>
-          <p className={styles.consoleEyebrow}>Change Orders</p>
-          <h3 className={styles.consoleHeading}>{scopedProjectLabel}</h3>
-          <p className={styles.consoleCopy}>
-            Track project scope deltas, preserve revision history, and carry approved CO values into
-            billing.
-          </p>
-        </div>
-      </section>
-
       <section className={styles.viewer}>
         <div className={styles.viewerHeader}>
           <div className={styles.viewerHeaderRow}>
-            <h3>Estimate-linked Revisions</h3>
+            <h3>{selectedProjectName ? `Change Orders for: ${selectedProjectName}` : "Change Orders"}</h3>
             <button
               type="button"
               className={collapseButtonStyles.collapseButton}
+              style={{ background: "var(--surface)" }}
               onClick={() => setIsViewerExpanded((current) => !current)}
               aria-expanded={isViewerExpanded}
             >
@@ -1667,15 +1682,14 @@ export function ChangeOrdersConsole({
             </button>
           </div>
           <p>
-            Select an approved origin estimate on the left. Change-order families are grouped by
-            that origin anchor.
+            Select an estimate to view its change orders.
           </p>
         </div>
         {isViewerExpanded ? (projectEstimates.length > 0 ? (
           <div className={styles.viewerGrid}>
             <div className={styles.viewerRail}>
               <div className={styles.viewerRailHeader}>
-                <span className={styles.viewerRailHeading}>Origin Estimates</span>
+                <span className={styles.viewerRailHeading}>Approved Estimates</span>
               </div>
               {projectEstimates.map((estimate) => {
                 const active = String(estimate.id) === selectedViewerEstimateId;
@@ -1687,7 +1701,7 @@ export function ChangeOrdersConsole({
                   <div key={estimate.id} className={styles.viewerRailEntry}>
                     <button
                       type="button"
-                      className={`${styles.viewerRailItem} ${active ? styles.viewerRailItemActive : ""}`}
+                      className={`${styles.viewerRailItem} ${active ? styles.viewerRailItemActive : ""} ${baselineStatus === "active" ? styles.viewerRailItemActiveBaseline : ""}`}
                       onClick={() => {
                         const nextEstimateId = String(estimate.id);
                         setSelectedViewerEstimateId(nextEstimateId);
@@ -1711,7 +1725,7 @@ export function ChangeOrdersConsole({
                       <span className={styles.viewerRailTitle}>
                         {estimate.title}
                         <span className={styles.viewerRailVersion}>
-                          Estimate #{estimate.id} · v{estimate.version} · History: {relatedCount} COs
+                          Estimate #{estimate.id} · {relatedCount} COs
                         </span>
                       </span>
                       {baselineStatus !== "none" ? (
@@ -1747,7 +1761,7 @@ export function ChangeOrdersConsole({
                         href={`/projects/${selectedProjectId}/estimates?estimate=${estimate.id}`}
                         className={styles.viewerCardLink}
                       >
-                        Open Original Estimate <span aria-hidden="true">↗</span>
+                        Open Original Estimate ↗
                       </Link>
                     ) : null}
                   </div>
@@ -1756,46 +1770,21 @@ export function ChangeOrdersConsole({
             </div>
             {selectedViewerEstimate ? (
               <div className={styles.viewerDetail}>
-                <p
-                  className={`${styles.viewerBaselineHint} ${
-                    selectedViewerEstimateIsActiveBaseline
-                      ? styles.viewerBaselineHintActive
-                      : styles.viewerBaselineHintWarning
-                  }`}
-                >
-                  {selectedViewerEstimateIsActiveBaseline
-                    ? `This origin estimate (#${selectedViewerEstimate.id} v${selectedViewerEstimate.version}) is the active estimate for this project.`
-                    : activeFinancialBaselineEstimate
-                      ? `This origin estimate is not the active estimate. Current active estimate is #${activeFinancialBaselineEstimate.id} v${activeFinancialBaselineEstimate.version}.`
-                      : "This project currently has no active estimate."}
-                </p>
                 {viewerChangeOrders.length > 0 ? (
                   <>
-                    <h4 className={styles.viewerSectionHeading}>Linked Change Orders</h4>
+                    <h4 className={styles.viewerSectionHeading}>Change Orders</h4>
                     <div className={`${styles.viewerRail} ${styles.viewerHistoryRail}`}>
                       {viewerChangeOrders.map((changeOrder) => {
                         const active = String(changeOrder.id) === selectedChangeOrderId;
                         const lastStatusEvent = lastStatusEventForChangeOrder(changeOrder.id);
                         return (
                           <div key={changeOrder.id} className={styles.viewerHistoryCardWrap}>
-                            {changeOrder.public_ref ? (
-                              <Link
-                                href={publicChangeOrderHref(changeOrder.public_ref)}
-                                className={styles.viewerHistoryPublicLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                aria-label={`Open public view for ${coLabel(changeOrder)}`}
-                                title="Open public view"
-                              >
-                                Public
-                              </Link>
-                            ) : null}
                             <button
                               type="button"
                               className={`${styles.viewerRailItem} ${styles.viewerHistoryItem} ${viewerHistoryStatusClass(changeOrder.status)} ${
                                 active ? `${styles.viewerRailItemActive} ${styles.viewerHistoryItemActive}` : ""
                               }`}
-                              onClick={() => {
+                              onMouseDown={() => {
                                 hydrateEditForm(changeOrder);
                               }}
                             >
@@ -1821,168 +1810,239 @@ export function ChangeOrdersConsole({
                                 <span className={styles.viewerHistoryMetaText}>No status events yet.</span>
                               )}
                             </button>
+                            {changeOrder.public_ref ? (
+                              <Link
+                                href={publicChangeOrderHref(changeOrder.public_ref)}
+                                className={styles.viewerHistoryPublicLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`Open public view for ${coLabel(changeOrder)}`}
+                                title="Open public view"
+                              >
+                                Public ↗
+                              </Link>
+                            ) : null}
                           </div>
                         );
                       })}
                     </div>
                     {selectedViewerChangeOrder ? (
                       <>
-                        {quickStatusOptions.length > 0 ? (
-                          <div className={styles.quickStatusPanel}>
-                            <span className={creatorStyles.lifecycleFieldLabel}>Next status</span>
-                            <div className={styles.quickStatusPills}>
-                              {quickStatusOptions.map((status) => {
-                                const isSelected = quickStatus === status;
-                                return (
+                        {/* Status & Actions section */}
+                        <div className={styles.viewerSection}>
+                          <button
+                            type="button"
+                            className={styles.viewerSectionToggle}
+                            onClick={() => setIsStatusSectionOpen((v) => !v)}
+                            aria-expanded={isStatusSectionOpen}
+                          >
+                            <h4>Status &amp; Actions</h4>
+                            <span className={styles.viewerSectionArrow}>▼</span>
+                          </button>
+                          {isStatusSectionOpen ? (
+                            <div className={styles.viewerSectionContent}>
+                              {quickStatusOptions.length > 0 ? (
+                                <>
+                                  <span className={creatorStyles.lifecycleFieldLabel}>Next status</span>
+                                  <div className={styles.quickStatusPills}>
+                                    {quickStatusOptions.map((status) => {
+                                      const isSelected = quickStatus === status;
+                                      return (
+                                        <button
+                                          key={status}
+                                          type="button"
+                                          className={`${styles.quickStatusButton} ${
+                                            isSelected
+                                              ? `${styles.quickStatusButtonActive} ${quickStatusToneClass(status)}`
+                                              : styles.quickStatusButtonInactive
+                                          }`}
+                                          onClick={() => setQuickStatus(status)}
+                                          aria-pressed={isSelected}
+                                        >
+                                          {quickStatusControlLabel(status, selectedViewerChangeOrder?.status)}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </>
+                              ) : null}
+                              <label className={creatorStyles.lifecycleField}>
+                                Status note
+                                <textarea
+                                  className={creatorStyles.statusNote}
+                                  value={quickStatusNote}
+                                  onChange={(event) => setQuickStatusNote(event.target.value)}
+                                  placeholder={quickStatusOptions.length > 0 ? "Optional note for this status action." : "Add a note without changing status."}
+                                  rows={2}
+                                />
+                              </label>
+                              {actionMessage && actionTone === "success" ? (
+                                <p className={creatorStyles.actionSuccess}>{actionMessage}</p>
+                              ) : null}
+                              {actionMessage && actionTone === "error" ? (
+                                <p className={creatorStyles.actionError}>{actionMessage}</p>
+                              ) : null}
+                              <div className={`${creatorStyles.lifecycleActions} ${styles.viewerStatusActionRow}`}>
+                                {quickStatusOptions.length > 0 ? (
                                   <button
-                                    key={status}
                                     type="button"
-                                    className={`${styles.quickStatusButton} ${
-                                      isSelected
-                                        ? `${styles.quickStatusButtonActive} ${quickStatusToneClass(status)}`
-                                        : styles.quickStatusButtonInactive
-                                    }`}
-                                    onClick={() => setQuickStatus(status)}
-                                    aria-pressed={isSelected}
+                                    className={`${styles.viewerStatusActionButton} ${styles.viewerStatusActionButtonPrimary}`}
+                                    onClick={handleQuickUpdateStatus}
+                                    disabled={!canMutateChangeOrders || !quickStatusOptions.length}
                                   >
-                                    {quickStatusControlLabel(status)}
+                                    Update CO Status
                                   </button>
-                                );
-                              })}
+                                ) : null}
+                                <button
+                                  type="button"
+                                  className={`${styles.viewerStatusActionButton} ${styles.viewerStatusActionButtonSecondary}`}
+                                  onClick={handleAddChangeOrderStatusNote}
+                                  disabled={!canMutateChangeOrders || !quickStatusNote.trim()}
+                                >
+                                  Add CO Status Note
+                                </button>
+                              </div>
                             </div>
-                            <div className={`${creatorStyles.lifecycleActions} ${styles.viewerStatusActionRow}`}>
-                              <button
-                                type="button"
-                                className={`${styles.viewerStatusActionButton} ${styles.viewerStatusActionButtonPrimary}`}
-                                onClick={handleQuickUpdateStatus}
-                                disabled={!canMutateChangeOrders || !quickStatusOptions.length}
-                              >
-                                Update CO Status
-                              </button>
-                              <button
-                                type="button"
-                                className={`${styles.viewerStatusActionButton} ${styles.viewerStatusActionButtonSecondary}`}
-                                onClick={handleAddChangeOrderStatusNote}
-                                disabled={!canMutateChangeOrders || !quickStatusNote.trim()}
-                              >
-                                Add CO Status Note
-                              </button>
-                            </div>
-                            <label className={creatorStyles.lifecycleField}>
-                              Status note
-                              <textarea
-                                className={creatorStyles.statusNote}
-                                value={quickStatusNote}
-                                onChange={(event) => setQuickStatusNote(event.target.value)}
-                                placeholder="Optional note for this status action or history-only note."
-                                rows={3}
-                              />
-                            </label>
-                          </div>
-                        ) : (
-                          <div className={styles.quickStatusPanel}>
-                            <label className={creatorStyles.lifecycleField}>
-                              Status note
-                              <textarea
-                                className={creatorStyles.statusNote}
-                                value={quickStatusNote}
-                                onChange={(event) => setQuickStatusNote(event.target.value)}
-                                placeholder="Add a note without changing status."
-                                rows={3}
-                              />
-                            </label>
-                            <div className={`${creatorStyles.lifecycleActions} ${styles.viewerStatusActionRow}`}>
-                              <button
-                                type="button"
-                                className={`${styles.viewerStatusActionButton} ${styles.viewerStatusActionButtonSecondary}`}
-                                onClick={handleAddChangeOrderStatusNote}
-                                disabled={!canMutateChangeOrders || !quickStatusNote.trim()}
-                              >
-                                Add CO Status Note
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                        <div className={styles.viewerEventPanel}>
-                          <span className={styles.viewerMetaLabel}>Status events</span>
-                          <p className={styles.viewerHint}>Newest first.</p>
-                          {selectedChangeOrderStatusEvents.length > 0 ? (
-                            <ul className={styles.viewerEventList}>
-                              {selectedChangeOrderStatusEvents.slice(0, 6).map((event) => (
-                                <li key={event.id} className={styles.viewerEventItem}>
-                                  <span className={`${styles.viewerEventAction} ${statusEventActionClass(event)}`}>
-                                    {statusEventActionLabel(event)}
-                                  </span>
-                                  <span className={styles.viewerEventMeta}>
-                                    {formatEventDateTime(event.created_at)} by {renderEventActor(event)}
-                                  </span>
-                                  {event.note ? (
-                                    <span className={styles.viewerEventNote}>{event.note}</span>
+                          ) : null}
+                        </div>
+
+                        {/* History section */}
+                        <div className={styles.viewerSection}>
+                          <button
+                            type="button"
+                            className={styles.viewerSectionToggle}
+                            onClick={() => setIsHistorySectionOpen((v) => !v)}
+                            aria-expanded={isHistorySectionOpen}
+                          >
+                            <h4>History ({selectedChangeOrderStatusEvents.length})</h4>
+                            <span className={styles.viewerSectionArrow}>▼</span>
+                          </button>
+                          {isHistorySectionOpen ? (
+                            <div className={styles.viewerSectionContent}>
+                              {selectedChangeOrderStatusEvents.length > 0 ? (
+                                <>
+                                  <ul className={styles.viewerEventList}>
+                                    {(showAllEvents
+                                      ? selectedChangeOrderStatusEvents
+                                      : selectedChangeOrderStatusEvents.slice(0, 4)
+                                    ).map((event) => (
+                                      <li key={event.id} className={styles.viewerEventItem}>
+                                        <span className={`${styles.viewerEventAction} ${statusEventActionClass(event)}`}>
+                                          {statusEventActionLabel(event)}
+                                        </span>
+                                        <span className={styles.viewerEventMeta}>
+                                          {formatEventDateTime(event.created_at)} by {renderEventActor(event)}
+                                        </span>
+                                        {event.note ? (
+                                          <span className={styles.viewerEventNote}>{event.note}</span>
+                                        ) : null}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                  {selectedChangeOrderStatusEvents.length > 4 ? (
+                                    <button
+                                      type="button"
+                                      className={styles.showAllToggle}
+                                      onClick={() => setShowAllEvents((v) => !v)}
+                                    >
+                                      {showAllEvents
+                                        ? "Show less"
+                                        : `Show all ${selectedChangeOrderStatusEvents.length} events`}
+                                    </button>
                                   ) : null}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className={styles.viewerHint}>No status events recorded for this change order yet.</p>
-                          )}
+                                </>
+                              ) : (
+                                <p className={styles.viewerHint}>No status events recorded yet.</p>
+                              )}
+                            </div>
+                          ) : null}
                         </div>
-                        {selectedViewerChangeOrder.line_items.length > 0 ? (
-                          <div className={styles.lineTableWrap}>
-                            <table className={styles.lineTable}>
-                              <caption className={styles.lineTableCaption}>
-                                Budget-line context for this revision. Money columns are USD flat amounts;
-                                schedule delta is calendar days.
-                              </caption>
-                              <thead>
-                                <tr>
-                                  <th>Type</th>
-                                  <th>Adjustment reason</th>
-                                  <th>Budget line</th>
-                                  <th>CO line note</th>
-                                  <th>CO line delta ($)</th>
-                                  <th>Original approved line item amount ($)</th>
-                                  <th>Approved CO delta ($)</th>
-                                  <th>Current working budget ($)</th>
-                                  <th>Schedule delta (days)</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {selectedViewerChangeOrder.line_items.map((line) => (
-                                  <tr key={line.id}>
-                                    <td>{line.line_type === "adjustment" ? "Adjustment" : "Scope"}</td>
-                                    <td>{line.adjustment_reason || "—"}</td>
-                                    <td>
-                                      #{line.budget_line} {line.budget_line_cost_code}
-                                    </td>
-                                    <td>{line.description || line.budget_line_description}</td>
-                                    <td>${line.amount_delta}</td>
-                                    <td>${originalApprovedAmountForLine(String(line.budget_line))}</td>
-                                    <td>${approvedChangeOrderDeltaForLine(String(line.budget_line))}</td>
-                                    <td>${currentWorkingAmountForLine(String(line.budget_line))}</td>
-                                    <td>{line.days_delta}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        ) : (
-                          <p>No line items yet on this change order.</p>
-                        )}
-                        <div className={styles.viewerMetaRow}>
-                          <span className={styles.viewerMetaLabel}>Line delta total</span>
-                          <strong>${selectedViewerChangeOrder.line_total_delta}</strong>
+
+                        {/* Line Items section */}
+                        <div className={styles.viewerSection}>
+                          <button
+                            type="button"
+                            className={styles.viewerSectionToggle}
+                            onClick={() => setIsLineItemsSectionOpen((v) => !v)}
+                            aria-expanded={isLineItemsSectionOpen}
+                          >
+                            <h4>Line Items ({selectedViewerChangeOrder.line_items.length})</h4>
+                            <span className={styles.viewerSectionArrow}>▼</span>
+                          </button>
+                          {isLineItemsSectionOpen ? (
+                            <div className={styles.viewerSectionContent}>
+                              {selectedViewerChangeOrder.line_items.length > 0 ? (
+                                <>
+                                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                                    <button
+                                      type="button"
+                                      className={styles.budgetToggle}
+                                      onClick={() => setShowBudgetColumns((v) => !v)}
+                                    >
+                                      {showBudgetColumns ? "Hide budget context" : "Show budget context"}
+                                    </button>
+                                  </div>
+                                  <div className={styles.lineTableWrap}>
+                                    <table className={styles.lineTable}>
+                                      <thead>
+                                        <tr>
+                                          <th>Type</th>
+                                          <th>Budget line</th>
+                                          <th>CO line note</th>
+                                          <th>CO line delta ($)</th>
+                                          <th>Days delta</th>
+                                          {showBudgetColumns ? (
+                                            <>
+                                              <th>Adjustment reason</th>
+                                              <th>Original approved ($)</th>
+                                              <th>Approved CO delta ($)</th>
+                                              <th>Working budget ($)</th>
+                                            </>
+                                          ) : null}
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {selectedViewerChangeOrder.line_items.map((line) => (
+                                          <tr key={line.id}>
+                                            <td>{line.line_type === "adjustment" ? "Adjustment" : "Scope"}</td>
+                                            <td>
+                                              #{line.budget_line} {line.budget_line_cost_code}
+                                            </td>
+                                            <td>{line.description || line.budget_line_description}</td>
+                                            <td>${line.amount_delta}</td>
+                                            <td>{line.days_delta}</td>
+                                            {showBudgetColumns ? (
+                                              <>
+                                                <td>{line.adjustment_reason || "—"}</td>
+                                                <td>${originalApprovedAmountForLine(String(line.budget_line))}</td>
+                                                <td>${approvedChangeOrderDeltaForLine(String(line.budget_line))}</td>
+                                                <td>${currentWorkingAmountForLine(String(line.budget_line))}</td>
+                                              </>
+                                            ) : null}
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </>
+                              ) : (
+                                <p className={styles.viewerHint}>No line items yet on this change order.</p>
+                              )}
+                              <div className={styles.viewerMetaRow}>
+                                <span className={styles.viewerMetaLabel}>Line delta total</span>
+                                <strong>${selectedViewerChangeOrder.line_total_delta}</strong>
+                              </div>
+                              <div className={styles.viewerMetaRow}>
+                                <span className={styles.viewerMetaLabel}>Pre-approval total</span>
+                                <strong>${selectedViewerWorkingTotals.preApproval}</strong>
+                              </div>
+                              <div className={styles.viewerMetaRow}>
+                                <span className={styles.viewerMetaLabel}>Post-approval total</span>
+                                <strong>${selectedViewerWorkingTotals.postApproval}</strong>
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
-                        <div className={styles.viewerMetaRow}>
-                          <span className={styles.viewerMetaLabel}>Working total pre-approval (this CO)</span>
-                          <strong>${selectedViewerWorkingTotals.preApproval}</strong>
-                        </div>
-                        <div className={styles.viewerMetaRow}>
-                          <span className={styles.viewerMetaLabel}>Working total post-approval (this CO)</span>
-                          <strong>${selectedViewerWorkingTotals.postApproval}</strong>
-                        </div>
-                        <p className={styles.viewerHint}>
-                          Post-approval total = pre-approval total + this CO line delta.
-                        </p>
                       </>
                     ) : null}
                   </>
@@ -2005,18 +2065,24 @@ export function ChangeOrdersConsole({
 
       <div className={styles.formToolbar}>
         <div className={styles.formContext}>
-          <span className={styles.formContextLabel}>Editing</span>
+          <span className={styles.formContextLabel}>
+            {!selectedChangeOrder ? "Creating" : isSelectedChangeOrderEditable ? "Editing" : "Viewing"}
+          </span>
           <div className={styles.formContextValueRow}>
             <strong>{workspaceContext}</strong>
             <span className={`${styles.editStatusBadge} ${workspaceBadgeClass}`}>
               {workspaceBadgeLabel}
             </span>
           </div>
-          <p className={styles.formContextHint}>
-            Add New Change Order opens a fresh draft workspace. Clone as New Revision copies the selected change order into a new draft revision.
-          </p>
         </div>
         <div className={styles.formToolbarActions}>
+          <button
+            type="button"
+            className={styles.primaryCreateButton}
+            onClick={handleStartNewChangeOrder}
+          >
+            {selectedChangeOrder ? "Create New Change Order" : "Reset"}
+          </button>
           {selectedViewerChangeOrder?.is_latest_revision ? (
             <button
               type="button"
@@ -2024,24 +2090,11 @@ export function ChangeOrdersConsole({
               onClick={handleCloneRevision}
               disabled={!canMutateChangeOrders}
             >
-              Clone as New Revision
+              Duplicate as New Revision
             </button>
-          ) : null}
-          <button
-            type="button"
-            className={styles.primaryCreateButton}
-            onClick={handleStartNewChangeOrder}
-          >
-            Add New Change Order
-          </button>
-          {actionMessage && actionTone === "success" ? (
-            <p className={`${creatorStyles.actionSuccess} ${styles.toolbarFeedbackMessage}`}>
-              {actionMessage}
-            </p>
           ) : null}
         </div>
       </div>
-
       {!selectedChangeOrder ? (
         <div ref={createCreatorRef}>
           <DocumentCreator
@@ -2070,7 +2123,6 @@ export function ChangeOrdersConsole({
                         Set sender address in Organization settings.
                       </p>
                     )}
-                    <p className={creatorStyles.blockMuted}>Prepared for approved estimate scope changes</p>
                   </div>
                   <div className={creatorStyles.headerRight}>
                     <div className={creatorStyles.logoBox}>
@@ -2255,50 +2307,71 @@ export function ChangeOrdersConsole({
                 </div>
 
                 <div className={changeOrderCreatorStyles.coSheetFooter}>
-                  <div className={`${creatorStyles.summary} ${changeOrderCreatorStyles.coSummaryCard}`}>
-                    <div className={creatorStyles.summaryRow}>
-                      <span>Original total</span>
-                      <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
-                        {originalEstimateTotal ? `$${originalEstimateTotal}` : "—"}
-                      </span>
+                  <div className={changeOrderCreatorStyles.coTotalsColumn}>
+                    <div className={`${creatorStyles.summary} ${changeOrderCreatorStyles.coSummaryCard}`}>
+                      <div className={creatorStyles.summaryRow}>
+                        <span>Original total</span>
+                        <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
+                          {originalEstimateTotal ? `$${originalEstimateTotal}` : "—"}
+                        </span>
+                      </div>
+                      <div className={creatorStyles.summaryRow}>
+                        <span>Current total (accepted)</span>
+                        <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
+                          {currentAcceptedTotal ? `$${currentAcceptedTotal}` : "—"}
+                        </span>
+                      </div>
+                      <div className={creatorStyles.summaryRow}>
+                        <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Cost delta ($)</span>
+                        <strong>{formatDecimal(newLineDeltaTotal)}</strong>
+                      </div>
+                      <div className={creatorStyles.summaryRow}>
+                        <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Time delta (days)</span>
+                        <strong>{newLineDaysTotal}</strong>
+                      </div>
                     </div>
-                    <div className={creatorStyles.summaryRow}>
-                      <span>Current total (accepted)</span>
-                      <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
-                        {currentAcceptedTotal ? `$${currentAcceptedTotal}` : "—"}
-                      </span>
-                    </div>
-                    <div className={creatorStyles.summaryRow}>
-                      <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Cost delta ($)</span>
-                      <strong>{formatDecimal(newLineDeltaTotal)}</strong>
-                    </div>
-                    <div className={creatorStyles.summaryRow}>
-                      <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Time delta (days)</span>
-                      <strong>{newLineDaysTotal}</strong>
+                    <div className={changeOrderCreatorStyles.coSheetFooterActions}>
+                      {!selectedViewerEstimateId ? (
+                        <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint}`}>
+                          Select an approved origin estimate from the history selector before creating a change
+                          order.
+                        </p>
+                      ) : null}
+                      {selectedViewerEstimateId && newLineValidation.issues.length ? (
+                        <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint} ${changeOrderCreatorStyles.coFooterErrorHint}`}>
+                          Line-level issues are highlighted inline. Fix them before creating this draft.
+                        </p>
+                      ) : null}
+                      {actionMessage && actionTone === "error" ? (
+                        <p className={creatorStyles.actionError}>{actionMessage}</p>
+                      ) : null}
+                      <div className={changeOrderCreatorStyles.coActionButtonRow}>
+                        <button
+                          type="submit"
+                          className={`${creatorStyles.primaryButton} ${changeOrderCreatorStyles.coFooterPrimaryButton}`}
+                          disabled={isCreateSubmitDisabled}
+                        >
+                          Create Change Order
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div className={changeOrderCreatorStyles.coSheetFooterActions}>
-                    {!selectedViewerEstimateId ? (
-                      <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint}`}>
-                        Select an approved origin estimate from the history selector before creating a change
-                        order.
-                      </p>
-                    ) : null}
-                    {selectedViewerEstimateId && newLineValidation.issues.length ? (
-                      <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint} ${changeOrderCreatorStyles.coFooterErrorHint}`}>
-                        Line-level issues are highlighted inline. Fix them before creating this draft.
-                      </p>
-                    ) : null}
-                    <div className={changeOrderCreatorStyles.coActionButtonRow}>
-                      <button
-                        type="submit"
-                        className={`${creatorStyles.primaryButton} ${changeOrderCreatorStyles.coFooterPrimaryButton}`}
-                        disabled={isCreateSubmitDisabled}
-                      >
-                        Create Change Order
-                      </button>
-                    </div>
-                  </div>
+                </div>
+
+                <div className={creatorStyles.terms}>
+                  <h4>Terms and Conditions</h4>
+                  {(newTermsText || defaultChangeOrderTerms || "Not set")
+                    .split("\n")
+                    .filter((line) => line.trim())
+                    .map((line, index) => (
+                      <p key={`${line}-${index}`}>{line}</p>
+                    ))}
+                </div>
+
+                <div className={creatorStyles.footer}>
+                  <span>{senderName || "Your Company"}</span>
+                  <span>{senderEmail || "Help email not set"}</span>
+                  <span>New Change Order Draft</span>
                 </div>
               </>
             ),
@@ -2308,6 +2381,7 @@ export function ChangeOrdersConsole({
       ) : null}
 
       {selectedChangeOrder ? (
+        <div ref={editCreatorRef}>
         <DocumentCreator
           adapter={changeOrderCreatorAdapter}
           document={selectedChangeOrder}
@@ -2524,61 +2598,79 @@ export function ChangeOrdersConsole({
                 ) : null}
 
                 <div className={changeOrderCreatorStyles.coSheetFooter}>
-                  <div className={`${creatorStyles.summary} ${changeOrderCreatorStyles.coSummaryCard}`}>
-                    <div className={creatorStyles.summaryRow}>
-                      <span>Original total</span>
-                      <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
-                        {originalEstimateTotal ? `$${originalEstimateTotal}` : "—"}
-                      </span>
-                    </div>
-                    <div className={creatorStyles.summaryRow}>
-                      <span>Current total (accepted)</span>
-                      <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
-                        {currentAcceptedTotal ? `$${currentAcceptedTotal}` : "—"}
-                      </span>
-                    </div>
-                    <div className={creatorStyles.summaryRow}>
-                      <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Cost delta ($)</span>
-                      <strong>{formatDecimal(editLineDeltaTotal)}</strong>
-                    </div>
-                    <div className={creatorStyles.summaryRow}>
-                      <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Time delta (days)</span>
-                      <strong>{editLineDaysTotal}</strong>
-                    </div>
-                  </div>
-                  <div className={changeOrderCreatorStyles.coSheetFooterActions}>
-                    {isSelectedChangeOrderEditable && editLineValidation.issues.length ? (
-                      <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint} ${changeOrderCreatorStyles.coFooterErrorHint}`}>
-                        Line-level issues are highlighted inline. Fix them before saving this revision.
-                      </p>
-                    ) : null}
-                    {selectedChangeOrder && !selectedChangeOrder.is_latest_revision ? (
-                      <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint} ${changeOrderCreatorStyles.coFooterErrorHint}`}>
-                        This revision is historical and read-only. Save/update actions are available on the latest revision only.
-                      </p>
-                    ) : null}
-                    {selectedChangeOrder && selectedChangeOrder.status !== "draft" ? (
-                      <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint} ${changeOrderCreatorStyles.coFooterErrorHint}`}>
-                        This revision is no longer in Draft. Content fields are locked after send/decision. Clone a new revision to edit.
-                      </p>
-                    ) : null}
-                    {isSelectedChangeOrderEditable ? (
-                      <div className={changeOrderCreatorStyles.coActionButtonRow}>
-                        <button
-                          type="submit"
-                          className={`${creatorStyles.primaryButton} ${changeOrderCreatorStyles.coFooterPrimaryButton}`}
-                          disabled={isEditSubmitDisabled}
-                        >
-                          Save Change Order
-                        </button>
+                  <div className={changeOrderCreatorStyles.coTotalsColumn}>
+                    <div className={`${creatorStyles.summary} ${changeOrderCreatorStyles.coSummaryCard}`}>
+                      <div className={creatorStyles.summaryRow}>
+                        <span>Original total</span>
+                        <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
+                          {originalEstimateTotal ? `$${originalEstimateTotal}` : "—"}
+                        </span>
                       </div>
-                    ) : null}
+                      <div className={creatorStyles.summaryRow}>
+                        <span>Current total (accepted)</span>
+                        <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
+                          {currentAcceptedTotal ? `$${currentAcceptedTotal}` : "—"}
+                        </span>
+                      </div>
+                      <div className={creatorStyles.summaryRow}>
+                        <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Cost delta ($)</span>
+                        <strong>{formatDecimal(editLineDeltaTotal)}</strong>
+                      </div>
+                      <div className={creatorStyles.summaryRow}>
+                        <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Time delta (days)</span>
+                        <strong>{editLineDaysTotal}</strong>
+                      </div>
+                    </div>
+                    <div className={changeOrderCreatorStyles.coSheetFooterActions}>
+                      {isSelectedChangeOrderEditable && editLineValidation.issues.length ? (
+                        <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint} ${changeOrderCreatorStyles.coFooterErrorHint}`}>
+                          Line-level issues are highlighted inline. Fix them before saving this revision.
+                        </p>
+                      ) : null}
+                      {selectedChangeOrder && !selectedChangeOrder.is_latest_revision ? (
+                        <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint} ${changeOrderCreatorStyles.coFooterErrorHint}`}>
+                          This revision is historical and read-only. Save/update actions are available on the latest revision only.
+                        </p>
+                      ) : null}
+                      {isSelectedChangeOrderEditable ? (
+                        <div className={changeOrderCreatorStyles.coActionButtonRow}>
+                          <button
+                            type="submit"
+                            className={`${creatorStyles.primaryButton} ${changeOrderCreatorStyles.coFooterPrimaryButton}`}
+                            disabled={isEditSubmitDisabled}
+                          >
+                            Save Change Order
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
+                </div>
+
+                <div className={creatorStyles.terms}>
+                  <h4>Terms and Conditions</h4>
+                  {(editTermsText || defaultChangeOrderTerms || "Not set")
+                    .split("\n")
+                    .filter((line) => line.trim())
+                    .map((line, index) => (
+                      <p key={`${line}-${index}`}>{line}</p>
+                    ))}
+                </div>
+
+                <div className={creatorStyles.footer}>
+                  <span>{senderName || "Your Company"}</span>
+                  <span>{senderEmail || "Help email not set"}</span>
+                  <span>
+                    {selectedChangeOrder
+                      ? `CO-${selectedChangeOrder.family_key} v${selectedChangeOrder.revision_number}`
+                      : "Change Order"}
+                  </span>
                 </div>
               </>
             ),
           }}
         />
+        </div>
       ) : null}
     </section>
   );

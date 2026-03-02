@@ -84,25 +84,26 @@ export function QuickAddConsole() {
     });
   }, [controllerApi.duplicateCandidates.length, statusMessage]);
 
+  const statusSlot = statusMessage ? (
+    <div
+      ref={statusAnchorRef}
+      role={statusTone === "error" ? "alert" : "status"}
+      aria-live={statusLiveMode}
+      className={`${styles.formStatus} ${
+        statusTone === "success"
+          ? styles.formStatusSuccess
+          : statusTone === "error"
+            ? styles.formStatusError
+            : styles.formStatusInfo
+      }`}
+    >
+      {renderStatusMessageContent()}
+    </div>
+  ) : <div ref={statusAnchorRef} />;
+
   return (
     <section className={styles.section}>
       <h2>Quick Add Customer</h2>
-      <div ref={statusAnchorRef} />
-      {statusMessage ? (
-        <div
-          role={statusTone === "error" ? "alert" : "status"}
-          aria-live={statusLiveMode}
-          className={`${styles.formStatus} ${
-            statusTone === "success"
-              ? styles.formStatusSuccess
-              : statusTone === "error"
-                ? styles.formStatusError
-                : styles.formStatusInfo
-          }`}
-        >
-          {renderStatusMessageContent()}
-        </div>
-      ) : null}
       <div className={styles.introCard}>
         <p className={styles.introLead}>
           Add a customer in under a minute, then optionally start a project in the same step.
@@ -140,6 +141,7 @@ export function QuickAddConsole() {
         onNotesChange={controllerApi.setNotes}
         fieldErrors={controllerApi.fieldErrors}
         onSubmit={controllerApi.handleQuickAdd}
+        statusSlot={statusSlot}
       />
     </section>
   );

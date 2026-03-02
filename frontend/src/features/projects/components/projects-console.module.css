@@ -333,11 +333,20 @@
 
 .baselineCard {
   border: 1px solid var(--border-accent);
+  border-left: 3px solid var(--border-accent);
   border-radius: 10px;
   padding: 10px var(--space-md);
   background: var(--table-header-bg);
   display: grid;
   gap: var(--space-xs);
+}
+
+.baselineActive {
+  border-left-color: var(--tone-success-border);
+}
+
+.baselineInactive {
+  border-left-color: var(--tone-warning-border);
 }
 
 .baselineCardLabel {

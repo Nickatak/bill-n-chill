@@ -6,7 +6,7 @@
  * provides approve/reject controls for change orders in "pending_approval" status.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { parseAmount, formatDecimal } from "@/shared/money-format";
 import { formatDateTimeDisplay } from "@/shared/date-format";
 import { PublicDocumentViewerShell } from "@/shared/document-viewer/public-document-viewer-shell";
@@ -23,6 +23,7 @@ import {
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { ApiResponse, ChangeOrderRecord } from "../types";
 import { usePrintContext } from "@/shared/hooks/use-print-context";
+import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import styles from "./change-order-public-preview.module.css";
 
 type ChangeOrderPublicPreviewProps = {
@@ -62,7 +63,21 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [decisionReceiptName, setDecisionReceiptName] = useState("");
   const [justSubmittedDecision, setJustSubmittedDecision] = useState<"approve" | "reject" | null>(null);
+  const decisionSectionRef = useRef<HTMLElement | null>(null);
+  const [decisionFlashCount, setDecisionFlashCount] = useState(0);
   const { printTimestamp } = usePrintContext();
+
+  useEffect(() => {
+    if (decisionFlashCount === 0) return;
+    const el = decisionSectionRef.current;
+    if (!el) return;
+    el.classList.remove(creatorStyles.sheetFlash);
+    void el.offsetWidth;
+    el.classList.add(creatorStyles.sheetFlash);
+    const cleanup = () => el.classList.remove(creatorStyles.sheetFlash);
+    el.addEventListener("animationend", cleanup, { once: true });
+    return () => el.removeEventListener("animationend", cleanup);
+  }, [decisionFlashCount]);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const canDecide = changeOrder?.status === "pending_approval";
@@ -72,9 +87,9 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
   const nonPendingDecisionMessage =
     changeOrder?.status === "approved"
       ? decisionReceiptName.trim()
-        ? `Decision status: ${decisionStatusLabel}. Thank you for your approval, ${decisionReceiptName.trim()}.`
-        : `Decision status: ${decisionStatusLabel}.`
-      : `Decision status: ${decisionStatusLabel}. This change order is not awaiting response.`;
+        ? `Status: ${decisionStatusLabel}. Approved by ${decisionReceiptName.trim()}.`
+        : `Status: ${decisionStatusLabel}.`
+      : `Status: ${decisionStatusLabel}.`;
   const decisionFeedbackMessage = useMemo(() => {
     if (!justSubmittedDecision) {
       return null;
@@ -165,6 +180,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
       setDecisionReceiptName(deciderName.trim());
       setJustSubmittedDecision(decision);
       setDecisionMessage("");
+      setDecisionFlashCount((c) => c + 1);
     } catch {
       setDecisionMessage("Could not reach change-order decision endpoint.");
     } finally {
@@ -338,7 +354,15 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
           />
 
           {showDecisionSection ? (
-            <section id="change-order-decision" className={`${styles.decisionCard} ${styles.publicDecisionSection}`}>
+            <section
+              ref={decisionSectionRef}
+              id="change-order-decision"
+              className={`${styles.decisionCard} ${styles.publicDecisionSection} ${
+                hasDecision && changeOrder?.status === "approved" ? styles.decisionCardApproved
+                : hasDecision && changeOrder?.status === "rejected" ? styles.decisionCardRejected
+                : ""
+              }`}
+            >
               <h3>Decision</h3>
               {canDecide ? (
                 <>
@@ -391,7 +415,11 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
                   </div>
                 </>
               ) : (
-                <p className={styles.decisionMessage}>{decisionFeedbackMessage ?? nonPendingDecisionMessage}</p>
+                <p className={`${styles.decisionMessage} ${
+                  changeOrder?.status === "approved" ? styles.decisionFeedbackApproved
+                  : changeOrder?.status === "rejected" ? styles.decisionFeedbackRejected
+                  : ""
+                }`}>{decisionFeedbackMessage ?? nonPendingDecisionMessage}</p>
               )}
             </section>
           ) : null}

@@ -172,7 +172,7 @@ export function MobileDrawer() {
                   className={`${styles.orgLink} ${isOrganizationPath ? styles.navLinkActive : ""}`}
                   onClick={() => setIsOpen(false)}
                 >
-                  {organization.displayName}
+                  {organization.displayName} (WIP)
                 </Link>
               </div>
             ) : null}

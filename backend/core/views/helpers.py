@@ -36,7 +36,6 @@ BILLABLE_INVOICE_STATUSES = {
     Invoice.Status.SENT,
     Invoice.Status.PARTIALLY_PAID,
     Invoice.Status.PAID,
-    Invoice.Status.OVERDUE,
 }
 
 RBAC_ROLE_OWNER = "owner"
@@ -165,6 +164,7 @@ def _build_organization_snapshot(organization: Organization) -> dict:
             "invoice_default_terms": organization.invoice_default_terms,
             "estimate_default_terms": organization.estimate_default_terms,
             "change_order_default_reason": organization.change_order_default_reason,
+            "change_order_default_terms": organization.change_order_default_terms,
             "invoice_default_footer": organization.invoice_default_footer,
             "invoice_default_notes": organization.invoice_default_notes,
             "created_by_id": organization.created_by_id,
@@ -290,6 +290,7 @@ def _ensure_primary_membership(user):
             invoice_default_terms=bootstrap_invoice_defaults["invoice_default_terms"],
             estimate_default_terms=bootstrap_invoice_defaults["estimate_default_terms"],
             change_order_default_reason=bootstrap_invoice_defaults["change_order_default_reason"],
+            change_order_default_terms=bootstrap_invoice_defaults["change_order_default_terms"],
             invoice_default_footer=bootstrap_invoice_defaults["invoice_default_footer"],
             invoice_default_notes=bootstrap_invoice_defaults["invoice_default_notes"],
             created_by=user,
@@ -357,6 +358,7 @@ def _serialize_public_organization_context(organization: Organization | None) ->
             "invoice_default_terms": "",
             "estimate_default_terms": "",
             "change_order_default_reason": "",
+            "change_order_default_terms": "",
         }
 
     sender_name = (organization.invoice_sender_name or organization.display_name or "").strip()
@@ -371,6 +373,7 @@ def _serialize_public_organization_context(organization: Organization | None) ->
         "invoice_default_terms": (organization.invoice_default_terms or "").strip(),
         "estimate_default_terms": (organization.estimate_default_terms or "").strip(),
         "change_order_default_reason": (organization.change_order_default_reason or "").strip(),
+        "change_order_default_terms": (organization.change_order_default_terms or "").strip(),
     }
 
 

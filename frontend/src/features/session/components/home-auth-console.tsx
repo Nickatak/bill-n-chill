@@ -213,6 +213,11 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
                 required
               />
             </label>
+            {message && (
+              <p className={`${styles.message} ${messageTone === "error" ? styles.messageError : ""}`}>
+                {message}
+              </p>
+            )}
             <div className={styles.buttonRow}>
               <button className={styles.button} type="submit" disabled={isChecking}>
                 {isChecking ? "Checking..." : "Sign in"}
@@ -222,11 +227,6 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
               Need an account? <Link href="/register">Create one</Link>.
             </p>
           </form>
-          {message && (
-            <p className={`${styles.message} ${messageTone === "error" ? styles.messageError : ""}`}>
-              {message}
-            </p>
-          )}
           {!health.ok && (
             <p className={styles.healthBad}>API Health: {health.message}</p>
           )}

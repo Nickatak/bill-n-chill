@@ -54,6 +54,19 @@ Last reviewed: 2026-02-28
 - Security and validation checks
 - Test coverage for modified behavior
 
+## Frontend CSS Conventions
+
+### Two-Tone Surface Contrast
+
+The app uses a two-tone surface system (`--surface` and `--surface-secondary`). Cards, panels, and viewer sections typically use `--surface-secondary` as their background. This creates a recurring problem: **interactive elements (buttons, pills, toggles) that also default to `--surface-secondary` will visually blend into their parent container.**
+
+**Rule:** When placing a button or interactive control inside a `--surface-secondary` container, use `--surface` (or another visually distinct token) as the element's background. Do not assume the default button background will contrast with its parent — always verify.
+
+Known examples of this pattern:
+- Collapse toggle buttons inside viewer panels
+- Secondary action buttons inside status/action cards
+- Filter action buttons inside filter bars
+
 ## Architecture and Modeling Conventions (Meta Choices)
 
 ## Object Terminology

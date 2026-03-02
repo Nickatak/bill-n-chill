@@ -30,33 +30,20 @@ class Invoice(models.Model):
         SENT = "sent", "Sent"
         PARTIALLY_PAID = "partially_paid", "Partially Paid"
         PAID = "paid", "Paid"
-        OVERDUE = "overdue", "Overdue"
         VOID = "void", "Void"
 
     # Transition-map format:
     # {from_status: {allowed_to_status_1, allowed_to_status_2, ...}}
     # Example: `draft -> sent` is allowed because
     # `Status.SENT` is in `ALLOWED_STATUS_TRANSITIONS[Status.DRAFT]`.
+    #
+    # Terminal states: paid, void (no outbound transitions).
+    # partially_paid can only advance to paid (not back to sent, not voidable).
     ALLOWED_STATUS_TRANSITIONS = {
         Status.DRAFT: {Status.SENT, Status.VOID},
-        Status.SENT: {
-            Status.PARTIALLY_PAID,
-            Status.PAID,
-            Status.OVERDUE,
-            Status.VOID,
-        },
-        Status.PARTIALLY_PAID: {
-            Status.SENT,
-            Status.PAID,
-            Status.OVERDUE,
-            Status.VOID,
-        },
-        Status.PAID: {Status.VOID},
-        Status.OVERDUE: {
-            Status.PARTIALLY_PAID,
-            Status.PAID,
-            Status.VOID,
-        },
+        Status.SENT: {Status.PARTIALLY_PAID, Status.PAID, Status.VOID},
+        Status.PARTIALLY_PAID: {Status.PAID},
+        Status.PAID: set(),
         Status.VOID: set(),
     }
 

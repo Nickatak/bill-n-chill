@@ -92,6 +92,13 @@
   font-weight: 600;
 }
 
+.fieldError input,
+.fieldError select,
+.fieldError textarea {
+  border-color: var(--status-red-border) !important;
+  box-shadow: 0 0 0 1px var(--status-red-border);
+}
+
 .formStatus {
   margin: 0;
   border: 1px solid;

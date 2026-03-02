@@ -35,6 +35,7 @@ type InvoiceFormState = {
   issueDate: string;
   dueDate: string;
   taxPercent: string;
+  termsText: string;
   subtotal: number;
   taxAmount: number;
   totalAmount: number;
@@ -125,6 +126,7 @@ export function createInvoiceDocumentAdapter(
       issue_date: form.issueDate,
       due_date: form.dueDate,
       tax_percent: form.taxPercent,
+      terms_text: form.termsText,
       line_items: form.lineItems.map((line) => ({
         line_type: line.lineType,
         budget_line: line.budgetLineId ? Number(line.budgetLineId) : null,
@@ -141,6 +143,7 @@ export function createInvoiceDocumentAdapter(
       issue_date: form.issueDate,
       due_date: form.dueDate,
       tax_percent: form.taxPercent,
+      terms_text: form.termsText,
       line_items: form.lineItems.map((line) => ({
         line_type: line.lineType,
         budget_line: line.budgetLineId ? Number(line.budgetLineId) : null,

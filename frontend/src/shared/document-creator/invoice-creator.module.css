@@ -1,9 +1,9 @@
-.invoiceComposerSheet {
+.invoiceCreatorSheet {
   border: 1px solid var(--border);
   border-radius: 18px;
   padding: var(--space-2xl);
   background: var(--surface);
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 18px 45px color-mix(in srgb, var(--text-primary) 8%, transparent);
   display: grid;
   width: 100%;
   grid-template-columns: minmax(0, 1fr);
@@ -11,7 +11,7 @@
   gap: var(--space-xl);
 }
 
-.invoiceComposerSection {
+.invoiceCreatorSection {
   display: grid;
   gap: var(--space-xl);
   grid-column: 1 / -1;
@@ -84,7 +84,7 @@
 .invoiceNumberIndicatorGenerated {
   background: var(--status-blue-bg);
   border-color: var(--status-blue-border);
-  color: var(--accent-hover);
+  color: var(--status-blue-text);
 }
 
 .invoiceNumberIndicatorEditing {
@@ -160,7 +160,7 @@
 }
 
 .invoiceLineHeader > span + span {
-  box-shadow: -1px 0 0 #5f7cab;
+  box-shadow: -1px 0 0 color-mix(in srgb, var(--table-header-text) 60%, transparent);
 }
 
 .invoiceLineRow input,
@@ -217,21 +217,21 @@
   min-width: 180px;
 }
 
-.invoiceComposerSheetLocked .invoiceLockableControl:disabled {
-  background: var(--input-disabled-bg);
-  border-color: var(--input-disabled-border);
-  color: var(--input-disabled-text);
+.invoiceCreatorSheetLocked .invoiceLockableControl:disabled {
+  background: var(--input-readonly-bg);
+  border-color: var(--input-border);
+  color: var(--input-readonly-text);
   cursor: not-allowed;
 }
 
-.invoiceComposerSheetLocked .invoiceLockableControl:disabled::placeholder {
+.invoiceCreatorSheetLocked .invoiceLockableControl:disabled::placeholder {
   color: var(--text-muted);
 }
 
-.invoiceComposerSheetLocked .invoiceReadAmount {
-  background: var(--input-disabled-bg);
-  border-color: var(--input-disabled-border);
-  color: var(--input-disabled-text);
+.invoiceCreatorSheetLocked .invoiceReadAmount {
+  background: var(--input-readonly-bg);
+  border-color: var(--input-border);
+  color: var(--input-readonly-text);
 }
 
 @media (max-width: 980px) {

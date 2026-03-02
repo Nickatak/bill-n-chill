@@ -70,6 +70,7 @@ class ChangeOrder(models.Model):
     amount_delta = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     days_delta = models.IntegerField(default=0)
     reason = models.TextField(blank=True)
+    terms_text = models.TextField(blank=True, default="")
     origin_estimate = models.ForeignKey(
         "Estimate",
         on_delete=models.PROTECT,

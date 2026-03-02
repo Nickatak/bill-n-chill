@@ -35,6 +35,7 @@ class Organization(models.Model):
     invoice_default_terms = models.TextField(blank=True, default="")
     estimate_default_terms = models.TextField(blank=True, default="")
     change_order_default_reason = models.TextField(blank=True, default="")
+    change_order_default_terms = models.TextField(blank=True, default="")
     invoice_default_footer = models.TextField(blank=True, default="")
     invoice_default_notes = models.TextField(blank=True, default="")
     created_by = models.ForeignKey(

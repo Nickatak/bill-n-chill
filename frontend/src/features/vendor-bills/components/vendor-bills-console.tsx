@@ -8,11 +8,15 @@
  */
 
 import { buildAuthHeaders } from "@/features/session/auth-headers";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { formatDateDisplay, todayDateInput, futureDateInput } from "@/shared/date-format";
 import { readApiErrorMessage } from "@/shared/api/error";
-import { ProjectListStatusValue, ProjectListViewer } from "@/shared/project-list-viewer";
+import {
+  collapseToggleButtonStyles as collapseButtonStyles,
+  ProjectListStatusValue,
+  ProjectListViewer,
+} from "@/shared/project-list-viewer";
 
 import {
   defaultApiBaseUrl,
@@ -32,7 +36,7 @@ import {
   VendorRecord,
 } from "../types";
 import styles from "./vendor-bills-console.module.css";
-import invoiceStyles from "../../invoices/components/invoices-console.module.css";
+import creatorStyles from "../../../shared/document-creator/creator-foundation.module.css";
 
 const VENDOR_BILL_STATUSES_FALLBACK: string[] = [
   "planned",
@@ -44,10 +48,10 @@ const VENDOR_BILL_STATUSES_FALLBACK: string[] = [
 ];
 const VENDOR_BILL_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
   planned: ["received", "void"],
-  received: ["approved", "void"],
+  received: ["approved", "scheduled", "void"],
   approved: ["scheduled", "paid", "void"],
   scheduled: ["paid", "void"],
-  paid: ["void"],
+  paid: [],
   void: [],
 };
 const VENDOR_BILL_CREATE_SHORTCUT_STATUSES_FALLBACK = ["planned", "received"];
@@ -109,10 +113,11 @@ type VendorBillsConsoleProps = {
   scopedProjectId?: number | null;
 };
 
-/** Returns default bill status filters -- all statuses except "void". */
+/** Returns default bill status filters -- active (non-terminal) statuses only. */
 function defaultBillStatusFilters(statuses: string[]): string[] {
-  const withoutVoid = statuses.filter((value) => value !== "void");
-  return withoutVoid.length ? withoutVoid : statuses;
+  const TERMINAL = new Set(["paid", "void"]);
+  const active = statuses.filter((value) => !TERMINAL.has(value));
+  return active.length ? active : statuses;
 }
 
 /** Converts a snake_case status to a human-readable label. */
@@ -168,7 +173,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const [newReceivedDate, setNewReceivedDate] = useState(todayDateInput());
   const [newIssueDate, setNewIssueDate] = useState("");
   const [newDueDate, setNewDueDate] = useState("");
-  const [newCurrency, setNewCurrency] = useState("USD");
   const [newSubtotal, setNewSubtotal] = useState("0.00");
   const [newTaxAmount, setNewTaxAmount] = useState("0.00");
   const [newShippingAmount, setNewShippingAmount] = useState("0.00");
@@ -185,7 +189,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const [receivedDate, setReceivedDate] = useState(todayDateInput());
   const [issueDate, setIssueDate] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [currency, setCurrency] = useState("USD");
   const [subtotal, setSubtotal] = useState("0.00");
   const [taxAmount, setTaxAmount] = useState("0.00");
   const [shippingAmount, setShippingAmount] = useState("0.00");
@@ -197,6 +200,16 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const [viewerNextStatus, setViewerNextStatus] = useState<string>("");
 
   const [duplicateCandidates, setDuplicateCandidates] = useState<VendorBillRecord[]>([]);
+
+  // Accordion section state for inline viewer expansion
+  const [isStatusSectionOpen, setIsStatusSectionOpen] = useState(true);
+  const [isAllocationsSectionOpen, setIsAllocationsSectionOpen] = useState(false);
+  const [isDetailsSectionOpen, setIsDetailsSectionOpen] = useState(false);
+
+  // Workspace visibility + flash animation
+  const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(true);
+  const billFormRef = useRef<HTMLFormElement>(null);
+  const [creatorFlashCount, setCreatorFlashCount] = useState(0);
   const activeVendors = vendors.filter((vendor) => vendor.is_active);
   const projectNeedle = projectSearch.trim().toLowerCase();
   const filteredProjects = !projectNeedle
@@ -227,6 +240,14 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     : filteredProjects.filter((project) =>
         projectStatusFilters.includes((project.status as ProjectStatusValue) ?? "active"),
       );
+  const billStatusCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const bill of vendorBills) {
+      counts[bill.status] = (counts[bill.status] ?? 0) + 1;
+    }
+    return counts;
+  }, [vendorBills]);
+
   const filteredVendorBills = vendorBills.filter((bill) => {
     if (billStatusFilters.length === 0 || !billStatusFilters.includes(bill.status)) {
       return false;
@@ -294,13 +315,27 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const selectedVendorBill =
     vendorBills.find((vendorBill) => String(vendorBill.id) === selectedVendorBillId) ?? null;
   const isEditingMode = Boolean(selectedVendorBillId);
+  const workspaceIsLockedByStatus = selectedVendorBill ? selectedVendorBill.status !== "planned" : false;
+  const workspaceIsLocked = !canMutateVendorBills || workspaceIsLockedByStatus;
+  const workspaceBadgeLabel = !selectedVendorBill
+    ? "CREATING"
+    : workspaceIsLocked
+      ? "READ-ONLY"
+      : "EDITING";
+  const workspaceBadgeClass = !selectedVendorBill
+    ? styles.tableStatusPlanned
+    : workspaceIsLocked
+      ? styles[`tableStatus${selectedVendorBill.status[0].toUpperCase()}${selectedVendorBill.status.slice(1)}`] ?? ""
+      : styles.tableStatusPlanned;
+  const workspaceContext = selectedVendorBill
+    ? `#${selectedVendorBill.id} — ${selectedVendorBill.bill_number || "Untitled"}`
+    : "New vendor bill";
   const vendorOptions = vendors;
   const formVendorId = isEditingMode ? vendorId : newVendorId;
   const formBillNumber = isEditingMode ? billNumber : newBillNumber;
   const formReceivedDate = isEditingMode ? receivedDate : newReceivedDate;
   const formIssueDate = isEditingMode ? issueDate : newIssueDate;
   const formDueDate = isEditingMode ? dueDate : newDueDate;
-  const formCurrency = isEditingMode ? currency : newCurrency;
   const formSubtotal = isEditingMode ? subtotal : newSubtotal;
   const formTaxAmount = isEditingMode ? taxAmount : newTaxAmount;
   const formShippingAmount = isEditingMode ? shippingAmount : newShippingAmount;
@@ -315,7 +350,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const formStatus: VendorBillStatus = isEditingMode ? status : newStatus;
   const canEditScheduledFor = formStatus === "approved" || formStatus === "scheduled";
   const formRequiresFullAllocation = false;
-  const formRequiresScheduledFor = false;
+  const scheduledForMissing = canEditScheduledFor && !formScheduledFor;
   const hasAllocationMismatch = Math.abs(formUnallocated) > allocationEpsilon;
   const formSubtotalAmount = Number(formSubtotal || 0);
   const formTaxAmountValue = Number(formTaxAmount || 0);
@@ -501,13 +536,12 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   function hydrate(item: VendorBillRecord) {
     setVendorId(String(item.vendor));
     setBillNumber(item.bill_number);
-    setReceivedDate(item.issue_date);
+    setReceivedDate(item.received_date ?? "");
     setIssueDate(item.issue_date);
     setDueDate(item.due_date);
-    setCurrency("USD");
-    setSubtotal(item.total);
-    setTaxAmount("0.00");
-    setShippingAmount("0.00");
+    setSubtotal(item.subtotal);
+    setTaxAmount(item.tax_amount);
+    setShippingAmount(item.shipping_amount);
     setScheduledFor(item.scheduled_for ?? "");
     setTotal(item.total);
     setNotes(item.notes);
@@ -865,9 +899,13 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       vendor,
       bill_number: newBillNumber,
       status: newStatus,
+      received_date: newReceivedDate || null,
       issue_date: newIssueDate,
       due_date: newDueDate,
       scheduled_for: newScheduledFor || null,
+      subtotal: newSubtotal,
+      tax_amount: newTaxAmount,
+      shipping_amount: newShippingAmount,
       total: newTotal,
       notes: newNotes,
       allocations: normalizedAllocations,
@@ -878,10 +916,15 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   function handleSelectVendorBill(id: string) {
     setSelectedVendorBillId(id);
     setViewerErrorMessage("");
+    // Reset accordion sections to defaults on selection change
+    setIsStatusSectionOpen(true);
+    setIsAllocationsSectionOpen(false);
+    setIsDetailsSectionOpen(false);
     const selected = vendorBills.find((row) => String(row.id) === id);
     if (!selected) return;
 
     hydrate(selected);
+    setCreatorFlashCount((c) => c + 1);
   }
 
   /** Resets the form to create-mode with default values for a new bill. */
@@ -897,7 +940,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setNewReceivedDate(today);
     setNewIssueDate(today);
     setNewDueDate(due);
-    setNewCurrency("USD");
     setNewSubtotal("0.00");
     setNewTaxAmount("0.00");
     setNewShippingAmount("0.00");
@@ -910,6 +952,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       setNewVendorId(String(activeVendors[0].id));
     }
     setStatusMessage("New vendor bill create mode.");
+    setCreatorFlashCount((c) => c + 1);
   }
 
   /** PATCHes the currently selected vendor bill with the edit form values. */
@@ -945,9 +988,13 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
         body: JSON.stringify({
           vendor,
           bill_number: billNumber,
+          received_date: receivedDate || null,
           issue_date: issueDate,
           due_date: dueDate,
           scheduled_for: scheduledFor || null,
+          subtotal,
+          tax_amount: taxAmount,
+          shipping_amount: shippingAmount,
           total,
           notes,
           allocations: allocations
@@ -1024,7 +1071,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       setVendorBills((current) => current.map((item) => (item.id === updated.id ? updated : item)));
       hydrate(updated);
       setViewerErrorMessage("");
-      setStatusMessage(`Updated vendor bill #${updated.id} to ${updated.status}.`);
+      setStatusMessage(`Updated vendor bill #${updated.id} to ${updated.status}. History updated.`);
     } catch {
       const message = "Could not reach vendor bill quick status endpoint.";
       setViewerErrorMessage(message);
@@ -1056,13 +1103,12 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
     setNewVendorId(String(selected.vendor));
     setNewBillNumber("");
-    setNewReceivedDate(selected.issue_date);
+    setNewReceivedDate(selected.received_date ?? "");
     setNewIssueDate(selected.issue_date);
     setNewDueDate(selected.due_date);
-    setNewCurrency("USD");
-    setNewSubtotal(selected.total);
-    setNewTaxAmount("0.00");
-    setNewShippingAmount("0.00");
+    setNewSubtotal(selected.subtotal);
+    setNewTaxAmount(selected.tax_amount);
+    setNewShippingAmount(selected.shipping_amount);
     setNewScheduledFor(selected.scheduled_for ?? "");
     setNewTotal(selected.total);
     setNewNotes(selected.notes || "");
@@ -1081,6 +1127,8 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setDuplicateCandidates([]);
     setCreateErrorMessage("Enter a new bill number, then create the recreated planned bill.");
     setStatusMessage(`Copied bill #${selected.id} into create form.`);
+    setCreatorFlashCount((c) => c + 1);
+    setIsWorkspaceExpanded(true);
   }
 
   // Bootstrap: load the policy contract and project/vendor lists once authenticated.
@@ -1194,6 +1242,19 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setNewAllocations((current) => hydrateGenericRows(current));
   }, [budgetLineMetaById]);
 
+  // Flash animation for the workspace form when switching bills or creating new.
+  useEffect(() => {
+    if (creatorFlashCount === 0) return;
+    const el = billFormRef.current;
+    if (!el) return;
+    el.classList.remove(creatorStyles.sheetFlash);
+    void el.offsetWidth;
+    el.classList.add(creatorStyles.sheetFlash);
+    const cleanup = () => el.classList.remove(creatorStyles.sheetFlash);
+    el.addEventListener("animationend", cleanup, { once: true });
+    return () => el.removeEventListener("animationend", cleanup);
+  }, [creatorFlashCount]);
+
   return (
     <section className={styles.console}>
       {projects.length > 0 ? (
@@ -1230,22 +1291,24 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
         <p>Create or load a project before entering bills.</p>
       )}
 
-      <section className={`${invoiceStyles.panel} ${invoiceStyles.viewerPanel}`}>
-        <div className={invoiceStyles.panelHeader}>
-          <h3>Project Bills</h3>
-          <span className={invoiceStyles.countBadge}>
-            {filteredVendorBills.length}/{vendorBills.length}
-          </span>
+      {/* ── Viewer Panel: bill table + inline expansion ──────────── */}
+      <div className={styles.viewerPanel}>
+        <div className={styles.panelHeader}>
+          <h3>{selectedProject ? `Bills for: ${selectedProject.name}` : "Bills"}</h3>
+          <div className={styles.panelHeaderActions}>
+            <button
+              type="button"
+              className={collapseButtonStyles.collapseButton}
+              style={{ background: "var(--surface)" }}
+              onClick={() => setIsWorkspaceExpanded((current) => !current)}
+              aria-expanded={isWorkspaceExpanded}
+            >
+              {isWorkspaceExpanded ? "Hide Form" : "Show Form"}
+            </button>
+          </div>
         </div>
 
-        {selectedProject ? (
-          <p className={invoiceStyles.inlineHint}>
-            {selectedProject.name} · {selectedProject.customer_display_name}
-          </p>
-        ) : null}
-
         <div className={styles.statusFilters}>
-          <span className={styles.statusFiltersLabel}>Bill status filter</span>
           <div className={styles.statusFilterButtons}>
             {billStatuses.map((statusValue) => {
               const active = billStatusFilters.includes(statusValue);
@@ -1254,30 +1317,53 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                 <button
                   key={statusValue}
                   type="button"
-                  className={`${invoiceStyles.statusFilterPill} ${
+                  className={`${styles.filterPill} ${
                     active
-                      ? `${invoiceStyles.statusFilterPillActive} ${styles[statusClass] ?? ""}`
-                      : invoiceStyles.statusFilterPillInactive
+                      ? `${styles.filterPillActive} ${styles[statusClass] ?? ""}`
+                      : styles.filterPillInactive
                   }`}
                   aria-pressed={active}
                   onClick={() => toggleBillStatusFilter(statusValue)}
                 >
-                  {statusDisplayLabel(statusValue)}
+                  <span>{statusDisplayLabel(statusValue)}</span>
+                  <span className={styles.filterPillCount}>{billStatusCounts[statusValue] ?? 0}</span>
+                </button>
+              );
+            })}
+            {(["all", "due_soon", "overdue"] as const).map((filterValue) => {
+              const active = dueFilter === filterValue;
+              const label = filterValue === "all" ? "All Due" : filterValue === "due_soon" ? `Due Soon (${dueSoonWindowDays}d)` : "Overdue";
+              return (
+                <button
+                  key={filterValue}
+                  type="button"
+                  className={`${styles.filterPill} ${
+                    active ? `${styles.filterPillActive} ${styles.filterPillDue}` : styles.filterPillInactive
+                  }`}
+                  aria-pressed={active}
+                  onClick={() => setDueFilter(filterValue)}
+                >
+                  {label}
                 </button>
               );
             })}
           </div>
-          <label className={invoiceStyles.field}>
-            <span>Due filter</span>
-            <select
-              value={dueFilter}
-              onChange={(event) => setDueFilter(event.target.value as "all" | "due_soon" | "overdue")}
+          <div className={styles.filterActions}>
+            <button
+              type="button"
+              className={styles.filterActionButton}
+              onClick={() => { setBillStatusFilters([...billStatuses]); setDueFilter("all"); }}
             >
-              <option value="all">All</option>
-              <option value="due_soon">Due soon ({dueSoonWindowDays}d)</option>
-              <option value="overdue">Overdue</option>
-            </select>
-          </label>
+              Show All
+            </button>
+            <button
+              type="button"
+              className={styles.filterActionButton}
+              onClick={() => { setBillStatusFilters(defaultBillStatusFilters(billStatuses)); setDueFilter("all"); }}
+            >
+              Reset Filters
+            </button>
+          </div>
         </div>
 
         <div className={styles.tableWrap}>
@@ -1297,7 +1383,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
               {filteredVendorBills.length ? (
                 filteredVendorBills.map((vendorBill) => {
                   const isSelected = selectedVendorBillId === String(vendorBill.id);
-                  return (
+                  return [
                     <tr
                       key={vendorBill.id}
                       className={isSelected ? styles.rowSelected : ""}
@@ -1316,12 +1402,180 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                       <td>{formatDateDisplay(vendorBill.due_date)}</td>
                       <td>${vendorBill.total}</td>
                       <td>${vendorBill.balance_due}</td>
-                    </tr>
-                  );
+                    </tr>,
+                    isSelected ? (
+                      <tr key={`expanded-${vendorBill.id}`} className={styles.expandedRow}>
+                        <td colSpan={7}>
+                          <div className={styles.expandedSections}>
+                            {/* Status & Actions */}
+                            <div className={styles.viewerSection}>
+                              <button
+                                type="button"
+                                className={styles.viewerSectionToggle}
+                                onClick={(e) => { e.stopPropagation(); setIsStatusSectionOpen((v) => !v); }}
+                                aria-expanded={isStatusSectionOpen}
+                              >
+                                <h4>Status &amp; Actions</h4>
+                                <span className={styles.viewerSectionArrow}>&#9660;</span>
+                              </button>
+                              {isStatusSectionOpen ? (
+                                <div className={styles.viewerSectionContent} onClick={(e) => e.stopPropagation()}>
+                                  {quickStatusOptions.length > 0 ? (
+                                    <>
+                                      <span className={styles.lifecycleFieldLabel}>Next status</span>
+                                      <div className={styles.statusPills}>
+                                        {quickStatusOptions.map((statusOption) => {
+                                          const active = statusOption === viewerNextStatus;
+                                          return (
+                                            <button
+                                              key={`viewer-status-${statusOption}`}
+                                              type="button"
+                                              className={`${styles.statusPill} ${
+                                                active ? statusPillClass(statusOption) : styles.statusPillInactive
+                                              } ${active ? styles.statusPillActive : ""}`}
+                                              aria-pressed={active}
+                                              onClick={() => setViewerNextStatus(statusOption)}
+                                            >
+                                              {statusDisplayLabel(statusOption)}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <p className={styles.viewerHint}>No next statuses available for this bill.</p>
+                                  )}
+                                  <div className={styles.viewerStatusActions}>
+                                    <button
+                                      type="button"
+                                      className={creatorStyles.primaryButton}
+                                      onClick={() => void handleUpdateVendorBillStatus()}
+                                      disabled={!selectedVendorBillId || !viewerNextStatus || !canMutateVendorBills}
+                                    >
+                                      Update Status
+                                    </button>
+                                  </div>
+                                  {viewerErrorMessage ? (
+                                    <p className={styles.viewerErrorText} role="alert" aria-live="polite">
+                                      {viewerErrorMessage}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                            </div>
+
+                            {/* Allocations */}
+                            <div className={styles.viewerSection}>
+                              <button
+                                type="button"
+                                className={styles.viewerSectionToggle}
+                                onClick={(e) => { e.stopPropagation(); setIsAllocationsSectionOpen((v) => !v); }}
+                                aria-expanded={isAllocationsSectionOpen}
+                              >
+                                <h4>Allocations ({vendorBill.allocations?.length ?? 0})</h4>
+                                <span className={styles.viewerSectionArrow}>&#9660;</span>
+                              </button>
+                              {isAllocationsSectionOpen ? (
+                                <div className={styles.viewerSectionContent} onClick={(e) => e.stopPropagation()}>
+                                  {vendorBill.allocations && vendorBill.allocations.length > 0 ? (
+                                    <div className={styles.readOnlyTableWrap}>
+                                      <table className={styles.readOnlyTable}>
+                                        <thead>
+                                          <tr>
+                                            <th>Budget Line</th>
+                                            <th>Amount</th>
+                                            <th>Note</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {vendorBill.allocations.map((alloc, allocIdx) => {
+                                            const lineMeta = budgetLineMetaById.get(Number(alloc.budget_line));
+                                            return (
+                                              <tr key={allocIdx}>
+                                                <td>{lineMeta?.label ?? `#${alloc.budget_line}`}</td>
+                                                <td>${alloc.amount}</td>
+                                                <td>{alloc.note || "—"}</td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  ) : (
+                                    <p className={styles.viewerHint}>No allocations on this bill.</p>
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
+
+                            {/* Bill Details */}
+                            <div className={styles.viewerSection}>
+                              <button
+                                type="button"
+                                className={styles.viewerSectionToggle}
+                                onClick={(e) => { e.stopPropagation(); setIsDetailsSectionOpen((v) => !v); }}
+                                aria-expanded={isDetailsSectionOpen}
+                              >
+                                <h4>Bill Details</h4>
+                                <span className={styles.viewerSectionArrow}>&#9660;</span>
+                              </button>
+                              {isDetailsSectionOpen ? (
+                                <div className={styles.viewerSectionContent} onClick={(e) => e.stopPropagation()}>
+                                  <div className={styles.detailGrid}>
+                                    <div>
+                                      <p className={styles.detailLabel}>Vendor</p>
+                                      <p className={styles.detailValue}>{vendorBill.vendor_name}</p>
+                                    </div>
+                                    <div>
+                                      <p className={styles.detailLabel}>Bill #</p>
+                                      <p className={styles.detailValue}>{vendorBill.bill_number}</p>
+                                    </div>
+                                    <div>
+                                      <p className={styles.detailLabel}>Issue Date</p>
+                                      <p className={styles.detailValue}>{formatDateDisplay(vendorBill.issue_date)}</p>
+                                    </div>
+                                    <div>
+                                      <p className={styles.detailLabel}>Due Date</p>
+                                      <p className={styles.detailValue}>{formatDateDisplay(vendorBill.due_date)}</p>
+                                    </div>
+                                    <div>
+                                      <p className={styles.detailLabel}>Total</p>
+                                      <p className={styles.detailValue}>${vendorBill.total}</p>
+                                    </div>
+                                    <div>
+                                      <p className={styles.detailLabel}>Balance Due</p>
+                                      <p className={styles.detailValue}>${vendorBill.balance_due}</p>
+                                    </div>
+                                    {vendorBill.scheduled_for ? (
+                                      <div>
+                                        <p className={styles.detailLabel}>Scheduled For</p>
+                                        <p className={styles.detailValue}>{formatDateDisplay(vendorBill.scheduled_for)}</p>
+                                      </div>
+                                    ) : (vendorBill.status === "approved" || vendorBill.status === "scheduled") ? (
+                                      <div>
+                                        <p className={styles.detailLabel}>Scheduled For</p>
+                                        <p className={`${styles.detailValue} ${styles.detailMissing}`}>Not set</p>
+                                      </div>
+                                    ) : null}
+                                    {vendorBill.notes ? (
+                                      <div style={{ gridColumn: "1 / -1" }}>
+                                        <p className={styles.detailLabel}>Notes</p>
+                                        <p className={styles.detailValue}>{vendorBill.notes}</p>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null,
+                  ];
                 })
               ) : (
                 <tr>
-                  <td colSpan={7} className={invoiceStyles.projectEmptyCell}>
+                  <td colSpan={7} className={styles.projectEmptyCell}>
                     No bills match the selected status/due filters.
                   </td>
                 </tr>
@@ -1329,522 +1583,494 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
             </tbody>
           </table>
         </div>
-
-        <section className={invoiceStyles.viewerStatusPanel}>
-          <div className={invoiceStyles.panelHeader}>
-            <h3>Bill Status & Recreate</h3>
-            <span className={invoiceStyles.countBadge}>
-              {selectedVendorBill ? `#${selectedVendorBill.id}` : "No selection"}
-            </span>
-          </div>
-
-          {selectedVendorBill ? (
-            <>
-              <p className={invoiceStyles.inlineHint}>
-                {selectedVendorBill.vendor_name} / {selectedVendorBill.bill_number} ({statusDisplayLabel(selectedVendorBill.status)})
-              </p>
-              <div className={styles.statusPicker}>
-                <span className={invoiceStyles.lifecycleFieldLabel}>Next status</span>
-                <div className={styles.statusPills}>
-                  {quickStatusOptions.map((statusOption) => {
-                    const active = statusOption === viewerNextStatus;
-                    return (
-                      <button
-                        key={`viewer-status-${statusOption}`}
-                        type="button"
-                        className={`${styles.statusPill} ${
-                          active ? statusPillClass(statusOption) : styles.statusPillInactive
-                        } ${active ? styles.statusPillActive : ""}`}
-                        aria-pressed={active}
-                        onClick={() => setViewerNextStatus(statusOption)}
-                      >
-                        {statusDisplayLabel(statusOption)}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              {quickStatusOptions.length === 0 ? (
-                <p className={invoiceStyles.inlineHint}>No next statuses available for this bill.</p>
-              ) : null}
-              <div className={invoiceStyles.buttonRow}>
-                <button
-                  type="button"
-                  className={invoiceStyles.secondaryButton}
-                  onClick={() => void handleUpdateVendorBillStatus()}
-                  disabled={!selectedVendorBillId || !viewerNextStatus || !canMutateVendorBills}
-                >
-                  Save Status
-                </button>
-                <button
-                  type="button"
-                  className={invoiceStyles.primaryButton}
-                  onClick={handleRecreateAsNewDraftTemplate}
-                  disabled={!selectedVendorBillId}
-                >
-                  Recreate as New Planned
-                </button>
-              </div>
-              {viewerErrorMessage ? (
-                <p className={styles.viewerErrorText} role="alert" aria-live="polite">
-                  {viewerErrorMessage}
-                </p>
-              ) : null}
-            </>
-          ) : (
-            <p className={invoiceStyles.emptyState}>Select a vendor bill to manage status or recreate it as new.</p>
-          )}
-        </section>
-      </section>
-
-      <div>
-        <button type="button" className={invoiceStyles.secondaryButton} onClick={handleStartNewVendorBill}>
-          New Bill
-        </button>
       </div>
 
-      <form className={styles.billForm} onSubmit={handleSubmitVendorBillForm}>
-        <h3 className={styles.formTitle}>Bill Intake</h3>
-
-        <section className={styles.formSection}>
-          <div className={styles.formSectionHeader}>
-            <h4 className={styles.formSectionTitle}>Bill Details</h4>
-            <p className={styles.formSectionHint}>Capture vendor metadata, dates, and financial totals.</p>
+      {/* ── Workspace Panel: bill form (create/edit) ─────────────── */}
+      {isWorkspaceExpanded ? (
+        <div className={styles.workspace}>
+          <div className={styles.workspaceToolbar}>
+            <div className={styles.workspaceContext}>
+              <span className={styles.workspaceContextLabel}>
+                {!selectedVendorBill ? "Creating" : workspaceIsLocked ? "Viewing" : "Editing"}
+              </span>
+              <div className={styles.workspaceContextValueRow}>
+                <strong>{workspaceContext}</strong>
+                <span className={`${styles.workspaceBadge} ${workspaceBadgeClass}`}>{workspaceBadgeLabel}</span>
+              </div>
+            </div>
+            <div className={styles.workspaceToolbarActions}>
+              {isEditingMode ? (
+                <>
+                  <button
+                    type="button"
+                    className={styles.toolbarActionButton}
+                    onClick={handleRecreateAsNewDraftTemplate}
+                    disabled={!selectedVendorBillId}
+                  >
+                    Recreate as New
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.toolbarActionButton}
+                    onClick={handleStartNewVendorBill}
+                  >
+                    New Bill
+                  </button>
+                </>
+              ) : null}
+            </div>
           </div>
 
-          <div className={styles.formGrid}>
-            <label className={styles.fieldSpan2}>
-              Vendor
-              <select
-                value={formVendorId}
-                onChange={(event) => setFormVendorId(event.target.value)}
-                required
-              >
-                <option value="">Select vendor</option>
-                {formVendorId &&
-                !vendorOptions.some((vendor) => String(vendor.id) === String(formVendorId)) ? (
-                  <option value={formVendorId}>#{formVendorId} - Vendor record unavailable</option>
-                ) : null}
-                {vendorOptions.map((vendor) => (
-                  <option key={vendor.id} value={vendor.id}>
-                    #{vendor.id} - {vendor.name} [{vendor.vendor_type}]
-                    {vendor.is_canonical ? " [canonical]" : ""}
-                    {!vendor.is_active ? " [inactive]" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {vendorOptions.length === 0 ? (
-              <p className={`${styles.formInlineHint} ${styles.fieldSpan2}`}>
-                No vendors available. Add a vendor first.
-              </p>
-            ) : !isEditingMode && activeVendors.length === 0 ? (
-              <p className={`${styles.formInlineHint} ${styles.fieldSpan2}`}>
-                No active vendors available for create. Reactivate one or create a new vendor.
-              </p>
-            ) : null}
-
-            <label>
-              Vendor bill number
-              <input
-                value={formBillNumber}
-                onChange={(event) => setFormBillNumber(event.target.value)}
-                required
-                disabled={!selectedProjectId}
-              />
-            </label>
-
-            <label>
-              Currency
-              <input value={formCurrency || "USD"} disabled readOnly />
-            </label>
-
-            <label>
-              Received date
-              <input
-                type="date"
-                value={formReceivedDate}
-                onChange={(event) => setFormReceivedDate(event.target.value)}
-                required
-                disabled={!selectedProjectId}
-              />
-            </label>
-
-            <label>
-              Bill date
-              <input
-                type="date"
-                value={formIssueDate}
-                onChange={(event) => setFormIssueDate(event.target.value)}
-                required
-                disabled={!selectedProjectId}
-              />
-            </label>
-
-            <label>
-              Due date
-              <input
-                type="date"
-                value={formDueDate}
-                onChange={(event) => setFormDueDate(event.target.value)}
-                required
-                disabled={!selectedProjectId}
-              />
-            </label>
-
-            {!isEditingMode || canEditScheduledFor ? (
-              <label>
-                Scheduled for
-                <input
-                  type="date"
-                  value={formScheduledFor}
-                  onChange={(event) => setFormScheduledFor(event.target.value)}
-                  disabled={!selectedProjectId || !canEditScheduledFor}
-                />
-              </label>
-            ) : null}
-
-            <label>
-              Subtotal
-              <input
-                value={formSubtotal}
-                onChange={(event) => setFormSubtotal(event.target.value)}
-                inputMode="decimal"
-                required
-                disabled={!selectedProjectId}
-              />
-            </label>
-
-            <label>
-              Tax amount
-              <input
-                value={formTaxAmount}
-                onChange={(event) => setFormTaxAmount(event.target.value)}
-                inputMode="decimal"
-                disabled={!selectedProjectId}
-              />
-            </label>
-
-            <label>
-              Shipping / freight amount
-              <input
-                value={formShippingAmount}
-                onChange={(event) => setFormShippingAmount(event.target.value)}
-                inputMode="decimal"
-                disabled={!selectedProjectId}
-              />
-            </label>
-
-            <label>
-              Total
-              <input
-                value={formTotal}
-                onChange={(event) => setFormTotal(event.target.value)}
-                inputMode="decimal"
-                required
-                disabled={!selectedProjectId}
-              />
-            </label>
-
-            <div className={`${styles.formActionsRow} ${styles.fieldSpan2}`}>
-              <button
-                type="button"
-                className={styles.formSecondaryButton}
-                onClick={() => setFormTotal(computedTotalFromParts)}
-                disabled={!selectedProjectId}
-              >
-                Use calculated total ({computedTotalFromParts})
-              </button>
-            </div>
-
-            <div className={`${styles.fieldSpan2} ${styles.allocationsBlock}`}>
+          <form ref={billFormRef} className={styles.billForm} onSubmit={handleSubmitVendorBillForm}>
+            <section className={styles.formSection}>
               <div className={styles.formSectionHeader}>
-                <h4 className={styles.formSectionTitle}>Line Item Allocation</h4>
-                <p className={styles.formSectionHint}>Map this bill to project estimate lines.</p>
+                <h4 className={styles.formSectionTitle}>Bill Details</h4>
+                <p className={styles.formSectionHint}>Capture vendor metadata, dates, and financial totals.</p>
               </div>
-              <fieldset className={styles.allocationFieldset}>
-                <legend>{isEditingMode ? "Allocations" : "Allocations (optional in planned)"}</legend>
-                <div className={styles.allocationHeader}>
-                  <span>Estimate line</span>
-                  <span>Origin estimate</span>
-                  <span>Amount</span>
-                  <span>Note</span>
-                  <span />
-                </div>
-                {!hasBudgetLineOptions ? (
-                  <p className={styles.hintText}>
-                    No estimate-backed lines available for this project yet. Approve an estimate first.
+
+              <div className={styles.formGrid}>
+                <label className={styles.fieldSpan2}>
+                  Vendor
+                  <select
+                    value={formVendorId}
+                    onChange={(event) => setFormVendorId(event.target.value)}
+                    required
+                  >
+                    <option value="">Select vendor</option>
+                    {formVendorId &&
+                    !vendorOptions.some((vendor) => String(vendor.id) === String(formVendorId)) ? (
+                      <option value={formVendorId}>#{formVendorId} - Vendor record unavailable</option>
+                    ) : null}
+                    {vendorOptions.map((vendor) => (
+                      <option key={vendor.id} value={vendor.id}>
+                        #{vendor.id} - {vendor.name} [{vendor.vendor_type}]
+                        {vendor.is_canonical ? " [canonical]" : ""}
+                        {!vendor.is_active ? " [inactive]" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {vendorOptions.length === 0 ? (
+                  <p className={`${styles.formInlineHint} ${styles.fieldSpan2}`}>
+                    No vendors available. Add a vendor first.
+                  </p>
+                ) : !isEditingMode && activeVendors.length === 0 ? (
+                  <p className={`${styles.formInlineHint} ${styles.fieldSpan2}`}>
+                    No active vendors available for create. Reactivate one or create a new vendor.
                   </p>
                 ) : null}
-                <div className={styles.allocationRows}>
-                  {formAllocations.map((row, index) => {
-                    const selectedLineMeta = budgetLineMetaById.get(Number(row.budget_line));
-                    const inferredGenericCode =
-                      selectedLineMeta && GENERIC_BUDGET_COST_CODES.has(selectedLineMeta.cost_code_code ?? "")
-                        ? (selectedLineMeta.cost_code_code ?? "")
-                        : "";
-                    const selectedLineKey =
-                      row.ui_line_key ||
-                      (inferredGenericCode ? `generic:${inferredGenericCode}` : (row.budget_line ? String(row.budget_line) : ""));
-                    const selectedGenericCode = selectedLineKey.startsWith("generic:")
-                      ? selectedLineKey.slice("generic:".length)
-                      : "";
-                    const genericTargets = selectedGenericCode
-                      ? (genericLineOptionsByCostCode.get(selectedGenericCode) ?? [])
-                      : [];
-                    const selectedTargetBudgetId =
-                      row.ui_target_budget_id ?? selectedLineMeta?.budgetId;
-                    return (
-                      <div key={`form-allocation-${index}`} className={styles.allocationRowWrap}>
-                        <div className={styles.allocationRow}>
-                          <select
-                            value={selectedLineKey}
-                            onChange={(event) => {
-                              const nextLineKey = event.target.value;
-                              if (nextLineKey.startsWith("generic:")) {
-                                const genericCode = nextLineKey.slice("generic:".length);
-                                const targetOptions = genericLineOptionsByCostCode.get(genericCode) ?? [];
-                                const targetBudgetId =
-                                  row.ui_target_budget_id ?? selectedLineMeta?.budgetId ?? targetOptions[0]?.budgetId;
-                                const matchedLine = targetOptions.find((option) => option.budgetId === targetBudgetId);
-                                updateFormAllocation(index, {
-                                  ui_line_key: nextLineKey,
-                                  ui_target_budget_id: targetBudgetId,
-                                  budget_line: matchedLine?.id ?? 0,
-                                });
-                                return;
-                              }
-                              const nextLineId = Number(nextLineKey || 0);
-                              const nextLineMeta = budgetLineMetaById.get(nextLineId);
-                              updateFormAllocation(index, {
-                                ui_line_key: "",
-                                ui_target_budget_id: nextLineMeta?.budgetId,
-                                budget_line: nextLineId,
-                              });
-                            }}
-                            disabled={!hasBudgetLineOptions}
-                          >
-                            <option value="">Select estimate line</option>
-                            <optgroup label="Generic scope buckets">
-                              {GENERIC_BUDGET_LINE_SPECS.filter(
-                                (spec) => (genericLineOptionsByCostCode.get(spec.costCode)?.length ?? 0) > 0,
-                              ).map((spec) => (
-                                <option key={spec.costCode} value={`generic:${spec.costCode}`}>
-                                  {spec.label}
-                                </option>
-                              ))}
-                            </optgroup>
-                            {budgetLineGroups.map((group) => (
-                              <optgroup key={group.budgetId} label={group.budgetLabel}>
-                                {group.lines
-                                  .filter(
-                                    (option) => !GENERIC_BUDGET_COST_CODES.has(option.cost_code_code ?? ""),
-                                  )
-                                  .map((option) => (
-                                  <option key={option.id} value={option.id}>
-                                    {option.label}
-                                  </option>
-                                  ))}
-                              </optgroup>
-                            ))}
-                          </select>
-                          <select
-                            value={selectedTargetBudgetId ? String(selectedTargetBudgetId) : ""}
-                            onChange={(event) => {
-                              if (!selectedGenericCode) {
-                                return;
-                              }
-                              const nextBudgetId = Number(event.target.value || 0);
-                              const matchedLine = genericTargets.find(
-                                (option) => option.budgetId === nextBudgetId,
-                              );
-                              updateFormAllocation(index, {
-                                ui_line_key: `generic:${selectedGenericCode}`,
-                                ui_target_budget_id: nextBudgetId || undefined,
-                                budget_line: matchedLine?.id ?? 0,
-                              });
-                            }}
-                            disabled={!selectedGenericCode || genericTargets.length === 0}
-                          >
-                            <option value="">
-                              {selectedGenericCode
-                                ? "Select origin estimate"
-                                : selectedTargetBudgetId
-                                  ? "Origin estimate"
-                                  : "N/A (select line)"}
-                            </option>
-                            {!selectedGenericCode && selectedTargetBudgetId ? (
-                              <option value={selectedTargetBudgetId}>
-                                {originEstimateLabelByBudgetId.get(selectedTargetBudgetId) ??
-                                  `Estimate baseline (${selectedTargetBudgetId})`}
-                              </option>
-                            ) : null}
-                            {genericTargets.map((option) => (
-                              <option key={`${selectedGenericCode}-${option.budgetId}`} value={option.budgetId}>
-                                {originEstimateLabelByBudgetId.get(option.budgetId) ??
-                                  `Estimate baseline (${option.budgetId})`}
-                              </option>
-                            ))}
-                          </select>
-                          <input
-                            value={row.amount}
-                            onChange={(event) => {
-                              updateFormAllocation(index, { amount: event.target.value });
-                            }}
-                            placeholder="Amount"
-                            inputMode="decimal"
-                            disabled={!hasBudgetLineOptions}
-                          />
-                          <input
-                            value={row.note}
-                            onChange={(event) => {
-                              updateFormAllocation(index, { note: event.target.value });
-                            }}
-                            placeholder="Note (optional)"
-                            disabled={!hasBudgetLineOptions}
-                          />
-                          <button
-                            type="button"
-                            className={styles.formDangerButton}
-                            onClick={() => removeFormAllocation(index)}
-                            disabled={formAllocations.length <= 1}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                        {selectedLineMeta ? (
-                          <p className={styles.allocationMeta}>
-                            Approved: {formatMoney(selectedLineMeta.planned_amount)} | Spent:{" "}
-                            {formatMoney(selectedLineMeta.actual_spend)} | Remaining:{" "}
-                            {formatMoney(selectedLineMeta.remaining_amount)}
-                          </p>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-                <button
-                  type="button"
-                  className={styles.formSecondaryButton}
-                  onClick={addFormAllocation}
-                  disabled={!hasBudgetLineOptions}
-                >
-                  Add Allocation Row
-                </button>
-                <p className={styles.allocationTotals}>
-                  Bill total: {formTotal} | Allocated: {formAllocationTotal.toFixed(2)} | Unallocated:{" "}
-                  <span className={hasAllocationMismatch ? styles.unallocatedMismatch : undefined}>
-                    {formUnallocated.toFixed(2)}
-                  </span>
-                </p>
-                <div className={styles.suggestedTotalRow}>
-                  <span>Suggested total from allocations: {formSuggestedTotal}</span>
+
+                <label>
+                  Vendor bill number
+                  <input
+                    value={formBillNumber}
+                    onChange={(event) => setFormBillNumber(event.target.value)}
+                    required
+                    disabled={!selectedProjectId}
+                  />
+                </label>
+
+                <label>
+                  Received date
+                  <input
+                    type="date"
+                    value={formReceivedDate}
+                    onChange={(event) => setFormReceivedDate(event.target.value)}
+                    disabled={!selectedProjectId}
+                  />
+                </label>
+
+                <label>
+                  Bill date
+                  <input
+                    type="date"
+                    value={formIssueDate}
+                    onChange={(event) => setFormIssueDate(event.target.value)}
+                    required
+                    disabled={!selectedProjectId}
+                  />
+                </label>
+
+                <label>
+                  Due date
+                  <input
+                    type="date"
+                    value={formDueDate}
+                    onChange={(event) => setFormDueDate(event.target.value)}
+                    required
+                    disabled={!selectedProjectId}
+                  />
+                </label>
+
+                {!isEditingMode || canEditScheduledFor ? (
+                  <label className={scheduledForMissing ? styles.fieldHighlight : undefined}>
+                    Scheduled for
+                    <input
+                      type="date"
+                      value={formScheduledFor}
+                      onChange={(event) => setFormScheduledFor(event.target.value)}
+                      disabled={!selectedProjectId || !canEditScheduledFor}
+                      className={scheduledForMissing ? styles.inputHighlight : undefined}
+                    />
+                    {scheduledForMissing ? (
+                      <span className={styles.fieldHintWarn}>Set a payment date before scheduling.</span>
+                    ) : null}
+                  </label>
+                ) : null}
+
+                <label>
+                  Subtotal
+                  <input
+                    value={formSubtotal}
+                    onChange={(event) => setFormSubtotal(event.target.value)}
+                    inputMode="decimal"
+                    required
+                    disabled={!selectedProjectId}
+                  />
+                </label>
+
+                <label>
+                  Tax amount
+                  <input
+                    value={formTaxAmount}
+                    onChange={(event) => setFormTaxAmount(event.target.value)}
+                    inputMode="decimal"
+                    disabled={!selectedProjectId}
+                  />
+                </label>
+
+                <label>
+                  Shipping / freight amount
+                  <input
+                    value={formShippingAmount}
+                    onChange={(event) => setFormShippingAmount(event.target.value)}
+                    inputMode="decimal"
+                    disabled={!selectedProjectId}
+                  />
+                </label>
+
+                <label>
+                  Total
+                  <input
+                    value={formTotal}
+                    onChange={(event) => setFormTotal(event.target.value)}
+                    inputMode="decimal"
+                    required
+                    disabled={!selectedProjectId}
+                  />
+                </label>
+
+                <div className={`${styles.formActionsRow} ${styles.fieldSpan2}`}>
                   <button
                     type="button"
                     className={styles.formSecondaryButton}
-                    onClick={() => setFormTotal(formSuggestedTotal)}
-                    disabled={!isEditingMode && !hasBudgetLineOptions}
+                    onClick={() => setFormTotal(computedTotalFromParts)}
+                    disabled={!selectedProjectId}
                   >
-                    Use allocated total
+                    Use calculated total ({computedTotalFromParts})
                   </button>
                 </div>
-                {formIsOverAllocated ? (
-                  <p className={styles.errorText}>Allocated amount cannot exceed bill total.</p>
-                ) : null}
-                {formRequiresFullAllocation ? (
-                  <p className={styles.errorText}>
-                    Status <strong>{status}</strong> requires full allocation (unallocated must be 0.00).
-                  </p>
-                ) : null}
-                {formRequiresScheduledFor && !formScheduledFor ? (
-                  <p className={styles.errorText}>
-                    Status <strong>scheduled</strong> requires a <strong>scheduled for</strong> date.
-                  </p>
-                ) : null}
-              </fieldset>
-            </div>
 
-            <label className={styles.fieldSpan2}>
-              Notes
-              <textarea
-                value={formNotes}
-                onChange={(event) => setFormNotes(event.target.value)}
-                disabled={!selectedProjectId}
-              />
-            </label>
-
-            {!isEditingMode ? (
-              <div className={`${styles.statusPicker} ${styles.fieldSpan2}`}>
-                <span className={styles.statusPickerLabel}>Initial status</span>
-                <div className={styles.statusPills}>
-                  {createStatusOptions.map((statusOption) => {
-                    const active = statusOption === newStatus;
-                    return (
+                <div className={`${styles.fieldSpan2} ${styles.allocationsBlock}`}>
+                  <div className={styles.formSectionHeader}>
+                    <h4 className={styles.formSectionTitle}>Line Item Allocation</h4>
+                    <p className={styles.formSectionHint}>Map this bill to project estimate lines.</p>
+                  </div>
+                  {!hasBudgetLineOptions ? (
+                    <p className={creatorStyles.inlineHint}>
+                      No estimate-backed lines available for this project yet. Approve an estimate first.
+                    </p>
+                  ) : null}
+                  <div className={creatorStyles.lineTable}>
+                    <div className={`${creatorStyles.lineHeader} ${styles.allocationLineHeader}`}>
+                      <div className={creatorStyles.lineHeaderCell}>Estimate Line</div>
+                      <div className={creatorStyles.lineHeaderCell}>Origin Estimate</div>
+                      <div className={creatorStyles.lineHeaderCell}>Amount</div>
+                      <div className={creatorStyles.lineHeaderCell}>Note</div>
+                      <div className={creatorStyles.lineHeaderCell} />
+                    </div>
+                    {formAllocations.map((row, index) => {
+                      const selectedLineMeta = budgetLineMetaById.get(Number(row.budget_line));
+                      const inferredGenericCode =
+                        selectedLineMeta && GENERIC_BUDGET_COST_CODES.has(selectedLineMeta.cost_code_code ?? "")
+                          ? (selectedLineMeta.cost_code_code ?? "")
+                          : "";
+                      const selectedLineKey =
+                        row.ui_line_key ||
+                        (inferredGenericCode ? `generic:${inferredGenericCode}` : (row.budget_line ? String(row.budget_line) : ""));
+                      const selectedGenericCode = selectedLineKey.startsWith("generic:")
+                        ? selectedLineKey.slice("generic:".length)
+                        : "";
+                      const genericTargets = selectedGenericCode
+                        ? (genericLineOptionsByCostCode.get(selectedGenericCode) ?? [])
+                        : [];
+                      const selectedTargetBudgetId =
+                        row.ui_target_budget_id ?? selectedLineMeta?.budgetId;
+                      return (
+                        <div key={`form-allocation-${index}`}>
+                          <div className={`${creatorStyles.lineRow} ${styles.allocationLineRow}`}>
+                            <div className={creatorStyles.lineCell}>
+                              <select
+                                className={creatorStyles.lineSelect}
+                                value={selectedLineKey}
+                                onChange={(event) => {
+                                  const nextLineKey = event.target.value;
+                                  if (nextLineKey.startsWith("generic:")) {
+                                    const genericCode = nextLineKey.slice("generic:".length);
+                                    const targetOptions = genericLineOptionsByCostCode.get(genericCode) ?? [];
+                                    const targetBudgetId =
+                                      row.ui_target_budget_id ?? selectedLineMeta?.budgetId ?? targetOptions[0]?.budgetId;
+                                    const matchedLine = targetOptions.find((option) => option.budgetId === targetBudgetId);
+                                    updateFormAllocation(index, {
+                                      ui_line_key: nextLineKey,
+                                      ui_target_budget_id: targetBudgetId,
+                                      budget_line: matchedLine?.id ?? 0,
+                                    });
+                                    return;
+                                  }
+                                  const nextLineId = Number(nextLineKey || 0);
+                                  const nextLineMeta = budgetLineMetaById.get(nextLineId);
+                                  updateFormAllocation(index, {
+                                    ui_line_key: "",
+                                    ui_target_budget_id: nextLineMeta?.budgetId,
+                                    budget_line: nextLineId,
+                                  });
+                                }}
+                                disabled={!hasBudgetLineOptions}
+                              >
+                                <option value="">Select estimate line</option>
+                                <optgroup label="Generic scope buckets">
+                                  {GENERIC_BUDGET_LINE_SPECS.filter(
+                                    (spec) => (genericLineOptionsByCostCode.get(spec.costCode)?.length ?? 0) > 0,
+                                  ).map((spec) => (
+                                    <option key={spec.costCode} value={`generic:${spec.costCode}`}>
+                                      {spec.label}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                                {budgetLineGroups.map((group) => (
+                                  <optgroup key={group.budgetId} label={group.budgetLabel}>
+                                    {group.lines
+                                      .filter(
+                                        (option) => !GENERIC_BUDGET_COST_CODES.has(option.cost_code_code ?? ""),
+                                      )
+                                      .map((option) => (
+                                      <option key={option.id} value={option.id}>
+                                        {option.label}
+                                      </option>
+                                      ))}
+                                  </optgroup>
+                                ))}
+                              </select>
+                            </div>
+                            <div className={creatorStyles.lineCell}>
+                              <select
+                                className={creatorStyles.lineSelect}
+                                value={selectedTargetBudgetId ? String(selectedTargetBudgetId) : ""}
+                                onChange={(event) => {
+                                  if (!selectedGenericCode) {
+                                    return;
+                                  }
+                                  const nextBudgetId = Number(event.target.value || 0);
+                                  const matchedLine = genericTargets.find(
+                                    (option) => option.budgetId === nextBudgetId,
+                                  );
+                                  updateFormAllocation(index, {
+                                    ui_line_key: `generic:${selectedGenericCode}`,
+                                    ui_target_budget_id: nextBudgetId || undefined,
+                                    budget_line: matchedLine?.id ?? 0,
+                                  });
+                                }}
+                                disabled={!selectedGenericCode || genericTargets.length === 0}
+                              >
+                                <option value="">
+                                  {selectedGenericCode
+                                    ? "Select origin estimate"
+                                    : selectedTargetBudgetId
+                                      ? "Origin estimate"
+                                      : "—"}
+                                </option>
+                                {!selectedGenericCode && selectedTargetBudgetId ? (
+                                  <option value={selectedTargetBudgetId}>
+                                    {originEstimateLabelByBudgetId.get(selectedTargetBudgetId) ??
+                                      `Estimate baseline (${selectedTargetBudgetId})`}
+                                  </option>
+                                ) : null}
+                                {genericTargets.map((option) => (
+                                  <option key={`${selectedGenericCode}-${option.budgetId}`} value={option.budgetId}>
+                                    {originEstimateLabelByBudgetId.get(option.budgetId) ??
+                                      `Estimate baseline (${option.budgetId})`}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className={creatorStyles.lineCell}>
+                              <input
+                                className={creatorStyles.lineInput}
+                                value={row.amount}
+                                onChange={(event) => {
+                                  updateFormAllocation(index, { amount: event.target.value });
+                                }}
+                                placeholder="0.00"
+                                inputMode="decimal"
+                                disabled={!hasBudgetLineOptions}
+                              />
+                            </div>
+                            <div className={creatorStyles.lineCell}>
+                              <input
+                                className={creatorStyles.lineInput}
+                                value={row.note}
+                                onChange={(event) => {
+                                  updateFormAllocation(index, { note: event.target.value });
+                                }}
+                                placeholder="Optional"
+                                disabled={!hasBudgetLineOptions}
+                              />
+                            </div>
+                            <div className={`${creatorStyles.lineCell} ${creatorStyles.lineActionsCell}`}>
+                              <button
+                                type="button"
+                                className={creatorStyles.removeButton}
+                                onClick={() => removeFormAllocation(index)}
+                                disabled={formAllocations.length <= 1}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                          {selectedLineMeta ? (
+                            <p className={styles.allocationMetaRow}>
+                              Approved: {formatMoney(selectedLineMeta.planned_amount)} · Spent:{" "}
+                              {formatMoney(selectedLineMeta.actual_spend)} · Remaining:{" "}
+                              {formatMoney(selectedLineMeta.remaining_amount)}
+                            </p>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className={creatorStyles.lineActions}>
+                    <button
+                      type="button"
+                      className={creatorStyles.secondaryButton}
+                      onClick={addFormAllocation}
+                      disabled={!hasBudgetLineOptions}
+                    >
+                      Add Allocation Row
+                    </button>
+                    <div className={styles.allocationTotals}>
+                      <span>
+                        Bill total: ${formTotal} · Allocated: ${formAllocationTotal.toFixed(2)} · Unallocated:{" "}
+                        <span className={hasAllocationMismatch ? styles.unallocatedMismatch : undefined}>
+                          ${formUnallocated.toFixed(2)}
+                        </span>
+                      </span>
                       <button
-                        key={statusOption}
                         type="button"
-                        className={`${styles.statusPill} ${
-                          active ? statusPillClass(statusOption) : styles.statusPillInactive
-                        } ${active ? styles.statusPillActive : ""}`}
-                        aria-pressed={active}
-                        onClick={() => setNewStatus(statusOption)}
+                        className={creatorStyles.secondaryButton}
+                        onClick={() => setFormTotal(formSuggestedTotal)}
+                        disabled={!isEditingMode && !hasBudgetLineOptions}
                       >
-                        {statusDisplayLabel(statusOption)}
+                        Use allocated total ({formSuggestedTotal})
                       </button>
-                    );
-                  })}
+                    </div>
+                  </div>
+                  {formIsOverAllocated ? (
+                    <p className={styles.errorText}>Allocated amount cannot exceed bill total.</p>
+                  ) : null}
+                  {formRequiresFullAllocation ? (
+                    <p className={styles.errorText}>
+                      Status <strong>{status}</strong> requires full allocation (unallocated must be 0.00).
+                    </p>
+                  ) : null}
+                  {scheduledForMissing ? (
+                    <p className={styles.errorText}>
+                      Set a <strong>scheduled for</strong> date before saving.
+                    </p>
+                  ) : null}
+                </div>
+
+                <label className={styles.fieldSpan2}>
+                  Notes
+                  <textarea
+                    value={formNotes}
+                    onChange={(event) => setFormNotes(event.target.value)}
+                    disabled={!selectedProjectId}
+                  />
+                </label>
+
+                {!isEditingMode ? (
+                  <div className={`${styles.statusPicker} ${styles.fieldSpan2}`}>
+                    <span className={styles.statusPickerLabel}>Initial status</span>
+                    <div className={styles.statusPills}>
+                      {createStatusOptions.map((statusOption) => {
+                        const active = statusOption === newStatus;
+                        return (
+                          <button
+                            key={statusOption}
+                            type="button"
+                            className={`${styles.statusPill} ${
+                              active ? statusPillClass(statusOption) : styles.statusPillInactive
+                            } ${active ? styles.statusPillActive : ""}`}
+                            aria-pressed={active}
+                            onClick={() => setNewStatus(statusOption)}
+                          >
+                            {statusDisplayLabel(statusOption)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className={`${styles.submitRow} ${styles.fieldSpan2}`}>
+                  {isEditingMode && editErrorMessage ? (
+                    <p className={styles.submitErrorText} role="alert" aria-live="polite">
+                      {editErrorMessage}
+                    </p>
+                  ) : null}
+                  {!isEditingMode && createErrorMessage ? (
+                    <p className={styles.submitErrorText} role="alert" aria-live="polite">
+                      {createErrorMessage}
+                    </p>
+                  ) : null}
+                  <button
+                    type="submit"
+                    className={styles.formPrimaryButton}
+                    disabled={
+                      !canMutateVendorBills ||
+                      !selectedProjectId ||
+                      !formVendorId ||
+                      formIsOverAllocated ||
+                      (formRequiresFullAllocation && Math.abs(formUnallocated) > allocationEpsilon) ||
+                      scheduledForMissing
+                    }
+                  >
+                    {isEditingMode ? "Save Vendor Bill" : "Create Vendor Bill"}
+                  </button>
                 </div>
               </div>
-            ) : null}
+            </section>
+          </form>
 
-            <div className={`${styles.submitRow} ${styles.fieldSpan2}`}>
-              {isEditingMode && editErrorMessage ? (
-                <p className={styles.submitErrorText} role="alert" aria-live="polite">
-                  {editErrorMessage}
+          {duplicateCandidates.length > 0 ? (
+            <div className={styles.impactCard}>
+              <p><strong>Duplicate candidates:</strong></p>
+              {duplicateCandidates.map((candidate) => (
+                <p key={candidate.id}>
+                  #{candidate.id} {candidate.vendor_name} / {candidate.bill_number} (
+                  {statusDisplayLabel(candidate.status)})
                 </p>
-              ) : null}
-              {!isEditingMode && createErrorMessage ? (
-                <p className={styles.submitErrorText} role="alert" aria-live="polite">
-                  {createErrorMessage}
-                </p>
-              ) : null}
-              <button
-                type="submit"
-                className={styles.formPrimaryButton}
-                disabled={
-                  !canMutateVendorBills ||
-                  !selectedProjectId ||
-                  !formVendorId ||
-                  formIsOverAllocated ||
-                  (formRequiresFullAllocation && Math.abs(formUnallocated) > allocationEpsilon) ||
-                  (formRequiresScheduledFor && !formScheduledFor)
-                }
-              >
-                {isEditingMode ? "Save Vendor Bill" : "Create Vendor Bill"}
-              </button>
+              ))}
+              <p>Void matching bill(s) first if you need to reuse this bill number.</p>
             </div>
-          </div>
-        </section>
-      </form>
-
-      {duplicateCandidates.length > 0 ? (
-        <>
-          <p>Duplicate candidates:</p>
-          <ul>
-            {duplicateCandidates.map((candidate) => (
-              <li key={candidate.id}>
-                #{candidate.id} {candidate.vendor_name} / {candidate.bill_number} (
-                {statusDisplayLabel(candidate.status)})
-              </li>
-            ))}
-          </ul>
-          <p>Void matching bill(s) first if you need to reuse this bill number.</p>
-        </>
+          ) : null}
+        </div>
       ) : null}
 
-      <p>{statusMessage}</p>
-      {!canMutateVendorBills ? <p>Role `{role}` can view bills but cannot create or update.</p> : null}
+      {statusMessage ? <p className={styles.inlineHint}>{statusMessage}</p> : null}
+      {!canMutateVendorBills ? <p className={styles.inlineHint}>Role `{role}` can view bills but cannot create or update.</p> : null}
     </section>
   );
 }
