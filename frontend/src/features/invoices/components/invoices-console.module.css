@@ -793,3 +793,35 @@
   color: var(--text-primary);
   font-size: 0.86rem;
 }
+
+/* ── Print ────────────────────────────────────────────────────── */
+
+@media print {
+  .authNotice,
+  .readOnlyNotice,
+  .statusBanner,
+  .panel,
+  .workspaceToolbar,
+  .workspaceToolbarActions,
+  .invoiceQuickStatusPills,
+  .invoiceViewerActionRow,
+  .invoiceViewerEventList,
+  .invoiceShowAllToggle,
+  .buttonRow,
+  .statusFilters,
+  .invoiceSearchInput,
+  .panelHeaderActions,
+  .toolbarActionButton,
+  .invoiceViewerActionSuccess,
+  .invoiceViewerActionError {
+    display: none !important;
+  }
+
+  /* Hide all viewer sections entirely in print */
+  .invoiceViewerSection,
+  .invoiceViewerSectionToggle,
+  .invoiceViewerSectionContent,
+  .invoiceExpandedSections {
+    display: none !important;
+  }
+}

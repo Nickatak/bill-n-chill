@@ -1679,12 +1679,75 @@
 .decisionBannerAwaiting {
 }
 
+/* ── Print ────────────────────────────────────────────────────── */
+
 @media print {
-  .decisionBannerAwaiting {
-    display: none;
+  .toolbar,
+  .projectTableWrap,
+  .projectTable,
+  .statusMessage,
+  .authMessage,
+  .versionTree,
+  .lifecycle,
+  .composerPrep,
+  .duplicatePanel,
+  .duplicateDialog,
+  .statusEvents,
+  .statusEventsTableWrap,
+  .financialActivationPanel,
+  .decisionBannerAwaiting,
+  .publicDecisionBanner,
+  .publicDecisionSection,
+  .workspaceToolbar,
+  .workspaceToolbarActions,
+  .primaryButton,
+  .secondaryButton,
+  .removeButton,
+  .smallButton,
+  .lineActions,
+  .lineActionsCell,
+  .finalizeActions,
+  .actionError,
+  .actionSuccess,
+  .statusPills,
+  .lifecycleActions,
+  .lifecycleActionButton,
+  .lifecycleLinkAction,
+  .logoBox,
+  .inlineHint,
+  .readOnlyHint,
+  .sortIndicator {
+    display: none !important;
   }
 
-  .publicDecisionSection {
-    display: none;
+  /* Strip sheet decoration */
+  .sheet {
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+    background: var(--surface);
   }
+
+  .sheetReadOnly {
+    background: var(--surface);
+  }
+
+  /* Flatten inputs */
+  .fieldInput,
+  .fieldSelect,
+  .lineInput,
+  .lineSelect,
+  .summaryTaxInput,
+  .termsInput,
+  .staticFieldValue,
+  .staticFieldInlineValue {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    min-height: 0;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
 }

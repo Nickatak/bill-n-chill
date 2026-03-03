@@ -443,8 +443,8 @@
 
 .statusPillActive.statusPillPlanned {
   background: var(--status-blue-solid);
-  border-color: var(--accent);
-  color: var(--accent-lighter);
+  border-color: var(--status-blue-solid);
+  color: var(--status-blue-solid-text);
 }
 
 .statusPillActive.statusPillReceived {
@@ -480,7 +480,7 @@
 .statusPillPlanned {
   border-color: var(--status-blue-border);
   background: var(--status-blue-bg);
-  color: var(--accent);
+  color: var(--status-blue-text);
 }
 
 .statusPillReceived {
@@ -854,5 +854,111 @@
 
   .detailGrid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ── Print ────────────────────────────────────────────────────── */
+
+@media print {
+  .panelHeaderActions,
+  .statusFilters,
+  .statusFilterButtons,
+  .filterActions,
+  .filterPill,
+  .viewerStatusActions,
+  .viewerSecondaryButton,
+  .formSection,
+  .formActionsRow,
+  .workspaceToolbar,
+  .workspaceToolbarActions,
+  .toolbarActionButton,
+  .submitRow,
+  .statusPicker,
+  .statusPills,
+  .formPrimaryButton,
+  .formSecondaryButton,
+  .formDangerButton {
+    display: none !important;
+  }
+
+  /* Hide toggle buttons but keep section content */
+  .viewerSectionToggle {
+    display: none !important;
+  }
+
+  .viewerSectionContent {
+    display: grid !important;
+  }
+
+  /* Strip viewer panel chrome */
+  .viewerPanel {
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    background: var(--surface);
+  }
+
+  .viewerSection {
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+  }
+
+  .expandedRow {
+    background: var(--surface) !important;
+  }
+
+  .expandedRow > td {
+    border-bottom: 0 !important;
+  }
+
+  /* Table */
+  .tableWrap {
+    border-radius: 0;
+    overflow: visible;
+  }
+
+  .table {
+    min-width: 0;
+  }
+
+  .table th {
+    background: #f3f4f6;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .table td {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .table tbody tr {
+    cursor: default;
+    break-inside: avoid;
+  }
+
+  /* Read-only tables */
+  .readOnlyTable th {
+    background: #f3f4f6;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .readOnlyTable td {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  /* Detail grid */
+  .detailLabel {
+    color: #374151;
+    -webkit-text-fill-color: #374151;
+  }
+
+  .detailValue {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
   }
 }

@@ -243,3 +243,109 @@
     grid-column: 1;
   }
 }
+
+/* ── Print ────────────────────────────────────────────────────── */
+
+@media print {
+  .invoiceLineActions,
+  .invoiceLineActionsCell,
+  .invoiceCreateActions,
+  .invoiceCreateStatusMessage,
+  .invoiceNumberIndicator,
+  .invoiceLineSectionIntro {
+    display: none !important;
+  }
+
+  .invoiceCreatorSheet {
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+    background: var(--surface);
+  }
+
+  .invoiceDetailCard {
+    border-color: #9ca3af;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  /* Restore 2-column meta layout (980px responsive breakpoint collapses it) */
+  .invoiceMetaLayout {
+    grid-template-columns: minmax(0, 1fr) minmax(200px, 340px);
+  }
+
+  .invoiceDetailCard {
+    grid-column: 2;
+  }
+
+  /* Hide Type (1st child) and Actions (8th child) columns */
+  .invoiceLineHeader > span:nth-child(1),
+  .invoiceLineRow > *:nth-child(1),
+  .invoiceLineHeader > span:nth-child(8),
+  .invoiceLineRow > *:nth-child(8) {
+    display: none !important;
+  }
+
+  /* 6-column print grid: Scope/Reason, Qty, Description, Unit, UnitPrice, Amount */
+  .invoiceLineHeader,
+  .invoiceLineRow {
+    grid-template-columns: 1.2fr 48px 1.6fr 52px 72px 78px;
+    min-width: 0;
+    gap: 4px;
+    padding: 6px var(--space-sm);
+  }
+
+  .invoiceLineHeader {
+    background: #f3f4f6;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+    font-size: 0.6rem;
+    letter-spacing: 0.02em;
+  }
+
+  .invoiceLineHeader > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .invoiceLineRow {
+    break-inside: avoid;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .invoiceLineHeader > span + span,
+  .invoiceLineRow > * + * {
+    box-shadow: -1px 0 0 #9ca3af;
+  }
+
+  .invoiceLockableControl {
+    appearance: none;
+    -webkit-appearance: none;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+    font-size: 0.78rem;
+  }
+
+  .invoiceReadAmount {
+    border: 0;
+    background: transparent;
+  }
+
+  .invoiceSheetFooter {
+    break-inside: avoid;
+    border-top-color: #9ca3af;
+  }
+
+  .invoiceNumberInput {
+    border: 0;
+    background: transparent;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+}

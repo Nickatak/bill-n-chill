@@ -1,16 +1,14 @@
 /**
  * Top-level application toolbar rendered at the very top of every page.
  *
- * Contains the organization link, quick-jump search, ops/meta dropdown,
- * print button, theme toggle, and logout. Visibility of individual
- * controls depends on session state and whether the current route is a
- * public document view.
+ * Contains the organization link, ops/meta dropdown, print button,
+ * theme toggle, and logout. Visibility of individual controls depends
+ * on session state and whether the current route is a public document view.
  */
 "use client";
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { isPublicDocumentRoute } from "@/features/session/public-routes";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { clearClientSession } from "@/features/session/client-session";
 import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import Link from "next/link";
@@ -24,19 +22,18 @@ import styles from "./app-toolbar.module.css";
 
 const THEME_KEY = "bnc-theme";
 type ThemeMode = "light" | "dark";
-const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
-/** Shape of a single result returned by the quick-jump search API. */
-type QuickJumpItem = {
-  kind: string;
-  record_id: number;
-  label: string;
-  sub_label: string;
-  project_id: number | null;
-  project_name: string;
-  ui_href: string;
-  detail_endpoint: string;
-};
+/** Internal routes where the Print button should be visible. */
+const PRINTABLE_ROUTE_PATTERNS = [
+  /^\/projects\/[^/]+\/estimates\/?$/,
+  /^\/projects\/[^/]+\/change-orders\/?$/,
+  /^\/invoices\/?$/,
+  /^\/change-orders\/?$/,
+];
+
+function isPrintableRoute(pathname: string): boolean {
+  return PRINTABLE_ROUTE_PATTERNS.some((pattern) => pattern.test(pathname));
+}
 
 // ---------------------------------------------------------------------------
 // Theme persistence
@@ -60,9 +57,9 @@ function applyTheme(theme: ThemeMode) {
  * Render the persistent toolbar at the top of the viewport.
  *
  * Authenticated users see the full set of controls (org link,
- * quick-jump, ops/meta, print, theme, logout). Public document
- * routes show only a "Home" link, print, and theme toggle so
- * customers get a minimal chrome-free experience.
+ * ops/meta, print, theme, logout). Public document routes show
+ * only a "Home" link, print, and theme toggle so customers get
+ * a minimal chrome-free experience.
  */
 export function AppToolbar() {
   const pathname = usePathname() ?? "";
@@ -72,16 +69,10 @@ export function AppToolbar() {
   const isPublicDocument = isPublicDocumentRoute(pathname);
   const isOrganizationPath = pathname === "/ops/organization";
   const hasActiveOpsMeta = opsMetaRoutes.some((route) => isRouteActive(pathname, route));
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<QuickJumpItem[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const quickJumpMenuRef = useRef<HTMLDetailsElement>(null);
   const opsMetaMenuRef = useRef<HTMLDetailsElement>(null);
-  const normalizedBaseUrl = useMemo(() => defaultApiBaseUrl.trim().replace(/\/$/, ""), []);
 
-  /** Close all open `<details>` menus (quick-jump and ops/meta). */
+  /** Close all open `<details>` menus. */
   function closeMenus() {
-    quickJumpMenuRef.current?.removeAttribute("open");
     opsMetaMenuRef.current?.removeAttribute("open");
   }
 
@@ -105,55 +96,6 @@ export function AppToolbar() {
     window.print();
   }
 
-  // Debounced quick-jump search: fires 180ms after the user stops typing
-  // so we avoid flooding the API with per-keystroke requests.
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadQuickJump() {
-      if (!hasSession || !token || searchQuery.trim().length < 2) {
-        setSearchResults([]);
-        return;
-      }
-      setSearchLoading(true);
-      try {
-        const response = await fetch(
-          `${normalizedBaseUrl}/search/quick-jump/?q=${encodeURIComponent(searchQuery.trim())}`,
-          {
-            headers: buildAuthHeaders(token),
-          },
-        );
-        const payload = await response.json();
-        if (!response.ok) {
-          if (!cancelled) {
-            setSearchResults([]);
-          }
-          return;
-        }
-        if (!cancelled) {
-          setSearchResults((payload?.data?.items as QuickJumpItem[]) ?? []);
-        }
-      } catch {
-        if (!cancelled) {
-          setSearchResults([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setSearchLoading(false);
-        }
-      }
-    }
-
-    const timer = window.setTimeout(() => {
-      void loadQuickJump();
-    }, 180);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [hasSession, normalizedBaseUrl, searchQuery, token]);
-
   // Close open menus on route change so the user starts fresh.
   useEffect(() => {
     closeMenus();
@@ -166,10 +108,7 @@ export function AppToolbar() {
       if (!target) {
         return;
       }
-      if (
-        quickJumpMenuRef.current?.contains(target) ||
-        opsMetaMenuRef.current?.contains(target)
-      ) {
+      if (opsMetaMenuRef.current?.contains(target)) {
         return;
       }
       closeMenus();
@@ -196,38 +135,6 @@ export function AppToolbar() {
         </Link>
       ) : null}
       {hasSession && !isPublicDocument ? (
-        <details ref={quickJumpMenuRef} className={styles.menu}>
-          <summary className={`${styles.button} ${styles.quickJumpButton}`}>Quick Jump</summary>
-          <div className={`${styles.menuList} ${styles.quickJumpList}`} role="menu" aria-label="Global quick jump">
-            <label className={styles.quickJumpInputWrap}>
-              <span className={styles.quickJumpLabel}>Search</span>
-              <input
-                className={styles.quickJumpInput}
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Project, CO, invoice, bill, payment..."
-              />
-            </label>
-            {searchLoading ? <p className={styles.quickJumpHint}>Searching...</p> : null}
-            {!searchLoading && searchQuery.trim().length >= 2 && searchResults.length === 0 ? (
-              <p className={styles.quickJumpHint}>No matches.</p>
-            ) : null}
-            {searchResults.map((item) => (
-              <Link
-                key={`${item.kind}-${item.record_id}`}
-                href={item.ui_href}
-                className={styles.menuItem}
-                role="menuitem"
-                onClick={closeMenus}
-              >
-                <strong>{item.label}</strong>
-                <span className={styles.quickJumpSubLabel}>{item.sub_label}</span>
-              </Link>
-            ))}
-          </div>
-        </details>
-      ) : null}
-      {hasSession && !isPublicDocument ? (
         <details ref={opsMetaMenuRef} className={styles.menu}>
           <summary className={`${styles.button} ${hasActiveOpsMeta ? styles.buttonActive : ""}`}>
             Ops / Meta
@@ -247,7 +154,7 @@ export function AppToolbar() {
           </div>
         </details>
       ) : null}
-      {hasSession || isPublicDocument ? (
+      {isPublicDocument || (hasSession && isPrintableRoute(pathname)) ? (
         <button type="button" className={styles.button} onClick={printPage}>
           Print
         </button>

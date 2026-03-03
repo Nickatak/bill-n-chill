@@ -277,3 +277,111 @@
     width: 100%;
   }
 }
+
+/* ── Print ────────────────────────────────────────────────────── */
+
+@media print {
+  .coLineActions,
+  .coLineAddButton,
+  .coSheetFooterActions,
+  .coActionButtonRow,
+  .coFooterHint,
+  .coFooterPrimaryButton,
+  .coLineSectionIntro p,
+  .coLineLegend,
+  .coLineIssue {
+    display: none !important;
+  }
+
+  .workflowSheet {
+    margin: 0;
+  }
+
+  .createSheet,
+  .editSheet {
+    border: 0;
+    box-shadow: none;
+  }
+
+  .coReadValue {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    min-height: 0;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .coLineHeader {
+    grid-template-columns: 0.7fr 1fr 1.2fr 0.9fr 0.7fr 0.6fr;
+    min-width: 0;
+    background: #f3f4f6;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+    letter-spacing: 0.02em;
+    font-size: 0.6rem;
+    gap: 4px;
+    padding: 8px;
+  }
+
+  .coLineRow {
+    grid-template-columns: 0.7fr 1fr 1.2fr 0.9fr 0.7fr 0.6fr;
+    min-width: 0;
+    break-inside: avoid;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+    gap: 4px;
+    padding: 6px 8px;
+  }
+
+  /* Hide adjustment reason (2nd) and actions (8th) columns */
+  .coLineHeader > span:nth-child(2),
+  .coLineRow > *:nth-child(2),
+  .coLineHeader > span:nth-child(8),
+  .coLineRow > *:nth-child(8) {
+    display: none;
+  }
+
+  .coLineHeader > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .coLineHeader > span + span,
+  .coLineRow > * + * {
+    box-shadow: -1px 0 0 #9ca3af;
+  }
+
+  .coSheetFooter {
+    break-inside: avoid;
+    border-top-color: #9ca3af;
+  }
+
+  .coSummaryCard {
+    border-color: #9ca3af;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .coMetaLabel {
+    color: #1e40af;
+    -webkit-text-fill-color: #1e40af;
+  }
+
+  .coMetaInput {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .lockableControl {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+}

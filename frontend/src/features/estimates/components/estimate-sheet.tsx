@@ -159,6 +159,12 @@ export function EstimateSheet({
     return `${code.code} - ${code.name}`;
   }
 
+  /** Return just the short code (e.g. "01-100") for print display. */
+  function findCostCodeShort(costCodeId: string): string {
+    const code = costCodes.find((candidate) => String(candidate.id) === costCodeId);
+    return code?.code || costCodeId || "—";
+  }
+
   /** Render a column header that doubles as a sort toggle when editing is allowed. */
   function renderSortableHeader(label: string, key: LineSortKey) {
     if (readOnly) {
@@ -253,7 +259,12 @@ export function EstimateSheet({
               {titlePresentation === "header" ? (
                 <div className={creatorStyles.sheetTitleValue}>{estimateTitle || "Untitled"}</div>
               ) : (
-                <div className={creatorStyles.sheetTitle}>Estimate</div>
+                <>
+                  <div className={creatorStyles.sheetTitle}>Estimate</div>
+                  <div className={`${creatorStyles.sheetTitleValue} ${creatorStyles.printOnly}`}>
+                    {estimateTitle || "Untitled"}
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -265,7 +276,7 @@ export function EstimateSheet({
                 {titlePresentation !== "header" ? (
                   <>
                     <div className={creatorStyles.metaTitle}>Estimate Details</div>
-                    <label className={creatorStyles.inlineField}>
+                    <label className={`${creatorStyles.inlineField} ${creatorStyles.screenOnly}`}>
                       Estimate title
                       {showReadOnlyText ? (
                         <span className={creatorStyles.staticFieldInlineValue}>{estimateTitle || "Untitled"}</span>
@@ -395,18 +406,21 @@ export function EstimateSheet({
                     )}
                   </div>
                   <div className={creatorStyles.lineCell}>
-                    {showReadOnlyText ? (
-                      <span className={creatorStyles.staticCellValue}>{findCostCodeLabel(line.costCodeId)}</span>
-                    ) : (
-                      <CostCodeCombobox
-                        costCodes={costCodes}
-                        value={line.costCodeId}
-                        onChange={(nextValue) => onLineItemChange(line.localId, "costCodeId", nextValue)}
-                        ariaLabel="Cost code"
-                        disabled={readOnly}
-                        placeholder="Search cost code"
-                      />
-                    )}
+                    <span className={creatorStyles.printOnly}>{findCostCodeShort(line.costCodeId)}</span>
+                    <span className={creatorStyles.screenOnly}>
+                      {showReadOnlyText ? (
+                        <span className={creatorStyles.staticCellValue}>{findCostCodeLabel(line.costCodeId)}</span>
+                      ) : (
+                        <CostCodeCombobox
+                          costCodes={costCodes}
+                          value={line.costCodeId}
+                          onChange={(nextValue) => onLineItemChange(line.localId, "costCodeId", nextValue)}
+                          ariaLabel="Cost code"
+                          disabled={readOnly}
+                          placeholder="Search cost code"
+                        />
+                      )}
+                    </span>
                   </div>
                   <div className={creatorStyles.lineCell}>
                     {showReadOnlyText ? (

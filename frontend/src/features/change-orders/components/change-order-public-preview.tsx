@@ -24,6 +24,7 @@ import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { ApiResponse, ChangeOrderRecord } from "../types";
 import { usePrintContext } from "@/shared/hooks/use-print-context";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
+import stampStyles from "@/shared/styles/decision-stamp.module.css";
 import styles from "./change-order-public-preview.module.css";
 
 type ChangeOrderPublicPreviewProps = {
@@ -62,7 +63,6 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
   const [decisionMessage, setDecisionMessage] = useState("");
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [decisionReceiptName, setDecisionReceiptName] = useState("");
-  const [justSubmittedDecision, setJustSubmittedDecision] = useState<"approve" | "reject" | null>(null);
   const decisionSectionRef = useRef<HTMLElement | null>(null);
   const [decisionFlashCount, setDecisionFlashCount] = useState(0);
   const { printTimestamp } = usePrintContext();
@@ -82,25 +82,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const canDecide = changeOrder?.status === "pending_approval";
   const hasDecision = changeOrder?.status === "approved" || changeOrder?.status === "rejected";
-  const showDecisionSection = canDecide || hasDecision;
   const decisionStatusLabel = statusLabel(changeOrder?.status);
-  const nonPendingDecisionMessage =
-    changeOrder?.status === "approved"
-      ? decisionReceiptName.trim()
-        ? `Status: ${decisionStatusLabel}. Approved by ${decisionReceiptName.trim()}.`
-        : `Status: ${decisionStatusLabel}.`
-      : `Status: ${decisionStatusLabel}.`;
-  const decisionFeedbackMessage = useMemo(() => {
-    if (!justSubmittedDecision) {
-      return null;
-    }
-    if (justSubmittedDecision === "approve") {
-      return decisionReceiptName.trim()
-        ? `Decision received: Approved. Thank you, ${decisionReceiptName.trim()}. Your response has been recorded.`
-        : "Decision received: Approved. Your response has been recorded.";
-    }
-    return "Decision received: Rejected. Your response has been recorded.";
-  }, [decisionReceiptName, justSubmittedDecision]);
   const sender = useMemo(
     () => resolvePublicSender(changeOrder?.organization_context),
     [changeOrder?.organization_context],
@@ -137,7 +119,6 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
         }
         setChangeOrder(payload.data as ChangeOrderRecord);
         setDecisionReceiptName("");
-        setJustSubmittedDecision(null);
         setStatusMessage("");
       } catch {
         setStatusMessage("Could not reach change-order endpoint.");
@@ -178,7 +159,6 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
       setChangeOrder(payload.data as ChangeOrderRecord);
 
       setDecisionReceiptName(deciderName.trim());
-      setJustSubmittedDecision(decision);
       setDecisionMessage("");
       setDecisionFlashCount((c) => c + 1);
     } catch {
@@ -266,39 +246,27 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
                   </p>
                 </div>
                 <div className={frameStyles.identityMetaRow}>
-                  {changeOrder.origin_estimate_context?.public_ref ? (
-                    <a
-                      className={frameStyles.metaLink}
-                      href={publicEstimateHref(changeOrder.origin_estimate_context.public_ref)}
-                    >
-                      View Related Estimate
-                    </a>
+                  {changeOrder.origin_estimate_context ? (
+                    <>
+                      {changeOrder.origin_estimate_context.public_ref ? (
+                        <a
+                          className={`${frameStyles.metaLink} ${creatorStyles.screenOnly}`}
+                          href={publicEstimateHref(changeOrder.origin_estimate_context.public_ref)}
+                        >
+                          View Related Estimate
+                        </a>
+                      ) : null}
+                      <span className={creatorStyles.printOnly}>
+                        Estimate: {changeOrder.origin_estimate_context.title || `#${changeOrder.origin_estimate_context.id}`}
+                        {changeOrder.origin_estimate_context.version ? ` v${changeOrder.origin_estimate_context.version}` : ""}
+                      </span>
+                    </>
                   ) : null}
                 </div>
-                <hr className={frameStyles.identityDivider} />
-                <section className={`${frameStyles.metaDetails} ${styles.detailsPanel}`}>
-                  <h4 className={frameStyles.metaDetailsTitle}>Change Order Details</h4>
-                  <div className={frameStyles.metaDetailsRow}>
-                    <span>CO #</span>
-                    <span>CO-{changeOrder.family_key}</span>
-                  </div>
-                  <div className={frameStyles.metaDetailsRow}>
-                    <span>Version</span>
-                    <span>v{changeOrder.revision_number}</span>
-                  </div>
-                  <div className={frameStyles.metaDetailsRow}>
-                    <span>Status</span>
-                    <span>{decisionStatusLabel}</span>
-                  </div>
-                  <div className={frameStyles.metaDetailsRow}>
-                    <span>Updated</span>
-                    <span>{formatDateTimeDisplay(changeOrder.updated_at, "Unknown")}</span>
-                  </div>
-                </section>
               </>
             }
             lineTitle="Line Items"
-            columns={["Budget Line", "Description", "Amount Delta", "Days Delta"]}
+            columns={["Cost Code", "Description", "Amount Delta", "Days Delta"]}
             rows={(changeOrder.line_items ?? []).map((line) => ({
               key: line.id,
               cells: [
@@ -353,75 +321,77 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
             }
           />
 
-          {showDecisionSection ? (
+          {canDecide ? (
             <section
               ref={decisionSectionRef}
               id="change-order-decision"
-              className={`${styles.decisionCard} ${styles.publicDecisionSection} ${
-                hasDecision && changeOrder?.status === "approved" ? styles.decisionCardApproved
-                : hasDecision && changeOrder?.status === "rejected" ? styles.decisionCardRejected
-                : ""
-              }`}
+              className={`${styles.decisionCard} ${styles.publicDecisionSection}`}
             >
               <h3>Decision</h3>
-              {canDecide ? (
-                <>
-                  {decisionMessage ? <p className={styles.decisionMessage}>{decisionMessage}</p> : null}
-                  <label className={styles.field}>
-                    Your name (optional)
-                    <input
-                      value={deciderName}
-                      onChange={(event) => setDeciderName(event.target.value)}
-                      placeholder="Homeowner name"
-                      disabled={decisionSubmitting}
-                    />
-                  </label>
-                  <label className={styles.field}>
-                    Your email (optional)
-                    <input
-                      value={deciderEmail}
-                      onChange={(event) => setDeciderEmail(event.target.value)}
-                      placeholder="owner@example.com"
-                      disabled={decisionSubmitting}
-                    />
-                  </label>
-                  <label className={styles.field}>
-                    Note (optional)
-                    <textarea
-                      value={decisionNote}
-                      onChange={(event) => setDecisionNote(event.target.value)}
-                      rows={3}
-                      placeholder="Optional decision note."
-                      disabled={decisionSubmitting}
-                    />
-                  </label>
-                  <div className={styles.decisionActions}>
-                    <button
-                      type="button"
-                      className={styles.primaryButton}
-                      onClick={() => void applyDecision("approve")}
-                      disabled={decisionSubmitting}
-                    >
-                      Approve Change Order
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.secondaryButton}
-                      onClick={() => void applyDecision("reject")}
-                      disabled={decisionSubmitting}
-                    >
-                      Reject Change Order
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <p className={`${styles.decisionMessage} ${
-                  changeOrder?.status === "approved" ? styles.decisionFeedbackApproved
-                  : changeOrder?.status === "rejected" ? styles.decisionFeedbackRejected
-                  : ""
-                }`}>{decisionFeedbackMessage ?? nonPendingDecisionMessage}</p>
-              )}
+              {decisionMessage ? <p className={styles.decisionMessage}>{decisionMessage}</p> : null}
+              <label className={styles.field}>
+                Your name (optional)
+                <input
+                  value={deciderName}
+                  onChange={(event) => setDeciderName(event.target.value)}
+                  placeholder="Homeowner name"
+                  disabled={decisionSubmitting}
+                />
+              </label>
+              <label className={styles.field}>
+                Your email (optional)
+                <input
+                  value={deciderEmail}
+                  onChange={(event) => setDeciderEmail(event.target.value)}
+                  placeholder="owner@example.com"
+                  disabled={decisionSubmitting}
+                />
+              </label>
+              <label className={styles.field}>
+                Note (optional)
+                <textarea
+                  value={decisionNote}
+                  onChange={(event) => setDecisionNote(event.target.value)}
+                  rows={3}
+                  placeholder="Optional decision note."
+                  disabled={decisionSubmitting}
+                />
+              </label>
+              <div className={styles.decisionActions}>
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  onClick={() => void applyDecision("approve")}
+                  disabled={decisionSubmitting}
+                >
+                  Approve Change Order
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={() => void applyDecision("reject")}
+                  disabled={decisionSubmitting}
+                >
+                  Reject Change Order
+                </button>
+              </div>
             </section>
+          ) : null}
+          {hasDecision ? (
+            <div
+              ref={decisionSectionRef}
+              className={`${stampStyles.decisionStamp} ${
+                changeOrder?.status === "approved" ? stampStyles.decisionStampApproved
+                : stampStyles.decisionStampRejected
+              }`}
+            >
+              <p className={stampStyles.decisionStampLabel}>
+                {changeOrder?.status === "approved" ? "Approved" : "Rejected"}
+              </p>
+              {decisionReceiptName.trim() ? (
+                <p className={stampStyles.decisionStampDetail}>by {decisionReceiptName.trim()}</p>
+              ) : null}
+            </div>
           ) : null}
         </>
       ) : null}

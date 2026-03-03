@@ -1040,3 +1040,256 @@
     width: 100%;
   }
 }
+
+/* ── Print utilities ──────────────────────────────────────────── */
+
+.printOnly {
+  display: none;
+}
+
+/* ── Print ────────────────────────────────────────────────────── */
+
+@media print {
+  .printOnly {
+    display: revert;
+  }
+
+  .screenOnly {
+    display: none !important;
+  }
+  .sheet {
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+    background: var(--surface);
+  }
+
+  .sheetReadOnly {
+    background: var(--surface);
+  }
+
+  /* Restore 2-column header layout (overrides the max-width:900px collapse) */
+  .sheetHeader {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metaOnlyRow {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  }
+
+  .metaOnlyRow .metaBlock {
+    grid-column: 2;
+  }
+
+  .headerRight {
+    justify-items: end;
+  }
+
+  .summary {
+    margin-left: auto;
+    width: auto;
+  }
+
+  .logoBox,
+  .primaryButton,
+  .secondaryButton,
+  .removeButton,
+  .smallButton,
+  .lineActions,
+  .lineActionsCell,
+  .finalizeActions,
+  .actionError,
+  .actionSuccess,
+  .actionDisabled,
+  .composerPrep,
+  .workspaceToolbar,
+  .lifecycle,
+  .publicDecisionBanner,
+  .publicDecisionSection,
+  .inlineHint,
+  .statusPicker,
+  .statusPills,
+  .lifecycleActions,
+  .lifecycleLinkAction {
+    display: none !important;
+  }
+
+  /* Flatten inputs to plain text */
+  .fieldInput,
+  .fieldSelect,
+  .lineInput,
+  .lineSelect,
+  .summaryTaxInput,
+  .termsInput {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    min-height: 0;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .staticFieldValue,
+  .staticFieldInlineValue,
+  .staticMetaValue,
+  .staticCellValue {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  /* Line table */
+  .lineTable {
+    border: 1px solid #9ca3af;
+    border-radius: 0;
+    overflow: visible;
+  }
+
+  .lineHeader,
+  .lineHeaderReadOnly {
+    grid-template-columns: 38px 1.6fr 1fr 42px 68px 62px 72px;
+    min-width: 0;
+    background: #f3f4f6;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+    letter-spacing: 0.02em;
+    font-size: 0.6rem;
+    gap: 4px;
+    padding: 8px 10px;
+  }
+
+  .lineHeaderNoMarkup {
+    grid-template-columns: 42px 1.6fr 1fr 48px 78px 76px;
+    min-width: 0;
+    background: #f3f4f6;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+    letter-spacing: 0.02em;
+    font-size: 0.6rem;
+    gap: 4px;
+    padding: 8px 10px;
+  }
+
+  .lineRow,
+  .lineRowReadOnly {
+    grid-template-columns: 38px 1.6fr 1fr 42px 68px 62px 72px;
+    min-width: 0;
+    break-inside: avoid;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+    gap: 4px;
+    padding: 6px 10px;
+  }
+
+  .lineRowNoMarkup {
+    grid-template-columns: 42px 1.6fr 1fr 48px 78px 76px;
+    min-width: 0;
+    break-inside: avoid;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+    gap: 4px;
+    padding: 6px 10px;
+  }
+
+  .lineHeaderCell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lineSelect {
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  .lineHeaderCell + .lineHeaderCell::before,
+  .lineCell + .lineCell::before {
+    background: #9ca3af;
+  }
+
+  /* Sort buttons render as plain text */
+  .lineHeaderButton {
+    cursor: default;
+  }
+
+  .sortIndicator {
+    display: none;
+  }
+
+  /* Summary */
+  .summary {
+    break-inside: avoid;
+    border-color: #9ca3af;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .summaryRow {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .summaryTotal {
+    background: #f3f4f6;
+    border-top-color: #9ca3af;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  /* Terms + footer */
+  .terms {
+    break-inside: avoid;
+    border-top-color: #9ca3af;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .footer {
+    break-inside: avoid;
+    border-top-color: #9ca3af;
+    color: #374151;
+    -webkit-text-fill-color: #374151;
+  }
+
+  /* Meta block */
+  .metaBlock {
+    border-color: #9ca3af;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .metaLine {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  /* Header text */
+  .blockLabel {
+    color: #1e40af;
+    -webkit-text-fill-color: #1e40af;
+  }
+
+  .blockText,
+  .blockMuted {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .sheetTitle {
+    color: #1e40af;
+    -webkit-text-fill-color: #1e40af;
+  }
+
+  .sheetTitleValue {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .amountCell {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+}

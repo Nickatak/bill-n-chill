@@ -1,0 +1,111 @@
+/**
+ * Decision stamp -- shared status badge shown below documents after a
+ * terminal decision (approved, rejected, paid).  Used on both public
+ * preview pages and internal console pages.
+ */
+
+.decisionStamp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 20px 24px;
+  border: 3px solid var(--border);
+  border-radius: 14px;
+  text-align: center;
+}
+
+.decisionStampLabel {
+  margin: 0;
+  font-size: 1.8rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.decisionStampDetail {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+.decisionStampApproved {
+  border-color: var(--status-green-border);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--status-green-bg) 30%, transparent),
+    var(--surface)
+  );
+}
+
+.decisionStampApproved .decisionStampLabel {
+  color: var(--status-green-text);
+}
+
+.decisionStampRejected {
+  border-color: var(--status-red-border);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--status-red-bg) 30%, transparent),
+    var(--surface)
+  );
+}
+
+.decisionStampRejected .decisionStampLabel {
+  color: var(--status-red-text);
+}
+
+.decisionStampPaid {
+  border-color: var(--status-green-border);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--status-green-bg) 30%, transparent),
+    var(--surface)
+  );
+}
+
+.decisionStampPaid .decisionStampLabel {
+  color: var(--status-green-text);
+}
+
+@media print {
+  .decisionStamp {
+    margin-top: 18px;
+    border-width: 2px;
+    background: none;
+    break-inside: avoid;
+  }
+
+  .decisionStampApproved {
+    border-color: #16a34a;
+  }
+
+  .decisionStampApproved .decisionStampLabel {
+    color: #16a34a !important;
+    -webkit-text-fill-color: #16a34a !important;
+  }
+
+  .decisionStampRejected {
+    border-color: #dc2626;
+  }
+
+  .decisionStampRejected .decisionStampLabel {
+    color: #dc2626 !important;
+    -webkit-text-fill-color: #dc2626 !important;
+  }
+
+  .decisionStampPaid {
+    border-color: #16a34a;
+  }
+
+  .decisionStampPaid .decisionStampLabel {
+    color: #16a34a !important;
+    -webkit-text-fill-color: #16a34a !important;
+  }
+
+  .decisionStampDetail {
+    color: #374151 !important;
+    -webkit-text-fill-color: #374151 !important;
+  }
+}

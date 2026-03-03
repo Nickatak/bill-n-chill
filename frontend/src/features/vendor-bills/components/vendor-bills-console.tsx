@@ -1483,7 +1483,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                                       <table className={styles.readOnlyTable}>
                                         <thead>
                                           <tr>
-                                            <th>Budget Line</th>
+                                            <th>Cost Code</th>
                                             <th>Amount</th>
                                             <th>Note</th>
                                           </tr>
@@ -1812,8 +1812,11 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                         <div key={`form-allocation-${index}`}>
                           <div className={`${creatorStyles.lineRow} ${styles.allocationLineRow}`}>
                             <div className={creatorStyles.lineCell}>
+                              <span className={creatorStyles.printOnly}>
+                                {selectedLineMeta?.cost_code_code || "—"}
+                              </span>
                               <select
-                                className={creatorStyles.lineSelect}
+                                className={`${creatorStyles.lineSelect} ${creatorStyles.screenOnly}`}
                                 value={selectedLineKey}
                                 onChange={(event) => {
                                   const nextLineKey = event.target.value;

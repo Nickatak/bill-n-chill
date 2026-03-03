@@ -23,6 +23,7 @@ import { formatDateDisplay } from "@/shared/date-format";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { ApiResponse, InvoiceRecord } from "../types";
 import { usePrintContext } from "@/shared/hooks/use-print-context";
+import stampStyles from "@/shared/styles/decision-stamp.module.css";
 import styles from "./invoice-public-preview.module.css";
 
 type InvoicePublicPreviewProps = {
@@ -208,10 +209,6 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
                     <span>Due date</span>
                     <span>{formatDateDisplay(invoice.due_date, "Not set")}</span>
                   </div>
-                  <div className={frameStyles.metaDetailsRow}>
-                    <span>Status</span>
-                    <span>{paymentStatusLabel}</span>
-                  </div>
                 </section>
               </>
             }
@@ -274,6 +271,11 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
             }
           />
 
+          {invoice.status === "paid" ? (
+            <div className={`${stampStyles.decisionStamp} ${stampStyles.decisionStampPaid}`}>
+              <p className={stampStyles.decisionStampLabel}>Paid</p>
+            </div>
+          ) : null}
           {showPaymentSection ? (
             <section id="invoice-payment" className={`${styles.paymentSection} ${styles.paymentCard}`}>
               <h3>Payment</h3>

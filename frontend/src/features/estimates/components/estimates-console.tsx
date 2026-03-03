@@ -16,6 +16,7 @@ import {
 } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
+import stampStyles from "@/shared/styles/decision-stamp.module.css";
 import styles from "./estimates-console.module.css";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -868,6 +869,15 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         activeFilters.includes(scopedEstimateMatch.status as EstimateStatusValue);
       if (scopedEstimateAllowed) {
         handleSelectEstimate(scopedEstimateMatch);
+        return;
+      }
+      const activeBaseline = rows.find(
+        (estimate) =>
+          estimate.is_active_financial_baseline &&
+          activeFilters.includes(estimate.status as EstimateStatusValue),
+      );
+      if (activeBaseline) {
+        handleSelectEstimate(activeBaseline);
         return;
       }
       const firstVisibleEstimate = rows.find((estimate) =>
@@ -2034,6 +2044,18 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
           onSortLineItems={handleSortLineItems}
           onSubmit={handleCreateEstimate}
         />
+        {selectedEstimate && (selectedEstimate.status === "approved" || selectedEstimate.status === "rejected") ? (
+          <div
+            className={`${stampStyles.decisionStamp} ${
+              selectedEstimate.status === "approved" ? stampStyles.decisionStampApproved
+              : stampStyles.decisionStampRejected
+            }`}
+          >
+            <p className={stampStyles.decisionStampLabel}>
+              {selectedEstimate.status === "approved" ? "Approved" : "Rejected"}
+            </p>
+          </div>
+        ) : null}
       </div>
     </section>
   );

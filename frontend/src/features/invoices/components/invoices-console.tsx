@@ -43,6 +43,7 @@ import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import styles from "./invoices-console.module.css";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import invoiceCreatorStyles from "@/shared/document-creator/invoice-creator.module.css";
+import stampStyles from "@/shared/styles/decision-stamp.module.css";
 import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
 type ProjectStatusValue = ProjectListStatusValue;
 type ProjectBudgetRecord = {
@@ -1932,26 +1933,31 @@ export function InvoicesConsole() {
                                 <option value="adjustment">Adjustment</option>
                               </select>
                               {line.lineType === "scope" ? (
-                                <select
-                                  className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                                  value={line.budgetLineId}
-                                  onChange={(event) =>
-                                    updateLineItem(line.localId, "budgetLineId", event.target.value)
-                                  }
-                                  required
-                                  disabled={workspaceIsLocked}
-                                >
-                                  <option value="">Select budget line</option>
-                                  {budgetLineGroups.map(([groupLabel, options]) => (
-                                    <optgroup key={groupLabel} label={groupLabel}>
-                                      {options.map((option) => (
-                                        <option key={option.id} value={option.id}>
-                                          {option.label}
-                                        </option>
-                                      ))}
-                                    </optgroup>
-                                  ))}
-                                </select>
+                                <div>
+                                  <span className={creatorStyles.printOnly}>
+                                    {budgetLineById.get(line.budgetLineId)?.costCodeCode || "—"}
+                                  </span>
+                                  <select
+                                    className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl} ${creatorStyles.screenOnly}`}
+                                    value={line.budgetLineId}
+                                    onChange={(event) =>
+                                      updateLineItem(line.localId, "budgetLineId", event.target.value)
+                                    }
+                                    required
+                                    disabled={workspaceIsLocked}
+                                  >
+                                    <option value="">Select cost code</option>
+                                    {budgetLineGroups.map(([groupLabel, options]) => (
+                                      <optgroup key={groupLabel} label={groupLabel}>
+                                        {options.map((option) => (
+                                          <option key={option.id} value={option.id}>
+                                            {option.label}
+                                          </option>
+                                        ))}
+                                      </optgroup>
+                                    ))}
+                                  </select>
+                                </div>
                               ) : (
                                 <input
                                   className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
@@ -2113,6 +2119,11 @@ export function InvoicesConsole() {
                   }}
                 />
               </div>
+              {workspaceSourceInvoice?.status === "paid" ? (
+                <div className={`${stampStyles.decisionStamp} ${stampStyles.decisionStampPaid}`}>
+                  <p className={stampStyles.decisionStampLabel}>Paid</p>
+                </div>
+              ) : null}
 
           </div>
         </>

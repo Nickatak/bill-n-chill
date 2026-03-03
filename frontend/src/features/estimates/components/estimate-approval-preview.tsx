@@ -20,6 +20,7 @@ import {
 import { PublicDocumentViewerShell } from "@/shared/document-viewer/public-document-viewer-shell";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
+import stampStyles from "@/shared/styles/decision-stamp.module.css";
 import styles from "./estimates-console.module.css";
 import { ApiResponse, CostCode, EstimateLineInput, EstimateRecord } from "../types";
 import { formatDateDisplay, formatDateInputFromIso } from "@/shared/date-format";
@@ -91,7 +92,6 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
   const [decisionMessage, setDecisionMessage] = useState("");
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [decisionReceiptName, setDecisionReceiptName] = useState("");
-  const [justSubmittedDecision, setJustSubmittedDecision] = useState<"approve" | "reject" | null>(null);
   const decisionSectionRef = useRef<HTMLDivElement | null>(null);
   const [decisionFlashCount, setDecisionFlashCount] = useState(0);
   const { printTimestamp } = usePrintContext();
@@ -143,25 +143,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
   const totalAmount = subtotal + taxAmount;
   const canDecide = estimate?.status === "sent";
   const hasDecision = estimate?.status === "approved" || estimate?.status === "rejected";
-  const showDecisionSection = canDecide || hasDecision;
   const decisionStatusLabel = estimateStatusLabel(estimate?.status);
-  const nonPendingDecisionMessage =
-    estimate?.status === "approved"
-      ? decisionReceiptName.trim()
-        ? `Status: ${decisionStatusLabel}. Approved by ${decisionReceiptName.trim()}.`
-        : `Status: ${decisionStatusLabel}.`
-      : `Status: ${decisionStatusLabel}.`;
-  const decisionFeedbackMessage = useMemo(() => {
-    if (!justSubmittedDecision) {
-      return null;
-    }
-    if (justSubmittedDecision === "approve") {
-      return decisionReceiptName.trim()
-        ? `Decision received: Approved. Thank you, ${decisionReceiptName.trim()}. Your response has been recorded.`
-        : "Decision received: Approved. Your response has been recorded.";
-    }
-    return "Decision received: Rejected. Your response has been recorded.";
-  }, [decisionReceiptName, justSubmittedDecision]);
   // Clear stale decision feedback when the estimate is no longer actionable.
   useEffect(() => {
     if (!canDecide) {
@@ -183,8 +165,6 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
         const nextEstimate = estimateJson.data as EstimateRecord;
         setEstimate(nextEstimate);
         setDecisionReceiptName("");
-        setJustSubmittedDecision(null);
-
         setStatusMessage("");
       } catch {
         setStatusMessage("Could not reach estimate endpoint.");
@@ -223,7 +203,6 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
 
       setEstimate(nextEstimate);
       setDecisionReceiptName(deciderName.trim());
-      setJustSubmittedDecision(decision);
       setDecisionMessage("");
       setDecisionFlashCount((c) => c + 1);
     } catch {
@@ -240,6 +219,11 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
       return "N/A";
     }
     return `${code.code} - ${code.name}`;
+  }
+
+  function findCostCodeShort(costCodeId: string): string {
+    const code = costCodes.find((candidate) => String(candidate.id) === costCodeId);
+    return code?.code || "N/A";
   }
 
   return (
@@ -341,13 +325,16 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
               </>
             }
             lineTitle="Line Items"
-            columns={["Qty", "Description", "Cost Code", "Unit", "Unit Price", "Amount"]}
+            columns={["Qty", "Desc", "Cost Code", "Unit", "Unit Price", "Amount"]}
             rows={lineItems.map((line, index) => ({
               key: line.localId,
               cells: [
                 Number(line.quantity || 0).toFixed(2),
                 line.description || "No description",
-                findCostCodeLabel(line.costCodeId),
+                <>
+                  <span className={creatorStyles.printOnly}>{findCostCodeShort(line.costCodeId)}</span>
+                  <span className={creatorStyles.screenOnly}>{findCostCodeLabel(line.costCodeId)}</span>
+                </>,
                 line.unit || "ea",
                 `$${Number(line.unitCost || 0).toFixed(2)}`,
                 `$${formatDecimal(lineTotals[index] ?? 0)}`,
@@ -396,77 +383,79 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
               </footer>
             }
           />
-          {showDecisionSection ? (
+          {canDecide ? (
             <div
               ref={decisionSectionRef}
               id="estimate-decision"
-              className={`${styles.lifecycle} ${styles.publicDecisionSection} ${
-                hasDecision && estimate?.status === "approved" ? styles.lifecycleApproved
-                : hasDecision && estimate?.status === "rejected" ? styles.lifecycleRejected
-                : ""
-              }`}
+              className={`${styles.lifecycle} ${styles.publicDecisionSection}`}
             >
               <h3>Decision</h3>
-              {canDecide && decisionMessage ? <p className={styles.inlineHint}>{decisionMessage}</p> : null}
-              {canDecide ? (
-                <>
-                  <label className={styles.lifecycleField}>
-                    Your name (optional)
-                    <input
-                      className={styles.fieldInput}
-                      value={deciderName}
-                      onChange={(event) => setDeciderName(event.target.value)}
-                      placeholder="Homeowner name"
-                      disabled={decisionSubmitting}
-                    />
-                  </label>
-                  <label className={styles.lifecycleField}>
-                    Your email (optional)
-                    <input
-                      className={styles.fieldInput}
-                      value={deciderEmail}
-                      onChange={(event) => setDeciderEmail(event.target.value)}
-                      placeholder="owner@example.com"
-                      disabled={decisionSubmitting}
-                    />
-                  </label>
-                  <label className={styles.lifecycleField}>
-                    Note (optional)
-                    <textarea
-                      className={styles.statusNote}
-                      value={decisionNote}
-                      onChange={(event) => setDecisionNote(event.target.value)}
-                      placeholder="Optional decision note."
-                      rows={3}
-                      disabled={decisionSubmitting}
-                    />
-                  </label>
-                  <div className={styles.lifecycleActions}>
-                    <button
-                      type="button"
-                      className={styles.primaryButton}
-                      onClick={() => void applyDecision("approve")}
-                      disabled={decisionSubmitting}
-                    >
-                      Approve Estimate
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.secondaryButton}
-                      onClick={() => void applyDecision("reject")}
-                      disabled={decisionSubmitting}
-                    >
-                      Reject Estimate
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <p className={`${styles.inlineHint} ${
-                  estimate?.status === "approved" ? styles.decisionFeedbackApproved
-                  : estimate?.status === "rejected" ? styles.decisionFeedbackRejected
-                  : ""
-                }`}>{decisionFeedbackMessage ?? nonPendingDecisionMessage}</p>
-              )}
+              {decisionMessage ? <p className={styles.inlineHint}>{decisionMessage}</p> : null}
+              <label className={styles.lifecycleField}>
+                Your name (optional)
+                <input
+                  className={styles.fieldInput}
+                  value={deciderName}
+                  onChange={(event) => setDeciderName(event.target.value)}
+                  placeholder="Homeowner name"
+                  disabled={decisionSubmitting}
+                />
+              </label>
+              <label className={styles.lifecycleField}>
+                Your email (optional)
+                <input
+                  className={styles.fieldInput}
+                  value={deciderEmail}
+                  onChange={(event) => setDeciderEmail(event.target.value)}
+                  placeholder="owner@example.com"
+                  disabled={decisionSubmitting}
+                />
+              </label>
+              <label className={styles.lifecycleField}>
+                Note (optional)
+                <textarea
+                  className={styles.statusNote}
+                  value={decisionNote}
+                  onChange={(event) => setDecisionNote(event.target.value)}
+                  placeholder="Optional decision note."
+                  rows={3}
+                  disabled={decisionSubmitting}
+                />
+              </label>
+              <div className={styles.lifecycleActions}>
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  onClick={() => void applyDecision("approve")}
+                  disabled={decisionSubmitting}
+                >
+                  Approve Estimate
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={() => void applyDecision("reject")}
+                  disabled={decisionSubmitting}
+                >
+                  Reject Estimate
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {hasDecision ? (
+            <div
+              ref={decisionSectionRef}
+              className={`${stampStyles.decisionStamp} ${
+                estimate?.status === "approved" ? stampStyles.decisionStampApproved
+                : stampStyles.decisionStampRejected
+              }`}
+            >
+              <p className={stampStyles.decisionStampLabel}>
+                {estimate?.status === "approved" ? "Approved" : "Rejected"}
+              </p>
+              {decisionReceiptName.trim() ? (
+                <p className={stampStyles.decisionStampDetail}>by {decisionReceiptName.trim()}</p>
+              ) : null}
             </div>
           ) : null}
         </>

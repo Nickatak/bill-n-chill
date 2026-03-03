@@ -28,6 +28,7 @@ import {
 import styles from "./change-orders-console.module.css";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import changeOrderCreatorStyles from "@/shared/document-creator/change-order-creator.module.css";
+import stampStyles from "@/shared/styles/decision-stamp.module.css";
 import { DocumentCreator } from "@/shared/document-creator";
 import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
 import {
@@ -1790,7 +1791,7 @@ export function ChangeOrdersConsole({
                               }}
                             >
                               <span className={styles.viewerRailTitle}>
-                                {coLabel(changeOrder)} {changeOrder.title}
+                                {changeOrder.title || "Untitled"} · {coLabel(changeOrder)}
                               </span>
                               <span className={styles.viewerHistoryStatusText}>{statusLabel(changeOrder.status)}</span>
                               <span
@@ -1988,7 +1989,7 @@ export function ChangeOrdersConsole({
                                       <thead>
                                         <tr>
                                           <th>Type</th>
-                                          <th>Budget line</th>
+                                          <th>Cost code</th>
                                           <th>CO line note</th>
                                           <th>CO line delta ($)</th>
                                           <th>Days delta</th>
@@ -2135,12 +2136,20 @@ export function ChangeOrdersConsole({
                       )}
                     </div>
                     <div className={creatorStyles.sheetTitle}>Change Order</div>
+                    <div className={`${creatorStyles.sheetTitleValue} ${creatorStyles.printOnly}`}>
+                      {newTitle || "Untitled"}
+                    </div>
                     <div className={creatorStyles.blockMuted}>Project #{selectedProjectId || "—"}</div>
+                    {selectedViewerEstimate ? (
+                      <div className={`${creatorStyles.blockMuted} ${creatorStyles.printOnly}`}>
+                        Estimate: {selectedViewerEstimate.title || `#${selectedViewerEstimate.id}`} v{selectedViewerEstimate.version}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
                 <div className={creatorStyles.partyGrid}>
-                  <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField}`}>
+                  <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField} ${creatorStyles.screenOnly}`}>
                     <span className={changeOrderCreatorStyles.coMetaLabel}>Title</span>
                     <input
                       className={`${creatorStyles.fieldInput} ${changeOrderCreatorStyles.coMetaInput}`}
@@ -2177,7 +2186,7 @@ export function ChangeOrdersConsole({
                   <div className={changeOrderCreatorStyles.coLineHeader}>
                     <span>Type</span>
                     <span>Adjustment reason</span>
-                    <span>Budget line</span>
+                    <span>Cost code</span>
                     <span>CO line note</span>
                     <span>Original approved line item amount ($)</span>
                     <span>CO delta ($)</span>
@@ -2228,22 +2237,27 @@ export function ChangeOrdersConsole({
                             }
                             disabled={line.lineType !== "adjustment"}
                           />
-                          <select
-                            className={creatorStyles.lineSelect}
-                            value={line.budgetLineId}
-                            onChange={(event) =>
-                              updateLine(setNewLineItems, line.localId, { budgetLineId: event.target.value })
-                            }
-                          >
-                            <option value="">
-                              {line.lineType === "adjustment" ? "Select adjustment bin" : "Select budget line"}
-                            </option>
-                            {availableBudgetLines.map((budgetLine) => (
-                              <option key={budgetLine.id} value={budgetLine.id}>
-                                #{budgetLine.id} {budgetLine.cost_code_code} - {budgetLine.description}
+                          <div>
+                            <span className={creatorStyles.printOnly}>
+                              {availableBudgetLines.find((b) => String(b.id) === line.budgetLineId)?.cost_code_code || "—"}
+                            </span>
+                            <select
+                              className={`${creatorStyles.lineSelect} ${creatorStyles.screenOnly}`}
+                              value={line.budgetLineId}
+                              onChange={(event) =>
+                                updateLine(setNewLineItems, line.localId, { budgetLineId: event.target.value })
+                              }
+                            >
+                              <option value="">
+                                {line.lineType === "adjustment" ? "Select adjustment bin" : "Select cost code"}
                               </option>
-                            ))}
-                          </select>
+                              {availableBudgetLines.map((budgetLine) => (
+                                <option key={budgetLine.id} value={budgetLine.id}>
+                                  #{budgetLine.id} {budgetLine.cost_code_code} - {budgetLine.description}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                           <input
                             className={creatorStyles.lineInput}
                             value={line.description}
@@ -2414,12 +2428,26 @@ export function ChangeOrdersConsole({
                         "Logo"
                       )}
                     </div>
-                    <div className={creatorStyles.sheetTitle}>Change Order Revision</div>
+                    <div className={`${creatorStyles.sheetTitle} ${creatorStyles.screenOnly}`}>Change Order Revision</div>
+                    <div className={`${creatorStyles.sheetTitle} ${creatorStyles.printOnly}`}>Change Order</div>
+                    <div className={`${creatorStyles.sheetTitleValue} ${creatorStyles.printOnly}`}>
+                      {editTitle || "Untitled"}
+                    </div>
+                    {(() => {
+                      const originEst = selectedChangeOrder?.origin_estimate
+                        ? projectEstimates.find((e) => e.id === selectedChangeOrder.origin_estimate)
+                        : null;
+                      return originEst ? (
+                        <div className={`${creatorStyles.blockMuted} ${creatorStyles.printOnly}`}>
+                          Estimate: {originEst.title || `#${originEst.id}`} v{originEst.version}
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                 </div>
 
                 <div className={creatorStyles.partyGrid}>
-                  <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField}`}>
+                  <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField} ${creatorStyles.screenOnly}`}>
                     <span className={changeOrderCreatorStyles.coMetaLabel}>Title</span>
                     <input
                       className={`${creatorStyles.fieldInput} ${changeOrderCreatorStyles.coMetaInput} ${changeOrderCreatorStyles.lockableControl}`}
@@ -2454,7 +2482,7 @@ export function ChangeOrdersConsole({
                   <div className={changeOrderCreatorStyles.coLineHeader}>
                     <span>Type</span>
                     <span>Adjustment reason</span>
-                    <span>Budget line</span>
+                    <span>Cost code</span>
                     <span>CO line note</span>
                     <span>Original approved line item amount ($)</span>
                     <span>CO delta ($)</span>
@@ -2506,23 +2534,28 @@ export function ChangeOrdersConsole({
                             }
                             disabled={!isSelectedChangeOrderEditable || line.lineType !== "adjustment"}
                           />
-                          <select
-                            className={`${creatorStyles.lineSelect} ${changeOrderCreatorStyles.lockableControl}`}
-                            value={line.budgetLineId}
-                            onChange={(event) =>
-                              updateLine(setEditLineItems, line.localId, { budgetLineId: event.target.value })
-                            }
-                            disabled={!isSelectedChangeOrderEditable}
-                          >
-                            <option value="">
-                              {line.lineType === "adjustment" ? "Select adjustment bin" : "Select budget line"}
-                            </option>
-                            {availableBudgetLines.map((budgetLine) => (
-                              <option key={budgetLine.id} value={budgetLine.id}>
-                                #{budgetLine.id} {budgetLine.cost_code_code} - {budgetLine.description}
+                          <div>
+                            <span className={creatorStyles.printOnly}>
+                              {availableBudgetLines.find((b) => String(b.id) === line.budgetLineId)?.cost_code_code || "—"}
+                            </span>
+                            <select
+                              className={`${creatorStyles.lineSelect} ${changeOrderCreatorStyles.lockableControl} ${creatorStyles.screenOnly}`}
+                              value={line.budgetLineId}
+                              onChange={(event) =>
+                                updateLine(setEditLineItems, line.localId, { budgetLineId: event.target.value })
+                              }
+                              disabled={!isSelectedChangeOrderEditable}
+                            >
+                              <option value="">
+                                {line.lineType === "adjustment" ? "Select adjustment bin" : "Select cost code"}
                               </option>
-                            ))}
-                          </select>
+                              {availableBudgetLines.map((budgetLine) => (
+                                <option key={budgetLine.id} value={budgetLine.id}>
+                                  #{budgetLine.id} {budgetLine.cost_code_code} - {budgetLine.description}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                           <input
                             className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
                             value={line.description}
@@ -2667,6 +2700,18 @@ export function ChangeOrdersConsole({
             ),
           }}
         />
+        {selectedChangeOrder && (selectedChangeOrder.status === "approved" || selectedChangeOrder.status === "rejected") ? (
+          <div
+            className={`${stampStyles.decisionStamp} ${
+              selectedChangeOrder.status === "approved" ? stampStyles.decisionStampApproved
+              : stampStyles.decisionStampRejected
+            }`}
+          >
+            <p className={stampStyles.decisionStampLabel}>
+              {selectedChangeOrder.status === "approved" ? "Approved" : "Rejected"}
+            </p>
+          </div>
+        ) : null}
         </div>
       ) : null}
     </section>
