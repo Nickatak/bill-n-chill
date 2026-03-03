@@ -38,11 +38,12 @@ class Invoice(models.Model):
     # `Status.SENT` is in `ALLOWED_STATUS_TRANSITIONS[Status.DRAFT]`.
     #
     # Terminal states: paid, void (no outbound transitions).
-    # partially_paid can only advance to paid (not back to sent, not voidable).
+    # partially_paid can advance to paid, or revert to sent when all
+    # allocations are removed (e.g. payment voided).
     ALLOWED_STATUS_TRANSITIONS = {
         Status.DRAFT: {Status.SENT, Status.VOID},
         Status.SENT: {Status.PARTIALLY_PAID, Status.PAID, Status.VOID},
-        Status.PARTIALLY_PAID: {Status.PAID},
+        Status.PARTIALLY_PAID: {Status.PAID, Status.SENT},
         Status.PAID: set(),
         Status.VOID: set(),
     }

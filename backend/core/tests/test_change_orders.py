@@ -75,11 +75,11 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(response.status_code, 200)
         return OrganizationMembership.objects.select_related("organization").get(user=self.user)
 
-    def _create_estimate(self, *, project_id: int, cost_code_id: int, token: str):
+    def _create_estimate(self, *, project_id: int, cost_code_id: int, token: str, title: str = "Budget Seed Estimate"):
         response = self.client.post(
             f"/api/v1/projects/{project_id}/estimates/",
             data={
-                "title": "Budget Seed Estimate",
+                "title": title,
                 "line_items": [
                     {
                         "cost_code": cost_code_id,
@@ -97,11 +97,12 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(response.status_code, 201)
         return response.json()["data"]["id"]
 
-    def _create_estimate_family(self):
+    def _create_estimate_family(self, *, title: str = "Budget Seed Estimate"):
         estimate_id = self._create_estimate(
             project_id=self.project.id,
             cost_code_id=self.cost_code.id,
             token=self.token.key,
+            title=title,
         )
         self._approve_estimate(estimate_id=estimate_id, token=self.token.key)
         self.last_approved_estimate_by_project[self.project.id] = estimate_id
@@ -539,7 +540,7 @@ class ChangeOrderTests(TestCase):
             cost_code_id=self.cost_code.id,
             token=self.token.key,
         )
-        estimate = self._create_estimate_family()
+        estimate = self._create_estimate_family(title="CO Origin Estimate")
 
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
@@ -590,6 +591,7 @@ class ChangeOrderTests(TestCase):
             project_id=self.project.id,
             cost_code_id=self.cost_code.id,
             token=self.token.key,
+            title="Draft Only Estimate",
         )
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
@@ -673,7 +675,7 @@ class ChangeOrderTests(TestCase):
             cost_code_id=self.cost_code.id,
             token=self.token.key,
         )
-        estimate = self._create_estimate_family()
+        estimate = self._create_estimate_family(title="Clone Revision Estimate")
         create = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
             data={
@@ -774,7 +776,7 @@ class ChangeOrderTests(TestCase):
         )
         change_order_id = self._create_change_order()
 
-        newer_estimate = self._create_estimate_family()
+        newer_estimate = self._create_estimate_family(title="Newer Origin Estimate")
         changed = self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
             data={"origin_estimate": newer_estimate.id},

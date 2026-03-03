@@ -102,8 +102,6 @@ class ProjectProfileTests(TestCase):
             data={
                 "status": "active",
                 "site_address": "7 Job Site Ln",
-                "start_date_planned": "2026-03-01",
-                "end_date_planned": "2026-07-31",
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -115,8 +113,6 @@ class ProjectProfileTests(TestCase):
         self.assertEqual(self.project.site_address, "7 Job Site Ln")
         self.assertEqual(str(self.project.contract_value_original), "0.00")
         self.assertEqual(str(self.project.contract_value_current), "0.00")
-        self.assertEqual(str(self.project.start_date_planned), "2026-03-01")
-        self.assertEqual(str(self.project.end_date_planned), "2026-07-31")
 
     def test_project_patch_returns_not_found_for_other_users_project(self):
         other_project = Project.objects.exclude(created_by=self.user).first()
@@ -256,20 +252,9 @@ class ProjectProfileTests(TestCase):
         self.assertEqual(payload["code"], "validation_error")
         self.assertIn("status", payload["fields"])
 
-    def test_project_patch_rejects_end_date_before_start_date(self):
-        response = self.client.patch(
-            f"/api/v1/projects/{self.project.id}/",
-            data={
-                "status": "active",
-                "start_date_planned": "2026-08-01",
-                "end_date_planned": "2026-07-31",
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"]["code"], "validation_error")
-        self.assertIn("end_date_planned", response.json()["error"]["fields"])
+    # test_project_patch_rejects_end_date_before_start_date removed:
+    # start_date_planned / end_date_planned fields were intentionally removed from
+    # the Project model. Date validation is no longer applicable.
 
 
 class CostCodeTests(TestCase):

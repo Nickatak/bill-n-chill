@@ -26,9 +26,14 @@ export type NavRoute = {
  */
 export const workflowRoutes: NavRoute[] = [
   {
+    href: "/",
+    label: "Dashboard",
+    exact: ["/"],
+  },
+  {
     href: "/intake/quick-add",
     label: "1 Intake",
-    exact: ["/", "/intake/quick-add"],
+    exact: ["/intake/quick-add"],
   },
   {
     href: "/customers",
@@ -49,7 +54,7 @@ export const workflowRoutes: NavRoute[] = [
   },
   {
     href: "/financials-auditing",
-    label: "5 Financials & Accounting (WIP)",
+    label: "5 Financials",
     exact: ["/financials-auditing"],
   },
 ];

@@ -1,14 +1,15 @@
 "use client";
 
 import type { HealthResult } from "@/shared/api/health";
-import { QuickAddConsole } from "@/features/intake";
+import { DashboardConsole } from "@/features/dashboard";
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { HomeAuthConsole } from "@/features/session/components/home-auth-console";
 import { useSessionAuthorization } from "@/features/session/session-authorization";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import homeStyles from "./page.module.css";
-import quickAddStyles from "./intake/quick-add/page.module.css";
+import shell from "@/shared/shell/page-shell.module.css";
+import { PageCard, PageShell } from "@/shared/shell";
 
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
@@ -70,13 +71,20 @@ export function HomeRouteContent({ health }: HomeRouteContentProps) {
     }
 
     return (
-      <div className={quickAddStyles.page}>
-        <main className={quickAddStyles.main}>
-          <section className={quickAddStyles.card}>
-            <QuickAddConsole />
-          </section>
-        </main>
-      </div>
+      <PageShell>
+        <header className={shell.hero}>
+          <div className={shell.heroTop}>
+            <p className={shell.eyebrow}>Dashboard</p>
+            <h1 className={shell.title}>Dashboard</h1>
+            <p className={shell.copy}>
+              Portfolio health, items that need attention, and contract impact at a glance.
+            </p>
+          </div>
+        </header>
+        <PageCard>
+          <DashboardConsole />
+        </PageCard>
+      </PageShell>
     );
   }
 

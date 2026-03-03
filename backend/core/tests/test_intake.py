@@ -142,29 +142,9 @@ class CustomerIntakeQuickAddTests(TestCase):
         self.assertEqual(payload["error"]["code"], "duplicate_detected")
         self.assertEqual(payload["data"]["duplicate_candidates"][0]["id"], existing.id)
 
-    def test_quick_add_create_anyway_allows_duplicate_customer_creation(self):
-        Customer.objects.create(
-            display_name="Existing Customer",
-            phone="555-0100",
-            billing_address="12 Existing St",
-            email="existing@example.com",
-            created_by=self.user,
-        )
-        response = self.client.post(
-            "/api/v1/customers/quick-add/",
-            data={
-                "full_name": "Jane Doe",
-                "phone": "555-0100",
-                "project_address": "123 Main St",
-                "email": "existing@example.com",
-                "duplicate_resolution": "create_anyway",
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(Customer.objects.count(), 2)
-        self.assertEqual(response.json()["meta"]["duplicate_resolution"], "create_anyway")
+    # test_quick_add_create_anyway_allows_duplicate_customer_creation removed:
+    # create_anyway resolution was intentionally removed. Duplicate contacts are
+    # now disallowed; only use_existing is supported for duplicate resolution.
 
     def test_quick_add_use_existing_reuses_customer(self):
         existing = Customer.objects.create(

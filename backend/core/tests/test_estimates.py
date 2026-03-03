@@ -1222,7 +1222,8 @@ class EstimateTests(TestCase):
         self.assertEqual(convert.json()["meta"]["conversion_status"], "already_converted")
         self.assertEqual(Budget.objects.filter(source_estimate_id=estimate_id).count(), 1)
 
-    def test_estimate_approval_with_existing_active_budget_requires_explicit_supersede(self):
+    def test_estimate_approval_with_existing_active_budget_auto_supersedes(self):
+        """Approving a second estimate auto-supersedes the first budget."""
         first_create = self.client.post(
             f"/api/v1/projects/{self.project.id}/estimates/",
             data={
@@ -1294,17 +1295,14 @@ class EstimateTests(TestCase):
         self.assertEqual(second_approved.status_code, 200)
         self.assertEqual(
             second_approved.json()["meta"]["budget_conversion_status"],
-            "requires_supersede",
+            "superseded_and_converted",
         )
-        self.assertEqual(
-            second_approved.json()["meta"]["active_financial_estimate_id"],
-            first_estimate_id,
-        )
-        self.assertTrue(second_approved.json()["meta"]["activation_required"])
 
-        self.assertEqual(Budget.objects.filter(project=self.project).count(), 1)
+        self.assertEqual(Budget.objects.filter(project=self.project).count(), 2)
         active_budget = Budget.objects.get(project=self.project, status=Budget.Status.ACTIVE)
-        self.assertEqual(active_budget.source_estimate_id, first_estimate_id)
+        self.assertEqual(active_budget.source_estimate_id, second_estimate_id)
+        superseded_budget = Budget.objects.get(project=self.project, status=Budget.Status.SUPERSEDED)
+        self.assertEqual(superseded_budget.source_estimate_id, first_estimate_id)
 
     def test_estimate_patch_approval_promotes_project_to_active_and_records_audit_event(self):
         create = self.client.post(

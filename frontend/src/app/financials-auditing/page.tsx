@@ -13,29 +13,27 @@ export default function FinancialsAuditingPage() {
     <PageShell>
       <header className={shell.hero}>
         <div className={shell.heroTop}>
-          <p className={shell.eyebrow}>Financials</p>
+          <p className={shell.eyebrow}>Accounting</p>
           <h1 className={shell.title}>Financials & Accounting</h1>
           <p className={shell.copy}>
-            Operations workspace for project-level financial truth, immutable audit events, and
-            accounting sync visibility.
+            Payments, audit trail exports, and accounting sync management.
           </p>
         </div>
         <div className={shell.heroMetaRow}>
-          <span className={shell.metaPill}>AR + AP visibility</span>
-          <span className={shell.metaPill}>Audit + sync traceability</span>
-          <span className={shell.metaPill}>Accounting export staging</span>
+          <span className={shell.metaPill}>Payments</span>
+          <span className={shell.metaPill}>Audit export</span>
+          <span className={shell.metaPill}>Accounting sync</span>
         </div>
       </header>
       <PageCard>
-        <FinancialsAuditingConsole />
-      </PageCard>
-      <PageCard muted>
         <h2 className={shell.sectionTitle}>Payments</h2>
         <p className={shell.sectionCopy}>
-          AR receipts and AP disbursements live here as part of the accounting surface for
-          allocation, reconciliation, and downstream sync.
+          AR receipts and AP disbursements — record payments and allocate to invoices or vendor bills.
         </p>
         <PaymentsConsole />
+      </PageCard>
+      <PageCard muted>
+        <FinancialsAuditingConsole />
       </PageCard>
     </PageShell>
   );

@@ -602,7 +602,7 @@ export function ProjectsConsole() {
                     </span>
                   </div>
                   <div className={styles.node}>
-                    <Link href={`/projects/${selectedProject.id}/audit-trail`}>Audit Trail (WIP)</Link>
+                    <Link href={`/projects/${selectedProject.id}/audit-trail`}>Audit Trail</Link>
                   </div>
                 </div>
                 <div className={styles.branch}>
@@ -613,7 +613,7 @@ export function ProjectsConsole() {
                     </div>
                     <div className={styles.node}>
                       <Link href={`/financials-auditing?project=${selectedProject.id}`}>
-                        Payments In (AR) (WIP)
+                        Payments In (AR)
                       </Link>
                     </div>
                   </div>
@@ -624,7 +624,7 @@ export function ProjectsConsole() {
                     </div>
                     <div className={styles.node}>
                       <Link href={`/financials-auditing?project=${selectedProject.id}`}>
-                        Payments Out (AP) (WIP)
+                        Payments Out (AP)
                       </Link>
                     </div>
                   </div>

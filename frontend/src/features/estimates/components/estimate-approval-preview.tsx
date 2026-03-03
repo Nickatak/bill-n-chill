@@ -23,6 +23,11 @@ import creatorStyles from "@/shared/document-creator/creator-foundation.module.c
 import stampStyles from "@/shared/styles/decision-stamp.module.css";
 import styles from "./estimates-console.module.css";
 import { ApiResponse, CostCode, EstimateLineInput, EstimateRecord } from "../types";
+import {
+  estimateStatusLabel,
+  mapLineCostCodes,
+  mapPublicEstimateLineItems,
+} from "../helpers";
 import { formatDateDisplay, formatDateInputFromIso } from "@/shared/date-format";
 import { formatDecimal } from "@/shared/money-format";
 import { usePrintContext } from "@/shared/hooks/use-print-context";
@@ -30,57 +35,6 @@ import { usePrintContext } from "@/shared/hooks/use-print-context";
 type EstimateApprovalPreviewProps = {
   publicToken: string;
 };
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: "Draft",
-  sent: "Sent",
-  approved: "Approved",
-  rejected: "Rejected",
-  archived: "Archived",
-  void: "Void",
-};
-
-/** Convert API line-item records into form-compatible input shapes. */
-function mapLineItemsToInputs(estimate: EstimateRecord | null): EstimateLineInput[] {
-  const items = estimate?.line_items ?? [];
-  if (!items.length) {
-    return [];
-  }
-  return items.map((item, index) => ({
-    localId: index + 1,
-    costCodeId: String(item.cost_code ?? ""),
-    description: item.description || "",
-    quantity: String(item.quantity ?? ""),
-    unit: item.unit || "ea",
-    unitCost: String(item.unit_cost ?? ""),
-    markupPercent: String(item.markup_percent ?? ""),
-  }));
-}
-
-/** Extract a deduplicated cost-code lookup list from inline line-item data. */
-function mapLineCostCodes(estimate: EstimateRecord | null): CostCode[] {
-  const items = estimate?.line_items ?? [];
-  const byId = new Map<number, CostCode>();
-  for (const item of items) {
-    const costCodeId = Number(item.cost_code);
-    if (!Number.isFinite(costCodeId)) {
-      continue;
-    }
-    byId.set(costCodeId, {
-      id: costCodeId,
-      code: item.cost_code_code || `CC-${costCodeId}`,
-      name: item.cost_code_name || "Cost code",
-      is_active: true,
-    });
-  }
-  return Array.from(byId.values());
-}
-
-/** Resolve a status value to its human-readable label, falling back gracefully. */
-function estimateStatusLabel(status?: string): string {
-  const normalized = (status || "").trim();
-  return STATUS_LABELS[normalized] || normalized || "Unknown";
-}
 
 /** Renders the public estimate preview and customer decision form. */
 export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreviewProps) {
@@ -109,7 +63,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
   }, [decisionFlashCount]);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
-  const lineItems = useMemo(() => mapLineItemsToInputs(estimate), [estimate]);
+  const lineItems = useMemo(() => mapPublicEstimateLineItems(estimate), [estimate]);
   const costCodes = useMemo(() => mapLineCostCodes(estimate), [estimate]);
   const estimateDate = formatDateInputFromIso(estimate?.created_at);
   const validThrough = estimate?.valid_through ?? "";

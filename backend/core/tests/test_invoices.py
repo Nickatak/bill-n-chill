@@ -995,8 +995,8 @@ class InvoiceTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("transition", response.json()["error"]["message"].lower())
 
-    def test_invoice_partially_paid_cannot_transition_back_to_sent(self):
-        """Once partially paid, an invoice cannot go back to sent."""
+    def test_invoice_partially_paid_can_revert_to_sent(self):
+        """partially_paid -> sent is allowed for payment void reversal."""
         invoice_id = self._create_invoice()
         self.client.patch(
             f"/api/v1/invoices/{invoice_id}/",
@@ -1010,14 +1010,14 @@ class InvoiceTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
+        # partially_paid -> sent is allowed (e.g. payment void reversal)
         response = self.client.patch(
             f"/api/v1/invoices/{invoice_id}/",
             data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("transition", response.json()["error"]["message"].lower())
+        self.assertEqual(response.status_code, 200)
 
     def test_invoice_overdue_is_not_a_valid_status(self):
         """Overdue was removed from the status enum — it is now a computed condition."""
