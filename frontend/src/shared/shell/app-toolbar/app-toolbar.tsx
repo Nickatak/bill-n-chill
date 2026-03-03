@@ -8,7 +8,7 @@
 "use client";
 
 import { isPublicDocumentRoute } from "@/features/session/public-routes";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { clearClientSession } from "@/features/session/client-session";
 import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import Link from "next/link";
@@ -140,17 +140,25 @@ export function AppToolbar() {
             Ops / Meta
           </summary>
           <div className={styles.menuList} role="menu" aria-label="Ops and metadata tools">
-            {opsMetaRoutes.map((route) => (
-              <Link
-                key={route.href}
-                href={route.href}
-                className={`${styles.menuItem} ${isRouteActive(pathname, route) ? styles.menuItemActive : ""}`}
-                role="menuitem"
-                onClick={closeMenus}
-              >
-                {route.label}
-              </Link>
-            ))}
+            {opsMetaRoutes.map((route, index) => {
+              const showSection =
+                route.section && (index === 0 || opsMetaRoutes[index - 1].section !== route.section);
+              return (
+                <Fragment key={route.href}>
+                  {showSection ? (
+                    <span className={styles.menuSectionLabel}>{route.section}</span>
+                  ) : null}
+                  <Link
+                    href={route.href}
+                    className={`${styles.menuItem} ${isRouteActive(pathname, route) ? styles.menuItemActive : ""}`}
+                    role="menuitem"
+                    onClick={closeMenus}
+                  >
+                    {route.label}
+                  </Link>
+                </Fragment>
+              );
+            })}
           </div>
         </details>
       ) : null}

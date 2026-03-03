@@ -16,6 +16,8 @@ export type NavRoute = {
   exact?: string[];
   /** Pathname prefixes that count as an active match. */
   startsWith?: string[];
+  /** Dropdown section label. Routes with the same section are grouped under a heading. */
+  section?: string;
 };
 
 /**
@@ -59,9 +61,9 @@ export const workflowRoutes: NavRoute[] = [
  */
 export const opsMetaRoutes: NavRoute[] = [
   { href: "/customers", label: "Customers", exact: ["/customers"] },
-  { href: "/cost-codes", label: "Cost Codes", exact: ["/cost-codes"] },
-  { href: "/vendors", label: "Vendors", exact: ["/vendors"] },
-  { href: "/ops/meta/help", label: "Help (WIP)", exact: ["/ops/meta/help"] },
+  { href: "/cost-codes", label: "Cost Codes", exact: ["/cost-codes"], section: "Management" },
+  { href: "/vendors", label: "Vendors", exact: ["/vendors"], section: "Management" },
+  { href: "/ops/meta/help", label: "Get Started", exact: ["/ops/meta/help"] },
 ];
 
 /**

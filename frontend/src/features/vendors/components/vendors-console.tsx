@@ -14,8 +14,9 @@ import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { ApiResponse, VendorCsvImportResult, VendorPayload, VendorRecord } from "../types";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
+import segmented from "../../../shared/styles/segmented.module.css";
 import styles from "./vendors-console.module.css";
-type ActivityFilter = "all" | "active" | "inactive";
+type ActivityFilter = "active" | "all";
 
 /** Full CRUD console for vendor records with search, pagination, and CSV import. */
 export function VendorsConsole() {
@@ -23,7 +24,7 @@ export function VendorsConsole() {
 
   const [rows, setRows] = useState<VendorRecord[]>([]);
   const [selectedId, setSelectedId] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const { message: statusMessage, tone: statusTone, setNeutral: setNeutralStatus, setSuccess: setSuccessStatus, setError: setErrorStatus } = useStatusMessage();
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("active");
   const [includeCanonical, setIncludeCanonical] = useState(false);
@@ -43,6 +44,7 @@ export function VendorsConsole() {
     "name,vendor_type,email,phone,tax_id_last4,notes\n",
   );
   const [importResult, setImportResult] = useState<VendorCsvImportResult | null>(null);
+  const [importExpanded, setImportExpanded] = useState(false);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
 
@@ -57,19 +59,21 @@ export function VendorsConsole() {
     [rows],
   );
   const filteredRows = useMemo(() => {
+    const needle = searchTerm.trim().toLowerCase();
     return orderedRows.filter((row) => {
       if (!includeCanonical && row.is_canonical) {
         return false;
       }
-      if (activityFilter === "active") {
-        return row.is_active;
+      if (activityFilter === "active" && !row.is_active) {
+        return false;
       }
-      if (activityFilter === "inactive") {
-        return !row.is_active;
+      if (!needle) {
+        return true;
       }
-      return true;
+      const haystack = `${row.id} ${row.name} ${row.email} ${row.phone} ${row.tax_id_last4}`.toLowerCase();
+      return haystack.includes(needle);
     });
-  }, [activityFilter, includeCanonical, orderedRows]);
+  }, [activityFilter, includeCanonical, orderedRows, searchTerm]);
   const { pageItems: pagedRows, currentPage: currentPageSafe, totalPages, prevPage, nextPage, resetPage, setCurrentPage } = usePagination(filteredRows, 6);
 
   const selectedVendor = useMemo(
@@ -112,8 +116,8 @@ export function VendorsConsole() {
     setIsActive(item.is_active);
   }
 
-  /** Fetch vendor list from the API, optionally with a search query override. */
-  async function loadVendors(queryOverride?: string) {
+  /** Fetch all vendor records from the API. Filtering is handled client-side. */
+  async function loadVendors() {
     if (!token) {
       setErrorStatus("No shared session found. Go to / and login first.");
       return;
@@ -121,9 +125,7 @@ export function VendorsConsole() {
     setNeutralStatus("Loading vendors...");
 
     try {
-      const effectiveQuery = (typeof queryOverride === "string" ? queryOverride : searchQuery).trim();
-      const query = effectiveQuery ? `?q=${encodeURIComponent(effectiveQuery)}` : "";
-      const response = await fetch(`${normalizedBaseUrl}/vendors/${query}`, {
+      const response = await fetch(`${normalizedBaseUrl}/vendors/`, {
         headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
@@ -306,7 +308,7 @@ export function VendorsConsole() {
   // Reset to page 1 when filters change so the user always sees the first matching results
   useEffect(() => {
     resetPage();
-  }, [activityFilter, includeCanonical, resetPage]);
+  }, [activityFilter, includeCanonical, searchTerm, resetPage]);
 
   return (
     <section className={styles.console}>
@@ -350,57 +352,39 @@ export function VendorsConsole() {
                 {filteredRows.length}/{rows.length}
               </span>
             </div>
-            <p className={styles.panelIntro}>
-              Search vendors by name/email/phone/tax id, then select one for editing.
-            </p>
-
-            <div className={styles.filters}>
-              <label className={styles.field}>
-                <span>Search query</span>
-                <input
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="name, email, phone, or tax id"
-                />
-              </label>
-              <label className={styles.field}>
-                <span>Activity</span>
-                <select
-                  value={activityFilter}
-                  onChange={(event) => setActivityFilter(event.target.value as ActivityFilter)}
+            <div className={styles.filterRow}>
+              <input
+                className={styles.searchInput}
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Search by name, email, phone, or tax ID"
+                aria-label="Search vendors"
+              />
+              <div className={segmented.group} role="group" aria-label="Vendor activity filter">
+                <button
+                  type="button"
+                  className={`${segmented.option} ${activityFilter === "active" ? segmented.optionActive : ""}`}
+                  onClick={() => setActivityFilter("active")}
                 >
-                  <option value="all">All</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </label>
-              <label className={styles.field}>
-                <span>Canonical</span>
-                <select
-                  value={includeCanonical ? "include" : "exclude"}
-                  onChange={(event) => setIncludeCanonical(event.target.value === "include")}
-                >
-                  <option value="exclude">Hide canonical</option>
-                  <option value="include">Include canonical</option>
-                </select>
-              </label>
-              <div className={styles.filterActions}>
-                <button type="button" className={styles.secondaryButton} onClick={() => void loadVendors()}>
-                  Run Search
+                  Active
                 </button>
                 <button
                   type="button"
-                  className={styles.ghostButton}
-                  onClick={() => {
-                    setSearchQuery("");
-                    setActivityFilter("active");
-                    setIncludeCanonical(false);
-                    void loadVendors("");
-                  }}
+                  className={`${segmented.option} ${activityFilter === "all" ? segmented.optionActive : ""}`}
+                  onClick={() => setActivityFilter("all")}
                 >
-                  Reset
+                  All
                 </button>
               </div>
+              <button
+                type="button"
+                className={`${styles.filterPill} ${includeCanonical ? styles.filterPillActive : ""}`}
+                onClick={() => setIncludeCanonical(!includeCanonical)}
+                aria-pressed={includeCanonical}
+              >
+                Canonical
+                <span className={styles.filterPillCount}>{canonicalCount}</span>
+              </button>
             </div>
 
             {filteredRows.length > 0 ? (
@@ -486,7 +470,7 @@ export function VendorsConsole() {
             ) : rows.length > 0 ? (
               <p className={styles.emptyState}>No vendors match the current filter.</p>
             ) : (
-              <p className={styles.emptyState}>No vendors loaded yet.</p>
+              <p className={styles.emptyState}>No vendors yet. Create one using the form, or import via CSV.</p>
             )}
 
             {duplicateCandidates.length > 0 ? (
@@ -514,21 +498,15 @@ export function VendorsConsole() {
               onSubmit={handleSubmit}
             >
               <div className={styles.panelHeader}>
-                <h3 className={styles.panelTitle}>Vendor Details</h3>
-                <div className={styles.panelActions}>
-                  <span className={styles.countBadge}>
-                    {selectedVendor ? `Editing #${selectedVendor.id}` : "Create mode"}
-                  </span>
-                  <button type="button" className={styles.ghostButton} onClick={startCreateMode}>
-                    Add New Vendor
+                <h3 className={styles.panelTitle}>
+                  {selectedVendor ? `Edit: ${selectedVendor.name}` : "New Vendor"}
+                </h3>
+                {selectedVendor ? (
+                  <button type="button" className={styles.newButton} onClick={startCreateMode}>
+                    + New
                   </button>
-                </div>
+                ) : null}
               </div>
-              <p className={styles.panelIntro}>
-                {selectedVendor
-                  ? "Update the selected vendor record and save changes."
-                  : "Create a new vendor, or select a row from the table to edit existing data."}
-              </p>
               {selectedVendorIsCanonical ? (
                 <p className={styles.panelIntro}>Canonical vendors are read-only and cannot be edited.</p>
               ) : null}
@@ -627,39 +605,57 @@ export function VendorsConsole() {
             </form>
 
             <section className={styles.panel}>
-              <div className={styles.panelHeader}>
+              <button
+                type="button"
+                className={styles.importToggle}
+                onClick={() => setImportExpanded((current) => !current)}
+                aria-expanded={importExpanded}
+              >
                 <h3 className={styles.panelTitle}>CSV Import</h3>
-              </div>
-              <p className={styles.panelIntro}>
-                Headers: <code>name,vendor_type,email,phone,tax_id_last4,notes</code>
-              </p>
-              <label className={styles.field}>
-                <span>CSV text</span>
-                <textarea
-                  value={importCsvText}
-                  onChange={(event) => setImportCsvText(event.target.value)}
-                  rows={7}
-                />
-              </label>
-              <div className={styles.formActions}>
-                <button type="button" className={styles.secondaryButton} onClick={() => void runCsvImport(true)}>
-                  Preview Import
-                </button>
-                <button type="button" className={styles.primaryButton} onClick={() => void runCsvImport(false)}>
-                  Apply Import
-                </button>
-              </div>
-              {importResult ? (
-                <label className={styles.field}>
-                  <span>Import result</span>
-                  <textarea
-                    readOnly
-                    rows={Math.min(10, importResult.rows.length + 2)}
-                    value={importResult.rows
-                      .map((row) => `row ${row.row_number} | ${row.status} | ${row.name || ""} | ${row.message}`)
-                      .join("\n")}
-                  />
-                </label>
+                <span className={styles.importToggleArrow}>{importExpanded ? "\u25B2" : "\u25BC"}</span>
+              </button>
+              {importExpanded ? (
+                <>
+                  <p className={styles.importHint}>
+                    Headers: name,vendor_type,email,phone,tax_id_last4,notes. Existing names update; new names are created as active.
+                  </p>
+                  <label className={styles.field}>
+                    <span>CSV text</span>
+                    <textarea
+                      value={importCsvText}
+                      onChange={(event) => setImportCsvText(event.target.value)}
+                      rows={7}
+                    />
+                  </label>
+                  <div className={styles.formActions}>
+                    <button type="button" className={styles.secondaryButton} onClick={() => void runCsvImport(true)}>
+                      Preview
+                    </button>
+                    <button type="button" className={styles.primaryButton} onClick={() => void runCsvImport(false)}>
+                      Apply
+                    </button>
+                  </div>
+                  {importResult ? (
+                    <div className={styles.importResult}>
+                      <p className={styles.importHint}>
+                        Rows: {importResult.total_rows} | Create: {importResult.created_count} | Update:{" "}
+                        {importResult.updated_count} | Errors: {importResult.error_count}
+                      </p>
+                      <ul className={styles.resultRows}>
+                        {importResult.rows.map((row) => (
+                          <li
+                            key={`${row.row_number}-${row.name ?? "none"}-${row.status}`}
+                            className={`${styles.resultRow} ${
+                              row.status === "error" ? styles.resultRowError : ""
+                            }`}
+                          >
+                            row {row.row_number} | {row.status} | {row.name || "(no name)"}: {row.message}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </>
               ) : null}
             </section>
           </div>

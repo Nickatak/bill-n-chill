@@ -1,80 +1,114 @@
-.jobGrid {
-  margin-top: var(--space-md);
+/* Onboarding checklist styles */
+
+.checklist {
   display: grid;
-  gap: var(--space-md);
+  gap: 14px;
 }
 
-.jobCard {
-  border: 1px solid #c7d6ea;
-  border-radius: var(--radius-lg);
-  background: #f8fbff;
-  padding: var(--space-md);
+/* ── Progress bar ─────────────────────────────────────────────── */
+
+.progressBar {
+  height: 6px;
+  background: var(--surface-secondary);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+  transition: width 400ms ease;
+}
+
+.progressLabel {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* ── Step list ────────────────────────────────────────────────── */
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
   display: grid;
   gap: 10px;
 }
 
-.jobTitle {
+.step {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 12px;
+  align-items: start;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  background: var(--surface);
+  transition: border-color 200ms ease, background 200ms ease;
+}
+
+.stepCompleted {
+  border-color: var(--status-green-border);
+  background: var(--status-green-bg);
+}
+
+/* ── Step number circle ───────────────────────────────────────── */
+
+.stepNumber {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  font-family: var(--font-geist-mono);
+  flex-shrink: 0;
+}
+
+.stepCompleted .stepNumber {
+  border-color: var(--status-green-border);
+  color: var(--status-green-text);
+}
+
+/* ── Step content ─────────────────────────────────────────────── */
+
+.stepContent {
+  display: grid;
+  gap: 4px;
+}
+
+.stepLabel {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.92rem;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
-.jobProfile {
-  margin: 0;
-  font-size: var(--font-base);
-  line-height: 1.45;
-  color: var(--status-gray-text);
+.stepCompleted .stepLabel {
+  color: var(--status-green-text);
 }
 
-.jobSection {
-  display: grid;
-  gap: 6px;
-}
-
-.jobSection h4 {
+.stepDescription {
   margin: 0;
-  font-size: 0.84rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--accent-hover);
-}
-
-.textList {
-  margin: 0;
-  padding-left: 18px;
-  display: grid;
-  gap: 5px;
-  color: var(--status-gray-text);
-  font-size: 0.88rem;
+  font-size: 0.86rem;
+  color: var(--text-secondary);
   line-height: 1.4;
 }
 
-.linkRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
+.stepLink {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent-text);
+  text-decoration: none;
 }
 
-.gapList {
-  margin: 10px 0 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  gap: var(--space-sm);
-}
-
-.gapItem {
-  border: 1px solid #c7d6ea;
-  border-radius: 10px;
-  background: var(--surface);
-  padding: 10px 12px;
-  color: #1e293b;
-  font-size: 0.88rem;
-  line-height: 1.4;
-}
-
-@media (min-width: 940px) {
-  .jobGrid {
-    grid-template-columns: 1fr 1fr;
-  }
+.stepLink:hover {
+  text-decoration: underline;
 }

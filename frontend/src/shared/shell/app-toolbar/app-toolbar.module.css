@@ -85,6 +85,15 @@
   padding: var(--space-sm);
 }
 
+.menuSectionLabel {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 4px 10px 0;
+}
+
 .menuItem {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
