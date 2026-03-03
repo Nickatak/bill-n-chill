@@ -23,6 +23,13 @@ import {
   fetchVendorBillPolicyContract,
   normalizeApiBaseUrl,
 } from "../api";
+import {
+  AllocationFormRow,
+  createEmptyAllocationRow,
+  defaultBillStatusFilters,
+  formatMoney,
+  projectStatusLabel,
+} from "../helpers";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { hasAnyRole } from "../../session/rbac";
 import {
@@ -93,37 +100,9 @@ type BudgetLineGroup = {
   lines: BudgetLineOption[];
 };
 
-type AllocationFormRow = VendorBillAllocationInput & {
-  ui_line_key?: string;
-  ui_target_budget_id?: number;
-};
-
-/** Creates a blank allocation row for the bill allocation form. */
-function createEmptyAllocationRow(): AllocationFormRow {
-  return {
-    budget_line: 0,
-    amount: "",
-    note: "",
-    ui_line_key: "",
-    ui_target_budget_id: undefined,
-  };
-}
-
 type VendorBillsConsoleProps = {
   scopedProjectId?: number | null;
 };
-
-/** Returns default bill status filters -- active (non-terminal) statuses only. */
-function defaultBillStatusFilters(statuses: string[]): string[] {
-  const TERMINAL = new Set(["paid", "void"]);
-  const active = statuses.filter((value) => !TERMINAL.has(value));
-  return active.length ? active : statuses;
-}
-
-/** Converts a snake_case status to a human-readable label. */
-function projectStatusLabel(statusValue: string): string {
-  return statusValue.replace("_", " ");
-}
 
 /** Renders the vendor bills dashboard: project picker, bill list, status panel, and bill form. */
 export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null }: VendorBillsConsoleProps) {
@@ -486,12 +465,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   /** Appends a new blank allocation row to the form. */
   function addFormAllocation() {
     setFormAllocations([...formAllocations, createEmptyAllocationRow()]);
-  }
-
-  /** Formats a string dollar value to two decimal places, defaulting to "0.00". */
-  function formatMoney(value?: string): string {
-    const parsed = Number(value ?? "0");
-    return Number.isFinite(parsed) ? parsed.toFixed(2) : "0.00";
   }
 
   /** Derives the UI key and target budget for a generic-scope budget line. */

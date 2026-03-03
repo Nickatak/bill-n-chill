@@ -11,7 +11,20 @@ import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { parseAmount, formatDecimal } from "@/shared/money-format";
-import { readApiErrorMessage } from "@/shared/api/error";
+import {
+  financialBaselineStatus,
+  formatFinancialBaselineStatus,
+  type FinancialBaselineStatusValue,
+} from "@/shared/financial-baseline";
+import {
+  coLabel,
+  defaultChangeOrderTitle,
+  emptyLine,
+  isFiniteNumericInput,
+  publicChangeOrderHref,
+  readChangeOrderApiError,
+  validateLineItems,
+} from "../helpers";
 import {
   defaultApiBaseUrl,
   fetchChangeOrderPolicyContract,
@@ -22,8 +35,10 @@ import { hasAnyRole } from "../../session/rbac";
 import {
   ApiResponse,
   BudgetLineRecord,
+  ChangeOrderLineInput,
   ChangeOrderPolicyContract,
   ChangeOrderRecord,
+  LineValidationIssue,
 } from "../types";
 import styles from "./change-orders-console.module.css";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
@@ -41,141 +56,11 @@ import {
   toChangeOrderStatusPolicy,
 } from "../document-adapter";
 
-type ChangeOrderLineInput = {
-  localId: number;
-  lineType: "scope" | "adjustment";
-  adjustmentReason: string;
-  budgetLineId: string;
-  description: string;
-  amountDelta: string;
-  daysDelta: string;
-};
-
 type LineSetter = (
   value:
     | ChangeOrderLineInput[]
     | ((current: ChangeOrderLineInput[]) => ChangeOrderLineInput[]),
 ) => void;
-
-type LineValidationIssue = {
-  localId: number;
-  rowNumber: number;
-  message: string;
-};
-
-type LineValidationResult = {
-  issues: LineValidationIssue[];
-  issuesByLocalId: Map<number, string[]>;
-};
-
-/** Check whether a string is a valid finite numeric value. */
-function isFiniteNumericInput(value: string): boolean {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return false;
-  }
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed);
-}
-
-/** Validate change-order line items for completeness and duplicates. */
-function validateLineItems(lines: ChangeOrderLineInput[]): LineValidationResult {
-  const budgetLineCounts = new Map<string, number>();
-  for (const line of lines) {
-    const budgetLineId = line.budgetLineId.trim();
-    if (!budgetLineId) {
-      continue;
-    }
-    budgetLineCounts.set(budgetLineId, (budgetLineCounts.get(budgetLineId) ?? 0) + 1);
-  }
-
-  const issues: LineValidationIssue[] = [];
-  const issuesByLocalId = new Map<number, string[]>();
-  lines.forEach((line, index) => {
-    const rowNumber = index + 1;
-    const rowIssues: string[] = [];
-    const budgetLineId = line.budgetLineId.trim();
-
-    if (!budgetLineId) {
-      rowIssues.push("Select a budget line.");
-    } else if ((budgetLineCounts.get(budgetLineId) ?? 0) > 1) {
-      rowIssues.push("Budget line is duplicated in this change order.");
-    }
-
-    if (line.lineType === "adjustment" && !line.adjustmentReason.trim()) {
-      rowIssues.push("Adjustment lines require a reason.");
-    }
-
-    if (!isFiniteNumericInput(line.amountDelta)) {
-      rowIssues.push("Amount delta must be a number.");
-    }
-
-    if (!isFiniteNumericInput(line.daysDelta) || !Number.isInteger(Number(line.daysDelta))) {
-      rowIssues.push("Days delta must be a whole number.");
-    }
-
-    if (!rowIssues.length) {
-      return;
-    }
-
-    issuesByLocalId.set(line.localId, rowIssues);
-    for (const message of rowIssues) {
-      issues.push({
-        localId: line.localId,
-        rowNumber,
-        message,
-      });
-    }
-  });
-
-  return {
-    issues,
-    issuesByLocalId,
-  };
-}
-
-/** Create a blank change-order line item with sensible defaults. */
-function emptyLine(localId: number): ChangeOrderLineInput {
-  return {
-    localId,
-    lineType: "scope",
-    adjustmentReason: "",
-    budgetLineId: "",
-    description: "",
-    amountDelta: "0.00",
-    daysDelta: "0",
-  };
-}
-
-/** Generate a default change-order title from the project name. */
-function defaultChangeOrderTitle(projectName?: string): string {
-  const trimmed = (projectName || "").trim();
-  if (!trimmed) {
-    return "Change Order";
-  }
-  return `Change Order: ${trimmed}`;
-}
-
-/** Build a human-readable label like "CO-3 v2" for a change order. */
-function coLabel(changeOrder: Pick<ChangeOrderRecord, "family_key" | "revision_number">): string {
-  return `CO-${changeOrder.family_key} v${changeOrder.revision_number}`;
-}
-
-/** Build the public-facing change-order URL for a viewer link. */
-function publicChangeOrderHref(publicRef?: string): string {
-  if (!publicRef) {
-    return "";
-  }
-  return `/change-order/${publicRef}`;
-}
-
-function readApiError(payload: ApiResponse | undefined, fallback: string): string {
-  const message = readApiErrorMessage(payload, fallback);
-  if (/invalid .*status transition/i.test(message) && !/refresh/i.test(message)) {
-    return `${message} This change order may have changed from a client action on the public page. Refresh to load the latest status.`;
-  }
-  return message;
-}
 
 type ChangeOrdersConsoleProps = {
   scopedProjectId?: number | null;
@@ -191,8 +76,6 @@ type OriginEstimateRecord = {
   financial_baseline_status?: "none" | "active" | "superseded";
   is_active_financial_baseline?: boolean;
 };
-
-type FinancialBaselineStatusValue = "none" | "active" | "superseded";
 
 type AuditEventRecord = {
   id: number;
@@ -321,9 +204,9 @@ export function ChangeOrdersConsole({
     projectEstimates.find((estimate) => String(estimate.id) === selectedViewerEstimateId) ?? null;
   const activeFinancialBaselineEstimate =
     projectEstimates.find(
-      (estimate) => estimateFinancialBaselineStatus(estimate) === "active",
+      (estimate) => financialBaselineStatus(estimate) === "active",
     ) ?? null;
-  const selectedViewerEstimateBaselineStatus = estimateFinancialBaselineStatus(selectedViewerEstimate);
+  const selectedViewerEstimateBaselineStatus = financialBaselineStatus(selectedViewerEstimate);
   const selectedViewerEstimateIsActiveBaseline = selectedViewerEstimateBaselineStatus === "active";
   const sortChangeOrdersForViewer = useCallback((rows: ChangeOrderRecord[]) => {
     return [...rows].sort((left, right) => {
@@ -818,32 +701,6 @@ export function ChangeOrdersConsole({
     return `approved on ${dateLabel}`;
   }
 
-  /** Derive the financial-baseline status for an origin estimate. */
-  function estimateFinancialBaselineStatus(
-    estimate?: OriginEstimateRecord | null,
-  ): FinancialBaselineStatusValue {
-    if (!estimate) {
-      return "none";
-    }
-    if (estimate.is_active_financial_baseline) {
-      return "active";
-    }
-    if (estimate.financial_baseline_status === "active" || estimate.financial_baseline_status === "superseded") {
-      return estimate.financial_baseline_status;
-    }
-    return "none";
-  }
-
-  function financialBaselineLabel(status: FinancialBaselineStatusValue): string {
-    if (status === "active") {
-      return "Active Estimate";
-    }
-    if (status === "superseded") {
-      return "Superseded Estimate";
-    }
-    return "";
-  }
-
   const hydrateEditForm = useCallback((changeOrder: ChangeOrderRecord | undefined) => {
     if (!changeOrder) {
       setSelectedChangeOrderId("");
@@ -1126,7 +983,7 @@ export function ChangeOrdersConsole({
     if (!response.ok) {
       return {
         rows: null as ChangeOrderRecord[] | null,
-        error: readApiError(payload, "Could not load change orders."),
+        error: readChangeOrderApiError(payload, "Could not load change orders."),
       };
     }
     return { rows: (payload.data as ChangeOrderRecord[]) ?? [], error: "" };
@@ -1168,7 +1025,7 @@ export function ChangeOrdersConsole({
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setFeedback(readApiError(payload, "Could not load projects."), "error");
+        setFeedback(readChangeOrderApiError(payload, "Could not load projects."), "error");
         return;
       }
       const rows = (payload.data as Array<{ id: number; name: string }>) ?? [];
@@ -1400,7 +1257,7 @@ export function ChangeOrdersConsole({
       );
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setFeedback(readApiError(payload, "Create change order failed."), "error");
+        setFeedback(readChangeOrderApiError(payload, "Create change order failed."), "error");
         return;
       }
       const created = payload.data as ChangeOrderRecord;
@@ -1455,7 +1312,7 @@ export function ChangeOrdersConsole({
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setFeedback(readApiError(payload, "Clone revision failed."), "error");
+        setFeedback(readChangeOrderApiError(payload, "Clone revision failed."), "error");
         return;
       }
       const created = payload.data as ChangeOrderRecord;
@@ -1511,7 +1368,7 @@ export function ChangeOrdersConsole({
       );
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setFeedback(readApiError(payload, "Save change order failed."), "error");
+        setFeedback(readChangeOrderApiError(payload, "Save change order failed."), "error");
         return;
       }
       const updated = payload.data as ChangeOrderRecord;
@@ -1566,7 +1423,7 @@ export function ChangeOrdersConsole({
       );
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setFeedback(readApiError(payload, "Status update failed."), "error");
+        setFeedback(readChangeOrderApiError(payload, "Status update failed."), "error");
         return;
       }
       const updated = payload.data as ChangeOrderRecord;
@@ -1626,7 +1483,7 @@ export function ChangeOrdersConsole({
       );
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setFeedback(readApiError(payload, "Status note update failed."), "error");
+        setFeedback(readChangeOrderApiError(payload, "Status note update failed."), "error");
         return;
       }
       const updated = payload.data as ChangeOrderRecord;
@@ -1695,7 +1552,7 @@ export function ChangeOrdersConsole({
               </div>
               {projectEstimates.map((estimate) => {
                 const active = String(estimate.id) === selectedViewerEstimateId;
-                const baselineStatus = estimateFinancialBaselineStatus(estimate);
+                const baselineStatus = financialBaselineStatus(estimate);
                 const relatedCount = changeOrders.filter(
                   (changeOrder) => changeOrder.origin_estimate === estimate.id,
                 ).length;
@@ -1738,7 +1595,7 @@ export function ChangeOrdersConsole({
                               : changeOrderCreatorStyles.viewerBaselineBadgeSuperseded
                           }`}
                         >
-                          {financialBaselineLabel(baselineStatus)}
+                          {formatFinancialBaselineStatus(baselineStatus)}
                         </span>
                       ) : null}
                       <span className={styles.viewerRailSubtext}>

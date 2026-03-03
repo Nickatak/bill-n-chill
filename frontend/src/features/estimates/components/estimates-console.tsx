@@ -27,23 +27,32 @@ import {
   addDaysToDateInput,
 } from "@/shared/date-format";
 import { formatDecimal } from "@/shared/money-format";
-import { readApiErrorMessage } from "@/shared/api/error";
+import { type FinancialBaselineStatusValue } from "@/shared/financial-baseline";
 import {
   ApiResponse,
   CostCode,
   EstimateLineInput,
-  EstimateLineItemRecord,
   EstimatePolicyContract,
   EstimateRecord,
   EstimateStatusEventRecord,
   ProjectRecord,
 } from "../types";
+import {
+  emptyLine,
+  estimateFinancialBaselineStatus,
+  formatFinancialBaselineStatus,
+  formatStatusAction,
+  isNotatedStatusEvent,
+  mapEstimateLineItemsToInputs,
+  normalizeFamilyTitle,
+  readEstimateApiError,
+  resolveEstimateValidationDeltaDays,
+} from "../helpers";
 import { EstimateSheet, OrganizationDocumentDefaults } from "./estimate-sheet";
 import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
 
 type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amount";
 type EstimateStatusValue = string;
-type FinancialBaselineStatusValue = "none" | "active" | "superseded";
 type EstimateFamilyCollisionPrompt = {
   title: string;
   latestEstimateId: number | null;
@@ -90,61 +99,7 @@ const ESTIMATE_QUICK_ACTION_BY_STATUS_FALLBACK: Record<string, "change_order" | 
   void: "revision",
 };
 const ESTIMATE_SYSTEM_ONLY_STATUSES = new Set<EstimateStatusValue>(["archived"]);
-const ESTIMATE_VALIDATION_DELTA_DAYS_FALLBACK = 30;
 const ESTIMATE_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
-
-/** Resolve the organization's configured validity window, clamped to 1-365 days. */
-function resolveEstimateValidationDeltaDays(
-  defaults?: OrganizationDocumentDefaults | null,
-): number {
-  const parsed = Number(defaults?.estimate_validation_delta_days);
-  if (!Number.isFinite(parsed)) {
-    return ESTIMATE_VALIDATION_DELTA_DAYS_FALLBACK;
-  }
-  return Math.max(1, Math.min(365, Math.round(parsed)));
-}
-
-/** Create a blank estimate line item with sensible defaults. */
-function emptyLine(localId: number, defaultCostCodeId = ""): EstimateLineInput {
-  return {
-    localId,
-    costCodeId: defaultCostCodeId,
-    description: "Scope item",
-    quantity: "1",
-    unit: "ea",
-    unitCost: "0",
-    markupPercent: "0",
-  };
-}
-
-/** Map API line-item records into form-compatible input shapes. */
-function mapEstimateLineItemsToInputs(items: EstimateLineItemRecord[] = []): EstimateLineInput[] {
-  if (!items.length) {
-    return [emptyLine(1)];
-  }
-  return items.map((item, index) => ({
-    localId: index + 1,
-    costCodeId: String(item.cost_code ?? ""),
-    description: item.description || "",
-    quantity: String(item.quantity ?? ""),
-    unit: item.unit || "ea",
-    unitCost: String(item.unit_cost ?? ""),
-    markupPercent: String(item.markup_percent ?? ""),
-  }));
-}
-
-function readApiError(payload: ApiResponse | undefined, fallback: string): string {
-  const message = readApiErrorMessage(payload, fallback);
-  if (/invalid .*status transition/i.test(message) && !/refresh/i.test(message)) {
-    return `${message} This estimate may have changed from a client action on the public page. Refresh to load the latest status.`;
-  }
-  return message;
-}
-
-/** Normalize an estimate title for case-insensitive family matching. */
-function normalizeFamilyTitle(value: string): string {
-  return value.trim().toLowerCase();
-}
 
 /** Internal estimates workspace: version tree, composer, status lifecycle, and family management. */
 export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }: EstimatesConsoleProps) {
@@ -323,67 +278,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     return statusLabelByValue[status] ?? status;
   }
 
-  /** Derive the financial-baseline status for an estimate (none | active | superseded). */
-  function estimateFinancialBaselineStatus(
-    estimate?: EstimateRecord | null,
-  ): FinancialBaselineStatusValue {
-    if (!estimate) {
-      return "none";
-    }
-    if (estimate.is_active_financial_baseline) {
-      return "active";
-    }
-    const status = estimate.financial_baseline_status;
-    if (status === "active" || status === "superseded") {
-      return status;
-    }
-    return "none";
-  }
-
-  /** Return a display label for a financial-baseline status. */
-  function formatFinancialBaselineStatus(status: FinancialBaselineStatusValue): string {
-    if (status === "active") {
-      return "Active Estimate";
-    }
-    if (status === "superseded") {
-      return "Superseded Estimate";
-    }
-    return "";
-  }
-
-  /** Derive a past-tense action label from a status-event record. */
-  function formatStatusAction(event: EstimateStatusEventRecord): string {
-    if (event.action_type === "notate") {
-      return "Notated";
-    }
-    if (event.action_type === "resend") {
-      return "Re-sent";
-    }
-    if (event.from_status === "sent" && event.to_status === "sent" && !(event.note || "").trim()) {
-      return "Re-sent";
-    }
-    if (event.from_status === event.to_status && (event.note || "").trim()) {
-      return "Notated";
-    }
-    const actionByStatus: Record<string, string> = {
-      draft: "Created as Draft",
-      sent: "Sent",
-      approved: "Approved",
-      rejected: "Rejected",
-      void: "Voided",
-      archived: "Archived",
-    };
-    return actionByStatus[event.to_status] ?? formatEstimateStatus(event.to_status);
-  }
-
-  /** Check whether a status event is a notation rather than a transition. */
-  function isNotatedStatusEvent(event: EstimateStatusEventRecord): boolean {
-    if (event.action_type === "notate") {
-      return true;
-    }
-    return event.from_status === event.to_status && (event.note || "").trim().length > 0;
-  }
-
   function formatEventDate(dateValue: string): string {
     return formatDateTimeDisplay(dateValue, dateValue);
   }
@@ -486,7 +380,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setActionMessage(readApiError(payload, "Clone failed."));
+        setActionMessage(readEstimateApiError(payload, "Clone failed."));
         return;
       }
       const cloned = payload.data as EstimateRecord;
@@ -753,11 +647,11 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       const organizationJson: ApiResponse = await organizationRes.json();
 
       if (!projectsRes.ok) {
-        setActionMessage(readApiError(projectsJson, "Failed loading projects."));
+        setActionMessage(readEstimateApiError(projectsJson, "Failed loading projects."));
         return;
       }
       if (!codesRes.ok) {
-        setActionMessage(readApiError(codesJson, "Failed loading cost codes."));
+        setActionMessage(readEstimateApiError(codesJson, "Failed loading cost codes."));
         return;
       }
 
@@ -836,7 +730,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
         if (!options?.quiet) {
-          setActionMessage(readApiError(payload, "Failed loading estimates."));
+          setActionMessage(readEstimateApiError(payload, "Failed loading estimates."));
         }
         return;
       }
@@ -1108,7 +1002,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
           setConfirmedFamilyTitleKey("");
         }
         setFormErrorMessage(
-          readApiError(payload, "Create estimate failed. Check values and try again."),
+          readEstimateApiError(payload, "Create estimate failed. Check values and try again."),
         );
         return;
       }
@@ -1186,7 +1080,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         const payload: ApiResponse = await response.json();
         if (!response.ok) {
           setFormErrorMessage(
-            readApiError(payload, "Save draft failed. Check values and try again."),
+            readEstimateApiError(payload, "Save draft failed. Check values and try again."),
           );
           return;
         }
@@ -1277,7 +1171,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setActionMessage(readApiError(payload, "Duplicate failed."));
+        setActionMessage(readEstimateApiError(payload, "Duplicate failed."));
         return;
       }
       const duplicated = payload.data as EstimateRecord;
@@ -1316,7 +1210,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setActionMessage(readApiError(payload, "Status update failed."));
+        setActionMessage(readEstimateApiError(payload, "Status update failed."));
         setActionTone("error");
         return;
       }
@@ -1372,7 +1266,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setActionMessage(readApiError(payload, "Status note update failed."));
+        setActionMessage(readEstimateApiError(payload, "Status note update failed."));
         setActionTone("error");
         return;
       }
@@ -1417,7 +1311,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
         const activeId = payload.error?.meta?.active_financial_estimate_id;
-        const message = readApiError(payload, "Active estimate update failed.");
+        const message = readEstimateApiError(payload, "Active estimate update failed.");
         setActionMessage(
           activeId ? `${message} Current active estimate is #${activeId}.` : message,
         );
@@ -1456,7 +1350,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         const payload: ApiResponse = await response.json();
         if (!response.ok) {
           if (!quiet) {
-            setActionMessage(readApiError(payload, "Failed loading status events."));
+            setActionMessage(readEstimateApiError(payload, "Failed loading status events."));
           }
           return;
         }

@@ -12,7 +12,19 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { formatDateDisplay, formatDateTimeDisplay, todayDateInput, futureDateInput } from "@/shared/date-format";
 import { parseAmount, formatDecimal } from "@/shared/money-format";
-import { readApiErrorMessage } from "@/shared/api/error";
+import {
+  dueDateFromIssueDate,
+  emptyLine,
+  invoiceNextActionHint,
+  invoiceStatusEventActionLabel,
+  invoiceStatusLabel,
+  nextInvoiceNumberPreview,
+  normalizeDecimalInput,
+  projectStatusLabel,
+  publicInvoiceHref,
+  readInvoiceApiError,
+  resolvePreferredStatusSelection,
+} from "../helpers";
 import { ProjectListStatusValue, ProjectListViewer } from "@/shared/project-list-viewer";
 import {
   defaultApiBaseUrl,
@@ -108,70 +120,6 @@ const DEFAULT_PROJECT_STATUS_FILTERS: ProjectStatusValue[] = ["active", "prospec
 const PROJECT_STATUS_VALUES: ProjectStatusValue[] = ["prospect", "active", "on_hold", "completed", "cancelled"];
 const GENERIC_BUDGET_COST_CODES = new Set(["99-901", "99-902", "99-903"]);
 
-/** Compute a due date by adding dueDays to a given issue date. */
-function dueDateFromIssueDate(issueDate: string, dueDays: number) {
-  const base = issueDate ? new Date(`${issueDate}T00:00:00`) : new Date();
-  const safeDueDays = Number.isFinite(dueDays) ? Math.max(1, Math.min(365, Math.round(dueDays))) : 30;
-  base.setDate(base.getDate() + safeDueDays);
-  return base.toISOString().slice(0, 10);
-}
-
-/** Normalize a number to a two-decimal string, returning a fallback for non-finite values. */
-function normalizeDecimalInput(value: number, fallback = "0"): string {
-  if (!Number.isFinite(value)) {
-    return fallback;
-  }
-  return value.toFixed(2);
-}
-
-/** Create a blank scope line item with sensible defaults for the creator workspace. */
-function emptyLine(localId: number, defaultBudgetLineId = ""): InvoiceLineInput {
-  return {
-    localId,
-    lineType: "scope",
-    budgetLineId: defaultBudgetLineId,
-    adjustmentReason: "",
-    internalNote: "",
-    description: "Invoice scope item",
-    quantity: "1",
-    unit: "ea",
-    unitPrice: "0",
-  };
-}
-
-/** Resolve a display label for an invoice status using the static fallback map. */
-function invoiceStatusLabel(status: string): string {
-  return INVOICE_STATUS_LABELS_FALLBACK[status] ?? status;
-}
-
-/** Build the public-facing route for a customer to view their invoice. */
-function publicInvoiceHref(publicRef?: string): string {
-  if (!publicRef) {
-    return "";
-  }
-  return `/invoice/${publicRef}`;
-}
-
-/** Return a contextual hint about the next workflow action for a given invoice status. */
-function invoiceNextActionHint(status: string): string {
-  if (status === "draft") {
-    return "Next: send the invoice to move it into billable AR tracking.";
-  }
-  if (status === "sent") {
-    return "Next: record payments to move invoice to partially paid or paid.";
-  }
-  if (status === "partially_paid") {
-    return "Next: allocate remaining payment and close the outstanding balance.";
-  }
-  if (status === "paid") {
-    return "Invoice is fully settled.";
-  }
-  if (status === "void") {
-    return "Invoice is void and no longer billable.";
-  }
-  return "Select a status transition as needed.";
-}
-
 /** Map an invoice status to its CSS module class for badge coloring. */
 function invoiceStatusClass(status: string): string {
   if (status === "draft") {
@@ -232,54 +180,6 @@ function invoiceCardStatusClass(status: string): string {
   return "";
 }
 
-/** Predict the next sequential invoice number (INV-XXXX) for pre-filling the workspace. */
-function nextInvoiceNumberPreview(rows: InvoiceRecord[]): string {
-  const usedNumbers = new Set<number>();
-  let digitWidth = 4;
-  for (const row of rows) {
-    const match = row.invoice_number.match(/^INV-(\d+)$/i);
-    if (!match) {
-      continue;
-    }
-    const value = Number(match[1]);
-    if (Number.isFinite(value) && value > 0) {
-      usedNumbers.add(value);
-      digitWidth = Math.max(digitWidth, match[1].length);
-    }
-  }
-  let nextNumber = rows.length + 1;
-  while (usedNumbers.has(nextNumber)) {
-    nextNumber += 1;
-  }
-  return `INV-${String(nextNumber).padStart(digitWidth, "0")}`;
-}
-
-/** Derive a human-readable action label for a status history event row. */
-function invoiceStatusEventActionLabel(
-  event: InvoiceStatusEventRecord,
-  statusLabel: (status: string) => string,
-): string {
-  if (event.action_type === "notate") {
-    return "Notated";
-  }
-  if (event.action_type === "resend") {
-    return "Re-sent";
-  }
-  if (event.action_type === "create") {
-    return "Created";
-  }
-  if (event.from_status === "sent" && event.to_status === "sent") {
-    return "Re-sent";
-  }
-  if (event.from_status === event.to_status && (event.note || "").trim()) {
-    return "Notated";
-  }
-  if (!event.from_status) {
-    return `Created as ${statusLabel(event.to_status)}`;
-  }
-  return `${statusLabel(event.from_status)} to ${statusLabel(event.to_status)}`;
-}
-
 /** Map a status event to its visual tone class for the history timeline. */
 function invoiceStatusEventToneClass(event: InvoiceStatusEventRecord): string {
   if (event.action_type === "resend" || (event.from_status === "sent" && event.to_status === "sent")) {
@@ -289,34 +189,6 @@ function invoiceStatusEventToneClass(event: InvoiceStatusEventRecord): string {
     return styles.statusToneNotate;
   }
   return invoiceStatusToneClass(event.to_status);
-}
-
-/** Pick the most likely next status to pre-select in the status picker for an invoice. */
-function resolvePreferredStatusSelection(
-  invoice: InvoiceRecord | null,
-  transitions: Record<string, string[]>,
-): string {
-  if (!invoice) {
-    return "draft";
-  }
-  const nextStatuses = [...(transitions[invoice.status] ?? [])];
-  if (invoice.status === "sent" && !nextStatuses.includes("sent")) {
-    nextStatuses.unshift("sent");
-  }
-  return nextStatuses[0] ?? invoice.status;
-}
-
-function readApiError(payload: ApiResponse | undefined, fallback: string): string {
-  const message = readApiErrorMessage(payload, fallback);
-  if (/invalid .*status transition/i.test(message) && !/refresh/i.test(message)) {
-    return `${message} This invoice may have changed from a client action on the public page. Refresh to load the latest status.`;
-  }
-  return message;
-}
-
-/** Convert a snake_case project status to a display-friendly label. */
-function projectStatusLabel(statusValue: string): string {
-  return statusValue.replace("_", " ");
 }
 
 /** Primary invoice management console with project selection, invoice viewer, and creator workspace. */
@@ -625,7 +497,7 @@ export function InvoicesConsole() {
         const payload: ApiResponse = await response.json();
 
         if (!response.ok) {
-          setErrorStatus(readApiError(payload, "Failed loading invoices."));
+          setErrorStatus(readInvoiceApiError(payload, "Failed loading invoices."));
           return;
         }
 
@@ -1147,7 +1019,7 @@ export function InvoicesConsole() {
         });
         const payload: ApiResponse = await response.json();
         if (!response.ok) {
-          setErrorStatus(readApiError(payload, "Save draft failed."));
+          setErrorStatus(readInvoiceApiError(payload, "Save draft failed."));
           return;
         }
         const updated = payload.data as InvoiceRecord;
@@ -1184,7 +1056,7 @@ export function InvoicesConsole() {
       const payload: ApiResponse = await response.json();
 
       if (!response.ok) {
-        setErrorStatus(readApiError(payload, "Create invoice failed."));
+        setErrorStatus(readInvoiceApiError(payload, "Create invoice failed."));
         return;
       }
 
@@ -1236,7 +1108,7 @@ export function InvoicesConsole() {
       const payload: ApiResponse = await response.json();
 
       if (!response.ok) {
-        setErrorStatus(readApiError(payload, "Status update failed."));
+        setErrorStatus(readInvoiceApiError(payload, "Status update failed."));
         return;
       }
 
@@ -1286,7 +1158,7 @@ export function InvoicesConsole() {
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setErrorStatus(readApiError(payload, "Status note update failed."));
+        setErrorStatus(readInvoiceApiError(payload, "Status note update failed."));
         return;
       }
       const updated = payload.data as InvoiceRecord;

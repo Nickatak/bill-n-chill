@@ -109,6 +109,22 @@ export type ChangeOrderPolicyContract = {
   error_rules?: Record<string, string>;
 };
 
+export type ChangeOrderLineInput = {
+  localId: number;
+  lineType: "scope" | "adjustment";
+  adjustmentReason: string;
+  budgetLineId: string;
+  description: string;
+  amountDelta: string;
+  daysDelta: string;
+};
+
+export type LineValidationIssue = {
+  localId: number;
+  rowNumber: number;
+  message: string;
+};
+
 export type ApiResponse = {
   data?:
     | UserData

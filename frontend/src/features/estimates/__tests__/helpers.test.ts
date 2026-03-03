@@ -1,0 +1,494 @@
+import { describe, expect, it } from "vitest";
+import {
+  emptyLine,
+  estimateFinancialBaselineStatus,
+  estimateStatusLabel,
+  formatFinancialBaselineStatus,
+  formatStatusAction,
+  isNotatedStatusEvent,
+  mapEstimateLineItemsToInputs,
+  mapLineCostCodes,
+  mapPublicEstimateLineItems,
+  normalizeFamilyTitle,
+  readEstimateApiError,
+  resolveEstimateValidationDeltaDays,
+} from "../helpers";
+import type { EstimateLineItemRecord, EstimateRecord, EstimateStatusEventRecord } from "../types";
+
+// ---------------------------------------------------------------------------
+// resolveEstimateValidationDeltaDays
+// ---------------------------------------------------------------------------
+
+describe("resolveEstimateValidationDeltaDays", () => {
+  it("returns 30 when defaults are undefined", () => {
+    expect(resolveEstimateValidationDeltaDays(undefined)).toBe(30);
+  });
+
+  it("returns 30 when defaults are null", () => {
+    expect(resolveEstimateValidationDeltaDays(null)).toBe(30);
+  });
+
+  it("returns 30 for NaN value", () => {
+    expect(
+      resolveEstimateValidationDeltaDays({ estimate_validation_delta_days: NaN }),
+    ).toBe(30);
+  });
+
+  it("uses the configured value when valid", () => {
+    expect(
+      resolveEstimateValidationDeltaDays({ estimate_validation_delta_days: 60 }),
+    ).toBe(60);
+  });
+
+  it("clamps to minimum of 1", () => {
+    expect(
+      resolveEstimateValidationDeltaDays({ estimate_validation_delta_days: 0 }),
+    ).toBe(1);
+    expect(
+      resolveEstimateValidationDeltaDays({ estimate_validation_delta_days: -10 }),
+    ).toBe(1);
+  });
+
+  it("clamps to maximum of 365", () => {
+    expect(
+      resolveEstimateValidationDeltaDays({ estimate_validation_delta_days: 999 }),
+    ).toBe(365);
+  });
+
+  it("rounds fractional values", () => {
+    expect(
+      resolveEstimateValidationDeltaDays({ estimate_validation_delta_days: 30.7 }),
+    ).toBe(31);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// emptyLine
+// ---------------------------------------------------------------------------
+
+describe("emptyLine", () => {
+  it("creates a line with the given localId", () => {
+    const line = emptyLine(5);
+    expect(line.localId).toBe(5);
+    expect(line.costCodeId).toBe("");
+    expect(line.description).toBe("Scope item");
+    expect(line.quantity).toBe("1");
+    expect(line.unit).toBe("ea");
+    expect(line.unitCost).toBe("0");
+    expect(line.markupPercent).toBe("0");
+  });
+
+  it("uses defaultCostCodeId when provided", () => {
+    const line = emptyLine(1, "42");
+    expect(line.costCodeId).toBe("42");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// mapEstimateLineItemsToInputs
+// ---------------------------------------------------------------------------
+
+describe("mapEstimateLineItemsToInputs", () => {
+  it("returns a single empty line when items array is empty", () => {
+    const result = mapEstimateLineItemsToInputs([]);
+    expect(result).toHaveLength(1);
+    expect(result[0].localId).toBe(1);
+    expect(result[0].description).toBe("Scope item");
+  });
+
+  it("returns a single empty line when called with no argument", () => {
+    const result = mapEstimateLineItemsToInputs();
+    expect(result).toHaveLength(1);
+  });
+
+  it("maps API line-item records to form inputs", () => {
+    const items: EstimateLineItemRecord[] = [
+      {
+        id: 10,
+        cost_code: 5,
+        cost_code_code: "01-100",
+        cost_code_name: "Demolition",
+        description: "Demo work",
+        quantity: "2",
+        unit: "day",
+        unit_cost: "1500.00",
+        markup_percent: "15",
+      },
+      {
+        id: 11,
+        cost_code: 8,
+        description: "Framing",
+        quantity: "40",
+        unit: "hr",
+        unit_cost: "75.00",
+        markup_percent: "10",
+      },
+    ];
+
+    const result = mapEstimateLineItemsToInputs(items);
+    expect(result).toHaveLength(2);
+
+    expect(result[0]).toEqual({
+      localId: 1,
+      costCodeId: "5",
+      description: "Demo work",
+      quantity: "2",
+      unit: "day",
+      unitCost: "1500.00",
+      markupPercent: "15",
+    });
+
+    expect(result[1]).toEqual({
+      localId: 2,
+      costCodeId: "8",
+      description: "Framing",
+      quantity: "40",
+      unit: "hr",
+      unitCost: "75.00",
+      markupPercent: "10",
+    });
+  });
+
+  it("defaults unit to 'ea' when empty", () => {
+    const items: EstimateLineItemRecord[] = [
+      {
+        id: 1,
+        cost_code: 1,
+        description: "Item",
+        quantity: "1",
+        unit: "",
+        unit_cost: "100",
+        markup_percent: "0",
+      },
+    ];
+    expect(mapEstimateLineItemsToInputs(items)[0].unit).toBe("ea");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// readEstimateApiError
+// ---------------------------------------------------------------------------
+
+describe("readEstimateApiError", () => {
+  it("returns the API error message when present", () => {
+    const payload = { error: { message: "Something went wrong" } };
+    expect(readEstimateApiError(payload, "Fallback")).toBe("Something went wrong");
+  });
+
+  it("returns fallback when no error message", () => {
+    expect(readEstimateApiError(undefined, "Fallback")).toBe("Fallback");
+  });
+
+  it("appends refresh hint for status transition errors", () => {
+    const payload = { error: { message: "Invalid status transition from draft to approved" } };
+    const result = readEstimateApiError(payload, "Fallback");
+    expect(result).toContain("Invalid status transition");
+    expect(result).toContain("Refresh to load the latest status");
+  });
+
+  it("does not append refresh hint if message already mentions refresh", () => {
+    const payload = { error: { message: "Invalid status transition. Please refresh." } };
+    const result = readEstimateApiError(payload, "Fallback");
+    expect(result).not.toContain("Refresh to load the latest status");
+  });
+
+  it("does not append refresh hint for non-transition errors", () => {
+    const payload = { error: { message: "Permission denied" } };
+    expect(readEstimateApiError(payload, "Fallback")).toBe("Permission denied");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// normalizeFamilyTitle
+// ---------------------------------------------------------------------------
+
+describe("normalizeFamilyTitle", () => {
+  it("lowercases and trims", () => {
+    expect(normalizeFamilyTitle("  Kitchen Remodel  ")).toBe("kitchen remodel");
+  });
+
+  it("handles empty string", () => {
+    expect(normalizeFamilyTitle("")).toBe("");
+  });
+
+  it("handles already-normalized input", () => {
+    expect(normalizeFamilyTitle("bathroom")).toBe("bathroom");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// mapPublicEstimateLineItems
+// ---------------------------------------------------------------------------
+
+describe("mapPublicEstimateLineItems", () => {
+  it("returns empty array for null estimate", () => {
+    expect(mapPublicEstimateLineItems(null)).toEqual([]);
+  });
+
+  it("returns empty array when estimate has no line items", () => {
+    const estimate = { line_items: [] } as unknown as EstimateRecord;
+    expect(mapPublicEstimateLineItems(estimate)).toEqual([]);
+  });
+
+  it("maps line items from estimate record", () => {
+    const estimate = {
+      line_items: [
+        {
+          id: 1,
+          cost_code: 5,
+          cost_code_code: "01-100",
+          cost_code_name: "Demo",
+          description: "Demo work",
+          quantity: "2",
+          unit: "day",
+          unit_cost: "500.00",
+          markup_percent: "10",
+        },
+      ],
+    } as unknown as EstimateRecord;
+
+    const result = mapPublicEstimateLineItems(estimate);
+    expect(result).toHaveLength(1);
+    expect(result[0].costCodeId).toBe("5");
+    expect(result[0].unitCost).toBe("500.00");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// mapLineCostCodes
+// ---------------------------------------------------------------------------
+
+describe("mapLineCostCodes", () => {
+  it("returns empty array for null estimate", () => {
+    expect(mapLineCostCodes(null)).toEqual([]);
+  });
+
+  it("extracts deduplicated cost codes from line items", () => {
+    const estimate = {
+      line_items: [
+        { cost_code: 5, cost_code_code: "01-100", cost_code_name: "Demo" },
+        { cost_code: 5, cost_code_code: "01-100", cost_code_name: "Demo" },
+        { cost_code: 8, cost_code_code: "02-200", cost_code_name: "Framing" },
+      ],
+    } as unknown as EstimateRecord;
+
+    const result = mapLineCostCodes(estimate);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({
+      id: 5,
+      code: "01-100",
+      name: "Demo",
+      is_active: true,
+    });
+    expect(result[1]).toEqual({
+      id: 8,
+      code: "02-200",
+      name: "Framing",
+      is_active: true,
+    });
+  });
+
+  it("uses fallback code when cost_code_code is missing", () => {
+    const estimate = {
+      line_items: [{ cost_code: 99 }],
+    } as unknown as EstimateRecord;
+
+    const result = mapLineCostCodes(estimate);
+    expect(result[0].code).toBe("CC-99");
+    expect(result[0].name).toBe("Cost code");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// estimateStatusLabel
+// ---------------------------------------------------------------------------
+
+describe("estimateStatusLabel", () => {
+  it("returns label for known status", () => {
+    expect(estimateStatusLabel("draft")).toBe("Draft");
+    expect(estimateStatusLabel("approved")).toBe("Approved");
+    expect(estimateStatusLabel("void")).toBe("Void");
+  });
+
+  it("returns the raw value for unknown status", () => {
+    expect(estimateStatusLabel("custom_status")).toBe("custom_status");
+  });
+
+  it("returns 'Unknown' for undefined", () => {
+    expect(estimateStatusLabel(undefined)).toBe("Unknown");
+  });
+
+  it("returns 'Unknown' for empty string", () => {
+    expect(estimateStatusLabel("")).toBe("Unknown");
+  });
+
+  it("trims whitespace before lookup", () => {
+    expect(estimateStatusLabel("  sent  ")).toBe("Sent");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// estimateFinancialBaselineStatus
+// ---------------------------------------------------------------------------
+
+describe("estimateFinancialBaselineStatus", () => {
+  it("returns 'none' for null", () => {
+    expect(estimateFinancialBaselineStatus(null)).toBe("none");
+  });
+
+  it("returns 'none' for undefined", () => {
+    expect(estimateFinancialBaselineStatus(undefined)).toBe("none");
+  });
+
+  it("returns 'active' when is_active_financial_baseline is true", () => {
+    const estimate = { is_active_financial_baseline: true } as unknown as EstimateRecord;
+    expect(estimateFinancialBaselineStatus(estimate)).toBe("active");
+  });
+
+  it("returns 'active' from financial_baseline_status field", () => {
+    const estimate = {
+      is_active_financial_baseline: false,
+      financial_baseline_status: "active",
+    } as unknown as EstimateRecord;
+    expect(estimateFinancialBaselineStatus(estimate)).toBe("active");
+  });
+
+  it("returns 'superseded' from financial_baseline_status field", () => {
+    const estimate = {
+      is_active_financial_baseline: false,
+      financial_baseline_status: "superseded",
+    } as unknown as EstimateRecord;
+    expect(estimateFinancialBaselineStatus(estimate)).toBe("superseded");
+  });
+
+  it("returns 'none' when no baseline flags are set", () => {
+    const estimate = {
+      is_active_financial_baseline: false,
+      financial_baseline_status: undefined,
+    } as unknown as EstimateRecord;
+    expect(estimateFinancialBaselineStatus(estimate)).toBe("none");
+  });
+
+  it("prioritizes is_active_financial_baseline over financial_baseline_status", () => {
+    const estimate = {
+      is_active_financial_baseline: true,
+      financial_baseline_status: "superseded",
+    } as unknown as EstimateRecord;
+    expect(estimateFinancialBaselineStatus(estimate)).toBe("active");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatFinancialBaselineStatus
+// ---------------------------------------------------------------------------
+
+describe("formatFinancialBaselineStatus", () => {
+  it("returns 'Active Estimate' for active", () => {
+    expect(formatFinancialBaselineStatus("active")).toBe("Active Estimate");
+  });
+
+  it("returns 'Superseded Estimate' for superseded", () => {
+    expect(formatFinancialBaselineStatus("superseded")).toBe("Superseded Estimate");
+  });
+
+  it("returns empty string for none", () => {
+    expect(formatFinancialBaselineStatus("none")).toBe("");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatStatusAction
+// ---------------------------------------------------------------------------
+
+describe("formatStatusAction", () => {
+  function event(overrides: Partial<EstimateStatusEventRecord>): EstimateStatusEventRecord {
+    return {
+      id: 1,
+      from_status: "draft",
+      to_status: "sent",
+      note: "",
+      changed_by_email: "user@example.com",
+      changed_at: "2026-01-01T00:00:00Z",
+      ...overrides,
+    };
+  }
+
+  it("returns 'Notated' for notate action_type", () => {
+    expect(formatStatusAction(event({ action_type: "notate" }))).toBe("Notated");
+  });
+
+  it("returns 'Re-sent' for resend action_type", () => {
+    expect(formatStatusAction(event({ action_type: "resend" }))).toBe("Re-sent");
+  });
+
+  it("returns 'Re-sent' for sent→sent with no note", () => {
+    expect(
+      formatStatusAction(event({ from_status: "sent", to_status: "sent", note: "" })),
+    ).toBe("Re-sent");
+  });
+
+  it("returns 'Notated' for same-status transition with a note", () => {
+    expect(
+      formatStatusAction(event({ from_status: "approved", to_status: "approved", note: "FYI" })),
+    ).toBe("Notated");
+  });
+
+  it("returns known action label for standard transitions", () => {
+    expect(formatStatusAction(event({ to_status: "draft" }))).toBe("Created as Draft");
+    expect(formatStatusAction(event({ to_status: "sent" }))).toBe("Sent");
+    expect(formatStatusAction(event({ to_status: "approved" }))).toBe("Approved");
+    expect(formatStatusAction(event({ to_status: "rejected" }))).toBe("Rejected");
+    expect(formatStatusAction(event({ to_status: "void" }))).toBe("Voided");
+    expect(formatStatusAction(event({ to_status: "archived" }))).toBe("Archived");
+  });
+
+  it("falls back to estimateStatusLabel for unknown status", () => {
+    expect(formatStatusAction(event({ to_status: "custom" }))).toBe("custom");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isNotatedStatusEvent
+// ---------------------------------------------------------------------------
+
+describe("isNotatedStatusEvent", () => {
+  function event(overrides: Partial<EstimateStatusEventRecord>): EstimateStatusEventRecord {
+    return {
+      id: 1,
+      from_status: "draft",
+      to_status: "sent",
+      note: "",
+      changed_by_email: "user@example.com",
+      changed_at: "2026-01-01T00:00:00Z",
+      ...overrides,
+    };
+  }
+
+  it("returns true for notate action_type", () => {
+    expect(isNotatedStatusEvent(event({ action_type: "notate" }))).toBe(true);
+  });
+
+  it("returns true for same-status with a note", () => {
+    expect(
+      isNotatedStatusEvent(event({ from_status: "sent", to_status: "sent", note: "Update" })),
+    ).toBe(true);
+  });
+
+  it("returns false for same-status with no note", () => {
+    expect(
+      isNotatedStatusEvent(event({ from_status: "sent", to_status: "sent", note: "" })),
+    ).toBe(false);
+  });
+
+  it("returns false for a real transition", () => {
+    expect(
+      isNotatedStatusEvent(event({ from_status: "draft", to_status: "sent", note: "Sending" })),
+    ).toBe(false);
+  });
+
+  it("returns false for whitespace-only note on same status", () => {
+    expect(
+      isNotatedStatusEvent(event({ from_status: "sent", to_status: "sent", note: "   " })),
+    ).toBe(false);
+  });
+});

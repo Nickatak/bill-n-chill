@@ -17,19 +17,10 @@ import {
   DocumentCreatorAdapter,
 } from "@/shared/document-creator/types";
 import {
+  ChangeOrderLineInput,
   ChangeOrderPolicyContract,
   ChangeOrderRecord,
 } from "./types";
-
-type ChangeOrderLineInput = {
-  localId: number;
-  lineType: "scope" | "adjustment";
-  adjustmentReason: string;
-  budgetLineId: string;
-  description: string;
-  amountDelta: string;
-  daysDelta: string;
-};
 
 type ChangeOrderStatusEvent = {
   id: number | string;
