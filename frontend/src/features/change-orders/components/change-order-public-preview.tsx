@@ -63,7 +63,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
   const [decisionMessage, setDecisionMessage] = useState("");
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [decisionReceiptName, setDecisionReceiptName] = useState("");
-  const decisionSectionRef = useRef<HTMLElement | null>(null);
+  const decisionSectionRef = useRef<HTMLDivElement | null>(null);
   const [decisionFlashCount, setDecisionFlashCount] = useState(0);
   const { printTimestamp } = usePrintContext();
 
