@@ -13,7 +13,9 @@ import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import styles from "./cost-codes-console.module.css";
 import { ApiResponse, CostCode, CsvImportResult } from "../types";
+
 type VisibilityFilter = "active" | "all";
+type FormMode = "create" | "edit";
 
 /** Full CRUD console for cost codes with search, visibility filter, and CSV import. */
 export function CostCodesConsole() {
@@ -25,14 +27,14 @@ export function CostCodesConsole() {
   const [searchTerm, setSearchTerm] = useState("");
   const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("active");
 
+  const [formMode, setFormMode] = useState<FormMode>("create");
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [isActive, setIsActive] = useState(true);
 
-  const [newCode, setNewCode] = useState("");
-  const [newName, setNewName] = useState("");
   const [importCsvText, setImportCsvText] = useState("code,name\n");
   const [importResult, setImportResult] = useState<CsvImportResult | null>(null);
+  const [importExpanded, setImportExpanded] = useState(false);
   const selectedIdRef = useRef<string>("");
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
@@ -56,12 +58,24 @@ export function CostCodesConsole() {
   const includeArchived = visibilityFilter === "all";
   const activeRowCount = rows.filter((row) => row.is_active).length;
   const archivedRowCount = rows.length - activeRowCount;
+  const selectedCostCode = rows.find((row) => String(row.id) === selectedId) ?? null;
+  const isEditing = formMode === "edit" && selectedCostCode;
 
-  /** Populate the edit form fields from a cost code record. */
+  /** Populate the form fields from a cost code record and switch to edit mode. */
   function hydrate(item: CostCode) {
     setCode(item.code);
     setName(item.name);
     setIsActive(item.is_active);
+    setFormMode("edit");
+  }
+
+  /** Clear the form and switch to create mode. */
+  function switchToCreate() {
+    setSelectedId("");
+    setCode("");
+    setName("");
+    setIsActive(true);
+    setFormMode("create");
   }
 
   // Keep ref in sync so the async loadCostCodes callback can read the latest selection
@@ -87,10 +101,7 @@ export function CostCodesConsole() {
         setRows(items);
 
         if (!items.length) {
-          setSelectedId("");
-          setCode("");
-          setName("");
-          setIsActive(true);
+          switchToCreate();
           if (!options?.keepStatusOnSuccess) {
             setNeutralStatus("No cost codes found. Create one to get started.");
           }
@@ -141,8 +152,8 @@ export function CostCodesConsole() {
         method: "POST",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
-          code: newCode.trim(),
-          name: newName.trim(),
+          code: code.trim(),
+          name: name.trim(),
           is_active: true,
         }),
       });
@@ -155,8 +166,6 @@ export function CostCodesConsole() {
       setRows((current) => [...current, created]);
       setSelectedId(String(created.id));
       hydrate(created);
-      setNewCode("");
-      setNewName("");
       setSuccessStatus(`Created cost code #${created.id} (${created.code} - ${created.name}).`);
     } catch {
       setErrorStatus("Could not reach cost code create endpoint.");
@@ -221,8 +230,6 @@ export function CostCodesConsole() {
     }
   }
 
-  const selectedCostCode = rows.find((row) => String(row.id) === selectedId) ?? null;
-
   return (
     <section className={styles.console}>
       <div className={styles.headerRow}>
@@ -234,7 +241,7 @@ export function CostCodesConsole() {
         </div>
         <div className={styles.headerStats}>
           <span className={styles.headerStatPill}>Total {rows.length}</span>
-          <span className={styles.headerStatPill}>Active {activeRowCount}</span>
+          <span className={`${styles.headerStatPill} ${styles.headerStatActive}`}>Active {activeRowCount}</span>
           <span className={styles.headerStatPill}>Archived {archivedRowCount}</span>
         </div>
       </div>
@@ -260,61 +267,38 @@ export function CostCodesConsole() {
           <section className={`${styles.panel} ${styles.existingPanel}`}>
             <div className={styles.panelHeader}>
               <h3 className={styles.panelTitle}>Existing Codes</h3>
-              <span className={styles.countBadge}>{rows.length}</span>
-            </div>
-            <p className={styles.panelIntro}>
-              Search and select a code to edit details or adjust active status.
-            </p>
-
-            <div className={styles.filterSwitchCard}>
-              <div className={styles.filterSwitchHeader}>
-                <span className={styles.filterSwitchTitle}>Visibility</span>
-              </div>
-              <div
-                className={styles.filterSegmentRow}
-                role="group"
-                aria-label="Cost code visibility filter"
-              >
-                <button
-                  type="button"
-                  className={`${styles.filterSegmentButton} ${
-                    !includeArchived ? styles.filterSegmentButtonActive : ""
-                  }`}
-                  onClick={() => setVisibilityFilter("active")}
-                  aria-pressed={!includeArchived}
-                >
-                  Active
-                  <span className={styles.filterSegmentCount}>{activeRowCount}</span>
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.filterSegmentButton} ${
-                    includeArchived ? styles.filterSegmentButtonActive : ""
-                  }`}
-                  onClick={() => setVisibilityFilter("all")}
-                  aria-pressed={includeArchived}
-                >
-                  All
-                  <span className={styles.filterSegmentCount}>{rows.length}</span>
-                </button>
-              </div>
-              <p className={styles.filterSwitchSummary}>
-                {includeArchived
-                  ? `${activeRowCount} active, ${archivedRowCount} archived`
-                  : `${activeRowCount} active`}
-              </p>
+              <span className={styles.countBadge}>{filteredRows.length}</span>
             </div>
 
-            <label className={styles.searchBlock} htmlFor="cost-code-search-input">
-              <span className={styles.searchLabel}>Search</span>
+            <div className={styles.filterRow}>
               <input
-                id="cost-code-search-input"
                 className={styles.searchInput}
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search by code or name"
+                aria-label="Search cost codes"
               />
-            </label>
+              <div className={styles.filterPills} role="group" aria-label="Cost code visibility filter">
+                <button
+                  type="button"
+                  className={`${styles.filterPill} ${!includeArchived ? styles.filterPillActive : ""}`}
+                  onClick={() => setVisibilityFilter("active")}
+                  aria-pressed={!includeArchived}
+                >
+                  Active
+                  <span className={styles.filterPillCount}>{activeRowCount}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.filterPill} ${includeArchived ? styles.filterPillActive : ""}`}
+                  onClick={() => setVisibilityFilter("all")}
+                  aria-pressed={includeArchived}
+                >
+                  All
+                  <span className={styles.filterPillCount}>{rows.length}</span>
+                </button>
+              </div>
+            </div>
 
             <div className={styles.list}>
               {filteredRows.length ? (
@@ -348,52 +332,35 @@ export function CostCodesConsole() {
 
           <div className={styles.layoutRight}>
             <section className={styles.panel}>
-              <h3 className={styles.panelTitle}>Create Cost Code</h3>
-              <p className={styles.panelIntro}>
-                Add a new code with a human-readable name for estimating and billing workflows.
-              </p>
-              <form className={styles.form} onSubmit={handleCreate}>
+              <div className={styles.panelHeader}>
+                <h3 className={styles.panelTitle}>
+                  {isEditing ? `Edit: ${selectedCostCode.code}` : "New Cost Code"}
+                </h3>
+                {isEditing ? (
+                  <button type="button" className={styles.newButton} onClick={switchToCreate}>
+                    + New
+                  </button>
+                ) : null}
+              </div>
+
+              <form className={styles.form} onSubmit={isEditing ? handleSave : handleCreate}>
                 <label className={styles.field}>
-                  Code
+                  Code{isEditing ? " (locked)" : ""}
                   <input
-                    value={newCode}
-                    onChange={(event) => setNewCode(event.target.value)}
+                    value={code}
+                    onChange={(event) => setCode(event.target.value)}
+                    disabled={!!isEditing}
+                    aria-readonly={!!isEditing || undefined}
                     required
                   />
                 </label>
                 <label className={styles.field}>
                   Name
-                  <input
-                    value={newName}
-                    onChange={(event) => setNewName(event.target.value)}
-                    required
-                  />
+                  <input value={name} onChange={(event) => setName(event.target.value)} required />
                 </label>
-                <div className={styles.buttonRow}>
-                  <button type="submit" className={styles.primaryButton}>
-                    Create
-                  </button>
-                </div>
-              </form>
-            </section>
-
-            <section className={styles.panel}>
-              <h3 className={styles.panelTitle}>Edit Cost Code</h3>
-              <p className={styles.panelIntro}>
-                Update naming and active status while keeping original code values stable.
-              </p>
-              {selectedCostCode ? (
-                <form className={styles.form} onSubmit={handleSave}>
-                  <label className={styles.field}>
-                    Code (locked)
-                    <input value={code} disabled aria-readonly="true" />
-                  </label>
-                  <label className={styles.field}>
-                    Name
-                    <input value={name} onChange={(event) => setName(event.target.value)} required />
-                  </label>
+                {isEditing ? (
                   <div className={styles.field}>
-                    Active
+                    Status
                     <div className={styles.segmentRow}>
                       <button
                         type="button"
@@ -404,72 +371,87 @@ export function CostCodesConsole() {
                       </button>
                       <button
                         type="button"
-                        className={`${styles.segmentButton} ${!isActive ? styles.segmentButtonActive : ""}`}
+                        className={`${styles.segmentButton} ${!isActive ? styles.segmentButtonInactive : ""}`}
                         onClick={() => setIsActive(false)}
                       >
-                        Inactive
+                        Archived
                       </button>
                     </div>
                   </div>
-                  <div className={styles.buttonRow}>
-                    <button type="submit" className={styles.primaryButton}>
-                      Save
+                ) : null}
+                <div className={styles.buttonRow}>
+                  <button type="submit" className={styles.primaryButton}>
+                    {isEditing ? "Save" : "Create"}
+                  </button>
+                  {isEditing ? (
+                    <button type="button" className={styles.secondaryButton} onClick={switchToCreate}>
+                      Cancel
                     </button>
-                  </div>
-                </form>
-              ) : (
-                <p className={styles.emptyState}>Create a code first, then select it to edit.</p>
-              )}
+                  ) : null}
+                </div>
+              </form>
             </section>
 
             <section className={styles.panel}>
-              <h3 className={styles.panelTitle}>CSV Import</h3>
-              <p className={styles.importSummary}>
-                Headers: code,name. Existing code updates names; unknown code creates active.
-              </p>
-              <label className={styles.field}>
-                CSV text
-                <textarea
-                  value={importCsvText}
-                  onChange={(event) => setImportCsvText(event.target.value)}
-                  rows={8}
-                />
-              </label>
-              <div className={styles.buttonRow}>
-                <button
-                  type="button"
-                  className={styles.secondaryButton}
-                  onClick={() => void runCsvImport(true)}
-                >
-                  Preview
-                </button>
-                <button
-                  type="button"
-                  className={styles.primaryButton}
-                  onClick={() => void runCsvImport(false)}
-                >
-                  Apply
-                </button>
-              </div>
-              {importResult ? (
-                <div className={styles.importResult}>
-                  <p className={styles.importSummary}>
-                    Rows: {importResult.total_rows} | Create: {importResult.created_count} | Update: {" "}
-                    {importResult.updated_count} | Errors: {importResult.error_count}
+              <button
+                type="button"
+                className={styles.importToggle}
+                onClick={() => setImportExpanded((current) => !current)}
+                aria-expanded={importExpanded}
+              >
+                <h3 className={styles.panelTitle}>CSV Import</h3>
+                <span className={styles.importToggleArrow}>{importExpanded ? "▲" : "▼"}</span>
+              </button>
+              {importExpanded ? (
+                <>
+                  <p className={styles.importHint}>
+                    Headers: code,name. Existing codes update names; new codes are created as active.
                   </p>
-                  <ul className={styles.resultRows}>
-                    {importResult.rows.map((row) => (
-                      <li
-                        key={`${row.row_number}-${row.code ?? "none"}-${row.status}`}
-                        className={`${styles.resultRow} ${
-                          row.status === "error" ? styles.resultRowError : ""
-                        }`}
-                      >
-                        row {row.row_number} | {row.status} | {row.code || "(no code)"}: {row.message}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                  <label className={styles.field}>
+                    CSV text
+                    <textarea
+                      value={importCsvText}
+                      onChange={(event) => setImportCsvText(event.target.value)}
+                      rows={8}
+                    />
+                  </label>
+                  <div className={styles.buttonRow}>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => void runCsvImport(true)}
+                    >
+                      Preview
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.primaryButton}
+                      onClick={() => void runCsvImport(false)}
+                    >
+                      Apply
+                    </button>
+                  </div>
+                  {importResult ? (
+                    <div className={styles.importResult}>
+                      <p className={styles.importHint}>
+                        Rows: {importResult.total_rows} | Create: {importResult.created_count} | Update: {" "}
+                        {importResult.updated_count} | Errors: {importResult.error_count}
+                      </p>
+                      <ul className={styles.resultRows}>
+                        {importResult.rows.map((row) => (
+                          <li
+                            key={`${row.row_number}-${row.code ?? "none"}-${row.status}`}
+                            className={`${styles.resultRow} ${
+                              row.status === "error" ? styles.resultRowError : ""
+                            }`}
+                          >
+                            row {row.row_number} | {row.status} | {row.code || "(no code)"}: {row.message}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </>
               ) : null}
             </section>
           </div>
