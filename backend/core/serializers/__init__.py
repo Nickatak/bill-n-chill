@@ -23,6 +23,8 @@ from core.serializers.intake import (
     CustomerManageSerializer,
 )
 from core.serializers.organization_management import (
+    OrganizationInviteCreateSerializer,
+    OrganizationInviteSerializer,
     OrganizationMembershipSerializer,
     OrganizationMembershipUpdateSerializer,
     OrganizationProfileSerializer,
@@ -70,6 +72,8 @@ __all__ = [
     "OrganizationProfileUpdateSerializer",
     "OrganizationMembershipSerializer",
     "OrganizationMembershipUpdateSerializer",
+    "OrganizationInviteSerializer",
+    "OrganizationInviteCreateSerializer",
     "ProjectSerializer",
     "ProjectProfileSerializer",
     "ProjectFinancialSummarySerializer",

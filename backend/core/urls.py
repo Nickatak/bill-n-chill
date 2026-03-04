@@ -1,6 +1,7 @@
 from django.urls import path
 
 from core.views import (
+    accept_invite_view,
     budget_line_detail_view,
     change_order_clone_revision_view,
     change_order_contract_view,
@@ -31,6 +32,9 @@ from core.views import (
     login_view,
     me_view,
     register_view,
+    verify_invite_view,
+    organization_invite_detail_view,
+    organization_invites_view,
     organization_membership_detail_view,
     organization_memberships_view,
     organization_profile_view,
@@ -68,7 +72,19 @@ urlpatterns = [
     path("auth/login/", login_view, name="auth-login"),
     path("auth/register/", register_view, name="auth-register"),
     path("auth/me/", me_view, name="auth-me"),
+    path("auth/verify-invite/<str:token>/", verify_invite_view, name="auth-verify-invite"),
+    path("auth/accept-invite/", accept_invite_view, name="auth-accept-invite"),
     path("organization/", organization_profile_view, name="organization-profile"),
+    path(
+        "organization/invites/",
+        organization_invites_view,
+        name="organization-invites",
+    ),
+    path(
+        "organization/invites/<int:invite_id>/",
+        organization_invite_detail_view,
+        name="organization-invite-detail",
+    ),
     path(
         "organization/memberships/",
         organization_memberships_view,

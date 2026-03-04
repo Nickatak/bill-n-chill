@@ -7,6 +7,7 @@
  */
 
 import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { canDo } from "@/features/session/rbac";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { usePagination } from "@/shared/hooks/use-pagination";
 
@@ -20,7 +21,8 @@ type ActivityFilter = "active" | "all";
 
 /** Full CRUD console for vendor records with search, pagination, and CSV import. */
 export function VendorsConsole() {
-  const { token, authMessage } = useSharedSessionAuth();
+  const { token, authMessage, capabilities } = useSharedSessionAuth();
+  const canMutateVendors = canDo(capabilities, "vendors", "create");
 
   const [rows, setRows] = useState<VendorRecord[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -218,6 +220,10 @@ export function VendorsConsole() {
   /** Unified form submit handler: creates a new vendor or PATCHes the selected one. */
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canMutateVendors) {
+      setErrorStatus("Your role is read-only for vendor mutations.");
+      return;
+    }
     const payloadBody: VendorPayload = {
       name: name.trim(),
       vendor_type: vendorType,
@@ -593,7 +599,7 @@ export function VendorsConsole() {
                 </span>
               </label>
               <div className={styles.formActions}>
-                <button type="submit" className={styles.primaryButton} disabled={selectedVendorIsCanonical}>
+                <button type="submit" className={styles.primaryButton} disabled={selectedVendorIsCanonical || !canMutateVendors}>
                   {selectedVendor ? "Save Vendor" : "Create Vendor"}
                 </button>
                 {selectedVendor ? (
@@ -628,10 +634,10 @@ export function VendorsConsole() {
                     />
                   </label>
                   <div className={styles.formActions}>
-                    <button type="button" className={styles.secondaryButton} onClick={() => void runCsvImport(true)}>
+                    <button type="button" className={styles.secondaryButton} onClick={() => void runCsvImport(true)} disabled={!canMutateVendors}>
                       Preview
                     </button>
-                    <button type="button" className={styles.primaryButton} onClick={() => void runCsvImport(false)}>
+                    <button type="button" className={styles.primaryButton} onClick={() => void runCsvImport(false)} disabled={!canMutateVendors}>
                       Apply
                     </button>
                   </div>

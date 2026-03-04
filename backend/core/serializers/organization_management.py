@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from core.models import Organization, OrganizationMembership
+from core.models import Organization, OrganizationInvite, OrganizationMembership
 
 User = get_user_model()
 
@@ -102,3 +102,42 @@ class OrganizationMembershipUpdateSerializer(serializers.Serializer):
                 {"non_field_errors": ["Provide at least one field to update."]}
             )
         return attrs
+
+
+class OrganizationInviteSerializer(serializers.ModelSerializer):
+    """Read serializer for listing pending invites."""
+
+    invited_by_email = serializers.EmailField(source="invited_by.email", read_only=True)
+    role_template_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OrganizationInvite
+        fields = [
+            "id",
+            "email",
+            "role",
+            "role_template",
+            "role_template_name",
+            "invited_by_email",
+            "token",
+            "expires_at",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_role_template_name(self, obj: OrganizationInvite) -> str:
+        if obj.role_template_id and obj.role_template:
+            return obj.role_template.name
+        return ""
+
+
+class OrganizationInviteCreateSerializer(serializers.Serializer):
+    """Write serializer for creating an invite."""
+
+    email = serializers.EmailField()
+    role = serializers.ChoiceField(
+        choices=OrganizationMembership.Role.choices,
+        default=OrganizationMembership.Role.VIEWER,
+        required=False,
+    )
+    role_template_id = serializers.IntegerField(required=False, allow_null=True)

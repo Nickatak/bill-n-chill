@@ -120,6 +120,7 @@ export function PaymentsConsole() {
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const searchParams = useSearchParams();
   const canMutatePayments = canDo(capabilities, "payments", "create");
+  const canAllocatePayments = canDo(capabilities, "payments", "allocate");
   const scopedProjectIdParam = searchParams.get("project");
   const scopedProjectId =
     scopedProjectIdParam && /^\d+$/.test(scopedProjectIdParam) ? Number(scopedProjectIdParam) : null;
@@ -459,8 +460,8 @@ export function PaymentsConsole() {
   /** Create a payment allocation against the selected invoice or vendor bill target. */
   async function handleCreateAllocation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canMutatePayments) {
-      setStatusMessage(`Role ${role} is read-only for payment mutations.`);
+    if (!canAllocatePayments) {
+      setStatusMessage(`Role ${role} does not have payment allocation permission.`);
       return;
     }
 
@@ -810,7 +811,7 @@ export function PaymentsConsole() {
           <button
             type="submit"
             disabled={
-              !canMutatePayments ||
+              !canAllocatePayments ||
               !selectedPaymentId ||
               !allocationTargetId ||
               allocationAmount === "0.00"

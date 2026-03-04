@@ -195,6 +195,7 @@ function invoiceStatusEventToneClass(event: InvoiceStatusEventRecord): string {
 export function InvoicesConsole() {
   const { token, authMessage, role, capabilities } = useSharedSessionAuth();
   const canMutateInvoices = canDo(capabilities, "invoices", "create");
+  const canSendInvoices = canDo(capabilities, "invoices", "send");
   const canEditInvoiceWorkspace = canMutateInvoices;
 
   const searchParams = useSearchParams();
@@ -343,8 +344,11 @@ export function InvoicesConsole() {
     if (selectedInvoice.status === "sent" && !nextStatuses.includes("sent")) {
       nextStatuses.unshift("sent");
     }
-    return nextStatuses;
-  }, [invoiceAllowedStatusTransitions, selectedInvoice]);
+    return nextStatuses.filter((status) => {
+      if (status === "sent") return canSendInvoices;
+      return true;
+    });
+  }, [invoiceAllowedStatusTransitions, selectedInvoice, canSendInvoices]);
 
   const invoiceStatusTotals = useMemo(() => {
     const totals = new Map<string, number>();

@@ -108,6 +108,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const searchParams = useSearchParams();
   const { token, role, capabilities } = useSharedSessionAuth();
   const canMutateEstimates = canDo(capabilities, "estimates", "create");
+  const canSendEstimates = canDo(capabilities, "estimates", "send");
+  const canApproveEstimates = canDo(capabilities, "estimates", "approve");
   const [formErrorMessage, setFormErrorMessage] = useState("");
   const [formSuccessMessage, setFormSuccessMessage] = useState("");
   const [actionMessage, setActionMessage] = useState("");
@@ -232,6 +234,11 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         nextStatusValues.includes(option.value) &&
         !ESTIMATE_SYSTEM_ONLY_STATUSES.has(option.value),
     )
+    .filter((option) => {
+      if (option.value === "sent") return canSendEstimates;
+      if (option.value === "approved") return canApproveEstimates;
+      return true;
+    })
     .map((option) =>
       selectedEstimate?.status === "sent" && option.value === "sent"
         ? { ...option, label: "Re-send" }

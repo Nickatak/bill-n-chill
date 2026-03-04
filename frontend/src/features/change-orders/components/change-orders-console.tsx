@@ -195,6 +195,8 @@ export function ChangeOrdersConsole({
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const canMutateChangeOrders = canDo(capabilities, "change_orders", "create");
+  const canSendChangeOrders = canDo(capabilities, "change_orders", "send");
+  const canApproveChangeOrders = canDo(capabilities, "change_orders", "approve");
   const scopedProjectId = scopedProjectIdProp;
   const initialOriginEstimateId = initialOriginEstimateIdProp;
   const selectedChangeOrder =
@@ -292,8 +294,12 @@ export function ChangeOrdersConsole({
     if (allowResend && !base.includes(selectedViewerChangeOrder.status)) {
       base.unshift(selectedViewerChangeOrder.status);
     }
-    return base;
-  }, [changeOrderAllowedTransitions, selectedViewerChangeOrder]);
+    return base.filter((status) => {
+      if (status === "pending_approval") return canSendChangeOrders;
+      if (status === "approved") return canApproveChangeOrders;
+      return true;
+    });
+  }, [changeOrderAllowedTransitions, selectedViewerChangeOrder, canSendChangeOrders, canApproveChangeOrders]);
   const isCreateSubmitDisabled =
     !canMutateChangeOrders ||
     !selectedProjectId ||

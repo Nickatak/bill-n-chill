@@ -7,6 +7,7 @@
  */
 
 import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { canDo } from "@/features/session/rbac";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
@@ -19,7 +20,8 @@ type FormMode = "create" | "edit";
 
 /** Full CRUD console for cost codes with search, visibility filter, and CSV import. */
 export function CostCodesConsole() {
-  const { token, authMessage } = useSharedSessionAuth();
+  const { token, authMessage, capabilities } = useSharedSessionAuth();
+  const canMutateCostCodes = canDo(capabilities, "cost_codes", "create");
 
   const [rows, setRows] = useState<CostCode[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
@@ -145,6 +147,10 @@ export function CostCodesConsole() {
   /** POST a new cost code and select it on success. */
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canMutateCostCodes) {
+      setErrorStatus("Your role is read-only for cost code mutations.");
+      return;
+    }
     setNeutralStatus("Creating cost code...");
 
     try {
@@ -175,6 +181,10 @@ export function CostCodesConsole() {
   /** PATCH the selected cost code with edited name and active status. */
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canMutateCostCodes) {
+      setErrorStatus("Your role is read-only for cost code mutations.");
+      return;
+    }
     const id = Number(selectedId);
     if (!id) {
       setErrorStatus("Select a cost code first.");
@@ -380,7 +390,7 @@ export function CostCodesConsole() {
                   </div>
                 ) : null}
                 <div className={styles.buttonRow}>
-                  <button type="submit" className={styles.primaryButton}>
+                  <button type="submit" className={styles.primaryButton} disabled={!canMutateCostCodes}>
                     {isEditing ? "Save" : "Create"}
                   </button>
                   {isEditing ? (
@@ -420,6 +430,7 @@ export function CostCodesConsole() {
                       type="button"
                       className={styles.secondaryButton}
                       onClick={() => void runCsvImport(true)}
+                      disabled={!canMutateCostCodes}
                     >
                       Preview
                     </button>
@@ -427,6 +438,7 @@ export function CostCodesConsole() {
                       type="button"
                       className={styles.primaryButton}
                       onClick={() => void runCsvImport(false)}
+                      disabled={!canMutateCostCodes}
                     >
                       Apply
                     </button>

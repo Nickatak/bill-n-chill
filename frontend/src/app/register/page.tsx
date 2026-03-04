@@ -7,14 +7,18 @@ export const metadata: Metadata = {
   title: "Register",
 };
 
-export default async function RegisterPage() {
-  const health = await fetchHealth();
+export default async function RegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ token?: string }>;
+}) {
+  const [health, params] = await Promise.all([fetchHealth(), searchParams]);
 
   return (
     <div className={homeStyles.page}>
       <main className={homeStyles.main}>
         <h1 className={homeStyles.title}>Bill n&apos; Chill</h1>
-        <HomeRegisterConsole health={health} />
+        <HomeRegisterConsole health={health} inviteToken={params.token} />
       </main>
     </div>
   );

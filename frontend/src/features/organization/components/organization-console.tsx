@@ -16,8 +16,11 @@ import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import { formatDateDisplay } from "@/shared/date-format";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
+import { canDo } from "@/features/session/rbac";
+
 import {
   ApiResponse,
+  OrganizationInviteRecord,
   OrganizationMembershipRecord,
   OrganizationMembershipStatus,
   OrganizationProfile,
@@ -91,7 +94,7 @@ function extractErrorMessage(payload: ApiResponse | null, fallback: string): str
 
 /** Organization profile editor and membership management console. */
 export function OrganizationConsole() {
-  const { token, role, organization: sessionOrganization } = useSharedSessionAuth();
+  const { token, role, capabilities, organization: sessionOrganization } = useSharedSessionAuth();
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
 
   const [errorMessage, setErrorMessage] = useState("");
@@ -115,10 +118,21 @@ export function OrganizationConsole() {
   const [membershipDrafts, setMembershipDrafts] = useState<Record<number, MembershipDraft>>({});
   const [documentSettingsView, setDocumentSettingsView] = useState<DocumentSettingsView>("invoice");
 
+  // Invite state
+  const [invites, setInvites] = useState<OrganizationInviteRecord[]>([]);
+  const [inviteEmailDraft, setInviteEmailDraft] = useState("");
+  const [inviteRoleDraft, setInviteRoleDraft] = useState("viewer");
+  const [isCreatingInvite, setIsCreatingInvite] = useState(false);
+  const [copiedInviteId, setCopiedInviteId] = useState<number | null>(null);
+  const [revokingInviteId, setRevokingInviteId] = useState<number | null>(null);
+  const [lastCreatedInviteToken, setLastCreatedInviteToken] = useState<string | null>(null);
+
   const canEditProfile =
     rolePolicy?.can_edit_profile ?? hasAnyRole(role, ["owner", "pm"]);
   const canManageMemberships =
     rolePolicy?.can_manage_memberships ?? hasAnyRole(role, ["owner"]);
+  const canInvite =
+    rolePolicy?.can_invite ?? canDo(capabilities, "users", "invite");
   const editableRoles = rolePolicy?.editable_roles ?? FALLBACK_EDITABLE_ROLES;
   const editableStatuses = rolePolicy?.editable_statuses ?? FALLBACK_EDITABLE_STATUSES;
   const hasSession = Boolean(token);
@@ -157,13 +171,16 @@ export function OrganizationConsole() {
     const loadData = async () => {
       setErrorMessage("");
       try {
-        const [profileResponse, membershipsResponse] = await Promise.all([
+        const [profileResponse, membershipsResponse, invitesResponse] = await Promise.all([
           fetch(`${normalizedBaseUrl}/organization/`, {
             headers: buildAuthHeaders(token),
           }),
           fetch(`${normalizedBaseUrl}/organization/memberships/`, {
             headers: buildAuthHeaders(token),
           }),
+          fetch(`${normalizedBaseUrl}/organization/invites/`, {
+            headers: buildAuthHeaders(token),
+          }).catch(() => null),
         ]);
         const profilePayload: ApiResponse = await profileResponse.json();
         const membershipsPayload: ApiResponse = await membershipsResponse.json();
@@ -181,6 +198,12 @@ export function OrganizationConsole() {
             extractErrorMessage(membershipsPayload, "Could not load organization memberships."),
           );
           return;
+        }
+        // Invites fetch is best-effort (user may not have users.invite capability)
+        if (invitesResponse?.ok) {
+          const invitesPayload = await invitesResponse.json();
+          const invitesData = invitesPayload?.data as { invites?: OrganizationInviteRecord[] } | undefined;
+          setInvites(invitesData?.invites ?? []);
         }
 
         const profileData = profilePayload.data as
@@ -393,6 +416,89 @@ export function OrganizationConsole() {
       setErrorMessage("Could not reach membership update endpoint.");
     } finally {
       setSavingMembershipId(null);
+    }
+  }
+
+  /** Build an invite link from a token. */
+  function buildInviteLink(inviteToken: string): string {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    return `${origin}/register?token=${inviteToken}`;
+  }
+
+  /** POST a new invite. */
+  async function handleCreateInvite(event: FormEvent) {
+    event.preventDefault();
+    if (!canInvite || isCreatingInvite) {
+      return;
+    }
+    setIsCreatingInvite(true);
+    setErrorMessage("");
+    setLastCreatedInviteToken(null);
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/organization/invites/`, {
+        method: "POST",
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        body: JSON.stringify({ email: inviteEmailDraft.trim(), role: inviteRoleDraft }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        setErrorMessage(extractErrorMessage(body, "Could not create invite."));
+        return;
+      }
+      const invite = body?.data?.invite as OrganizationInviteRecord | undefined;
+      if (invite) {
+        setInvites((current) => [invite, ...current]);
+        setLastCreatedInviteToken(invite.token);
+        setInviteEmailDraft("");
+        setInviteRoleDraft("viewer");
+      }
+    } catch {
+      setErrorMessage("Could not reach invite endpoint.");
+    } finally {
+      setIsCreatingInvite(false);
+    }
+  }
+
+  /** DELETE (revoke) a pending invite. */
+  async function handleRevokeInvite(inviteId: number) {
+    if (!canInvite) {
+      return;
+    }
+    setRevokingInviteId(inviteId);
+    setErrorMessage("");
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/organization/invites/${inviteId}/`, {
+        method: "DELETE",
+        headers: buildAuthHeaders(token),
+      });
+      if (!response.ok && response.status !== 204) {
+        const body = await response.json().catch(() => null);
+        setErrorMessage(extractErrorMessage(body, "Could not revoke invite."));
+        return;
+      }
+      setInvites((current) => current.filter((inv) => inv.id !== inviteId));
+      if (lastCreatedInviteToken) {
+        const removedInvite = invites.find((inv) => inv.id === inviteId);
+        if (removedInvite?.token === lastCreatedInviteToken) {
+          setLastCreatedInviteToken(null);
+        }
+      }
+    } catch {
+      setErrorMessage("Could not reach invite revoke endpoint.");
+    } finally {
+      setRevokingInviteId(null);
+    }
+  }
+
+  /** Copy an invite link to clipboard. */
+  async function handleCopyInviteLink(invite: OrganizationInviteRecord) {
+    try {
+      await navigator.clipboard.writeText(buildInviteLink(invite.token));
+      setCopiedInviteId(invite.id);
+      setTimeout(() => setCopiedInviteId(null), 2000);
+    } catch {
+      // Fallback: select text in a temp input
+      setErrorMessage("Could not copy to clipboard.");
     }
   }
 
@@ -673,6 +779,114 @@ export function OrganizationConsole() {
             })}
           </div>
         </section>
+
+        {canInvite ? (
+          <section className={shell.card}>
+            <h2 className={shell.sectionTitle}>Invite Members</h2>
+            <p className={shell.sectionCopy}>
+              Create invite links to share with new or existing users. Links expire after 24 hours.
+            </p>
+
+            <form className={styles.inviteForm} onSubmit={handleCreateInvite}>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Email</span>
+                <input
+                  type="email"
+                  value={inviteEmailDraft}
+                  onChange={(event) => setInviteEmailDraft(event.target.value)}
+                  placeholder="teammate@example.com"
+                  required
+                  disabled={isCreatingInvite}
+                />
+              </label>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Role</span>
+                <select
+                  value={inviteRoleDraft}
+                  onChange={(event) => setInviteRoleDraft(event.target.value)}
+                  disabled={isCreatingInvite}
+                >
+                  {editableRoles.map((value) => (
+                    <option key={value} value={value}>
+                      {roleLabel(value)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className={styles.inviteFormActions}>
+                <button
+                  className={styles.primaryButton}
+                  type="submit"
+                  disabled={isCreatingInvite || !inviteEmailDraft.trim()}
+                >
+                  {isCreatingInvite ? "Creating..." : "Create Invite"}
+                </button>
+              </div>
+            </form>
+
+            {lastCreatedInviteToken ? (
+              <div className={styles.inviteLinkBanner}>
+                <span className={styles.fieldLabel}>Invite Link (copy and share)</span>
+                <div className={styles.inviteLinkRow}>
+                  <code className={styles.inviteLinkCode}>
+                    {buildInviteLink(lastCreatedInviteToken)}
+                  </code>
+                  <button
+                    className={styles.secondaryButton}
+                    type="button"
+                    onClick={() => {
+                      const invite = invites.find((inv) => inv.token === lastCreatedInviteToken);
+                      if (invite) handleCopyInviteLink(invite);
+                    }}
+                  >
+                    {copiedInviteId != null &&
+                    invites.find((inv) => inv.token === lastCreatedInviteToken)?.id === copiedInviteId
+                      ? "Copied!"
+                      : "Copy"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {invites.length > 0 ? (
+              <div className={styles.inviteList}>
+                <h3 className={styles.sectionSubTitle}>Pending Invites</h3>
+                {invites.map((invite) => (
+                  <article key={invite.id} className={styles.inviteRow}>
+                    <div className={styles.inviteIdentity}>
+                      <p className={styles.memberName}>{invite.email}</p>
+                      <p className={styles.memberEmail}>
+                        {roleLabel(invite.role)}
+                        {invite.role_template_name ? ` (${invite.role_template_name})` : ""}
+                        {" · "}Invited by {invite.invited_by_email}
+                      </p>
+                      <p className={styles.memberEmail}>
+                        Expires {formatDateDisplay(invite.expires_at)}
+                      </p>
+                    </div>
+                    <div className={styles.inviteActions}>
+                      <button
+                        className={styles.secondaryButton}
+                        type="button"
+                        onClick={() => handleCopyInviteLink(invite)}
+                      >
+                        {copiedInviteId === invite.id ? "Copied!" : "Copy Link"}
+                      </button>
+                      <button
+                        className={`${styles.secondaryButton} ${styles.revokeButton}`}
+                        type="button"
+                        onClick={() => handleRevokeInvite(invite.id)}
+                        disabled={revokingInviteId === invite.id}
+                      >
+                        {revokingInviteId === invite.id ? "Revoking..." : "Revoke"}
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
       </main>
     </div>
   );

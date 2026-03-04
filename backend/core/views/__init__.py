@@ -4,12 +4,16 @@ from core.views.shared_operations.accounting import (
     accounting_sync_event_retry_view,
     project_accounting_sync_events_view,
 )
+from core.views.shared_operations.organization_invites import (
+    organization_invite_detail_view,
+    organization_invites_view,
+)
 from core.views.shared_operations.organization_management import (
     organization_membership_detail_view,
     organization_memberships_view,
     organization_profile_view,
 )
-from core.views.auth import health_view, login_view, me_view, register_view
+from core.views.auth import accept_invite_view, health_view, login_view, me_view, register_view, verify_invite_view
 from core.views.estimating.budgets import budget_line_detail_view, project_budgets_view
 from core.views.change_orders.change_orders import (
     change_order_contract_view,
@@ -76,11 +80,15 @@ from core.views.accounts_payable.vendor_bills import (
 from core.views.shared_operations.vendors import vendor_detail_view, vendors_import_csv_view, vendors_list_create_view
 
 __all__ = [
+    "accept_invite_view",
     "health_view",
     "login_view",
     "register_view",
+    "verify_invite_view",
     "me_view",
     "organization_profile_view",
+    "organization_invites_view",
+    "organization_invite_detail_view",
     "organization_memberships_view",
     "organization_membership_detail_view",
     "project_accounting_sync_events_view",

@@ -28,12 +28,14 @@ def _organization_role_policy(user) -> dict:
     can_edit_identity = "edit" in caps.get("org_identity", [])
     can_edit_presets = "edit" in caps.get("org_presets", [])
     can_manage_memberships = "edit_role" in caps.get("users", [])
+    can_invite = "invite" in caps.get("users", [])
     return {
         "effective_role": effective_role,
         "can_edit_identity": can_edit_identity,
         "can_edit_presets": can_edit_presets,
         "can_edit_profile": can_edit_identity or can_edit_presets,
         "can_manage_memberships": can_manage_memberships,
+        "can_invite": can_invite,
         "editable_roles": [choice[0] for choice in OrganizationMembership.Role.choices],
         "editable_statuses": [choice[0] for choice in OrganizationMembership.Status.choices],
     }

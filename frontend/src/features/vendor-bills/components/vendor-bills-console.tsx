@@ -288,6 +288,8 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const canMutateVendorBills = canDo(capabilities, "vendor_bills", "create");
+  const canApproveVendorBills = canDo(capabilities, "vendor_bills", "approve");
+  const canPayVendorBills = canDo(capabilities, "vendor_bills", "pay");
   const isProjectScoped = scopedProjectId !== null;
   const selectedProject =
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;
@@ -334,9 +336,14 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const formSubtotalAmount = Number(formSubtotal || 0);
   const formTaxAmountValue = Number(formTaxAmount || 0);
   const formShippingAmountValue = Number(formShippingAmount || 0);
-  const quickStatusOptions = selectedVendorBill
+  const quickStatusOptions = (selectedVendorBill
     ? allowedStatusTransitions[selectedVendorBill.status] ?? []
-    : [];
+    : []
+  ).filter((status: string) => {
+    if (status === "approved") return canApproveVendorBills;
+    if (status === "paid") return canPayVendorBills;
+    return true;
+  });
   const computedTotalFromParts = (
     formSubtotalAmount +
     formTaxAmountValue +

@@ -26,6 +26,7 @@ type ContactEditorFormProps = {
   activeProjectCount: number;
   hasActiveOrOnHoldProject: boolean;
   onSubmit: FormEventHandler<HTMLFormElement>;
+  readOnly?: boolean;
 };
 
 /** Editable customer detail form with archive-safety guard for active projects. */
@@ -46,6 +47,7 @@ export function ContactEditorForm({
   activeProjectCount,
   hasActiveOrOnHoldProject,
   onSubmit,
+  readOnly = false,
 }: ContactEditorFormProps) {
   // Prevent archiving while the customer still has work in progress
   const archiveToggleBlocked = hasActiveOrOnHoldProject && !isArchived;
@@ -129,7 +131,7 @@ export function ContactEditorForm({
       ) : null}
 
       <div className={styles.actionRow}>
-        <button className={styles.primaryButton} type="submit" disabled={!selectedId}>
+        <button className={styles.primaryButton} type="submit" disabled={!selectedId || readOnly}>
           Save Customer
         </button>
       </div>

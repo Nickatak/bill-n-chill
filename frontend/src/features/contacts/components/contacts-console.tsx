@@ -7,6 +7,7 @@
  */
 
 import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { canDo } from "@/features/session/rbac";
 import { FormEvent, MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -38,7 +39,9 @@ type ProjectCreateApiResponse = {
 
 /** Root console component for customer CRUD, filtering, and project creation. */
 export function ContactsConsole() {
-  const { token } = useSharedSessionAuth();
+  const { token, capabilities } = useSharedSessionAuth();
+  const canMutateCustomers = canDo(capabilities, "customers", "create");
+  const canMutateProjects = canDo(capabilities, "projects", "create");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -228,6 +231,10 @@ export function ContactsConsole() {
   /** PATCH the customer record, update the local list, and close the editor on success. */
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canMutateCustomers) {
+      setStatusMessage("Your role is read-only for customer mutations.");
+      return;
+    }
     const customerId = Number(editingId);
     if (!customerId) {
       setStatusMessage("Select a customer first.");
@@ -268,6 +275,10 @@ export function ContactsConsole() {
   /** POST a new project under the selected customer, then navigate to its workspace. */
   async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canMutateProjects) {
+      setStatusMessage("Your role is read-only for project creation.");
+      return;
+    }
     const customerId = createProjectCustomerId;
     if (!customerId) {
       setStatusMessage("Select a customer first.");
@@ -369,6 +380,7 @@ export function ContactsConsole() {
               activeProjectCount={editingCustomer.active_project_count ?? 0}
               hasActiveOrOnHoldProject={Boolean(editingCustomer.has_active_or_on_hold_project)}
               onSubmit={handleSave}
+              readOnly={!canMutateCustomers}
             />
           </section>
         </div>
@@ -395,6 +407,7 @@ export function ContactsConsole() {
               projectStatus={projectStatus}
               onProjectStatusChange={setProjectStatus}
               onSubmit={handleCreateProject}
+              readOnly={!canMutateProjects}
             />
           </section>
         </div>
