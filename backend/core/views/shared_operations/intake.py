@@ -19,7 +19,7 @@ from core.serializers import (
     CustomerSerializer,
     ProjectSerializer,
 )
-from core.views.helpers import _organization_user_ids
+from core.views.helpers import _capability_gate, _organization_user_ids
 
 ALLOWED_PROJECT_CREATE_STATUSES = {
     Project.Status.PROSPECT,
@@ -253,6 +253,10 @@ def customer_detail_view(request, customer_id: int):
         payload["has_active_or_on_hold_project"] = payload["active_project_count"] > 0
         return Response({"data": payload})
 
+    permission_error, _ = _capability_gate(request.user, "customers", "edit")
+    if permission_error:
+        return Response(permission_error, status=403)
+
     with transaction.atomic():
         previous_is_archived = contact.is_archived
         serializer = CustomerManageSerializer(contact, data=request.data, partial=True)
@@ -337,6 +341,10 @@ def customer_project_create_view(request, customer_id: int):
             },
             status=404,
         )
+
+    permission_error, _ = _capability_gate(request.user, "projects", "create")
+    if permission_error:
+        return Response(permission_error, status=403)
 
     serializer = CustomerProjectCreateSerializer(data=request.data or {})
     serializer.is_valid(raise_exception=True)
@@ -428,6 +436,10 @@ def quick_add_customer_intake_view(request):
     - Intake provenance is captured as immutable `LeadContactRecord`.
     - Optional project creation is performed in the same request when `create_project=true`.
     """
+    permission_error, _ = _capability_gate(request.user, "customers", "create")
+    if permission_error:
+        return Response(permission_error, status=403)
+
     initial_contract_value = request.data.get("initial_contract_value", None)
     if initial_contract_value == "":
         initial_contract_value = None

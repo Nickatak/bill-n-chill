@@ -30,7 +30,6 @@ class OrganizationManagementTests(TestCase):
 
         self.organization = Organization.objects.create(
             display_name="Org Management Test",
-            slug="org-management-test",
             created_by=self.owner_user,
         )
         self.owner_membership = OrganizationMembership.objects.create(
@@ -54,7 +53,6 @@ class OrganizationManagementTests(TestCase):
 
         self.other_organization = Organization.objects.create(
             display_name="Other Org",
-            slug="org-management-other",
             created_by=self.outsider_user,
         )
         self.outsider_membership = OrganizationMembership.objects.create(
@@ -94,57 +92,66 @@ class OrganizationManagementTests(TestCase):
         self.assertTrue(payload["role_policy"]["can_edit_profile"])
         self.assertTrue(payload["role_policy"]["can_manage_memberships"])
 
-    def test_organization_profile_patch_allows_owner_and_pm_but_forbids_viewer(self):
+    def test_organization_profile_patch_identity_requires_org_identity_edit(self):
+        # PM cannot edit identity fields (display_name, logo_url, billing_address)
         patch_by_pm = self.client.patch(
             "/api/v1/organization/",
-            data={"display_name": "Org Name From PM"},
+            data={"display_name": "PM Should Not Edit Identity"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.pm_token.key}",
+        )
+        self.assertEqual(patch_by_pm.status_code, 403)
+        self.assertEqual(patch_by_pm.json()["error"]["code"], "forbidden")
+
+        # Owner can edit identity fields
+        patch_by_owner = self.client.patch(
+            "/api/v1/organization/",
+            data={"display_name": "Owner Can Edit"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.owner_token.key}",
+        )
+        self.assertEqual(patch_by_owner.status_code, 200)
+        self.organization.refresh_from_db()
+        self.assertEqual(self.organization.display_name, "Owner Can Edit")
+
+    def test_organization_profile_patch_presets_allows_pm_but_forbids_viewer(self):
+        # PM can edit preset fields
+        patch_by_pm = self.client.patch(
+            "/api/v1/organization/",
+            data={"help_email": "pm-help@example.com"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.pm_token.key}",
         )
         self.assertEqual(patch_by_pm.status_code, 200)
         self.organization.refresh_from_db()
-        self.assertEqual(self.organization.display_name, "Org Name From PM")
+        self.assertEqual(self.organization.help_email, "pm-help@example.com")
 
         latest_record = OrganizationRecord.objects.filter(organization=self.organization).latest("id")
         self.assertEqual(latest_record.event_type, OrganizationRecord.EventType.UPDATED)
         self.assertEqual(latest_record.recorded_by_id, self.pm_user.id)
 
+        # Viewer cannot edit preset fields
         patch_by_viewer = self.client.patch(
             "/api/v1/organization/",
-            data={"display_name": "Viewer Should Not Edit"},
+            data={"help_email": "viewer@no.com"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.viewer_token.key}",
         )
         self.assertEqual(patch_by_viewer.status_code, 403)
         self.assertEqual(patch_by_viewer.json()["error"]["code"], "forbidden")
 
-    def test_organization_profile_patch_validates_slug_uniqueness(self):
-        response = self.client.patch(
-            "/api/v1/organization/",
-            data={"slug": self.other_organization.slug},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.owner_token.key}",
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"]["code"], "validation_error")
-        self.assertIn("slug", response.json()["error"]["fields"])
-
-    def test_organization_profile_patch_updates_invoice_branding_defaults(self):
+    def test_organization_profile_patch_updates_org_defaults(self):
         response = self.client.patch(
             "/api/v1/organization/",
             data={
                 "logo_url": "https://example.com/new-logo.png",
-                "invoice_sender_name": "Billing Team",
-                "invoice_sender_email": "billing@example.com",
                 "help_email": "help@example.com",
-                "invoice_sender_address": "123 Main St\nAustin, TX 78701",
-                "invoice_default_due_days": 21,
-                "estimate_validation_delta_days": 45,
-                "invoice_default_terms": "Net 21",
-                "estimate_default_terms": "Estimate terms and assumptions.",
-                "change_order_default_reason": "Default CO reason text.",
-                "invoice_default_footer": "Thanks for your business.",
-                "invoice_default_notes": "Please include invoice number with payment.",
+                "billing_address": "123 Main St\nAustin, TX 78701",
+                "default_invoice_due_delta": 21,
+                "default_estimate_valid_delta": 45,
+                "invoice_terms_and_conditions": "Net 21",
+                "estimate_terms_and_conditions": "Estimate terms and assumptions.",
+                "change_order_terms_and_conditions": "CO terms text.",
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.owner_token.key}",
@@ -152,39 +159,32 @@ class OrganizationManagementTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.organization.refresh_from_db()
         self.assertEqual(self.organization.logo_url, "https://example.com/new-logo.png")
-        self.assertEqual(self.organization.invoice_sender_name, "Billing Team")
-        self.assertEqual(self.organization.invoice_sender_email, "billing@example.com")
         self.assertEqual(self.organization.help_email, "help@example.com")
-        self.assertEqual(self.organization.invoice_sender_address, "123 Main St\nAustin, TX 78701")
-        self.assertEqual(self.organization.invoice_default_due_days, 21)
-        self.assertEqual(self.organization.estimate_validation_delta_days, 45)
-        self.assertEqual(self.organization.invoice_default_terms, "Net 21")
-        self.assertEqual(self.organization.estimate_default_terms, "Estimate terms and assumptions.")
-        self.assertEqual(self.organization.change_order_default_reason, "Default CO reason text.")
-        self.assertEqual(self.organization.invoice_default_footer, "Thanks for your business.")
-        self.assertEqual(
-            self.organization.invoice_default_notes,
-            "Please include invoice number with payment.",
-        )
+        self.assertEqual(self.organization.billing_address, "123 Main St\nAustin, TX 78701")
+        self.assertEqual(self.organization.default_invoice_due_delta, 21)
+        self.assertEqual(self.organization.default_estimate_valid_delta, 45)
+        self.assertEqual(self.organization.invoice_terms_and_conditions, "Net 21")
+        self.assertEqual(self.organization.estimate_terms_and_conditions, "Estimate terms and assumptions.")
+        self.assertEqual(self.organization.change_order_terms_and_conditions, "CO terms text.")
 
-    def test_organization_profile_patch_validates_invoice_default_due_days_range(self):
+    def test_organization_profile_patch_validates_delta_range(self):
         response = self.client.patch(
             "/api/v1/organization/",
-            data={"invoice_default_due_days": 0},
+            data={"default_invoice_due_delta": 0},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.owner_token.key}",
         )
         self.assertEqual(response.status_code, 400)
-        self.assertIn("invoice_default_due_days", response.json())
+        self.assertIn("default_invoice_due_delta", response.json())
 
         estimate_delta_response = self.client.patch(
             "/api/v1/organization/",
-            data={"estimate_validation_delta_days": 0},
+            data={"default_estimate_valid_delta": 0},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.owner_token.key}",
         )
         self.assertEqual(estimate_delta_response.status_code, 400)
-        self.assertIn("estimate_validation_delta_days", estimate_delta_response.json())
+        self.assertIn("default_estimate_valid_delta", estimate_delta_response.json())
 
     def test_organization_memberships_list_is_scoped_to_active_org(self):
         response = self.client.get(
@@ -200,12 +200,25 @@ class OrganizationManagementTests(TestCase):
         self.assertIn(self.viewer_membership.id, returned_ids)
         self.assertNotIn(self.outsider_membership.id, returned_ids)
 
-    def test_organization_membership_patch_requires_owner_role(self):
+    def test_organization_membership_patch_requires_users_edit_role_capability(self):
+        # Worker has no users capabilities → blocked
+        worker_user = User.objects.create_user(
+            username="org-worker-gate",
+            email="org-worker-gate@example.com",
+            password="secret123",
+        )
+        worker_token, _ = Token.objects.get_or_create(user=worker_user)
+        OrganizationMembership.objects.create(
+            organization=self.organization,
+            user=worker_user,
+            role=OrganizationMembership.Role.WORKER,
+            status=OrganizationMembership.Status.ACTIVE,
+        )
         response = self.client.patch(
             f"/api/v1/organization/memberships/{self.viewer_membership.id}/",
             data={"role": OrganizationMembership.Role.WORKER},
             content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.pm_token.key}",
+            HTTP_AUTHORIZATION=f"Token {worker_token.key}",
         )
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()["error"]["code"], "forbidden")

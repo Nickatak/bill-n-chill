@@ -9,7 +9,7 @@ from rest_framework.response import Response
 
 from core.models import Budget, BudgetLine, ChangeOrder, ChangeOrderLine, Invoice, InvoiceLine, VendorBill, VendorBillAllocation
 from core.serializers import BudgetLineSerializer, BudgetLineUpdateSerializer, BudgetSerializer
-from core.views.helpers import _organization_user_ids, _role_gate_error_payload, _validate_project_for_user
+from core.views.helpers import _organization_user_ids, _validate_project_for_user
 
 
 @api_view(["GET"])
@@ -102,9 +102,6 @@ def budget_line_detail_view(request, budget_id: int, line_id: int):
     - Supports `description` and `budget_amount` updates.
     """
     actor_user_ids = _organization_user_ids(request.user)
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
-    if permission_error:
-        return Response(permission_error, status=403)
 
     try:
         budget = Budget.objects.get(id=budget_id, created_by_id__in=actor_user_ids)

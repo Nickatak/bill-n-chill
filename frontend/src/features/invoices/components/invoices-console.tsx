@@ -411,8 +411,8 @@ export function InvoicesConsole() {
         setHasAutoSelectedProjectWithInvoices(false);
         if (orgRes.ok && organizationData) {
           setOrganizationInvoiceDefaults(organizationData);
-          setDueDate(dueDateFromIssueDate(issueDate, organizationData.invoice_default_due_days || 30));
-          setTermsText((current) => current || organizationData.invoice_default_terms || "");
+          setDueDate(dueDateFromIssueDate(issueDate, organizationData.default_invoice_due_delta || 30));
+          setTermsText((current) => current || organizationData.invoice_terms_and_conditions || "");
         }
 
         setSelectedProjectId((current) => {
@@ -938,11 +938,11 @@ export function InvoicesConsole() {
    *  Pre-populates line items from the active budget with remaining billable amounts. */
   function resetCreateDraft() {
     const nextIssueDate = todayDateInput();
-    const dueDays = organizationInvoiceDefaults?.invoice_default_due_days ?? 30;
+    const dueDays = organizationInvoiceDefaults?.default_invoice_due_delta ?? 30;
     setIssueDate(nextIssueDate);
     setDueDate(dueDateFromIssueDate(nextIssueDate, dueDays));
     setTaxPercent("0");
-    setTermsText(organizationInvoiceDefaults?.invoice_default_terms || "");
+    setTermsText(organizationInvoiceDefaults?.invoice_terms_and_conditions || "");
 
     const billableLines = budgetLineOptions
       .filter((opt) => parseAmount(opt.remainingBillable) > 0)
@@ -1193,7 +1193,7 @@ export function InvoicesConsole() {
     setIssueDate(nextIssueDate);
     setDueDate(dueDateFromIssueDate(
       nextIssueDate,
-      organizationInvoiceDefaults?.invoice_default_due_days ?? 30,
+      organizationInvoiceDefaults?.default_invoice_due_delta ?? 30,
     ));
     setTaxPercent(selectedInvoice.tax_percent || "0");
     setTermsText(selectedInvoice.terms_text || "");
@@ -1212,7 +1212,7 @@ export function InvoicesConsole() {
     [organizationInvoiceDefaults],
   );
   const senderDisplayName = organizationBranding.senderDisplayName;
-  const senderEmail = organizationBranding.senderEmail;
+  const senderEmail = organizationBranding.helpEmail;
   const senderAddressLines = organizationBranding.senderAddressLines;
   const senderLogoUrl = organizationBranding.logoUrl;
   const invoiceCreatorStatusPolicy = useMemo(
@@ -1966,7 +1966,7 @@ export function InvoicesConsole() {
 
                       <div className={creatorStyles.terms}>
                         <h4>Terms and Conditions</h4>
-                        {(termsText || organizationInvoiceDefaults?.invoice_default_terms || "Not set")
+                        {(termsText || organizationInvoiceDefaults?.invoice_terms_and_conditions || "Not set")
                           .split("\n")
                           .filter((line) => line.trim())
                           .map((line, index) => (

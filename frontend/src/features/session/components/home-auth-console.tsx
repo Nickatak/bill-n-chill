@@ -23,7 +23,6 @@ type LoginResponse = {
     organization?: {
       id?: number;
       display_name?: string;
-      slug?: string;
     };
   };
   error?: {
@@ -56,7 +55,7 @@ function formatTimestamp(value?: string): string {
 /**
  * Map the login endpoint's snake_case organization payload to the
  * client-side SessionOrganization shape. Returns undefined if any
- * required field (id, display_name, slug) is missing, so downstream
+ * required field (id, display_name) is missing, so downstream
  * code never sees a partially-populated org.
  */
 function toSessionOrganization(
@@ -64,17 +63,15 @@ function toSessionOrganization(
     | {
         id?: number;
         display_name?: string;
-        slug?: string;
       }
     | undefined,
 ): SessionOrganization | undefined {
-  if (!raw?.id || !raw.display_name || !raw.slug) {
+  if (!raw?.id || !raw.display_name) {
     return undefined;
   }
   return {
     id: raw.id,
     displayName: raw.display_name,
-    slug: raw.slug,
   };
 }
 

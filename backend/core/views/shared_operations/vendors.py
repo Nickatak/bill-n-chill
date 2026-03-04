@@ -14,7 +14,7 @@ from core.views.helpers import (
     _ensure_primary_membership,
     _organization_user_ids,
     _parse_request_bool,
-    _role_gate_error_payload,
+    _capability_gate,
 )
 
 
@@ -62,7 +62,7 @@ def vendors_list_create_view(request):
             )
         return Response({"data": VendorSerializer(rows, many=True).data})
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm", "bookkeeping"})
+    permission_error, _ = _capability_gate(request.user, "vendors", "create")
     if permission_error:
         return Response(permission_error, status=403)
 
@@ -153,7 +153,7 @@ def vendor_detail_view(request, vendor_id: int):
     if request.method == "GET":
         return Response({"data": VendorSerializer(vendor).data})
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm", "bookkeeping"})
+    permission_error, _ = _capability_gate(request.user, "vendors", "edit")
     if permission_error:
         return Response(permission_error, status=403)
 
@@ -224,7 +224,7 @@ def vendor_detail_view(request, vendor_id: int):
 @permission_classes([IsAuthenticated])
 def vendors_import_csv_view(request):
     """Import vendors from CSV in preview/apply mode with strict header validation."""
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm", "bookkeeping"})
+    permission_error, _ = _capability_gate(request.user, "vendors", "create")
     if permission_error:
         return Response(permission_error, status=403)
 

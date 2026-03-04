@@ -154,7 +154,7 @@ class InvoiceTests(TestCase):
             self.customer.display_name,
         )
         self.assertIn("organization_context", payload)
-        self.assertIn("sender_name", payload["organization_context"])
+        self.assertIn("display_name", payload["organization_context"])
         self.assertIn("help_email", payload["organization_context"])
         self.assertEqual(len(payload["line_items"]), 1)
 
@@ -276,15 +276,10 @@ class InvoiceTests(TestCase):
     def test_invoice_create_uses_organization_invoice_defaults_when_payload_omits_them(self):
         organization = Organization.objects.create(
             display_name="Invoice Defaults Org",
-            slug="invoice-defaults-org",
             logo_url="https://example.com/logo-default.png",
-            invoice_sender_name="Nick Construction LLC",
-            invoice_sender_email="billing@nickco.example.com",
-            invoice_sender_address="100 Main St\nAustin, TX 78701",
-            invoice_default_due_days=45,
-            invoice_default_terms="Net 45. Late fee after due date.",
-            invoice_default_footer="Thanks for your business.",
-            invoice_default_notes="Please include invoice number with payment.",
+            billing_address="100 Main St\nAustin, TX 78701",
+            default_invoice_due_delta=45,
+            invoice_terms_and_conditions="Net 45. Late fee after due date.",
             created_by=self.user,
         )
         OrganizationMembership.objects.update_or_create(
@@ -319,26 +314,21 @@ class InvoiceTests(TestCase):
 
         self.assertEqual(payload["issue_date"], expected_issue_date)
         self.assertEqual(payload["due_date"], expected_due_date)
-        self.assertEqual(payload["sender_name"], organization.invoice_sender_name)
-        self.assertEqual(payload["sender_email"], organization.invoice_sender_email)
-        self.assertEqual(payload["sender_address"], organization.invoice_sender_address)
+        self.assertEqual(payload["sender_name"], organization.display_name)
+        self.assertEqual(payload["sender_email"], "")
+        self.assertEqual(payload["sender_address"], organization.billing_address)
         self.assertEqual(payload["sender_logo_url"], organization.logo_url)
-        self.assertEqual(payload["terms_text"], organization.invoice_default_terms)
-        self.assertEqual(payload["footer_text"], organization.invoice_default_footer)
-        self.assertEqual(payload["notes_text"], organization.invoice_default_notes)
+        self.assertEqual(payload["terms_text"], organization.invoice_terms_and_conditions)
+        self.assertEqual(payload["footer_text"], "")
+        self.assertEqual(payload["notes_text"], "")
 
     def test_invoice_create_allows_overriding_organization_invoice_defaults(self):
         organization = Organization.objects.create(
             display_name="Invoice Override Org",
-            slug="invoice-override-org",
             logo_url="https://example.com/logo-org.png",
-            invoice_sender_name="Org Sender",
-            invoice_sender_email="ap@org.example.com",
-            invoice_sender_address="Org Address",
-            invoice_default_due_days=30,
-            invoice_default_terms="Org terms",
-            invoice_default_footer="Org footer",
-            invoice_default_notes="Org notes",
+            billing_address="Org Address",
+            default_invoice_due_delta=30,
+            invoice_terms_and_conditions="Org terms",
             created_by=self.user,
         )
         OrganizationMembership.objects.update_or_create(

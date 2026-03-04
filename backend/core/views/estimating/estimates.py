@@ -33,7 +33,7 @@ from core.views.helpers import (
     _record_financial_audit_event,
     _record_estimate_status_event,
     _resolve_organization_for_public_actor,
-    _role_gate_error_payload,
+    _capability_gate,
     _serialize_public_organization_context,
     _serialize_public_project_context,
     _validate_project_for_user,
@@ -440,7 +440,7 @@ def project_estimates_view(request, project_id: int):
             }
         )
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    permission_error, _ = _capability_gate(request.user, "estimates", "create")
     if permission_error:
         return Response(permission_error, status=403)
 
@@ -451,7 +451,7 @@ def project_estimates_view(request, project_id: int):
     if resolved_valid_through is None:
         validation_delta_days = max(
             1,
-            min(365, int(organization.estimate_validation_delta_days or 30)),
+            min(365, int(organization.default_estimate_valid_delta or 30)),
         )
         resolved_valid_through = timezone.localdate() + timedelta(days=validation_delta_days)
     if "terms_text" in data:
@@ -529,7 +529,7 @@ def project_estimates_view(request, project_id: int):
         if candidate.valid_through != resolved_valid_through:
             continue
         candidate_terms_text = (candidate.terms_text or "").strip()
-        incoming_terms_text = (organization.estimate_default_terms or "").strip()
+        incoming_terms_text = (organization.estimate_terms_and_conditions or "").strip()
         if candidate_terms_text != incoming_terms_text:
             continue
         if candidate.tax_percent != data.get("tax_percent", Decimal("0")):
@@ -597,7 +597,7 @@ def project_estimates_view(request, project_id: int):
         user=request.user,
         title=data.get("title", ""),
     )
-    terms_text = (organization.estimate_default_terms or "").strip()
+    terms_text = (organization.estimate_terms_and_conditions or "").strip()
 
     estimate = Estimate.objects.create(
         project=project,
@@ -673,7 +673,7 @@ def estimate_detail_view(request, estimate_id: int):
     if request.method == "GET":
         return Response({"data": _serialize_estimate(estimate=estimate, actor_user_ids=actor_user_ids)})
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    permission_error, _ = _capability_gate(request.user, "estimates", "edit")
     if permission_error:
         return Response(permission_error, status=403)
     serializer = EstimateWriteSerializer(
@@ -682,6 +682,19 @@ def estimate_detail_view(request, estimate_id: int):
     )
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
+
+    # Status-transition capability gates
+    if "status" in data:
+        _next = data["status"]
+        if _next in {Estimate.Status.SENT}:
+            _err, _ = _capability_gate(request.user, "estimates", "send")
+            if _err:
+                return Response(_err, status=403)
+        elif _next in {Estimate.Status.APPROVED, Estimate.Status.VOID}:
+            _err, _ = _capability_gate(request.user, "estimates", "approve")
+            if _err:
+                return Response(_err, status=403)
+
     if "title" in data and data["title"] != estimate.title:
         return Response(
             {
@@ -882,7 +895,7 @@ def estimate_clone_version_view(request, estimate_id: int):
             status=404,
         )
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    permission_error, _ = _capability_gate(request.user, "estimates", "create")
     if permission_error:
         return Response(permission_error, status=403)
 
@@ -986,7 +999,7 @@ def estimate_duplicate_view(request, estimate_id: int):
             status=404,
         )
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    permission_error, _ = _capability_gate(request.user, "estimates", "create")
     if permission_error:
         return Response(permission_error, status=403)
 
@@ -1121,18 +1134,18 @@ def estimate_convert_to_budget_view(request, estimate_id: int):
         request.data.get("supersede_active", False),
         default=False,
     )
-    permission_error, effective_role = _role_gate_error_payload(request.user, {"owner", "pm"})
+    permission_error, capabilities = _capability_gate(request.user, "estimates", "approve")
     if permission_error:
         return Response(permission_error, status=403)
-    if supersede_active and effective_role != "owner":
+    if supersede_active and "edit" not in capabilities.get("org_identity", []):
         return Response(
             {
                 "error": {
                     "code": "forbidden",
                     "message": "Only owners can supersede an active financial baseline.",
                     "fields": {
-                        "role": [
-                            "Owner role is required when supersede_active=true."
+                        "capability": [
+                            "org_identity.edit is required when supersede_active=true."
                         ]
                     },
                 }

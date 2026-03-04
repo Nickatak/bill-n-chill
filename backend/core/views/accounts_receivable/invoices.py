@@ -33,7 +33,7 @@ from core.views.helpers import (
     _resolve_organization_for_public_actor,
     _record_financial_audit_event,
     _record_invoice_status_event,
-    _role_gate_error_payload,
+    _capability_gate,
     _serialize_public_organization_context,
     _serialize_public_project_context,
     _validate_project_for_user,
@@ -398,7 +398,7 @@ def project_invoices_view(request, project_id: int):
         )
         return Response({"data": InvoiceSerializer(rows, many=True).data})
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm", "bookkeeping"})
+    permission_error, _ = _capability_gate(request.user, "invoices", "create")
     if permission_error:
         return Response(permission_error, status=403)
 
@@ -406,19 +406,19 @@ def project_invoices_view(request, project_id: int):
     serializer.is_valid(raise_exception=True)
     membership = _ensure_primary_membership(request.user)
     organization = membership.organization
-    default_due_days = int(organization.invoice_default_due_days or 30)
+    default_due_days = int(organization.default_invoice_due_delta or 30)
     default_due_days = max(1, min(default_due_days, 365))
     ingress = build_invoice_create_ingress(
         serializer.validated_data,
         default_issue_date=timezone.localdate(),
         default_due_days=default_due_days,
-        default_sender_name=(organization.invoice_sender_name or organization.display_name or "").strip(),
-        default_sender_email=(organization.invoice_sender_email or "").strip(),
-        default_sender_address=(organization.invoice_sender_address or "").strip(),
+        default_sender_name=(organization.display_name or "").strip(),
+        default_sender_email="",
+        default_sender_address=(organization.billing_address or "").strip(),
         default_sender_logo_url=(organization.logo_url or "").strip(),
-        default_terms_text=(organization.invoice_default_terms or "").strip(),
-        default_footer_text=(organization.invoice_default_footer or "").strip(),
-        default_notes_text=(organization.invoice_default_notes or "").strip(),
+        default_terms_text=(organization.invoice_terms_and_conditions or "").strip(),
+        default_footer_text="",
+        default_notes_text="",
     )
     line_items = ingress.line_items
     if not line_items:
@@ -600,7 +600,7 @@ def invoice_detail_view(request, invoice_id: int):
     if request.method == "GET":
         return Response({"data": InvoiceSerializer(invoice).data})
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm", "bookkeeping"})
+    permission_error, _ = _capability_gate(request.user, "invoices", "edit")
     if permission_error:
         return Response(permission_error, status=403)
 
@@ -912,7 +912,7 @@ def invoice_send_view(request, invoice_id: int):
             status=404,
         )
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm", "bookkeeping"})
+    permission_error, _ = _capability_gate(request.user, "invoices", "send")
     if permission_error:
         return Response(permission_error, status=403)
 

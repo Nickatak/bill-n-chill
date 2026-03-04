@@ -32,7 +32,7 @@ from core.views.helpers import (
     _organization_user_ids,
     _record_financial_audit_event,
     _resolve_organization_for_public_actor,
-    _role_gate_error_payload,
+    _capability_gate,
     _serialize_public_organization_context,
     _serialize_public_project_context,
     _validate_project_for_user,
@@ -288,7 +288,7 @@ def project_change_orders_view(request, project_id: int):
         )
         return Response({"data": ChangeOrderSerializer(rows, many=True).data})
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    permission_error, _ = _capability_gate(request.user, "change_orders", "create")
     if permission_error:
         return Response(permission_error, status=403)
 
@@ -302,12 +302,12 @@ def project_change_orders_view(request, project_id: int):
     reason_text = (
         str(data["reason"]).strip()
         if "reason" in data
-        else (organization.change_order_default_reason or "").strip()
+        else ""
     )
     terms_text = (
         str(data["terms_text"]).strip()
         if "terms_text" in data
-        else (organization.change_order_default_terms or "").strip()
+        else (organization.change_order_terms_and_conditions or "").strip()
     )
 
     fields = {}
@@ -447,13 +447,26 @@ def change_order_detail_view(request, change_order_id: int):
     if request.method == "GET":
         return Response({"data": ChangeOrderSerializer(change_order).data})
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    permission_error, _ = _capability_gate(request.user, "change_orders", "edit")
     if permission_error:
         return Response(permission_error, status=403)
 
     serializer = ChangeOrderWriteSerializer(data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
+
+    # Status-transition capability gates
+    if "status" in data:
+        _next = data["status"]
+        if _next == ChangeOrder.Status.PENDING_APPROVAL:
+            _err, _ = _capability_gate(request.user, "change_orders", "send")
+            if _err:
+                return Response(_err, status=403)
+        elif _next in {ChangeOrder.Status.APPROVED, ChangeOrder.Status.VOID}:
+            _err, _ = _capability_gate(request.user, "change_orders", "approve")
+            if _err:
+                return Response(_err, status=403)
+
     incoming_line_items = data.get("line_items", None)
     content_fields = {"title", "reason", "amount_delta", "days_delta", "origin_estimate", "line_items"}
     attempted_content_fields = sorted(field for field in content_fields if field in data)
@@ -734,7 +747,7 @@ def change_order_clone_revision_view(request, change_order_id: int):
             status=404,
         )
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    permission_error, _ = _capability_gate(request.user, "change_orders", "create")
     if permission_error:
         return Response(permission_error, status=403)
 

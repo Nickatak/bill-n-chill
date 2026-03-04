@@ -124,7 +124,7 @@ export function AppToolbar() {
         <Link
           href="/ops/organization"
           className={`${styles.button} ${isOrganizationPath ? styles.buttonActive : ""}`}
-          title={`Organization slug: ${organization.slug}`}
+          title={`Organization: ${organization.displayName}`}
         >
           {organization.displayName} Organization (WIP)
         </Link>

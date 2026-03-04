@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import Organization, OrganizationMembership, OrganizationMembershipRecord, OrganizationRecord
+from core.models import OrganizationMembership, OrganizationMembershipRecord, OrganizationRecord
 from core.serializers.organization_management import (
     OrganizationMembershipSerializer,
     OrganizationMembershipUpdateSerializer,
@@ -13,9 +13,11 @@ from core.serializers.organization_management import (
     OrganizationProfileUpdateSerializer,
 )
 from core.views.helpers import (
+    _capability_gate,
     _ensure_primary_membership,
     _record_organization_membership_record,
     _record_organization_record,
+    _resolve_user_capabilities,
     _resolve_user_role,
     _role_gate_error_payload,
 )
@@ -23,11 +25,15 @@ from core.views.helpers import (
 
 def _organization_role_policy(user) -> dict:
     effective_role = _resolve_user_role(user)
-    can_edit_profile = effective_role in {"owner", "pm"}
-    can_manage_memberships = effective_role == "owner"
+    caps = _resolve_user_capabilities(user)
+    can_edit_identity = "edit" in caps.get("org_identity", [])
+    can_edit_presets = "edit" in caps.get("org_presets", [])
+    can_manage_memberships = "edit_role" in caps.get("users", [])
     return {
         "effective_role": effective_role,
-        "can_edit_profile": can_edit_profile,
+        "can_edit_identity": can_edit_identity,
+        "can_edit_presets": can_edit_presets,
+        "can_edit_profile": can_edit_identity or can_edit_presets,
         "can_manage_memberships": can_manage_memberships,
         "editable_roles": [choice[0] for choice in OrganizationMembership.Role.choices],
         "editable_statuses": [choice[0] for choice in OrganizationMembership.Status.choices],
@@ -66,142 +72,64 @@ def organization_profile_view(request):
             }
         )
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
-    if permission_error:
-        return Response(permission_error, status=403)
-
     serializer = OrganizationProfileUpdateSerializer(data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
     incoming = serializer.validated_data
 
+    # Field-level capability gates: identity vs presets
+    _identity_fields = {"display_name", "logo_url", "billing_address"}
+    _preset_fields = {
+        "help_email", "default_invoice_due_delta", "default_estimate_valid_delta",
+        "invoice_terms_and_conditions", "estimate_terms_and_conditions",
+        "change_order_terms_and_conditions",
+    }
+    if _identity_fields & incoming.keys():
+        permission_error, _ = _capability_gate(request.user, "org_identity", "edit")
+        if permission_error:
+            return Response(permission_error, status=403)
+    if _preset_fields & incoming.keys():
+        permission_error, _ = _capability_gate(request.user, "org_presets", "edit")
+        if permission_error:
+            return Response(permission_error, status=403)
+
     update_fields = ["updated_at"]
     changed_fields: list[str] = []
-    next_display_name = organization.display_name
-    next_slug = organization.slug
-    if "display_name" in incoming:
-        display_name = str(incoming["display_name"]).strip()
-        if display_name != organization.display_name:
-            next_display_name = display_name
-            changed_fields.append("display_name")
-            update_fields.append("display_name")
 
-    if "slug" in incoming:
-        raw_slug = incoming.get("slug")
-        slug_value = str(raw_slug).strip() if raw_slug is not None else ""
-        normalized_slug = slug_value or None
-        if normalized_slug is not None and Organization.objects.filter(slug=normalized_slug).exclude(
-            id=organization.id
-        ).exists():
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_error",
-                        "message": "Organization slug must be unique.",
-                        "fields": {"slug": ["This slug is already in use by another organization."]},
-                    }
-                },
-                status=400,
-            )
-        if normalized_slug != organization.slug:
-            next_slug = normalized_slug
-            changed_fields.append("slug")
-            update_fields.append("slug")
+    # Simple string fields: check each for change and stage update
+    _string_fields = {
+        "display_name": {"attr": "display_name", "strip": True, "allow_blank": False},
+        "logo_url": {"attr": "logo_url", "strip": True},
+        "help_email": {"attr": "help_email", "strip": True},
+        "billing_address": {"attr": "billing_address", "strip": True},
+        "invoice_terms_and_conditions": {"attr": "invoice_terms_and_conditions", "strip": True},
+        "estimate_terms_and_conditions": {"attr": "estimate_terms_and_conditions", "strip": True},
+        "change_order_terms_and_conditions": {"attr": "change_order_terms_and_conditions", "strip": True},
+    }
+    for field_name, opts in _string_fields.items():
+        if field_name not in incoming:
+            continue
+        value = str(incoming.get(field_name) or "").strip() if opts.get("strip") else str(incoming.get(field_name) or "")
+        if value != getattr(organization, opts["attr"]):
+            setattr(organization, opts["attr"], value)
+            changed_fields.append(field_name)
+            update_fields.append(opts["attr"])
 
-    if "logo_url" in incoming:
-        logo_url = str(incoming.get("logo_url") or "").strip()
-        if logo_url != organization.logo_url:
-            organization.logo_url = logo_url
-            changed_fields.append("logo_url")
-            update_fields.append("logo_url")
-
-    if "invoice_sender_name" in incoming:
-        sender_name = str(incoming.get("invoice_sender_name") or "").strip()
-        if sender_name != organization.invoice_sender_name:
-            organization.invoice_sender_name = sender_name
-            changed_fields.append("invoice_sender_name")
-            update_fields.append("invoice_sender_name")
-
-    if "invoice_sender_email" in incoming:
-        sender_email = str(incoming.get("invoice_sender_email") or "").strip()
-        if sender_email != organization.invoice_sender_email:
-            organization.invoice_sender_email = sender_email
-            changed_fields.append("invoice_sender_email")
-            update_fields.append("invoice_sender_email")
-
-    if "help_email" in incoming:
-        help_email = str(incoming.get("help_email") or "").strip()
-        if help_email != organization.help_email:
-            organization.help_email = help_email
-            changed_fields.append("help_email")
-            update_fields.append("help_email")
-
-    if "invoice_sender_address" in incoming:
-        sender_address = str(incoming.get("invoice_sender_address") or "").strip()
-        if sender_address != organization.invoice_sender_address:
-            organization.invoice_sender_address = sender_address
-            changed_fields.append("invoice_sender_address")
-            update_fields.append("invoice_sender_address")
-
-    if "invoice_default_due_days" in incoming:
-        due_days = int(incoming.get("invoice_default_due_days") or 30)
-        if due_days != organization.invoice_default_due_days:
-            organization.invoice_default_due_days = due_days
-            changed_fields.append("invoice_default_due_days")
-            update_fields.append("invoice_default_due_days")
-
-    if "estimate_validation_delta_days" in incoming:
-        validation_delta_days = int(incoming.get("estimate_validation_delta_days") or 30)
-        if validation_delta_days != organization.estimate_validation_delta_days:
-            organization.estimate_validation_delta_days = validation_delta_days
-            changed_fields.append("estimate_validation_delta_days")
-            update_fields.append("estimate_validation_delta_days")
-
-    if "invoice_default_terms" in incoming:
-        default_terms = str(incoming.get("invoice_default_terms") or "").strip()
-        if default_terms != organization.invoice_default_terms:
-            organization.invoice_default_terms = default_terms
-            changed_fields.append("invoice_default_terms")
-            update_fields.append("invoice_default_terms")
-
-    if "estimate_default_terms" in incoming:
-        estimate_default_terms = str(incoming.get("estimate_default_terms") or "").strip()
-        if estimate_default_terms != organization.estimate_default_terms:
-            organization.estimate_default_terms = estimate_default_terms
-            changed_fields.append("estimate_default_terms")
-            update_fields.append("estimate_default_terms")
-
-    if "change_order_default_reason" in incoming:
-        change_order_default_reason = str(incoming.get("change_order_default_reason") or "").strip()
-        if change_order_default_reason != organization.change_order_default_reason:
-            organization.change_order_default_reason = change_order_default_reason
-            changed_fields.append("change_order_default_reason")
-            update_fields.append("change_order_default_reason")
-
-    if "change_order_default_terms" in incoming:
-        change_order_default_terms = str(incoming.get("change_order_default_terms") or "").strip()
-        if change_order_default_terms != organization.change_order_default_terms:
-            organization.change_order_default_terms = change_order_default_terms
-            changed_fields.append("change_order_default_terms")
-            update_fields.append("change_order_default_terms")
-
-    if "invoice_default_footer" in incoming:
-        default_footer = str(incoming.get("invoice_default_footer") or "").strip()
-        if default_footer != organization.invoice_default_footer:
-            organization.invoice_default_footer = default_footer
-            changed_fields.append("invoice_default_footer")
-            update_fields.append("invoice_default_footer")
-
-    if "invoice_default_notes" in incoming:
-        default_notes = str(incoming.get("invoice_default_notes") or "").strip()
-        if default_notes != organization.invoice_default_notes:
-            organization.invoice_default_notes = default_notes
-            changed_fields.append("invoice_default_notes")
-            update_fields.append("invoice_default_notes")
+    # Integer fields
+    _int_fields = {
+        "default_invoice_due_delta": "default_invoice_due_delta",
+        "default_estimate_valid_delta": "default_estimate_valid_delta",
+    }
+    for field_name, attr in _int_fields.items():
+        if field_name not in incoming:
+            continue
+        value = int(incoming.get(field_name) or 30)
+        if value != getattr(organization, attr):
+            setattr(organization, attr, value)
+            changed_fields.append(field_name)
+            update_fields.append(attr)
 
     if changed_fields:
         with transaction.atomic():
-            organization.display_name = next_display_name
-            organization.slug = next_slug
             organization.save(update_fields=update_fields)
             _record_organization_record(
                 organization=organization,
@@ -263,8 +191,8 @@ def _is_last_active_owner(membership: OrganizationMembership, *, next_role: str,
 @api_view(["PATCH"])
 @permission_classes([IsAuthenticated])
 def organization_membership_detail_view(request, membership_id: int):
-    """Patch one organization membership's role/status (owner-only)."""
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner"})
+    """Patch one organization membership's role/status (requires users.edit_role)."""
+    permission_error, _ = _capability_gate(request.user, "users", "edit_role")
     if permission_error:
         return Response(permission_error, status=403)
 

@@ -494,7 +494,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const loadEstimateIntoForm = useCallback((estimate: EstimateRecord) => {
     const estimateTerms = (estimate.terms_text || "").trim();
     setEstimateTitle(estimate.title || "Untitled");
-    setTermsText(estimateTerms || organizationDefaults?.estimate_default_terms || "");
+    setTermsText(estimateTerms || organizationDefaults?.estimate_terms_and_conditions || "");
     setTaxPercent(String(estimate.tax_percent ?? "0"));
     setValidThrough(estimate.valid_through ?? "");
     const mapped = mapEstimateLineItemsToInputs(estimate.line_items ?? []);
@@ -504,7 +504,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     if (createdDate) {
       setEstimateDate(createdDate);
     }
-  }, [organizationDefaults?.estimate_default_terms]);
+  }, [organizationDefaults?.estimate_terms_and_conditions]);
 
   const handleSelectEstimate = useCallback((estimate: EstimateRecord) => {
     const nextEstimateId = String(estimate.id);
@@ -552,7 +552,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setEstimateTitle("");
     setFamilyCollisionPrompt(null);
     setConfirmedFamilyTitleKey("");
-    setTermsText(organizationDefaults?.estimate_default_terms || "");
+    setTermsText(organizationDefaults?.estimate_terms_and_conditions || "");
     setTaxPercent("0");
     setLineItems([emptyLine(1, defaultCostCodeId)]);
     setLineSortKey(null);
@@ -664,7 +664,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setCostCodes(codeRows);
       if (organizationRes.ok && organizationData) {
         setOrganizationDefaults(organizationData);
-        setTermsText((current) => current || organizationData.estimate_default_terms || "");
+        setTermsText((current) => current || organizationData.estimate_terms_and_conditions || "");
         setValidThrough((current) => {
           if (selectedEstimateIdRef.current || current) {
             return current;

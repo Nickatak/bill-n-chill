@@ -35,7 +35,7 @@ from core.serializers import (
     QuickJumpSearchSerializer,
     ProjectSerializer,
 )
-from core.views.helpers import _organization_user_ids
+from core.views.helpers import _capability_gate, _organization_user_ids
 
 def _parse_optional_date(value: str):
     if not value:
@@ -344,6 +344,10 @@ def project_detail_view(request, project_id: int):
         payload = ProjectProfileSerializer(project).data
         payload["accepted_contract_total"] = f"{accepted_total:.2f}"
         return Response({"data": payload})
+
+    permission_error, _ = _capability_gate(request.user, "projects", "edit")
+    if permission_error:
+        return Response(permission_error, status=403)
 
     if project.status in {Project.Status.COMPLETED, Project.Status.CANCELLED}:
         return Response(

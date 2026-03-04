@@ -92,7 +92,6 @@ class VendorTests(TestCase):
     def test_vendor_list_includes_rows_created_by_other_user_in_same_org(self):
         shared_org = Organization.objects.create(
             display_name="Shared Vendor Org",
-            slug="shared-vendor-org-tests",
             created_by=self.user,
         )
         OrganizationMembership.objects.update_or_create(
@@ -126,7 +125,6 @@ class VendorTests(TestCase):
         )
         isolated_org = Organization.objects.create(
             display_name="Isolated Vendor Org",
-            slug="isolated-vendor-org-tests",
             created_by=self.other_user,
         )
         isolated_vendor = Vendor.objects.create(
@@ -309,7 +307,6 @@ class VendorTests(TestCase):
             defaults={
                 "organization": Organization.objects.create(
                     display_name="Vendor Org",
-                    slug="vendor-org-tests",
                     created_by=self.user,
                 ),
                 "role": OrganizationMembership.Role.OWNER,

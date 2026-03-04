@@ -14,13 +14,11 @@
 type PublicOrganizationContext = {
   display_name?: string | null;
   logo_url?: string | null;
-  sender_name?: string | null;
-  sender_email?: string | null;
-  sender_address?: string | null;
+  billing_address?: string | null;
   help_email?: string | null;
-  invoice_default_terms?: string | null;
-  estimate_default_terms?: string | null;
-  change_order_default_reason?: string | null;
+  invoice_terms_and_conditions?: string | null;
+  estimate_terms_and_conditions?: string | null;
+  change_order_terms_and_conditions?: string | null;
 };
 
 /** Project-level customer fields available on public document endpoints. */
@@ -39,7 +37,6 @@ type PublicProjectContext = {
 export type PublicViewerSender = {
   companyName: string;
   senderName: string;
-  senderEmail: string;
   senderAddress: string;
   senderAddressLines: string[];
   logoUrl: string;
@@ -89,25 +86,19 @@ export function toAddressLines(value?: string | null): string[] {
 /**
  * Resolve organization context into a display-ready sender shape.
  *
- * Cascades through available name fields so the document always shows a
- * reasonable company identity even when branding is partially configured.
+ * Uses display_name as the canonical company/sender identity.
  */
 export function resolvePublicSender(
   organizationContext?: PublicOrganizationContext | null,
 ): PublicViewerSender {
-  const companyName =
-    normalizeValue(organizationContext?.display_name) ||
-    normalizeValue(organizationContext?.sender_name) ||
-    "Your Company";
-  const senderName = normalizeValue(organizationContext?.sender_name) || companyName;
-  const senderEmail = normalizeValue(organizationContext?.sender_email);
-  const senderAddress = normalizeValue(organizationContext?.sender_address);
-  const helpEmail = normalizeValue(organizationContext?.help_email) || senderEmail;
+  const companyName = normalizeValue(organizationContext?.display_name) || "Your Company";
+  const senderName = companyName;
+  const senderAddress = normalizeValue(organizationContext?.billing_address);
+  const helpEmail = normalizeValue(organizationContext?.help_email);
 
   return {
     companyName,
     senderName,
-    senderEmail,
     senderAddress,
     senderAddressLines: toAddressLines(senderAddress),
     logoUrl: normalizeValue(organizationContext?.logo_url),
@@ -137,10 +128,7 @@ export function resolvePublicRecipient(
 }
 
 /**
- * Look up the default terms/reason text for a given document type.
- *
- * Used to pre-fill the terms section when composing a new document from
- * a public viewer action (e.g. "approve with changes").
+ * Look up the default terms text for a given document type.
  */
 export function resolveDefaultTerms(
   organizationContext: PublicOrganizationContext | null | undefined,
@@ -150,10 +138,10 @@ export function resolveDefaultTerms(
     return "";
   }
   if (documentType === "estimate") {
-    return normalizeValue(organizationContext.estimate_default_terms);
+    return normalizeValue(organizationContext.estimate_terms_and_conditions);
   }
   if (documentType === "invoice") {
-    return normalizeValue(organizationContext.invoice_default_terms);
+    return normalizeValue(organizationContext.invoice_terms_and_conditions);
   }
-  return normalizeValue(organizationContext.change_order_default_reason);
+  return normalizeValue(organizationContext.change_order_terms_and_conditions);
 }

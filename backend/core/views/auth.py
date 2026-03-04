@@ -10,7 +10,7 @@ from core.utils.runtime_metadata import (
     get_app_revision,
     get_last_data_reset_at,
 )
-from core.views.helpers import _ensure_primary_membership, _resolve_user_role
+from core.views.helpers import _ensure_primary_membership, _resolve_user_capabilities, _resolve_user_role
 
 User = get_user_model()
 
@@ -109,8 +109,8 @@ def login_view(request):
                 "organization": {
                     "id": membership.organization_id,
                     "display_name": membership.organization.display_name,
-                    "slug": membership.organization.slug,
                 },
+                "capabilities": _resolve_user_capabilities(user),
             }
         }
     )
@@ -178,8 +178,8 @@ def register_view(request):
                 "organization": {
                     "id": membership.organization_id,
                     "display_name": membership.organization.display_name,
-                    "slug": membership.organization.slug,
                 },
+                "capabilities": _resolve_user_capabilities(user),
             }
         },
         status=201,
@@ -231,8 +231,8 @@ def me_view(request):
                 "organization": {
                     "id": membership.organization_id,
                     "display_name": membership.organization.display_name,
-                    "slug": membership.organization.slug,
                 },
+                "capabilities": _resolve_user_capabilities(user),
             }
         }
     )

@@ -30,34 +30,34 @@ describe("resolveEstimateValidationDeltaDays", () => {
 
   it("returns 30 for NaN value", () => {
     expect(
-      resolveEstimateValidationDeltaDays({ estimate_validation_delta_days: NaN }),
+      resolveEstimateValidationDeltaDays({ default_estimate_valid_delta: NaN }),
     ).toBe(30);
   });
 
   it("uses the configured value when valid", () => {
     expect(
-      resolveEstimateValidationDeltaDays({ estimate_validation_delta_days: 60 }),
+      resolveEstimateValidationDeltaDays({ default_estimate_valid_delta: 60 }),
     ).toBe(60);
   });
 
   it("clamps to minimum of 1", () => {
     expect(
-      resolveEstimateValidationDeltaDays({ estimate_validation_delta_days: 0 }),
+      resolveEstimateValidationDeltaDays({ default_estimate_valid_delta: 0 }),
     ).toBe(1);
     expect(
-      resolveEstimateValidationDeltaDays({ estimate_validation_delta_days: -10 }),
+      resolveEstimateValidationDeltaDays({ default_estimate_valid_delta: -10 }),
     ).toBe(1);
   });
 
   it("clamps to maximum of 365", () => {
     expect(
-      resolveEstimateValidationDeltaDays({ estimate_validation_delta_days: 999 }),
+      resolveEstimateValidationDeltaDays({ default_estimate_valid_delta: 999 }),
     ).toBe(365);
   });
 
   it("rounds fractional values", () => {
     expect(
-      resolveEstimateValidationDeltaDays({ estimate_validation_delta_days: 30.7 }),
+      resolveEstimateValidationDeltaDays({ default_estimate_valid_delta: 30.7 }),
     ).toBe(31);
   });
 });

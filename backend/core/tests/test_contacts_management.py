@@ -50,7 +50,7 @@ class ContactsManagementTests(TestCase):
     def test_contacts_list_includes_customers_from_same_organization(self):
         shared_org = Organization.objects.create(
             display_name="Shared Contact Org",
-            slug="shared-contact-org",
+
             created_by=self.user,
         )
         OrganizationMembership.objects.update_or_create(
@@ -83,7 +83,7 @@ class ContactsManagementTests(TestCase):
     def test_contact_detail_allows_access_to_same_organization_customer(self):
         shared_org = Organization.objects.create(
             display_name="Shared Contact Detail Org",
-            slug="shared-contact-detail-org",
+
             created_by=self.user,
         )
         OrganizationMembership.objects.update_or_create(
@@ -321,7 +321,7 @@ class ContactsManagementTests(TestCase):
     def test_customer_project_create_allows_same_org_customer(self):
         shared_org = Organization.objects.create(
             display_name="Shared Customer Project Org",
-            slug="shared-customer-project-org",
+
             created_by=self.user,
         )
         OrganizationMembership.objects.update_or_create(

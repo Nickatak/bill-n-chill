@@ -94,8 +94,7 @@ type AuditEventRecord = {
 };
 
 type OrganizationDocumentDefaults = OrganizationBrandingDefaults & {
-  change_order_default_reason: string;
-  change_order_default_terms: string;
+  change_order_terms_and_conditions: string;
 };
 
 const CHANGE_ORDER_STATUS_LABELS_FALLBACK: Record<string, string> = {
@@ -252,11 +251,11 @@ export function ChangeOrdersConsole({
   );
   const senderBranding = resolveOrganizationBranding(organizationDefaults);
   const senderName = senderBranding.senderDisplayName;
-  const senderEmail = senderBranding.senderEmail;
+  const senderEmail = senderBranding.helpEmail;
   const senderAddressLines = senderBranding.senderAddressLines;
   const senderLogoUrl = senderBranding.logoUrl;
-  const defaultChangeOrderReason = (organizationDefaults?.change_order_default_reason || "").trim();
-  const defaultChangeOrderTerms = (organizationDefaults?.change_order_default_terms || "").trim();
+  const defaultChangeOrderReason = "";
+  const defaultChangeOrderTerms = (organizationDefaults?.change_order_terms_and_conditions || "").trim();
   const newLineDeltaTotal = useMemo(
     () =>
       newLineItems.reduce((sum, line) => sum + parseAmount(line.amountDelta), 0),
@@ -1006,8 +1005,7 @@ export function ChangeOrdersConsole({
       )?.organization;
       if (organizationData) {
         setOrganizationDefaults(organizationData);
-        setNewReason((current) => current || organizationData.change_order_default_reason || "");
-        setNewTermsText((current) => current || organizationData.change_order_default_terms || "");
+        setNewTermsText((current) => current || organizationData.change_order_terms_and_conditions || "");
       }
     } catch {
       // Branding defaults are best-effort; change order workflows can continue.

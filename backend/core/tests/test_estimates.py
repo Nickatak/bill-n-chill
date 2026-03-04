@@ -100,7 +100,7 @@ class EstimateTests(TestCase):
             self.customer.display_name,
         )
         self.assertIn("organization_context", payload)
-        self.assertIn("sender_name", payload["organization_context"])
+        self.assertIn("display_name", payload["organization_context"])
         self.assertIn("help_email", payload["organization_context"])
         self.assertEqual(len(payload["line_items"]), 1)
 
@@ -282,8 +282,8 @@ class EstimateTests(TestCase):
 
     def test_project_estimates_create_uses_organization_validation_delta_when_valid_through_omitted(self):
         membership = self._bootstrap_primary_membership()
-        membership.organization.estimate_validation_delta_days = 14
-        membership.organization.save(update_fields=["estimate_validation_delta_days", "updated_at"])
+        membership.organization.default_estimate_valid_delta = 14
+        membership.organization.save(update_fields=["default_estimate_valid_delta", "updated_at"])
 
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/estimates/",
@@ -313,8 +313,8 @@ class EstimateTests(TestCase):
 
     def test_project_estimates_create_uses_organization_default_terms_when_omitted(self):
         membership = self._bootstrap_primary_membership()
-        membership.organization.estimate_default_terms = "Org default estimate terms."
-        membership.organization.save(update_fields=["estimate_default_terms", "updated_at"])
+        membership.organization.estimate_terms_and_conditions = "Org default estimate terms."
+        membership.organization.save(update_fields=["estimate_terms_and_conditions", "updated_at"])
 
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/estimates/",

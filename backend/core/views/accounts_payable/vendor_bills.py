@@ -26,7 +26,7 @@ from core.views.helpers import (
     _ensure_primary_membership,
     _organization_user_ids,
     _record_financial_audit_event,
-    _role_gate_error_payload,
+    _capability_gate,
     _validate_project_for_user,
 )
 
@@ -289,7 +289,7 @@ def project_vendor_bills_view(request, project_id: int):
         )
         return Response({"data": VendorBillSerializer(rows, many=True).data})
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm", "bookkeeping"})
+    permission_error, _ = _capability_gate(request.user, "vendor_bills", "create")
     if permission_error:
         return Response(permission_error, status=403)
 
@@ -578,13 +578,25 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
         )
         return Response({"data": VendorBillSerializer(vendor_bill).data})
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm", "bookkeeping"})
+    permission_error, _ = _capability_gate(request.user, "vendor_bills", "edit")
     if permission_error:
         return Response(permission_error, status=403)
 
     serializer = VendorBillWriteSerializer(data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
+
+    # Status-transition capability gates
+    if "status" in data:
+        _next = data["status"]
+        if _next in {VendorBill.Status.APPROVED, VendorBill.Status.SCHEDULED}:
+            _err, _ = _capability_gate(request.user, "vendor_bills", "approve")
+            if _err:
+                return Response(_err, status=403)
+        elif _next == VendorBill.Status.PAID:
+            _err, _ = _capability_gate(request.user, "vendor_bills", "pay")
+            if _err:
+                return Response(_err, status=403)
 
     next_vendor_id = data.get("vendor", vendor_bill.vendor_id)
     next_bill_number = data.get("bill_number", vendor_bill.bill_number)

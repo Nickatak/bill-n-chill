@@ -5,13 +5,11 @@ export type ProjectRecord = { id: number; name: string; customer_display_name: s
 export type OrganizationPublicContext = {
   display_name: string;
   logo_url: string;
-  sender_name: string;
-  sender_email: string;
-  sender_address: string;
+  billing_address: string;
   help_email: string;
-  invoice_default_terms: string;
-  estimate_default_terms: string;
-  change_order_default_reason: string;
+  invoice_terms_and_conditions: string;
+  estimate_terms_and_conditions: string;
+  change_order_terms_and_conditions: string;
 };
 
 export type BudgetLineRecord = {

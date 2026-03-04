@@ -66,7 +66,6 @@ class ProjectProfileTests(TestCase):
     def test_projects_list_includes_rows_created_by_other_user_in_same_org(self):
         shared_org = Organization.objects.create(
             display_name="Shared Project Org",
-            slug="shared-project-org",
             created_by=self.user,
         )
         OrganizationMembership.objects.update_or_create(
@@ -272,12 +271,10 @@ class CostCodeTests(TestCase):
         self.token, _ = Token.objects.get_or_create(user=self.user)
         self.user_org = Organization.objects.create(
             display_name="Cost Code Test Org A",
-            slug="cost-code-test-org-a",
             created_by=self.user,
         )
         self.other_org = Organization.objects.create(
             display_name="Cost Code Test Org B",
-            slug="cost-code-test-org-b",
             created_by=self.other_user,
         )
         OrganizationMembership.objects.create(
@@ -325,7 +322,6 @@ class CostCodeTests(TestCase):
     def test_cost_codes_list_includes_rows_created_by_other_user_in_same_org(self):
         shared_org = Organization.objects.create(
             display_name="Shared Org",
-            slug="shared-org-cost-codes",
             created_by=self.user,
         )
         OrganizationMembership.objects.update_or_create(
@@ -356,7 +352,6 @@ class CostCodeTests(TestCase):
         )
         other_isolated_org = Organization.objects.create(
             display_name="Isolated Org",
-            slug="isolated-org-cost-codes",
             created_by=self.other_user,
         )
         isolated_org_code = CostCode.objects.create(
@@ -384,7 +379,6 @@ class CostCodeTests(TestCase):
             defaults={
                 "organization": Organization.objects.create(
                     display_name="Cost Code Org",
-                    slug="cost-code-org-tests",
                     created_by=self.user,
                 ),
                 "role": OrganizationMembership.Role.OWNER,

@@ -49,10 +49,9 @@ describe("buildAuthHeaders", () => {
   it("adds organization headers when organization is provided", () => {
     const headers = new Headers(
       buildAuthHeaders("abc123", {
-        organization: { id: 5, displayName: "Acme Corp", slug: "acme-corp" },
+        organization: { id: 5, displayName: "Acme Corp" },
       }),
     );
-    expect(headers.get("X-Organization-Slug")).toBe("acme-corp");
     expect(headers.get("X-Organization-Id")).toBe("5");
   });
 
@@ -60,13 +59,11 @@ describe("buildAuthHeaders", () => {
     const headers = new Headers(
       buildAuthHeaders("abc123", { organization: null }),
     );
-    expect(headers.get("X-Organization-Slug")).toBeNull();
     expect(headers.get("X-Organization-Id")).toBeNull();
   });
 
   it("omits organization headers when no session and no org provided", () => {
     const headers = new Headers(buildAuthHeaders("abc123"));
-    expect(headers.get("X-Organization-Slug")).toBeNull();
     expect(headers.get("X-Organization-Id")).toBeNull();
   });
 });

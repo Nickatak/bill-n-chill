@@ -5,17 +5,17 @@ User = get_user_model()
 
 
 class RoleTemplate(models.Model):
-    """UNUSED (for now): Preset/custom role definition that composes multiple Permission entries.
+    """Preset/custom role definition with capability flags.
 
     Workflow role:
-    - Represents role presets (owner/manager/worker/accounting/viewer) and future custom roles.
+    - Represents role presets (owner/pm/worker/bookkeeping/viewer) and future custom roles.
     - Can be system-level (`organization` is null) or organization-local.
     - Bound to users indirectly via OrganizationMembership.role_template.
+    - `capability_flags_json` stores the permission matrix as {resource: [actions]}.
 
     Notes:
     - `slug` is the stable role identifier for API/UI wiring.
-    - This model is introduced now for documentation/data-shape readiness;
-      endpoint authorization will migrate to permission-key checks incrementally.
+    - System templates (is_system=True, organization=None) are seeded via migration.
     """
 
     name = models.CharField(max_length=120)
@@ -28,6 +28,7 @@ class RoleTemplate(models.Model):
         blank=True,
     )
     is_system = models.BooleanField(default=False)
+    capability_flags_json = models.JSONField(default=dict, blank=True)
     description = models.TextField(blank=True, default="")
     created_by = models.ForeignKey(
         User,

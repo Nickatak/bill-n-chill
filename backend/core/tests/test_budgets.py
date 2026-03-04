@@ -270,7 +270,6 @@ class BudgetTests(TestCase):
     def test_pm_role_cannot_supersede_active_baseline(self):
         org = Organization.objects.create(
             display_name="Budget PM Org",
-            slug="budget-pm-org",
             created_by=self.user,
         )
         OrganizationMembership.objects.update_or_create(

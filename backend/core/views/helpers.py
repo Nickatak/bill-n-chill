@@ -4,8 +4,6 @@ from django.contrib.auth.models import Group
 from django.db import transaction
 from django.db.models import Q
 from django.db.models import Sum
-from django.utils.text import slugify
-
 from core.models import (
     Budget,
     BudgetLine,
@@ -26,11 +24,12 @@ from core.models import (
     OrganizationMembership,
     OrganizationMembershipRecord,
     OrganizationRecord,
+    RoleTemplate,
     VendorBill,
 )
 from core.policies.cost_codes import STARTER_COST_CODE_ROWS
 from core.utils.money import MONEY_ZERO, quantize_money
-from core.utils.organization_defaults import build_invoice_profile_defaults
+from core.utils.organization_defaults import build_org_bootstrap_defaults
 
 BILLABLE_INVOICE_STATUSES = {
     Invoice.Status.SENT,
@@ -129,16 +128,6 @@ def _default_org_name_for_user(user) -> str:
     return f"{humanized or 'New'} Organization"
 
 
-def _next_org_slug(seed: str) -> str:
-    base_slug = slugify(seed) or "org"
-    candidate = base_slug
-    suffix = 2
-    while Organization.objects.filter(slug=candidate).exists():
-        candidate = f"{base_slug}-{suffix}"
-        suffix += 1
-    return candidate
-
-
 def _legacy_group_role(user) -> str | None:
     group_names = set(Group.objects.filter(user=user).values_list("name", flat=True))
     normalized_names = {_normalize_legacy_role(name.strip().lower()) for name in group_names}
@@ -153,20 +142,14 @@ def _build_organization_snapshot(organization: Organization) -> dict:
         "organization": {
             "id": organization.id,
             "display_name": organization.display_name,
-            "slug": organization.slug,
             "logo_url": organization.logo_url,
-            "invoice_sender_name": organization.invoice_sender_name,
-            "invoice_sender_email": organization.invoice_sender_email,
             "help_email": organization.help_email,
-            "invoice_sender_address": organization.invoice_sender_address,
-            "invoice_default_due_days": organization.invoice_default_due_days,
-            "estimate_validation_delta_days": organization.estimate_validation_delta_days,
-            "invoice_default_terms": organization.invoice_default_terms,
-            "estimate_default_terms": organization.estimate_default_terms,
-            "change_order_default_reason": organization.change_order_default_reason,
-            "change_order_default_terms": organization.change_order_default_terms,
-            "invoice_default_footer": organization.invoice_default_footer,
-            "invoice_default_notes": organization.invoice_default_notes,
+            "billing_address": organization.billing_address,
+            "default_invoice_due_delta": organization.default_invoice_due_delta,
+            "default_estimate_valid_delta": organization.default_estimate_valid_delta,
+            "invoice_terms_and_conditions": organization.invoice_terms_and_conditions,
+            "estimate_terms_and_conditions": organization.estimate_terms_and_conditions,
+            "change_order_terms_and_conditions": organization.change_order_terms_and_conditions,
             "created_by_id": organization.created_by_id,
             "created_at": organization.created_at.isoformat() if organization.created_at else None,
         }
@@ -273,26 +256,13 @@ def _ensure_primary_membership(user):
 
     with transaction.atomic():
         display_name = _default_org_name_for_user(user)
-        bootstrap_invoice_defaults = build_invoice_profile_defaults(
+        bootstrap_defaults = build_org_bootstrap_defaults(
             display_name=display_name,
             owner_email=user.email or "",
         )
         organization = Organization.objects.create(
             display_name=display_name,
-            slug=_next_org_slug((user.email or user.username or f"user-{user.id}").split("@")[0]),
-            invoice_sender_name=bootstrap_invoice_defaults["invoice_sender_name"],
-            invoice_sender_email=bootstrap_invoice_defaults["invoice_sender_email"],
-            help_email=bootstrap_invoice_defaults["help_email"],
-            invoice_default_due_days=bootstrap_invoice_defaults["invoice_default_due_days"],
-            estimate_validation_delta_days=bootstrap_invoice_defaults[
-                "estimate_validation_delta_days"
-            ],
-            invoice_default_terms=bootstrap_invoice_defaults["invoice_default_terms"],
-            estimate_default_terms=bootstrap_invoice_defaults["estimate_default_terms"],
-            change_order_default_reason=bootstrap_invoice_defaults["change_order_default_reason"],
-            change_order_default_terms=bootstrap_invoice_defaults["change_order_default_terms"],
-            invoice_default_footer=bootstrap_invoice_defaults["invoice_default_footer"],
-            invoice_default_notes=bootstrap_invoice_defaults["invoice_default_notes"],
+            **bootstrap_defaults,
             created_by=user,
         )
         _record_organization_record(
@@ -351,29 +321,21 @@ def _serialize_public_organization_context(organization: Organization | None) ->
         return {
             "display_name": "",
             "logo_url": "",
-            "sender_name": "",
-            "sender_email": "",
-            "sender_address": "",
+            "billing_address": "",
             "help_email": "",
-            "invoice_default_terms": "",
-            "estimate_default_terms": "",
-            "change_order_default_reason": "",
-            "change_order_default_terms": "",
+            "invoice_terms_and_conditions": "",
+            "estimate_terms_and_conditions": "",
+            "change_order_terms_and_conditions": "",
         }
 
-    sender_name = (organization.invoice_sender_name or organization.display_name or "").strip()
-    sender_email = (organization.invoice_sender_email or "").strip()
     return {
         "display_name": (organization.display_name or "").strip(),
         "logo_url": (organization.logo_url or "").strip(),
-        "sender_name": sender_name,
-        "sender_email": sender_email,
-        "sender_address": (organization.invoice_sender_address or "").strip(),
-        "help_email": (organization.help_email or sender_email).strip(),
-        "invoice_default_terms": (organization.invoice_default_terms or "").strip(),
-        "estimate_default_terms": (organization.estimate_default_terms or "").strip(),
-        "change_order_default_reason": (organization.change_order_default_reason or "").strip(),
-        "change_order_default_terms": (organization.change_order_default_terms or "").strip(),
+        "billing_address": (organization.billing_address or "").strip(),
+        "help_email": (organization.help_email or "").strip(),
+        "invoice_terms_and_conditions": (organization.invoice_terms_and_conditions or "").strip(),
+        "estimate_terms_and_conditions": (organization.estimate_terms_and_conditions or "").strip(),
+        "change_order_terms_and_conditions": (organization.change_order_terms_and_conditions or "").strip(),
     }
 
 
@@ -440,6 +402,62 @@ def _role_gate_error_payload(user, allowed_roles):
             }
         },
         effective_role,
+    )
+
+
+def _resolve_user_capabilities(user) -> dict:
+    """Resolve the effective capability flags for a user.
+
+    Resolution order:
+    1. membership.role_template.capability_flags_json (if role_template assigned)
+    2. System RoleTemplate matching membership.role slug (fallback for legacy users)
+    3. Per-membership capability_flags_json overrides (merged additively)
+    """
+    membership = _ensure_primary_membership(user)
+    if not membership:
+        return {}
+    # Ensure role_template is prefetched if assigned
+    if membership.role_template_id:
+        membership = (
+            OrganizationMembership.objects.select_related("role_template")
+            .get(pk=membership.pk)
+        )
+
+    if membership.role_template_id:
+        base = dict(membership.role_template.capability_flags_json or {})
+    else:
+        system_template = RoleTemplate.objects.filter(
+            is_system=True,
+            slug=_normalize_legacy_role(membership.role),
+        ).first()
+        base = dict(system_template.capability_flags_json) if system_template else {}
+
+    overrides = membership.capability_flags_json or {}
+    if overrides:
+        for resource, actions in overrides.items():
+            existing = set(base.get(resource, []))
+            existing.update(actions)
+            base[resource] = sorted(existing)
+
+    return base
+
+
+def _capability_gate(user, resource: str, action: str):
+    """Check if user has the required capability. Returns (error_payload|None, capabilities)."""
+    capabilities = _resolve_user_capabilities(user)
+    if action in capabilities.get(resource, []):
+        return None, capabilities
+    return (
+        {
+            "error": {
+                "code": "forbidden",
+                "message": "You do not have permission to perform this action.",
+                "fields": {
+                    "capability": [f"Required: {resource}.{action}."]
+                },
+            }
+        },
+        capabilities,
     )
 
 

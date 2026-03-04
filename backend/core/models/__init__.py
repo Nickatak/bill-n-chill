@@ -26,10 +26,8 @@ from core.models.shared_operations import (
     CostCode,
     Organization,
     OrganizationMembership,
-    Permission,
     Project,
     RoleTemplate,
-    RoleTemplatePermission,
     Vendor,
 )
 from core.models.cash_management import Payment, PaymentAllocation
@@ -39,9 +37,7 @@ __all__ = [
     "CostCode",
     "Organization",
     "OrganizationMembership",
-    "Permission",
     "RoleTemplate",
-    "RoleTemplatePermission",
     "Vendor",
     "Estimate",
     "ScopeItem",

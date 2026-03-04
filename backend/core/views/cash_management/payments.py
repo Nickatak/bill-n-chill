@@ -29,7 +29,7 @@ from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
     _organization_user_ids,
     _record_financial_audit_event,
-    _role_gate_error_payload,
+    _capability_gate,
     _validate_project_for_user,
 )
 
@@ -329,7 +329,7 @@ def project_payments_view(request, project_id: int):
         )
         return Response({"data": PaymentSerializer(rows, many=True).data})
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "bookkeeping"})
+    permission_error, _ = _capability_gate(request.user, "payments", "create")
     if permission_error:
         return Response(permission_error, status=403)
 
@@ -469,7 +469,7 @@ def payment_detail_view(request, payment_id: int):
     if request.method == "GET":
         return Response({"data": PaymentSerializer(payment).data})
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "bookkeeping"})
+    permission_error, _ = _capability_gate(request.user, "payments", "edit")
     if permission_error:
         return Response(permission_error, status=403)
 
@@ -660,7 +660,7 @@ def payment_allocate_view(request, payment_id: int):
             status=404,
         )
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "bookkeeping"})
+    permission_error, _ = _capability_gate(request.user, "payments", "allocate")
     if permission_error:
         return Response(permission_error, status=403)
 

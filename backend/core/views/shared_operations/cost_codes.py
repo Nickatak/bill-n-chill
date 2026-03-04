@@ -15,7 +15,7 @@ from core.views.helpers import (
     _ensure_primary_membership,
     _organization_user_ids,
     _parse_request_bool,
-    _role_gate_error_payload,
+    _capability_gate,
 )
 
 
@@ -55,7 +55,7 @@ def cost_codes_list_create_view(request):
         rows = CostCode.objects.filter(scope_filter).order_by("code", "name")
         return Response({"data": CostCodeSerializer(rows, many=True).data})
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    permission_error, _ = _capability_gate(request.user, "cost_codes", "create")
     if permission_error:
         return Response(permission_error, status=403)
 
@@ -84,7 +84,7 @@ def cost_codes_list_create_view(request):
 @permission_classes([IsAuthenticated])
 def cost_code_detail_view(request, cost_code_id: int):
     """Patch mutable cost-code fields while enforcing `code` immutability."""
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    permission_error, _ = _capability_gate(request.user, "cost_codes", "edit")
     if permission_error:
         return Response(permission_error, status=403)
 
@@ -123,7 +123,7 @@ def cost_code_detail_view(request, cost_code_id: int):
 @permission_classes([IsAuthenticated])
 def cost_codes_import_csv_view(request):
     """Import cost codes from CSV in preview/apply mode with header and row validation."""
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "pm"})
+    permission_error, _ = _capability_gate(request.user, "cost_codes", "create")
     if permission_error:
         return Response(permission_error, status=403)
 

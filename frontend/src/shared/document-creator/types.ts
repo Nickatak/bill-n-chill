@@ -60,9 +60,8 @@ export type CreatorAction = {
 export type OrganizationBrandingDefaults = {
   display_name: string;
   logo_url: string;
-  invoice_sender_name: string;
-  invoice_sender_email: string;
-  invoice_sender_address: string;
+  billing_address: string;
+  help_email: string;
 };
 
 export type CreatorSectionSlot =

@@ -24,8 +24,8 @@ import {
 type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amount";
 
 type OrganizationDocumentDefaults = OrganizationBrandingDefaults & {
-  estimate_default_terms: string;
-  estimate_validation_delta_days: number;
+  estimate_terms_and_conditions: string;
+  default_estimate_valid_delta: number;
 };
 
 type EstimateSheetProps = {
@@ -146,7 +146,7 @@ export function EstimateSheet({
   const showReadOnlyText = readOnly && readOnlyPresentation === "text";
   const senderBranding = resolveOrganizationBranding(organizationDefaults);
   const senderName = senderBranding.senderDisplayName;
-  const senderEmail = senderBranding.senderEmail;
+  const senderEmail = senderBranding.helpEmail;
   const senderAddressLines = senderBranding.senderAddressLines;
   const senderLogoUrl = senderBranding.logoUrl;
 
@@ -597,7 +597,7 @@ export function EstimateSheet({
           <>
             <div className={creatorStyles.terms}>
               <h4>Terms and Conditions</h4>
-              {(termsText || organizationDefaults?.estimate_default_terms || "Not set")
+              {(termsText || organizationDefaults?.estimate_terms_and_conditions || "Not set")
                 .split("\n")
                 .filter((line) => line.trim())
                 .map((line, index) => (

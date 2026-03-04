@@ -48,38 +48,24 @@ describe("resolveOrganizationBranding", () => {
   it("resolves all fields from complete defaults", () => {
     const result = resolveOrganizationBranding({
       display_name: "Acme Corp",
-      invoice_sender_name: "Acme Billing",
-      invoice_sender_email: "billing@acme.com",
-      invoice_sender_address: "123 Main St\nSuite 200",
+      billing_address: "123 Main St\nSuite 200",
       logo_url: "https://acme.com/logo.png",
-    });
-    expect(result.senderName).toBe("Acme Billing");
-    expect(result.senderDisplayName).toBe("Acme Billing");
-    expect(result.senderEmail).toBe("billing@acme.com");
-    expect(result.senderAddress).toBe("123 Main St\nSuite 200");
-    expect(result.senderAddressLines).toEqual(["123 Main St", "Suite 200"]);
-    expect(result.logoUrl).toBe("https://acme.com/logo.png");
-  });
-
-  it("falls back to display_name when invoice_sender_name is empty", () => {
-    const result = resolveOrganizationBranding({
-      display_name: "Acme Corp",
-      invoice_sender_name: "",
-      invoice_sender_email: "",
-      invoice_sender_address: "",
-      logo_url: "",
+      help_email: "help@acme.com",
     });
     expect(result.senderName).toBe("Acme Corp");
     expect(result.senderDisplayName).toBe("Acme Corp");
+    expect(result.senderAddress).toBe("123 Main St\nSuite 200");
+    expect(result.senderAddressLines).toEqual(["123 Main St", "Suite 200"]);
+    expect(result.logoUrl).toBe("https://acme.com/logo.png");
+    expect(result.helpEmail).toBe("help@acme.com");
   });
 
-  it("uses 'Your Company' when both name fields are empty", () => {
+  it("uses 'Your Company' when display_name is empty", () => {
     const result = resolveOrganizationBranding({
       display_name: "",
-      invoice_sender_name: "",
-      invoice_sender_email: "",
-      invoice_sender_address: "",
+      billing_address: "",
       logo_url: "",
+      help_email: "",
     });
     expect(result.senderName).toBe("");
     expect(result.senderDisplayName).toBe("Your Company");
@@ -89,10 +75,10 @@ describe("resolveOrganizationBranding", () => {
     const result = resolveOrganizationBranding(null);
     expect(result.senderName).toBe("");
     expect(result.senderDisplayName).toBe("Your Company");
-    expect(result.senderEmail).toBe("");
     expect(result.senderAddress).toBe("");
     expect(result.senderAddressLines).toEqual([]);
     expect(result.logoUrl).toBe("");
+    expect(result.helpEmail).toBe("");
   });
 
   it("handles undefined defaults", () => {
@@ -103,14 +89,13 @@ describe("resolveOrganizationBranding", () => {
   it("trims whitespace from all fields", () => {
     const result = resolveOrganizationBranding({
       display_name: "  Acme  ",
-      invoice_sender_name: "",
-      invoice_sender_email: "  billing@acme.com  ",
-      invoice_sender_address: "  123 Main  ",
+      billing_address: "  123 Main  ",
       logo_url: "  https://acme.com/logo.png  ",
+      help_email: "  help@acme.com  ",
     });
     expect(result.senderName).toBe("Acme");
-    expect(result.senderEmail).toBe("billing@acme.com");
     expect(result.senderAddress).toBe("123 Main");
     expect(result.logoUrl).toBe("https://acme.com/logo.png");
+    expect(result.helpEmail).toBe("help@acme.com");
   });
 });

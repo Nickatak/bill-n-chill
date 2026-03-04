@@ -57,17 +57,15 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
     () =>
       resolvePublicSender({
         ...invoice?.organization_context,
-        sender_name: invoice?.organization_context?.sender_name || invoice?.sender_name,
-        sender_email: invoice?.organization_context?.sender_email || invoice?.sender_email,
-        sender_address: invoice?.organization_context?.sender_address || invoice?.sender_address,
-        logo_url: invoice?.organization_context?.logo_url || invoice?.sender_logo_url,
+        display_name:
+          invoice?.sender_name || invoice?.organization_context?.display_name,
+        logo_url:
+          invoice?.sender_logo_url || invoice?.organization_context?.logo_url,
       }),
     [
       invoice?.organization_context,
-      invoice?.sender_address,
-      invoice?.sender_email,
-      invoice?.sender_logo_url,
       invoice?.sender_name,
+      invoice?.sender_logo_url,
     ],
   );
   const recipient = useMemo(

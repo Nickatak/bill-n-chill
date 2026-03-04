@@ -77,7 +77,7 @@ export function useSharedSessionAuth() {
   const token = session?.token ?? "";
   const role: SessionRole = session?.role || "owner";
   const organization = session?.organization ?? null;
-  const orgLabel = organization?.displayName || organization?.slug || "";
+  const orgLabel = organization?.displayName || "";
   const authMessage = session
     ? `Using shared session for ${session.email || "user"} (${role})${orgLabel ? ` in ${orgLabel}` : ""}.`
     : NO_SHARED_SESSION_MESSAGE;

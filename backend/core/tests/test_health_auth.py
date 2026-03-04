@@ -35,6 +35,7 @@ class AuthEndpointTests(TestCase):
         )
         self.assertEqual(login_response.status_code, 200)
         self.assertOrganizationPayload(login_response.json()["data"]["organization"])
+        self.assertIn("capabilities", login_response.json()["data"])
         token = login_response.json()["data"]["token"]
         self.assertTrue(token)
 
@@ -45,6 +46,7 @@ class AuthEndpointTests(TestCase):
         self.assertEqual(me_response.status_code, 200)
         self.assertEqual(me_response.json()["data"]["email"], "pm@example.com")
         self.assertOrganizationPayload(me_response.json()["data"]["organization"])
+        self.assertIn("capabilities", me_response.json()["data"])
 
         membership = OrganizationMembership.objects.get(user=self.user)
         self.assertEqual(membership.role, OrganizationMembership.Role.OWNER)
@@ -62,6 +64,7 @@ class AuthEndpointTests(TestCase):
         )
         self.assertEqual(register_response.status_code, 201)
         self.assertOrganizationPayload(register_response.json()["data"]["organization"])
+        self.assertIn("capabilities", register_response.json()["data"])
         token = register_response.json()["data"]["token"]
         self.assertTrue(token)
 
@@ -82,7 +85,7 @@ class AuthEndpointTests(TestCase):
             len(STARTER_COST_CODE_ROWS),
         )
 
-    def test_register_bootstraps_organization_invoice_defaults(self):
+    def test_register_bootstraps_organization_defaults(self):
         register_response = self.client.post(
             "/api/v1/auth/register/",
             data={"email": "defaults@example.com", "password": "secret123"},
@@ -94,27 +97,21 @@ class AuthEndpointTests(TestCase):
         membership = OrganizationMembership.objects.select_related("organization").get(user=user)
         organization = membership.organization
 
-        self.assertEqual(organization.invoice_sender_name, organization.display_name)
-        self.assertEqual(organization.invoice_sender_email, "defaults@example.com")
         self.assertEqual(organization.help_email, "defaults@example.com")
-        self.assertEqual(organization.invoice_default_due_days, 30)
-        self.assertEqual(organization.estimate_validation_delta_days, 30)
+        self.assertEqual(organization.default_invoice_due_delta, 30)
+        self.assertEqual(organization.default_estimate_valid_delta, 30)
         self.assertEqual(
-            organization.invoice_default_terms,
+            organization.invoice_terms_and_conditions,
             "Payment due within 30 days of invoice date.",
         )
         self.assertEqual(
-            organization.estimate_default_terms,
+            organization.estimate_terms_and_conditions,
             "Estimate is valid for 30 days. Scope and pricing are based on visible conditions only; hidden conditions may require a change order.",
         )
         self.assertEqual(
-            organization.change_order_default_reason,
-            "Scope adjustment requested after baseline approval due to field conditions or owner request.",
-        )
-        self.assertEqual(organization.invoice_default_footer, "Thank you for your business.")
-        self.assertEqual(
-            organization.invoice_default_notes,
-            "Please include invoice number with your payment.",
+            organization.change_order_terms_and_conditions,
+            "Change order pricing is based on current labor and material rates. "
+            "Approved changes are final and will be reflected in the next billing cycle.",
         )
 
     def test_register_rejects_duplicate_email(self):
@@ -229,37 +226,6 @@ class AuthEndpointTests(TestCase):
         with self.assertRaises(ValidationError):
             OrganizationMembershipRecord.objects.filter(pk=membership_record.pk).delete()
 
-    def test_org_slug_generation_handles_email_local_part_collisions(self):
-        user_a = User.objects.create_user(
-            username="bob-a",
-            email="bob@example.com",
-            password="secret123",
-        )
-        user_b = User.objects.create_user(
-            username="bob-b",
-            email="bob@another-domain.com",
-            password="secret123",
-        )
-
-        login_a = self.client.post(
-            "/api/v1/auth/login/",
-            data={"email": "bob@example.com", "password": "secret123"},
-            content_type="application/json",
-        )
-        self.assertEqual(login_a.status_code, 200)
-        login_b = self.client.post(
-            "/api/v1/auth/login/",
-            data={"email": "bob@another-domain.com", "password": "secret123"},
-            content_type="application/json",
-        )
-        self.assertEqual(login_b.status_code, 200)
-
-        membership_a = OrganizationMembership.objects.get(user=user_a)
-        membership_b = OrganizationMembership.objects.get(user=user_b)
-        self.assertNotEqual(membership_a.organization.slug, membership_b.organization.slug)
-        self.assertTrue(membership_a.organization.slug.startswith("bob"))
-        self.assertTrue(membership_b.organization.slug.startswith("bob"))
-
     def test_membership_role_overrides_legacy_group_role_resolution(self):
         user = User.objects.create_user(
             username="mixed-role",
@@ -271,7 +237,6 @@ class AuthEndpointTests(TestCase):
 
         org = Organization.objects.create(
             display_name="Mixed Role Org",
-            slug="mixed-role-org",
             created_by=user,
         )
         OrganizationMembership.objects.create(
@@ -293,7 +258,5 @@ class AuthEndpointTests(TestCase):
         self.assertIsInstance(organization, dict)
         self.assertIn("id", organization)
         self.assertIn("display_name", organization)
-        self.assertIn("slug", organization)
         self.assertIsNotNone(organization["id"])
         self.assertTrue(organization["display_name"])
-        self.assertTrue(organization["slug"])

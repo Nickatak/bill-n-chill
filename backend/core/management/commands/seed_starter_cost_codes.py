@@ -58,7 +58,7 @@ class Command(BaseCommand):
             if not created_by:
                 self.stderr.write(
                     self.style.WARNING(
-                        f"Skipped org #{organization.id} ({organization.slug}): no user available for created_by."
+                        f"Skipped org #{organization.id} ({organization.display_name}): no user available for created_by."
                     )
                 )
                 continue
@@ -84,7 +84,7 @@ class Command(BaseCommand):
             total_existing += org_existing
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"Org #{organization.id} ({organization.slug}): created={org_created}, existing={org_existing}"
+                    f"Org #{organization.id} ({organization.display_name}): created={org_created}, existing={org_existing}"
                 )
             )
 

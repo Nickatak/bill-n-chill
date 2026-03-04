@@ -1,14 +1,11 @@
 from django.core.management.base import BaseCommand
 
 from core.models import Organization
-from core.utils.organization_defaults import apply_missing_invoice_profile_defaults
+from core.utils.organization_defaults import apply_missing_org_defaults
 
 
 class Command(BaseCommand):
-    help = (
-        "Backfill missing organization invoice profile defaults "
-        "(sender identity + default terms/footer/notes)."
-    )
+    help = "Backfill missing organization defaults (T&C, deltas, help email)."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -25,7 +22,7 @@ class Command(BaseCommand):
         organizations = Organization.objects.select_related("created_by").order_by("id")
         for organization in organizations:
             scanned += 1
-            changed_fields = apply_missing_invoice_profile_defaults(
+            changed_fields = apply_missing_org_defaults(
                 organization=organization,
                 owner_email=organization.created_by.email or "",
             )

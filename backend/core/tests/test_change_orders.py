@@ -205,7 +205,7 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(payload["project_context"]["id"], self.project.id)
         self.assertEqual(payload["project_context"]["customer_display_name"], self.customer.display_name)
         self.assertIn("organization_context", payload)
-        self.assertIn("sender_name", payload["organization_context"])
+        self.assertIn("display_name", payload["organization_context"])
         self.assertIn("help_email", payload["organization_context"])
 
     def test_public_change_order_decision_view_approves_pending_approval(self):
@@ -401,10 +401,8 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(second.json()["data"]["family_key"], "2")
         self.assertEqual(ChangeOrder.objects.count(), 2)
 
-    def test_change_order_create_uses_org_default_reason_when_payload_omits_reason(self):
-        membership = self._bootstrap_primary_membership()
-        membership.organization.change_order_default_reason = "Default org change-order reason."
-        membership.organization.save(update_fields=["change_order_default_reason", "updated_at"])
+    def test_change_order_create_defaults_reason_to_empty_when_omitted(self):
+        self._bootstrap_primary_membership()
         self._create_active_budget(
             project_id=self.project.id,
             cost_code_id=self.cost_code.id,
@@ -423,12 +421,10 @@ class ChangeOrderTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()["data"]["reason"], "Default org change-order reason.")
+        self.assertEqual(response.json()["data"]["reason"], "")
 
     def test_change_order_create_allows_per_change_order_reason_override(self):
-        membership = self._bootstrap_primary_membership()
-        membership.organization.change_order_default_reason = "Template-owned change-order reason."
-        membership.organization.save(update_fields=["change_order_default_reason", "updated_at"])
+        self._bootstrap_primary_membership()
         self._create_active_budget(
             project_id=self.project.id,
             cost_code_id=self.cost_code.id,
@@ -451,9 +447,7 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(response.json()["data"]["reason"], "User-provided reason should be honored")
 
     def test_change_order_patch_allows_reason_updates(self):
-        membership = self._bootstrap_primary_membership()
-        membership.organization.change_order_default_reason = "Template reason v1."
-        membership.organization.save(update_fields=["change_order_default_reason", "updated_at"])
+        self._bootstrap_primary_membership()
         self._create_active_budget(
             project_id=self.project.id,
             cost_code_id=self.cost_code.id,

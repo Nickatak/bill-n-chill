@@ -14,8 +14,8 @@ type BuildAuthHeadersOptions = {
 };
 
 /**
- * Attach X-Organization-Slug and X-Organization-Id headers when an
- * organization is present, enabling Django's org-scoped middleware.
+ * Attach X-Organization-Id header when an organization is present,
+ * enabling Django's org-scoped middleware.
  */
 function maybeApplyOrganizationHeaders(
   headers: Record<string, string>,
@@ -25,9 +25,6 @@ function maybeApplyOrganizationHeaders(
     return;
   }
 
-  if (organization.slug) {
-    headers["X-Organization-Slug"] = organization.slug;
-  }
   if (organization.id) {
     headers["X-Organization-Id"] = String(organization.id);
   }

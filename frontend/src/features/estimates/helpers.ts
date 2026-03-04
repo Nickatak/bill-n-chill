@@ -36,9 +36,9 @@ const STATUS_LABELS: Record<string, string> = {
 
 /** Resolve the organization's configured validity window, clamped to 1–365 days. */
 export function resolveEstimateValidationDeltaDays(
-  defaults?: { estimate_validation_delta_days?: number } | null,
+  defaults?: { default_estimate_valid_delta?: number } | null,
 ): number {
-  const parsed = Number(defaults?.estimate_validation_delta_days);
+  const parsed = Number(defaults?.default_estimate_valid_delta);
   if (!Number.isFinite(parsed)) {
     return ESTIMATE_VALIDATION_DELTA_DAYS_FALLBACK;
   }
