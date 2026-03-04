@@ -1,6 +1,6 @@
 # Architecture
 
-Last reviewed: 2026-02-28
+Last reviewed: 2026-03-04
 
 ## Table of Contents
 
@@ -15,7 +15,7 @@ Last reviewed: 2026-02-28
 - [UX Channel Strategy](#ux-channel-strategy)
 - [API Strategy](#api-strategy)
 - [Data and Persistence](#data-and-persistence)
-- [Auth](#auth)
+- [Auth and RBAC](#auth-and-rbac)
 - [Cross-Cutting Concerns](#cross-cutting-concerns)
 - [Reference Docs](#reference-docs)
 
@@ -43,9 +43,9 @@ Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> M
   - `backend/core/views/accounts_receivable`: invoice workflows and public decision flows.
   - `backend/core/views/accounts_payable`: vendor-bill workflows.
   - `backend/core/views/cash_management`: payments + allocations.
-  - `backend/core/views/helpers.py`: shared role guardrails, organization scope helpers, and write-path utilities.
+  - `backend/core/views/helpers.py`: capability-based RBAC enforcement (`_capability_gate`, `_resolve_user_capabilities`), organization scope helpers, and write-path utilities.
 - Domain models:
-  - `backend/core/models/shared_operations`: org, membership, customer, project, cost code, vendor, sync-event operational rows.
+  - `backend/core/models/shared_operations`: org, membership, role template, customer, project, cost code, vendor, sync-event operational rows.
   - `backend/core/models/estimating`: estimates, lines, budgets, budget lines, estimate status events.
   - `backend/core/models/change_orders`: change orders, change-order lines.
   - `backend/core/models/accounts_receivable`: invoices, invoice lines, invoice status events.
@@ -70,8 +70,8 @@ Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> M
   - `frontend/src/shared/components`: cross-feature UI primitives.
   - `frontend/src/shared/document-composer`: shared authoring patterns for financial docs.
   - `frontend/src/shared/document-viewer`: shared read/public preview rendering patterns.
-- Session:
-  - `frontend/src/features/session/*`: token/session management and auth bootstrap checks.
+- Session and RBAC:
+  - `frontend/src/features/session/*`: token/session management, auth bootstrap checks, and capability-based UI gating (`rbac.ts`: `canDo`, `hasAnyRole`).
 
 ### Key Runtime Flows
 
@@ -94,6 +94,8 @@ Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> M
   - model-level transition guards and consistency checks.
 - API contract third:
   - serializer/view validation for payload quality, UX-friendly errors, and endpoint policy.
+- RBAC enforcement:
+  - capability-based gates on all write endpoints (`_capability_gate`).
 - Financial write safety:
   - multi-write money operations execute in atomic transactions.
 - Audit posture:
@@ -133,10 +135,14 @@ Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> M
 - Use MySQL for local, dev, and prod-like environments.
 - Local host workflows can run Django/Next.js directly while MySQL runs in Docker.
 
-## Auth
+## Auth and RBAC
 
 - Current implementation uses DRF token authentication for API access.
 - Frontend stores and reuses the token for authenticated API requests.
+- RBAC enforcement:
+  - Backend: `_capability_gate(user, resource, action)` resolves capabilities from `RoleTemplate.capability_flags_json` and checks per-action access. All write endpoints use capability gates.
+  - Frontend: `canDo(capabilities, resource, action)` gates mutation UI (create forms, submit buttons, status controls). Capabilities are stored in session from auth responses and refreshed on `/auth/me/` verification.
+  - Five system roles (owner, pm, worker, bookkeeping, viewer) with preset capability matrices. Custom roles supported via org-local `RoleTemplate` (not yet exposed in UI).
 
 ## Cross-Cutting Concerns
 

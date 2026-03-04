@@ -1,6 +1,6 @@
 # bill-n-chill Domain Model (v1)
 
-Last reviewed: 2026-02-28
+Last reviewed: 2026-03-04
 
 ## Table of Contents
 
@@ -112,38 +112,67 @@ Represents an account/tenant using bill-n-chill.
 Key fields:
 - `id`
 - `display_name`
-- `slug`
 - `logo_url`
-- `invoice_sender_name`
-- `invoice_sender_email`
-- `invoice_sender_address`
-- `invoice_default_due_days`
-- `invoice_default_terms`
-- `invoice_default_footer`
-- `invoice_default_notes`
-- `estimate_default_terms`
-- `change_order_default_reason`
+- `help_email`
+- `billing_address`
+- `default_invoice_due_delta`
+- `default_estimate_valid_delta`
+- `invoice_terms_and_conditions`
+- `estimate_terms_and_conditions`
+- `change_order_terms_and_conditions`
 - `created_by`
+
+Settings split:
+- **Identity fields** (`display_name`, `logo_url`, `billing_address`): owner-only edit.
+- **Preset fields** (`help_email`, deltas, T&C fields): owner + PM can edit.
+- Field-level capability gates enforce this split at the API layer.
 
 Policy:
 - Internal-facing tenant boundary object.
 - Bootstrap lifecycle captures are append-only in `OrganizationRecord`.
 
+#### RoleTemplate
+
+Preset or custom role definition with a capability-flags permission matrix.
+
+Key fields:
+- `id`
+- `name`
+- `slug` (unique, stable identifier for API/UI wiring)
+- `organization_id` (nullable; null for system-level presets)
+- `is_system`
+- `capability_flags_json` (JSONField: `{resource: [actions]}`)
+- `description`
+- `created_by` (nullable)
+
+System presets (seeded via migration):
+- `owner`, `pm`, `worker`, `bookkeeping`, `viewer`
+
+Policy:
+- System templates are immutable presets; organization-local templates enable future custom roles.
+- `capability_flags_json` is the canonical permission source consumed by `_resolve_user_capabilities`.
+
 #### OrganizationMembership
 
-Represents one user's active organization context and base RBAC role.
+Represents one user's active organization context and RBAC role.
 
 Key fields:
 - `id`
 - `organization_id`
-- `user_id`
+- `user_id` (OneToOneField — one active org per user)
 - `role` (`owner`, `pm`, `worker`, `bookkeeping`, `viewer`)
+- `role_template_id` (nullable FK to `RoleTemplate`)
 - `status` (`active`, `disabled`)
-- `role_template_id` (nullable)
-- `capability_flags_json`
+- `capability_flags_json` (additive overrides merged onto template capabilities)
+
+RBAC resolution:
+- Primary: `role_template.capability_flags_json` (if `role_template` is assigned).
+- Fallback: system `RoleTemplate` matching the `role` slug.
+- `capability_flags_json` on membership provides additive per-user grants layered on top.
 
 Policy:
 - Internal-facing RBAC membership row.
+- One active membership per user (OneToOneField on `user`).
 - Bootstrap and lifecycle changes are append-only in `OrganizationMembershipRecord`.
 
 #### OrganizationRecord
@@ -690,8 +719,9 @@ Policy:
 
 ### Relationship Summary
 
-- `Organization` has many `OrganizationMemberships`, `Vendors`, `CostCodes`, and `ScopeItems`.
+- `Organization` has many `OrganizationMemberships`, `RoleTemplates`, `Vendors`, `CostCodes`, and `ScopeItems`.
 - `Organization` has many `OrganizationRecords` and `OrganizationMembershipRecords`.
+- `RoleTemplate` provides capability flags to `OrganizationMembership` (nullable FK).
 - `CustomerIntake` has many `CustomerIntakeRecords`.
 - `Customer` has many `CustomerRecords`.
 - `User` owns/scopes `CustomerIntake`, `Customers`, `Projects`, and financial workflow records via `created_by`.
@@ -756,4 +786,4 @@ This section is a compact index only. Canonical endpoint behavior lives in `docs
 - Minimal commitment object in v1, or full subcontract/change-event chain?
 
 4. Multi-organization structures:
-- Keep one active organization per user, or add first-class multi-org switching early?
+- **Resolved**: One active organization per user (enforced by `OneToOneField` on `OrganizationMembership.user`). Multi-org switching deferred until needed.

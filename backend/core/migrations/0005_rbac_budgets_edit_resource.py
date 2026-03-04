@@ -1,44 +1,40 @@
-"""RBAC Phase 2: Add payments resource to system RoleTemplate capability flags.
+"""RBAC: Add budgets.edit action to owner and PM system RoleTemplates.
 
-Adds 'payments' key to capability_flags_json for all 5 system role templates.
-- owner, pm, bookkeeping: full payment lifecycle (view, create, edit, allocate)
-- worker, viewer: view only
+Extends the budgets capability from view-only to [view, edit] for owner and PM.
+All other roles remain view-only. Closes the ungated budget_line_detail_view PATCH.
 """
 
 from django.db import migrations
 
 
-PAYMENTS_BY_ROLE = {
-    "owner": ["view", "create", "edit", "allocate"],
-    "pm": ["view", "create", "edit", "allocate"],
-    "worker": ["view"],
-    "bookkeeping": ["view", "create", "edit", "allocate"],
-    "viewer": ["view"],
+BUDGETS_EDIT_BY_ROLE = {
+    "owner": ["view", "edit"],
+    "pm": ["view", "edit"],
 }
 
 
-def add_payments_resource(apps, schema_editor):
+def add_budgets_edit(apps, schema_editor):
     RoleTemplate = apps.get_model("core", "RoleTemplate")
-    for slug, actions in PAYMENTS_BY_ROLE.items():
+    for slug, actions in BUDGETS_EDIT_BY_ROLE.items():
         try:
             template = RoleTemplate.objects.get(is_system=True, slug=slug)
         except RoleTemplate.DoesNotExist:
             continue
         caps = template.capability_flags_json or {}
-        caps["payments"] = actions
+        caps["budgets"] = actions
         template.capability_flags_json = caps
         template.save(update_fields=["capability_flags_json"])
 
 
-def remove_payments_resource(apps, schema_editor):
+def remove_budgets_edit(apps, schema_editor):
     RoleTemplate = apps.get_model("core", "RoleTemplate")
-    for slug in PAYMENTS_BY_ROLE:
+    for slug in BUDGETS_EDIT_BY_ROLE:
         try:
             template = RoleTemplate.objects.get(is_system=True, slug=slug)
         except RoleTemplate.DoesNotExist:
             continue
         caps = template.capability_flags_json or {}
-        caps.pop("payments", None)
+        caps["budgets"] = ["view"]
         template.capability_flags_json = caps
         template.save(update_fields=["capability_flags_json"])
 
@@ -46,12 +42,12 @@ def remove_payments_resource(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("core", "0002_rbac_phase1"),
+        ("core", "0004_rbac_accounting_sync_resource"),
     ]
 
     operations = [
         migrations.RunPython(
-            add_payments_resource,
-            remove_payments_resource,
+            add_budgets_edit,
+            remove_budgets_edit,
         ),
     ]

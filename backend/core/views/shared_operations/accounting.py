@@ -8,7 +8,7 @@ from rest_framework.response import Response
 
 from core.models import AccountingSyncEvent, AccountingSyncRecord
 from core.serializers import AccountingSyncEventSerializer, AccountingSyncEventWriteSerializer
-from core.views.helpers import _organization_user_ids, _role_gate_error_payload, _validate_project_for_user
+from core.views.helpers import _capability_gate, _organization_user_ids, _validate_project_for_user
 
 
 def _build_accounting_sync_snapshot(sync_event: AccountingSyncEvent) -> dict:
@@ -64,7 +64,7 @@ def project_accounting_sync_events_view(request, project_id: int):
 
     Contract:
     - `GET`: project/user-scoped sync event history.
-    - `POST`: requires role `owner|bookkeeping` and core sync identity fields.
+    - `POST`: requires `accounting_sync.create` capability and core sync identity fields.
     - Create writes are atomic: sync row plus immutable `AccountingSyncRecord(created)`.
     """
     actor_user_ids = _organization_user_ids(request.user)
@@ -82,7 +82,7 @@ def project_accounting_sync_events_view(request, project_id: int):
         ).order_by("-created_at", "-id")
         return Response({"data": AccountingSyncEventSerializer(rows, many=True).data})
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "bookkeeping"})
+    permission_error, _ = _capability_gate(request.user, "accounting_sync", "create")
     if permission_error:
         return Response(permission_error, status=403)
 
@@ -149,7 +149,7 @@ def accounting_sync_event_retry_view(request, sync_event_id: int):
     """Retry a failed accounting sync event by moving it back to `queued`.
 
     Contract:
-    - Requires role `owner|bookkeeping`.
+    - Requires `accounting_sync.retry` capability.
     - Successful sync rows are not retryable; already queued rows return no-op meta.
     - Retry writes are atomic: status fields update plus immutable `AccountingSyncRecord(retried)`.
     """
@@ -165,7 +165,7 @@ def accounting_sync_event_retry_view(request, sync_event_id: int):
             status=404,
         )
 
-    permission_error, _ = _role_gate_error_payload(request.user, {"owner", "bookkeeping"})
+    permission_error, _ = _capability_gate(request.user, "accounting_sync", "retry")
     if permission_error:
         return Response(permission_error, status=403)
 

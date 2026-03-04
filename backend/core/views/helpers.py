@@ -412,6 +412,13 @@ def _resolve_user_capabilities(user) -> dict:
     1. membership.role_template.capability_flags_json (if role_template assigned)
     2. System RoleTemplate matching membership.role slug (fallback for legacy users)
     3. Per-membership capability_flags_json overrides (merged additively)
+
+    TODO(perf): This issues up to 3 DB queries per call (membership lookup,
+    role_template re-fetch, system template fallback). Not a problem at current
+    scale. If request latency becomes a concern, consider having
+    _ensure_primary_membership always select_related("role_template") to
+    collapse the first two queries, and/or caching resolved capabilities on
+    the request object.
     """
     membership = _ensure_primary_membership(user)
     if not membership:

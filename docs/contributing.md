@@ -1,6 +1,6 @@
 # Contributing
 
-Last reviewed: 2026-02-28
+Last reviewed: 2026-03-04
 
 ## Table of Contents
 
@@ -10,6 +10,7 @@ Last reviewed: 2026-02-28
   - [Helper Placement](#helper-placement)
   - [Commit Style](#commit-style)
   - [Review Focus](#review-focus)
+- [RBAC Patterns](#rbac-patterns)
 - [Architecture and Modeling Conventions (Meta Choices)](#architecture-and-modeling-conventions-meta-choices)
   - [Object Terminology](#object-terminology)
   - [Mutable + Immutable Pattern](#mutable--immutable-pattern)
@@ -66,6 +67,39 @@ Known examples of this pattern:
 - Collapse toggle buttons inside viewer panels
 - Secondary action buttons inside status/action cards
 - Filter action buttons inside filter bars
+
+## RBAC Patterns
+
+### Backend: Capability Gates
+
+All write endpoints must use capability-based gating:
+```python
+permission_error, _ = _capability_gate(request.user, "resource_name", "action")
+if permission_error:
+    return Response(permission_error, status=403)
+```
+
+- Use `_capability_gate` (not `_role_gate_error_payload`) for new endpoints.
+- For status-dependent actions within a single endpoint, gate each action separately:
+  ```python
+  if new_status == "sent":
+      _err, _ = _capability_gate(request.user, "estimates", "send")
+  elif new_status == "approved":
+      _err, _ = _capability_gate(request.user, "estimates", "approve")
+  ```
+- The capability surface is defined in `RoleTemplate.capability_flags_json` and documented in `docs/api.md`.
+
+### Frontend: `canDo` UI Gating
+
+Use `canDo(capabilities, resource, action)` from `session/rbac.ts` to gate mutation UI:
+```typescript
+const { capabilities } = useSharedSessionAuth();
+const canMutate = canDo(capabilities, "estimates", "create");
+```
+
+- Gate create forms, submit buttons, and status dropdowns behind `canMutate*` booleans.
+- Show a read-only hint when the user lacks mutation capabilities.
+- The backend always enforces — frontend gating is UX, not security.
 
 ## Architecture and Modeling Conventions (Meta Choices)
 

@@ -17,11 +17,35 @@ export type SessionOrganization = {
   displayName: string;
 };
 
+export type Capabilities = Record<string, string[]>;
+
+/**
+ * Structural validation for capabilities from API/localStorage.
+ * Returns the capabilities if valid, undefined if malformed.
+ * Logs a warning on malformed data for debuggability.
+ */
+function validateCapabilities(raw: unknown): Capabilities | undefined {
+  if (raw == null) return undefined;
+  if (typeof raw !== "object" || Array.isArray(raw)) {
+    console.warn("[session] Malformed capabilities: expected object, got", typeof raw);
+    return undefined;
+  }
+  const obj = raw as Record<string, unknown>;
+  for (const [key, value] of Object.entries(obj)) {
+    if (!Array.isArray(value) || !value.every((v) => typeof v === "string")) {
+      console.warn(`[session] Malformed capabilities.${key}: expected string[], got`, value);
+      return undefined;
+    }
+  }
+  return obj as Capabilities;
+}
+
 export type ClientSession = {
   token: string;
   email: string;
   role?: SessionRole;
   organization?: SessionOrganization;
+  capabilities?: Capabilities;
 };
 
 /** Read the current session from localStorage. Returns null if absent, expired, or malformed. */
@@ -45,6 +69,7 @@ export function loadClientSession(): ClientSession | null {
       email: parsed.email ?? "",
       role: parsed.role,
       organization: parsed.organization,
+      capabilities: validateCapabilities(parsed.capabilities),
     };
   } catch {
     return null;

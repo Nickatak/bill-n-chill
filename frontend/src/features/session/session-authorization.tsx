@@ -15,7 +15,10 @@ import { type ReactNode, createContext, useContext, useEffect, useMemo, useRef, 
 import { buildAuthHeaders } from "./auth-headers";
 import {
   clearClientSession,
+  loadClientSession,
+  saveClientSession,
   SESSION_STORAGE_KEY,
+  type Capabilities,
   type SessionOrganization,
   type SessionRole,
 } from "./client-session";
@@ -29,6 +32,7 @@ type AuthorizationStatus = "checking" | "authorized" | "unauthorized";
 type SessionAuthorizationContextValue = {
   token: string;
   role: SessionRole;
+  capabilities: Capabilities | undefined;
   organization: SessionOrganization | null;
   authMessage: string;
   status: AuthorizationStatus;
@@ -48,7 +52,7 @@ type SessionAuthorizationProviderProps = {
  * exposes auth state to all descendants via context.
  */
 export function SessionAuthorizationProvider({ children }: SessionAuthorizationProviderProps) {
-  const { token, role, organization, authMessage } = useSharedSessionAuth();
+  const { token, role, organization, authMessage, capabilities } = useSharedSessionAuth();
   const [status, setStatus] = useState<AuthorizationStatus>("checking");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const verifiedTokenRef = useRef("");
@@ -75,7 +79,7 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
         const response = await fetch(`${defaultApiBaseUrl}/auth/me/`, {
           headers: buildAuthHeaders(candidateToken, { organization }),
         });
-        await response.json();
+        const mePayload = await response.json();
 
         if (cancelled) {
           return;
@@ -92,6 +96,15 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
           // Preserve authorized UI on transient upstream/CDN failures.
           setStatus("authorized");
           return;
+        }
+
+        // Refresh capabilities from the /me response so they stay current.
+        const freshCapabilities = mePayload?.data?.capabilities;
+        if (freshCapabilities) {
+          const current = loadClientSession();
+          if (current) {
+            saveClientSession({ ...current, capabilities: freshCapabilities });
+          }
         }
 
         verifiedTokenRef.current = candidateToken;
@@ -162,6 +175,7 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
     () => ({
       token,
       role,
+      capabilities,
       organization,
       authMessage,
       status,
@@ -169,7 +183,7 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
       isChecking: status === "checking",
       isRefreshing,
     }),
-    [authMessage, isRefreshing, organization, role, status, token],
+    [authMessage, capabilities, isRefreshing, organization, role, status, token],
   );
 
   return (

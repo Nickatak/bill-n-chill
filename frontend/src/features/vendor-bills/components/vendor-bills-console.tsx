@@ -31,7 +31,7 @@ import {
   projectStatusLabel,
 } from "../helpers";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
-import { hasAnyRole } from "../../session/rbac";
+import { canDo } from "../../session/rbac";
 import {
   ApiResponse,
   ProjectRecord,
@@ -113,7 +113,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const scopedProjectId = scopedProjectIdProp;
   const preferredProjectId = scopedProjectId ?? queryProjectId;
 
-  const { token, role } = useSharedSessionAuth();
+  const { token, role, capabilities } = useSharedSessionAuth();
   const dueSoonWindowDays = 7;
   const [statusMessage, setStatusMessage] = useState("");
   const [createErrorMessage, setCreateErrorMessage] = useState("");
@@ -287,7 +287,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   }, [budgetLineGroups]);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
-  const canMutateVendorBills = hasAnyRole(role, ["owner", "pm", "bookkeeping"]);
+  const canMutateVendorBills = canDo(capabilities, "vendor_bills", "create");
   const isProjectScoped = scopedProjectId !== null;
   const selectedProject =
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;

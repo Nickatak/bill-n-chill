@@ -17,7 +17,7 @@ import {
   normalizeApiBaseUrl,
 } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
-import { hasAnyRole } from "../../session/rbac";
+import { canDo } from "../../session/rbac";
 import {
   ApiResponse,
   InvoiceRecord,
@@ -72,7 +72,7 @@ function paymentNextActionHint(status: PaymentStatus): string {
 
 /** Full payment lifecycle console: create, edit, transition, and allocate payments per project. */
 export function PaymentsConsole() {
-  const { token, authMessage, role } = useSharedSessionAuth();
+  const { token, authMessage, role, capabilities } = useSharedSessionAuth();
   const [statusMessage, setStatusMessage] = useState("");
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -119,7 +119,7 @@ export function PaymentsConsole() {
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const searchParams = useSearchParams();
-  const canMutatePayments = hasAnyRole(role, ["owner", "bookkeeping"]);
+  const canMutatePayments = canDo(capabilities, "payments", "create");
   const scopedProjectIdParam = searchParams.get("project");
   const scopedProjectId =
     scopedProjectIdParam && /^\d+$/.test(scopedProjectIdParam) ? Number(scopedProjectIdParam) : null;

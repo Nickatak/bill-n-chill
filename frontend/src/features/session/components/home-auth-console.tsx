@@ -24,6 +24,7 @@ type LoginResponse = {
       id?: number;
       display_name?: string;
     };
+    capabilities?: Record<string, string[]>;
   };
   error?: {
     message?: string;
@@ -145,6 +146,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
         email: nextEmail,
         role: nextRole,
         organization: nextOrganization,
+        capabilities: payload.data?.capabilities,
       });
 
       setPassword("");

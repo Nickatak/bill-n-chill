@@ -31,7 +31,7 @@ import {
   normalizeApiBaseUrl,
 } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
-import { hasAnyRole } from "../../session/rbac";
+import { canDo } from "../../session/rbac";
 import {
   ApiResponse,
   BudgetLineRecord,
@@ -121,7 +121,7 @@ export function ChangeOrdersConsole({
   scopedProjectId: scopedProjectIdProp = null,
   initialOriginEstimateId: initialOriginEstimateIdProp = null,
 }: ChangeOrdersConsoleProps) {
-  const { token, role } = useSharedSessionAuth();
+  const { token, role, capabilities } = useSharedSessionAuth();
   const [actionMessage, setActionMessage] = useState("");
   const [actionTone, setActionTone] = useState<"error" | "success" | "info">("info");
 
@@ -194,7 +194,7 @@ export function ChangeOrdersConsole({
   }, [editFlashCount]);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
-  const canMutateChangeOrders = hasAnyRole(role, ["owner", "pm"]);
+  const canMutateChangeOrders = canDo(capabilities, "change_orders", "create");
   const scopedProjectId = scopedProjectIdProp;
   const initialOriginEstimateId = initialOriginEstimateIdProp;
   const selectedChangeOrder =

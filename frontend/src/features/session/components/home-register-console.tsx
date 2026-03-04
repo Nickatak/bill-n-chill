@@ -23,6 +23,7 @@ type RegisterResponse = {
       id?: number;
       display_name?: string;
     };
+    capabilities?: Record<string, string[]>;
   };
   error?: {
     message?: string;
@@ -145,6 +146,7 @@ export function HomeRegisterConsole({ health }: HomeRegisterConsoleProps) {
         email: nextEmail,
         role: nextRole,
         organization: nextOrganization,
+        capabilities: payload.data?.capabilities,
       });
 
       setMessage("Account created. Redirecting...");

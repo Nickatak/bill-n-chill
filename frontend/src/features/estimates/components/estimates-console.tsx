@@ -15,6 +15,7 @@ import {
   normalizeApiBaseUrl,
 } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
+import { canDo } from "../../session/rbac";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import stampStyles from "@/shared/styles/decision-stamp.module.css";
 import styles from "./estimates-console.module.css";
@@ -105,7 +106,8 @@ const ESTIMATE_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
 export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }: EstimatesConsoleProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { token } = useSharedSessionAuth();
+  const { token, role, capabilities } = useSharedSessionAuth();
+  const canMutateEstimates = canDo(capabilities, "estimates", "create");
   const [formErrorMessage, setFormErrorMessage] = useState("");
   const [formSuccessMessage, setFormSuccessMessage] = useState("");
   const [actionMessage, setActionMessage] = useState("");
@@ -192,7 +194,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const activeFinancialEstimate =
     estimates.find((estimate) => estimate.is_active_financial_baseline) ?? null;
   const isEditingDraft = Boolean(selectedEstimate && selectedEstimate.status === "draft");
-  const isReadOnly = Boolean(selectedEstimate && selectedEstimate.status !== "draft");
+  const isReadOnly = !canMutateEstimates || Boolean(selectedEstimate && selectedEstimate.status !== "draft");
   const statusClasses: Record<string, string> = {
     draft: styles.statusDraft,
     sent: styles.statusSent,
@@ -944,8 +946,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   }
 
   const canCreateEstimate = useMemo(
-    () => Boolean(selectedProjectId) && lineItems.length > 0,
-    [lineItems.length, selectedProjectId],
+    () => canMutateEstimates && Boolean(selectedProjectId) && lineItems.length > 0,
+    [canMutateEstimates, lineItems.length, selectedProjectId],
   );
 
   async function submitNewEstimateWithTitle({
@@ -1031,6 +1033,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setFormErrorMessage("");
     setFormSuccessMessage("");
     if (submitGuard.current) {
+      return;
+    }
+    if (!canMutateEstimates) {
+      setFormErrorMessage(`Role ${role} is read-only for estimate mutations.`);
       return;
     }
     if (isReadOnly) {
@@ -1902,6 +1908,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
           </div>
         ) : null}
       </section>
+
+      {!canMutateEstimates ? (
+        <p className={styles.inlineHint}>Role `{role}` can view estimates but cannot create or update.</p>
+      ) : null}
 
       <div ref={estimateComposerRef}>
         <EstimateSheet

@@ -1,6 +1,6 @@
 # API Standards
 
-Last reviewed: 2026-02-28
+Last reviewed: 2026-03-04
 
 ## Table of Contents
 
@@ -11,7 +11,7 @@ Last reviewed: 2026-02-28
   - [Money Precision Policy](#money-precision-policy)
   - [Core Health Endpoint](#core-health-endpoint)
   - [Authentication (v1 baseline)](#authentication-v1-baseline)
-  - [Role Matrix (RBAC Thin Pass)](#role-matrix-rbac-thin-pass)
+  - [RBAC: Capability-Based Enforcement](#rbac-capability-based-enforcement)
   - [Auditability and Traceability Standards](#auditability-and-traceability-standards)
   - [API Versioning Rules](#api-versioning-rules)
 - [Endpoint Contracts (Spec)](#endpoint-contracts-spec)
@@ -193,12 +193,18 @@ bill-n-chill currently uses DRF token authentication for API access.
         },
         "organization": {
           "id": 1,
-          "display_name": "Pm Organization",
-          "slug": "pm"
+          "display_name": "Pm Organization"
+        },
+        "capabilities": {
+          "estimates": ["view", "create", "edit", "approve", "send"],
+          "invoices": ["view", "create", "edit", "approve", "send"],
+          "...": "..."
         }
       }
     }
     ```
+- `POST /api/v1/auth/register/`
+  - Same response shape as login (including `capabilities`).
 - `GET /api/v1/auth/me/`
   - Header: `Authorization: Token TOKEN_VALUE`
   - Purpose: confirm token validity and current user identity.
@@ -206,25 +212,45 @@ bill-n-chill currently uses DRF token authentication for API access.
     - `id`
     - `email`
     - `role` (`owner` | `pm` | `bookkeeping` | `worker` | `viewer`)
-    - `organization` (`id`, `display_name`, `slug`)
+    - `organization` (`id`, `display_name`)
+    - `capabilities` (resolved capability flags dict — same shape as login)
 - Auth bootstrap audit behavior:
   - if a user has no active org membership, auth self-heal creates an `Organization` and `OrganizationMembership`
   - the bootstrap write appends immutable `OrganizationRecord(event_type=created, capture_source=auth_bootstrap)`
   - the bootstrap write appends immutable `OrganizationMembershipRecord(event_type=created, capture_source=auth_bootstrap)`
 
-## Role Matrix (RBAC Thin Pass)
+## RBAC: Capability-Based Enforcement
 
-- Role source:
-  - Primary source: `OrganizationMembership.role` (one active membership per user).
-  - Backward compatibility fallback: Django group name match (`owner`, `pm`, `bookkeeping`, `worker`, `viewer`), then default `owner`.
-- Error shape for denied write action:
+All write endpoints are gated by capability checks, not role strings.
+
+- Capability resolution:
+  - Primary: `RoleTemplate.capability_flags_json` (via membership's `role_template`).
+  - Fallback: system `RoleTemplate` matching `OrganizationMembership.role` slug.
+  - Additive: `OrganizationMembership.capability_flags_json` overrides merged on top.
+- Enforcement function: `_capability_gate(user, resource, action)` in `views/helpers.py`.
+- Error shape for denied action:
   - HTTP `403`
   - `error.code = "forbidden"`
-- Write access matrix:
-  - `owner`: full write access across money workflow endpoints.
-  - `pm`: estimate/budget/change-order/invoice/vendor-bill writes.
-  - `bookkeeping`: invoice/vendor-bill/payment/accounting-sync writes.
-  - `viewer`: read-only across protected surfaces.
+  - `error.fields.capability = ["Required: {resource}.{action}."]`
+- Capability surface (resources and actions):
+  ```
+  estimates:        view, create, edit, approve, send
+  change_orders:    view, create, edit, approve, send
+  invoices:         view, create, edit, approve, send
+  vendor_bills:     view, create, edit, approve, pay
+  payments:         view, create, edit, allocate
+  projects:         view, create, edit
+  customers:        view, create, edit, disable
+  cost_codes:       view, create, edit, disable
+  vendors:          view, create, edit, disable
+  budgets:          view
+  org_identity:     view, edit
+  org_presets:      view, edit
+  users:            view, invite, edit_role, disable
+  financial_audit:  view
+  ```
+- See `docs/meta/rbac-design.md` for the full role→capability permission matrix.
+- Legacy: `_role_gate_error_payload` still exists for backward compatibility but is no longer used by any active endpoint.
 
 ## Auditability and Traceability Standards
 
@@ -254,18 +280,9 @@ This section defines endpoint-by-endpoint request/response, validation, and work
 
 - `PATCH /api/v1/organization/`
   - Auth required
-  - Role guard: `owner`, `pm`
-  - Supports updating:
-    - `display_name`
-    - `slug`
-    - `logo_url`
-    - `invoice_sender_name`
-    - `invoice_sender_email`
-    - `invoice_sender_address`
-    - `invoice_default_due_days` (`1..365`)
-    - `invoice_default_terms`
-    - `invoice_default_footer`
-    - `invoice_default_notes`
+  - Capability gate: field-level split
+    - **Identity fields** (`display_name`, `logo_url`, `billing_address`): requires `org_identity.edit` (owner only).
+    - **Preset fields** (`help_email`, `default_invoice_due_delta`, `default_estimate_valid_delta`, `invoice_terms_and_conditions`, `estimate_terms_and_conditions`, `change_order_terms_and_conditions`): requires `org_presets.edit` (owner + PM).
   - Audit behavior:
     - appends immutable `OrganizationRecord(event_type=updated, capture_source=manual_ui)`
 
@@ -275,7 +292,7 @@ This section defines endpoint-by-endpoint request/response, validation, and work
 
 - `PATCH /api/v1/organization/memberships/{membership_id}/`
   - Auth required
-  - Role guard: `owner`
+  - Capability gate: `users.edit_role`
   - Supports updating:
     - `role`
     - `status`
@@ -391,7 +408,7 @@ Resolution fields accepted by `POST /api/v1/customers/quick-add/`:
 
 - `POST /api/v1/cost-codes/import-csv/`
   - Auth required
-  - Role guard: `owner`, `pm`
+  - Capability gate: `cost_codes.create`
   - Body:
     - `csv_text` (required)
     - `dry_run` (optional; default `true`)
@@ -838,7 +855,7 @@ INV-02 extends invoice billing actions with a scope guard based on approved proj
 
 - `POST /api/v1/vendors/import-csv/`
   - Auth required
-  - Role guard: `owner`, `pm`, `bookkeeping`
+  - Capability gate: `vendors.create`
   - Body:
     - `csv_text` (required)
     - `dry_run` (optional; default `true`)

@@ -1,6 +1,6 @@
 # bill-n-chill Feature Ledger
 
-Last reviewed: 2026-02-28
+Last reviewed: 2026-03-04
 
 ## Purpose
 
@@ -9,8 +9,8 @@ Track implementation-complete feature slices without duplicating full API/domain
 ## Current Status
 
 - Current Feature: `Complete`
-- Completed Features: `33/33`
-- State: all MVP v1 slices listed below are shipped.
+- Completed Features: `36/36`
+- State: all MVP v1 slices and RBAC phases listed below are shipped.
 
 ## How To Use This File
 
@@ -75,6 +75,12 @@ Track implementation-complete feature slices without duplicating full API/domain
 31. `UX-03` Theme system (light + dark)
 32. `QA-01` Financial audit trail
 33. `QA-02` Project timeline / activity center
+
+### Phase 7: RBAC and Capability Enforcement
+
+34. `RBAC-01` Org model cleanup, RoleTemplate with capability flags, system role presets
+35. `RBAC-02` Backend capability-based enforcement across all views
+36. `RBAC-03` Frontend capability wiring (`canDo` replaces `hasAnyRole`)
 
 ## Workflow IA Note
 

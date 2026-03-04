@@ -32,7 +32,7 @@ import {
   normalizeApiBaseUrl,
 } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
-import { hasAnyRole } from "../../session/rbac";
+import { canDo } from "../../session/rbac";
 import {
   ApiResponse,
   InvoiceLineInput,
@@ -193,8 +193,8 @@ function invoiceStatusEventToneClass(event: InvoiceStatusEventRecord): string {
 
 /** Primary invoice management console with project selection, invoice viewer, and creator workspace. */
 export function InvoicesConsole() {
-  const { token, authMessage, role } = useSharedSessionAuth();
-  const canMutateInvoices = hasAnyRole(role, ["owner", "pm", "bookkeeping"]);
+  const { token, authMessage, role, capabilities } = useSharedSessionAuth();
+  const canMutateInvoices = canDo(capabilities, "invoices", "create");
   const canEditInvoiceWorkspace = canMutateInvoices;
 
   const searchParams = useSearchParams();

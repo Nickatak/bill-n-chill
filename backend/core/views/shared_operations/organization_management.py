@@ -19,7 +19,6 @@ from core.views.helpers import (
     _record_organization_record,
     _resolve_user_capabilities,
     _resolve_user_role,
-    _role_gate_error_payload,
 )
 
 

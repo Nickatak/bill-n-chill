@@ -12,6 +12,7 @@ import { useMemo, useSyncExternalStore } from "react";
 import {
   SESSION_CHANGE_EVENT,
   SESSION_STORAGE_KEY,
+  type Capabilities,
   type ClientSession,
   type SessionRole,
 } from "./client-session";
@@ -68,6 +69,7 @@ export function useSharedSessionAuth() {
         email: parsed.email ?? "",
         role: parsed.role,
         organization: parsed.organization,
+        capabilities: parsed.capabilities,
       };
     } catch {
       return null;
@@ -77,10 +79,11 @@ export function useSharedSessionAuth() {
   const token = session?.token ?? "";
   const role: SessionRole = session?.role || "owner";
   const organization = session?.organization ?? null;
+  const capabilities: Capabilities | undefined = session?.capabilities;
   const orgLabel = organization?.displayName || "";
   const authMessage = session
     ? `Using shared session for ${session.email || "user"} (${role})${orgLabel ? ` in ${orgLabel}` : ""}.`
     : NO_SHARED_SESSION_MESSAGE;
 
-  return { token, authMessage, role, organization };
+  return { token, authMessage, role, organization, capabilities };
 }

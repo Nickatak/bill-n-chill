@@ -9,7 +9,7 @@ from rest_framework.response import Response
 
 from core.models import Budget, BudgetLine, ChangeOrder, ChangeOrderLine, Invoice, InvoiceLine, VendorBill, VendorBillAllocation
 from core.serializers import BudgetLineSerializer, BudgetLineUpdateSerializer, BudgetSerializer
-from core.views.helpers import _organization_user_ids, _validate_project_for_user
+from core.views.helpers import _capability_gate, _organization_user_ids, _validate_project_for_user
 
 
 @api_view(["GET"])
@@ -97,10 +97,14 @@ def budget_line_detail_view(request, budget_id: int, line_id: int):
     """Patch one budget line on an active budget and return refreshed computed line metrics.
 
     Contract:
-    - Requires role `owner|pm`.
+    - Requires `budgets.edit` capability.
     - Only active budgets are editable.
     - Supports `description` and `budget_amount` updates.
     """
+    permission_error, _ = _capability_gate(request.user, "budgets", "edit")
+    if permission_error:
+        return Response(permission_error, status=403)
+
     actor_user_ids = _organization_user_ids(request.user)
 
     try:
