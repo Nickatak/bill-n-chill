@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from core.tests.common import *
 
 
-class ContactsManagementTests(TestCase):
+class CustomersManagementTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username="pm_contacts",
@@ -32,11 +32,11 @@ class ContactsManagementTests(TestCase):
             created_by=self.other,
         )
 
-    def test_contacts_list_requires_authentication(self):
+    def test_customers_list_requires_authentication(self):
         response = self.client.get("/api/v1/customers/")
         self.assertEqual(response.status_code, 401)
 
-    def test_contacts_list_returns_user_scoped_rows(self):
+    def test_customers_list_returns_user_scoped_rows(self):
         response = self.client.get(
             "/api/v1/customers/",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -47,7 +47,7 @@ class ContactsManagementTests(TestCase):
         self.assertEqual(rows[0]["id"], self.customer.id)
         self.assertEqual(rows[0]["display_name"], "Alice Customer")
 
-    def test_contacts_list_includes_customers_from_same_organization(self):
+    def test_customers_list_includes_customers_from_same_organization(self):
         shared_org = Organization.objects.create(
             display_name="Shared Contact Org",
 
@@ -80,7 +80,7 @@ class ContactsManagementTests(TestCase):
         self.assertIn(self.customer.id, returned_ids)
         self.assertIn(self.other_customer.id, returned_ids)
 
-    def test_contact_detail_allows_access_to_same_organization_customer(self):
+    def test_customer_detail_allows_access_to_same_organization_customer(self):
         shared_org = Organization.objects.create(
             display_name="Shared Contact Detail Org",
 
@@ -110,7 +110,7 @@ class ContactsManagementTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["data"]["id"], self.other_customer.id)
 
-    def test_contacts_list_supports_search(self):
+    def test_customers_list_supports_search(self):
         response = self.client.get(
             "/api/v1/customers/?q=Alice",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -120,7 +120,7 @@ class ContactsManagementTests(TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["id"], self.customer.id)
 
-    def test_contacts_list_project_count_excludes_prospect_projects(self):
+    def test_customers_list_project_count_excludes_prospect_projects(self):
         Project.objects.create(
             customer=self.customer,
             name="Prospect Shell",
@@ -139,7 +139,7 @@ class ContactsManagementTests(TestCase):
         self.assertEqual(row["project_count"], 0)
         self.assertEqual(row["has_project"], False)
 
-    def test_contact_patch_updates_record(self):
+    def test_customer_patch_updates_record(self):
         response = self.client.patch(
             f"/api/v1/customers/{self.customer.id}/",
             data={
@@ -160,7 +160,7 @@ class ContactsManagementTests(TestCase):
         record = CustomerRecord.objects.get(customer_id=self.customer.id)
         self.assertEqual(record.event_type, CustomerRecord.EventType.UPDATED)
 
-    def test_contact_patch_requires_phone_or_email(self):
+    def test_customer_patch_requires_phone_or_email(self):
         response = self.client.patch(
             f"/api/v1/customers/{self.customer.id}/",
             data={"phone": "", "email": ""},
@@ -172,7 +172,7 @@ class ContactsManagementTests(TestCase):
         self.assertIn("phone", payload)
         self.assertIn("email", payload)
 
-    def test_contact_patch_can_toggle_archive_flag(self):
+    def test_customer_patch_can_toggle_archive_flag(self):
         response = self.client.patch(
             f"/api/v1/customers/{self.customer.id}/",
             data={"is_archived": True},
@@ -189,7 +189,7 @@ class ContactsManagementTests(TestCase):
         self.assertEqual(record.metadata_json.get("to_is_archived"), True)
         self.assertEqual(record.metadata_json.get("cancelled_prospect_project_count"), 0)
 
-    def test_contact_patch_archiving_cancels_prospect_projects(self):
+    def test_customer_patch_archiving_cancels_prospect_projects(self):
         prospect = Project.objects.create(
             customer=self.customer,
             name="Prospect Project",
@@ -228,7 +228,7 @@ class ContactsManagementTests(TestCase):
         self.assertEqual(record.event_type, CustomerRecord.EventType.UPDATED)
         self.assertEqual(record.metadata_json.get("cancelled_prospect_project_count"), 1)
 
-    def test_contact_patch_rejects_archive_when_customer_has_active_project(self):
+    def test_customer_patch_rejects_archive_when_customer_has_active_project(self):
         active = Project.objects.create(
             customer=self.customer,
             name="Guarded Project",
@@ -265,7 +265,7 @@ class ContactsManagementTests(TestCase):
         self.assertEqual(active.status, Project.Status.ACTIVE)
         self.assertEqual(prospect.status, Project.Status.PROSPECT)
 
-    def test_contact_patch_allows_archive_when_customer_projects_are_closed(self):
+    def test_customer_patch_allows_archive_when_customer_projects_are_closed(self):
         Project.objects.create(
             customer=self.customer,
             name="Completed Project",
@@ -287,7 +287,7 @@ class ContactsManagementTests(TestCase):
         self.customer.refresh_from_db()
         self.assertTrue(self.customer.is_archived)
 
-    def test_contact_detail_is_user_scoped(self):
+    def test_customer_detail_is_user_scoped(self):
         response = self.client.get(
             f"/api/v1/customers/{self.other_customer.id}/",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -398,7 +398,7 @@ class ContactsManagementTests(TestCase):
         self.assertEqual(record.metadata_json.get("project_status_final"), Project.Status.ACTIVE)
         self.assertEqual(record.metadata_json.get("project_status_transition"), "prospect_to_active")
 
-    def test_contact_delete_not_allowed(self):
+    def test_customer_delete_not_allowed(self):
         response = self.client.delete(
             f"/api/v1/customers/{self.customer.id}/",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -409,7 +409,7 @@ class ContactsManagementTests(TestCase):
             CustomerRecord.objects.filter(event_type=CustomerRecord.EventType.DELETED).exists()
         )
 
-    def test_contact_delete_not_allowed_even_with_projects(self):
+    def test_customer_delete_not_allowed_even_with_projects(self):
         Project.objects.create(
             customer=self.customer,
             name="Project Preventing Delete",
@@ -429,7 +429,7 @@ class ContactsManagementTests(TestCase):
             CustomerRecord.objects.filter(event_type=CustomerRecord.EventType.DELETED).exists()
         )
 
-    def test_contact_delete_is_not_allowed_for_other_user_record(self):
+    def test_customer_delete_is_not_allowed_for_other_user_record(self):
         response = self.client.delete(
             f"/api/v1/customers/{self.other_customer.id}/",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -473,7 +473,7 @@ class ContactsManagementTests(TestCase):
         with self.assertRaises(ValidationError):
             CustomerRecord.objects.filter(pk=customer_record.pk).delete()
 
-    def test_contact_patch_rejects_project_activation_when_customer_archived(self):
+    def test_customer_patch_rejects_project_activation_when_customer_archived(self):
         self.customer.is_archived = True
         self.customer.save(update_fields=["is_archived", "updated_at"])
         project = Project.objects.create(

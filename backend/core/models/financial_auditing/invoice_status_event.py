@@ -51,5 +51,16 @@ class InvoiceStatusEvent(models.Model):
     class Meta:
         ordering = ["-changed_at", "-id"]
 
+    @classmethod
+    def record(cls, *, invoice, from_status, to_status, note, changed_by):
+        """Append an immutable invoice status transition row."""
+        return cls.objects.create(
+            invoice=invoice,
+            from_status=from_status,
+            to_status=to_status,
+            note=note,
+            changed_by=changed_by,
+        )
+
     def __str__(self) -> str:
         return f"Invoice {self.invoice_id}: {self.from_status} -> {self.to_status}"

@@ -82,6 +82,37 @@ class PaymentAllocationRecord(models.Model):
     class Meta:
         ordering = ["-created_at", "-id"]
 
+    @classmethod
+    def record(
+        cls,
+        *,
+        payment,
+        allocation,
+        event_type: str,
+        capture_source: str,
+        target_type: str,
+        target_object_id: int,
+        recorded_by,
+        source_reference: str = "",
+        note: str = "",
+        metadata: dict | None = None,
+    ):
+        """Append an immutable audit row for a payment allocation event."""
+        return cls.objects.create(
+            payment=payment,
+            payment_allocation=allocation,
+            event_type=event_type,
+            capture_source=capture_source,
+            source_reference=source_reference,
+            target_type=target_type,
+            target_object_id=target_object_id,
+            applied_amount=allocation.applied_amount,
+            note=note,
+            snapshot_json=allocation.build_snapshot(),
+            metadata_json=metadata or {},
+            recorded_by=recorded_by,
+        )
+
     def save(self, *args, **kwargs):
         if self.pk is not None:
             raise ValidationError("Payment allocation records are immutable and cannot be updated.")

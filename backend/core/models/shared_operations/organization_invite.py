@@ -75,5 +75,24 @@ class OrganizationInvite(models.Model):
     def is_valid(self):
         return not self.is_expired and not self.is_consumed
 
+    @classmethod
+    def lookup_valid(cls, token_str):
+        """Fetch an invite by token and validate it's still usable.
+
+        Returns (invite, None) on success, or (None, error_code) where
+        error_code is one of: "not_found", "consumed", "expired".
+        """
+        try:
+            invite = cls.objects.select_related(
+                "organization", "role_template"
+            ).get(token=token_str)
+        except cls.DoesNotExist:
+            return None, "not_found"
+        if invite.is_consumed:
+            return None, "consumed"
+        if invite.is_expired:
+            return None, "expired"
+        return invite, None
+
     def __str__(self):
         return f"Invite {self.email} -> {self.organization_id} ({self.token[:8]}...)"

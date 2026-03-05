@@ -3,7 +3,6 @@
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Sum
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -28,198 +27,16 @@ from core.serializers import (
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
     _organization_user_ids,
-    _record_financial_audit_event,
     _capability_gate,
     _validate_project_for_user,
 )
-
-
-def _settled_allocated_total(payment: Payment) -> Decimal:
-    return quantize_money(
-        PaymentAllocation.objects.filter(
-            payment=payment,
-            payment__status=Payment.Status.SETTLED,
-        ).aggregate(total=Sum("applied_amount")).get("total")
-        or MONEY_ZERO
-    )
-
-
-def _all_allocated_total(payment: Payment) -> Decimal:
-    return quantize_money(
-        PaymentAllocation.objects.filter(payment=payment).aggregate(total=Sum("applied_amount")).get("total")
-        or MONEY_ZERO
-    )
-
-
-def _set_invoice_balance_from_allocations(invoice: Invoice):
-    applied_total = (
-        PaymentAllocation.objects.filter(
-            invoice=invoice,
-            payment__status=Payment.Status.SETTLED,
-        ).aggregate(total=Sum("applied_amount")).get("total")
-        or Decimal("0")
-    )
-
-    next_balance = quantize_money(Decimal(str(invoice.total)) - applied_total)
-    if next_balance < MONEY_ZERO:
-        next_balance = MONEY_ZERO
-
-    update_fields = ["balance_due", "updated_at"]
-    invoice.balance_due = next_balance
-
-    if invoice.status != Invoice.Status.VOID:
-        if next_balance == MONEY_ZERO:
-            invoice.status = Invoice.Status.PAID
-            update_fields.append("status")
-        elif next_balance < Decimal(str(invoice.total)):
-            invoice.status = Invoice.Status.PARTIALLY_PAID
-            update_fields.append("status")
-        elif invoice.status in {Invoice.Status.PAID, Invoice.Status.PARTIALLY_PAID}:
-            invoice.status = Invoice.Status.SENT
-            update_fields.append("status")
-
-    invoice.save(update_fields=list(dict.fromkeys(update_fields)))
-
-
-def _set_vendor_bill_balance_from_allocations(vendor_bill: VendorBill):
-    applied_total = (
-        PaymentAllocation.objects.filter(
-            vendor_bill=vendor_bill,
-            payment__status=Payment.Status.SETTLED,
-        ).aggregate(total=Sum("applied_amount")).get("total")
-        or Decimal("0")
-    )
-
-    next_balance = quantize_money(Decimal(str(vendor_bill.total)) - applied_total)
-    if next_balance < MONEY_ZERO:
-        next_balance = MONEY_ZERO
-
-    update_fields = ["balance_due", "updated_at"]
-    vendor_bill.balance_due = next_balance
-
-    if vendor_bill.status != VendorBill.Status.VOID:
-        if next_balance == MONEY_ZERO:
-            vendor_bill.status = VendorBill.Status.PAID
-            update_fields.append("status")
-        elif vendor_bill.status == VendorBill.Status.PAID:
-            vendor_bill.status = VendorBill.Status.SCHEDULED
-            update_fields.append("status")
-
-    vendor_bill.save(update_fields=list(dict.fromkeys(update_fields)))
-
-
-def _recalculate_payment_allocation_targets(payment: Payment):
-    invoice_ids = set(
-        PaymentAllocation.objects.filter(payment=payment, invoice_id__isnull=False).values_list(
-            "invoice_id", flat=True
-        )
-    )
-    vendor_bill_ids = set(
-        PaymentAllocation.objects.filter(payment=payment, vendor_bill_id__isnull=False).values_list(
-            "vendor_bill_id", flat=True
-        )
-    )
-
-    for invoice in Invoice.objects.filter(id__in=invoice_ids):
-        _set_invoice_balance_from_allocations(invoice)
-
-    for vendor_bill in VendorBill.objects.filter(id__in=vendor_bill_ids):
-        _set_vendor_bill_balance_from_allocations(vendor_bill)
-
-
-def _direction_target_mismatch(direction: str, target_type: str) -> bool:
-    return (direction == Payment.Direction.INBOUND and target_type != PaymentAllocation.TargetType.INVOICE) or (
-        direction == Payment.Direction.OUTBOUND
-        and target_type != PaymentAllocation.TargetType.VENDOR_BILL
-    )
-
-
-def _build_payment_snapshot(payment: Payment) -> dict:
-    return {
-        "payment": {
-            "id": payment.id,
-            "project_id": payment.project_id,
-            "direction": payment.direction,
-            "method": payment.method,
-            "status": payment.status,
-            "amount": str(payment.amount),
-            "payment_date": payment.payment_date.isoformat() if payment.payment_date else None,
-            "reference_number": payment.reference_number,
-            "notes": payment.notes,
-            "allocated_total": str(payment.allocated_total),
-            "unapplied_amount": str(payment.unapplied_amount),
-        }
-    }
-
-
-def _record_payment_record(
-    *,
-    payment: Payment,
-    event_type: str,
-    capture_source: str,
-    recorded_by,
-    from_status: str | None = None,
-    to_status: str | None = None,
-    source_reference: str = "",
-    note: str = "",
-    metadata: dict | None = None,
-):
-    PaymentRecord.objects.create(
-        payment=payment,
-        event_type=event_type,
-        capture_source=capture_source,
-        source_reference=source_reference,
-        from_status=from_status,
-        to_status=to_status,
-        note=note,
-        snapshot_json=_build_payment_snapshot(payment),
-        metadata_json=metadata or {},
-        recorded_by=recorded_by,
-    )
-
-
-def _build_payment_allocation_snapshot(*, payment: Payment, allocation: PaymentAllocation) -> dict:
-    return {
-        "payment": _build_payment_snapshot(payment)["payment"],
-        "allocation": {
-            "id": allocation.id,
-            "target_type": allocation.target_type,
-            "invoice_id": allocation.invoice_id,
-            "vendor_bill_id": allocation.vendor_bill_id,
-            "applied_amount": str(allocation.applied_amount),
-            "created_by_id": allocation.created_by_id,
-            "created_at": allocation.created_at.isoformat() if allocation.created_at else None,
-        },
-    }
-
-
-def _record_payment_allocation_record(
-    *,
-    payment: Payment,
-    allocation: PaymentAllocation,
-    event_type: str,
-    capture_source: str,
-    target_type: str,
-    target_object_id: int,
-    recorded_by,
-    source_reference: str = "",
-    note: str = "",
-    metadata: dict | None = None,
-):
-    PaymentAllocationRecord.objects.create(
-        payment=payment,
-        payment_allocation=allocation,
-        event_type=event_type,
-        capture_source=capture_source,
-        source_reference=source_reference,
-        target_type=target_type,
-        target_object_id=target_object_id,
-        applied_amount=allocation.applied_amount,
-        note=note,
-        snapshot_json=_build_payment_allocation_snapshot(payment=payment, allocation=allocation),
-        metadata_json=metadata or {},
-        recorded_by=recorded_by,
-    )
+from core.views.cash_management.payments_helpers import (
+    _all_allocated_total,
+    _direction_target_mismatch,
+    _recalculate_payment_allocation_targets,
+    _set_invoice_balance_from_allocations,
+    _set_vendor_bill_balance_from_allocations,
+)
 
 
 @api_view(["GET"])
@@ -368,7 +185,7 @@ def project_payments_view(request, project_id: int):
             notes=data.get("notes", ""),
             created_by=request.user,
         )
-        _record_payment_record(
+        PaymentRecord.record(
             payment=payment,
             event_type=PaymentRecord.EventType.CREATED,
             capture_source=PaymentRecord.CaptureSource.MANUAL_UI,
@@ -378,7 +195,7 @@ def project_payments_view(request, project_id: int):
             note="Payment created.",
             metadata={"direction": payment.direction, "method": payment.method},
         )
-        _record_financial_audit_event(
+        FinancialAuditEvent.record(
             project=project,
             event_type=FinancialAuditEvent.EventType.PAYMENT_UPDATED,
             object_type="payment",
@@ -550,7 +367,7 @@ def payment_detail_view(request, payment_id: int):
         } & {Payment.Status.SETTLED}:
             _recalculate_payment_allocation_targets(payment)
         if len(update_fields) > 1:
-            _record_payment_record(
+            PaymentRecord.record(
                 payment=payment,
                 event_type=(
                     PaymentRecord.EventType.STATUS_CHANGED
@@ -568,7 +385,7 @@ def payment_detail_view(request, payment_id: int):
                     "status_changed": status_changed,
                 },
             )
-            _record_financial_audit_event(
+            FinancialAuditEvent.record(
                 project=payment.project,
                 event_type=FinancialAuditEvent.EventType.PAYMENT_UPDATED,
                 object_type="payment",
@@ -815,7 +632,7 @@ def payment_allocate_view(request, payment_id: int):
         for allocation, row, invoice, vendor_bill in created_allocations:
             target_id = invoice.id if invoice else vendor_bill.id
             target_type = "invoice" if invoice else "vendor_bill"
-            _record_financial_audit_event(
+            FinancialAuditEvent.record(
                 project=payment.project,
                 event_type=FinancialAuditEvent.EventType.PAYMENT_ALLOCATED,
                 object_type="payment_allocation",
@@ -832,7 +649,7 @@ def payment_allocate_view(request, payment_id: int):
                     "target_id": target_id,
                 },
             )
-            _record_payment_allocation_record(
+            PaymentAllocationRecord.record(
                 payment=payment,
                 allocation=allocation,
                 event_type=PaymentAllocationRecord.EventType.APPLIED,
@@ -848,7 +665,7 @@ def payment_allocate_view(request, payment_id: int):
                     "target_id": target_id,
                 },
             )
-        _record_payment_record(
+        PaymentRecord.record(
             payment=payment,
             event_type=PaymentRecord.EventType.ALLOCATION_APPLIED,
             capture_source=PaymentRecord.CaptureSource.MANUAL_UI,

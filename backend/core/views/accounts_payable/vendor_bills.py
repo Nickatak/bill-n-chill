@@ -1,32 +1,32 @@
 """Accounts payable vendor-bill endpoints and allocation lifecycle."""
 
 from datetime import timedelta
-from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Q
-from django.db.models import Sum
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.models import (
-    BudgetLine,
     FinancialAuditEvent,
     Vendor,
     VendorBill,
-    VendorBillAllocation,
     VendorBillSnapshot,
 )
 from core.policies import get_vendor_bill_policy_contract
 from core.serializers import VendorBillSerializer, VendorBillWriteSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
+from core.views.accounts_payable.vendor_bills_helpers import (
+    _allocation_total,
+    _find_duplicate_vendor_bills,
+    _sync_vendor_bill_allocations,
+    _validate_allocation_budget_lines,
+    _vendor_scope_filter,
+)
 from core.views.helpers import (
-    _ensure_primary_membership,
-    _organization_user_ids,
-    _record_financial_audit_event,
     _capability_gate,
+    _organization_user_ids,
     _validate_project_for_user,
 )
 
@@ -40,132 +40,6 @@ RECEIVED_PLUS_STATUSES = {
     VendorBill.Status.SCHEDULED,
     VendorBill.Status.PAID,
 }
-
-
-def _vendor_scope_filter(user):
-    membership = _ensure_primary_membership(user)
-    actor_user_ids = _organization_user_ids(user)
-    return Q(organization__isnull=True, is_canonical=True) | Q(
-        organization_id=membership.organization_id
-    ) | Q(
-        organization__isnull=True,
-        created_by_id__in=actor_user_ids,
-    )
-
-
-def _find_duplicate_vendor_bills(
-    user,
-    *,
-    vendor_id: int,
-    bill_number: str,
-    exclude_vendor_bill_id=None,
-):
-    """Return same-user vendor bills matching vendor+bill number (case-insensitive)."""
-    bill_number_norm = (bill_number or "").strip()
-    if not vendor_id or not bill_number_norm:
-        return []
-    actor_user_ids = _organization_user_ids(user)
-
-    rows = VendorBill.objects.filter(
-        created_by_id__in=actor_user_ids,
-        vendor_id=vendor_id,
-        bill_number__iexact=bill_number_norm,
-    )
-    if exclude_vendor_bill_id:
-        rows = rows.exclude(id=exclude_vendor_bill_id)
-
-    return list(rows.select_related("vendor", "project").order_by("-created_at", "-id"))
-
-
-def _allocation_total(*, vendor_bill):
-    """Return the quantized sum of allocations currently attached to a vendor bill."""
-    total = (
-        VendorBillAllocation.objects.filter(vendor_bill=vendor_bill).aggregate(sum=Sum("amount"))["sum"]
-        or MONEY_ZERO
-    )
-    return quantize_money(total)
-
-
-def _validate_allocation_budget_lines(*, project, user, allocations):
-    """Resolve allocation budget lines scoped to the same project and owner."""
-    budget_line_ids = [entry["budget_line"] for entry in allocations]
-    if not budget_line_ids:
-        return {}
-    actor_user_ids = _organization_user_ids(user)
-    rows = BudgetLine.objects.filter(
-        id__in=budget_line_ids,
-        budget__project=project,
-        budget__created_by_id__in=actor_user_ids,
-    ).select_related("budget")
-    return {row.id: row for row in rows}
-
-
-def _sync_vendor_bill_allocations(*, vendor_bill, allocations):
-    """Replace all allocations for a vendor bill with the provided allocation set."""
-    VendorBillAllocation.objects.filter(vendor_bill=vendor_bill).delete()
-    if not allocations:
-        return
-    VendorBillAllocation.objects.bulk_create(
-        [
-            VendorBillAllocation(
-                vendor_bill=vendor_bill,
-                budget_line_id=entry["budget_line"],
-                amount=entry["amount"],
-                note=entry.get("note", ""),
-            )
-            for entry in allocations
-        ]
-    )
-
-
-def _record_vendor_bill_status_snapshot(*, vendor_bill, capture_status, previous_status, acted_by):
-    """Persist an immutable vendor-bill snapshot for status transition auditability."""
-    allocation_rows = list(
-        VendorBillAllocation.objects.filter(vendor_bill=vendor_bill)
-        .select_related("budget_line", "budget_line__cost_code")
-        .order_by("id")
-    )
-    snapshot = {
-        "vendor_bill": {
-            "id": vendor_bill.id,
-            "project_id": vendor_bill.project_id,
-            "vendor_id": vendor_bill.vendor_id,
-            "bill_number": vendor_bill.bill_number,
-            "status": vendor_bill.status,
-            "received_date": vendor_bill.received_date.isoformat() if vendor_bill.received_date else None,
-            "issue_date": vendor_bill.issue_date.isoformat() if vendor_bill.issue_date else None,
-            "due_date": vendor_bill.due_date.isoformat() if vendor_bill.due_date else None,
-            "scheduled_for": vendor_bill.scheduled_for.isoformat() if vendor_bill.scheduled_for else None,
-            "subtotal": str(vendor_bill.subtotal),
-            "tax_amount": str(vendor_bill.tax_amount),
-            "shipping_amount": str(vendor_bill.shipping_amount),
-            "total": str(vendor_bill.total),
-            "balance_due": str(vendor_bill.balance_due),
-            "notes": vendor_bill.notes,
-        },
-        "decision_context": {
-            "capture_status": capture_status,
-            "previous_status": previous_status,
-        },
-        "allocations": [
-            {
-                "vendor_bill_allocation_id": row.id,
-                "budget_line_id": row.budget_line_id,
-                "cost_code_id": row.budget_line.cost_code_id,
-                "cost_code_code": row.budget_line.cost_code.code,
-                "cost_code_name": row.budget_line.cost_code.name,
-                "amount": str(row.amount),
-                "note": row.note,
-            }
-            for row in allocation_rows
-        ],
-    }
-    VendorBillSnapshot.objects.create(
-        vendor_bill=vendor_bill,
-        capture_status=capture_status,
-        snapshot_json=snapshot,
-        acted_by=acted_by,
-    )
 
 
 @api_view(["GET"])
@@ -461,7 +335,7 @@ def project_vendor_bills_view(request, project_id: int):
         )
         if allocations:
             _sync_vendor_bill_allocations(vendor_bill=vendor_bill, allocations=allocations)
-        _record_financial_audit_event(
+        FinancialAuditEvent.record(
             project=project,
             event_type=FinancialAuditEvent.EventType.VENDOR_BILL_UPDATED,
             object_type="vendor_bill",
@@ -821,7 +695,7 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
             vendor_bill.status = VendorBill.Status.APPROVED
             intermediate_update_fields = [f for f in update_fields if f != "status"] + ["status"]
             vendor_bill.save(update_fields=intermediate_update_fields)
-            _record_financial_audit_event(
+            FinancialAuditEvent.record(
                 project=vendor_bill.project,
                 event_type=FinancialAuditEvent.EventType.VENDOR_BILL_UPDATED,
                 object_type="vendor_bill",
@@ -837,7 +711,7 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
                     "compound_transition": True,
                 },
             )
-            _record_vendor_bill_status_snapshot(
+            VendorBillSnapshot.record(
                 vendor_bill=vendor_bill,
                 capture_status=VendorBill.Status.APPROVED,
                 previous_status=previous_status,
@@ -849,7 +723,7 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
             # Step 2: approved → scheduled (final)
             vendor_bill.status = VendorBill.Status.SCHEDULED
             vendor_bill.save(update_fields=["status", "updated_at"])
-            _record_financial_audit_event(
+            FinancialAuditEvent.record(
                 project=vendor_bill.project,
                 event_type=FinancialAuditEvent.EventType.VENDOR_BILL_UPDATED,
                 object_type="vendor_bill",
@@ -865,7 +739,7 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
                     "compound_transition": True,
                 },
             )
-            _record_vendor_bill_status_snapshot(
+            VendorBillSnapshot.record(
                 vendor_bill=vendor_bill,
                 capture_status=VendorBill.Status.SCHEDULED,
                 previous_status=VendorBill.Status.APPROVED,
@@ -875,7 +749,7 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
             if len(update_fields) > 1:
                 vendor_bill.save(update_fields=update_fields)
                 if previous_status != next_status or "total" in data:
-                    _record_financial_audit_event(
+                    FinancialAuditEvent.record(
                         project=vendor_bill.project,
                         event_type=FinancialAuditEvent.EventType.VENDOR_BILL_UPDATED,
                         object_type="vendor_bill",
@@ -904,7 +778,7 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
                     VendorBill.Status.VOID,
                 }
             ):
-                _record_vendor_bill_status_snapshot(
+                VendorBillSnapshot.record(
                     vendor_bill=vendor_bill,
                     capture_status=next_status,
                     previous_status=previous_status,

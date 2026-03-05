@@ -17,17 +17,17 @@
   - String `"false"` still evaluates truthy at runtime.
 
 3. Multi-group legacy-role precedence escalation
-- Status: `partially mitigated`
-- Current state:
-  - Active `OrganizationMembership.role` is now preferred over legacy group-role resolution.
-  - Legacy-group precedence logic still exists as a fallback path for users without active membership.
+- Status: `resolved`
+- Outcome:
+  - All write endpoints now use `_capability_gate(user, resource, action)` which resolves permissions through `RoleTemplate.capability_flags_json`, not legacy group-role precedence.
+  - Legacy `_legacy_group_role` still exists but only fires in the `_ensure_primary_membership` bootstrap path (assigning initial role to new users), not in any gating decision.
 
 4. Read-only role inconsistency on dictionary surfaces
-- Status: `open`
-- Current state:
-  - Role gates are present on import endpoints.
-  - `POST/PATCH` dictionary mutation for cost codes/vendors remains ungated by role in list/detail endpoints.
-  - `viewer` can still mutate these surfaces unless blocked by other constraints.
+- Status: `resolved`
+- Outcome:
+  - Cost code and vendor list/detail endpoints now gate on `cost_codes.create`/`cost_codes.edit` and `vendors.create`/`vendors.edit` capabilities via `_capability_gate`.
+  - `viewer` system role template has no `create` or `edit` actions on these resources.
+  - Import endpoints also gated (`cost_codes.create`, `vendors.create`).
 
 ## Findings (ordered by severity)
 

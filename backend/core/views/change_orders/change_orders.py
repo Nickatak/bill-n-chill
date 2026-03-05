@@ -13,9 +13,7 @@ from rest_framework.response import Response
 
 from core.models import (
     Budget,
-    BudgetLine,
     ChangeOrder,
-    ChangeOrderLine,
     ChangeOrderSnapshot,
     Estimate,
     FinancialAuditEvent,
@@ -24,48 +22,22 @@ from core.models import (
 from core.policies import get_change_order_policy_contract
 from core.serializers import ChangeOrderSerializer, ChangeOrderWriteSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
-from core.views.helpers import (
-    SYSTEM_BUDGET_LINE_CODES,
-    _ensure_primary_membership,
+from core.views.change_orders.change_orders_helpers import (
+    _build_public_decision_note,
     _get_active_budget_for_project,
+    _model_validation_error_response,
     _next_change_order_family_key,
-    _organization_user_ids,
-    _record_financial_audit_event,
-    _resolve_organization_for_public_actor,
+    _serialize_public_change_order,
+    _sync_change_order_lines,
+    _validate_change_order_lines,
+    _validation_error_response,
+)
+from core.views.helpers import (
     _capability_gate,
-    _serialize_public_organization_context,
-    _serialize_public_project_context,
+    _ensure_membership,
+    _organization_user_ids,
     _validate_project_for_user,
 )
-
-def _build_public_decision_note(
-    *,
-    action_label: str,
-    note: str,
-    decider_name: str,
-    decider_email: str,
-) -> str:
-    actor_parts = [part for part in [decider_name.strip(), decider_email.strip()] if part]
-    actor_label = " / ".join(actor_parts) if actor_parts else "anonymous customer"
-    note_value = note.strip()
-    if note_value:
-        return f"{action_label} via public link by {actor_label}. {note_value}"
-    return f"{action_label} via public link by {actor_label}."
-
-
-def _serialize_public_change_order(change_order: ChangeOrder) -> dict:
-    serialized = ChangeOrderSerializer(change_order).data
-    organization = _resolve_organization_for_public_actor(change_order.requested_by)
-    serialized["project_context"] = _serialize_public_project_context(change_order.project)
-    serialized["organization_context"] = _serialize_public_organization_context(organization)
-    if change_order.origin_estimate_id:
-        serialized["origin_estimate_context"] = {
-            "id": change_order.origin_estimate_id,
-            "title": change_order.origin_estimate.title,
-            "version": change_order.origin_estimate.version,
-            "public_ref": change_order.origin_estimate.public_ref,
-        }
-    return serialized
 
 
 @api_view(["GET"])
@@ -192,7 +164,7 @@ def public_change_order_decision_view(request, public_token: str):
             Budget.objects.filter(id=active_budget.id).update(
                 approved_change_order_total=F("approved_change_order_total") + financial_delta,
             )
-        _record_financial_audit_event(
+        FinancialAuditEvent.record(
             project=change_order.project,
             event_type=FinancialAuditEvent.EventType.CHANGE_ORDER_UPDATED,
             object_type="change_order",
@@ -210,7 +182,7 @@ def public_change_order_decision_view(request, public_token: str):
                 "financial_delta": str(financial_delta),
             },
         )
-        _record_change_order_decision_snapshot(
+        ChangeOrderSnapshot.record(
             change_order=change_order,
             decision_status=next_status,
             previous_status=previous_status,
@@ -295,7 +267,7 @@ def project_change_orders_view(request, project_id: int):
     serializer = ChangeOrderWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
-    membership = _ensure_primary_membership(request.user)
+    membership = _ensure_membership(request.user)
     organization = membership.organization
     incoming_line_items = data.get("line_items", [])
     origin_estimate = None
@@ -386,7 +358,7 @@ def project_change_orders_view(request, project_id: int):
                 origin_estimate=origin_estimate,
                 requested_by=request.user,
             )
-            _record_financial_audit_event(
+            FinancialAuditEvent.record(
                 project=project,
                 event_type=FinancialAuditEvent.EventType.CHANGE_ORDER_UPDATED,
                 object_type="change_order",
@@ -678,7 +650,7 @@ def change_order_detail_view(request, change_order_id: int):
                     event_note = "Change order status updated."
                 if financial_delta != MONEY_ZERO:
                     event_note = f"{event_note} Financial delta applied: {financial_delta}."
-                _record_financial_audit_event(
+                FinancialAuditEvent.record(
                     project=change_order.project,
                     event_type=FinancialAuditEvent.EventType.CHANGE_ORDER_UPDATED,
                     object_type="change_order",
@@ -704,7 +676,7 @@ def change_order_detail_view(request, change_order_id: int):
                     ChangeOrder.Status.VOID,
                 }
             ):
-                _record_change_order_decision_snapshot(
+                ChangeOrderSnapshot.record(
                     change_order=change_order,
                     decision_status=next_status,
                     previous_status=previous_status,
@@ -798,7 +770,7 @@ def change_order_clone_revision_view(request, change_order_id: int):
             ],
             line_map={line.budget_line_id: line.budget_line for line in change_order.line_items.all()},
         )
-        _record_financial_audit_event(
+        FinancialAuditEvent.record(
             project=clone.project,
             event_type=FinancialAuditEvent.EventType.CHANGE_ORDER_UPDATED,
             object_type="change_order",
@@ -818,7 +790,7 @@ def change_order_clone_revision_view(request, change_order_id: int):
             previous_status = change_order.status
             change_order.status = ChangeOrder.Status.VOID
             change_order.save(update_fields=["status", "updated_at"])
-            _record_financial_audit_event(
+            FinancialAuditEvent.record(
                 project=change_order.project,
                 event_type=FinancialAuditEvent.EventType.CHANGE_ORDER_UPDATED,
                 object_type="change_order",
@@ -833,7 +805,7 @@ def change_order_clone_revision_view(request, change_order_id: int):
                     "superseded_by_change_order_id": clone.id,
                 },
             )
-            _record_change_order_decision_snapshot(
+            ChangeOrderSnapshot.record(
                 change_order=change_order,
                 decision_status=ChangeOrder.Status.VOID,
                 previous_status=previous_status,
@@ -847,208 +819,3 @@ def change_order_clone_revision_view(request, change_order_id: int):
         .get()
     )
     return Response({"data": ChangeOrderSerializer(created).data}, status=201)
-
-
-def _validate_change_order_lines(*, project, line_items):
-    if not line_items:
-        return {}, MONEY_ZERO, None
-
-    budget_line_ids = [int(row["budget_line"]) for row in line_items]
-    unique_budget_line_ids = set(budget_line_ids)
-    if len(unique_budget_line_ids) != len(budget_line_ids):
-        return (
-            {},
-            MONEY_ZERO,
-            _validation_error_response(
-                message="Duplicate budget lines are not allowed within a change order.",
-                fields={"line_items": ["Use each budget_line at most once."]},
-                rule="co_line_duplicate_budget_line",
-            ),
-        )
-
-    line_map = {
-        row.id: row
-        for row in BudgetLine.objects.select_related("budget", "cost_code").filter(
-            id__in=unique_budget_line_ids,
-        )
-    }
-    if len(line_map) != len(unique_budget_line_ids):
-        return (
-            {},
-            MONEY_ZERO,
-            _validation_error_response(
-                message="One or more line_items budget_line values are invalid.",
-                fields={"line_items": ["Use valid budget_line ids."]},
-                rule="co_line_budget_line_invalid",
-            ),
-        )
-
-    total = MONEY_ZERO
-    for row in line_items:
-        budget_line_id = int(row["budget_line"])
-        budget_line = line_map[budget_line_id]
-        line_type = row.get("line_type", ChangeOrderLine.LineType.SCOPE)
-        adjustment_reason = str(row.get("adjustment_reason", "")).strip()
-
-        if line_type == ChangeOrderLine.LineType.SCOPE:
-            if (
-                budget_line.cost_code
-                and budget_line.cost_code.code in SYSTEM_BUDGET_LINE_CODES
-            ):
-                return (
-                    {},
-                    MONEY_ZERO,
-                    _validation_error_response(
-                        message="Scope lines cannot use internal generic budget lines.",
-                        fields={"line_items": ["Scope lines must use estimate-derived budget lines."]},
-                        rule="co_line_scope_budget_line_disallows_generic",
-                    ),
-                )
-        elif line_type == ChangeOrderLine.LineType.ADJUSTMENT:
-            if not adjustment_reason:
-                return (
-                    {},
-                    MONEY_ZERO,
-                    _validation_error_response(
-                        message="Adjustment lines require adjustment_reason.",
-                        fields={"line_items": ["Provide adjustment_reason for adjustment lines."]},
-                        rule="co_line_adjustment_requires_reason",
-                    ),
-                )
-            if (
-                not budget_line.cost_code
-                or budget_line.cost_code.code not in SYSTEM_BUDGET_LINE_CODES
-            ):
-                return (
-                    {},
-                    MONEY_ZERO,
-                    _validation_error_response(
-                        message="Adjustment lines must use generic adjustment budget lines.",
-                        fields={"line_items": ["Adjustment lines must target a generic system budget line."]},
-                        rule="co_line_adjustment_requires_generic_budget_line",
-                    ),
-                )
-
-        total = quantize_money(total + Decimal(str(row["amount_delta"])))
-    return line_map, total, None
-
-
-def _sync_change_order_lines(*, change_order, line_items, line_map):
-    ChangeOrderLine.objects.filter(change_order=change_order).delete()
-    for row in line_items:
-        ChangeOrderLine.objects.create(
-            change_order=change_order,
-            budget_line=line_map[int(row["budget_line"])],
-            description=row.get("description", ""),
-            line_type=row.get("line_type", ChangeOrderLine.LineType.SCOPE),
-            adjustment_reason=str(row.get("adjustment_reason", "")).strip(),
-            amount_delta=quantize_money(row["amount_delta"]),
-            days_delta=row.get("days_delta", 0),
-        )
-
-
-def _record_change_order_decision_snapshot(
-    *,
-    change_order,
-    decision_status,
-    previous_status,
-    applied_financial_delta,
-    decided_by,
-):
-    line_rows = list(
-        ChangeOrderLine.objects.filter(change_order=change_order)
-        .select_related("budget_line", "budget_line__cost_code")
-        .order_by("id")
-    )
-    origin_estimate_version = None
-    if change_order.origin_estimate_id is not None:
-        origin_estimate_version = (
-            Estimate.objects.filter(id=change_order.origin_estimate_id).values_list("version", flat=True).first()
-        )
-
-    snapshot = {
-        "change_order": {
-            "id": change_order.id,
-            "project_id": change_order.project_id,
-            "family_key": change_order.family_key,
-            "revision_number": change_order.revision_number,
-            "title": change_order.title,
-            "status": change_order.status,
-            "amount_delta": str(change_order.amount_delta),
-            "days_delta": change_order.days_delta,
-            "reason": change_order.reason,
-            "terms_text": change_order.terms_text,
-            "origin_estimate_id": change_order.origin_estimate_id,
-            "origin_estimate_version": origin_estimate_version,
-            "previous_change_order_id": change_order.previous_change_order_id,
-            "approved_by_id": change_order.approved_by_id,
-            "approved_at": change_order.approved_at.isoformat() if change_order.approved_at else None,
-        },
-        "decision_context": {
-            "decision_status": decision_status,
-            "previous_status": previous_status,
-            "applied_financial_delta": str(applied_financial_delta),
-        },
-        "line_items": [
-            {
-                "change_order_line_id": row.id,
-                "budget_line_id": row.budget_line_id,
-                "cost_code_id": row.budget_line.cost_code_id,
-                "cost_code_code": row.budget_line.cost_code.code,
-                "cost_code_name": row.budget_line.cost_code.name,
-                "description": row.description,
-                "line_type": row.line_type,
-                "adjustment_reason": row.adjustment_reason,
-                "amount_delta": str(row.amount_delta),
-                "days_delta": row.days_delta,
-            }
-            for row in line_rows
-        ],
-    }
-    ChangeOrderSnapshot.objects.create(
-        change_order=change_order,
-        decision_status=decision_status,
-        snapshot_json=snapshot,
-        decided_by=decided_by,
-    )
-
-
-def _validation_error_response(*, message: str, fields: dict, rule: str | None = None):
-    error = {
-        "code": "validation_error",
-        "message": message,
-        "fields": fields,
-    }
-    if rule:
-        error["rule"] = rule
-    return Response({"error": error}, status=400)
-
-
-def _infer_model_validation_rule(*, fields: dict) -> str | None:
-    field_keys = set(fields.keys())
-    if {"approved_by", "approved_at"} & field_keys:
-        return "co_approval_metadata_invariant"
-    if {"previous_change_order", "family_key", "revision_number"} & field_keys:
-        return "co_revision_chain_invalid"
-    if "status" in field_keys:
-        return "co_status_transition_not_allowed"
-    if "origin_estimate" in field_keys:
-        return "co_origin_estimate_project_scope"
-    if {"budget_line", "line_items"} & field_keys:
-        return "co_line_budget_line_invalid"
-    if {"adjustment_reason", "line_type"} & field_keys:
-        return "co_line_adjustment_requires_reason"
-    return None
-
-
-def _model_validation_error_response(*, exc: ValidationError, message: str):
-    fields = {}
-    if hasattr(exc, "message_dict"):
-        fields = exc.message_dict
-    else:
-        fields = {"non_field_errors": exc.messages}
-    return _validation_error_response(
-        message=message,
-        fields=fields,
-        rule=_infer_model_validation_rule(fields=fields),
-    )

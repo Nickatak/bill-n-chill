@@ -13,6 +13,9 @@ Provide login/registration UX, persisted browser session state (token + role + o
    - clear local session token (signout or expiry path)
 2. `UserSessionValidation`
    - verify token validity (`GET /auth/me/`)
+3. `InviteFlow`
+   - verify invite token (`GET /auth/verify-invite/{token}/`)
+   - accept invite as existing user (`POST /auth/accept-invite/`)
 
 ## Composition and Entry Flow
 1. Entry sources:
@@ -42,8 +45,12 @@ Provide login/registration UX, persisted browser session state (token + role + o
 4. `GET /health/`:
    consumed by route wrappers and surfaced through session-aware home rendering.
 5. Authenticated feature requests:
-   all token-authenticated frontend calls now send `X-Organization-Id` and `X-Organization-Slug`
-   headers when organization context exists in the local shared session.
+   all token-authenticated frontend calls send `X-Organization-Id`
+   header when organization context exists in the local shared session.
+6. `GET /auth/verify-invite/{token}/`:
+   validates invite token and returns org name, email, role, and `is_existing_user` flag.
+7. `POST /auth/accept-invite/`:
+   Flow C — existing user accepts invite with password confirmation; returns session payload.
 
 ## Backend Contracts Used
 - Contract endpoint(s): none
@@ -74,7 +81,9 @@ Provide login/registration UX, persisted browser session state (token + role + o
 
 ## Test Anchors
 - Existing anchors:
-  - backend tests in `backend/core/tests/test_auth.py`
+  - backend tests in `backend/core/tests/test_health_auth.py`
+  - backend invite tests in `backend/core/tests/test_invites.py`
+  - frontend tests in `frontend/src/features/session/__tests__/auth-headers.test.ts`
 - TODO:
   - add frontend tests for local session persistence and clear-on-expiry behavior
   - add frontend tests for auth-state transitions across route mounts

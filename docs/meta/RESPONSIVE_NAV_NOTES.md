@@ -27,7 +27,7 @@ laptops and tablets.
 
 - **Field workers on laptops:** A site worker using a laptop to add a billable
   or review a change order hits the overlap zone directly.
-- **RBAC-driven nav:** When role-based access lands, different users will see
+- **RBAC-driven nav:** Role-based access is now live — different roles see
   different route sets. Fewer visible routes means fewer pills, which helps, but
   the toolbar (org, quick jump, ops/meta, theme, logout) is always present.
 - **Tablet usage:** iPads in landscape (1024px) are squarely in the overlap zone.
@@ -52,5 +52,6 @@ laptops and tablets.
 ## Decision
 
 Deferred. The overlap doesn't affect the primary user segments today (office
-staff on 1080p+ monitors, field workers on phones). Revisit when RBAC
-implementation begins or when laptop/tablet usage becomes a confirmed need.
+staff on 1080p+ monitors, field workers on phones). RBAC is now live and
+does reduce pill count for restricted roles. Revisit when laptop/tablet usage
+becomes a confirmed need.

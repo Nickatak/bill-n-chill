@@ -12,46 +12,20 @@ from core.serializers.organization_management import (
     OrganizationProfileSerializer,
     OrganizationProfileUpdateSerializer,
 )
-from core.views.helpers import (
-    _capability_gate,
-    _ensure_primary_membership,
-    _record_organization_membership_record,
-    _record_organization_record,
-    _resolve_user_capabilities,
-    _resolve_user_role,
+from core.rbac import _capability_gate
+from core.user_helpers import _ensure_membership
+from core.views.shared_operations.organization_management_helpers import (
+    _is_last_active_owner,
+    _organization_membership_queryset,
+    _organization_role_policy,
 )
-
-
-def _organization_role_policy(user) -> dict:
-    effective_role = _resolve_user_role(user)
-    caps = _resolve_user_capabilities(user)
-    can_edit_identity = "edit" in caps.get("org_identity", [])
-    can_edit_presets = "edit" in caps.get("org_presets", [])
-    can_manage_memberships = "edit_role" in caps.get("users", [])
-    can_invite = "invite" in caps.get("users", [])
-    return {
-        "effective_role": effective_role,
-        "can_edit_identity": can_edit_identity,
-        "can_edit_presets": can_edit_presets,
-        "can_edit_profile": can_edit_identity or can_edit_presets,
-        "can_manage_memberships": can_manage_memberships,
-        "can_invite": can_invite,
-        "editable_roles": [choice[0] for choice in OrganizationMembership.Role.choices],
-        "editable_statuses": [choice[0] for choice in OrganizationMembership.Status.choices],
-    }
-
-
-def _organization_membership_queryset(organization_id: int):
-    return OrganizationMembership.objects.select_related("user").filter(
-        organization_id=organization_id
-    ).order_by("status", "role", "user_id")
 
 
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def organization_profile_view(request):
     """Fetch or patch organization profile for the caller's active membership org."""
-    membership = _ensure_primary_membership(request.user)
+    membership = _ensure_membership(request.user)
     organization = membership.organization
 
     if request.method == "GET":
@@ -132,7 +106,7 @@ def organization_profile_view(request):
     if changed_fields:
         with transaction.atomic():
             organization.save(update_fields=update_fields)
-            _record_organization_record(
+            OrganizationRecord.record(
                 organization=organization,
                 event_type=OrganizationRecord.EventType.UPDATED,
                 capture_source=OrganizationRecord.CaptureSource.MANUAL_UI,
@@ -156,7 +130,7 @@ def organization_profile_view(request):
 @permission_classes([IsAuthenticated])
 def organization_memberships_view(request):
     """List memberships for caller's active organization scope."""
-    membership = _ensure_primary_membership(request.user)
+    membership = _ensure_membership(request.user)
     rows = _organization_membership_queryset(membership.organization_id)
     return Response(
         {
@@ -170,25 +144,6 @@ def organization_memberships_view(request):
     )
 
 
-def _is_last_active_owner(membership: OrganizationMembership, *, next_role: str, next_status: str) -> bool:
-    is_owner_now = membership.role == OrganizationMembership.Role.OWNER
-    is_active_now = membership.status == OrganizationMembership.Status.ACTIVE
-    remains_active_owner = (
-        next_role == OrganizationMembership.Role.OWNER
-        and next_status == OrganizationMembership.Status.ACTIVE
-    )
-    if not (is_owner_now and is_active_now):
-        return False
-    if remains_active_owner:
-        return False
-    has_other_active_owner = OrganizationMembership.objects.filter(
-        organization_id=membership.organization_id,
-        role=OrganizationMembership.Role.OWNER,
-        status=OrganizationMembership.Status.ACTIVE,
-    ).exclude(id=membership.id).exists()
-    return not has_other_active_owner
-
-
 @api_view(["PATCH"])
 @permission_classes([IsAuthenticated])
 def organization_membership_detail_view(request, membership_id: int):
@@ -197,7 +152,7 @@ def organization_membership_detail_view(request, membership_id: int):
     if permission_error:
         return Response(permission_error, status=403)
 
-    viewer_membership = _ensure_primary_membership(request.user)
+    viewer_membership = _ensure_membership(request.user)
     try:
         membership = _organization_membership_queryset(viewer_membership.organization_id).get(
             id=membership_id
@@ -274,7 +229,7 @@ def organization_membership_detail_view(request, membership_id: int):
             membership.save(update_fields=update_fields)
 
             if role_changed:
-                _record_organization_membership_record(
+                OrganizationMembershipRecord.record(
                     membership=membership,
                     event_type=OrganizationMembershipRecord.EventType.ROLE_CHANGED,
                     capture_source=OrganizationMembershipRecord.CaptureSource.MANUAL_UI,
@@ -287,7 +242,7 @@ def organization_membership_detail_view(request, membership_id: int):
                     metadata={"changed_field": "role"},
                 )
             if status_changed:
-                _record_organization_membership_record(
+                OrganizationMembershipRecord.record(
                     membership=membership,
                     event_type=OrganizationMembershipRecord.EventType.STATUS_CHANGED,
                     capture_source=OrganizationMembershipRecord.CaptureSource.MANUAL_UI,

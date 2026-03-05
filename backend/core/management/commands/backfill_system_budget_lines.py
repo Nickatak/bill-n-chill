@@ -2,7 +2,8 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from core.models import Budget, BudgetLine, CostCode
-from core.views.helpers import SYSTEM_BUDGET_LINE_SPECS, _ensure_primary_membership
+from core.user_helpers import _ensure_membership
+from core.views.helpers import SYSTEM_BUDGET_LINE_SPECS
 
 
 class Command(BaseCommand):
@@ -47,7 +48,7 @@ class Command(BaseCommand):
             creator = budget.created_by
             membership = membership_by_user_id.get(creator.id)
             if membership is None:
-                membership = _ensure_primary_membership(creator)
+                membership = _ensure_membership(creator)
                 membership_by_user_id[creator.id] = membership
 
             budget_touched = False

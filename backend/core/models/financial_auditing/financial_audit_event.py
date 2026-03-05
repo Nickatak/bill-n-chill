@@ -60,5 +60,34 @@ class FinancialAuditEvent(models.Model):
     def delete(self, *args, **kwargs):
         raise ValidationError("FinancialAuditEvent is immutable and cannot be deleted.")
 
+    @classmethod
+    def record(
+        cls,
+        *,
+        project,
+        event_type,
+        object_type,
+        object_id,
+        created_by,
+        from_status="",
+        to_status="",
+        amount=None,
+        note="",
+        metadata=None,
+    ):
+        """Append an immutable financial audit event row."""
+        return cls.objects.create(
+            project=project,
+            event_type=event_type,
+            object_type=object_type,
+            object_id=object_id,
+            from_status=from_status or "",
+            to_status=to_status or "",
+            amount=amount,
+            note=note,
+            metadata_json=metadata or {},
+            created_by=created_by,
+        )
+
     def __str__(self) -> str:
         return f"{self.event_type} ({self.object_type}:{self.object_id})"

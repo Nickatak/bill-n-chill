@@ -1,7 +1,6 @@
 from django.core.management.base import BaseCommand, CommandError
 
 from core.models import CostCode, Organization, OrganizationMembership
-from core.policies.cost_codes import STARTER_COST_CODE_ROWS
 
 
 def _resolve_created_by_for_org(organization: Organization):
@@ -20,7 +19,7 @@ def _resolve_created_by_for_org(organization: Organization):
 
 
 class Command(BaseCommand):
-    help = "Seed starter cost-code catalog into one or more organizations."
+    help = "Seed default cost-code catalog into one or more organizations."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -51,7 +50,6 @@ class Command(BaseCommand):
             raise CommandError("No matching organizations found.")
 
         total_created = 0
-        total_existing = 0
 
         for organization in organizations:
             created_by = _resolve_created_by_for_org(organization)
@@ -63,33 +61,18 @@ class Command(BaseCommand):
                 )
                 continue
 
-            org_created = 0
-            org_existing = 0
-            for code, name in STARTER_COST_CODE_ROWS:
-                _row, created = CostCode.objects.get_or_create(
-                    organization=organization,
-                    code=code,
-                    defaults={
-                        "name": name,
-                        "is_active": True,
-                        "created_by": created_by,
-                    },
-                )
-                if created:
-                    org_created += 1
-                else:
-                    org_existing += 1
-
+            org_created = CostCode.seed_defaults(
+                organization=organization, created_by=created_by,
+            )
             total_created += org_created
-            total_existing += org_existing
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"Org #{organization.id} ({organization.display_name}): created={org_created}, existing={org_existing}"
+                    f"Org #{organization.id} ({organization.display_name}): created={org_created}"
                 )
             )
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Starter cost-code seed complete. created={total_created}, existing={total_existing}"
+                f"Default cost-code seed complete. created={total_created}"
             )
         )

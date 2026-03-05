@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ContactsConsole } from "@/features/contacts";
+import { CustomersConsole } from "@/features/customers";
 import { PageCard, PageShell } from "@/shared/shell";
 
 export const metadata: Metadata = {
@@ -10,7 +10,7 @@ export default function CustomersPage() {
   return (
     <PageShell>
       <PageCard>
-        <ContactsConsole />
+        <CustomersConsole />
       </PageCard>
     </PageShell>
   );

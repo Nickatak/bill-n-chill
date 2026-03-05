@@ -1,5 +1,5 @@
 from core.models.shared_operations.accounting_sync_event import AccountingSyncEvent
-from core.models.shared_operations.contacts import Customer
+from core.models.shared_operations.customers import Customer
 from core.models.shared_operations.cost_code import CostCode
 from core.models.shared_operations.organization import Organization
 from core.models.shared_operations.organization_invite import OrganizationInvite

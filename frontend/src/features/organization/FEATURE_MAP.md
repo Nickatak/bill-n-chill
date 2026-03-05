@@ -12,6 +12,9 @@ Manage organization profile metadata, invoice branding/default templates, and RB
    - update invoice branding/default templates (`PATCH /organization/`)
 2. `OrganizationMembership`
    - update role/status (`PATCH /organization/memberships/{id}/`)
+3. `OrganizationInvite`
+   - create invite (`POST /organization/invites/`) — requires `users.invite` capability
+   - revoke invite (`DELETE /organization/invites/{id}/`) — requires `users.invite` capability
 
 ## Composition and Entry Flow
 1. Entry sources:
@@ -25,7 +28,8 @@ Manage organization profile metadata, invoice branding/default templates, and RB
 5. Default behavior:
    - load profile + memberships for active organization and hydrate edit drafts.
 6. Overrides:
-   - `owner|pm` can edit org profile; owner-only can edit membership role/status.
+   - `org_identity.edit` (owner only) gates identity fields; `org_presets.edit` (owner + PM) gates preset fields.
+   - `users.edit_role` gates membership role/status changes; `users.invite` gates invite create/revoke.
 7. Relationship flow:
    - route mount -> org fetch -> draft edit -> patch -> list/profile refresh.
 
@@ -34,6 +38,9 @@ Manage organization profile metadata, invoice branding/default templates, and RB
 2. `PATCH /organization/`
 3. `GET /organization/memberships/`
 4. `PATCH /organization/memberships/{id}/`
+5. `GET /organization/invites/`
+6. `POST /organization/invites/`
+7. `DELETE /organization/invites/{id}/`
 
 ## Backend Contracts Used
 - Contract endpoint(s): none
@@ -60,7 +67,7 @@ Manage organization profile metadata, invoice branding/default templates, and RB
   - missing shared session token
   - endpoint load failures
   - role-gate `403` errors for forbidden edits
-  - validation errors for self-downgrade/self-disable/slug conflicts
+  - validation errors for self-downgrade/self-disable
 - Empty states:
   - membership list empty (unlikely but explicitly handled)
 

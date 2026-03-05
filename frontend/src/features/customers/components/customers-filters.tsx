@@ -6,12 +6,12 @@
  */
 
 import segmented from "../../../shared/styles/segmented.module.css";
-import styles from "./contacts-console.module.css";
+import styles from "./customers-console.module.css";
 
 type ActivityFilter = "all" | "active";
 type ProjectFilter = "all" | "with_project";
 
-type ContactsFiltersProps = {
+type CustomersFiltersProps = {
   query: string;
   onQueryChange: (value: string) => void;
   activityFilter: ActivityFilter;
@@ -21,14 +21,14 @@ type ContactsFiltersProps = {
 };
 
 /** Renders search input and inline segmented controls for activity/project filters. */
-export function ContactsFilters({
+export function CustomersFilters({
   query,
   onQueryChange,
   activityFilter,
   onActivityFilterChange,
   projectFilter,
   onProjectFilterChange,
-}: ContactsFiltersProps) {
+}: CustomersFiltersProps) {
   return (
     <div className={styles.controlsRow}>
       <input

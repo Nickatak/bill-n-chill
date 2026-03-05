@@ -53,6 +53,30 @@ class ChangeOrderSnapshot(models.Model):
     class Meta:
         ordering = ["-created_at", "-id"]
 
+    @classmethod
+    def record(
+        cls,
+        *,
+        change_order,
+        decision_status: str,
+        previous_status: str,
+        applied_financial_delta,
+        decided_by,
+    ):
+        """Append an immutable snapshot row for a change-order decision event."""
+        snapshot = change_order.build_snapshot()
+        snapshot["decision_context"] = {
+            "decision_status": decision_status,
+            "previous_status": previous_status,
+            "applied_financial_delta": str(applied_financial_delta),
+        }
+        return cls.objects.create(
+            change_order=change_order,
+            decision_status=decision_status,
+            snapshot_json=snapshot,
+            decided_by=decided_by,
+        )
+
     def __str__(self) -> str:
         return f"CO-{self.change_order.family_key} v{self.change_order.revision_number} {self.decision_status}"
 

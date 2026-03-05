@@ -2,14 +2,14 @@
 
 /**
  * Controlled form for editing an existing customer's profile fields (name, contact info,
- * archive status). Rendered inside a modal dialog from ContactsConsole.
+ * archive status). Rendered inside a modal dialog from CustomersConsole.
  */
 
 import { FormEventHandler } from "react";
 
-import styles from "./contacts-console.module.css";
+import styles from "./customers-console.module.css";
 
-type ContactEditorFormProps = {
+type CustomerEditorFormProps = {
   selectedId: string;
   selectedCustomerName: string;
   displayName: string;
@@ -30,7 +30,7 @@ type ContactEditorFormProps = {
 };
 
 /** Editable customer detail form with archive-safety guard for active projects. */
-export function ContactEditorForm({
+export function CustomerEditorForm({
   selectedId,
   selectedCustomerName,
   displayName,
@@ -48,7 +48,7 @@ export function ContactEditorForm({
   hasActiveOrOnHoldProject,
   onSubmit,
   readOnly = false,
-}: ContactEditorFormProps) {
+}: CustomerEditorFormProps) {
   // Prevent archiving while the customer still has work in progress
   const archiveToggleBlocked = hasActiveOrOnHoldProject && !isArchived;
 

@@ -1,5 +1,6 @@
 from core.tests.common import *
-from core.views.helpers import _resolve_user_capabilities, _capability_gate
+from core.rbac import _capability_gate
+from core.user_helpers import _resolve_user_capabilities
 
 
 class ResolveUserCapabilitiesTests(TestCase):
@@ -89,13 +90,13 @@ class ResolveUserCapabilitiesTests(TestCase):
             email="orphan@example.com",
             password="secret123",
         )
-        # resolve_user_capabilities bootstraps membership via _ensure_primary_membership
+        # resolve_user_capabilities bootstraps membership via _ensure_membership
         caps = _resolve_user_capabilities(orphan)
         # Bootstrapped users get owner role
         self.assertIn("create", caps.get("estimates", []))
 
     def test_inactive_membership_bootstraps_via_ensure(self):
-        # OneToOneField means _ensure_primary_membership can't create a second
+        # OneToOneField means _ensure_membership can't create a second
         # membership — it will find no ACTIVE one and bootstrap a new org+membership.
         # But since user already has a membership row, this would fail the unique
         # constraint. So we test a user with NO membership at all.

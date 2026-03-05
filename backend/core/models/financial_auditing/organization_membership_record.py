@@ -115,6 +115,40 @@ class OrganizationMembershipRecord(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
+    @classmethod
+    def record(
+        cls,
+        *,
+        membership,
+        event_type: str,
+        capture_source: str,
+        recorded_by,
+        from_status: str | None = None,
+        to_status: str | None = None,
+        from_role: str = "",
+        to_role: str = "",
+        source_reference: str = "",
+        note: str = "",
+        metadata: dict | None = None,
+    ):
+        """Append an immutable audit row for a membership mutation."""
+        cls.objects.create(
+            organization=membership.organization,
+            organization_membership=membership,
+            membership_user=membership.user,
+            event_type=event_type,
+            capture_source=capture_source,
+            source_reference=source_reference,
+            from_status=from_status,
+            to_status=to_status,
+            from_role=from_role,
+            to_role=to_role,
+            note=note,
+            snapshot_json=membership.build_snapshot(),
+            metadata_json=metadata or {},
+            recorded_by=recorded_by,
+        )
+
     class Meta:
         ordering = ["-created_at", "-id"]
 

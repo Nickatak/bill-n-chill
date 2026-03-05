@@ -1,8 +1,8 @@
-# Starter Cost Codes (ICP v1)
+# Default Cost Codes (ICP v1)
 
 Last reviewed: 2026-02-28
 
-Starter catalog CSV for small-to-mid residential GC/remodel workflows:
+Default catalog CSV for small-to-mid residential GC/remodel workflows:
 
 - [`docs/starter-cost-codes.csv`](./starter-cost-codes.csv)
 
@@ -16,11 +16,11 @@ Starter catalog CSV for small-to-mid residential GC/remodel workflows:
 Use management command:
 
 ```bash
-backend/.venv/bin/python backend/manage.py seed_starter_cost_codes --org-id <ORG_ID>
+backend/.venv/bin/python backend/manage.py seed_default_cost_codes --org-id <ORG_ID>
 ```
 
 Seed all organizations:
 
 ```bash
-backend/.venv/bin/python backend/manage.py seed_starter_cost_codes --all-orgs
+backend/.venv/bin/python backend/manage.py seed_default_cost_codes --all-orgs
 ```

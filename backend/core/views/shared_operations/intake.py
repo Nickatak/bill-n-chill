@@ -1,6 +1,5 @@
 """Shared customer-intake endpoints."""
 
-import re
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -20,155 +19,17 @@ from core.serializers import (
     ProjectSerializer,
 )
 from core.views.helpers import _capability_gate, _organization_user_ids
+from core.views.shared_operations.intake_helpers import (
+    _build_customer_duplicate_candidate,
+    _build_intake_payload,
+    _find_duplicate_customers,
+    build_intake_snapshot,
+)
 
 ALLOWED_PROJECT_CREATE_STATUSES = {
     Project.Status.PROSPECT,
     Project.Status.ACTIVE,
 }
-
-
-def _normalized_phone(value: str) -> str:
-    return re.sub(r"\D", "", value or "")
-
-
-def _find_duplicate_customers(user, *, phone: str, email: str):
-    actor_user_ids = _organization_user_ids(user)
-    customers = Customer.objects.filter(created_by_id__in=actor_user_ids)
-    phone_norm = _normalized_phone(phone)
-    email_norm = (email or "").strip().lower()
-
-    query = Q()
-    if phone:
-        query |= Q(phone=phone)
-    if email_norm:
-        query |= Q(email__iexact=email_norm)
-    direct = list(customers.filter(query)) if query else []
-
-    # Secondary pass for normalized phone matching (for example 5550100 vs 555-0100).
-    phone_matches = []
-    if phone_norm:
-        for customer in customers:
-            if _normalized_phone(customer.phone) == phone_norm:
-                phone_matches.append(customer)
-
-    deduped = {customer.id: customer for customer in [*direct, *phone_matches]}
-    return list(deduped.values())
-
-
-def _build_customer_duplicate_candidate(customer: Customer) -> dict:
-    return {
-        "id": customer.id,
-        "display_name": customer.display_name,
-        "phone": customer.phone,
-        "billing_address": customer.billing_address,
-        "email": customer.email,
-        "is_archived": customer.is_archived,
-        "created_at": customer.created_at.isoformat() if customer.created_at else None,
-    }
-
-
-def _build_customer_snapshot(customer: Customer) -> dict:
-    return {
-        "customer": {
-            "id": customer.id,
-            "display_name": customer.display_name,
-            "email": customer.email,
-            "phone": customer.phone,
-            "billing_address": customer.billing_address,
-            "is_archived": customer.is_archived,
-            "created_by_id": customer.created_by_id,
-            "created_at": customer.created_at.isoformat() if customer.created_at else None,
-            "updated_at": customer.updated_at.isoformat() if customer.updated_at else None,
-        }
-    }
-
-
-def _build_intake_payload(
-    *,
-    payload: dict,
-    intake_record_id: int | None,
-    created_at,
-    converted_customer_id: int | None = None,
-    converted_project_id: int | None = None,
-    converted_at=None,
-) -> dict:
-    return {
-        "id": intake_record_id,
-        "full_name": payload.get("full_name", ""),
-        "phone": payload.get("phone", ""),
-        "project_address": payload.get("project_address", ""),
-        "email": payload.get("email", ""),
-        "initial_contract_value": (
-            str(payload.get("initial_contract_value"))
-            if payload.get("initial_contract_value") is not None
-            else None
-        ),
-        "notes": payload.get("notes", ""),
-        "source": payload.get("source", ""),
-        "is_archived": False,
-        "has_project": converted_project_id is not None,
-        "converted_customer": converted_customer_id,
-        "converted_project": converted_project_id,
-        "converted_at": converted_at.isoformat() if converted_at else None,
-        "created_at": created_at.isoformat() if created_at else None,
-    }
-
-
-def _record_customer_intake_record(
-    *,
-    payload: dict,
-    event_type: str,
-    capture_source: str,
-    recorded_by,
-    source_reference: str = "",
-    note: str = "",
-    metadata: dict | None = None,
-    intake_record_id: int | None = None,
-    converted_customer_id: int | None = None,
-    converted_project_id: int | None = None,
-    converted_at=None,
-):
-    snapshot_json = {
-        "customer_intake": _build_intake_payload(
-            payload=payload,
-            intake_record_id=intake_record_id,
-            created_at=timezone.now(),
-            converted_customer_id=converted_customer_id,
-            converted_project_id=converted_project_id,
-            converted_at=converted_at,
-        )
-    }
-    return LeadContactRecord.objects.create(
-        intake_record_id=intake_record_id,
-        event_type=event_type,
-        capture_source=capture_source,
-        source_reference=source_reference,
-        note=note,
-        snapshot_json=snapshot_json,
-        metadata_json=metadata or {},
-        recorded_by=recorded_by,
-    )
-
-def _record_customer_record(
-    *,
-    customer: Customer,
-    event_type: str,
-    capture_source: str,
-    recorded_by,
-    source_reference: str = "",
-    note: str = "",
-    metadata: dict | None = None,
-):
-    CustomerRecord.objects.create(
-        customer=customer,
-        event_type=event_type,
-        capture_source=capture_source,
-        source_reference=source_reference,
-        note=note,
-        snapshot_json=_build_customer_snapshot(customer),
-        metadata_json=metadata or {},
-        recorded_by=recorded_by,
-    )
 
 
 @api_view(["GET"])
@@ -219,7 +80,7 @@ def customer_detail_view(request, customer_id: int):
     - `DELETE`: intentionally unsupported (`405`); archive via `PATCH is_archived`.
     """
     actor_user_ids = _organization_user_ids(request.user)
-    contact = (
+    customer = (
         Customer.objects.filter(id=customer_id, created_by_id__in=actor_user_ids)
         .annotate(
             project_count=Count(
@@ -235,7 +96,7 @@ def customer_detail_view(request, customer_id: int):
         )
         .first()
     )
-    if contact is None:
+    if customer is None:
         return Response(
             {
                 "error": {
@@ -248,7 +109,7 @@ def customer_detail_view(request, customer_id: int):
         )
 
     if request.method == "GET":
-        payload = CustomerManageSerializer(contact).data
+        payload = CustomerManageSerializer(customer).data
         payload["has_project"] = payload["project_count"] > 0
         payload["has_active_or_on_hold_project"] = payload["active_project_count"] > 0
         return Response({"data": payload})
@@ -258,9 +119,13 @@ def customer_detail_view(request, customer_id: int):
         return Response(permission_error, status=403)
 
     with transaction.atomic():
-        previous_is_archived = contact.is_archived
-        serializer = CustomerManageSerializer(contact, data=request.data, partial=True)
+        previous_is_archived = customer.is_archived
+        serializer = CustomerManageSerializer(customer, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        # save() → full_clean() → Customer.clean(), which raises
+        # DjangoValidationError if archiving a customer with active/on-hold
+        # projects.  Frontend disables the toggle in that case, but this is
+        # the backend safety net.
         try:
             serializer.save()
         except DjangoValidationError as exc:
@@ -268,33 +133,38 @@ def customer_detail_view(request, customer_id: int):
                 return Response(exc.message_dict, status=400)
             return Response({"non_field_errors": exc.messages}, status=400)
 
+        # Archive cascade: when a customer is archived, auto-cancel any
+        # prospect-status projects.  Active/on-hold projects block archival
+        # entirely (enforced by Customer.clean() above).
         cancelled_prospect_project_count = 0
-        if not previous_is_archived and contact.is_archived:
-            cancelled_prospect_project_count = contact.projects.filter(
+        if not previous_is_archived and customer.is_archived:
+            cancelled_prospect_project_count = customer.projects.filter(
                 status=Project.Status.PROSPECT
             ).update(status=Project.Status.CANCELLED, updated_at=timezone.now())
 
-        _record_customer_record(
-            customer=contact,
+        CustomerRecord.record(
+            customer=customer,
             event_type=CustomerRecord.EventType.UPDATED,
             capture_source=CustomerRecord.CaptureSource.MANUAL_UI,
             recorded_by=request.user,
             note=(
                 "Customer archive state changed."
-                if contact.is_archived != previous_is_archived
+                if customer.is_archived != previous_is_archived
                 else "Customer updated."
             ),
             metadata={
                 "from_is_archived": previous_is_archived,
-                "to_is_archived": contact.is_archived,
+                "to_is_archived": customer.is_archived,
                 "cancelled_prospect_project_count": cancelled_prospect_project_count,
             }
-            if contact.is_archived != previous_is_archived
+            if customer.is_archived != previous_is_archived
             else {},
         )
 
-    refreshed = (
-        Customer.objects.filter(id=contact.id, created_by_id__in=actor_user_ids)
+    # Re-fetch with fresh annotations — project_count / active_project_count
+    # are DB-computed and may have changed after the prospect cancellation.
+    annotated_customer = (
+        Customer.objects.filter(id=customer.id, created_by_id__in=actor_user_ids)
         .annotate(
             project_count=Count(
                 "projects",
@@ -309,7 +179,7 @@ def customer_detail_view(request, customer_id: int):
         )
         .first()
     )
-    payload = CustomerManageSerializer(refreshed).data
+    payload = CustomerManageSerializer(annotated_customer).data
     payload["has_project"] = payload["project_count"] > 0
     payload["has_active_or_on_hold_project"] = payload["active_project_count"] > 0
     return Response({"data": payload})
@@ -384,7 +254,7 @@ def customer_project_create_view(request, customer_id: int):
                 project.status = Project.Status.ACTIVE
                 project.save()
                 status_transition = "prospect_to_active"
-            _record_customer_record(
+            CustomerRecord.record(
                 customer=customer,
                 event_type=CustomerRecord.EventType.UPDATED,
                 capture_source=CustomerRecord.CaptureSource.MANUAL_UI,
@@ -596,7 +466,7 @@ def quick_add_customer_intake_view(request):
                     created_by=request.user,
                 )
                 customer_created = True
-                _record_customer_record(
+                CustomerRecord.record(
                     customer=customer,
                     event_type=CustomerRecord.EventType.CREATED,
                     capture_source=CustomerRecord.CaptureSource.MANUAL_UI,
@@ -604,8 +474,8 @@ def quick_add_customer_intake_view(request):
                     note="Customer created from intake quick add.",
                 )
 
-            created_record = _record_customer_intake_record(
-                payload=payload,
+            created_record = LeadContactRecord.record(
+                snapshot_json=build_intake_snapshot(payload=payload),
                 event_type=LeadContactRecord.EventType.CREATED,
                 capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
                 recorded_by=request.user,
@@ -636,11 +506,18 @@ def quick_add_customer_intake_view(request):
                     project.save()
                     status_transition = "prospect_to_active"
                 converted_at = timezone.now()
-                _record_customer_intake_record(
-                    payload=payload,
+                LeadContactRecord.record(
+                    snapshot_json=build_intake_snapshot(
+                        payload=payload,
+                        intake_record_id=intake_record_id,
+                        converted_customer_id=customer.id,
+                        converted_project_id=project.id,
+                        converted_at=converted_at,
+                    ),
                     event_type=LeadContactRecord.EventType.CONVERTED,
                     capture_source=LeadContactRecord.CaptureSource.MANUAL_UI,
                     recorded_by=request.user,
+                    intake_record_id=intake_record_id,
                     note="Customer intake converted during quick add.",
                     metadata={
                         "converted_customer_id": customer.id,
@@ -650,10 +527,6 @@ def quick_add_customer_intake_view(request):
                         "project_status_final": project.status,
                         "project_status_transition": status_transition,
                     },
-                    intake_record_id=intake_record_id,
-                    converted_customer_id=customer.id,
-                    converted_project_id=project.id,
-                    converted_at=converted_at,
                 )
     except DjangoValidationError as exc:
         if hasattr(exc, "message_dict"):

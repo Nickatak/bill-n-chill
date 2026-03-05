@@ -13,16 +13,16 @@ Provide operational lookup and maintenance for canonical customer records outsid
 
 ## Composition and Entry Flow
 1. Entry sources:
-   - direct route entry: `frontend/src/app/customers/page.tsx` renders `ContactsConsole`
-   - feature export entry: `frontend/src/features/contacts/index.ts` exports `ContactsConsole`
+   - direct route entry: `frontend/src/app/customers/page.tsx` renders `CustomersConsole`
+   - feature export entry: `frontend/src/features/customers/index.ts` exports `CustomersConsole`
 2. Parent/Owner:
-   `ContactsConsole` owns lookup filters, row rendering, project-link indexing, and modal edit/archive mutations.
+   `CustomersConsole` owns lookup filters, row rendering, project-link indexing, and modal edit/archive mutations.
 3. Controller/Hook:
    console-level state/effects manage query/filter state, selected row, and save/archive flows.
 4. Children:
-   - `ContactsFilters`: query + activity controls
-   - `ContactsList`: row-based customer list with quick project links
-   - `ContactEditorForm`: modal editor opened as a secondary action
+   - `CustomersFilters`: query + activity controls
+   - `CustomersList`: row-based customer list with quick project links
+   - `CustomerEditorForm`: modal editor opened as a secondary action
 5. Default behavior:
    load customer rows with activity filter defaulted to `active` and support search/filter plus selected-record edits.
 6. Overrides:
@@ -67,7 +67,7 @@ Provide operational lookup and maintenance for canonical customer records outsid
 
 ## Test Anchors
 - Existing anchors:
-  - backend tests in `backend/core/tests/*contacts*` (legacy file names)
+  - backend tests in `backend/core/tests/test_customers_management.py`
 - TODO:
   - add frontend tests for filtering logic
   - add frontend tests for edit/archive flow and selection fallback

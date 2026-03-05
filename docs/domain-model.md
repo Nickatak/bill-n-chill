@@ -217,6 +217,36 @@ Policy:
 - Append-only immutable capture model for RBAC provenance and incident forensics.
 - Internal-facing audit artifact.
 
+#### OrganizationInvite
+
+Single-use invite token for adding a user to an organization.
+
+Key fields:
+- `id`
+- `organization_id`
+- `email`
+- `role` (`owner`, `pm`, `worker`, `bookkeeping`, `viewer`)
+- `token` (unique, auto-generated UUID)
+- `invited_by` (FK to User)
+- `expires_at` (24 hours from creation)
+- `used_at` (nullable; set when accepted)
+- `used_by` (nullable FK to User; set when accepted)
+- `created_at`
+
+Lifecycle:
+- Created via `POST /organization/invites/` (requires `users.invite` capability).
+- Token is verified via `GET /auth/verify-invite/{token}/` (unauthenticated).
+- Acceptance paths:
+  - **Flow B (new user):** Token passed during `POST /auth/register/` — creates user and attaches to inviting org.
+  - **Flow C (existing user):** `POST /auth/accept-invite/` with password confirmation — switches user's org.
+- Single-use: `used_at` is set on acceptance; token cannot be reused.
+- Expiry: 24-hour window from `created_at`; expired tokens are rejected.
+
+Policy:
+- One pending invite per email per organization (duplicate guard).
+- Revocable via `DELETE /organization/invites/{id}/` before use.
+- Internal-facing RBAC artifact — no audit record model (invite lifecycle is simple enough to track via `used_at`/`used_by`).
+
 #### CustomerIntake
 
 Lightweight intake record captured before full project/customer setup.
@@ -719,7 +749,7 @@ Policy:
 
 ### Relationship Summary
 
-- `Organization` has many `OrganizationMemberships`, `RoleTemplates`, `Vendors`, `CostCodes`, and `ScopeItems`.
+- `Organization` has many `OrganizationMemberships`, `OrganizationInvites`, `RoleTemplates`, `Vendors`, `CostCodes`, and `ScopeItems`.
 - `Organization` has many `OrganizationRecords` and `OrganizationMembershipRecords`.
 - `RoleTemplate` provides capability flags to `OrganizationMembership` (nullable FK).
 - `CustomerIntake` has many `CustomerIntakeRecords`.

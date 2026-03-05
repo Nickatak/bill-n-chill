@@ -86,6 +86,31 @@ class LeadContactRecord(models.Model):
     class Meta:
         ordering = ["-created_at", "-id"]
 
+    @classmethod
+    def record(
+        cls,
+        *,
+        snapshot_json: dict,
+        event_type: str,
+        capture_source: str,
+        recorded_by,
+        intake_record_id: int | None = None,
+        source_reference: str = "",
+        note: str = "",
+        metadata: dict | None = None,
+    ):
+        """Append an immutable audit row for a customer-intake event."""
+        return cls.objects.create(
+            intake_record_id=intake_record_id,
+            event_type=event_type,
+            capture_source=capture_source,
+            source_reference=source_reference,
+            note=note,
+            snapshot_json=snapshot_json,
+            metadata_json=metadata or {},
+            recorded_by=recorded_by,
+        )
+
     def save(self, *args, **kwargs):
         if self.pk is not None:
             raise ValidationError("Customer intake records are immutable and cannot be updated.")

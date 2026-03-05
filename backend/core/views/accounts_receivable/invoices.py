@@ -21,95 +21,25 @@ from core.views.accounts_receivable.invoice_ingress import (
     build_invoice_create_ingress,
     build_invoice_patch_ingress,
 )
-from core.views.helpers import (
+from core.views.accounts_receivable.invoices_helpers import (
     _apply_invoice_lines_and_totals,
+    _build_public_invoice_decision_note,
     _calculate_invoice_line_totals,
-    _ensure_primary_membership,
     _enforce_invoice_scope_guard,
+    _invoice_line_apply_error_response,
     _is_billable_invoice_status,
     _next_invoice_number,
-    _organization_user_ids,
     _resolve_invoice_cost_codes_for_user,
-    _resolve_organization_for_public_actor,
-    _record_financial_audit_event,
-    _record_invoice_status_event,
+)
+from core.views.helpers import (
     _capability_gate,
+    _ensure_membership,
+    _organization_user_ids,
+    _resolve_organization_for_public_actor,
     _serialize_public_organization_context,
     _serialize_public_project_context,
     _validate_project_for_user,
 )
-
-
-def _invoice_line_apply_error_response(apply_error):
-    if "missing_budget_lines" in apply_error:
-        return (
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "One or more budget lines are invalid for this project's active budget.",
-                    "fields": {"budget_line": apply_error["missing_budget_lines"]},
-                }
-            },
-            400,
-        )
-    if "missing_cost_codes" in apply_error:
-        return (
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "One or more cost codes are invalid for this user.",
-                    "fields": {"cost_code": apply_error["missing_cost_codes"]},
-                }
-            },
-            400,
-        )
-    if "missing_scope_items" in apply_error:
-        return (
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "One or more scope items are invalid for this user.",
-                    "fields": {"scope_item": apply_error["missing_scope_items"]},
-                }
-            },
-            400,
-        )
-    if "invalid_lines" in apply_error:
-        return (
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "One or more invoice lines are invalid.",
-                    "fields": {"line_items": apply_error["invalid_lines"]},
-                }
-            },
-            400,
-        )
-    return (
-        {
-            "error": {
-                "code": "validation_error",
-                "message": "Invoice line validation failed.",
-                "fields": {},
-            }
-        },
-        400,
-    )
-
-
-def _build_public_invoice_decision_note(
-    *,
-    action_label: str,
-    note: str,
-    decider_name: str,
-    decider_email: str,
-) -> str:
-    actor_parts = [part for part in [decider_name.strip(), decider_email.strip()] if part]
-    actor_label = " / ".join(actor_parts) if actor_parts else "anonymous customer"
-    note_value = note.strip()
-    if note_value:
-        return f"{action_label} via public link by {actor_label}. {note_value}"
-    return f"{action_label} via public link by {actor_label}."
 
 
 @api_view(["GET"])
@@ -223,14 +153,14 @@ def public_invoice_decision_view(request, public_token: str):
                 )
             invoice.status = Invoice.Status.PAID
             invoice.save(update_fields=["status", "updated_at"])
-            _record_invoice_status_event(
+            InvoiceStatusEvent.record(
                 invoice=invoice,
                 from_status=previous_status,
                 to_status=invoice.status,
                 note=public_note,
                 changed_by=invoice.created_by,
             )
-            _record_financial_audit_event(
+            FinancialAuditEvent.record(
                 project=invoice.project,
                 event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
                 object_type="invoice",
@@ -248,14 +178,14 @@ def public_invoice_decision_view(request, public_token: str):
                 },
             )
         else:
-            _record_invoice_status_event(
+            InvoiceStatusEvent.record(
                 invoice=invoice,
                 from_status=previous_status,
                 to_status=previous_status,
                 note=public_note,
                 changed_by=invoice.created_by,
             )
-            _record_financial_audit_event(
+            FinancialAuditEvent.record(
                 project=invoice.project,
                 event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
                 object_type="invoice",
@@ -404,7 +334,7 @@ def project_invoices_view(request, project_id: int):
 
     serializer = InvoiceWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
-    membership = _ensure_primary_membership(request.user)
+    membership = _ensure_membership(request.user)
     organization = membership.organization
     default_due_days = int(organization.default_invoice_due_delta or 30)
     default_due_days = max(1, min(default_due_days, 365))
@@ -478,14 +408,14 @@ def project_invoices_view(request, project_id: int):
             return Response(payload, status=status_code)
 
         invoice.refresh_from_db()
-        _record_invoice_status_event(
+        InvoiceStatusEvent.record(
             invoice=invoice,
             from_status=None,
             to_status=invoice.status,
             note="Invoice created.",
             changed_by=request.user,
         )
-        _record_financial_audit_event(
+        FinancialAuditEvent.record(
             project=project,
             event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
             object_type="invoice",
@@ -822,14 +752,14 @@ def invoice_detail_view(request, invoice_id: int):
                 status_event_note = status_note.strip()
                 if not status_event_note:
                     status_event_note = "Invoice re-sent." if is_resend else "Invoice status updated."
-                _record_invoice_status_event(
+                InvoiceStatusEvent.record(
                     invoice=invoice,
                     from_status=previous_status,
                     to_status=next_status,
                     note=status_event_note,
                     changed_by=request.user,
                 )
-            _record_financial_audit_event(
+            FinancialAuditEvent.record(
                 project=invoice.project,
                 event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
                 object_type="invoice",
@@ -951,14 +881,14 @@ def invoice_send_view(request, invoice_id: int):
 
         invoice.status = Invoice.Status.SENT
         invoice.save(update_fields=["status", "updated_at"])
-        _record_invoice_status_event(
+        InvoiceStatusEvent.record(
             invoice=invoice,
             from_status=previous_status,
             to_status=Invoice.Status.SENT,
             note="Invoice sent.",
             changed_by=request.user,
         )
-        _record_financial_audit_event(
+        FinancialAuditEvent.record(
             project=invoice.project,
             event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
             object_type="invoice",

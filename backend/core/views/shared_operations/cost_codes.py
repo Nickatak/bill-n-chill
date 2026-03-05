@@ -4,7 +4,6 @@ import csv
 from io import StringIO
 
 from django.db import IntegrityError
-from django.db.models import Q
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -12,33 +11,15 @@ from rest_framework.response import Response
 from core.models import CostCode
 from core.serializers import CostCodeSerializer
 from core.views.helpers import (
-    _ensure_primary_membership,
+    _ensure_membership,
     _organization_user_ids,
     _parse_request_bool,
     _capability_gate,
 )
-
-
-def _cost_code_scope_filter(user):
-    membership = _ensure_primary_membership(user)
-    actor_user_ids = _organization_user_ids(user)
-    return Q(organization_id=membership.organization_id) | Q(
-        organization__isnull=True,
-        created_by_id__in=actor_user_ids,
-    )
-
-
-def _duplicate_code_error_response():
-    return Response(
-        {
-            "error": {
-                "code": "validation_error",
-                "message": "A cost code with this code already exists in your organization.",
-                "fields": {"code": ["Code must be unique within your organization."]},
-            }
-        },
-        status=400,
-    )
+from core.views.shared_operations.cost_codes_helpers import (
+    _cost_code_scope_filter,
+    _duplicate_code_error_response,
+)
 
 
 @api_view(["GET", "POST"])
@@ -61,7 +42,7 @@ def cost_codes_list_create_view(request):
 
     serializer = CostCodeSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
-    membership = _ensure_primary_membership(request.user)
+    membership = _ensure_membership(request.user)
     incoming_code = str(serializer.validated_data.get("code", "")).strip()
     if CostCode.objects.filter(
         organization_id=membership.organization_id,
@@ -128,7 +109,7 @@ def cost_codes_import_csv_view(request):
         return Response(permission_error, status=403)
 
     scope_filter = _cost_code_scope_filter(request.user)
-    membership = _ensure_primary_membership(request.user)
+    membership = _ensure_membership(request.user)
 
     csv_text = request.data.get("csv_text", "")
     dry_run = _parse_request_bool(request.data.get("dry_run", True), default=True)

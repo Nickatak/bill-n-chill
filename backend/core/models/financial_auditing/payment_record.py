@@ -89,6 +89,34 @@ class PaymentRecord(models.Model):
     class Meta:
         ordering = ["-created_at", "-id"]
 
+    @classmethod
+    def record(
+        cls,
+        *,
+        payment,
+        event_type: str,
+        capture_source: str,
+        recorded_by,
+        from_status: str | None = None,
+        to_status: str | None = None,
+        source_reference: str = "",
+        note: str = "",
+        metadata: dict | None = None,
+    ):
+        """Append an immutable audit row for a payment mutation."""
+        return cls.objects.create(
+            payment=payment,
+            event_type=event_type,
+            capture_source=capture_source,
+            source_reference=source_reference,
+            from_status=from_status,
+            to_status=to_status,
+            note=note,
+            snapshot_json=payment.build_snapshot(),
+            metadata_json=metadata or {},
+            recorded_by=recorded_by,
+        )
+
     def save(self, *args, **kwargs):
         if self.pk is not None:
             raise ValidationError("Payment records are immutable and cannot be updated.")

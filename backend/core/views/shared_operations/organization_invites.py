@@ -10,7 +10,8 @@ from core.serializers.organization_management import (
     OrganizationInviteCreateSerializer,
     OrganizationInviteSerializer,
 )
-from core.views.helpers import _capability_gate, _ensure_primary_membership
+from core.rbac import _capability_gate
+from core.user_helpers import _ensure_membership
 
 
 @api_view(["GET", "POST"])
@@ -39,7 +40,7 @@ def organization_invites_view(request):
     if permission_error:
         return Response(permission_error, status=403)
 
-    membership = _ensure_primary_membership(request.user)
+    membership = _ensure_membership(request.user)
     now = timezone.now()
 
     if request.method == "GET":
@@ -146,7 +147,7 @@ def organization_invite_detail_view(request, invite_id: int):
     if permission_error:
         return Response(permission_error, status=403)
 
-    membership = _ensure_primary_membership(request.user)
+    membership = _ensure_membership(request.user)
     try:
         invite = OrganizationInvite.objects.get(
             id=invite_id,

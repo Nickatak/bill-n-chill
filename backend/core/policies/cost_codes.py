@@ -1,9 +1,9 @@
-"""Starter cost-code policy used for org bootstrap and demo seeding."""
+"""Default cost-code policy used for org bootstrap and demo seeding."""
 
-STARTER_COST_CODE_POLICY_VERSION = "2026-02-24.cost-codes.starter.v1"
+DEFAULT_COST_CODE_POLICY_VERSION = "2026-02-24.cost-codes.default.v1"
 
 # Lean default catalog for small-to-mid residential GC/remodel operations.
-STARTER_COST_CODE_ROWS: list[tuple[str, str]] = [
+DEFAULT_COST_CODE_ROWS: list[tuple[str, str]] = [
     ("01-100", "Project Management & Supervision"),
     ("01-110", "Permits & Inspections"),
     ("01-120", "Temporary Utilities"),

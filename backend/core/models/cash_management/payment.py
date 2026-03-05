@@ -117,6 +117,24 @@ class Payment(models.Model):
         self.full_clean()
         return super().save(*args, **kwargs)
 
+    def build_snapshot(self) -> dict:
+        """Point-in-time snapshot for immutable audit records."""
+        return {
+            "payment": {
+                "id": self.id,
+                "project_id": self.project_id,
+                "direction": self.direction,
+                "method": self.method,
+                "status": self.status,
+                "amount": str(self.amount),
+                "payment_date": self.payment_date.isoformat() if self.payment_date else None,
+                "reference_number": self.reference_number,
+                "notes": self.notes,
+                "allocated_total": str(self.allocated_total),
+                "unapplied_amount": str(self.unapplied_amount),
+            }
+        }
+
     def __str__(self) -> str:
         return f"{self.project.name} {self.direction} {self.amount}"
 
@@ -169,6 +187,21 @@ class PaymentAllocation(models.Model):
 
     class Meta:
         ordering = ["-created_at", "-id"]
+
+    def build_snapshot(self) -> dict:
+        """Point-in-time snapshot for immutable audit records (includes parent payment)."""
+        return {
+            "payment": self.payment.build_snapshot()["payment"],
+            "allocation": {
+                "id": self.id,
+                "target_type": self.target_type,
+                "invoice_id": self.invoice_id,
+                "vendor_bill_id": self.vendor_bill_id,
+                "applied_amount": str(self.applied_amount),
+                "created_by_id": self.created_by_id,
+                "created_at": self.created_at.isoformat() if self.created_at else None,
+            },
+        }
 
     def __str__(self) -> str:
         return f"Payment {self.payment_id} -> {self.target_type} {self.applied_amount}"

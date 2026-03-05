@@ -13,9 +13,9 @@ import type { ProjectRecord } from "@/features/projects/types";
 import { formatPhone } from "@/shared/phone-format";
 
 import { CustomerRow } from "../types";
-import styles from "./contacts-console.module.css";
+import styles from "./customers-console.module.css";
 
-type ContactsListProps = {
+type CustomersListProps = {
   rows: CustomerRow[];
   filteredRows: CustomerRow[];
   query: string;
@@ -57,14 +57,14 @@ function projectStatusClass(status: string): string {
 }
 
 /** Customer list with expandable project accordions and per-customer status filters. */
-export function ContactsList({
+export function CustomersList({
   rows,
   filteredRows,
   query,
   projectsByCustomer,
   onEdit,
   onCreateProject,
-}: ContactsListProps) {
+}: CustomersListProps) {
   const [openCustomerId, setOpenCustomerId] = useState<number | null>(null);
   const [projectStatusFiltersByCustomer, setProjectStatusFiltersByCustomer] = useState<
     Record<number, ProjectStatusFilterState>

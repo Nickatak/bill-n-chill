@@ -51,6 +51,29 @@ class CostCode(models.Model):
         ordering = ["code", "name"]
         unique_together = ("organization", "code")
 
+    @classmethod
+    def seed_defaults(cls, *, organization, created_by) -> int:
+        """Seed the default cost codes for an organization.
+
+        Returns the number of cost codes actually created (skips duplicates).
+        """
+        from core.policies.cost_codes import DEFAULT_COST_CODE_ROWS
+
+        created_count = 0
+        for code, name in DEFAULT_COST_CODE_ROWS:
+            _row, created = cls.objects.get_or_create(
+                organization=organization,
+                code=code,
+                defaults={
+                    "name": name,
+                    "is_active": True,
+                    "created_by": created_by,
+                },
+            )
+            if created:
+                created_count += 1
+        return created_count
+
     def __str__(self) -> str:
         return f"{self.code} - {self.name}"
 

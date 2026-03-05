@@ -66,6 +66,30 @@ class CustomerRecord(models.Model):
     class Meta:
         ordering = ["-created_at", "-id"]
 
+    @classmethod
+    def record(
+        cls,
+        *,
+        customer,
+        event_type: str,
+        capture_source: str,
+        recorded_by,
+        source_reference: str = "",
+        note: str = "",
+        metadata: dict | None = None,
+    ):
+        """Append an immutable audit row for a customer mutation."""
+        return cls.objects.create(
+            customer=customer,
+            event_type=event_type,
+            capture_source=capture_source,
+            source_reference=source_reference,
+            note=note,
+            snapshot_json=customer.build_snapshot(),
+            metadata_json=metadata or {},
+            recorded_by=recorded_by,
+        )
+
     def save(self, *args, **kwargs):
         if self.pk is not None:
             raise ValidationError("Customer records are immutable and cannot be updated.")

@@ -27,7 +27,7 @@ from core.models import (
     VendorBill,
     VendorBillAllocation,
 )
-from core.views.helpers import _build_budget_baseline_snapshot
+from core.views.estimating.estimates_helpers import _build_budget_baseline_snapshot
 
 User = get_user_model()
 

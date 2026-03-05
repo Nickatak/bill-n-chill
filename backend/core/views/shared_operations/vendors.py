@@ -11,38 +11,14 @@ from rest_framework.response import Response
 from core.models import Vendor
 from core.serializers import VendorSerializer, VendorWriteSerializer
 from core.views.helpers import (
-    _ensure_primary_membership,
-    _organization_user_ids,
+    _ensure_membership,
     _parse_request_bool,
     _capability_gate,
 )
-
-
-def _vendor_scope_filter(user):
-    membership = _ensure_primary_membership(user)
-    actor_user_ids = _organization_user_ids(user)
-    return Q(organization__isnull=True, is_canonical=True) | Q(organization_id=membership.organization_id) | Q(
-        organization__isnull=True,
-        created_by_id__in=actor_user_ids,
-    )
-
-
-def _find_duplicate_vendors(user, *, name: str, email: str, exclude_vendor_id=None):
-    rows = Vendor.objects.filter(_vendor_scope_filter(user))
-    if exclude_vendor_id:
-        rows = rows.exclude(id=exclude_vendor_id)
-
-    name_norm = (name or "").strip()
-    email_norm = (email or "").strip().lower()
-    query = Q()
-    if name_norm:
-        query |= Q(name__iexact=name_norm)
-    if email_norm:
-        query |= Q(email__iexact=email_norm)
-
-    if not query:
-        return []
-    return list(rows.filter(query).order_by("name", "id"))
+from core.views.shared_operations.vendors_helpers import (
+    _find_duplicate_vendors,
+    _vendor_scope_filter,
+)
 
 
 @api_view(["GET", "POST"])
@@ -66,7 +42,7 @@ def vendors_list_create_view(request):
     if permission_error:
         return Response(permission_error, status=403)
 
-    membership = _ensure_primary_membership(request.user)
+    membership = _ensure_membership(request.user)
     serializer = VendorWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
@@ -230,7 +206,7 @@ def vendors_import_csv_view(request):
 
     csv_text = request.data.get("csv_text", "")
     dry_run = _parse_request_bool(request.data.get("dry_run", True), default=True)
-    membership = _ensure_primary_membership(request.user)
+    membership = _ensure_membership(request.user)
     scope_filter = _vendor_scope_filter(request.user)
     if not csv_text or not str(csv_text).strip():
         return Response(

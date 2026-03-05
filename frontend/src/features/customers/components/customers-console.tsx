@@ -16,11 +16,11 @@ import type { ProjectRecord } from "@/features/projects/types";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { ApiResponse, CustomerRow } from "../types";
-import { ContactEditorForm } from "./contact-editor-form";
-import { ContactsFilters } from "./contacts-filters";
-import { ContactsList } from "./contacts-list";
+import { CustomerEditorForm } from "./customer-editor-form";
+import { CustomersFilters } from "./customers-filters";
+import { CustomersList } from "./customers-list";
 import { CustomerProjectCreateForm } from "./customer-project-create-form";
-import styles from "./contacts-console.module.css";
+import styles from "./customers-console.module.css";
 
 type ActivityFilter = "all" | "active";
 type ProjectFilter = "all" | "with_project";
@@ -38,7 +38,7 @@ type ProjectCreateApiResponse = {
 };
 
 /** Root console component for customer CRUD, filtering, and project creation. */
-export function ContactsConsole() {
+export function CustomersConsole() {
   const { token, capabilities } = useSharedSessionAuth();
   const canMutateCustomers = canDo(capabilities, "customers", "create");
   const canMutateProjects = canDo(capabilities, "projects", "create");
@@ -67,10 +67,7 @@ export function ContactsConsole() {
   const [projectStatus, setProjectStatus] = useState<ProjectStatusValue>("prospect");
 
   const normalizedBaseUrl = useMemo(() => normalizeApiBaseUrl(defaultApiBaseUrl), []);
-  const scopedContactIdParam = searchParams.get("contact");
   const scopedCustomerIdParam = searchParams.get("customer");
-  const scopedContactId =
-    scopedContactIdParam && /^\d+$/.test(scopedContactIdParam) ? Number(scopedContactIdParam) : null;
   const scopedCustomerId =
     scopedCustomerIdParam && /^\d+$/.test(scopedCustomerIdParam) ? Number(scopedCustomerIdParam) : null;
 
@@ -104,7 +101,7 @@ export function ContactsConsole() {
   }
 
   /** Fetch the customer list from the API, optionally filtered by search text. */
-  async function loadContacts(searchQuery: string) {
+  async function loadCustomers(searchQuery: string) {
     setStatusMessage("");
     try {
       const params = new URLSearchParams();
@@ -123,7 +120,7 @@ export function ContactsConsole() {
 
       const items = (payload.data as CustomerRow[]) ?? [];
       setRows(items);
-      const scopedId = scopedCustomerId ?? scopedContactId;
+      const scopedId = scopedCustomerId;
       const scopedCustomer = scopedId ? items.find((entry) => entry.id === scopedId) : null;
       if (scopedCustomer) {
         setEditingId(String(scopedCustomer.id));
@@ -169,11 +166,11 @@ export function ContactsConsole() {
       return;
     }
     const timer = window.setTimeout(() => {
-      void loadContacts(query);
+      void loadCustomers(query);
     }, 250);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, query, normalizedBaseUrl, scopedContactId, scopedCustomerId]);
+  }, [token, query, normalizedBaseUrl, scopedCustomerId]);
 
   // Fetch project index once on mount for the per-customer project accordion
   useEffect(() => {
@@ -329,7 +326,7 @@ export function ContactsConsole() {
         <p>Find customers quickly and jump directly to their project workspaces.</p>
       </header>
 
-      <ContactsFilters
+      <CustomersFilters
         query={query}
         onQueryChange={setQuery}
         activityFilter={activityFilter}
@@ -342,7 +339,7 @@ export function ContactsConsole() {
 
       {/* Customer table with expandable project accordions */}
 
-      <ContactsList
+      <CustomersList
         rows={rows}
         filteredRows={filteredRows}
         query={query}
@@ -363,7 +360,7 @@ export function ContactsConsole() {
             <button type="button" className={styles.modalClose} onClick={closeEditor}>
               Close
             </button>
-            <ContactEditorForm
+            <CustomerEditorForm
               selectedId={editingId}
               selectedCustomerName={editingCustomer.display_name ?? ""}
               displayName={displayName}

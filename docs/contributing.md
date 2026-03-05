@@ -11,6 +11,7 @@ Last reviewed: 2026-03-04
   - [Commit Style](#commit-style)
   - [Review Focus](#review-focus)
 - [RBAC Patterns](#rbac-patterns)
+- [Call Chain Documentation](#call-chain-documentation)
 - [Architecture and Modeling Conventions (Meta Choices)](#architecture-and-modeling-conventions-meta-choices)
   - [Object Terminology](#object-terminology)
   - [Mutable + Immutable Pattern](#mutable--immutable-pattern)
@@ -79,7 +80,7 @@ if permission_error:
     return Response(permission_error, status=403)
 ```
 
-- Use `_capability_gate` (not `_role_gate_error_payload`) for new endpoints.
+- Use `_capability_gate` for all permission-gated endpoints.
 - For status-dependent actions within a single endpoint, gate each action separately:
   ```python
   if new_status == "sent":
@@ -100,6 +101,10 @@ const canMutate = canDo(capabilities, "estimates", "create");
 - Gate create forms, submit buttons, and status dropdowns behind `canMutate*` booleans.
 - Show a read-only hint when the user lacks mutation capabilities.
 - The backend always enforces — frontend gating is UX, not security.
+
+## Call Chain Documentation
+
+Per-domain call chain docs live in [`docs/call-chains/`](call-chains/README.md). See the README there for format, conventions, and the domain index.
 
 ## Architecture and Modeling Conventions (Meta Choices)
 

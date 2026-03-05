@@ -1,8 +1,7 @@
 /**
- * Contacts feature API configuration.
+ * Customers feature API configuration.
  *
- * Provides base URL resolution for customer and contact
- * management API calls.
+ * Provides base URL resolution for customer management API calls.
  */
 
 /** Default API base URL, sourced from environment or falling back to localhost. */

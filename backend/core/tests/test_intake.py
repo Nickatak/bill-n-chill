@@ -265,7 +265,7 @@ class CustomerIntakeQuickAddTests(TestCase):
 
     def test_quick_add_rolls_back_when_record_capture_fails(self):
         with patch(
-            "core.views.shared_operations.intake._record_customer_intake_record",
+            "core.models.financial_auditing.lead_contact_record.LeadContactRecord.record",
             side_effect=RuntimeError("capture-write-failed"),
         ):
             with self.assertRaises(RuntimeError):

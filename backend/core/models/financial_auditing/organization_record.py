@@ -63,6 +63,30 @@ class OrganizationRecord(models.Model):
     class Meta:
         ordering = ["-created_at", "-id"]
 
+    @classmethod
+    def record(
+        cls,
+        *,
+        organization,
+        event_type: str,
+        capture_source: str,
+        recorded_by,
+        source_reference: str = "",
+        note: str = "",
+        metadata: dict | None = None,
+    ):
+        """Append an immutable audit row for an organization mutation."""
+        cls.objects.create(
+            organization=organization,
+            event_type=event_type,
+            capture_source=capture_source,
+            source_reference=source_reference,
+            note=note,
+            snapshot_json=organization.build_snapshot(),
+            metadata_json=metadata or {},
+            recorded_by=recorded_by,
+        )
+
     def save(self, *args, **kwargs):
         if self.pk is not None:
             raise ValidationError("Organization records are immutable and cannot be updated.")

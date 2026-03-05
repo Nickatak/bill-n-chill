@@ -2,13 +2,13 @@
 
 /**
  * Controlled form for creating a new project under a specific customer.
- * Rendered inside a modal dialog from ContactsConsole. Allows the user to
+ * Rendered inside a modal dialog from CustomersConsole. Allows the user to
  * set a project name, optional site address, and initial status (prospect/active).
  */
 
 import { FormEventHandler } from "react";
 
-import styles from "./contacts-console.module.css";
+import styles from "./customers-console.module.css";
 
 type ProjectStatusValue = "prospect" | "active";
 

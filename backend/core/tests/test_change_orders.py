@@ -472,7 +472,7 @@ class ChangeOrderTests(TestCase):
         )
 
         with patch(
-            "core.views.change_orders.change_orders._record_financial_audit_event",
+            "core.models.financial_auditing.financial_audit_event.FinancialAuditEvent.record",
             side_effect=RuntimeError("capture-write-failed"),
         ):
             with self.assertRaises(RuntimeError):

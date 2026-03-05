@@ -431,7 +431,7 @@ class InvoiceTests(TestCase):
 
     def test_invoice_create_rolls_back_when_status_event_write_fails(self):
         with patch(
-            "core.views.accounts_receivable.invoices._record_invoice_status_event",
+            "core.models.financial_auditing.invoice_status_event.InvoiceStatusEvent.record",
             side_effect=RuntimeError("capture-write-failed"),
         ):
             with self.assertRaises(RuntimeError):

@@ -117,6 +117,44 @@ class VendorBill(models.Model):
         if errors:
             raise ValidationError(errors)
 
+    def build_snapshot(self) -> dict:
+        """Point-in-time snapshot for immutable audit records."""
+        allocation_rows = list(
+            self.allocations.select_related("budget_line", "budget_line__cost_code")
+            .order_by("id")
+        )
+        return {
+            "vendor_bill": {
+                "id": self.id,
+                "project_id": self.project_id,
+                "vendor_id": self.vendor_id,
+                "bill_number": self.bill_number,
+                "status": self.status,
+                "received_date": self.received_date.isoformat() if self.received_date else None,
+                "issue_date": self.issue_date.isoformat() if self.issue_date else None,
+                "due_date": self.due_date.isoformat() if self.due_date else None,
+                "scheduled_for": self.scheduled_for.isoformat() if self.scheduled_for else None,
+                "subtotal": str(self.subtotal),
+                "tax_amount": str(self.tax_amount),
+                "shipping_amount": str(self.shipping_amount),
+                "total": str(self.total),
+                "balance_due": str(self.balance_due),
+                "notes": self.notes,
+            },
+            "allocations": [
+                {
+                    "vendor_bill_allocation_id": row.id,
+                    "budget_line_id": row.budget_line_id,
+                    "cost_code_id": row.budget_line.cost_code_id,
+                    "cost_code_code": row.budget_line.cost_code.code,
+                    "cost_code_name": row.budget_line.cost_code.name,
+                    "amount": str(row.amount),
+                    "note": row.note,
+                }
+                for row in allocation_rows
+            ],
+        }
+
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)

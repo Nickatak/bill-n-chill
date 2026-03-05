@@ -13,60 +13,61 @@ from core.utils.runtime_metadata import (
     get_app_revision,
     get_last_data_reset_at,
 )
-from core.views.helpers import (
-    _ensure_primary_membership,
-    _record_organization_membership_record,
-    _resolve_user_capabilities,
-    _resolve_user_role,
-)
+from core.user_helpers import _ensure_membership, _resolve_user_capabilities
 
 User = get_user_model()
 
 
-def _auth_response_payload(user, membership):
+# ── helpers ──
+
+
+def _build_auth_response_payload(user, membership):
     """Build the standard auth response payload dict."""
     return {
         "token": Token.objects.get_or_create(user=user)[0].key,
         "user": {
             "id": user.id,
             "email": user.email,
-            "role": _resolve_user_role(user),
+            "role": membership.role,
         },
         "organization": {
             "id": membership.organization_id,
             "display_name": membership.organization.display_name,
         },
-        "capabilities": _resolve_user_capabilities(user),
+        "capabilities": _resolve_user_capabilities(user, membership=membership),
     }
 
 
-def _validate_invite_token(token_str):
-    """Look up and validate an invite token. Returns (invite, error_response) tuple."""
+_INVITE_ERROR_MAP = {
+    "not_found": (404, "not_found", "Invite not found."),
+    "consumed": (410, "consumed", "This invite has already been used."),
+    "expired": (410, "expired", "This invite has expired. Ask the org admin to send a new one."),
+}
+
+
+def _lookup_valid_invite(token_str):
+    """Look up a valid invite token, returning (invite, error_response).
+
+    Domain validation (exists / consumed / expired) lives on the model via
+    OrganizationInvite.lookup_valid(). This helper maps those results to
+    HTTP responses for view consumption.
+    """
     if not token_str:
         return None, Response(
             {"error": {"code": "validation_error", "message": "invite_token is required.", "fields": {}}},
             status=400,
         )
-    try:
-        invite = OrganizationInvite.objects.select_related(
-            "organization", "role_template"
-        ).get(token=token_str)
-    except OrganizationInvite.DoesNotExist:
+    invite, error_code = OrganizationInvite.lookup_valid(token_str)
+    if error_code:
+        status, code, message = _INVITE_ERROR_MAP[error_code]
         return None, Response(
-            {"error": {"code": "not_found", "message": "Invite not found.", "fields": {}}},
-            status=404,
-        )
-    if invite.is_consumed:
-        return None, Response(
-            {"error": {"code": "consumed", "message": "This invite has already been used.", "fields": {}}},
-            status=410,
-        )
-    if invite.is_expired:
-        return None, Response(
-            {"error": {"code": "expired", "message": "This invite has expired. Ask the org admin to send a new one.", "fields": {}}},
-            status=410,
+            {"error": {"code": code, "message": message, "fields": {}}},
+            status=status,
         )
     return invite, None
+
+
+# ── views ──
 
 
 @api_view(["GET"])
@@ -148,9 +149,9 @@ def login_view(request):
     serializer = LoginSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     user = serializer.validated_data["user"]
-    membership = _ensure_primary_membership(user)
+    membership = _ensure_membership(user)
 
-    return Response({"data": _auth_response_payload(user, membership)})
+    return Response({"data": _build_auth_response_payload(user, membership)})
 
 
 @api_view(["POST"])
@@ -200,7 +201,7 @@ def register_view(request):
 
     # Flow B: invited registration
     if invite_token:
-        invite, error_response = _validate_invite_token(invite_token)
+        invite, error_response = _lookup_valid_invite(invite_token)
         if error_response:
             return error_response
 
@@ -226,7 +227,7 @@ def register_view(request):
                 role_template=invite.role_template,
                 status=OrganizationMembership.Status.ACTIVE,
             )
-            _record_organization_membership_record(
+            OrganizationMembershipRecord.record(
                 membership=membership,
                 event_type=OrganizationMembershipRecord.EventType.CREATED,
                 capture_source=OrganizationMembershipRecord.CaptureSource.MANUAL_UI,
@@ -243,13 +244,13 @@ def register_view(request):
 
         # Reload with select_related for response
         membership = OrganizationMembership.objects.select_related("organization").get(id=membership.id)
-        return Response({"data": _auth_response_payload(user, membership)}, status=201)
+        return Response({"data": _build_auth_response_payload(user, membership)}, status=201)
 
     # Flow A: standard registration (no invite)
     user = User.objects.create_user(username=email, email=email, password=password)
-    membership = _ensure_primary_membership(user)
+    membership = _ensure_membership(user)
 
-    return Response({"data": _auth_response_payload(user, membership)}, status=201)
+    return Response({"data": _build_auth_response_payload(user, membership)}, status=201)
 
 
 @api_view(["GET"])
@@ -287,22 +288,8 @@ def me_view(request):
       - `backend/core/tests/test_health_auth.py::test_me_self_heals_legacy_user_missing_membership`
     """
     user = request.user
-    membership = _ensure_primary_membership(user)
-    # me_view returns the same shape minus the token wrapper for backwards compat
-    return Response(
-        {
-            "data": {
-                "id": user.id,
-                "email": user.email,
-                "role": _resolve_user_role(user),
-                "organization": {
-                    "id": membership.organization_id,
-                    "display_name": membership.organization.display_name,
-                },
-                "capabilities": _resolve_user_capabilities(user),
-            }
-        }
-    )
+    membership = _ensure_membership(user)
+    return Response({"data": _build_auth_response_payload(user, membership)})
 
 
 @api_view(["GET"])
@@ -326,7 +313,7 @@ def verify_invite_view(request, token):
     - Test anchors:
       - `backend/core/tests/test_invites.py::test_verify_invite_*`
     """
-    invite, error_response = _validate_invite_token(token)
+    invite, error_response = _lookup_valid_invite(token)
     if error_response:
         return error_response
 
@@ -393,7 +380,7 @@ def accept_invite_view(request):
             status=400,
         )
 
-    invite, error_response = _validate_invite_token(invite_token)
+    invite, error_response = _lookup_valid_invite(invite_token)
     if error_response:
         return error_response
 
@@ -423,7 +410,7 @@ def accept_invite_view(request):
         # Idempotent — consume token and return current context
         invite.consumed_at = timezone.now()
         invite.save(update_fields=["consumed_at"])
-        return Response({"data": _auth_response_payload(user, existing_membership)})
+        return Response({"data": _build_auth_response_payload(user, existing_membership)})
 
     # Move membership to new org
     with transaction.atomic():
@@ -437,7 +424,7 @@ def accept_invite_view(request):
             existing_membership.save(update_fields=[
                 "organization", "role", "role_template", "status", "updated_at",
             ])
-            _record_organization_membership_record(
+            OrganizationMembershipRecord.record(
                 membership=existing_membership,
                 event_type=OrganizationMembershipRecord.EventType.ROLE_CHANGED,
                 capture_source=OrganizationMembershipRecord.CaptureSource.MANUAL_UI,
@@ -459,7 +446,7 @@ def accept_invite_view(request):
                 role_template=invite.role_template,
                 status=OrganizationMembership.Status.ACTIVE,
             )
-            _record_organization_membership_record(
+            OrganizationMembershipRecord.record(
                 membership=membership,
                 event_type=OrganizationMembershipRecord.EventType.CREATED,
                 capture_source=OrganizationMembershipRecord.CaptureSource.MANUAL_UI,
@@ -477,4 +464,4 @@ def accept_invite_view(request):
 
     # Reload for response
     membership = OrganizationMembership.objects.select_related("organization").get(id=membership.id)
-    return Response({"data": _auth_response_payload(user, membership)})
+    return Response({"data": _build_auth_response_payload(user, membership)})

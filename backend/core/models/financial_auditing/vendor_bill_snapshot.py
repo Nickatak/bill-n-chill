@@ -52,6 +52,28 @@ class VendorBillSnapshot(models.Model):
     class Meta:
         ordering = ["-created_at", "-id"]
 
+    @classmethod
+    def record(
+        cls,
+        *,
+        vendor_bill,
+        capture_status: str,
+        previous_status: str,
+        acted_by,
+    ):
+        """Append an immutable snapshot row for a vendor-bill status transition."""
+        snapshot = vendor_bill.build_snapshot()
+        snapshot["decision_context"] = {
+            "capture_status": capture_status,
+            "previous_status": previous_status,
+        }
+        return cls.objects.create(
+            vendor_bill=vendor_bill,
+            capture_status=capture_status,
+            snapshot_json=snapshot,
+            acted_by=acted_by,
+        )
+
     def __str__(self) -> str:
         return f"VB-{self.vendor_bill_id} {self.capture_status}"
 

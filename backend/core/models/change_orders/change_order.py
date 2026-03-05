@@ -222,6 +222,58 @@ class ChangeOrder(models.Model):
         if errors:
             raise ValidationError(errors)
 
+    def build_snapshot(self) -> dict:
+        """Point-in-time snapshot for immutable audit records."""
+        from core.models.estimating.estimate import Estimate
+
+        origin_estimate_version = None
+        if self.origin_estimate_id is not None:
+            origin_estimate_version = (
+                Estimate.objects.filter(id=self.origin_estimate_id)
+                .values_list("version", flat=True)
+                .first()
+            )
+
+        line_rows = list(
+            self.line_items.select_related("budget_line", "budget_line__cost_code")
+            .order_by("id")
+        )
+
+        return {
+            "change_order": {
+                "id": self.id,
+                "project_id": self.project_id,
+                "family_key": self.family_key,
+                "revision_number": self.revision_number,
+                "title": self.title,
+                "status": self.status,
+                "amount_delta": str(self.amount_delta),
+                "days_delta": self.days_delta,
+                "reason": self.reason,
+                "terms_text": self.terms_text,
+                "origin_estimate_id": self.origin_estimate_id,
+                "origin_estimate_version": origin_estimate_version,
+                "previous_change_order_id": self.previous_change_order_id,
+                "approved_by_id": self.approved_by_id,
+                "approved_at": self.approved_at.isoformat() if self.approved_at else None,
+            },
+            "line_items": [
+                {
+                    "change_order_line_id": row.id,
+                    "budget_line_id": row.budget_line_id,
+                    "cost_code_id": row.budget_line.cost_code_id,
+                    "cost_code_code": row.budget_line.cost_code.code,
+                    "cost_code_name": row.budget_line.cost_code.name,
+                    "description": row.description,
+                    "line_type": row.line_type,
+                    "adjustment_reason": row.adjustment_reason,
+                    "amount_delta": str(row.amount_delta),
+                    "days_delta": row.days_delta,
+                }
+                for row in line_rows
+            ],
+        }
+
     def save(self, *args, **kwargs):
         update_fields = kwargs.get("update_fields")
         if not self.public_token:

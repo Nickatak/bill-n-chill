@@ -66,5 +66,20 @@ class OrganizationMembership(models.Model):
     class Meta:
         ordering = ["organization_id", "user_id"]
 
+    def build_snapshot(self) -> dict:
+        """Build an immutable point-in-time snapshot dict for audit records."""
+        return {
+            "organization_membership": {
+                "id": self.id,
+                "organization_id": self.organization_id,
+                "user_id": self.user_id,
+                "role": self.role,
+                "status": self.status,
+                "role_template_id": self.role_template_id,
+                "capability_flags_json": self.capability_flags_json or {},
+                "created_at": self.created_at.isoformat() if self.created_at else None,
+            }
+        }
+
     def __str__(self) -> str:
         return f"{self.user_id} -> {self.organization_id} ({self.role})"

@@ -9,13 +9,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import (
-    Budget,
-    Estimate,
-    EstimateStatusEvent,
-    FinancialAuditEvent,
-    Project,
-)
+from core.models import Estimate, EstimateStatusEvent
 from core.policies import get_estimate_policy_contract
 from core.serializers import (
     BudgetSerializer,
@@ -24,16 +18,22 @@ from core.serializers import (
     EstimateStatusEventSerializer,
     EstimateWriteSerializer,
 )
-from core.views.helpers import (
+from core.views.estimating.estimates_helpers import (
+    _activate_project_from_estimate_approval,
     _apply_estimate_lines_and_totals,
-    _create_budget_from_estimate,
-    _ensure_primary_membership,
+    _archive_estimate_family,
+    _build_public_estimate_decision_note,
+    _ensure_budget_from_approved_estimate,
+    _next_estimate_family_version,
+    _serialize_estimate,
+    _serialize_estimates,
+)
+from core.views.helpers import (
+    _capability_gate,
+    _ensure_membership,
     _organization_user_ids,
     _parse_request_bool,
-    _record_financial_audit_event,
-    _record_estimate_status_event,
     _resolve_organization_for_public_actor,
-    _capability_gate,
     _serialize_public_organization_context,
     _serialize_public_project_context,
     _validate_project_for_user,
@@ -61,21 +61,6 @@ def public_estimate_detail_view(request, public_token: str):
     serialized["project_context"] = _serialize_public_project_context(estimate.project)
     serialized["organization_context"] = _serialize_public_organization_context(organization)
     return Response({"data": serialized})
-
-
-def _build_public_estimate_decision_note(
-    *,
-    action_label: str,
-    note: str,
-    decider_name: str,
-    decider_email: str,
-) -> str:
-    actor_parts = [part for part in [decider_name.strip(), decider_email.strip()] if part]
-    actor_label = " / ".join(actor_parts) if actor_parts else "anonymous customer"
-    note_value = note.strip()
-    if note_value:
-        return f"{action_label} via public link by {actor_label}. {note_value}"
-    return f"{action_label} via public link by {actor_label}."
 
 
 @api_view(["POST"])
@@ -138,7 +123,7 @@ def public_estimate_decision_view(request, public_token: str):
     with transaction.atomic():
         estimate.status = next_status
         estimate.save(update_fields=["status", "updated_at"])
-        _record_estimate_status_event(
+        EstimateStatusEvent.record(
             estimate=estimate,
             from_status=previous_status,
             to_status=estimate.status,
@@ -200,210 +185,6 @@ def estimate_contract_view(_request):
     return Response({"data": get_estimate_policy_contract()})
 
 
-def _archive_estimate_family(*, project, user, title, exclude_ids, note):
-    normalized_title = (title or "").strip()
-    if not normalized_title:
-        return
-    actor_user_ids = _organization_user_ids(user)
-
-    candidates = (
-        Estimate.objects.filter(
-            project=project,
-            created_by_id__in=actor_user_ids,
-            title=normalized_title,
-        )
-        .exclude(id__in=exclude_ids)
-        .exclude(status=Estimate.Status.ARCHIVED)
-    )
-    for candidate in candidates:
-        if not Estimate.is_transition_allowed(
-            current_status=candidate.status,
-            next_status=Estimate.Status.ARCHIVED,
-        ):
-            continue
-        previous_status = candidate.status
-        candidate.status = Estimate.Status.ARCHIVED
-        candidate.save(update_fields=["status", "updated_at"])
-        _record_estimate_status_event(
-            estimate=candidate,
-            from_status=previous_status,
-            to_status=Estimate.Status.ARCHIVED,
-            note=note,
-            changed_by=user,
-        )
-
-
-def _next_estimate_family_version(*, project, user, title):
-    normalized_title = (title or "").strip()
-    actor_user_ids = _organization_user_ids(user)
-    latest = (
-        Estimate.objects.filter(
-            project=project,
-            created_by_id__in=actor_user_ids,
-            title=normalized_title,
-        )
-        .order_by("-version")
-        .first()
-    )
-    return (latest.version + 1) if latest else 1
-
-
-def _active_budget_for_project(*, project, actor_user_ids):
-    return (
-        Budget.objects.filter(
-            project=project,
-            created_by_id__in=actor_user_ids,
-            status=Budget.Status.ACTIVE,
-        )
-        .select_related("source_estimate")
-        .order_by("-created_at", "-id")
-        .first()
-    )
-
-
-def _estimate_financial_baseline_context(*, project, actor_user_ids):
-    budgets = (
-        Budget.objects.filter(project=project, created_by_id__in=actor_user_ids)
-        .select_related("source_estimate")
-        .order_by("-created_at", "-id")
-    )
-    financial_baseline_status_by_estimate_id: dict[int, str] = {}
-    active_budget = None
-    for budget in budgets:
-        source_estimate_id = budget.source_estimate_id
-        if source_estimate_id is None:
-            continue
-        if budget.status == Budget.Status.ACTIVE:
-            if source_estimate_id not in financial_baseline_status_by_estimate_id:
-                financial_baseline_status_by_estimate_id[source_estimate_id] = "active"
-            if active_budget is None:
-                active_budget = budget
-            continue
-        if source_estimate_id not in financial_baseline_status_by_estimate_id:
-            financial_baseline_status_by_estimate_id[source_estimate_id] = "superseded"
-    return {
-        "financial_baseline_status_by_estimate_id": financial_baseline_status_by_estimate_id,
-        "active_budget_id": active_budget.id if active_budget else None,
-        "active_budget_source_estimate_id": active_budget.source_estimate_id if active_budget else None,
-        "active_budget_source_estimate_version": (
-            active_budget.source_estimate.version
-            if active_budget and active_budget.source_estimate_id
-            else None
-        ),
-    }
-
-
-def _serialize_estimate(*, estimate, actor_user_ids):
-    context = _estimate_financial_baseline_context(
-        project=estimate.project,
-        actor_user_ids=actor_user_ids,
-    )
-    return EstimateSerializer(estimate, context=context).data
-
-
-def _serialize_estimates(*, estimates, project, actor_user_ids):
-    context = _estimate_financial_baseline_context(
-        project=project,
-        actor_user_ids=actor_user_ids,
-    )
-    return EstimateSerializer(estimates, many=True, context=context).data
-
-
-def _sync_project_contract_baseline_if_unset(*, estimate):
-    project = estimate.project
-    if project.contract_value_original != Decimal("0") or project.contract_value_current != Decimal("0"):
-        return False
-    project.contract_value_original = estimate.grand_total
-    project.contract_value_current = estimate.grand_total
-    project.save(update_fields=["contract_value_original", "contract_value_current", "updated_at"])
-    return True
-
-
-def _activate_project_from_estimate_approval(*, estimate, actor, note: str):
-    project = estimate.project
-    if project.status not in (Project.Status.PROSPECT, Project.Status.ON_HOLD):
-        return False
-    if not Project.is_transition_allowed(project.status, Project.Status.ACTIVE):
-        return False
-
-    previous_status = project.status
-    project.status = Project.Status.ACTIVE
-    project.save(update_fields=["status", "updated_at"])
-    _record_financial_audit_event(
-        project=project,
-        event_type="project_status_changed",
-        object_type="project",
-        object_id=project.id,
-        from_status=previous_status,
-        to_status=project.status,
-        note=note,
-        created_by=actor,
-        metadata={
-            "trigger": "estimate_approved",
-            "estimate_id": estimate.id,
-            "estimate_version": estimate.version,
-        },
-    )
-    return True
-
-
-def _ensure_budget_from_approved_estimate(
-    *,
-    estimate,
-    user,
-    note: str,
-    allow_supersede: bool = False,
-):
-    _sync_project_contract_baseline_if_unset(estimate=estimate)
-    actor_user_ids = _organization_user_ids(user)
-    existing = (
-        Budget.objects.filter(source_estimate=estimate, created_by_id__in=actor_user_ids)
-        .select_related("source_estimate")
-        .prefetch_related("line_items", "line_items__cost_code")
-        .order_by("-created_at", "-id")
-        .first()
-    )
-    if existing and existing.status == Budget.Status.ACTIVE:
-        return existing, "already_converted"
-
-    active_budget = _active_budget_for_project(project=estimate.project, actor_user_ids=actor_user_ids)
-    active_budget_conflict = (
-        active_budget is not None
-        and active_budget.source_estimate_id is not None
-        and active_budget.source_estimate_id != estimate.id
-    )
-    if active_budget_conflict and not allow_supersede:
-        return active_budget, "requires_supersede"
-
-    budget = _create_budget_from_estimate(estimate=estimate, user=user)
-    budget = (
-        Budget.objects.filter(id=budget.id)
-        .select_related("source_estimate")
-        .prefetch_related("line_items", "line_items__cost_code")
-        .get()
-    )
-    _record_financial_audit_event(
-        project=estimate.project,
-        event_type=FinancialAuditEvent.EventType.BUDGET_CONVERTED,
-        object_type="budget",
-        object_id=budget.id,
-        to_status=budget.status,
-        amount=estimate.grand_total,
-        note=note,
-        created_by=user,
-        metadata={
-            "estimate_id": estimate.id,
-            "estimate_version": estimate.version,
-            "activation_mode": "supersede_active"
-            if active_budget_conflict and allow_supersede
-            else "initial_or_no_conflict",
-        },
-    )
-    if active_budget_conflict and allow_supersede:
-        return budget, "superseded_and_converted"
-    return budget, "converted"
-
-
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_estimates_view(request, project_id: int):
@@ -415,7 +196,7 @@ def project_estimates_view(request, project_id: int):
     - Applies duplicate-submit suppression window and archives superseded family rows after create.
     """
     actor_user_ids = _organization_user_ids(request.user)
-    membership = _ensure_primary_membership(request.user)
+    membership = _ensure_membership(request.user)
     organization = membership.organization
     project = _validate_project_for_user(project_id, request.user)
     if not project:
@@ -630,7 +411,7 @@ def project_estimates_view(request, project_id: int):
         )
 
     estimate.refresh_from_db()
-    _record_estimate_status_event(
+    EstimateStatusEvent.record(
         estimate=estimate,
         from_status=None,
         to_status=estimate.status,
@@ -851,7 +632,7 @@ def estimate_detail_view(request, estimate_id: int):
     )
     budget_conversion_meta = {}
     if should_record_status_event:
-        _record_estimate_status_event(
+        EstimateStatusEvent.record(
             estimate=estimate,
             from_status=previous_status,
             to_status=estimate.status,
@@ -957,7 +738,7 @@ def estimate_clone_version_view(request, estimate_id: int):
         )
 
     cloned.refresh_from_db()
-    _record_estimate_status_event(
+    EstimateStatusEvent.record(
         estimate=cloned,
         from_status=None,
         to_status=cloned.status,
@@ -967,7 +748,7 @@ def estimate_clone_version_view(request, estimate_id: int):
     if estimate.status == Estimate.Status.SENT:
         estimate.status = Estimate.Status.REJECTED
         estimate.save(update_fields=["status", "updated_at"])
-        _record_estimate_status_event(
+        EstimateStatusEvent.record(
             estimate=estimate,
             from_status=Estimate.Status.SENT,
             to_status=Estimate.Status.REJECTED,
@@ -1077,7 +858,7 @@ def estimate_duplicate_view(request, estimate_id: int):
         )
 
     duplicated.refresh_from_db()
-    _record_estimate_status_event(
+    EstimateStatusEvent.record(
         estimate=duplicated,
         from_status=None,
         to_status=duplicated.status,

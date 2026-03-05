@@ -1,6 +1,5 @@
 from datetime import timedelta
 
-from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from core.tests.common import *
 from django.utils import timezone
@@ -1295,10 +1294,24 @@ class RoleHardeningTests(TestCase):
         self.viewer_token, _ = Token.objects.get_or_create(user=self.viewer_user)
         self.bookkeeping_token, _ = Token.objects.get_or_create(user=self.bookkeeping_user)
 
-        viewer_group, _ = Group.objects.get_or_create(name="viewer")
-        bookkeeping_group, _ = Group.objects.get_or_create(name="bookkeeping")
-        self.viewer_user.groups.add(viewer_group)
-        self.bookkeeping_user.groups.add(bookkeeping_group)
+        org = Organization.objects.create(
+            display_name="Role Hardening Org", created_by=self.owner_user,
+        )
+        OrganizationMembership.objects.create(
+            organization=org, user=self.owner_user,
+            role=OrganizationMembership.Role.OWNER,
+            status=OrganizationMembership.Status.ACTIVE,
+        )
+        OrganizationMembership.objects.create(
+            organization=org, user=self.viewer_user,
+            role=OrganizationMembership.Role.VIEWER,
+            status=OrganizationMembership.Status.ACTIVE,
+        )
+        OrganizationMembership.objects.create(
+            organization=org, user=self.bookkeeping_user,
+            role=OrganizationMembership.Role.BOOKKEEPING,
+            status=OrganizationMembership.Status.ACTIVE,
+        )
 
         self.viewer_customer = Customer.objects.create(
             display_name="Viewer Owner",

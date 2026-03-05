@@ -9,12 +9,25 @@ class Customer(models.Model):
     """Client/owner account that owns one or more projects.
 
     Workflow role:
-    - Canonical contact-representation object used by the Contacts management page.
+    - Canonical customer record used by the Customers management page.
     - Usually created/reused during lead conversion.
     - Serves as the customer anchor for projects and owner invoices.
 
+    Tenant isolation:
+    - Customer has no direct ``organization_id`` FK.  Org scoping is resolved
+      indirectly: ``created_by`` → ``OrganizationMembership`` → organization.
+      Every org-scoped query filters on
+      ``created_by_id__in=_organization_user_ids(user)`` to collect records
+      owned by any member of the caller's organization.
+    - This means two organizations can each have a customer with the same
+      phone/email and they remain naturally isolated — no cross-org leakage
+      because the user-ID sets never overlap.
+    - Trade-off: every scoped query must resolve the membership list first
+      (one extra query).  A direct ``organization_id`` FK would be simpler but
+      would require a migration across all org-scoped models.  Acceptable for
+      current scale; revisit if the membership fan-out becomes a bottleneck.
+
     Current policy:
-    - Customer records are user-scoped via `created_by` in current implementation.
     - `billing_address` is billing-only and intentionally separate from
       project-level `site_address`/service location data.
     - Deduplication/reuse behavior is handled by intake conversion logic, not by
@@ -57,6 +70,22 @@ class Customer(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
+
+    def build_snapshot(self) -> dict:
+        """Point-in-time snapshot for immutable audit records."""
+        return {
+            "customer": {
+                "id": self.id,
+                "display_name": self.display_name,
+                "email": self.email,
+                "phone": self.phone,
+                "billing_address": self.billing_address,
+                "is_archived": self.is_archived,
+                "created_by_id": self.created_by_id,
+                "created_at": self.created_at.isoformat() if self.created_at else None,
+                "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            }
+        }
 
     def __str__(self) -> str:
         return self.display_name

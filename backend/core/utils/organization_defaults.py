@@ -17,8 +17,8 @@ DEFAULT_CHANGE_ORDER_TERMS = (
 )
 
 
-def build_org_bootstrap_defaults(*, display_name: str, owner_email: str = "") -> dict[str, Any]:
-    """Build bootstrap defaults for a freshly created organization."""
+def build_org_defaults(*, owner_email: str = "") -> dict[str, Any]:
+    """Build the default field values for a new or backfilled organization."""
 
     resolved_email = (owner_email or "").strip()
     return {
@@ -38,8 +38,7 @@ def apply_missing_org_defaults(*, organization, owner_email: str = "") -> list[s
     """
 
     changed_fields: list[str] = []
-    defaults = build_org_bootstrap_defaults(
-        display_name=organization.display_name,
+    defaults = build_org_defaults(
         owner_email=owner_email,
     )
 

@@ -61,10 +61,14 @@ Source of truth: `backend/core/urls.py`.
 ├── auth/
 │   ├── login/
 │   ├── register/
-│   └── me/
+│   ├── me/
+│   ├── verify-invite/{token}/
+│   └── accept-invite/
 ├── organization/
-│   └── memberships/
-│       └── {membership_id}/
+│   ├── memberships/
+│   │   └── {membership_id}/
+│   └── invites/
+│       └── {invite_id}/
 ├── customers/
 │   ├── quick-add/
 │   ├── {customer_id}/
@@ -214,6 +218,21 @@ bill-n-chill currently uses DRF token authentication for API access.
     - `role` (`owner` | `pm` | `bookkeeping` | `worker` | `viewer`)
     - `organization` (`id`, `display_name`)
     - `capabilities` (resolved capability flags dict — same shape as login)
+- `GET /api/v1/auth/verify-invite/{token}/`
+  - No auth required (public endpoint).
+  - Validates an invite token and returns invite context for the registration/accept-invite UI.
+  - Response includes:
+    - `organization_name`
+    - `email`
+    - `role`
+    - `is_existing_user` (boolean — determines Flow B vs Flow C)
+  - Error cases: expired token (404), already-used token (404).
+- `POST /api/v1/auth/accept-invite/`
+  - No auth required (unauthenticated endpoint for existing users).
+  - Flow C: existing user accepts an invite to join a different organization.
+  - Body: `token`, `password` (confirmation to prevent forced org-switch attacks).
+  - Success response: same shape as login (token, user, organization, capabilities).
+  - Safety: password confirmation prevents malicious invite-link org-switching.
 - Auth bootstrap audit behavior:
   - if a user has no active org membership, auth self-heal creates an `Organization` and `OrganizationMembership`
   - the bootstrap write appends immutable `OrganizationRecord(event_type=created, capture_source=auth_bootstrap)`
@@ -243,14 +262,13 @@ All write endpoints are gated by capability checks, not role strings.
   customers:        view, create, edit, disable
   cost_codes:       view, create, edit, disable
   vendors:          view, create, edit, disable
-  budgets:          view
+  budgets:          view, edit
   org_identity:     view, edit
   org_presets:      view, edit
   users:            view, invite, edit_role, disable
   financial_audit:  view
+  accounting_sync:  view, create, retry
   ```
-- See `docs/meta/rbac-design.md` for the full role→capability permission matrix.
-- Legacy: `_role_gate_error_payload` still exists for backward compatibility but is no longer used by any active endpoint.
 
 ## Auditability and Traceability Standards
 
@@ -302,6 +320,23 @@ This section defines endpoint-by-endpoint request/response, validation, and work
     - last-active-owner removal blocked
   - Audit behavior:
     - appends immutable `OrganizationMembershipRecord` for role/status changes.
+
+- `GET /api/v1/organization/invites/`
+  - Auth required
+  - Capability gate: `users.invite`
+  - Returns pending (unexpired, unused) invites for the current organization.
+
+- `POST /api/v1/organization/invites/`
+  - Auth required
+  - Capability gate: `users.invite`
+  - Body: `email`, `role`
+  - Creates a single-use invite token with 24-hour expiry.
+  - Duplicate guard: rejects if a pending invite already exists for the same email in the same org.
+
+- `DELETE /api/v1/organization/invites/{invite_id}/`
+  - Auth required
+  - Capability gate: `users.invite`
+  - Revokes a pending invite.
 
 ## Customer Intake (INT-01)
 
@@ -697,7 +732,7 @@ CO-02 extends existing CO endpoints with propagation behavior.
   - Auth required
   - Creates a new invoice in `draft` with:
     - `issue_date` (optional; defaults to today)
-    - `due_date` (optional; defaults to `issue_date + organization.invoice_default_due_days`)
+    - `due_date` (optional; defaults to `issue_date + organization.default_invoice_due_delta`)
     - `sender_name` (optional; defaults to org invoice sender name/display name)
     - `sender_email` (optional; defaults to org invoice sender email)
     - `sender_address` (optional; defaults to org invoice sender address)

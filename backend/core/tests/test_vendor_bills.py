@@ -228,7 +228,7 @@ class VendorBillTests(TestCase):
 
     def test_vendor_bill_create_rolls_back_when_audit_write_fails(self):
         with patch(
-            "core.views.accounts_payable.vendor_bills._record_financial_audit_event",
+            "core.models.financial_auditing.financial_audit_event.FinancialAuditEvent.record",
             side_effect=RuntimeError("capture-write-failed"),
         ):
             with self.assertRaises(RuntimeError):
