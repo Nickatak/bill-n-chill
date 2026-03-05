@@ -125,6 +125,7 @@ export function AppToolbar() {
           href="/ops/organization"
           className={`${styles.button} ${isOrganizationPath ? styles.buttonActive : ""}`}
           title={`Organization: ${organization.displayName}`}
+          data-onboarding-target="organization"
         >
           {organization.displayName} Organization (WIP)
         </Link>

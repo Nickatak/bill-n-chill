@@ -9,6 +9,7 @@
 
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { useSharedSessionAuth } from "@/features/session/use-shared-session";
+import { GuideArrowOverlay } from "@/shared/onboarding/guide-arrow-overlay";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import styles from "./page.module.css";
@@ -75,6 +76,7 @@ export function OnboardingChecklist() {
   const { token } = useSharedSessionAuth();
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [activeGuideStep, setActiveGuideStep] = useState<string | null>(null);
 
   const checkProgress = useCallback(async () => {
     if (!token) return;
@@ -138,7 +140,13 @@ export function OnboardingChecklist() {
         {STEPS.map((step, index) => {
           const isCompleted = completedSteps.has(step.key);
           return (
-            <li key={step.key} className={`${styles.step} ${isCompleted ? styles.stepCompleted : ""}`}>
+            <li
+              key={step.key}
+              className={`${styles.step} ${isCompleted ? styles.stepCompleted : ""}`}
+              data-onboarding-step={step.key}
+              onMouseEnter={() => setActiveGuideStep(step.key)}
+              onMouseLeave={() => setActiveGuideStep(null)}
+            >
               <span className={styles.stepNumber}>{isCompleted ? "\u2713" : index + 1}</span>
               <div className={styles.stepContent}>
                 <h3 className={styles.stepLabel}>{step.label}</h3>
@@ -151,6 +159,7 @@ export function OnboardingChecklist() {
           );
         })}
       </ol>
+      <GuideArrowOverlay activeStep={activeGuideStep} />
     </div>
   );
 }

@@ -16,6 +16,12 @@ import { isRouteActive, workflowRoutes } from "../nav-routes";
 import styles from "./workflow-navbar.module.css";
 import toolbar from "../app-toolbar/app-toolbar.module.css";
 
+/** Map workflow route hrefs to onboarding target names for guide arrows. */
+const ONBOARDING_TARGETS: Record<string, string> = {
+  "/customers": "customers",
+  "/projects": "projects",
+};
+
 /**
  * Render the primary workflow step navbar.
  *
@@ -125,6 +131,7 @@ export function WorkflowNavbar() {
                     className={`${styles.link} ${styles.dropdownSummary} ${
                       isBillingPath ? styles.linkActive : ""
                     }`}
+                    data-onboarding-target="billing"
                     aria-haspopup="menu"
                     aria-expanded={isBillingOpen}
                     onClick={() =>
@@ -169,11 +176,13 @@ export function WorkflowNavbar() {
             }
 
             const isActive = isRouteActive(pathname, route);
+            const onboardingTarget = ONBOARDING_TARGETS[route.href];
             return (
               <Link
                 key={route.href}
                 href={route.href}
                 className={`${styles.link} ${isActive ? styles.linkActive : ""}`}
+                {...(onboardingTarget ? { "data-onboarding-target": onboardingTarget } : {})}
               >
                 {route.label}
               </Link>

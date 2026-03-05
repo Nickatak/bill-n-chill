@@ -1,0 +1,39 @@
+/* SVG overlay for onboarding guide arrows — desktop only. */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 950;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.arrowPath {
+  stroke: var(--accent);
+  stroke-width: 2;
+  fill: none;
+  opacity: 0.8;
+  transition:
+    stroke-dashoffset 350ms ease-out,
+    opacity 200ms ease-out;
+}
+
+.arrowhead {
+  fill: var(--accent);
+  opacity: 0.8;
+}
+
+/* Applied via JS to the nav element the arrow points at. */
+.targetHighlight {
+  background: var(--accent-light) !important;
+  border-radius: var(--radius-sm);
+  transition: background 200ms ease;
+}
+
+@media (max-width: 700px) {
+  .overlay {
+    display: none;
+  }
+}
