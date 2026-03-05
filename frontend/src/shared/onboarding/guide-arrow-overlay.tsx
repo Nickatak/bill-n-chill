@@ -16,7 +16,7 @@ const STEP_TARGETS: Record<string, string> = {
   project: "projects",
   estimate: "projects",
   send: "projects",
-  invoice: "billing",
+  invoice: "invoices",
 };
 
 /** Minimum viewport width for arrows to render (matches navbar hide breakpoint). */

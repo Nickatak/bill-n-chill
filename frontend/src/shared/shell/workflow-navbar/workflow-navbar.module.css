@@ -1,4 +1,4 @@
-/* Workflow navbar: fixed top nav pill row with billing dropdown. */
+/* Workflow navbar: fixed top nav pill row. */
 
 .nav {
   position: fixed;
@@ -61,39 +61,6 @@
   color: var(--text-on-accent);
 }
 
-.dropdownMenu {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.dropdownSummary {
-  appearance: none;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  color: var(--text-primary);
-  cursor: pointer;
-  font-family: inherit;
-  line-height: inherit;
-}
-
-.dropdownSummary::-webkit-details-marker {
-  display: none;
-}
-
-.dropdownList {
-  margin-top: 0;
-  min-width: 220px;
-}
-
-.dropdownListFloating {
-  position: fixed;
-  z-index: 1250;
-  left: 0;
-  top: 0;
-  right: auto;
-  width: 240px;
-}
 
 @media (max-width: 700px) {
   .nav {

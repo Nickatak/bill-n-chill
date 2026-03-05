@@ -190,11 +190,6 @@
   background: var(--accent);
 }
 
-.navLinkIndented {
-  padding-left: calc(var(--space-sm) + 14px);
-  font-weight: 500;
-}
-
 /* ── Action buttons ── */
 
 .actionButton {

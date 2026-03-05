@@ -10,8 +10,6 @@
 export type NavRoute = {
   href: string;
   label: string;
-  /** When set, the navbar renders a custom control instead of a plain link. */
-  kind?: "billing_menu";
   /** Pathnames that count as an exact active match. */
   exact?: string[];
   /** Pathname prefixes that count as an active match. */
@@ -43,13 +41,17 @@ export const workflowRoutes: NavRoute[] = [
   },
   {
     href: "/invoices",
-    label: "3 Billing",
-    kind: "billing_menu",
-    exact: ["/invoices", "/bills"],
+    label: "3 Invoices",
+    exact: ["/invoices"],
+  },
+  {
+    href: "/bills",
+    label: "4 Bills",
+    exact: ["/bills"],
   },
   {
     href: "/financials-auditing",
-    label: "4 Financials",
+    label: "5 Financials",
     exact: ["/financials-auditing"],
   },
 ];

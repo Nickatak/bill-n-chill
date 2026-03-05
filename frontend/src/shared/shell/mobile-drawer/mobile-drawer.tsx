@@ -31,43 +31,6 @@ function toggleTheme() {
   }
 }
 
-/**
- * Expand the billing_menu route into its two sub-links (Invoices, Bills).
- * All other routes pass through as-is. Returns a flat list of link items.
- */
-function expandedWorkflowLinks(pathname: string) {
-  const pathProjectMatch = pathname.match(/^\/projects\/(\d+)(?:\/|$)/);
-  const projectId = pathProjectMatch?.[1] ?? null;
-
-  const links: { href: string; label: string; indented?: boolean; active: boolean }[] = [];
-  for (const route of workflowRoutes) {
-    if (route.kind === "billing_menu") {
-      const billsHref = projectId
-        ? `/bills?project=${encodeURIComponent(projectId)}`
-        : "/bills";
-      links.push({
-        href: "/invoices",
-        label: "Invoices",
-        indented: true,
-        active: pathname === "/invoices",
-      });
-      links.push({
-        href: billsHref,
-        label: "Bills",
-        indented: true,
-        active: pathname === "/bills",
-      });
-    } else {
-      links.push({
-        href: route.href,
-        label: route.label,
-        active: isRouteActive(pathname, route),
-      });
-    }
-  }
-  return links;
-}
-
 export function MobileDrawer() {
   const pathname = usePathname() ?? "";
   const router = useRouter();
@@ -139,7 +102,6 @@ export function MobileDrawer() {
   }
 
   // Authenticated: full hamburger + drawer.
-  const workflowLinks = expandedWorkflowLinks(pathname);
   const isOrganizationPath = pathname === "/ops/organization";
 
   return (
@@ -179,14 +141,14 @@ export function MobileDrawer() {
 
             <div className={styles.drawerNav}>
               <span className={styles.sectionLabel}>Workflow</span>
-              {workflowLinks.map((link) => (
+              {workflowRoutes.map((route) => (
                 <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`${styles.navLink} ${link.active ? styles.navLinkActive : ""} ${link.indented ? styles.navLinkIndented : ""}`}
+                  key={route.href}
+                  href={route.href}
+                  className={`${styles.navLink} ${isRouteActive(pathname, route) ? styles.navLinkActive : ""}`}
                   onClick={() => setIsOpen(false)}
                 >
-                  {link.label}
+                  {route.label}
                 </Link>
               ))}
             </div>
