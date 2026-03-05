@@ -8,7 +8,7 @@
 "use client";
 
 import { isPublicDocumentRoute } from "@/features/session/public-routes";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef } from "react";
 import { clearClientSession } from "@/features/session/client-session";
 import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import Link from "next/link";
@@ -143,6 +143,7 @@ export function AppToolbar() {
                     className={`${styles.menuItem} ${isRouteActive(pathname, route) ? styles.menuItemActive : ""}`}
                     role="menuitem"
                     onClick={closeMenus}
+                    {...(route.href === "/ops/organization" ? { "data-onboarding-target": "organization-item" } : {})}
                   >
                     {route.label}
                   </Link>

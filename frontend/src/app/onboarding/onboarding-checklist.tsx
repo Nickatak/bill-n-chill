@@ -1,10 +1,12 @@
 "use client";
 
 /**
- * Guided onboarding checklist. Auto-detects progress by probing existing
- * list endpoints (customers, projects, invoices) and the session org profile.
- * Steps that can't be auto-detected yet remain unchecked until the user
- * navigates through them.
+ * Guided onboarding checklist with two workflow tracks:
+ * - Individual Contractors: org → customer → project → invoice (direct)
+ * - Remodelers / GCs: org → customer → project → estimate → send → invoice
+ *
+ * Auto-detects progress by probing list endpoints and localStorage flags.
+ * Tab selection persists to localStorage.
  */
 
 import { buildAuthHeaders } from "@/features/session/auth-headers";
@@ -20,9 +22,10 @@ type Step = {
   description: string;
   href: string;
   linkLabel: string;
+  optional?: boolean;
 };
 
-const STEPS: Step[] = [
+const SHARED_STEPS: Step[] = [
   {
     key: "organization",
     label: "Set up your organization",
@@ -44,6 +47,29 @@ const STEPS: Step[] = [
     href: "/projects",
     linkLabel: "Projects",
   },
+];
+
+const INDIVIDUAL_STEPS: Step[] = [
+  ...SHARED_STEPS,
+  {
+    key: "estimate",
+    label: "Build an estimate",
+    description: "Optional — formalize scope and pricing if the job needs a contract baseline.",
+    href: "/projects",
+    linkLabel: "Projects",
+    optional: true,
+  },
+  {
+    key: "invoice",
+    label: "Create an invoice",
+    description: "Invoice your customer directly for completed work — no estimate required.",
+    href: "/invoices",
+    linkLabel: "Invoices",
+  },
+];
+
+const REMODELER_STEPS: Step[] = [
+  ...SHARED_STEPS,
   {
     key: "estimate",
     label: "Build an estimate",
@@ -61,11 +87,15 @@ const STEPS: Step[] = [
   {
     key: "invoice",
     label: "Create an invoice",
-    description: "Bill against your contract. Line items pull from your approved estimate and budget.",
+    description: "Bill for your work. Invoice from your budget or add direct line items for simpler jobs.",
     href: "/invoices",
     linkLabel: "Invoices",
   },
 ];
+
+type WorkflowTab = "individual" | "remodeler";
+
+const TAB_KEY = "onboarding:workflow-tab";
 
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
@@ -77,6 +107,21 @@ export function OnboardingChecklist() {
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [activeGuideStep, setActiveGuideStep] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<WorkflowTab>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(TAB_KEY);
+      if (saved === "individual" || saved === "remodeler") return saved;
+    }
+    return "remodeler";
+  });
+
+  function switchTab(tab: WorkflowTab) {
+    setActiveTab(tab);
+    localStorage.setItem(TAB_KEY, tab);
+    setActiveGuideStep(null);
+  }
+
+  const steps = activeTab === "individual" ? INDIVIDUAL_STEPS : REMODELER_STEPS;
 
   const checkProgress = useCallback(async () => {
     if (!token) return;
@@ -123,12 +168,30 @@ export function OnboardingChecklist() {
     void checkProgress();
   }, [checkProgress, token]);
 
-  const completedCount = completedSteps.size;
-  const totalSteps = STEPS.length;
+  const requiredSteps = steps.filter((s) => !s.optional);
+  const completedCount = requiredSteps.filter((s) => completedSteps.has(s.key)).length;
+  const totalSteps = requiredSteps.length;
   const progressPercent = Math.round((completedCount / totalSteps) * 100);
 
   return (
     <div className={styles.checklist}>
+      <div className={styles.tabBar}>
+        <button
+          type="button"
+          className={`${styles.tab} ${activeTab === "individual" ? styles.tabActive : ""}`}
+          onClick={() => switchTab("individual")}
+        >
+          Individual Contractors
+        </button>
+        <button
+          type="button"
+          className={`${styles.tab} ${activeTab === "remodeler" ? styles.tabActive : ""}`}
+          onClick={() => switchTab("remodeler")}
+        >
+          Remodelers / GCs
+        </button>
+      </div>
+
       <div className={styles.progressBar}>
         <div className={styles.progressFill} style={{ width: `${progressPercent}%` }} />
       </div>
@@ -137,19 +200,22 @@ export function OnboardingChecklist() {
       </p>
 
       <ol className={styles.steps}>
-        {STEPS.map((step, index) => {
+        {steps.map((step, index) => {
           const isCompleted = completedSteps.has(step.key);
           return (
             <li
               key={step.key}
-              className={`${styles.step} ${isCompleted ? styles.stepCompleted : ""}`}
+              className={`${styles.step} ${isCompleted ? styles.stepCompleted : ""} ${step.optional ? styles.stepOptional : ""}`}
               data-onboarding-step={step.key}
               onMouseEnter={() => setActiveGuideStep(step.key)}
               onMouseLeave={() => setActiveGuideStep(null)}
             >
               <span className={styles.stepNumber}>{isCompleted ? "\u2713" : index + 1}</span>
               <div className={styles.stepContent}>
-                <h3 className={styles.stepLabel}>{step.label}</h3>
+                <h3 className={styles.stepLabel}>
+                  {step.label}
+                  {step.optional ? <span className={styles.optionalBadge}>Optional</span> : null}
+                </h3>
                 <p className={styles.stepDescription}>{step.description}</p>
                 <Link href={step.href} className={styles.stepLink}>
                   {step.linkLabel} &rarr;

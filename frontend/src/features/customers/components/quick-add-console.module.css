@@ -4,10 +4,7 @@
 }
 
 .introCard {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
   padding: var(--space-md);
-  background: var(--surface-secondary);
   display: grid;
   gap: 2px;
 }

@@ -13,8 +13,8 @@
 ### Functional
 4. [x] CSV `dry_run` string boolean bug — already fixed via `_parse_request_bool` helper
 5. [ ] Invite registration race auto-detect — depends on #8 (email verification), bundle together
-6. [ ] Direct invoicing (`DIRECT` line type) — designed (decision record exists), not implemented
-7. [ ] Invoice/CO rail pagination not built
+6. [x] Direct invoicing (`DIRECT` line type) — designed (decision record exists), not implemented
+7. [x] Invoice/CO rail pagination not built
 
 ### Security
 8. [ ] No email verification on registration

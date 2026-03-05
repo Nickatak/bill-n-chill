@@ -5,6 +5,38 @@
   gap: 14px;
 }
 
+/* ── Workflow tabs ────────────────────────────────────────────── */
+
+.tabBar {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+}
+
+.tab {
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.tab:hover {
+  color: var(--text-primary);
+}
+
+.tabActive {
+  color: var(--accent-text);
+  border-bottom-color: var(--accent);
+}
+
 /* ── Progress bar ─────────────────────────────────────────────── */
 
 .progressBar {
@@ -55,6 +87,15 @@
   background: var(--status-green-bg);
 }
 
+.stepOptional {
+  border-style: dashed;
+  opacity: 0.8;
+}
+
+.stepOptional .stepNumber {
+  border-style: dashed;
+}
+
 /* ── Step number circle ───────────────────────────────────────── */
 
 .stepNumber {
@@ -93,6 +134,19 @@
 
 .stepCompleted .stepLabel {
   color: var(--status-green-text);
+}
+
+.optionalBadge {
+  margin-left: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+  vertical-align: middle;
 }
 
 .stepDescription {

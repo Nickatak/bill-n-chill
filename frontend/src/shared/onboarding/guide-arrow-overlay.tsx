@@ -4,6 +4,9 @@
  * SVG overlay that draws animated arrows from onboarding step cards
  * to their corresponding navigation elements. Desktop only — hidden
  * when the viewport is too narrow for the navbar to be visible.
+ *
+ * The "organization" step is special: it opens the toolbar dropdown
+ * and points at the Organization menu item inside it.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -11,13 +14,16 @@ import styles from "./guide-arrow-overlay.module.css";
 
 /** Maps onboarding step keys to the data-onboarding-target values on nav elements. */
 const STEP_TARGETS: Record<string, string> = {
-  organization: "organization",
+  organization: "organization-item",
   customer: "customers",
   project: "projects",
   estimate: "projects",
   send: "projects",
   invoice: "invoices",
 };
+
+/** Steps that require opening the toolbar dropdown first. */
+const MENU_STEPS = new Set(["organization"]);
 
 /** Minimum viewport width for arrows to render (matches navbar hide breakpoint). */
 const MIN_WIDTH = 700;
@@ -65,6 +71,7 @@ export function GuideArrowOverlay({ activeStep }: Props) {
   const [arrow, setArrow] = useState<ArrowState>(null);
   const [isWide, setIsWide] = useState(false);
   const highlightedRef = useRef<Element | null>(null);
+  const openedMenuRef = useRef<HTMLDetailsElement | null>(null);
 
   // Track viewport width to hide arrows on mobile.
   useEffect(() => {
@@ -76,11 +83,15 @@ export function GuideArrowOverlay({ activeStep }: Props) {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  // Remove highlight class from previous target on cleanup.
+  // Remove highlight class and close any menu we opened.
   const clearHighlight = useCallback(() => {
     if (highlightedRef.current) {
       highlightedRef.current.classList.remove(styles.targetHighlight);
       highlightedRef.current = null;
+    }
+    if (openedMenuRef.current) {
+      openedMenuRef.current.open = false;
+      openedMenuRef.current = null;
     }
   }, []);
 
@@ -100,26 +111,53 @@ export function GuideArrowOverlay({ activeStep }: Props) {
     }
 
     const stepEl = document.querySelector(`[data-onboarding-step="${activeStep}"]`);
-    const targetEl = document.querySelector(`[data-onboarding-target="${targetName}"]`);
-
-    if (!stepEl || !targetEl) {
+    if (!stepEl) {
       setArrow(null);
       clearHighlight();
       return;
     }
 
-    const fromRect = stepEl.getBoundingClientRect();
-    const toRect = targetEl.getBoundingClientRect();
-    const path = computeArrowPath(fromRect, toRect);
+    const needsMenu = MENU_STEPS.has(activeStep);
 
-    setArrow({ path, pathLength: 0 });
+    // Use rAF so we run after React's cleanup of the previous effect
+    // (which closes any previously-opened menu).
+    const frameId = requestAnimationFrame(() => {
+      // For menu steps, open the dropdown first so the target is visible.
+      if (needsMenu) {
+        const menuEl = document.querySelector<HTMLDetailsElement>(
+          `[data-onboarding-target="organization"]`,
+        );
+        if (menuEl && !menuEl.open) {
+          menuEl.open = true;
+          openedMenuRef.current = menuEl;
+        }
+      }
 
-    // Highlight the target nav element.
-    clearHighlight();
-    targetEl.classList.add(styles.targetHighlight);
-    highlightedRef.current = targetEl;
+      // Wait another frame for the menu to lay out before measuring.
+      requestAnimationFrame(() => {
+        const targetEl = document.querySelector(`[data-onboarding-target="${targetName}"]`);
+        if (!targetEl) {
+          setArrow(null);
+          return;
+        }
+
+        const fromRect = stepEl.getBoundingClientRect();
+        const toRect = targetEl.getBoundingClientRect();
+        const path = computeArrowPath(fromRect, toRect);
+
+        setArrow({ path, pathLength: 0 });
+
+        // Highlight the target nav element.
+        if (highlightedRef.current) {
+          highlightedRef.current.classList.remove(styles.targetHighlight);
+        }
+        targetEl.classList.add(styles.targetHighlight);
+        highlightedRef.current = targetEl;
+      });
+    });
 
     return () => {
+      cancelAnimationFrame(frameId);
       clearHighlight();
     };
   }, [activeStep, isWide, clearHighlight]);

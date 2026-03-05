@@ -5,7 +5,7 @@
   inset: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 950;
+  z-index: 1250;
   pointer-events: none;
   overflow: visible;
 }
@@ -25,11 +25,14 @@
   opacity: 0.8;
 }
 
-/* Applied via JS to the nav element the arrow points at. */
+/* Applied via JS to the nav element the arrow points at.
+   Uses box-shadow instead of outline — outline gets clipped by
+   the navbar's overflow-x: auto container. */
 .targetHighlight {
-  background: var(--accent-light) !important;
+  background: var(--accent-lighter) !important;
+  box-shadow: 0 0 0 2px var(--accent) !important;
   border-radius: var(--radius-sm);
-  transition: background 200ms ease;
+  transition: background 200ms ease, box-shadow 200ms ease;
 }
 
 @media (max-width: 700px) {

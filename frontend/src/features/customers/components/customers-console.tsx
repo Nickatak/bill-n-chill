@@ -333,11 +333,6 @@ export function CustomersConsole() {
 
   return (
     <section className={styles.section}>
-      <header className={styles.intro}>
-        <h2>Customers</h2>
-        <p>Find customers quickly and jump directly to their project workspaces.</p>
-      </header>
-
       {/* Quick Add — collapsible intake form */}
       <div className={styles.quickAddSection}>
         <div className={styles.quickAddHeader}>

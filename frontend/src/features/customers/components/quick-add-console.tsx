@@ -103,7 +103,6 @@ export function QuickAddConsole() {
 
   return (
     <section className={styles.section}>
-      <h2>Quick Add Customer</h2>
       <div className={styles.introCard}>
         <p className={styles.introLead}>
           Add a customer in under a minute, then optionally start a project in the same step.
