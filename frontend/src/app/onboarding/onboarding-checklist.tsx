@@ -68,8 +68,11 @@ const STEPS: Step[] = [
 
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
+/** localStorage key set when the user visits the organization settings page. */
+export const ORG_VISITED_KEY = "onboarding:org-visited";
+
 export function OnboardingChecklist() {
-  const { token, organization } = useSharedSessionAuth();
+  const { token } = useSharedSessionAuth();
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
@@ -78,8 +81,8 @@ export function OnboardingChecklist() {
 
     const completed = new Set<string>();
 
-    // Organization: check if display name is set to something meaningful
-    if (organization?.displayName && organization.displayName !== "Organization") {
+    // Organization: marked complete when the user has visited the org settings page.
+    if (typeof window !== "undefined" && localStorage.getItem(ORG_VISITED_KEY)) {
       completed.add("organization");
     }
 
@@ -108,7 +111,7 @@ export function OnboardingChecklist() {
 
     setCompletedSteps(completed);
     setLoading(false);
-  }, [token, organization]);
+  }, [token]);
 
   useEffect(() => {
     if (!token) {

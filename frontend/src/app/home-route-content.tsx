@@ -40,8 +40,14 @@ export function HomeRouteContent({ health }: HomeRouteContentProps) {
         if (cancelled) return;
 
         if (res.ok && Array.isArray(payload.data) && payload.data.length === 0) {
-          router.replace("/ops/meta/help");
-          return;
+          // Only auto-redirect once. After the user has seen onboarding,
+          // let them navigate freely (they can always return via the nav).
+          const seen = localStorage.getItem("onboarding:seen");
+          if (!seen) {
+            localStorage.setItem("onboarding:seen", "1");
+            router.replace("/onboarding");
+            return;
+          }
         }
       } catch {
         // Network error — don't redirect, show normal home

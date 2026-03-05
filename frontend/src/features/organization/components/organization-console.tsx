@@ -159,6 +159,11 @@ export function OrganizationConsole() {
     [memberships],
   );
 
+  // Mark the onboarding "org visited" step as complete on mount.
+  useEffect(() => {
+    localStorage.setItem("onboarding:org-visited", "1");
+  }, []);
+
   // Fetch org profile and memberships in parallel on mount
   useEffect(() => {
     if (!hasSession) {

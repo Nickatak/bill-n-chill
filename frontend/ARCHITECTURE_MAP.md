@@ -33,7 +33,7 @@ This map defines how to trace behavior from route to feature code and how to com
 | --- | --- | --- |
 | `/` | `frontend/src/app/page.tsx` | `frontend/src/app/home-route-content.tsx` |
 | `/register` | `frontend/src/app/register/page.tsx` | `frontend/src/features/session/components/home-register-console.tsx` |
-| `/ops/meta/help` | `frontend/src/app/ops/meta/help/page.tsx` | route-local WIP help content |
+| `/onboarding` | `frontend/src/app/onboarding/page.tsx` | Onboarding checklist for new orgs |
 | `/projects` | `frontend/src/app/projects/page.tsx` | `frontend/src/features/projects/components/projects-console.tsx` |
 | `/projects/[projectId]/activity` | `frontend/src/app/projects/[projectId]/activity/page.tsx` | `frontend/src/features/projects/components/project-activity-console.tsx` |
 | `/projects/[projectId]/estimates` | `frontend/src/app/projects/[projectId]/estimates/page.tsx` | `frontend/src/features/estimates/components/estimates-console.tsx` |

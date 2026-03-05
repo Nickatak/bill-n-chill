@@ -127,10 +127,10 @@ const hierarchyRules: HierarchyRule[] = [
     ],
   },
   {
-    when: (pathname) => pathname === "/ops/meta/help",
+    when: (pathname) => pathname === "/onboarding",
     crumbs: [
       META_HUB_CRUMB,
-      { href: "/ops/meta/help", label: "Get Started" },
+      { href: "/onboarding", label: "Get Started" },
     ],
   },
 ];

@@ -63,7 +63,7 @@ export const opsMetaRoutes: NavRoute[] = [
   { href: "/customers", label: "Customers", exact: ["/customers"] },
   { href: "/cost-codes", label: "Cost Codes", exact: ["/cost-codes"], section: "Management" },
   { href: "/vendors", label: "Vendors", exact: ["/vendors"], section: "Management" },
-  { href: "/ops/meta/help", label: "Get Started", exact: ["/ops/meta/help"] },
+  { href: "/onboarding", label: "Get Started", exact: ["/onboarding"] },
 ];
 
 /**
