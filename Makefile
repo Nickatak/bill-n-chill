@@ -109,6 +109,7 @@ local-test-backend:
 
 local-test-frontend:
 	npm run lint --prefix frontend
+	npx --prefix frontend vitest run
 
 local-clean:
 	find frontend/.next -type f -delete 2>/dev/null || true

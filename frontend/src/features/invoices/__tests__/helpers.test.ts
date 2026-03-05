@@ -87,6 +87,18 @@ describe("emptyLine", () => {
     const result = emptyLine(1, "42");
     expect(result.budgetLineId).toBe("42");
   });
+
+  it("creates a direct line when lineType is direct", () => {
+    const result = emptyLine(1, "", "direct");
+    expect(result.lineType).toBe("direct");
+    expect(result.budgetLineId).toBe("");
+    expect(result.description).toBe("Direct invoice item");
+  });
+
+  it("ignores defaultBudgetLineId for direct lines", () => {
+    const result = emptyLine(1, "99", "direct");
+    expect(result.budgetLineId).toBe("");
+  });
 });
 
 // ---------------------------------------------------------------------------

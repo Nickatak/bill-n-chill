@@ -52,6 +52,8 @@ import {
   toInvoiceStatusPolicy,
 } from "../document-adapter";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
+import { useClientPagination } from "@/shared/hooks/use-client-pagination";
+import { PaginationControls } from "@/shared/components/pagination-controls";
 import styles from "./invoices-console.module.css";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import invoiceCreatorStyles from "@/shared/document-creator/invoice-creator.module.css";
@@ -336,6 +338,7 @@ export function InvoicesConsole() {
       return haystack.includes(invoiceNeedle);
     });
   }, [filteredInvoices, invoiceNeedle]);
+  const { page: invoicePage, totalPages: invoiceTotalPages, totalCount: invoiceTotalCount, paginatedItems: paginatedInvoices, setPage: setInvoicePage } = useClientPagination(searchedInvoices);
   const nextStatusOptions = useMemo(() => {
     if (!selectedInvoice) {
       return [] as string[];
@@ -878,7 +881,7 @@ export function InvoicesConsole() {
       }
       return sourceLines.map((line, index) => {
         const lineType: InvoiceLineInput["lineType"] =
-          line.line_type === "adjustment" ? "adjustment" : "scope";
+          line.line_type === "adjustment" ? "adjustment" : line.line_type === "direct" ? "direct" : "scope";
         const rawBudgetLineId = line.budget_line ? String(line.budget_line) : "";
         const budgetLineId =
           lineType === "scope"
@@ -972,9 +975,11 @@ export function InvoicesConsole() {
     if (billableLines.length > 0) {
       setLineItems(billableLines);
       setNextLineId(billableLines.length + 1);
+    } else if (options.length > 0) {
+      setLineItems([emptyLine(1, String(options[0].id))]);
+      setNextLineId(2);
     } else {
-      const defaultBudgetLineId = options[0] ? String(options[0].id) : "";
-      setLineItems([emptyLine(1, defaultBudgetLineId)]);
+      setLineItems([emptyLine(1, "", "direct")]);
       setNextLineId(2);
     }
 
@@ -987,6 +992,7 @@ export function InvoicesConsole() {
   function handleStartNewInvoiceDraft() {
     resetCreateDraft();
     setSuccessStatus("Started a new invoice draft.");
+    setCreatorFlashCount((c) => c + 1);
   }
 
   /** Create a new invoice or save an existing draft, depending on workspace context. */
@@ -1011,6 +1017,14 @@ export function InvoicesConsole() {
       )
     ) {
       setErrorStatus("Each adjustment line requires a reason.");
+      return;
+    }
+    if (
+      lineItems.some(
+        (line) => line.lineType === "direct" && !line.description.trim(),
+      )
+    ) {
+      setErrorStatus("Each direct line requires a description.");
       return;
     }
 
@@ -1192,29 +1206,61 @@ export function InvoicesConsole() {
   }
 
   /** Clone the selected invoice's line items into a fresh draft with a new invoice number. */
-  function handleDuplicateInvoiceIntoDraft() {
+  async function handleDuplicateInvoiceIntoDraft() {
     if (!selectedInvoice) {
       setErrorStatus("Select an invoice first.");
       return;
     }
+    const projectId = Number(selectedProjectId);
+    if (!projectId) {
+      setErrorStatus("Select a project first.");
+      return;
+    }
 
     const nextDraftLines = invoiceToWorkspaceLines(selectedInvoice);
-
     const nextIssueDate = todayDateInput();
-    setIssueDate(nextIssueDate);
-    setDueDate(dueDateFromIssueDate(
+    const nextDueDate = dueDateFromIssueDate(
       nextIssueDate,
       organizationInvoiceDefaults?.default_invoice_due_delta ?? 30,
-    ));
-    setTaxPercent(selectedInvoice.tax_percent || "0");
-    setTermsText(selectedInvoice.terms_text || "");
-    setLineItems(nextDraftLines);
-    setNextLineId(nextDraftLines.length + 1);
-    setWorkspaceSourceInvoiceId(null);
-    setEditingDraftInvoiceId(null);
-    setWorkspaceContext(`Draft from ${selectedInvoice.invoice_number}`);
-    setSuccessStatus(`Draft created from ${selectedInvoice.invoice_number}.`);
-    setCreatorFlashCount((c) => c + 1);
+    );
+    const nextTaxPercent = selectedInvoice.tax_percent || "0";
+    const nextTermsText = selectedInvoice.terms_text || "";
+
+    setNeutralStatus("Duplicating invoice...");
+    try {
+      const subtotal = nextDraftLines.reduce((sum, line) => sum + parseAmount(line.quantity) * parseAmount(line.unitPrice), 0);
+      const taxAmount = subtotal * (parseAmount(nextTaxPercent) / 100);
+      const duplicateFormState: InvoiceFormState = {
+        issueDate: nextIssueDate,
+        dueDate: nextDueDate,
+        taxPercent: nextTaxPercent,
+        termsText: nextTermsText,
+        subtotal,
+        taxAmount,
+        totalAmount: subtotal + taxAmount,
+        lineItems: nextDraftLines,
+      };
+      const createPayload = invoiceCreatorAdapter.toCreatePayload(duplicateFormState);
+      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/invoices/`, {
+        method: "POST",
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        body: JSON.stringify(createPayload),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setErrorStatus(readInvoiceApiError(payload, "Duplicate failed."));
+        return;
+      }
+      const created = payload.data as InvoiceRecord;
+      await loadInvoices(projectId);
+      setSelectedInvoiceId(String(created.id));
+      setSelectedStatus(created.status);
+      loadInvoiceIntoWorkspace(created);
+      setSuccessStatus(`Duplicated as ${created.invoice_number}.`);
+      setCreatorFlashCount((c) => c + 1);
+    } catch {
+      setErrorStatus("Could not reach invoice create endpoint.");
+    }
   }
 
   const selectedProject = projects.find((project) => String(project.id) === selectedProjectId) ?? null;
@@ -1269,12 +1315,14 @@ export function InvoicesConsole() {
   );
   const statusMessageAtCreator =
     statusTone === "success" && /^(Created|Saved|Started|Loaded)\b/i.test(statusMessage);
+  const statusMessageAtToolbar =
+    statusTone === "success" && /^Duplicated\b/i.test(statusMessage);
 
   return (
     <section className={styles.console}>
       {!token ? <p className={styles.authNotice}>{authMessage}</p> : null}
 
-      {statusMessage && !statusMessageAtCreator ? (
+      {statusMessage && !statusMessageAtCreator && !statusMessageAtToolbar ? (
         <p
           className={`${styles.statusBanner} ${
             statusTone === "success"
@@ -1360,8 +1408,8 @@ export function InvoicesConsole() {
               </div>
 
               <div className={styles.invoiceRail}>
-                {searchedInvoices.length ? (
-                  searchedInvoices.map((invoice) => {
+                {paginatedInvoices.length ? (
+                  paginatedInvoices.map((invoice) => {
                     const isSelected = String(invoice.id) === selectedInvoiceId;
                     return (
                       <article
@@ -1626,6 +1674,7 @@ export function InvoicesConsole() {
                   </p>
                 )}
               </div>
+              <PaginationControls page={invoicePage} totalPages={invoiceTotalPages} totalCount={invoiceTotalCount} onPageChange={setInvoicePage} />
 
                 </>
               ) : (
@@ -1651,9 +1700,9 @@ export function InvoicesConsole() {
                       className={styles.toolbarActionButton}
                       onClick={handleStartNewInvoiceDraft}
                     >
-                      {editingDraftInvoiceId ? "Create New Invoice" : "Reset"}
+                      {workspaceSourceInvoice ? "Create New Invoice" : "Reset"}
                     </button>
-                    {editingDraftInvoiceId ? (
+                    {workspaceSourceInvoice ? (
                       <button
                         type="button"
                         className={styles.toolbarActionButton}
@@ -1663,6 +1712,9 @@ export function InvoicesConsole() {
                       </button>
                     ) : null}
                   </div>
+                  {statusMessageAtToolbar ? (
+                    <p className={creatorStyles.actionSuccess}>{statusMessage}</p>
+                  ) : null}
                   <p className={styles.workspaceToolbarHint}>
                     Invoices do not use revision families. Duplicate always creates a new invoice #.
                   </p>
@@ -1800,21 +1852,26 @@ export function InvoicesConsole() {
                               key={line.localId}
                               className={`${invoiceCreatorStyles.invoiceLineRow} ${index % 2 === 1 ? invoiceCreatorStyles.invoiceLineRowAlt : ""}`}
                             >
-                              <select
-                                className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                                value={line.lineType}
-                                onChange={(event) =>
-                                  updateLineItem(
-                                    line.localId,
-                                    "lineType",
-                                    event.target.value as InvoiceLineInput["lineType"],
-                                  )
-                                }
-                                disabled={workspaceIsLocked}
-                              >
-                                <option value="scope">Scope</option>
-                                <option value="adjustment">Adjustment</option>
-                              </select>
+                              {budgetLineOptions.length > 0 ? (
+                                <select
+                                  className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
+                                  value={line.lineType}
+                                  onChange={(event) =>
+                                    updateLineItem(
+                                      line.localId,
+                                      "lineType",
+                                      event.target.value as InvoiceLineInput["lineType"],
+                                    )
+                                  }
+                                  disabled={workspaceIsLocked}
+                                >
+                                  <option value="scope">Scope</option>
+                                  <option value="adjustment">Adjustment</option>
+                                  <option value="direct">Direct</option>
+                                </select>
+                              ) : (
+                                <span className={creatorStyles.lineInput} style={{ color: "var(--text-secondary)" }}>Direct</span>
+                              )}
                               {line.lineType === "scope" ? (
                                 <div>
                                   <span className={creatorStyles.printOnly}>
@@ -1841,7 +1898,7 @@ export function InvoicesConsole() {
                                     ))}
                                   </select>
                                 </div>
-                              ) : (
+                              ) : line.lineType === "adjustment" ? (
                                 <input
                                   className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
                                   value={line.adjustmentReason}
@@ -1852,6 +1909,8 @@ export function InvoicesConsole() {
                                   required
                                   disabled={workspaceIsLocked}
                                 />
+                              ) : (
+                                <span className={creatorStyles.lineInput} style={{ color: "var(--text-secondary)" }}>—</span>
                               )}
                               <input
                                 className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}

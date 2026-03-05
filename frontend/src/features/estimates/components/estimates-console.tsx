@@ -1199,7 +1199,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setOpenFamilyHistory(new Set<string>([duplicatedFamilyTitle]));
       duplicateDialogRef.current?.close();
       setStatusEvents([]);
-      setActionMessage("");
+      setActionMessage(`Duplicated as ${duplicated.title || "Untitled"} v${duplicated.version}.`);
+      setActionTone("success");
       setCreatorFlashCount((c) => c + 1);
     } catch {
       setActionMessage("Could not reach duplicate endpoint.");
@@ -1843,6 +1844,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
             ) : null}
           </div>
         </div>
+        {actionMessage && actionTone === "success" && /^Duplicated\b/i.test(actionMessage) ? (
+          <p className={creatorStyles.actionSuccess}>{actionMessage}</p>
+        ) : null}
         {actionMessage && actionTone !== "success" ? <p className={`${styles.actionError} ${styles.composerPrepMessage}`}>{actionMessage}</p> : null}
         <dialog ref={duplicateDialogRef} className={styles.duplicateDialog}>
           <p className={styles.inlineHint}>

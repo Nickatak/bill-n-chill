@@ -107,7 +107,7 @@ export type InvoicePolicyContract = {
 
 export type InvoiceLineInput = {
   localId: number;
-  lineType: "scope" | "adjustment";
+  lineType: "scope" | "adjustment" | "direct";
   budgetLineId: string;
   adjustmentReason: string;
   internalNote: string;

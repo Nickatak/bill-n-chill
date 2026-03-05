@@ -22,6 +22,7 @@ from core.views.accounts_receivable.invoice_ingress import (
     build_invoice_patch_ingress,
 )
 from core.views.accounts_receivable.invoices_helpers import (
+    _activate_project_from_invoice_creation,
     _apply_invoice_lines_and_totals,
     _calculate_invoice_line_totals,
     _enforce_invoice_scope_guard,
@@ -427,6 +428,7 @@ def project_invoices_view(request, project_id: int):
             created_by=request.user,
             metadata={"invoice_number": invoice.invoice_number},
         )
+        _activate_project_from_invoice_creation(invoice=invoice, actor=request.user)
     return Response({"data": InvoiceSerializer(invoice).data}, status=201)
 
 

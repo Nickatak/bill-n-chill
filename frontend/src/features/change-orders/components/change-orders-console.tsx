@@ -55,6 +55,8 @@ import {
   ChangeOrderFormState,
   toChangeOrderStatusPolicy,
 } from "../document-adapter";
+import { useClientPagination } from "@/shared/hooks/use-client-pagination";
+import { PaginationControls } from "@/shared/components/pagination-controls";
 
 type LineSetter = (
   value:
@@ -239,6 +241,7 @@ export function ChangeOrdersConsole({
       changeOrders.filter((changeOrder) => changeOrder.origin_estimate === originEstimateId),
     );
   }, [changeOrders, selectedViewerEstimateId, sortChangeOrdersForViewer]);
+  const { page: coPage, totalPages: coTotalPages, totalCount: coTotalCount, paginatedItems: paginatedChangeOrders, setPage: setCoPage } = useClientPagination(viewerChangeOrders);
   const selectedViewerChangeOrder =
     viewerChangeOrders.find((changeOrder) => String(changeOrder.id) === selectedChangeOrderId) ??
     viewerChangeOrders[0] ??
@@ -1226,6 +1229,7 @@ export function ChangeOrdersConsole({
       setNextLineLocalId(2);
     }
     setFeedback("Ready for a new change order draft.", "info");
+    setCreateFlashCount((c) => c + 1);
   }
 
   /** Handle form submission for creating a new change order draft. */
@@ -1328,7 +1332,7 @@ export function ChangeOrdersConsole({
         hydrateEditForm(persisted ?? created);
         await loadProjectAuditEvents(projectId);
       }
-      setFeedback("");
+      setFeedback(`Duplicated as ${coLabel(created)}.`, "success");
       setEditFlashCount((c) => c + 1);
     } catch {
       setFeedback("Could not reach clone revision endpoint.", "error");
@@ -1637,7 +1641,7 @@ export function ChangeOrdersConsole({
                   <>
                     <h4 className={styles.viewerSectionHeading}>Change Orders</h4>
                     <div className={`${styles.viewerRail} ${styles.viewerHistoryRail}`}>
-                      {viewerChangeOrders.map((changeOrder) => {
+                      {paginatedChangeOrders.map((changeOrder) => {
                         const active = String(changeOrder.id) === selectedChangeOrderId;
                         const lastStatusEvent = lastStatusEventForChangeOrder(changeOrder.id);
                         return (
@@ -1689,6 +1693,7 @@ export function ChangeOrdersConsole({
                         );
                       })}
                     </div>
+                    <PaginationControls page={coPage} totalPages={coTotalPages} totalCount={coTotalCount} onPageChange={setCoPage} />
                     {selectedViewerChangeOrder ? (
                       <>
                         {/* Status & Actions section */}
@@ -1957,6 +1962,9 @@ export function ChangeOrdersConsole({
             </button>
           ) : null}
         </div>
+        {actionMessage && actionTone === "success" && /^Duplicated\b/i.test(actionMessage) ? (
+          <p className={creatorStyles.actionSuccess}>{actionMessage}</p>
+        ) : null}
       </div>
       {!selectedChangeOrder ? (
         <div ref={createCreatorRef}>

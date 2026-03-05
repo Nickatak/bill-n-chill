@@ -53,15 +53,19 @@ export function normalizeDecimalInput(value: number, fallback = "0"): string {
 // Factory helpers
 // ---------------------------------------------------------------------------
 
-/** Create a blank scope line item with sensible defaults for the creator workspace. */
-export function emptyLine(localId: number, defaultBudgetLineId = ""): InvoiceLineInput {
+/** Create a blank line item with sensible defaults for the creator workspace. */
+export function emptyLine(
+  localId: number,
+  defaultBudgetLineId = "",
+  lineType: InvoiceLineInput["lineType"] = "scope",
+): InvoiceLineInput {
   return {
     localId,
-    lineType: "scope",
-    budgetLineId: defaultBudgetLineId,
+    lineType,
+    budgetLineId: lineType === "scope" ? defaultBudgetLineId : "",
     adjustmentReason: "",
     internalNote: "",
-    description: "Invoice scope item",
+    description: lineType === "direct" ? "Direct invoice item" : "Invoice scope item",
     quantity: "1",
     unit: "ea",
     unitPrice: "0",

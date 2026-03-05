@@ -11,6 +11,7 @@ from core.models import (
     Invoice,
     InvoiceLine,
     InvoiceScopeOverrideEvent,
+    Project,
     ScopeItem,
 )
 from core.user_helpers import _ensure_membership
@@ -58,6 +59,9 @@ def _enforce_invoice_scope_guard(
 ):
     """Check whether the invoice total exceeds the project's approved scope. Returns an error dict or None."""
     if not _is_billable_invoice_status(candidate_status):
+        return None
+
+    if not Budget.objects.filter(project=project, status=Budget.Status.ACTIVE).exists():
         return None
 
     approved_scope_limit = project.contract_value_current
@@ -273,6 +277,19 @@ def _apply_invoice_lines_and_totals(invoice, line_items_data, tax_percent, user)
             )
             continue
 
+        if line_type == InvoiceLine.LineType.DIRECT:
+            description = (item.get("description") or "").strip()
+            if not description:
+                invalid_lines.append(
+                    {
+                        "line_index": index,
+                        "field": "description",
+                        "message": "Direct lines require a description.",
+                    }
+                )
+                continue
+            budget_line = None
+
         if budget_line:
             if cost_code and budget_line.cost_code_id != cost_code.id:
                 invalid_lines.append(
@@ -401,5 +418,34 @@ def _invoice_line_apply_error_response(apply_error):
         },
         400,
     )
+
+
+def _activate_project_from_invoice_creation(*, invoice, actor):
+    """Transition a prospect project to active when a direct invoice is created."""
+    project = invoice.project
+    if project.status != Project.Status.PROSPECT:
+        return False
+    if not Project.is_transition_allowed(project.status, Project.Status.ACTIVE):
+        return False
+
+    previous_status = project.status
+    project.status = Project.Status.ACTIVE
+    project.save(update_fields=["status", "updated_at"])
+    FinancialAuditEvent.record(
+        project=project,
+        event_type="project_status_changed",
+        object_type="project",
+        object_id=project.id,
+        from_status=previous_status,
+        to_status=project.status,
+        note=f"Project moved to active after creation of invoice #{invoice.id}.",
+        created_by=actor,
+        metadata={
+            "trigger": "invoice_created",
+            "invoice_id": invoice.id,
+            "invoice_number": invoice.invoice_number,
+        },
+    )
+    return True
 
 

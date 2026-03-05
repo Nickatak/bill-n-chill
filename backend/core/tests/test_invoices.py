@@ -1015,3 +1015,229 @@ class InvoiceTests(TestCase):
             any(status == "overdue" for status, _label in Invoice.Status.choices),
             "overdue should not be in Invoice.Status choices",
         )
+
+    # ── Direct invoicing ──────────────────────────────────────────────
+
+    def _create_unbudgeted_project(self):
+        """Helper: create a project with no estimate/budget."""
+        customer = Customer.objects.create(
+            display_name="Direct Client",
+            email="direct@example.com",
+            phone="555-0000",
+            billing_address="1 Direct St",
+            created_by=self.user,
+        )
+        return Project.objects.create(
+            customer=customer,
+            name="Unbudgeted Project",
+            status=Project.Status.ACTIVE,
+            contract_value_original="0.00",
+            contract_value_current="0.00",
+            created_by=self.user,
+        )
+
+    def test_create_invoice_with_direct_lines_no_budget(self):
+        """DIRECT lines succeed on a project with no budget."""
+        project = self._create_unbudgeted_project()
+        response = self.client.post(
+            f"/api/v1/projects/{project.id}/invoices/",
+            data={
+                "invoice_number": "INV-DIRECT-1",
+                "issue_date": "2025-01-01",
+                "due_date": "2025-01-31",
+                "customer": self.customer.id,
+                "line_items": [
+                    {
+                        "line_type": "direct",
+                        "description": "Consulting services",
+                        "quantity": "1",
+                        "unit_price": "500.00",
+                    },
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201, response.json())
+        invoice_data = response.json()["data"]
+        self.assertEqual(invoice_data["total"], "500.00")
+
+    def test_direct_line_missing_description_rejected(self):
+        """DIRECT lines without a description are rejected."""
+        project = self._create_unbudgeted_project()
+        response = self.client.post(
+            f"/api/v1/projects/{project.id}/invoices/",
+            data={
+                "invoice_number": "INV-DIRECT-2",
+                "issue_date": "2025-01-01",
+                "due_date": "2025-01-31",
+                "customer": self.customer.id,
+                "line_items": [
+                    {
+                        "line_type": "direct",
+                        "description": "",
+                        "quantity": "1",
+                        "unit_price": "100.00",
+                    },
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_direct_lines_on_budgeted_project(self):
+        """DIRECT lines work on a project that already has a budget."""
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/invoices/",
+            data={
+                "invoice_number": "INV-DIRECT-3",
+                "issue_date": "2025-01-01",
+                "due_date": "2025-01-31",
+                "customer": self.customer.id,
+                "line_items": [
+                    {
+                        "line_type": "direct",
+                        "description": "Extra work outside scope",
+                        "quantity": "2",
+                        "unit_price": "250.00",
+                    },
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201, response.json())
+        self.assertEqual(response.json()["data"]["total"], "500.00")
+
+    def test_mixed_scope_and_direct_lines(self):
+        """Mixed SCOPE + DIRECT lines on a budgeted project succeed."""
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/invoices/",
+            data={
+                "invoice_number": "INV-MIXED-1",
+                "issue_date": "2025-01-01",
+                "due_date": "2025-01-31",
+                "customer": self.customer.id,
+                "line_items": [
+                    {
+                        "line_type": "scope",
+                        "budget_line": self.budget_line.id,
+                        "description": "Foundation work",
+                        "quantity": "1",
+                        "unit_price": "1000.00",
+                    },
+                    {
+                        "line_type": "direct",
+                        "description": "Emergency repair",
+                        "quantity": "1",
+                        "unit_price": "300.00",
+                    },
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201, response.json())
+        self.assertEqual(response.json()["data"]["total"], "1300.00")
+
+    def test_send_direct_invoice_no_budget_skips_scope_guard(self):
+        """Sending a DIRECT-only invoice on unbudgeted project skips scope guard."""
+        project = self._create_unbudgeted_project()
+        create_response = self.client.post(
+            f"/api/v1/projects/{project.id}/invoices/",
+            data={
+                "invoice_number": "INV-DIRECT-SEND",
+                "issue_date": "2025-01-01",
+                "due_date": "2025-01-31",
+                "customer": self.customer.id,
+                "line_items": [
+                    {
+                        "line_type": "direct",
+                        "description": "Consulting",
+                        "quantity": "1",
+                        "unit_price": "10000.00",
+                    },
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(create_response.status_code, 201)
+        invoice_id = create_response.json()["data"]["id"]
+
+        send_response = self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(send_response.status_code, 200, send_response.json())
+
+    def test_create_invoice_on_prospect_project_activates_it(self):
+        """Creating an invoice on a prospect project promotes it to active."""
+        customer = Customer.objects.create(
+            display_name="Prospect Client",
+            email="prospect@example.com",
+            phone="555-0001",
+            billing_address="1 Prospect St",
+            created_by=self.user,
+        )
+        project = Project.objects.create(
+            customer=customer,
+            name="Prospect Project",
+            status=Project.Status.PROSPECT,
+            contract_value_original="0.00",
+            contract_value_current="0.00",
+            created_by=self.user,
+        )
+        self.assertEqual(project.status, Project.Status.PROSPECT)
+
+        response = self.client.post(
+            f"/api/v1/projects/{project.id}/invoices/",
+            data={
+                "invoice_number": "INV-PROSPECT",
+                "issue_date": "2025-01-01",
+                "due_date": "2025-01-31",
+                "customer": customer.id,
+                "line_items": [
+                    {
+                        "line_type": "direct",
+                        "description": "Quick job",
+                        "quantity": "1",
+                        "unit_price": "500.00",
+                    },
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        project.refresh_from_db()
+        self.assertEqual(project.status, Project.Status.ACTIVE)
+
+    def test_create_invoice_on_active_project_stays_active(self):
+        """Creating an invoice on an already-active project doesn't change status."""
+        project = self._create_unbudgeted_project()  # already ACTIVE
+        response = self.client.post(
+            f"/api/v1/projects/{project.id}/invoices/",
+            data={
+                "invoice_number": "INV-ACTIVE",
+                "issue_date": "2025-01-01",
+                "due_date": "2025-01-31",
+                "customer": project.customer_id,
+                "line_items": [
+                    {
+                        "line_type": "direct",
+                        "description": "Follow-up",
+                        "quantity": "1",
+                        "unit_price": "200.00",
+                    },
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        project.refresh_from_db()
+        self.assertEqual(project.status, Project.Status.ACTIVE)

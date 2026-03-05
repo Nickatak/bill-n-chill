@@ -183,6 +183,7 @@ class InvoiceLine(models.Model):
     class LineType(models.TextChoices):
         SCOPE = "scope", "Scope"
         ADJUSTMENT = "adjustment", "Adjustment"
+        DIRECT = "direct", "Direct"
 
     invoice = models.ForeignKey(
         "Invoice",
