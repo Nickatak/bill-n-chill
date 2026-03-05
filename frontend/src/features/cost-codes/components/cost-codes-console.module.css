@@ -338,7 +338,7 @@
   text-transform: none;
   letter-spacing: normal;
   font-size: var(--font-base);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .field input:disabled {

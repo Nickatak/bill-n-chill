@@ -1,9 +1,9 @@
 /**
  * Top-level application toolbar rendered at the very top of every page.
  *
- * Contains the organization dropdown menu, print button,
- * theme toggle, and logout. Visibility of individual controls depends
- * on session state and whether the current route is a public document view.
+ * Contains the organization dropdown menu, print button, and logout.
+ * Visibility of individual controls depends on session state and
+ * whether the current route is a public document view.
  */
 "use client";
 
@@ -17,11 +17,8 @@ import { isRouteActive, businessMenuRoutes } from "../nav-routes";
 import styles from "./app-toolbar.module.css";
 
 // ---------------------------------------------------------------------------
-// Constants and types
+// Constants
 // ---------------------------------------------------------------------------
-
-const THEME_KEY = "bnc-theme";
-type ThemeMode = "light" | "dark";
 
 /** Internal routes where the Print button should be visible. */
 const PRINTABLE_ROUTE_PATTERNS = [
@@ -36,30 +33,15 @@ function isPrintableRoute(pathname: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Theme persistence
-// ---------------------------------------------------------------------------
-
-/** Write the chosen theme to the DOM and persist it to localStorage. */
-function applyTheme(theme: ThemeMode) {
-  document.documentElement.setAttribute("data-theme", theme);
-  try {
-    window.localStorage.setItem(THEME_KEY, theme);
-  } catch {
-    // no-op: localStorage can be unavailable in restricted environments
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 /**
  * Render the persistent toolbar at the top of the viewport.
  *
- * Authenticated users see the full set of controls (org menu,
- * print, theme, logout). Public document routes show
- * only a "Home" link, print, and theme toggle so customers get
- * a minimal chrome-free experience.
+ * Authenticated users see the full set of controls (org menu, print, logout).
+ * Public document routes show only a "Home" link and print button so
+ * customers get a minimal chrome-free experience.
  */
 export function AppToolbar() {
   const pathname = usePathname() ?? "";
@@ -73,14 +55,6 @@ export function AppToolbar() {
   /** Close all open `<details>` menus. */
   function closeMenus() {
     opsMetaMenuRef.current?.removeAttribute("open");
-  }
-
-  /** Toggle between light and dark themes. */
-  function toggleTheme() {
-    const current =
-      document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
-    const next: ThemeMode = current === "dark" ? "light" : "dark";
-    applyTheme(next);
   }
 
   /** Clear the session and redirect to the home / login page. */
@@ -158,9 +132,6 @@ export function AppToolbar() {
           Print
         </button>
       ) : null}
-      <button type="button" className={styles.themeToggle} onClick={toggleTheme} aria-label="Toggle theme">
-        Toggle theme
-      </button>
       {hasSession ? (
         <button type="button" className={styles.logout} onClick={logout}>
           Logout

@@ -2,10 +2,7 @@
 .page {
   min-height: 100dvh;
   padding: 18px;
-  background:
-    radial-gradient(circle at 0% 0%, rgba(14, 116, 144, 0.14), transparent 28%),
-    radial-gradient(circle at 100% 0%, rgba(37, 99, 235, 0.12), transparent 30%),
-    var(--surface-secondary);
+  background: var(--surface-secondary);
   font-family: var(--font-geist-sans);
 }
 
@@ -24,9 +21,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   padding: 15px;
-  background:
-    linear-gradient(140deg, rgba(29, 78, 216, 0.08), rgba(14, 116, 144, 0.04) 35%, transparent 80%),
-    var(--surface);
+  background: var(--surface);
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
   display: grid;
   gap: var(--space-md);

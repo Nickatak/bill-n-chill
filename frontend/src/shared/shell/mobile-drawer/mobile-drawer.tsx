@@ -3,8 +3,8 @@
 /**
  * Mobile navigation drawer, visible only at ≤700px.
  *
- * Renders a fixed header bar (hamburger + theme toggle) and a slide-out
- * drawer containing all workflow routes, business menu routes, and actions.
+ * Renders a fixed header bar (hamburger) and a slide-out drawer containing
+ * all workflow routes, business menu routes, and actions.
  * On public document routes it renders a minimal header bar instead.
  */
 
@@ -16,20 +16,6 @@ import { isPublicDocumentRoute } from "@/features/session/public-routes";
 import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import { isRouteActive, businessMenuRoutes, workflowRoutes } from "../nav-routes";
 import styles from "./mobile-drawer.module.css";
-
-const THEME_KEY = "bnc-theme";
-
-function toggleTheme() {
-  const current =
-    document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
-  const next = current === "dark" ? "light" : "dark";
-  document.documentElement.setAttribute("data-theme", next);
-  try {
-    window.localStorage.setItem(THEME_KEY, next);
-  } catch {
-    // no-op
-  }
-}
 
 export function MobileDrawer() {
   const pathname = usePathname() ?? "";
@@ -71,7 +57,7 @@ export function MobileDrawer() {
     window.print();
   }
 
-  // Public document routes: minimal header (Home + Print + Theme).
+  // Public document routes: minimal header (Home + Print).
   if (isPublicDocument) {
     return (
       <div className={styles.root}>
@@ -86,9 +72,6 @@ export function MobileDrawer() {
           <div className={styles.headerActions}>
             <button type="button" className={styles.headerButton} onClick={() => window.print()}>
               Print
-            </button>
-            <button type="button" className={styles.headerButton} onClick={toggleTheme}>
-              Theme
             </button>
           </div>
         </header>
@@ -115,9 +98,6 @@ export function MobileDrawer() {
           <span />
           <span />
           <span />
-        </button>
-        <button type="button" className={styles.headerButton} onClick={toggleTheme}>
-          Theme
         </button>
       </header>
 

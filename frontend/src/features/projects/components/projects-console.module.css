@@ -196,7 +196,7 @@
   text-transform: none;
   letter-spacing: normal;
   font-size: 0.8rem;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .quickStatusSelectProspect {
@@ -367,7 +367,7 @@
 .baselineCardMeta {
   font-size: 0.78rem;
   color: var(--status-gray-text);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .metricSection {

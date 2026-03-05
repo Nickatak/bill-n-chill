@@ -1,142 +1,8 @@
-/* Base reset and design token system. */
+/* Base reset and design token system. Dark-only for MVP. */
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
 
-  /* --- Accent / Primary --- */
-  --accent: #1d4ed8;
-  --accent-hover: #1e40af;
-  --accent-light: #dbeafe;
-  --accent-lighter: #eff6ff;
-  --accent-border: #93c5fd;
-  --accent-text: #1e3a8a;
-
-  /* --- Surface / Layout --- */
-  --surface: #ffffff;
-  --surface-secondary: #f8fafc;
-  --surface-hover: #e0e7ff;
-  --surface-inset: #f1f5f9;
-  --border: #e2e8f0;
-  --border-light: #f1f5f9;
-  --border-accent: #cbd5f5;
-
-  /* --- Text --- */
-  --text-primary: #0f172a;
-  --text-secondary: #64748b;
-  --text-muted: #94a3b8;
-  --text-on-accent: #eff6ff;
-
-  /* --- Status palette (badge: pastel bg, saturated text) --- */
-  --status-blue-bg: #dbeafe;
-  --status-blue-border: #93c5fd;
-  --status-blue-text: #1e3a8a;
-
-  --status-amber-bg: #fef3c7;
-  --status-amber-border: #fcd34d;
-  --status-amber-text: #92400e;
-
-  --status-green-bg: #dcfce7;
-  --status-green-border: #86efac;
-  --status-green-text: #166534;
-
-  --status-red-bg: #fee2e2;
-  --status-red-border: #fca5a5;
-  --status-red-text: #991b1b;
-
-  --status-gray-bg: #e2e8f0;
-  --status-gray-border: #cbd5e1;
-  --status-gray-text: #334155;
-
-  --status-emerald-bg: #d1fae5;
-  --status-emerald-border: #6ee7b7;
-  --status-emerald-text: #065f46;
-
-  --status-orange-bg: #fff7ed;
-  --status-orange-border: #fdba74;
-  --status-orange-text: #9a3412;
-
-  --status-violet-bg: #ede9fe;
-  --status-violet-border: #c4b5fd;
-  --status-violet-text: #5b21b6;
-
-  /* --- Status palette (solid: saturated bg, light text — mode-invariant) --- */
-  --status-blue-solid: #2563eb;
-  --status-blue-solid-text: #eff6ff;
-  --status-amber-solid: #d97706;
-  --status-amber-solid-text: #fffbeb;
-  --status-green-solid: #16a34a;
-  --status-green-solid-text: #f0fdf4;
-  --status-red-solid: #dc2626;
-  --status-red-solid-text: #fee2e2;
-  --status-gray-solid: #6b7280;
-  --status-gray-solid-text: #f9fafb;
-  --status-emerald-solid: #0f766e;
-  --status-emerald-solid-text: #ecfeff;
-  --status-orange-solid: #ea580c;
-  --status-orange-solid-text: #fff7ed;
-  --status-violet-solid: #7c3aed;
-  --status-violet-solid-text: #f5f3ff;
-
-  /* --- Semantic Tones --- */
-  --tone-success-bg: #dcfce7;
-  --tone-success-border: #4ade80;
-  --tone-success-text: #14532d;
-
-  --tone-error-bg: #fee2e2;
-  --tone-error-border: #f87171;
-  --tone-error-text: #991b1b;
-
-  --tone-warning-bg: #fef3c7;
-  --tone-warning-border: #fcd34d;
-  --tone-warning-text: #92400e;
-
-  --tone-neutral-bg: #f1f5f9;
-  --tone-neutral-border: #cbd5e1;
-  --tone-neutral-text: #334155;
-
-  /* --- Table --- */
-  --table-header-bg: #eef2ff;
-  --table-header-text: #1e3a8a;
-  --table-row-alt: #f8fafc;
-  --table-row-hover: #e0e7ff;
-  --table-row-active: #c7d2fe;
-  --table-border: #e2e8f0;
-
-  /* --- Inputs / Forms --- */
-  --input-bg: #ffffff;
-  --input-border: #cbd5e1;
-  --input-text: #0f172a;
-  --input-readonly-bg: #f8fafc;
-  --input-readonly-text: #64748b;
-  --input-disabled-bg: #f1f5f9;
-  --input-disabled-text: #94a3b8;
-  --input-disabled-border: #e2e8f0;
-
-  /* --- Spacing Scale --- */
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 12px;
-  --space-lg: 16px;
-  --space-xl: 20px;
-  --space-2xl: 24px;
-
-  /* --- Border Radius --- */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-pill: 999px;
-
-  /* --- Typography --- */
-  --font-xs: 0.72rem;
-  --font-sm: 0.82rem;
-  --font-base: 0.9rem;
-  --font-md: 0.98rem;
-  --font-lg: 1.1rem;
-}
-
-html[data-theme="dark"] {
   --background: #0a0a0a;
   --foreground: #ededed;
 
@@ -146,7 +12,7 @@ html[data-theme="dark"] {
   --accent-light: #1e293b;
   --accent-lighter: #172033;
   --accent-border: #3b82f6;
-  --accent-text: #93c5fd;
+  --accent-text: #94c4ff;
 
   /* --- Surface / Layout --- */
   --surface: #18181b;
@@ -157,10 +23,10 @@ html[data-theme="dark"] {
   --border-light: #27272a;
   --border-accent: #52525b;
 
-  /* --- Text --- */
-  --text-primary: #fafafa;
-  --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
+  /* --- Text (high-contrast for outdoor legibility) --- */
+  --text-primary: #ffffff;
+  --text-secondary: #cdcdd5;
+  --text-muted: #8b8b95;
   --text-on-accent: #dbeafe;
 
   /* --- Status palette (badge) --- */
@@ -196,6 +62,24 @@ html[data-theme="dark"] {
   --status-violet-border: #a78bfa;
   --status-violet-text: #ede9fe;
 
+  /* --- Status palette (solid: saturated bg, light text — mode-invariant) --- */
+  --status-blue-solid: #2563eb;
+  --status-blue-solid-text: #eff6ff;
+  --status-amber-solid: #d97706;
+  --status-amber-solid-text: #fffbeb;
+  --status-green-solid: #16a34a;
+  --status-green-solid-text: #f0fdf4;
+  --status-red-solid: #dc2626;
+  --status-red-solid-text: #fee2e2;
+  --status-gray-solid: #6b7280;
+  --status-gray-solid-text: #f9fafb;
+  --status-emerald-solid: #0f766e;
+  --status-emerald-solid-text: #ecfeff;
+  --status-orange-solid: #ea580c;
+  --status-orange-solid-text: #fff7ed;
+  --status-violet-solid: #7c3aed;
+  --status-violet-solid-text: #f5f3ff;
+
   /* --- Semantic Tones --- */
   --tone-success-bg: #14532d;
   --tone-success-border: #22c55e;
@@ -215,7 +99,7 @@ html[data-theme="dark"] {
 
   /* --- Table --- */
   --table-header-bg: #27272a;
-  --table-header-text: #93c5fd;
+  --table-header-text: #94c4ff;
   --table-row-alt: #1c1c1f;
   --table-row-hover: #27272a;
   --table-row-active: #3f3f46;
@@ -224,12 +108,34 @@ html[data-theme="dark"] {
   /* --- Inputs / Forms --- */
   --input-bg: #09090b;
   --input-border: #3f3f46;
-  --input-text: #fafafa;
+  --input-text: #ffffff;
   --input-readonly-bg: #18181b;
-  --input-readonly-text: #a1a1aa;
+  --input-readonly-text: #c4c4cc;
   --input-disabled-bg: #18181b;
   --input-disabled-text: #71717a;
   --input-disabled-border: #27272a;
+
+  /* --- Spacing Scale --- */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 20px;
+  --space-2xl: 24px;
+
+  /* --- Border Radius --- */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  /* --- Typography --- */
+  --font-xs: 0.72rem;
+  --font-sm: 0.82rem;
+  --font-base: 0.9rem;
+  --font-md: 0.98rem;
+  --font-lg: 1.1rem;
 }
 
 html,
@@ -256,12 +162,4 @@ body {
 a {
   color: inherit;
   text-decoration: none;
-}
-
-html[data-theme="dark"] {
-  color-scheme: dark;
-}
-
-html[data-theme="light"] {
-  color-scheme: light;
 }

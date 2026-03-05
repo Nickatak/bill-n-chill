@@ -31,18 +31,6 @@
   color: var(--text-on-accent);
 }
 
-.themeToggle {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  color: var(--text-primary);
-  min-height: 38px;
-  padding: 0 var(--space-md);
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
 .logout {
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);

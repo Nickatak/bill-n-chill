@@ -28,28 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // NOTE: default theme is intentionally dark for MVP demos.
-    // Revert later by changing this data-theme and the fallback below from "dark" to "light".
-    <html lang="en" data-theme="dark" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function () {
-                var key = 'bnc-theme';
-                var fallback = 'dark';
-                try {
-                  var stored = window.localStorage.getItem(key);
-                  var theme = (stored === 'dark' || stored === 'light') ? stored : fallback;
-                  document.documentElement.setAttribute('data-theme', theme);
-                } catch (e) {
-                  document.documentElement.setAttribute('data-theme', fallback);
-                }
-              })();
-            `,
-          }}
-        />
-      </head>
+    <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <SessionAuthorizationProvider>
           <AppToolbar />
