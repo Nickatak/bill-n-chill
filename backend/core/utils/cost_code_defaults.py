@@ -1,4 +1,4 @@
-"""Default cost-code policy used for org bootstrap and demo seeding."""
+"""Default cost-code seed data used for org bootstrap and demo seeding."""
 
 DEFAULT_COST_CODE_POLICY_VERSION = "2026-02-24.cost-codes.default.v1"
 

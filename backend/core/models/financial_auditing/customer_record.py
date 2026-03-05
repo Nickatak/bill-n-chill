@@ -1,11 +1,12 @@
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 from django.db import models
+
+from core.models.mixins import ImmutableModelMixin
 
 User = get_user_model()
 
 
-class CustomerRecord(models.Model):
+class CustomerRecord(ImmutableModelMixin):
     """Immutable audit capture for customer lifecycle events.
 
     Business workflow:
@@ -23,17 +24,13 @@ class CustomerRecord(models.Model):
         UPDATED = "updated", "Updated"
         DELETED = "deleted", "Deleted"
 
+    _immutable_label = "Customer records"
+
     class CaptureSource(models.TextChoices):
         MANUAL_UI = "manual_ui", "Manual UI"
         MANUAL_API = "manual_api", "Manual API"
         IMPORT = "import", "Import"
         SYSTEM = "system", "System"
-
-    class CustomerRecordQuerySet(models.QuerySet):
-        def delete(self):
-            raise ValidationError("Customer records are immutable and cannot be deleted.")
-
-    objects = CustomerRecordQuerySet.as_manager()
 
     customer = models.ForeignKey(
         "Customer",
@@ -89,14 +86,6 @@ class CustomerRecord(models.Model):
             metadata_json=metadata or {},
             recorded_by=recorded_by,
         )
-
-    def save(self, *args, **kwargs):
-        if self.pk is not None:
-            raise ValidationError("Customer records are immutable and cannot be updated.")
-        return super().save(*args, **kwargs)
-
-    def delete(self, using=None, keep_parents=False):
-        raise ValidationError("Customer records are immutable and cannot be deleted.")
 
     def __str__(self) -> str:
         return f"CUST-{self.customer_id or 'na'} {self.event_type}"

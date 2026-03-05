@@ -1,6 +1,11 @@
 import re
 
+from django.db.models import Q
+from rest_framework.response import Response
+
 from core.models import (
+    Budget,
+    CostCode,
     Organization,
     OrganizationMembership,
     Project,
@@ -114,3 +119,80 @@ def _parse_request_bool(raw_value, *, default: bool = True) -> bool:
 def _normalized_phone(value: str) -> str:
     """Strip a phone string to digits only (for duplicate-detection comparisons)."""
     return re.sub(r"\D", "", value or "")
+
+
+# ---------------------------------------------------------------------------
+# Shared cross-domain helpers (deduplicated from per-domain *_helpers.py)
+# ---------------------------------------------------------------------------
+
+
+def _build_public_decision_note(
+    *,
+    action_label: str,
+    note: str,
+    decider_name: str,
+    decider_email: str,
+) -> str:
+    """Build a human-readable note for a public-link decision (approve/reject/dispute)."""
+    actor_parts = [part for part in [decider_name.strip(), decider_email.strip()] if part]
+    actor_label = " / ".join(actor_parts) if actor_parts else "anonymous customer"
+    note_value = note.strip()
+    if note_value:
+        return f"{action_label} via public link by {actor_label}. {note_value}"
+    return f"{action_label} via public link by {actor_label}."
+
+
+def _vendor_scope_filter(user) -> Q:
+    """Build a Q filter for vendors visible to the given user's organization."""
+    membership = _ensure_membership(user)
+    actor_user_ids = _organization_user_ids(user)
+    return (
+        Q(organization__isnull=True, is_canonical=True)
+        | Q(organization_id=membership.organization_id)
+        | Q(organization__isnull=True, created_by_id__in=actor_user_ids)
+    )
+
+
+def _resolve_cost_codes_for_user(user, line_items_data, *, cost_code_key="cost_code"):
+    """Resolve and validate cost code IDs from line item data for the user's org scope.
+
+    Returns ``(code_map, missing_ids)``.  *cost_code_key* defaults to ``"cost_code"``
+    and items where the key is absent/falsy are silently skipped.
+    """
+    ids = [item[cost_code_key] for item in line_items_data if item.get(cost_code_key)]
+    if not ids:
+        return {}, []
+
+    membership = _ensure_membership(user)
+    actor_user_ids = _organization_user_ids(user)
+    codes = CostCode.objects.filter(id__in=ids).filter(
+        Q(organization_id=membership.organization_id)
+        | Q(organization__isnull=True, created_by_id__in=actor_user_ids)
+    )
+    code_map = {code.id: code for code in codes}
+    missing = [cost_code_id for cost_code_id in ids if cost_code_id not in code_map]
+    return code_map, missing
+
+
+def _active_budget_for_project(*, project, actor_user_ids, select_related=None):
+    """Return the most recent active budget for a project, or None.
+
+    Accepts a pre-resolved *actor_user_ids* list.  Pass *select_related* as a
+    list of FK names to eagerly load (e.g., ``["source_estimate"]``).
+    """
+    qs = Budget.objects.filter(
+        project=project,
+        created_by_id__in=actor_user_ids,
+        status=Budget.Status.ACTIVE,
+    )
+    if select_related:
+        qs = qs.select_related(*select_related)
+    return qs.order_by("-created_at", "-id").first()
+
+
+def _not_found_response(message: str = "Not found."):
+    """Return a standard 404 error response."""
+    return Response(
+        {"error": {"code": "not_found", "message": message, "fields": {}}},
+        status=404,
+    )

@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 from django.db import models
+
+from core.models.mixins import ImmutableModelMixin
 
 User = get_user_model()
 
@@ -19,7 +20,7 @@ ORG_MEMBERSHIP_ROLE_CHOICES = [
 ]
 
 
-class OrganizationMembershipRecord(models.Model):
+class OrganizationMembershipRecord(ImmutableModelMixin):
     """Immutable audit capture for membership lifecycle and role changes.
 
     Business workflow:
@@ -39,19 +40,13 @@ class OrganizationMembershipRecord(models.Model):
         ROLE_TEMPLATE_CHANGED = "role_template_changed", "Role Template Changed"
         CAPABILITY_FLAGS_UPDATED = "capability_flags_updated", "Capability Flags Updated"
 
+    _immutable_label = "Organization membership records"
+
     class CaptureSource(models.TextChoices):
         AUTH_BOOTSTRAP = "auth_bootstrap", "Auth Bootstrap"
         MANUAL_UI = "manual_ui", "Manual UI"
         MANUAL_API = "manual_api", "Manual API"
         SYSTEM = "system", "System"
-
-    class OrganizationMembershipRecordQuerySet(models.QuerySet):
-        def delete(self):
-            raise ValidationError(
-                "Organization membership records are immutable and cannot be deleted."
-            )
-
-    objects = OrganizationMembershipRecordQuerySet.as_manager()
 
     organization = models.ForeignKey(
         "Organization",
@@ -151,16 +146,6 @@ class OrganizationMembershipRecord(models.Model):
 
     class Meta:
         ordering = ["-created_at", "-id"]
-
-    def save(self, *args, **kwargs):
-        if self.pk is not None:
-            raise ValidationError(
-                "Organization membership records are immutable and cannot be updated."
-            )
-        return super().save(*args, **kwargs)
-
-    def delete(self, using=None, keep_parents=False):
-        raise ValidationError("Organization membership records are immutable and cannot be deleted.")
 
     def __str__(self) -> str:
         return (

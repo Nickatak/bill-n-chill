@@ -5,10 +5,12 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Sum
 
+from core.models.mixins import StatusTransitionMixin
+
 User = get_user_model()
 
 
-class Payment(models.Model):
+class Payment(StatusTransitionMixin, models.Model):
     """Recorded money movement for a project (AR inbound or AP outbound).
 
     Business workflow:
@@ -46,6 +48,8 @@ class Payment(models.Model):
     # {from_status: {allowed_to_status_1, allowed_to_status_2, ...}}
     # Example: `pending -> settled` is allowed because
     # `Status.SETTLED` is in `ALLOWED_STATUS_TRANSITIONS[Status.PENDING]`.
+    _status_label = "payment"
+
     ALLOWED_STATUS_TRANSITIONS = {
         Status.PENDING: {Status.SETTLED, Status.FAILED, Status.VOID},
         Status.SETTLED: {Status.VOID},
@@ -80,12 +84,6 @@ class Payment(models.Model):
     class Meta:
         ordering = ["-payment_date", "-created_at"]
 
-    @classmethod
-    def is_transition_allowed(cls, current_status: str, next_status: str) -> bool:
-        if current_status == next_status:
-            return True
-        return next_status in cls.ALLOWED_STATUS_TRANSITIONS.get(current_status, set())
-
     @property
     def allocated_total(self) -> Decimal:
         return (
@@ -100,16 +98,7 @@ class Payment(models.Model):
 
     def clean(self):
         errors = {}
-
-        if self.pk:
-            previous_status = (
-                type(self).objects.filter(pk=self.pk).values_list("status", flat=True).first()
-            )
-            if previous_status and not self.is_transition_allowed(previous_status, self.status):
-                errors.setdefault("status", []).append(
-                    f"Invalid payment status transition: {previous_status} -> {self.status}."
-                )
-
+        self.validate_status_transition(errors)
         if errors:
             raise ValidationError(errors)
 

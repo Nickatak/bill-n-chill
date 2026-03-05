@@ -1,16 +1,16 @@
-import secrets
-import string
-
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
 from django.utils.text import slugify
 
+from core.models.mixins import StatusTransitionMixin
+from core.utils.tokens import generate_public_token
+
 User = get_user_model()
 
 
-class ChangeOrder(models.Model):
+class ChangeOrder(StatusTransitionMixin, models.Model):
     """Post-baseline contract delta request for scope/time/cost changes.
 
     Business workflow:
@@ -34,6 +34,8 @@ class ChangeOrder(models.Model):
     # {from_status: {allowed_to_status_1, allowed_to_status_2, ...}}
     # Example: `draft -> pending_approval` is allowed because
     # `Status.PENDING_APPROVAL` is in `ALLOWED_STATUS_TRANSITIONS[Status.DRAFT]`.
+    _status_label = "change-order"
+
     ALLOWED_STATUS_TRANSITIONS = {
         Status.DRAFT: {
             Status.PENDING_APPROVAL,
@@ -121,11 +123,6 @@ class ChangeOrder(models.Model):
     def __str__(self) -> str:
         return f"{self.project.name} CO-{self.family_key} v{self.revision_number}"
 
-    @staticmethod
-    def _generate_public_token(length: int = 12) -> str:
-        alphabet = string.ascii_letters + string.digits
-        return "".join(secrets.choice(alphabet) for _ in range(length))
-
     @property
     def public_slug(self) -> str:
         normalized = slugify(f"co-{self.family_key}-v{self.revision_number}")
@@ -136,12 +133,6 @@ class ChangeOrder(models.Model):
         if not self.public_token:
             return ""
         return f"{self.public_slug}--{self.public_token}"
-
-    @classmethod
-    def is_transition_allowed(cls, current_status: str, next_status: str) -> bool:
-        if current_status == next_status:
-            return True
-        return next_status in cls.ALLOWED_STATUS_TRANSITIONS.get(current_status, set())
 
     def clean(self):
         from core.models.estimating.estimate import Estimate
@@ -210,14 +201,7 @@ class ChangeOrder(models.Model):
                         f"revision_number must be {expected_revision} for this previous_change_order."
                     )
 
-        if self.pk:
-            previous_status = (
-                type(self).objects.filter(pk=self.pk).values_list("status", flat=True).first()
-            )
-            if previous_status and not self.is_transition_allowed(previous_status, self.status):
-                errors.setdefault("status", []).append(
-                    f"Invalid change-order status transition: {previous_status} -> {self.status}."
-                )
+        self.validate_status_transition(errors)
 
         if errors:
             raise ValidationError(errors)
@@ -278,7 +262,7 @@ class ChangeOrder(models.Model):
         update_fields = kwargs.get("update_fields")
         if not self.public_token:
             while True:
-                candidate = self._generate_public_token()
+                candidate = generate_public_token()
                 if not type(self).objects.filter(public_token=candidate).exists():
                     self.public_token = candidate
                     break

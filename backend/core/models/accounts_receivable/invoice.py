@@ -1,16 +1,16 @@
-import secrets
-import string
-
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, Q
 from django.utils.text import slugify
 
+from core.models.mixins import StatusTransitionMixin
+from core.utils.tokens import generate_public_token
+
 User = get_user_model()
 
 
-class Invoice(models.Model):
+class Invoice(StatusTransitionMixin, models.Model):
     """Customer-facing AR invoice issued to the project customer.
 
     Business workflow:
@@ -40,6 +40,8 @@ class Invoice(models.Model):
     # Terminal states: paid, void (no outbound transitions).
     # partially_paid can advance to paid, or revert to sent when all
     # allocations are removed (e.g. payment voided).
+    _status_label = "invoice"
+
     ALLOWED_STATUS_TRANSITIONS = {
         Status.DRAFT: {Status.SENT, Status.VOID},
         Status.SENT: {Status.PARTIALLY_PAID, Status.PAID, Status.VOID},
@@ -108,11 +110,6 @@ class Invoice(models.Model):
     def __str__(self) -> str:
         return f"{self.project.name} {self.invoice_number}"
 
-    @staticmethod
-    def _generate_public_token(length: int = 12) -> str:
-        alphabet = string.ascii_letters + string.digits
-        return "".join(secrets.choice(alphabet) for _ in range(length))
-
     @property
     def public_slug(self) -> str:
         normalized = slugify((self.invoice_number or "").strip())
@@ -123,12 +120,6 @@ class Invoice(models.Model):
         if not self.public_token:
             return ""
         return f"{self.public_slug}--{self.public_token}"
-
-    @classmethod
-    def is_transition_allowed(cls, current_status: str, next_status: str) -> bool:
-        if current_status == next_status:
-            return True
-        return next_status in cls.ALLOWED_STATUS_TRANSITIONS.get(current_status, set())
 
     def clean(self):
         errors = {}
@@ -144,14 +135,7 @@ class Invoice(models.Model):
                 "Invoice customer must match the project customer."
             )
 
-        if self.pk:
-            previous_status = (
-                type(self).objects.filter(pk=self.pk).values_list("status", flat=True).first()
-            )
-            if previous_status and not self.is_transition_allowed(previous_status, self.status):
-                errors.setdefault("status", []).append(
-                    f"Invalid invoice status transition: {previous_status} -> {self.status}."
-                )
+        self.validate_status_transition(errors)
 
         if errors:
             raise ValidationError(errors)
@@ -160,7 +144,7 @@ class Invoice(models.Model):
         update_fields = kwargs.get("update_fields")
         if not self.public_token:
             while True:
-                candidate = self._generate_public_token()
+                candidate = generate_public_token()
                 if not type(self).objects.filter(public_token=candidate).exists():
                     self.public_token = candidate
                     break

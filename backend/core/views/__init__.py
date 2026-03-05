@@ -61,16 +61,18 @@ from core.views.cash_management.payments import (
     project_payments_view,
 )
 from core.views.shared_operations.projects import (
-    attention_feed_view,
-    change_impact_summary_view,
-    portfolio_snapshot_view,
     project_accounting_export_view,
     project_audit_events_view,
     project_detail_view,
     project_financial_summary_view,
+    projects_list_view,
+)
+from core.views.shared_operations.reporting import (
+    attention_feed_view,
+    change_impact_summary_view,
+    portfolio_snapshot_view,
     project_timeline_events_view,
     quick_jump_search_view,
-    projects_list_view,
 )
 from core.views.accounts_payable.vendor_bills import (
     project_vendor_bills_view,

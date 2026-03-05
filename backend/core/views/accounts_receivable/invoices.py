@@ -23,18 +23,18 @@ from core.views.accounts_receivable.invoice_ingress import (
 )
 from core.views.accounts_receivable.invoices_helpers import (
     _apply_invoice_lines_and_totals,
-    _build_public_invoice_decision_note,
     _calculate_invoice_line_totals,
     _enforce_invoice_scope_guard,
     _invoice_line_apply_error_response,
     _is_billable_invoice_status,
     _next_invoice_number,
-    _resolve_invoice_cost_codes_for_user,
 )
 from core.views.helpers import (
+    _build_public_decision_note,
     _capability_gate,
     _ensure_membership,
     _organization_user_ids,
+    _resolve_cost_codes_for_user,
     _resolve_organization_for_public_actor,
     _serialize_public_organization_context,
     _serialize_public_project_context,
@@ -130,7 +130,7 @@ def public_invoice_decision_view(request, public_token: str):
 
     decider_name = str(request.data.get("decider_name", "") or "")
     decider_email = str(request.data.get("decider_email", "") or "")
-    public_note = _build_public_invoice_decision_note(
+    public_note = _build_public_decision_note(
         action_label="Approved for payment" if decision_type == "approve" else "Disputed",
         note=str(request.data.get("note", "") or ""),
         decider_name=decider_name,
@@ -610,7 +610,7 @@ def invoice_detail_view(request, invoice_id: int):
                 },
                 status=400,
             )
-        _, missing_cost_codes = _resolve_invoice_cost_codes_for_user(request.user, line_items)
+        _, missing_cost_codes = _resolve_cost_codes_for_user(request.user, line_items)
         if missing_cost_codes:
             return Response(
                 {

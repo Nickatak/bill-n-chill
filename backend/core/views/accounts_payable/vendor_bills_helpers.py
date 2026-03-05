@@ -1,21 +1,11 @@
 """Domain-specific helpers for vendor-bill views."""
 
-from django.db.models import Q, Sum
+from django.db.models import Sum
 
 from core.models import BudgetLine, VendorBill, VendorBillAllocation
 from core.utils.money import MONEY_ZERO, quantize_money
-from core.views.helpers import _ensure_membership, _organization_user_ids
-
-
-def _vendor_scope_filter(user):
-    membership = _ensure_membership(user)
-    actor_user_ids = _organization_user_ids(user)
-    return Q(organization__isnull=True, is_canonical=True) | Q(
-        organization_id=membership.organization_id
-    ) | Q(
-        organization__isnull=True,
-        created_by_id__in=actor_user_ids,
-    )
+from core.views.helpers import _organization_user_ids
+from core.views.helpers import _vendor_scope_filter  # noqa: F401 — re-exported for vendor_bills.py
 
 
 def _find_duplicate_vendor_bills(

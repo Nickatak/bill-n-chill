@@ -1,11 +1,12 @@
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 from django.db import models
+
+from core.models.mixins import ImmutableModelMixin
 
 User = get_user_model()
 
 
-class ChangeOrderSnapshot(models.Model):
+class ChangeOrderSnapshot(ImmutableModelMixin):
     """Immutable financial-audit snapshot for decision outcomes on a change order.
 
     Business workflow:
@@ -22,16 +23,12 @@ class ChangeOrderSnapshot(models.Model):
     - Visibility: `internal-facing`.
     """
 
+    _immutable_label = "Change-order snapshots"
+
     class DecisionStatus(models.TextChoices):
         APPROVED = "approved", "Approved"
         REJECTED = "rejected", "Rejected"
         VOID = "void", "Void"
-
-    class ChangeOrderSnapshotQuerySet(models.QuerySet):
-        def delete(self):
-            raise ValidationError("Change-order snapshots are immutable and cannot be deleted.")
-
-    objects = ChangeOrderSnapshotQuerySet.as_manager()
 
     change_order = models.ForeignKey(
         "ChangeOrder",
@@ -79,11 +76,3 @@ class ChangeOrderSnapshot(models.Model):
 
     def __str__(self) -> str:
         return f"CO-{self.change_order.family_key} v{self.change_order.revision_number} {self.decision_status}"
-
-    def save(self, *args, **kwargs):
-        if self.pk is not None:
-            raise ValidationError("Change-order snapshots are immutable and cannot be updated.")
-        return super().save(*args, **kwargs)
-
-    def delete(self, using=None, keep_parents=False):
-        raise ValidationError("Change-order snapshots are immutable and cannot be deleted.")

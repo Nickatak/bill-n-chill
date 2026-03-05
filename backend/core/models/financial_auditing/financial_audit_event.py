@@ -1,11 +1,12 @@
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 from django.db import models
+
+from core.models.mixins import ImmutableModelMixin
 
 User = get_user_model()
 
 
-class FinancialAuditEvent(models.Model):
+class FinancialAuditEvent(ImmutableModelMixin):
     """DEPRECATED: Immutable project-scoped financial activity index row.
 
     Deprecation status:
@@ -49,16 +50,10 @@ class FinancialAuditEvent(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
+    _immutable_label = "Financial audit events"
+
     class Meta:
         ordering = ["-created_at", "-id"]
-
-    def save(self, *args, **kwargs):
-        if self.pk is not None:
-            raise ValidationError("FinancialAuditEvent is immutable and cannot be updated.")
-        super().save(*args, **kwargs)
-
-    def delete(self, *args, **kwargs):
-        raise ValidationError("FinancialAuditEvent is immutable and cannot be deleted.")
 
     @classmethod
     def record(

@@ -1,6 +1,6 @@
 from core.tests.common import *
 from django.core.exceptions import ValidationError
-from core.policies.cost_codes import DEFAULT_COST_CODE_ROWS
+from core.utils.cost_code_defaults import DEFAULT_COST_CODE_ROWS
 
 class HealthEndpointTests(TestCase):
     def test_health_endpoint_returns_ok_payload(self):

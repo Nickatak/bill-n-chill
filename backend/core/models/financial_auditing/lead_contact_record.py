@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 from django.db import models
+
+from core.models.mixins import ImmutableModelMixin
 
 User = get_user_model()
 
@@ -13,7 +14,7 @@ LEAD_CONTACT_STATUS_CHOICES = [
 ]
 
 
-class LeadContactRecord(models.Model):
+class LeadContactRecord(ImmutableModelMixin):
     """Immutable audit capture for customer-intake lifecycle and conversion events.
 
     Business workflow:
@@ -33,17 +34,13 @@ class LeadContactRecord(models.Model):
         CONVERTED = "converted", "Converted"
         DELETED = "deleted", "Deleted"
 
+    _immutable_label = "Customer intake records"
+
     class CaptureSource(models.TextChoices):
         MANUAL_UI = "manual_ui", "Manual UI"
         MANUAL_API = "manual_api", "Manual API"
         IMPORT = "import", "Import"
         SYSTEM = "system", "System"
-
-    class LeadContactRecordQuerySet(models.QuerySet):
-        def delete(self):
-            raise ValidationError("Customer intake records are immutable and cannot be deleted.")
-
-    objects = LeadContactRecordQuerySet.as_manager()
 
     intake_record_id = models.PositiveBigIntegerField(
         db_index=True,
@@ -110,14 +107,6 @@ class LeadContactRecord(models.Model):
             metadata_json=metadata or {},
             recorded_by=recorded_by,
         )
-
-    def save(self, *args, **kwargs):
-        if self.pk is not None:
-            raise ValidationError("Customer intake records are immutable and cannot be updated.")
-        return super().save(*args, **kwargs)
-
-    def delete(self, using=None, keep_parents=False):
-        raise ValidationError("Customer intake records are immutable and cannot be deleted.")
 
     def __str__(self) -> str:
         return f"INTAKE-{self.intake_record_id or 'na'} {self.event_type}"

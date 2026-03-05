@@ -3,6 +3,11 @@ from decimal import Decimal
 from rest_framework import serializers
 
 from core.models import Estimate, EstimateLineItem, EstimateStatusEvent
+from core.serializers.mixins import resolve_public_actor_customer_id, resolve_public_actor_display
+
+
+def _estimate_customer(obj):
+    return getattr(getattr(getattr(obj, "estimate", None), "project", None), "customer", None)
 
 
 class EstimateLineItemSerializer(serializers.ModelSerializer):
@@ -100,27 +105,11 @@ class EstimateStatusEventSerializer(serializers.ModelSerializer):
             return "notate"
         return "unchanged"
 
-    @staticmethod
-    def _is_public_decision_event(obj: EstimateStatusEvent) -> bool:
-        return "via public link" in (obj.note or "").lower()
-
     def get_changed_by_display(self, obj: EstimateStatusEvent) -> str:
-        if self._is_public_decision_event(obj):
-            customer = getattr(getattr(getattr(obj, "estimate", None), "project", None), "customer", None)
-            if customer and (customer.display_name or "").strip():
-                return customer.display_name.strip()
-        actor_email = (getattr(getattr(obj, "changed_by", None), "email", "") or "").strip()
-        if actor_email:
-            return actor_email
-        if obj.changed_by_id:
-            return f"User #{obj.changed_by_id}"
-        return "Unknown user"
+        return resolve_public_actor_display(obj, actor_field="changed_by", customer_fn=_estimate_customer)
 
     def get_changed_by_customer_id(self, obj: EstimateStatusEvent):
-        if not self._is_public_decision_event(obj):
-            return None
-        customer = getattr(getattr(getattr(obj, "estimate", None), "project", None), "customer", None)
-        return customer.id if customer else None
+        return resolve_public_actor_customer_id(obj, customer_fn=_estimate_customer)
 
     class Meta:
         model = EstimateStatusEvent

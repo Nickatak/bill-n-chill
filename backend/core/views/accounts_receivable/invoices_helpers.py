@@ -2,12 +2,11 @@
 
 from decimal import Decimal
 
-from django.db.models import Q, Sum
+from django.db.models import Sum
 
 from core.models import (
     Budget,
     BudgetLine,
-    CostCode,
     FinancialAuditEvent,
     Invoice,
     InvoiceLine,
@@ -19,6 +18,7 @@ from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
     SYSTEM_BUDGET_LINE_CODES,
     _organization_user_ids,
+    _resolve_cost_codes_for_user,
 )
 
 BILLABLE_INVOICE_STATUSES = {
@@ -165,26 +165,6 @@ def _calculate_invoice_line_totals(line_items_data):
     return normalized_items, subtotal
 
 
-def _resolve_invoice_cost_codes_for_user(user, line_items_data):
-    ids = [item["cost_code"] for item in line_items_data if item.get("cost_code")]
-    if not ids:
-        return {}, []
-
-    membership = _ensure_membership(user)
-    actor_user_ids = _organization_user_ids(user)
-    codes = CostCode.objects.filter(
-        id__in=ids,
-    ).filter(
-        Q(organization_id=membership.organization_id) | Q(
-            organization__isnull=True,
-            created_by_id__in=actor_user_ids,
-        )
-    )
-    code_map = {code.id: code for code in codes}
-    missing = [cost_code_id for cost_code_id in ids if cost_code_id not in code_map]
-    return code_map, missing
-
-
 def _resolve_invoice_scope_items_for_user(user, line_items_data):
     ids = [item["scope_item"] for item in line_items_data if item.get("scope_item")]
     if not ids:
@@ -223,7 +203,7 @@ def _apply_invoice_lines_and_totals(invoice, line_items_data, tax_percent, user)
     )
     if missing_budget_lines:
         return {"missing_budget_lines": missing_budget_lines}
-    code_map, missing = _resolve_invoice_cost_codes_for_user(user, normalized_items)
+    code_map, missing = _resolve_cost_codes_for_user(user, normalized_items)
     if missing:
         return {"missing_cost_codes": missing}
     scope_item_map, missing_scope_items = _resolve_invoice_scope_items_for_user(
@@ -414,16 +394,3 @@ def _invoice_line_apply_error_response(apply_error):
     )
 
 
-def _build_public_invoice_decision_note(
-    *,
-    action_label: str,
-    note: str,
-    decider_name: str,
-    decider_email: str,
-) -> str:
-    actor_parts = [part for part in [decider_name.strip(), decider_email.strip()] if part]
-    actor_label = " / ".join(actor_parts) if actor_parts else "anonymous customer"
-    note_value = note.strip()
-    if note_value:
-        return f"{action_label} via public link by {actor_label}. {note_value}"
-    return f"{action_label} via public link by {actor_label}."

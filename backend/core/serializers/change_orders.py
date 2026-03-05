@@ -38,6 +38,10 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
     is_latest_revision = serializers.SerializerMethodField()
 
     def get_is_latest_revision(self, obj) -> bool:
+        latest_map = self.context.get("is_latest_revision_map")
+        if latest_map is not None:
+            return latest_map.get(obj.id, False)
+        # Fallback for single-object detail views without precomputed context.
         return not ChangeOrder.objects.filter(
             project=obj.project,
             family_key=obj.family_key,

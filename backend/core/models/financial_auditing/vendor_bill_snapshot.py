@@ -1,11 +1,12 @@
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 from django.db import models
+
+from core.models.mixins import ImmutableModelMixin
 
 User = get_user_model()
 
 
-class VendorBillSnapshot(models.Model):
+class VendorBillSnapshot(ImmutableModelMixin):
     """Immutable AP lifecycle snapshot for financially meaningful vendor-bill statuses.
 
     Business workflow:
@@ -19,18 +20,14 @@ class VendorBillSnapshot(models.Model):
     - Visibility: `internal-facing`.
     """
 
+    _immutable_label = "Vendor-bill snapshots"
+
     class CaptureStatus(models.TextChoices):
         RECEIVED = "received", "Received"
         APPROVED = "approved", "Approved"
         SCHEDULED = "scheduled", "Scheduled"
         PAID = "paid", "Paid"
         VOID = "void", "Void"
-
-    class VendorBillSnapshotQuerySet(models.QuerySet):
-        def delete(self):
-            raise ValidationError("Vendor-bill snapshots are immutable and cannot be deleted.")
-
-    objects = VendorBillSnapshotQuerySet.as_manager()
 
     vendor_bill = models.ForeignKey(
         "VendorBill",
@@ -76,11 +73,3 @@ class VendorBillSnapshot(models.Model):
 
     def __str__(self) -> str:
         return f"VB-{self.vendor_bill_id} {self.capture_status}"
-
-    def save(self, *args, **kwargs):
-        if self.pk is not None:
-            raise ValidationError("Vendor-bill snapshots are immutable and cannot be updated.")
-        return super().save(*args, **kwargs)
-
-    def delete(self, using=None, keep_parents=False):
-        raise ValidationError("Vendor-bill snapshots are immutable and cannot be deleted.")

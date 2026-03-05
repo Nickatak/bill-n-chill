@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 from django.db import models
+
+from core.models.mixins import ImmutableModelMixin
 
 User = get_user_model()
 
@@ -12,7 +13,7 @@ ACCOUNTING_SYNC_STATUS_CHOICES = [
 ]
 
 
-class AccountingSyncRecord(models.Model):
+class AccountingSyncRecord(ImmutableModelMixin):
     """Immutable audit record for accounting synchronization lifecycle captures.
 
     Business workflow:
@@ -32,18 +33,14 @@ class AccountingSyncRecord(models.Model):
         IMPORTED = "imported", "Imported"
         SYNCED = "synced", "Synced"
 
+    _immutable_label = "Accounting sync records"
+
     class CaptureSource(models.TextChoices):
         MANUAL_UI = "manual_ui", "Manual UI"
         MANUAL_API = "manual_api", "Manual API"
         JOB_RUNNER = "job_runner", "Job Runner"
         WEBHOOK = "webhook", "Webhook"
         SYSTEM = "system", "System"
-
-    class AccountingSyncRecordQuerySet(models.QuerySet):
-        def delete(self):
-            raise ValidationError("Accounting sync records are immutable and cannot be deleted.")
-
-    objects = AccountingSyncRecordQuerySet.as_manager()
 
     accounting_sync_event = models.ForeignKey(
         "AccountingSyncEvent",
@@ -85,14 +82,6 @@ class AccountingSyncRecord(models.Model):
 
     class Meta:
         ordering = ["-created_at", "-id"]
-
-    def save(self, *args, **kwargs):
-        if self.pk is not None:
-            raise ValidationError("Accounting sync records are immutable and cannot be updated.")
-        return super().save(*args, **kwargs)
-
-    def delete(self, using=None, keep_parents=False):
-        raise ValidationError("Accounting sync records are immutable and cannot be deleted.")
 
     def __str__(self) -> str:
         return f"SYNC-{self.accounting_sync_event_id} {self.event_type}"

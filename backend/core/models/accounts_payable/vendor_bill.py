@@ -2,10 +2,12 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from core.models.mixins import StatusTransitionMixin
+
 User = get_user_model()
 
 
-class VendorBill(models.Model):
+class VendorBill(StatusTransitionMixin, models.Model):
     """AP bill received from a vendor/subcontractor for project costs.
 
     Business workflow:
@@ -28,6 +30,8 @@ class VendorBill(models.Model):
     # {from_status: {allowed_to_status_1, allowed_to_status_2, ...}}
     # Example: `received -> approved` is allowed because
     # `Status.APPROVED` is in `ALLOWED_STATUS_TRANSITIONS[Status.RECEIVED]`.
+    _status_label = "vendor bill"
+
     ALLOWED_STATUS_TRANSITIONS = {
         Status.PLANNED: {Status.RECEIVED, Status.VOID},
         Status.RECEIVED: {Status.APPROVED, Status.VOID},
@@ -90,12 +94,6 @@ class VendorBill(models.Model):
     def __str__(self) -> str:
         return f"{self.vendor.name} {self.bill_number}"
 
-    @classmethod
-    def is_transition_allowed(cls, current_status: str, next_status: str) -> bool:
-        if current_status == next_status:
-            return True
-        return next_status in cls.ALLOWED_STATUS_TRANSITIONS.get(current_status, set())
-
     def clean(self):
         errors = {}
 
@@ -105,14 +103,7 @@ class VendorBill(models.Model):
         if self.status == self.Status.SCHEDULED and self.scheduled_for is None:
             errors.setdefault("scheduled_for", []).append("Provide a scheduled payment date.")
 
-        if self.pk:
-            previous_status = (
-                type(self).objects.filter(pk=self.pk).values_list("status", flat=True).first()
-            )
-            if previous_status and not self.is_transition_allowed(previous_status, self.status):
-                errors.setdefault("status", []).append(
-                    f"Invalid vendor bill status transition: {previous_status} -> {self.status}."
-                )
+        self.validate_status_transition(errors)
 
         if errors:
             raise ValidationError(errors)

@@ -1,11 +1,12 @@
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 from django.db import models
+
+from core.models.mixins import ImmutableModelMixin
 
 User = get_user_model()
 
 
-class OrganizationRecord(models.Model):
+class OrganizationRecord(ImmutableModelMixin):
     """Immutable audit capture for organization lifecycle events.
 
     Business workflow:
@@ -22,17 +23,13 @@ class OrganizationRecord(models.Model):
         CREATED = "created", "Created"
         UPDATED = "updated", "Updated"
 
+    _immutable_label = "Organization records"
+
     class CaptureSource(models.TextChoices):
         AUTH_BOOTSTRAP = "auth_bootstrap", "Auth Bootstrap"
         MANUAL_UI = "manual_ui", "Manual UI"
         MANUAL_API = "manual_api", "Manual API"
         SYSTEM = "system", "System"
-
-    class OrganizationRecordQuerySet(models.QuerySet):
-        def delete(self):
-            raise ValidationError("Organization records are immutable and cannot be deleted.")
-
-    objects = OrganizationRecordQuerySet.as_manager()
 
     organization = models.ForeignKey(
         "Organization",
@@ -86,14 +83,6 @@ class OrganizationRecord(models.Model):
             metadata_json=metadata or {},
             recorded_by=recorded_by,
         )
-
-    def save(self, *args, **kwargs):
-        if self.pk is not None:
-            raise ValidationError("Organization records are immutable and cannot be updated.")
-        return super().save(*args, **kwargs)
-
-    def delete(self, using=None, keep_parents=False):
-        raise ValidationError("Organization records are immutable and cannot be deleted.")
 
     def __str__(self) -> str:
         return f"ORG-{self.organization_id} {self.event_type}"

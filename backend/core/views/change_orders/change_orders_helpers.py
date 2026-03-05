@@ -5,31 +5,17 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from rest_framework.response import Response
 
-from core.models import Budget, BudgetLine, ChangeOrder, ChangeOrderLine
+from core.models import BudgetLine, ChangeOrder, ChangeOrderLine
 from core.serializers import ChangeOrderSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
     SYSTEM_BUDGET_LINE_CODES,
+    _active_budget_for_project,  # noqa: F401 — re-exported for change_orders.py
     _organization_user_ids,
     _resolve_organization_for_public_actor,
     _serialize_public_organization_context,
     _serialize_public_project_context,
 )
-
-
-def _build_public_decision_note(
-    *,
-    action_label: str,
-    note: str,
-    decider_name: str,
-    decider_email: str,
-) -> str:
-    actor_parts = [part for part in [decider_name.strip(), decider_email.strip()] if part]
-    actor_label = " / ".join(actor_parts) if actor_parts else "anonymous customer"
-    note_value = note.strip()
-    if note_value:
-        return f"{action_label} via public link by {actor_label}. {note_value}"
-    return f"{action_label} via public link by {actor_label}."
 
 
 def _serialize_public_change_order(change_order) -> dict:
@@ -164,19 +150,6 @@ def _next_change_order_family_key(*, project):
         if key_str.isdigit():
             numeric_keys.append(int(key_str))
     return str((max(numeric_keys) + 1) if numeric_keys else 1)
-
-
-def _get_active_budget_for_project(*, project, user):
-    actor_user_ids = _organization_user_ids(user)
-    return (
-        Budget.objects.filter(
-            project=project,
-            created_by_id__in=actor_user_ids,
-            status=Budget.Status.ACTIVE,
-        )
-        .order_by("-created_at")
-        .first()
-    )
 
 
 def _infer_model_validation_rule(*, fields: dict) -> str | None:

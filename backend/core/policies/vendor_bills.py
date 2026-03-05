@@ -1,46 +1,28 @@
 """Vendor-bill policy contracts shared with UI consumers."""
 
 from core.models import VendorBill
+from core.policies._base import _build_base_policy_contract
 
 VENDOR_BILL_POLICY_VERSION = "2026-03-01.vendor_bills.v2"
 
 # Compound transitions the view layer supports beyond the model's atomic map.
-# received → scheduled is a shortcut that atomically walks through approved.
+# received -> scheduled is a shortcut that atomically walks through approved.
 COMPOUND_TRANSITIONS = {
     VendorBill.Status.RECEIVED: [VendorBill.Status.SCHEDULED],
 }
 
 
-def _status_order() -> list[str]:
-    return [status for status, _label in VendorBill.Status.choices]
-
-
 def get_vendor_bill_policy_contract() -> dict:
     """Return canonical vendor-bill workflow policy for UI consumers."""
-    statuses = _status_order()
-    status_index = {status: idx for idx, status in enumerate(statuses)}
-    status_labels = {status: label for status, label in VendorBill.Status.choices}
-
-    allowed_status_transitions = {}
-    for status in statuses:
-        next_statuses = list(VendorBill.ALLOWED_STATUS_TRANSITIONS.get(status, set()))
-        # Merge any compound transitions so the UI shows them as available.
-        for compound_target in COMPOUND_TRANSITIONS.get(status, []):
-            if compound_target not in next_statuses:
-                next_statuses.append(compound_target)
-        next_statuses.sort(key=lambda value: status_index.get(value, 999))
-        allowed_status_transitions[status] = next_statuses
-
-    terminal_statuses = [
-        status for status in statuses if not allowed_status_transitions.get(status, [])
-    ]
-
-    return {
-        "policy_version": VENDOR_BILL_POLICY_VERSION,
-        "status_labels": status_labels,
-        "statuses": statuses,
-        "default_create_status": VendorBill.Status.PLANNED,
-        "create_shortcut_statuses": [VendorBill.Status.PLANNED, VendorBill.Status.RECEIVED],
-        "allowed_status_transitions": allowed_status_transitions,
-        "terminal_statuses": terminal_statuses,
-    }
+    return _build_base_policy_contract(
+        model_class=VendorBill,
+        policy_version=VENDOR_BILL_POLICY_VERSION,
+        default_create_status=VendorBill.Status.PLANNED,
+        extra_transitions=COMPOUND_TRANSITIONS,
+        extra_fields={
+            "create_shortcut_statuses": [
+                VendorBill.Status.PLANNED,
+                VendorBill.Status.RECEIVED,
+            ],
+        },
+    )

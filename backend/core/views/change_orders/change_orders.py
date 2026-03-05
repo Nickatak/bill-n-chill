@@ -4,8 +4,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import F
-from django.db.models import Sum
+from django.db.models import F, Max, Sum
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -23,8 +22,7 @@ from core.policies import get_change_order_policy_contract
 from core.serializers import ChangeOrderSerializer, ChangeOrderWriteSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.change_orders.change_orders_helpers import (
-    _build_public_decision_note,
-    _get_active_budget_for_project,
+    _active_budget_for_project,
     _model_validation_error_response,
     _next_change_order_family_key,
     _serialize_public_change_order,
@@ -33,6 +31,7 @@ from core.views.change_orders.change_orders_helpers import (
     _validation_error_response,
 )
 from core.views.helpers import (
+    _build_public_decision_note,
     _capability_gate,
     _ensure_membership,
     _organization_user_ids,
@@ -134,9 +133,9 @@ def public_change_order_decision_view(request, public_token: str):
     active_budget = None
     update_fields = ["status", "updated_at"]
     if next_status == ChangeOrder.Status.APPROVED:
-        active_budget = _get_active_budget_for_project(
+        active_budget = _active_budget_for_project(
             project=change_order.project,
-            user=change_order.requested_by,
+            actor_user_ids=_organization_user_ids(change_order.requested_by),
         )
         if not active_budget:
             return Response(
@@ -258,7 +257,16 @@ def project_change_orders_view(request, project_id: int):
             .prefetch_related("line_items", "line_items__budget_line", "line_items__budget_line__cost_code")
             .order_by("-created_at", "-revision_number")
         )
-        return Response({"data": ChangeOrderSerializer(rows, many=True).data})
+        latest_ids = (
+            ChangeOrder.objects.filter(project=project, requested_by_id__in=actor_user_ids)
+            .values("family_key")
+            .annotate(latest_id=Max("id"))
+            .values_list("latest_id", flat=True)
+        )
+        is_latest_revision_map = {pk: True for pk in latest_ids}
+        return Response(
+            {"data": ChangeOrderSerializer(rows, many=True, context={"is_latest_revision_map": is_latest_revision_map}).data}
+        )
 
     permission_error, _ = _capability_gate(request.user, "change_orders", "create")
     if permission_error:
@@ -294,7 +302,7 @@ def project_change_orders_view(request, project_id: int):
             rule="co_create_missing_required_fields",
         )
 
-    active_budget = _get_active_budget_for_project(project=project, user=request.user)
+    active_budget = _active_budget_for_project(project=project, actor_user_ids=actor_user_ids)
     if not active_budget:
         return _validation_error_response(
             message="Project must have an active budget before creating change orders.",
@@ -502,9 +510,9 @@ def change_order_detail_view(request, change_order_id: int):
 
     active_budget = None
     if financial_delta != MONEY_ZERO:
-        active_budget = _get_active_budget_for_project(
+        active_budget = _active_budget_for_project(
             project=change_order.project,
-            user=request.user,
+            actor_user_ids=actor_user_ids,
         )
         if not active_budget:
             return _validation_error_response(

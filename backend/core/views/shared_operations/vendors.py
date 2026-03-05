@@ -1,8 +1,5 @@
 """Shared operational vendor endpoints."""
 
-import csv
-from io import StringIO
-
 from django.db.models import Q
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -10,6 +7,7 @@ from rest_framework.response import Response
 
 from core.models import Vendor
 from core.serializers import VendorSerializer, VendorWriteSerializer
+from core.utils.csv_import import CsvImportError, process_csv_import
 from core.views.helpers import (
     _ensure_membership,
     _parse_request_bool,
@@ -208,149 +206,65 @@ def vendors_import_csv_view(request):
     dry_run = _parse_request_bool(request.data.get("dry_run", True), default=True)
     membership = _ensure_membership(request.user)
     scope_filter = _vendor_scope_filter(request.user)
-    if not csv_text or not str(csv_text).strip():
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "csv_text is required.",
-                    "fields": {"csv_text": ["Provide CSV content with headers."]},
-                }
-            },
-            status=400,
-        )
 
-    reader = csv.DictReader(StringIO(str(csv_text)))
-    expected_headers = {"name", "vendor_type", "email", "phone", "tax_id_last4", "notes"}
-    incoming_headers = set(reader.fieldnames or [])
-    if "name" not in incoming_headers:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "CSV headers are invalid for vendor import.",
-                    "fields": {"headers": [f"Expected at least: name. Optional: vendor_type,email,phone,tax_id_last4,notes. Found: {', '.join(sorted(incoming_headers))}"]},
-                }
-            },
-            status=400,
-        )
-    unknown_headers = incoming_headers - expected_headers
-    if unknown_headers:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "CSV contains unsupported headers.",
-                    "fields": {"headers": [f"Unsupported: {', '.join(sorted(unknown_headers))}."]},
-                }
-            },
-            status=400,
-        )
+    valid_vendor_types = {Vendor.VendorType.TRADE, Vendor.VendorType.RETAIL}
 
-    rows_out = []
-    created_count = 0
-    updated_count = 0
-    error_count = 0
-
-    for index, row in enumerate(reader, start=2):
-        name = (row.get("name") or "").strip()
-        vendor_type = (row.get("vendor_type") or Vendor.VendorType.TRADE).strip().lower()
-        email = (row.get("email") or "").strip()
-        phone = (row.get("phone") or "").strip()
-        tax_id_last4 = (row.get("tax_id_last4") or "").strip()
-        notes = (row.get("notes") or "").strip()
-
-        if not name:
-            error_count += 1
-            rows_out.append(
-                {"row_number": index, "name": name, "status": "error", "message": "name is required."}
-            )
-            continue
-        if vendor_type not in {Vendor.VendorType.TRADE, Vendor.VendorType.RETAIL}:
-            error_count += 1
-            rows_out.append(
-                {
-                    "row_number": index,
-                    "name": name,
-                    "status": "error",
-                    "message": "vendor_type must be trade or retail.",
-                }
-            )
-            continue
-        existing = Vendor.objects.filter(scope_filter, name__iexact=name).first()
-        if existing:
-            if dry_run:
-                rows_out.append(
-                    {
-                        "row_number": index,
-                        "name": name,
-                        "status": "would_update",
-                        "message": f"Would update vendor #{existing.id}.",
-                    }
-                )
-            else:
-                existing.vendor_type = vendor_type
-                existing.email = email
-                existing.phone = phone
-                existing.tax_id_last4 = tax_id_last4
-                existing.notes = notes
-                existing.save(
-                    update_fields=[
-                        "vendor_type",
-                        "email",
-                        "phone",
-                        "tax_id_last4",
-                        "notes",
-                        "updated_at",
-                    ]
-                )
-                updated_count += 1
-                rows_out.append(
-                    {
-                        "row_number": index,
-                        "name": name,
-                        "status": "updated",
-                        "message": f"Updated vendor #{existing.id}.",
-                    }
-                )
-            continue
-
-        if dry_run:
-            rows_out.append(
-                {
-                    "row_number": index,
-                    "name": name,
-                    "status": "would_create",
-                    "message": "Would create new vendor.",
-                }
-            )
+    def validate_row(row):
+        # Apply vendor_type default before validation (mirrors original behavior).
+        if not row.get("vendor_type"):
+            row["vendor_type"] = Vendor.VendorType.TRADE
         else:
-            Vendor.objects.create(
-                created_by=request.user,
-                organization_id=membership.organization_id,
-                name=name,
-                vendor_type=vendor_type,
-                email=email,
-                phone=phone,
-                tax_id_last4=tax_id_last4,
-                notes=notes,
-                is_active=True,
-            )
-            created_count += 1
-            rows_out.append(
-                {"row_number": index, "name": name, "status": "created", "message": "Created vendor."}
-            )
+            row["vendor_type"] = row["vendor_type"].lower()
+        if not row.get("name"):
+            return "name is required."
+        if row["vendor_type"] not in valid_vendor_types:
+            return "vendor_type must be trade or retail."
+        return None
 
-    return Response(
-        {
-            "data": {
-                "entity": "vendors",
-                "mode": "preview" if dry_run else "apply",
-                "total_rows": len(rows_out),
-                "created_count": created_count,
-                "updated_count": updated_count,
-                "error_count": error_count,
-                "rows": rows_out,
-            }
-        }
-    )
+    def lookup_existing(row):
+        return Vendor.objects.filter(scope_filter, name__iexact=row["name"]).first()
+
+    def create_vendor(row):
+        return Vendor.objects.create(
+            created_by=request.user,
+            organization_id=membership.organization_id,
+            name=row["name"],
+            vendor_type=row.get("vendor_type", Vendor.VendorType.TRADE),
+            email=row.get("email", ""),
+            phone=row.get("phone", ""),
+            tax_id_last4=row.get("tax_id_last4", ""),
+            notes=row.get("notes", ""),
+            is_active=True,
+        )
+
+    def update_vendor(existing, row):
+        existing.vendor_type = row.get("vendor_type", Vendor.VendorType.TRADE)
+        existing.email = row.get("email", "")
+        existing.phone = row.get("phone", "")
+        existing.tax_id_last4 = row.get("tax_id_last4", "")
+        existing.notes = row.get("notes", "")
+        existing.save(
+            update_fields=["vendor_type", "email", "phone", "tax_id_last4", "notes", "updated_at"]
+        )
+        return existing
+
+    def serialize_row(_instance, status, row, row_number, message):
+        return {"row_number": row_number, "name": row.get("name", ""), "status": status, "message": message}
+
+    try:
+        rows_out, summary = process_csv_import(
+            csv_text=csv_text,
+            dry_run=dry_run,
+            required_headers={"name"},
+            allowed_headers={"name", "vendor_type", "email", "phone", "tax_id_last4", "notes"},
+            entity_name="vendor",
+            lookup_existing_fn=lookup_existing,
+            create_fn=create_vendor,
+            update_fn=update_vendor,
+            validate_row_fn=validate_row,
+            serialize_row_fn=serialize_row,
+        )
+    except CsvImportError as exc:
+        return Response(exc.error_payload, status=400)
+
+    return Response({"data": {**summary, "rows": rows_out}})

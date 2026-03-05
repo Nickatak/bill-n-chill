@@ -1,11 +1,12 @@
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 from django.db import models
+
+from core.models.mixins import ImmutableModelMixin
 
 User = get_user_model()
 
 
-class PaymentAllocationRecord(models.Model):
+class PaymentAllocationRecord(ImmutableModelMixin):
     """Immutable audit record for payment-allocation provenance captures.
 
     Business workflow:
@@ -30,15 +31,11 @@ class PaymentAllocationRecord(models.Model):
         CSV_IMPORT = "csv_import", "CSV Import"
         SYSTEM = "system", "System"
 
+    _immutable_label = "Payment allocation records"
+
     class TargetType(models.TextChoices):
         INVOICE = "invoice", "Invoice"
         VENDOR_BILL = "vendor_bill", "Vendor Bill"
-
-    class PaymentAllocationRecordQuerySet(models.QuerySet):
-        def delete(self):
-            raise ValidationError("Payment allocation records are immutable and cannot be deleted.")
-
-    objects = PaymentAllocationRecordQuerySet.as_manager()
 
     payment = models.ForeignKey(
         "Payment",
@@ -112,14 +109,6 @@ class PaymentAllocationRecord(models.Model):
             metadata_json=metadata or {},
             recorded_by=recorded_by,
         )
-
-    def save(self, *args, **kwargs):
-        if self.pk is not None:
-            raise ValidationError("Payment allocation records are immutable and cannot be updated.")
-        return super().save(*args, **kwargs)
-
-    def delete(self, using=None, keep_parents=False):
-        raise ValidationError("Payment allocation records are immutable and cannot be deleted.")
 
     def __str__(self) -> str:
         return f"PAY-{self.payment_id} {self.event_type} {self.target_type}:{self.target_object_id}"

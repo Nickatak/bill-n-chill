@@ -1,15 +1,15 @@
-import secrets
-import string
-
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.text import slugify
 
+from core.models.mixins import StatusTransitionMixin
+from core.utils.tokens import generate_public_token
+
 User = get_user_model()
 
 
-class Estimate(models.Model):
+class Estimate(StatusTransitionMixin, models.Model):
     """Customer-facing scope and price proposal for a project.
 
     Business workflow:
@@ -43,6 +43,8 @@ class Estimate(models.Model):
     # {from_status: {allowed_to_status_1, allowed_to_status_2, ...}}
     # Example: `draft -> sent` is allowed because
     # `Status.SENT` is in `ALLOWED_STATUS_TRANSITIONS[Status.DRAFT]`.
+    _status_label = "estimate"
+
     ALLOWED_STATUS_TRANSITIONS = {
         Status.DRAFT: {Status.SENT, Status.VOID, Status.ARCHIVED},
         Status.SENT: {
@@ -96,17 +98,6 @@ class Estimate(models.Model):
     def __str__(self) -> str:
         return f"{self.project.name} v{self.version}"
 
-    @classmethod
-    def is_transition_allowed(cls, current_status: str, next_status: str) -> bool:
-        if current_status == next_status:
-            return True
-        return next_status in cls.ALLOWED_STATUS_TRANSITIONS.get(current_status, set())
-
-    @staticmethod
-    def _generate_public_token(length: int = 12) -> str:
-        alphabet = string.ascii_letters + string.digits
-        return "".join(secrets.choice(alphabet) for _ in range(length))
-
     @property
     def public_slug(self) -> str:
         normalized = slugify((self.title or "").strip())
@@ -118,21 +109,14 @@ class Estimate(models.Model):
 
     def clean(self):
         errors = {}
-        if self.pk:
-            previous_status = (
-                type(self).objects.filter(pk=self.pk).values_list("status", flat=True).first()
-            )
-            if previous_status and not self.is_transition_allowed(previous_status, self.status):
-                errors.setdefault("status", []).append(
-                    f"Invalid estimate status transition: {previous_status} -> {self.status}."
-                )
+        self.validate_status_transition(errors)
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         if not self.public_token:
             while True:
-                candidate = self._generate_public_token()
+                candidate = generate_public_token()
                 if not Estimate.objects.filter(public_token=candidate).exists():
                     self.public_token = candidate
                     break

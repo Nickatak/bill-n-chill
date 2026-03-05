@@ -18,17 +18,17 @@ from core.serializers import (
     EstimateStatusEventSerializer,
     EstimateWriteSerializer,
 )
+from core.views.estimating.budgets_helpers import _ensure_budget_from_approved_estimate
 from core.views.estimating.estimates_helpers import (
     _activate_project_from_estimate_approval,
     _apply_estimate_lines_and_totals,
     _archive_estimate_family,
-    _build_public_estimate_decision_note,
-    _ensure_budget_from_approved_estimate,
     _next_estimate_family_version,
     _serialize_estimate,
     _serialize_estimates,
 )
 from core.views.helpers import (
+    _build_public_decision_note,
     _capability_gate,
     _ensure_membership,
     _organization_user_ids,
@@ -111,7 +111,7 @@ def public_estimate_decision_view(request, public_token: str):
             status=409,
         )
 
-    decision_note = _build_public_estimate_decision_note(
+    decision_note = _build_public_decision_note(
         action_label="Approved" if next_status == Estimate.Status.APPROVED else "Rejected",
         note=str(request.data.get("note", "") or ""),
         decider_name=str(request.data.get("decider_name", "") or ""),

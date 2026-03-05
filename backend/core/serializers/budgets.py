@@ -3,6 +3,7 @@ from decimal import Decimal
 from rest_framework import serializers
 
 from core.models import Budget, BudgetLine
+from core.utils.money import quantize_money
 
 
 class BudgetLineSerializer(serializers.ModelSerializer):
@@ -50,9 +51,8 @@ class BudgetLineSerializer(serializers.ModelSerializer):
         ]
 
     @staticmethod
-    def _money_str(value: Decimal) -> str:
-        amount = value if isinstance(value, Decimal) else Decimal(str(value or 0))
-        return f"{amount:.2f}"
+    def _money_str(value) -> str:
+        return str(quantize_money(value or 0))
 
     def get_planned_amount(self, obj):
         return str(obj.budget_amount or Decimal("0"))

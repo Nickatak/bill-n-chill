@@ -57,7 +57,7 @@ class CostCode(models.Model):
 
         Returns the number of cost codes actually created (skips duplicates).
         """
-        from core.policies.cost_codes import DEFAULT_COST_CODE_ROWS
+        from core.utils.cost_code_defaults import DEFAULT_COST_CODE_ROWS
 
         created_count = 0
         for code, name in DEFAULT_COST_CODE_ROWS:

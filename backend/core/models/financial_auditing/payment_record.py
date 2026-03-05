@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 from django.db import models
+
+from core.models.mixins import ImmutableModelMixin
 
 User = get_user_model()
 
@@ -13,7 +14,7 @@ PAYMENT_STATUS_CHOICES = [
 ]
 
 
-class PaymentRecord(models.Model):
+class PaymentRecord(ImmutableModelMixin):
     """Immutable audit record for payment lifecycle and provenance captures.
 
     Business workflow:
@@ -34,6 +35,8 @@ class PaymentRecord(models.Model):
         IMPORTED = "imported", "Imported"
         SYNCED = "synced", "Synced"
 
+    _immutable_label = "Payment records"
+
     class CaptureSource(models.TextChoices):
         MANUAL_UI = "manual_ui", "Manual UI"
         MANUAL_API = "manual_api", "Manual API"
@@ -41,12 +44,6 @@ class PaymentRecord(models.Model):
         PROCESSOR_SYNC = "processor_sync", "Processor Sync"
         CSV_IMPORT = "csv_import", "CSV Import"
         SYSTEM = "system", "System"
-
-    class PaymentRecordQuerySet(models.QuerySet):
-        def delete(self):
-            raise ValidationError("Payment records are immutable and cannot be deleted.")
-
-    objects = PaymentRecordQuerySet.as_manager()
 
     payment = models.ForeignKey(
         "Payment",
@@ -116,14 +113,6 @@ class PaymentRecord(models.Model):
             metadata_json=metadata or {},
             recorded_by=recorded_by,
         )
-
-    def save(self, *args, **kwargs):
-        if self.pk is not None:
-            raise ValidationError("Payment records are immutable and cannot be updated.")
-        return super().save(*args, **kwargs)
-
-    def delete(self, using=None, keep_parents=False):
-        raise ValidationError("Payment records are immutable and cannot be deleted.")
 
     def __str__(self) -> str:
         return f"PAY-{self.payment_id} {self.event_type} ({self.capture_source})"

@@ -1,8 +1,5 @@
 """Shared operational cost-code endpoints."""
 
-import csv
-from io import StringIO
-
 from django.db import IntegrityError
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -10,6 +7,7 @@ from rest_framework.response import Response
 
 from core.models import CostCode
 from core.serializers import CostCodeSerializer
+from core.utils.csv_import import CsvImportError, process_csv_import
 from core.views.helpers import (
     _ensure_membership,
     _organization_user_ids,
@@ -110,134 +108,56 @@ def cost_codes_import_csv_view(request):
 
     scope_filter = _cost_code_scope_filter(request.user)
     membership = _ensure_membership(request.user)
-
     csv_text = request.data.get("csv_text", "")
     dry_run = _parse_request_bool(request.data.get("dry_run", True), default=True)
-    if not csv_text or not str(csv_text).strip():
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "csv_text is required.",
-                    "fields": {"csv_text": ["Provide CSV content with headers."]},
-                }
-            },
-            status=400,
+
+    headers = {"code", "name"}
+
+    def validate_row(row):
+        if not row.get("code") or not row.get("name"):
+            return "code and name are required."
+        return None
+
+    def lookup_existing(row):
+        return CostCode.objects.filter(scope_filter, code__iexact=row["code"]).first()
+
+    def create_cost_code(row):
+        return CostCode.objects.create(
+            created_by=request.user,
+            organization_id=membership.organization_id,
+            code=row["code"],
+            name=row["name"],
+            is_active=True,
         )
 
-    reader = csv.DictReader(StringIO(str(csv_text)))
-    expected_headers = {"code", "name"}
-    incoming_headers = set(reader.fieldnames or [])
-    if not {"code", "name"}.issubset(incoming_headers):
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "CSV headers are invalid for cost code import.",
-                    "fields": {"headers": [f"Expected: code,name. Found: {', '.join(sorted(incoming_headers))}"]},
-                }
-            },
-            status=400,
-        )
-    unknown_headers = incoming_headers - expected_headers
-    if unknown_headers:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "CSV contains unsupported headers.",
-                    "fields": {"headers": [f"Unsupported: {', '.join(sorted(unknown_headers))}."]},
-                }
-            },
-            status=400,
-        )
+    def update_cost_code(existing, row):
+        existing.name = row["name"]
+        existing.save(update_fields=["name", "updated_at"])
+        return existing
 
-    rows_out = []
-    created_count = 0
-    updated_count = 0
-    error_count = 0
-
-    for index, row in enumerate(reader, start=2):
-        code = (row.get("code") or "").strip()
-        name = (row.get("name") or "").strip()
-        if not code or not name:
-            error_count += 1
-            rows_out.append(
-                {
-                    "row_number": index,
-                    "code": code,
-                    "name": name,
-                    "status": "error",
-                    "message": "code and name are required.",
-                }
-            )
-            continue
-        existing = CostCode.objects.filter(scope_filter, code__iexact=code).first()
-        if existing:
-            if dry_run:
-                rows_out.append(
-                    {
-                        "row_number": index,
-                        "code": code,
-                        "name": name,
-                        "status": "would_update",
-                        "message": f"Would update cost code #{existing.id}.",
-                    }
-                )
-            else:
-                existing.name = name
-                existing.save(update_fields=["name", "updated_at"])
-                updated_count += 1
-                rows_out.append(
-                    {
-                        "row_number": index,
-                        "code": code,
-                        "name": name,
-                        "status": "updated",
-                        "message": f"Updated cost code #{existing.id}.",
-                    }
-                )
-            continue
-
-        if dry_run:
-            rows_out.append(
-                {
-                    "row_number": index,
-                    "code": code,
-                    "name": name,
-                    "status": "would_create",
-                    "message": "Would create new cost code.",
-                }
-            )
-        else:
-            CostCode.objects.create(
-                created_by=request.user,
-                organization_id=membership.organization_id,
-                code=code,
-                name=name,
-                is_active=True,
-            )
-            created_count += 1
-            rows_out.append(
-                {
-                    "row_number": index,
-                    "code": code,
-                    "name": name,
-                    "status": "created",
-                    "message": "Created cost code.",
-                }
-            )
-
-    return Response(
-        {
-            "data": {
-                "entity": "cost_codes",
-                "mode": "preview" if dry_run else "apply",
-                "total_rows": len(rows_out),
-                "created_count": created_count,
-                "updated_count": updated_count,
-                "error_count": error_count,
-                "rows": rows_out,
-            }
+    def serialize_row(_instance, status, row, row_number, message):
+        return {
+            "row_number": row_number,
+            "code": row.get("code", ""),
+            "name": row.get("name", ""),
+            "status": status,
+            "message": message,
         }
-    )
+
+    try:
+        rows_out, summary = process_csv_import(
+            csv_text=csv_text,
+            dry_run=dry_run,
+            required_headers=headers,
+            allowed_headers=headers,
+            entity_name="cost code",
+            lookup_existing_fn=lookup_existing,
+            create_fn=create_cost_code,
+            update_fn=update_cost_code,
+            validate_row_fn=validate_row,
+            serialize_row_fn=serialize_row,
+        )
+    except CsvImportError as exc:
+        return Response(exc.error_payload, status=400)
+
+    return Response({"data": {**summary, "rows": rows_out}})

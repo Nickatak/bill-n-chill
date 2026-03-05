@@ -2,10 +2,12 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from core.models.mixins import StatusTransitionMixin
+
 User = get_user_model()
 
 
-class Project(models.Model):
+class Project(StatusTransitionMixin, models.Model):
     """Primary execution container for delivery and financial workflows.
 
     Business workflow:
@@ -38,6 +40,8 @@ class Project(models.Model):
 
     # Transition-map format:
     # {from_status: {allowed_to_status_1, allowed_to_status_2, ...}}
+    _status_label = "project"
+
     ALLOWED_STATUS_TRANSITIONS = {
         Status.PROSPECT: {Status.ACTIVE, Status.CANCELLED},
         Status.ACTIVE: {Status.ON_HOLD, Status.COMPLETED, Status.CANCELLED},
@@ -85,12 +89,6 @@ class Project(models.Model):
     def __str__(self) -> str:
         return self.name
 
-    @classmethod
-    def is_transition_allowed(cls, current_status: str, next_status: str) -> bool:
-        if current_status == next_status:
-            return True
-        return next_status in cls.ALLOWED_STATUS_TRANSITIONS.get(current_status, set())
-
     def clean(self):
         errors = {}
 
@@ -100,14 +98,7 @@ class Project(models.Model):
                     "Cannot set project to active or on hold while customer is archived."
                 )
 
-        if self.pk:
-            previous_status = (
-                type(self).objects.filter(pk=self.pk).values_list("status", flat=True).first()
-            )
-            if previous_status and not self.is_transition_allowed(previous_status, self.status):
-                errors.setdefault("status", []).append(
-                    f"Invalid project status transition: {previous_status} -> {self.status}."
-                )
+        self.validate_status_transition(errors)
 
         if errors:
             raise ValidationError(errors)
