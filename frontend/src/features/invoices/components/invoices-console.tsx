@@ -527,7 +527,7 @@ export function InvoicesConsole() {
       const resolvedProjectId = projectIdArg ?? Number(selectedProjectId);
       if (!token || !resolvedProjectId) {
         setBudgetLineOptions([]);
-        return;
+        return [];
       }
       try {
         const response = await fetch(`${normalizedBaseUrl}/projects/${resolvedProjectId}/budgets/`, {
@@ -536,7 +536,7 @@ export function InvoicesConsole() {
         const payload = (await response.json()) as { data?: ProjectBudgetRecord[] };
         if (!response.ok) {
           setBudgetLineOptions([]);
-          return;
+          return [];
         }
         const budgets = payload.data ?? [];
         const activeBudget = budgets.find((row) => row.status === "active");
@@ -602,8 +602,10 @@ export function InvoicesConsole() {
             .filter((line) => !GENERIC_BUDGET_COST_CODES.has(line.costCodeCode))
             ?? [];
         setBudgetLineOptions(options);
+        return options;
       } catch {
         setBudgetLineOptions([]);
+        return [];
       }
     },
     [normalizedBaseUrl, selectedProjectId, token],
@@ -652,6 +654,7 @@ export function InvoicesConsole() {
   }, [loadDependencies, token]);
 
   // Reload invoices and budget line options whenever the selected project changes.
+  // Also reset the workspace draft so line items reflect the new project's budget.
   useEffect(() => {
     const projectId = Number(selectedProjectId);
     if (!token || !projectId) {
@@ -661,7 +664,9 @@ export function InvoicesConsole() {
       return;
     }
     void loadInvoices(projectId);
-    void loadBudgetLineOptions(projectId);
+    void loadBudgetLineOptions(projectId).then((options) => {
+      resetCreateDraft(options);
+    });
   }, [loadBudgetLineOptions, loadInvoices, selectedProjectId, token]);
 
   // Auto-select the first project that has invoices when the default project is empty.
@@ -939,8 +944,10 @@ export function InvoicesConsole() {
   }
 
   /** Reset the creator workspace to a fresh new-draft state.
-   *  Pre-populates line items from the active budget with remaining billable amounts. */
-  function resetCreateDraft() {
+   *  Pre-populates line items from the active budget with remaining billable amounts.
+   *  Accepts optional budget line options for use before state has settled. */
+  function resetCreateDraft(optionsOverride?: BudgetLineOption[]) {
+    const options = optionsOverride ?? budgetLineOptions;
     const nextIssueDate = todayDateInput();
     const dueDays = organizationInvoiceDefaults?.default_invoice_due_delta ?? 30;
     setIssueDate(nextIssueDate);
@@ -948,7 +955,7 @@ export function InvoicesConsole() {
     setTaxPercent("0");
     setTermsText(organizationInvoiceDefaults?.invoice_terms_and_conditions || "");
 
-    const billableLines = budgetLineOptions
+    const billableLines = options
       .filter((opt) => parseAmount(opt.remainingBillable) > 0)
       .map((opt, idx) => ({
         localId: idx + 1,
@@ -966,7 +973,7 @@ export function InvoicesConsole() {
       setLineItems(billableLines);
       setNextLineId(billableLines.length + 1);
     } else {
-      const defaultBudgetLineId = budgetLineOptions[0] ? String(budgetLineOptions[0].id) : "";
+      const defaultBudgetLineId = options[0] ? String(options[0].id) : "";
       setLineItems([emptyLine(1, defaultBudgetLineId)]);
       setNextLineId(2);
     }
