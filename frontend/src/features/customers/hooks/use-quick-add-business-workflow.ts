@@ -13,7 +13,7 @@ import { FormEvent, RefObject, useState } from "react";
 
 import { postQuickAddCustomerIntake } from "../api";
 import {
-  ApiResponse,
+  IntakeApiResponse,
   CustomerIntakeRecord,
   CustomerIntakePayload,
   DuplicateData,
@@ -138,7 +138,7 @@ export function useQuickAddBusinessWorkflow({
         ...options,
       },
     });
-    const payload: ApiResponse = await response.json();
+    const payload: IntakeApiResponse = await response.json();
 
     // --- Duplicate conflict — park the submission and show candidates ---
 

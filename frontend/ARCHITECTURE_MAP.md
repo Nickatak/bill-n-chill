@@ -33,7 +33,6 @@ This map defines how to trace behavior from route to feature code and how to com
 | --- | --- | --- |
 | `/` | `frontend/src/app/page.tsx` | `frontend/src/app/home-route-content.tsx` |
 | `/register` | `frontend/src/app/register/page.tsx` | `frontend/src/features/session/components/home-register-console.tsx` |
-| `/settings/intake` | `frontend/src/app/settings/intake/page.tsx` | `frontend/src/features/settings-intake/components/intake-settings-console.tsx` |
 | `/ops/meta/help` | `frontend/src/app/ops/meta/help/page.tsx` | route-local WIP help content |
 | `/projects` | `frontend/src/app/projects/page.tsx` | `frontend/src/features/projects/components/projects-console.tsx` |
 | `/projects/[projectId]/activity` | `frontend/src/app/projects/[projectId]/activity/page.tsx` | `frontend/src/features/projects/components/project-activity-console.tsx` |
@@ -42,10 +41,9 @@ This map defines how to trace behavior from route to feature code and how to com
 | `/invoices` | `frontend/src/app/invoices/page.tsx` | `frontend/src/features/invoices/components/invoices-console.tsx` |
 | `/bills` | `frontend/src/app/bills/page.tsx` | `frontend/src/features/vendor-bills/components/vendor-bills-console.tsx` |
 | `/vendors` | `frontend/src/app/vendors/page.tsx` | `frontend/src/features/vendors/components/vendors-console.tsx` |
-| `/customers` | `frontend/src/app/customers/page.tsx` | `frontend/src/features/contacts/components/contacts-console.tsx` |
+| `/customers` | `frontend/src/app/customers/page.tsx` | `frontend/src/features/customers/components/customers-console.tsx` |
 | `/cost-codes` | `frontend/src/app/cost-codes/page.tsx` | `frontend/src/features/cost-codes/components/cost-codes-console.tsx` |
 | `/financials-auditing` | `frontend/src/app/financials-auditing/page.tsx` | `frontend/src/features/financials-auditing/components/financials-auditing-console.tsx` + `frontend/src/features/payments/components/payments-console.tsx` |
-| `/intake/quick-add` | `frontend/src/app/intake/quick-add/page.tsx` | `frontend/src/features/intake/components/quick-add-console.tsx` |
 | `/estimate/[publicRef]` | `frontend/src/app/estimate/[publicRef]/page.tsx` | `frontend/src/features/estimates/components/estimate-approval-preview.tsx` |
 | `/invoice/[publicRef]` | `frontend/src/app/invoice/[publicRef]/page.tsx` | `frontend/src/features/invoices/components/invoice-public-preview.tsx` |
 | `/change-order/[publicRef]` | `frontend/src/app/change-order/[publicRef]/page.tsx` | `frontend/src/features/change-orders/components/change-order-public-preview.tsx` |
@@ -82,13 +80,11 @@ When debugging UI behavior, walk this path in order.
 3. `frontend/src/features/vendor-bills/FEATURE_MAP.md`
 4. `frontend/src/features/payments/FEATURE_MAP.md`
 5. `frontend/src/features/budgets/FEATURE_MAP.md`
-6. `frontend/src/features/contacts/FEATURE_MAP.md`
+6. `frontend/src/features/customers/FEATURE_MAP.md`
 7. `frontend/src/features/cost-codes/FEATURE_MAP.md`
 8. `frontend/src/features/financials-auditing/FEATURE_MAP.md`
-9. `frontend/src/features/intake/FEATURE_MAP.md`
-10. `frontend/src/features/invoices/FEATURE_MAP.md`
-11. `frontend/src/features/projects/FEATURE_MAP.md`
-12. `frontend/src/features/session/FEATURE_MAP.md`
-13. `frontend/src/features/settings-intake/FEATURE_MAP.md`
-14. `frontend/src/features/vendors/FEATURE_MAP.md`
-15. Template: `frontend/src/features/FEATURE_MAP_TEMPLATE.md`
+9. `frontend/src/features/invoices/FEATURE_MAP.md`
+10. `frontend/src/features/projects/FEATURE_MAP.md`
+11. `frontend/src/features/session/FEATURE_MAP.md`
+12. `frontend/src/features/vendors/FEATURE_MAP.md`
+13. Template: `frontend/src/features/FEATURE_MAP_TEMPLATE.md`

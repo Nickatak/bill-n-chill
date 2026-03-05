@@ -16,7 +16,7 @@ from core.serializers.estimates import (
     EstimateStatusEventSerializer,
     EstimateWriteSerializer,
 )
-from core.serializers.intake import (
+from core.serializers.customers import (
     CustomerIntakeQuickAddSerializer,
     CustomerProjectCreateSerializer,
     CustomerSerializer,

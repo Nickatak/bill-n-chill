@@ -19,7 +19,7 @@ from core.serializers import (
     ProjectSerializer,
 )
 from core.views.helpers import _capability_gate, _organization_user_ids
-from core.views.shared_operations.intake_helpers import (
+from core.views.shared_operations.customers_helpers import (
     _build_customer_duplicate_candidate,
     _build_intake_payload,
     _find_duplicate_customers,
@@ -61,11 +61,34 @@ def customers_list_view(request):
             | Q(email__icontains=query)
             | Q(billing_address__icontains=query)
         )
+
+    # Pagination — defaults to page 1, 25 per page.
+    total_count = rows.count()
+    try:
+        page_size = max(1, min(100, int(request.query_params.get("page_size", 25))))
+    except (ValueError, TypeError):
+        page_size = 25
+    total_pages = max(1, (total_count + page_size - 1) // page_size)
+    try:
+        page = max(1, min(total_pages, int(request.query_params.get("page", 1))))
+    except (ValueError, TypeError):
+        page = 1
+    offset = (page - 1) * page_size
+    rows = rows[offset : offset + page_size]
+
     data = CustomerManageSerializer(rows, many=True).data
     for row in data:
         row["has_project"] = row["project_count"] > 0
         row["has_active_or_on_hold_project"] = row["active_project_count"] > 0
-    return Response({"data": data})
+    return Response({
+        "data": data,
+        "meta": {
+            "page": page,
+            "page_size": page_size,
+            "total_count": total_count,
+            "total_pages": total_pages,
+        },
+    })
 
 
 @api_view(["GET", "PATCH"])

@@ -31,30 +31,25 @@ export const workflowRoutes: NavRoute[] = [
     exact: ["/"],
   },
   {
-    href: "/intake/quick-add",
-    label: "1 Intake",
-    exact: ["/intake/quick-add"],
-  },
-  {
     href: "/customers",
-    label: "2 Customers",
+    label: "1 Customers",
     exact: ["/customers"],
   },
   {
     href: "/projects",
-    label: "3 Projects",
+    label: "2 Projects",
     exact: ["/projects"],
     startsWith: ["/projects/"],
   },
   {
     href: "/invoices",
-    label: "4 Billing",
+    label: "3 Billing",
     kind: "billing_menu",
     exact: ["/invoices", "/bills"],
   },
   {
     href: "/financials-auditing",
-    label: "5 Financials",
+    label: "4 Financials",
     exact: ["/financials-auditing"],
   },
 ];

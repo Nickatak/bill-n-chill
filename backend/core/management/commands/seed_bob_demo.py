@@ -1149,7 +1149,7 @@ class Command(BaseCommand):
         self.stdout.write("Child Models Change Orders: CO-1 approved, CO-2 void")
         self.stdout.write(f"Project ID: {project.id}")
         self.stdout.write("Manual flow entry points:")
-        self.stdout.write("- /intake/quick-add")
+        self.stdout.write("- /customers")
         self.stdout.write("- /projects")
         self.stdout.write(f"- /projects/{project.id}/estimates")
         self.stdout.write(f"- /projects/{project.id}/budgets/analytics")

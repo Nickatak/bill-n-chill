@@ -20,6 +20,8 @@ import { CustomerEditorForm } from "./customer-editor-form";
 import { CustomersFilters } from "./customers-filters";
 import { CustomersList } from "./customers-list";
 import { CustomerProjectCreateForm } from "./customer-project-create-form";
+import { QuickAddConsole } from "./quick-add-console";
+import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
 import styles from "./customers-console.module.css";
 
 type ActivityFilter = "all" | "active";
@@ -45,6 +47,7 @@ export function CustomersConsole() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const [isQuickAddExpanded, setIsQuickAddExpanded] = useState(true);
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<CustomerRow[]>([]);
   const [projectsByCustomer, setProjectsByCustomer] = useState<Record<number, ProjectRecord[]>>({});
@@ -56,6 +59,9 @@ export function CustomersConsole() {
   const backdropPointerStartRef = useRef(false);
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("active");
   const [projectFilter, setProjectFilter] = useState<ProjectFilter>("all");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState("");
@@ -101,18 +107,21 @@ export function CustomersConsole() {
   }
 
   /** Fetch the customer list from the API, optionally filtered by search text. */
-  async function loadCustomers(searchQuery: string) {
+  async function loadCustomers(searchQuery: string, requestedPage: number) {
     setStatusMessage("");
     try {
       const params = new URLSearchParams();
       if (searchQuery.trim()) {
         params.set("q", searchQuery.trim());
       }
-      const url = `${normalizedBaseUrl}/customers/${params.toString() ? `?${params.toString()}` : ""}`;
+      params.set("page", String(requestedPage));
+      params.set("page_size", "25");
+      const url = `${normalizedBaseUrl}/customers/?${params.toString()}`;
       const response = await fetch(url, {
         headers: buildAuthHeaders(token),
       });
-      const payload: ApiResponse = await response.json();
+      const payload: ApiResponse & { meta?: { page?: number; total_pages?: number; total_count?: number } } =
+        await response.json();
       if (!response.ok) {
         setStatusMessage(payload.error?.message ?? "Could not load customers.");
         return;
@@ -120,6 +129,9 @@ export function CustomersConsole() {
 
       const items = (payload.data as CustomerRow[]) ?? [];
       setRows(items);
+      setTotalPages(payload.meta?.total_pages ?? 1);
+      setTotalCount(payload.meta?.total_count ?? items.length);
+      setPage(payload.meta?.page ?? requestedPage);
       const scopedId = scopedCustomerId;
       const scopedCustomer = scopedId ? items.find((entry) => entry.id === scopedId) : null;
       if (scopedCustomer) {
@@ -166,11 +178,11 @@ export function CustomersConsole() {
       return;
     }
     const timer = window.setTimeout(() => {
-      void loadCustomers(query);
+      void loadCustomers(query, page);
     }, 250);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, query, normalizedBaseUrl, scopedCustomerId]);
+  }, [token, query, page, normalizedBaseUrl, scopedCustomerId]);
 
   // Fetch project index once on mount for the per-customer project accordion
   useEffect(() => {
@@ -326,27 +338,73 @@ export function CustomersConsole() {
         <p>Find customers quickly and jump directly to their project workspaces.</p>
       </header>
 
-      <CustomersFilters
-        query={query}
-        onQueryChange={setQuery}
-        activityFilter={activityFilter}
-        onActivityFilterChange={setActivityFilter}
-        projectFilter={projectFilter}
-        onProjectFilterChange={setProjectFilter}
-      />
+      {/* Quick Add — collapsible intake form */}
+      <div className={styles.quickAddSection}>
+        <div className={styles.quickAddHeader}>
+          <h3 className={styles.quickAddTitle}>Quick Add Customer</h3>
+          <button
+            type="button"
+            className={collapseButtonStyles.collapseButton}
+            onClick={() => setIsQuickAddExpanded((v) => !v)}
+            aria-expanded={isQuickAddExpanded}
+          >
+            {isQuickAddExpanded ? "Collapse" : "Expand"}
+          </button>
+        </div>
+        {isQuickAddExpanded ? <QuickAddConsole /> : null}
+      </div>
 
-      {statusMessage ? <p className={styles.statusMessage}>{statusMessage}</p> : null}
+      {/* Browse — search, filters, customer list, pagination */}
+      <div className={styles.browseSection}>
+        <h3 className={styles.browseSectionTitle}>Browse Customers</h3>
 
-      {/* Customer table with expandable project accordions */}
+        <CustomersFilters
+          query={query}
+          onQueryChange={(next) => {
+            setQuery(next);
+            setPage(1);
+          }}
+          activityFilter={activityFilter}
+          onActivityFilterChange={setActivityFilter}
+          projectFilter={projectFilter}
+          onProjectFilterChange={setProjectFilter}
+        />
 
-      <CustomersList
-        rows={rows}
-        filteredRows={filteredRows}
-        query={query}
-        projectsByCustomer={projectsByCustomer}
-        onEdit={openEditor}
-        onCreateProject={openProjectCreator}
-      />
+        {statusMessage ? <p className={styles.statusMessage}>{statusMessage}</p> : null}
+
+        <CustomersList
+          rows={rows}
+          filteredRows={filteredRows}
+          query={query}
+          projectsByCustomer={projectsByCustomer}
+          onEdit={openEditor}
+          onCreateProject={openProjectCreator}
+        />
+
+        {totalPages > 1 ? (
+          <nav className={styles.pagination} aria-label="Customer list pagination">
+            <button
+              type="button"
+              className={styles.paginationButton}
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Previous
+            </button>
+            <span className={styles.paginationInfo}>
+              Page {page} of {totalPages} ({totalCount} customers)
+            </span>
+            <button
+              type="button"
+              className={styles.paginationButton}
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            >
+              Next
+            </button>
+          </nav>
+        ) : null}
+      </div>
 
       {/* Edit customer modal */}
 

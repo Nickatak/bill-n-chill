@@ -212,7 +212,7 @@
 
 .inlineActions {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   gap: var(--space-md);
 }
 
@@ -432,9 +432,12 @@
 
 @media (max-width: 860px) {
   .formGrid,
-  .optionalBody,
-  .inlineActions {
+  .optionalBody {
     grid-template-columns: 1fr;
+  }
+
+  .inlineActions {
+    flex-direction: column;
   }
 }
 

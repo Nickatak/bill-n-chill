@@ -118,7 +118,7 @@ Expected URLs (key surfaces):
 
 - Backend health: `http://localhost:8000/api/v1/health/`
 - Frontend app: `http://localhost:3000`
-- Intake: `http://localhost:3000/intake/quick-add`
+- Customers: `http://localhost:3000/customers`
 - Projects: `http://localhost:3000/projects`
 - Estimates: `http://localhost:3000/estimates`
 - Change Orders: `http://localhost:3000/change-orders`

@@ -42,7 +42,7 @@ type HierarchyRule = {
 // Shared crumb anchors
 // ---------------------------------------------------------------------------
 
-const INTAKE_CRUMB: CrumbDef = { href: "/intake/quick-add", label: "Intake" };
+const CUSTOMERS_HUB_CRUMB: CrumbDef = { href: "/customers", label: "Customers" };
 const PROJECTS_HUB_CRUMB: CrumbDef = { href: "/projects", label: "Projects" };
 const BILLING_HUB_CRUMB: CrumbDef = { href: "/invoices", label: "Billing" };
 const META_HUB_CRUMB: CrumbDef = { href: "/customers", label: "Ops / Meta" };
@@ -65,8 +65,8 @@ const legacyProjectScopedPrefixes = [
  */
 const hierarchyRules: HierarchyRule[] = [
   {
-    when: (pathname) => pathname === "/" || pathname === "/intake/quick-add",
-    crumbs: [INTAKE_CRUMB],
+    when: (pathname) => pathname === "/",
+    crumbs: [{ href: "/", label: "Dashboard" }],
   },
   {
     when: (pathname) => pathname === "/projects",
@@ -103,7 +103,7 @@ const hierarchyRules: HierarchyRule[] = [
   },
   {
     when: (pathname) => pathname === "/customers",
-    crumbs: [{ href: "/customers", label: "Customers" }],
+    crumbs: [CUSTOMERS_HUB_CRUMB],
   },
   {
     when: (pathname) => pathname === "/vendors",

@@ -466,7 +466,7 @@ export function ProjectsConsole() {
 
       {projects.length === 0 ? (
         <p>
-          No projects yet. Create one from <code>/customers</code> or <code>/intake/quick-add</code>.
+          No projects yet. Create one from <code>/customers</code>.
         </p>
       ) : null}
 

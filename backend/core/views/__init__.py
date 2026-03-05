@@ -39,7 +39,7 @@ from core.views.estimating.estimates import (
     public_estimate_detail_view,
     project_estimates_view,
 )
-from core.views.shared_operations.intake import (
+from core.views.shared_operations.customers import (
     customer_project_create_view,
     customer_detail_view,
     customers_list_view,

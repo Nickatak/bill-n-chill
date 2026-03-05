@@ -2,20 +2,20 @@
 
 > **Line anchors are pinned manually.** Update after refactors that move function definitions.
 
-End-to-end function call order for each customer action. All backend view functions live in [`intake.py`](../../backend/core/views/shared_operations/intake.py) unless noted.
+End-to-end function call order for each customer action. All backend view functions live in [`customers.py`](../../backend/core/views/shared_operations/customers.py) unless noted.
 
 ## Key Source Files
 
 | Layer | File | Purpose |
 |-------|------|---------|
-| Backend | [`views/shared_operations/intake.py`](../../backend/core/views/shared_operations/intake.py) | All customer endpoints + view helpers |
-| Backend | [`serializers/intake.py`](../../backend/core/serializers/intake.py) | Validation serializers |
+| Backend | [`views/shared_operations/customers.py`](../../backend/core/views/shared_operations/customers.py) | All customer endpoints + view helpers |
+| Backend | [`serializers/customers.py`](../../backend/core/serializers/customers.py) | Validation serializers |
 | Backend | [`models/shared_operations/customers.py`](../../backend/core/models/shared_operations/customers.py) | `Customer` model |
 | Backend | [`models/financial_auditing/customer_record.py`](../../backend/core/models/financial_auditing/customer_record.py) | `CustomerRecord` immutable audit |
 | Backend | [`models/financial_auditing/lead_contact_record.py`](../../backend/core/models/financial_auditing/lead_contact_record.py) | `LeadContactRecord` immutable audit |
-| Frontend | [`features/customers/components/customers-console.tsx`](../../frontend/src/features/customers/components/customers-console.tsx) | Customer list, edit, project create |
-| Frontend | [`features/intake/hooks/use-quick-add-business-workflow.ts`](../../frontend/src/features/intake/hooks/use-quick-add-business-workflow.ts) | Quick-add submission orchestration |
-| Frontend | [`features/intake/api.ts`](../../frontend/src/features/intake/api.ts) | Quick-add API helper |
+| Frontend | [`features/customers/components/customers-console.tsx`](../../frontend/src/features/customers/components/customers-console.tsx) | Customer list, edit, project create, quick-add |
+| Frontend | [`features/customers/hooks/use-quick-add-business-workflow.ts`](../../frontend/src/features/customers/hooks/use-quick-add-business-workflow.ts) | Quick-add submission orchestration |
+| Frontend | [`features/customers/api.ts`](../../frontend/src/features/customers/api.ts) | API helpers |
 
 ## List Customers
 
@@ -27,7 +27,7 @@ End-to-end function call order for each customer action. All backend view functi
 
 ---
 
-`BACKEND` — [`customers_list_view`](../../backend/core/views/shared_operations/intake.py#L37)
+`BACKEND` — [`customers_list_view`](../../backend/core/views/shared_operations/customers.py#L37)
 
 *── org scoping ──*
 
@@ -40,7 +40,7 @@ End-to-end function call order for each customer action. All backend view functi
 
 *── serialization ──*
 
-- [`CustomerManageSerializer(rows, many=True)`](../../backend/core/serializers/intake.py#L77)
+- [`CustomerManageSerializer(rows, many=True)`](../../backend/core/serializers/customers.py#L77)
 
 ---
 
@@ -61,7 +61,7 @@ End-to-end function call order for each customer action. All backend view functi
 
 ---
 
-`BACKEND` — [`customer_detail_view`](../../backend/core/views/shared_operations/intake.py#L73) (PATCH branch)
+`BACKEND` — [`customer_detail_view`](../../backend/core/views/shared_operations/customers.py#L73) (PATCH branch)
 
 *── org scoping ──*
 
@@ -75,7 +75,7 @@ End-to-end function call order for each customer action. All backend view functi
 *── persist ──*
 
 - `transaction.atomic():`
-  - [`CustomerManageSerializer(customer, data=…, partial=True).save()`](../../backend/core/serializers/intake.py#L77)
+  - [`CustomerManageSerializer(customer, data=…, partial=True).save()`](../../backend/core/serializers/customers.py#L77)
   - *── archive cascade ──*
   - if `is_archived` changed `false → true`: `customer.projects.filter(status=PROSPECT).update(status=CANCELLED)`
   - *── audit record ──*
@@ -103,7 +103,7 @@ End-to-end function call order for each customer action. All backend view functi
 
 ---
 
-`BACKEND` — [`customer_project_create_view`](../../backend/core/views/shared_operations/intake.py#L190)
+`BACKEND` — [`customer_project_create_view`](../../backend/core/views/shared_operations/customers.py#L190)
 
 *── org scoping ──*
 
@@ -116,7 +116,7 @@ End-to-end function call order for each customer action. All backend view functi
 
 *── validation ──*
 
-- [`CustomerProjectCreateSerializer(data=…).is_valid()`](../../backend/core/serializers/intake.py#L140)
+- [`CustomerProjectCreateSerializer(data=…).is_valid()`](../../backend/core/serializers/customers.py#L140)
 - defaults: `name` → `"<customer> Project"`, `site_address` → customer billing address, `initial_contract_value` → `0`
 - if `site_address` is empty after defaults: `HTTP 400`
 
@@ -138,65 +138,65 @@ End-to-end function call order for each customer action. All backend view functi
 
 ## Quick Add Customer Intake
 
-`FRONTEND` — [`QuickAddConsole`](../../frontend/src/features/intake/components/quick-add-console.tsx#L19)
+`FRONTEND` — [`QuickAddConsole`](../../frontend/src/features/customers/components/quick-add-console.tsx#L19)
 
-- [`useQuickAddController({ token })`](../../frontend/src/features/intake/hooks/use-quick-add-controller.ts#L41)
-  - [`useQuickAddBusinessWorkflow(…)`](../../frontend/src/features/intake/hooks/use-quick-add-business-workflow.ts#L62)
+- [`useQuickAddController({ token })`](../../frontend/src/features/customers/hooks/use-quick-add-controller.ts#L41)
+  - [`useQuickAddBusinessWorkflow(…)`](../../frontend/src/features/customers/hooks/use-quick-add-business-workflow.ts#L62)
 
 *── submission ──*
 
-- [`handleQuickAdd(event)`](../../frontend/src/features/intake/hooks/use-quick-add-business-workflow.ts#L238)
-  - [`validateLeadFields(payload, { intent, projectName })`](../../frontend/src/features/intake/hooks/quick-add-validation.ts)
-  - [`submitQuickAdd(payload, submission)`](../../frontend/src/features/intake/hooks/use-quick-add-business-workflow.ts#L125)
-    - [`postQuickAddCustomerIntake({ baseUrl, token, body })`](../../frontend/src/features/intake/api.ts#L25)
+- [`handleQuickAdd(event)`](../../frontend/src/features/customers/hooks/use-quick-add-business-workflow.ts#L238)
+  - [`validateLeadFields(payload, { intent, projectName })`](../../frontend/src/features/customers/hooks/quick-add-validation.ts)
+  - [`submitQuickAdd(payload, submission)`](../../frontend/src/features/customers/hooks/use-quick-add-business-workflow.ts#L125)
+    - [`postQuickAddCustomerIntake({ baseUrl, token, body })`](../../frontend/src/features/customers/api.ts#L25)
       - [`buildAuthHeaders(token, { contentType })`](../../frontend/src/features/session/auth-headers.ts#L39)
       - `fetch POST /customers/quick-add/  { full_name, phone, email, … }`
 
 ---
 
-`BACKEND` — [`quick_add_customer_intake_view`](../../backend/core/views/shared_operations/intake.py#L430)
+`BACKEND` — [`quick_add_customer_intake_view`](../../backend/core/views/shared_operations/customers.py#L300)
 
 *── capability gate ──*
 
-- [`_capability_gate(request.user, "customers", "create")`](../../backend/core/rbac.py#L104)
+- [`_capability_gate(request.user, "customers", "create")`](../../backend/core/rbac.py#L18)
 
 *── validation ──*
 
-- [`CustomerIntakeQuickAddSerializer(data=…).is_valid()`](../../backend/core/serializers/intake.py#L27)
+- [`CustomerIntakeQuickAddSerializer(data=…).is_valid()`](../../backend/core/serializers/customers.py#L27)
 - project field validation (if `create_project=true`)
 
 *── duplicate detection ──*
 
-- [`_find_duplicate_customers(user, phone=…, email=…)`](../../backend/core/views/shared_operations/intake.py#L34)
-  - [`_organization_user_ids(user)`](../../backend/core/views/helpers.py#L118)
+- [`_find_duplicate_customers(user, phone=…, email=…)`](../../backend/core/views/shared_operations/customers_helpers.py#L10)
+  - [`_organization_user_ids(user)`](../../backend/core/user_helpers.py#L99)
   - direct match by phone/email
-  - [`_normalized_phone()`](../../backend/core/views/shared_operations/intake.py#L30) secondary pass
-- if duplicates found and no resolution: `HTTP 409` with [`_build_customer_duplicate_candidate(…)`](../../backend/core/views/shared_operations/intake.py#L58)
+  - [`_normalized_phone()`](../../backend/core/views/helpers.py#L114) secondary pass
+- if duplicates found and no resolution: `HTTP 409` with [`_build_customer_duplicate_candidate(…)`](../../backend/core/views/shared_operations/customers_helpers.py#L34)
 
 *── persist (no duplicates, or resolution=use_existing) ──*
 
 - `transaction.atomic():`
   - *── customer ──*
   - `Customer.objects.create(…)` (or use selected existing customer)
-  - [`_record_customer_record(…, CREATED)`](../../backend/core/views/shared_operations/intake.py#L152)
-    - [`_build_customer_snapshot(customer)`](../../backend/core/views/shared_operations/intake.py#L70)
+  - [`CustomerRecord.record(…, CREATED)`](../../backend/core/models/financial_auditing/customer_record.py#L70)
+    - [`customer.build_snapshot()`](../../backend/core/models/shared_operations/customers.py#L61)
     - [`CustomerRecord.objects.create(…)`](../../backend/core/models/financial_auditing/customer_record.py#L8)
   - *── intake record ──*
-  - [`_record_customer_intake_record(…, CREATED)`](../../backend/core/views/shared_operations/intake.py#L117)
-    - [`_build_intake_payload(…)`](../../backend/core/views/shared_operations/intake.py#L86)
+  - [`LeadContactRecord.record(…, CREATED)`](../../backend/core/models/financial_auditing/lead_contact_record.py#L90)
+    - [`_build_intake_payload(…)`](../../backend/core/views/shared_operations/customers_helpers.py#L46)
     - [`LeadContactRecord.objects.create(…)`](../../backend/core/models/financial_auditing/lead_contact_record.py#L16)
   - *── project (if create_project=true) ──*
   - `Project.objects.create(…)`
   - if `requested_status == ACTIVE`: `project.status = ACTIVE; project.save()`
-  - [`_record_customer_intake_record(…, CONVERTED)`](../../backend/core/views/shared_operations/intake.py#L117)
-    - [`_build_intake_payload(…, converted_customer_id, converted_project_id)`](../../backend/core/views/shared_operations/intake.py#L86)
+  - [`LeadContactRecord.record(…, CONVERTED)`](../../backend/core/models/financial_auditing/lead_contact_record.py#L90)
+    - [`_build_intake_payload(…, converted_customer_id, converted_project_id)`](../../backend/core/views/shared_operations/customers_helpers.py#L46)
     - [`LeadContactRecord.objects.create(…)`](../../backend/core/models/financial_auditing/lead_contact_record.py#L16)
 
 ---
 
 `HTTP 201` → `FRONTEND`
 
-- [`submitQuickAdd`](../../frontend/src/features/intake/hooks/use-quick-add-business-workflow.ts#L125) success path:
+- [`submitQuickAdd`](../../frontend/src/features/customers/hooks/use-quick-add-business-workflow.ts#L125) success path:
   - update confirmation state (`lastConvertedCustomerId`, `lastConvertedProjectId`)
   - reset form fields for next entry
   - `setLeadMessage("Customer + project created.")`
@@ -206,6 +206,6 @@ End-to-end function call order for each customer action. All backend view functi
 `HTTP 409` → `FRONTEND`
 
 - `setDuplicateCandidates(candidates)` — show duplicate resolution UI
-- [`resolveDuplicate(resolution, targetId)`](../../frontend/src/features/intake/hooks/use-quick-add-business-workflow.ts#L302)
-  - replays [`submitQuickAdd(…, { duplicate_resolution, duplicate_target_id })`](../../frontend/src/features/intake/hooks/use-quick-add-business-workflow.ts#L125)
+- [`resolveDuplicate(resolution, targetId)`](../../frontend/src/features/customers/hooks/use-quick-add-business-workflow.ts#L302)
+  - replays [`submitQuickAdd(…, { duplicate_resolution, duplicate_target_id })`](../../frontend/src/features/customers/hooks/use-quick-add-business-workflow.ts#L125)
   - `fetch POST /customers/quick-add/` (same endpoint, with resolution params)

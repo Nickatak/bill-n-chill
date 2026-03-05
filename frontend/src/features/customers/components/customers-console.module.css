@@ -37,6 +37,53 @@
     );
 }
 
+/* ── Quick Add collapsible section ── */
+
+.quickAddSection {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  background: var(--surface-secondary);
+}
+
+.quickAddHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.quickAddTitle {
+  margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-family: var(--font-geist-mono);
+  font-weight: 700;
+}
+
+/* ── Browse section ── */
+
+.browseSection {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  background: var(--surface-secondary);
+  display: grid;
+  gap: 14px;
+}
+
+.browseSectionTitle {
+  margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-family: var(--font-geist-mono);
+  font-weight: 700;
+}
+
 /* ── Filter bar ── */
 
 .controlsRow {
@@ -351,6 +398,40 @@
   padding: var(--space-md) 2px;
   color: var(--text-secondary);
   font-size: var(--font-base);
+}
+
+/* ── Pagination ── */
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+}
+
+.paginationButton {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 6px var(--space-md);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.paginationButton:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--text-primary) 35%, var(--border) 65%);
+}
+
+.paginationButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.paginationInfo {
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
 }
 
 /* ── Modal ── */
