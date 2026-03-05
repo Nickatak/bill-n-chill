@@ -3,6 +3,7 @@ from django.urls import path
 from core.views import (
     accept_invite_view,
     budget_line_detail_view,
+    check_invite_by_email_view,
     change_order_clone_revision_view,
     change_order_contract_view,
     change_order_detail_view,
@@ -74,6 +75,7 @@ urlpatterns = [
     path("auth/me/", me_view, name="auth-me"),
     path("auth/verify-invite/<str:token>/", verify_invite_view, name="auth-verify-invite"),
     path("auth/accept-invite/", accept_invite_view, name="auth-accept-invite"),
+    path("auth/check-invite/", check_invite_by_email_view, name="auth-check-invite"),
     path("organization/", organization_profile_view, name="organization-profile"),
     path(
         "organization/invites/",

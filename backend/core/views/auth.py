@@ -296,6 +296,69 @@ def me_view(request):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
+def check_invite_by_email_view(request):
+    """Check if a pending invite exists for the given email.
+
+    Used by the register page to auto-detect pending invites when a user
+    navigates to /register directly (without an invite link). Returns the
+    invite token so the frontend can switch to Flow B.
+
+    Contract:
+    - `GET`:
+      - `200`: pending invite found — returns org name, role, and invite token.
+      - `400`: email query param missing.
+      - `404`: no pending invite for this email.
+
+    - Preconditions:
+      - none (`AllowAny`).
+
+    - Object mutations:
+      - `GET`: none (read-only).
+
+    - Security:
+      - Leaks org name to anyone who guesses an invited email. Accepted
+        tradeoff: requires exact email + 24h expiry window. See
+        docs/meta/invite-registration-race.md.
+
+    - Test anchors:
+      - `backend/core/tests/test_invites.py::test_check_invite_by_email_*`
+    """
+    email = (request.query_params.get("email") or "").strip()
+    if not email:
+        return Response(
+            {"error": {"code": "validation_error", "message": "email query parameter is required.", "fields": {}}},
+            status=400,
+        )
+
+    invite = (
+        OrganizationInvite.objects.select_related("organization")
+        .filter(
+            email__iexact=email,
+            consumed_at__isnull=True,
+            expires_at__gt=timezone.now(),
+        )
+        .first()
+    )
+
+    if not invite:
+        return Response(
+            {"error": {"code": "not_found", "message": "No pending invite found.", "fields": {}}},
+            status=404,
+        )
+
+    return Response(
+        {
+            "data": {
+                "organization_name": invite.organization.display_name,
+                "role": invite.role,
+                "invite_token": invite.token,
+            }
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def verify_invite_view(request, token):
     """Verify an invite token and return context for the registration page.
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import type { HealthResult } from "@/shared/api/health";
@@ -38,6 +38,12 @@ type VerifyInviteData = {
   email: string;
   role: string;
   is_existing_user: boolean;
+};
+
+type DetectedInvite = {
+  organization_name: string;
+  role: string;
+  invite_token: string;
 };
 
 type InviteFlowState = "none" | "verifying" | "flow-b" | "flow-c" | "error";
@@ -98,6 +104,31 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
   // Invite flow state
   const [inviteFlow, setInviteFlow] = useState<InviteFlowState>(inviteToken ? "verifying" : "none");
   const [inviteData, setInviteData] = useState<VerifyInviteData | null>(null);
+
+  // Auto-detected invite (user registered directly without invite link)
+  const [detectedInvite, setDetectedInvite] = useState<DetectedInvite | null>(null);
+
+  // The effective invite token — prop (from URL) or auto-detected
+  const effectiveInviteToken = inviteToken ?? detectedInvite?.invite_token;
+
+  // Check for pending invites when user types their email (no invite token in URL).
+  const checkForPendingInvite = useCallback(async () => {
+    if (inviteToken || !email.trim()) return;
+
+    try {
+      const response = await fetch(
+        `${defaultApiBaseUrl}/auth/check-invite/?email=${encodeURIComponent(email.trim())}`,
+      );
+      if (response.ok) {
+        const body = await response.json();
+        setDetectedInvite(body.data as DetectedInvite);
+      } else {
+        setDetectedInvite(null);
+      }
+    } catch {
+      // Silently fail — this is a convenience check, not critical
+    }
+  }, [inviteToken, email]);
 
   // Verify invite token on mount
   useEffect(() => {
@@ -207,8 +238,8 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
 
     try {
       const body: Record<string, string> = { email, password };
-      if (inviteToken && inviteFlow === "flow-b") {
-        body.invite_token = inviteToken;
+      if (effectiveInviteToken) {
+        body.invite_token = effectiveInviteToken;
       }
 
       const response = await fetch(`${defaultApiBaseUrl}/auth/register/`, {
@@ -331,12 +362,13 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
   return (
     <section className={styles.shell}>
       <div className={styles.card}>
-        {inviteFlow === "flow-b" && inviteData ? (
+        {inviteFlow === "flow-b" && (inviteData || detectedInvite) ? (
           <div className={styles.warning} role="note" aria-label="Invite context">
             <p className={styles.warningTitle}>You&apos;re Invited</p>
             <p className={styles.warningText}>
-              Create an account to join <strong>{inviteData.organization_name}</strong> as{" "}
-              <strong>{inviteData.role}</strong>.
+              Create an account to join{" "}
+              <strong>{inviteData?.organization_name ?? detectedInvite?.organization_name}</strong> as{" "}
+              <strong>{inviteData?.role ?? detectedInvite?.role}</strong>.
             </p>
           </div>
         ) : (
@@ -353,6 +385,14 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
             </p>
           </div>
         )}
+        {detectedInvite && inviteFlow === "none" ? (
+          <div className={styles.inviteDetected} role="note" aria-label="Pending invite detected">
+            <p className={styles.inviteDetectedText}>
+              You&apos;ve been invited to join <strong>{detectedInvite.organization_name}</strong> as{" "}
+              <strong>{detectedInvite.role}</strong>. Complete registration below to join.
+            </p>
+          </div>
+        ) : null}
         <form className={styles.form} onSubmit={handleRegister}>
           <label>
             Email
@@ -360,6 +400,7 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
+              onBlur={checkForPendingInvite}
               autoComplete="email"
               required
               readOnly={inviteFlow === "flow-b"}

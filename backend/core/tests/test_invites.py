@@ -221,6 +221,56 @@ class VerifyInviteTests(InviteTestMixin, TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class CheckInviteByEmailTests(InviteTestMixin, TestCase):
+    """Tests for the check-invite-by-email endpoint (auto-detect pending invites)."""
+
+    def test_check_invite_returns_pending_invite(self):
+        self._create_invite(email="pending@test.com", role="pm")
+
+        response = self.client.get("/api/v1/auth/check-invite/?email=pending@test.com")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data["organization_name"], "Test Org")
+        self.assertEqual(data["role"], "pm")
+        self.assertTrue(data["invite_token"])
+
+    def test_check_invite_case_insensitive(self):
+        self._create_invite(email="CasE@test.com")
+
+        response = self.client.get("/api/v1/auth/check-invite/?email=case@test.com")
+        self.assertEqual(response.status_code, 200)
+
+    def test_check_invite_no_pending_returns_404(self):
+        response = self.client.get("/api/v1/auth/check-invite/?email=nobody@test.com")
+        self.assertEqual(response.status_code, 404)
+
+    def test_check_invite_expired_not_returned(self):
+        OrganizationInvite(
+            organization=self.organization, email="expired@test.com",
+            role="viewer", invited_by=self.owner,
+            expires_at=timezone.now() - timedelta(hours=1),
+        ).save()
+
+        response = self.client.get("/api/v1/auth/check-invite/?email=expired@test.com")
+        self.assertEqual(response.status_code, 404)
+
+    def test_check_invite_consumed_not_returned(self):
+        invite = OrganizationInvite(
+            organization=self.organization, email="consumed@test.com",
+            role="viewer", invited_by=self.owner,
+        )
+        invite.save()
+        invite.consumed_at = timezone.now()
+        invite.save(update_fields=["consumed_at"])
+
+        response = self.client.get("/api/v1/auth/check-invite/?email=consumed@test.com")
+        self.assertEqual(response.status_code, 404)
+
+    def test_check_invite_missing_email_returns_400(self):
+        response = self.client.get("/api/v1/auth/check-invite/")
+        self.assertEqual(response.status_code, 400)
+
+
 class FlowBTests(InviteTestMixin, TestCase):
     """Tests for Flow B: new user registering with invite token."""
 
