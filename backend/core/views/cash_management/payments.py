@@ -114,7 +114,7 @@ def project_payments_view(request, project_id: int):
           "direction": "inbound|outbound (required)",
           "method": "cash|check|ach|wire|credit_card|other (required)",
           "amount": "decimal (required)",
-          "status": "pending|settled|failed|void (optional, default=pending)",
+          "status": "pending|settled|void (optional, default=settled)",
           "payment_date": "YYYY-MM-DD (optional, default=today)",
           "reference_number": "string (optional)",
           "notes": "string (optional)"
@@ -178,7 +178,7 @@ def project_payments_view(request, project_id: int):
             project=project,
             direction=data["direction"],
             method=data["method"],
-            status=data.get("status", Payment.Status.PENDING),
+            status=data.get("status", Payment.Status.SETTLED),
             amount=data["amount"],
             payment_date=data.get("payment_date") or timezone.localdate(),
             reference_number=data.get("reference_number", ""),
@@ -255,7 +255,7 @@ def payment_detail_view(request, payment_id: int):
         {
           "direction": "inbound|outbound (optional; blocked after allocations exist)",
           "method": "cash|check|ach|wire|credit_card|other (optional)",
-          "status": "pending|settled|failed|void (optional; transition rules apply)",
+          "status": "pending|settled|void (optional; transition rules apply)",
           "amount": "decimal (optional; cannot be below allocated total)",
           "payment_date": "YYYY-MM-DD (optional)",
           "reference_number": "string (optional)",

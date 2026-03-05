@@ -43,7 +43,6 @@ class Payment(StatusTransitionMixin, models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
         SETTLED = "settled", "Settled"
-        FAILED = "failed", "Failed"
         VOID = "void", "Void"
 
     # Transition-map format:
@@ -53,9 +52,8 @@ class Payment(StatusTransitionMixin, models.Model):
     _status_label = "payment"
 
     ALLOWED_STATUS_TRANSITIONS = {
-        Status.PENDING: {Status.SETTLED, Status.FAILED, Status.VOID},
+        Status.PENDING: {Status.SETTLED, Status.VOID},
         Status.SETTLED: {Status.VOID},
-        Status.FAILED: {Status.VOID},
         Status.VOID: set(),
     }
 
@@ -69,7 +67,7 @@ class Payment(StatusTransitionMixin, models.Model):
     status = models.CharField(
         max_length=16,
         choices=Status.choices,
-        default=Status.PENDING,
+        default=Status.SETTLED,
     )
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     payment_date = models.DateField()

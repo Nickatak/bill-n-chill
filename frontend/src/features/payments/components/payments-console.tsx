@@ -33,19 +33,17 @@ import {
 } from "../types";
 import styles from "./payments-console.module.css";
 
-const PAYMENT_STATUSES_FALLBACK = ["pending", "settled", "failed", "void"];
+const PAYMENT_STATUSES_FALLBACK = ["pending", "settled", "void"];
 const PAYMENT_STATUS_LABELS_FALLBACK: Record<string, string> = {
   pending: "Pending",
   settled: "Settled",
-  failed: "Failed",
   void: "Void",
 };
 const PAYMENT_DIRECTIONS_FALLBACK = ["inbound", "outbound"];
 const PAYMENT_METHODS_FALLBACK = ["ach", "card", "check", "wire", "cash", "other"];
 const PAYMENT_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
-  pending: ["settled", "failed", "void"],
+  pending: ["settled", "void"],
   settled: ["void"],
-  failed: ["void"],
   void: [],
 };
 const PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK: Record<string, PaymentAllocationTargetType> = {
@@ -56,13 +54,10 @@ const PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK: Record<string, PaymentAll
 /** Return a contextual hint about the next workflow step for a given payment status. */
 function paymentNextActionHint(status: PaymentStatus): string {
   if (status === "pending") {
-    return "Next: settle or mark failed once bank confirmation is known.";
+    return "Next: settle once funds are confirmed, or void if cancelled.";
   }
   if (status === "settled") {
     return "Next: allocate this payment to invoice/vendor-bill targets.";
-  }
-  if (status === "failed") {
-    return "Next: retry collection/disbursement or void if cancelled.";
   }
   if (status === "void") {
     return "Payment is void and cannot be allocated.";
@@ -93,11 +88,11 @@ export function PaymentsConsole() {
   >(PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK);
   const [defaultCreateDirection, setDefaultCreateDirection] = useState<string>("inbound");
   const [defaultCreateMethod, setDefaultCreateMethod] = useState<string>("ach");
-  const [defaultCreateStatus, setDefaultCreateStatus] = useState<string>("pending");
+  const [defaultCreateStatus, setDefaultCreateStatus] = useState<string>("settled");
 
   const [newDirection, setNewDirection] = useState<PaymentDirection>("inbound");
   const [newMethod, setNewMethod] = useState<PaymentMethod>("ach");
-  const [newStatus, setNewStatus] = useState<PaymentStatus>("pending");
+  const [newStatus, setNewStatus] = useState<PaymentStatus>("settled");
   const [newAmount, setNewAmount] = useState("0.00");
   const [newPaymentDate, setNewPaymentDate] = useState(todayDateInput());
   const [newReferenceNumber, setNewReferenceNumber] = useState("");
@@ -105,7 +100,7 @@ export function PaymentsConsole() {
 
   const [direction, setDirection] = useState<PaymentDirection>("inbound");
   const [method, setMethod] = useState<PaymentMethod>("ach");
-  const [status, setStatus] = useState<PaymentStatus>("pending");
+  const [status, setStatus] = useState<PaymentStatus>("settled");
   const [amount, setAmount] = useState("0.00");
   const [paymentDate, setPaymentDate] = useState(todayDateInput());
   const [referenceNumber, setReferenceNumber] = useState("");
@@ -119,7 +114,8 @@ export function PaymentsConsole() {
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const searchParams = useSearchParams();
-  const canMutatePayments = canDo(capabilities, "payments", "create");
+  const canCreatePayments = canDo(capabilities, "payments", "create");
+  const canEditPayments = canDo(capabilities, "payments", "edit");
   const canAllocatePayments = canDo(capabilities, "payments", "allocate");
   const scopedProjectIdParam = searchParams.get("project");
   const scopedProjectId =
@@ -301,8 +297,8 @@ export function PaymentsConsole() {
   /** Submit a new payment record for the selected project. */
   async function handleCreatePayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canMutatePayments) {
-      setStatusMessage(`Role ${role} is read-only for payment mutations.`);
+    if (!canCreatePayments) {
+      setStatusMessage(`Role ${role} does not have payment create permission.`);
       return;
     }
 
@@ -360,8 +356,8 @@ export function PaymentsConsole() {
   /** Persist edits to the selected payment via PATCH. */
   async function handleSavePayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canMutatePayments) {
-      setStatusMessage(`Role ${role} is read-only for payment mutations.`);
+    if (!canEditPayments) {
+      setStatusMessage(`Role ${role} does not have payment edit permission.`);
       return;
     }
 
@@ -512,8 +508,8 @@ export function PaymentsConsole() {
 
   /** One-tap status transition for mobile quick actions (e.g. settle, void). */
   async function handleQuickPaymentStatus(nextStatus: PaymentStatus) {
-    if (!canMutatePayments) {
-      setStatusMessage(`Role ${role} is read-only for payment mutations.`);
+    if (!canEditPayments) {
+      setStatusMessage(`Role ${role} does not have payment edit permission.`);
       return;
     }
     const paymentId = Number(selectedPaymentId);
@@ -561,7 +557,7 @@ export function PaymentsConsole() {
       </p>
 
       <p className={styles.authMessage}>{authMessage}</p>
-      {!canMutatePayments ? (
+      {!canCreatePayments && !canEditPayments ? (
         <p className={styles.readOnlyNotice}>
           Role `{role}` can view payments but cannot create, edit, or allocate.
         </p>
@@ -644,7 +640,7 @@ export function PaymentsConsole() {
           <textarea value={newNotes} onChange={(event) => setNewNotes(event.target.value)} rows={3} />
         </label>
 
-        <button type="submit" disabled={!selectedProjectId || !canMutatePayments}>
+        <button type="submit" disabled={!selectedProjectId || !canCreatePayments}>
           Create Payment
         </button>
       </form>
@@ -731,7 +727,7 @@ export function PaymentsConsole() {
           <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} />
         </label>
 
-        <button type="submit" disabled={!selectedPaymentId || !canMutatePayments}>
+        <button type="submit" disabled={!selectedPaymentId || !canEditPayments}>
           Save Payment
         </button>
         <p>Mobile quick actions:</p>
@@ -741,7 +737,7 @@ export function PaymentsConsole() {
               key={`quick-status-${nextStatus}`}
               type="button"
               onClick={() => handleQuickPaymentStatus(nextStatus)}
-              disabled={!selectedPaymentId || !canMutatePayments}
+              disabled={!selectedPaymentId || !canEditPayments}
             >
               {paymentStatusDisplayLabel(nextStatus)}
             </button>

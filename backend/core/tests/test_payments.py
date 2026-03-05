@@ -48,7 +48,7 @@ class PaymentTests(TestCase):
             created_by=self.other_user,
         )
 
-    def _create_payment(self, *, status="pending", amount="800.00", direction="inbound"):
+    def _create_payment(self, *, status="settled", amount="800.00", direction="inbound"):
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/payments/",
             data={
@@ -132,7 +132,7 @@ class PaymentTests(TestCase):
             payload["methods"],
             [method for method, _label in Payment.Method.choices],
         )
-        self.assertEqual(payload["default_create_status"], Payment.Status.PENDING)
+        self.assertEqual(payload["default_create_status"], Payment.Status.SETTLED)
         self.assertEqual(payload["default_create_direction"], Payment.Direction.INBOUND)
         self.assertEqual(payload["default_create_method"], Payment.Method.ACH)
         self.assertEqual(payload["allowed_status_transitions"], expected_transitions)
@@ -144,7 +144,7 @@ class PaymentTests(TestCase):
                 Payment.Direction.OUTBOUND: "vendor_bill",
             },
         )
-        self.assertTrue(str(payload["policy_version"]).startswith("2026-02-23.payments."))
+        self.assertTrue(str(payload["policy_version"]).startswith("2026-03-05.payments."))
 
     def test_payment_create_and_project_list(self):
         response = self.client.post(
@@ -162,7 +162,7 @@ class PaymentTests(TestCase):
         )
         self.assertEqual(response.status_code, 201)
         payload = response.json()["data"]
-        self.assertEqual(payload["status"], "pending")
+        self.assertEqual(payload["status"], "settled")
         self.assertEqual(payload["direction"], "inbound")
         self.assertEqual(payload["method"], "ach")
         self.assertEqual(payload["amount"], "1200.00")
@@ -180,7 +180,7 @@ class PaymentTests(TestCase):
         self.assertEqual(record.event_type, PaymentRecord.EventType.CREATED)
         self.assertEqual(record.capture_source, PaymentRecord.CaptureSource.MANUAL_UI)
         self.assertIsNone(record.from_status)
-        self.assertEqual(record.to_status, Payment.Status.PENDING)
+        self.assertEqual(record.to_status, Payment.Status.SETTLED)
         self.assertEqual(record.recorded_by_id, self.user.id)
 
     def test_payment_list_scoped_by_project_and_user(self):
@@ -235,54 +235,6 @@ class PaymentTests(TestCase):
         self.assertEqual(to_void.status_code, 200)
         self.assertEqual(to_void.json()["data"]["status"], "void")
 
-    def test_payment_failed_only_transitions_to_void_and_void_is_terminal(self):
-        payment_id = self._create_payment(status="pending")
-
-        to_failed = self.client.patch(
-            f"/api/v1/payments/{payment_id}/",
-            data={"status": "failed"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(to_failed.status_code, 200)
-        self.assertEqual(to_failed.json()["data"]["status"], "failed")
-
-        failed_to_pending = self.client.patch(
-            f"/api/v1/payments/{payment_id}/",
-            data={"status": "pending"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(failed_to_pending.status_code, 400)
-        self.assertEqual(failed_to_pending.json()["error"]["code"], "validation_error")
-
-        failed_to_settled = self.client.patch(
-            f"/api/v1/payments/{payment_id}/",
-            data={"status": "settled"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(failed_to_settled.status_code, 400)
-        self.assertEqual(failed_to_settled.json()["error"]["code"], "validation_error")
-
-        to_void = self.client.patch(
-            f"/api/v1/payments/{payment_id}/",
-            data={"status": "void"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(to_void.status_code, 200)
-        self.assertEqual(to_void.json()["data"]["status"], "void")
-
-        void_to_pending = self.client.patch(
-            f"/api/v1/payments/{payment_id}/",
-            data={"status": "pending"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(void_to_pending.status_code, 400)
-        self.assertEqual(void_to_pending.json()["error"]["code"], "validation_error")
-
     def test_payment_patch_updates_direction_method_status_reference(self):
         payment_id = self._create_payment(status="pending", direction="inbound")
 
@@ -291,9 +243,9 @@ class PaymentTests(TestCase):
             data={
                 "direction": "outbound",
                 "method": "wire",
-                "status": "failed",
+                "status": "settled",
                 "reference_number": "WIR-3001",
-                "notes": "Wire rejected by bank.",
+                "notes": "Wire confirmed by bank.",
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -302,7 +254,7 @@ class PaymentTests(TestCase):
         payload = response.json()["data"]
         self.assertEqual(payload["direction"], "outbound")
         self.assertEqual(payload["method"], "wire")
-        self.assertEqual(payload["status"], "failed")
+        self.assertEqual(payload["status"], "settled")
         self.assertEqual(payload["reference_number"], "WIR-3001")
 
     def test_payment_allocation_inbound_partial_updates_invoice_balances(self):

@@ -11,7 +11,6 @@ User = get_user_model()
 PAYMENT_STATUS_CHOICES = [
     ("pending", "Pending"),
     ("settled", "Settled"),
-    ("failed", "Failed"),
     ("void", "Void"),
 ]
 
@@ -34,17 +33,19 @@ class PaymentRecord(ImmutableModelMixin):
         UPDATED = "updated", "Updated"
         STATUS_CHANGED = "status_changed", "Status Changed"
         ALLOCATION_APPLIED = "allocation_applied", "Allocation Applied"
-        IMPORTED = "imported", "Imported"
-        SYNCED = "synced", "Synced"
+        # TODO: Re-enable for sync integration (deferred from MVP)
+        # IMPORTED = "imported", "Imported"
+        # SYNCED = "synced", "Synced"
 
     _immutable_label = "Payment records"
 
     class CaptureSource(models.TextChoices):
         MANUAL_UI = "manual_ui", "Manual UI"
         MANUAL_API = "manual_api", "Manual API"
-        ACH_WEBHOOK = "ach_webhook", "ACH Webhook"
-        PROCESSOR_SYNC = "processor_sync", "Processor Sync"
-        CSV_IMPORT = "csv_import", "CSV Import"
+        # TODO: Re-enable for sync integration (deferred from MVP)
+        # ACH_WEBHOOK = "ach_webhook", "ACH Webhook"
+        # PROCESSOR_SYNC = "processor_sync", "Processor Sync"
+        # CSV_IMPORT = "csv_import", "CSV Import"
         SYSTEM = "system", "System"
 
     payment = models.ForeignKey(

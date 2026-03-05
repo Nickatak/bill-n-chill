@@ -35,18 +35,16 @@ import styles from "./payment-recorder.module.css";
 // Fallback constants (used if policy contract fetch fails)
 // ---------------------------------------------------------------------------
 
-const PAYMENT_STATUSES_FALLBACK = ["pending", "settled", "failed", "void"];
+const PAYMENT_STATUSES_FALLBACK = ["pending", "settled", "void"];
 const PAYMENT_STATUS_LABELS_FALLBACK: Record<string, string> = {
   pending: "Pending",
   settled: "Settled",
-  failed: "Failed",
   void: "Void",
 };
 const PAYMENT_METHODS_FALLBACK = ["ach", "card", "check", "wire", "cash", "other"];
 const PAYMENT_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
-  pending: ["settled", "failed", "void"],
+  pending: ["settled", "void"],
   settled: ["void"],
-  failed: ["void"],
   void: [],
 };
 const PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK: Record<string, PaymentAllocationTargetType> = {
@@ -71,9 +69,8 @@ export type PaymentRecorderProps = {
 
 /** Return a contextual hint about the next workflow step for a given payment status. */
 function paymentNextActionHint(status: PaymentStatus): string {
-  if (status === "pending") return "Next: settle or mark failed once bank confirmation is known.";
+  if (status === "pending") return "Next: settle once funds are confirmed, or void if cancelled.";
   if (status === "settled") return "Next: allocate this payment to targets.";
-  if (status === "failed") return "Next: retry collection/disbursement or void if cancelled.";
   if (status === "void") return "Payment is void and cannot be allocated.";
   return "Use allowed transitions from the policy contract.";
 }
@@ -104,23 +101,23 @@ export function PaymentRecorder({
     Record<string, PaymentAllocationTargetType>
   >(PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK);
   const [defaultCreateMethod, setDefaultCreateMethod] = useState<string>("ach");
-  const [defaultCreateStatus, setDefaultCreateStatus] = useState<string>("pending");
 
   // Payment list
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [selectedPaymentId, setSelectedPaymentId] = useState("");
 
-  // Create form (direction is locked from prop)
+  // Create form (direction is locked from prop, status defaults to settled on backend)
   const [newMethod, setNewMethod] = useState<PaymentMethod>("ach");
-  const [newStatus, setNewStatus] = useState<PaymentStatus>("pending");
   const [newAmount, setNewAmount] = useState("0.00");
   const [newPaymentDate, setNewPaymentDate] = useState(todayDateInput());
   const [newReferenceNumber, setNewReferenceNumber] = useState("");
   const [newNotes, setNewNotes] = useState("");
+  const [createAllocTarget, setCreateAllocTarget] = useState("");
+  const [createAllocAmount, setCreateAllocAmount] = useState("");
 
   // Edit form (direction is locked from prop)
   const [method, setMethod] = useState<PaymentMethod>("ach");
-  const [status, setStatus] = useState<PaymentStatus>("pending");
+  const [status, setStatus] = useState<PaymentStatus>("settled");
   const [amount, setAmount] = useState("0.00");
   const [paymentDate, setPaymentDate] = useState(todayDateInput());
   const [referenceNumber, setReferenceNumber] = useState("");
@@ -131,7 +128,8 @@ export function PaymentRecorder({
   const [allocationAmount, setAllocationAmount] = useState("0.00");
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
-  const canMutatePayments = canDo(capabilities, "payments", "create");
+  const canCreatePayments = canDo(capabilities, "payments", "create");
+  const canEditPayments = canDo(capabilities, "payments", "edit");
   const canAllocatePayments = canDo(capabilities, "payments", "allocate");
 
   const directionLabel = direction === "inbound" ? "Inbound" : "Outbound";
@@ -169,11 +167,12 @@ export function PaymentRecorder({
 
   function clearCreateForm() {
     setNewMethod(defaultCreateMethod);
-    setNewStatus(defaultCreateStatus);
     setNewAmount("0.00");
     setNewPaymentDate(todayDateInput());
     setNewReferenceNumber("");
     setNewNotes("");
+    setCreateAllocTarget("");
+    setCreateAllocAmount("");
   }
 
   function paymentStatusDisplayLabel(value: string): string {
@@ -209,8 +208,6 @@ export function PaymentRecorder({
 
       const nextDefaultMethod =
         contract.default_create_method || contract.methods[0] || PAYMENT_METHODS_FALLBACK[0];
-      const nextDefaultStatus =
-        contract.default_create_status || contract.statuses[0] || PAYMENT_STATUSES_FALLBACK[0];
 
       setPaymentStatuses(contract.statuses);
       setPaymentStatusLabels({ ...PAYMENT_STATUS_LABELS_FALLBACK, ...(contract.status_labels || {}) });
@@ -221,11 +218,9 @@ export function PaymentRecorder({
         ...(contract.allocation_target_by_direction || {}),
       });
       setDefaultCreateMethod(nextDefaultMethod);
-      setDefaultCreateStatus(nextDefaultStatus);
       setNewMethod((c) => (contract.methods.includes(c) ? c : nextDefaultMethod));
       setMethod((c) => (contract.methods.includes(c) ? c : nextDefaultMethod));
-      setNewStatus((c) => (contract.statuses.includes(c) ? c : nextDefaultStatus));
-      setStatus((c) => (contract.statuses.includes(c) ? c : nextDefaultStatus));
+      setStatus((c) => (contract.statuses.includes(c) ? c : "settled"));
     } catch {
       // Best-effort; static fallback remains active.
     }
@@ -260,8 +255,8 @@ export function PaymentRecorder({
 
   async function handleCreatePayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canMutatePayments) {
-      setStatusMessage(`Role ${role} is read-only for payment mutations.`);
+    if (!canCreatePayments) {
+      setStatusMessage(`Role ${role} does not have payment create permission.`);
       return;
     }
     if (!projectId) {
@@ -277,7 +272,6 @@ export function PaymentRecorder({
         body: JSON.stringify({
           direction,
           method: newMethod,
-          status: newStatus,
           amount: newAmount,
           payment_date: newPaymentDate,
           reference_number: newReferenceNumber,
@@ -290,12 +284,62 @@ export function PaymentRecorder({
         return;
       }
 
-      const created = payload.data as PaymentRecord;
+      let created = payload.data as PaymentRecord;
+
+      // One-step allocate: if user filled in the optional allocation, chain it.
+      const wantAllocate = createAllocTarget && createAllocAmount && createAllocAmount !== "0.00";
+      if (wantAllocate && canAllocatePayments) {
+        try {
+          const allocResponse = await fetch(`${normalizedBaseUrl}/payments/${created.id}/allocate/`, {
+            method: "POST",
+            headers: buildAuthHeaders(token, { contentType: "application/json" }),
+            body: JSON.stringify({
+              allocations: [
+                {
+                  target_type: allocationTargetType,
+                  target_id: Number(createAllocTarget),
+                  applied_amount: createAllocAmount,
+                },
+              ],
+            }),
+          });
+          const allocPayload: ApiResponse = await allocResponse.json();
+          if (allocResponse.ok) {
+            const result = allocPayload.data as PaymentAllocateResult;
+            created = result.payment;
+            onPaymentsChanged?.();
+          } else {
+            // Payment was created successfully but allocation failed — partial success.
+            setPayments((current) => [created, ...current]);
+            setSelectedPaymentId(String(created.id));
+            hydratePayment(created);
+            clearCreateForm();
+            setStatusMessage(
+              `Created payment #${created.id}, but allocation failed: ${allocPayload.error?.message ?? "unknown error"}. You can allocate manually below.`,
+            );
+            return;
+          }
+        } catch {
+          setPayments((current) => [created, ...current]);
+          setSelectedPaymentId(String(created.id));
+          hydratePayment(created);
+          clearCreateForm();
+          setStatusMessage(
+            `Created payment #${created.id}, but could not reach allocation endpoint. You can allocate manually below.`,
+          );
+          return;
+        }
+      }
+
       setPayments((current) => [created, ...current]);
       setSelectedPaymentId(String(created.id));
       hydratePayment(created);
       clearCreateForm();
-      setStatusMessage(`Created payment #${created.id}.`);
+      setStatusMessage(
+        wantAllocate
+          ? `Created and allocated payment #${created.id}.`
+          : `Created payment #${created.id}.`,
+      );
     } catch {
       setStatusMessage("Could not reach payment create endpoint.");
     }
@@ -311,8 +355,8 @@ export function PaymentRecorder({
 
   async function handleSavePayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canMutatePayments) {
-      setStatusMessage(`Role ${role} is read-only for payment mutations.`);
+    if (!canEditPayments) {
+      setStatusMessage(`Role ${role} does not have payment edit permission.`);
       return;
     }
     const paymentId = Number(selectedPaymentId);
@@ -400,8 +444,8 @@ export function PaymentRecorder({
   }
 
   async function handleQuickPaymentStatus(nextStatus: PaymentStatus) {
-    if (!canMutatePayments) {
-      setStatusMessage(`Role ${role} is read-only for payment mutations.`);
+    if (!canEditPayments) {
+      setStatusMessage(`Role ${role} does not have payment edit permission.`);
       return;
     }
     const paymentId = Number(selectedPaymentId);
@@ -457,27 +501,19 @@ export function PaymentRecorder({
           : "Record payments made to vendors and allocate them to bills."}
       </p>
 
-      {!canMutatePayments ? (
+      {!canCreatePayments && !canEditPayments ? (
         <p className={styles.readOnlyNotice}>
           Role `{role}` can view payments but cannot create, edit, or allocate.
         </p>
       ) : null}
 
       <form onSubmit={handleCreatePayment}>
-        <h3>Create Payment</h3>
+        <h3>Record Payment</h3>
         <label>
           Method
           <select value={newMethod} onChange={(e) => setNewMethod(e.target.value as PaymentMethod)}>
             {paymentMethods.map((v) => (
               <option key={`create-method-${v}`} value={v}>{v}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Status
-          <select value={newStatus} onChange={(e) => setNewStatus(e.target.value as PaymentStatus)}>
-            {paymentStatuses.map((v) => (
-              <option key={`create-status-${v}`} value={v}>{paymentStatusDisplayLabel(v)}</option>
             ))}
           </select>
         </label>
@@ -498,8 +534,34 @@ export function PaymentRecorder({
           <textarea value={newNotes} onChange={(e) => setNewNotes(e.target.value)} rows={3} />
         </label>
 
-        <button type="submit" disabled={!projectId || !canMutatePayments}>
-          Create Payment
+        {payableTargets.length > 0 ? (
+          <>
+            <h4>Allocate to {direction === "inbound" ? "Invoice" : "Bill"} (optional)</h4>
+            <label>
+              Target
+              <select value={createAllocTarget} onChange={(e) => setCreateAllocTarget(e.target.value)}>
+                <option value="">None</option>
+                {payableTargets.map((target) => (
+                  <option key={target.id} value={target.id}>
+                    {target.label} (due {target.balanceDue})
+                  </option>
+                ))}
+              </select>
+            </label>
+            {createAllocTarget ? (
+              <label>
+                Applied amount
+                <input
+                  value={createAllocAmount}
+                  onChange={(e) => setCreateAllocAmount(e.target.value)}
+                />
+              </label>
+            ) : null}
+          </>
+        ) : null}
+
+        <button type="submit" disabled={!projectId || !canCreatePayments}>
+          {createAllocTarget && createAllocAmount ? "Record & Allocate" : "Record Payment"}
         </button>
       </form>
 
@@ -562,7 +624,7 @@ export function PaymentRecorder({
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
         </label>
 
-        <button type="submit" disabled={!selectedPaymentId || !canMutatePayments}>
+        <button type="submit" disabled={!selectedPaymentId || !canEditPayments}>
           Save Payment
         </button>
         {quickStatusOptions.length > 0 ? (
@@ -574,7 +636,7 @@ export function PaymentRecorder({
                   key={`quick-status-${nextStatus}`}
                   type="button"
                   onClick={() => handleQuickPaymentStatus(nextStatus)}
-                  disabled={!selectedPaymentId || !canMutatePayments}
+                  disabled={!selectedPaymentId || !canEditPayments}
                 >
                   {paymentStatusDisplayLabel(nextStatus)}
                 </button>

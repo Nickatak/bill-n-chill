@@ -28,9 +28,10 @@ class PaymentAllocationRecord(ImmutableModelMixin):
     class CaptureSource(models.TextChoices):
         MANUAL_UI = "manual_ui", "Manual UI"
         MANUAL_API = "manual_api", "Manual API"
-        ACH_WEBHOOK = "ach_webhook", "ACH Webhook"
-        PROCESSOR_SYNC = "processor_sync", "Processor Sync"
-        CSV_IMPORT = "csv_import", "CSV Import"
+        # TODO: Re-enable for sync integration (deferred from MVP)
+        # ACH_WEBHOOK = "ach_webhook", "ACH Webhook"
+        # PROCESSOR_SYNC = "processor_sync", "Processor Sync"
+        # CSV_IMPORT = "csv_import", "CSV Import"
         SYSTEM = "system", "System"
 
     _immutable_label = "Payment allocation records"

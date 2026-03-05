@@ -1039,7 +1039,7 @@ class ReportingPackTests(TestCase):
             project=self.project,
             direction=Payment.Direction.INBOUND,
             method=Payment.Method.ACH,
-            status=Payment.Status.FAILED,
+            status=Payment.Status.VOID,
             amount="120.00",
             payment_date=today,
             created_by=self.user,

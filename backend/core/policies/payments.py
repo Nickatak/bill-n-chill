@@ -3,7 +3,7 @@
 from core.models import Payment
 from core.policies._base import _build_base_policy_contract
 
-PAYMENT_POLICY_VERSION = "2026-02-23.payments.v1"
+PAYMENT_POLICY_VERSION = "2026-03-05.payments.v2"
 
 
 def get_payment_policy_contract() -> dict:
@@ -11,7 +11,7 @@ def get_payment_policy_contract() -> dict:
     return _build_base_policy_contract(
         model_class=Payment,
         policy_version=PAYMENT_POLICY_VERSION,
-        default_create_status=Payment.Status.PENDING,
+        default_create_status=Payment.Status.SETTLED,
         extra_fields={
             "directions": [v for v, _l in Payment.Direction.choices],
             "methods": [v for v, _l in Payment.Method.choices],

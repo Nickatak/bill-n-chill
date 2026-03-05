@@ -9,9 +9,9 @@ export type ProjectRecord = {
   customer_display_name: string;
 };
 
-export type PaymentDirection = string;
-export type PaymentMethod = string;
-export type PaymentStatus = string;
+export type PaymentDirection = string; // "inbound" | "outbound"
+export type PaymentMethod = string; // "ach" | "card" | "check" | "wire" | "cash" | "other"
+export type PaymentStatus = string; // "pending" | "settled" | "void" ("failed" removed — sync deferred)
 export type PaymentAllocationTargetType = "invoice" | "vendor_bill";
 
 /** Generic allocation target shape accepted by PaymentRecorder. */
