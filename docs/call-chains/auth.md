@@ -45,12 +45,9 @@ Parent doc: [`docs/auth.md`](../auth.md)
 
 *── auth response ──*
 
-- [`_build_auth_response_payload(user, membership)`](../../backend/core/views/auth.py#L25)
+- [`_build_auth_response_payload(user, membership)`](../../backend/core/views/auth.py#L24)
   - `Token.objects.get_or_create(user=user)`
-  - [`_resolve_user_role(user)`](../../backend/core/user_helpers.py#L43)
-  - [`_resolve_user_capabilities(user)`](../../backend/core/user_helpers.py#L58)
-    - [`_ensure_membership(user)`](../../backend/core/user_helpers.py#L129)
-    - [`RoleTemplate.objects.filter(is_system=True, slug=…)`](../../backend/core/models/shared_operations/role_template.py#L7)
+  - [`_resolve_user_capabilities(user, membership=membership)`](../../backend/core/user_helpers.py#L58)
 
 ---
 
@@ -116,10 +113,9 @@ Parent doc: [`docs/auth.md`](../auth.md)
 
 *── auth response ──*
 
-- [`_build_auth_response_payload(user, membership)`](../../backend/core/views/auth.py#L25)
+- [`_build_auth_response_payload(user, membership)`](../../backend/core/views/auth.py#L24)
   - `Token.objects.get_or_create(user=user)`
-  - [`_resolve_user_role(user)`](../../backend/core/user_helpers.py#L43)
-  - [`_resolve_user_capabilities(user)`](../../backend/core/user_helpers.py#L58)
+  - [`_resolve_user_capabilities(user, membership=membership)`](../../backend/core/user_helpers.py#L58)
 
 ---
 

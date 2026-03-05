@@ -12,11 +12,9 @@ class LoginSerializer(serializers.Serializer):
         email = attrs["email"].strip().lower()
         password = attrs["password"]
 
-        users = User.objects.filter(email__iexact=email, is_active=True)
-        if users.count() != 1:
+        user = User.objects.filter(email__iexact=email, is_active=True).first()
+        if not user:
             raise serializers.ValidationError("Invalid email or password.")
-
-        user = users.first()
         if not user.check_password(password):
             raise serializers.ValidationError("Invalid email or password.")
 
