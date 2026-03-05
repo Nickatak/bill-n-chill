@@ -55,25 +55,16 @@ class AuthEndpointTests(TestCase):
             len(DEFAULT_COST_CODE_ROWS),
         )
 
-    def test_register_creates_account_and_returns_token(self):
+    def test_register_creates_account_and_sends_verification(self):
         register_response = self.client.post(
             "/api/v1/auth/register/",
             data={"email": "newuser@example.com", "password": "secret123"},
             content_type="application/json",
         )
-        self.assertEqual(register_response.status_code, 201)
-        self.assertOrganizationPayload(register_response.json()["data"]["organization"])
-        self.assertIn("capabilities", register_response.json()["data"])
-        token = register_response.json()["data"]["token"]
-        self.assertTrue(token)
-
-        me_response = self.client.get(
-            "/api/v1/auth/me/",
-            HTTP_AUTHORIZATION=f"Token {token}",
-        )
-        self.assertEqual(me_response.status_code, 200)
-        self.assertEqual(me_response.json()["data"]["user"]["email"], "newuser@example.com")
-        self.assertOrganizationPayload(me_response.json()["data"]["organization"])
+        self.assertEqual(register_response.status_code, 200)
+        payload = register_response.json()
+        self.assertIn("message", payload["data"])
+        self.assertNotIn("token", payload["data"])
 
         new_user = User.objects.get(email="newuser@example.com")
         membership = OrganizationMembership.objects.get(user=new_user)
@@ -83,6 +74,7 @@ class AuthEndpointTests(TestCase):
             CostCode.objects.filter(organization_id=membership.organization_id).count(),
             len(DEFAULT_COST_CODE_ROWS),
         )
+        self.assertTrue(EmailVerificationToken.objects.filter(user=new_user).exists())
 
     def test_register_bootstraps_organization_defaults(self):
         register_response = self.client.post(
@@ -90,7 +82,7 @@ class AuthEndpointTests(TestCase):
             data={"email": "defaults@example.com", "password": "secret123"},
             content_type="application/json",
         )
-        self.assertEqual(register_response.status_code, 201)
+        self.assertEqual(register_response.status_code, 200)
 
         user = User.objects.get(email="defaults@example.com")
         membership = OrganizationMembership.objects.select_related("organization").get(user=user)
@@ -113,13 +105,15 @@ class AuthEndpointTests(TestCase):
             "Approved changes are final and will be reflected in the next billing cycle.",
         )
 
-    def test_register_rejects_duplicate_email(self):
+    def test_register_duplicate_email_returns_same_200(self):
         response = self.client.post(
             "/api/v1/auth/register/",
             data={"email": "pm@example.com", "password": "secret123"},
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 400)
+        # Anti-enumeration: same response whether email exists or not.
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("message", response.json()["data"])
 
     def test_login_self_heals_legacy_user_missing_membership(self):
         legacy_user = User.objects.create_user(

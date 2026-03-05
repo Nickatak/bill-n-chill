@@ -25,7 +25,7 @@ export function isPublicAuthRoute(pathname?: string | null): boolean {
   if (!pathname) {
     return false;
   }
-  if (pathname === "/" || pathname === "/register") {
+  if (pathname === "/" || pathname === "/register" || pathname === "/verify-email") {
     return true;
   }
   return isPublicDocumentRoute(pathname);

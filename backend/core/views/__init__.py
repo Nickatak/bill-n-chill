@@ -13,7 +13,7 @@ from core.views.shared_operations.organization_management import (
     organization_memberships_view,
     organization_profile_view,
 )
-from core.views.auth import accept_invite_view, check_invite_by_email_view, health_view, login_view, me_view, register_view, verify_invite_view
+from core.views.auth import accept_invite_view, check_invite_by_email_view, health_view, login_view, me_view, register_view, resend_verification_view, verify_email_view, verify_invite_view
 from core.views.estimating.budgets import budget_line_detail_view, project_budgets_view
 from core.views.change_orders.change_orders import (
     change_order_contract_view,
@@ -87,6 +87,8 @@ __all__ = [
     "health_view",
     "login_view",
     "register_view",
+    "resend_verification_view",
+    "verify_email_view",
     "verify_invite_view",
     "me_view",
     "organization_profile_view",

@@ -306,13 +306,25 @@ class AuthCapabilitiesResponseTests(TestCase):
         self.assertIn("create", caps["estimates"])
         self.assertIn("payments", caps)
 
-    def test_register_response_includes_capabilities(self):
-        response = self.client.post(
+    def test_verify_email_response_includes_capabilities(self):
+        # Register creates user + verification token (Flow A).
+        from core.models import EmailVerificationToken
+
+        self.client.post(
             "/api/v1/auth/register/",
             data={"email": "cap-register@example.com", "password": "secret123"},
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 201)
+        user = User.objects.get(email="cap-register@example.com")
+        token_obj = EmailVerificationToken.objects.get(user=user)
+
+        # Verify email — this is the first auth response for Flow A users.
+        response = self.client.post(
+            "/api/v1/auth/verify-email/",
+            data={"token": token_obj.token},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
         data = response.json()["data"]
         self.assertIn("capabilities", data)
         caps = data["capabilities"]

@@ -16,6 +16,8 @@ class LoginSerializer(serializers.Serializer):
         email = attrs["email"].strip().lower()
         password = attrs["password"]
 
+        # Anti-enumeration: both branches return the same error message so
+        # an attacker cannot distinguish "no such account" from "wrong password".
         user = User.objects.filter(email__iexact=email, is_active=True).first()
         if not user:
             raise serializers.ValidationError("Invalid email or password.")
@@ -27,13 +29,15 @@ class LoginSerializer(serializers.Serializer):
 
 
 class RegisterSerializer(serializers.Serializer):
-    """Write serializer for new user registration."""
+    """Write serializer for new user registration.
+
+    Email uniqueness is NOT checked here — the view handles it silently
+    to prevent email enumeration (always returns the same response
+    regardless of whether the email exists).
+    """
 
     email = serializers.EmailField()
     password = serializers.CharField(min_length=8)
 
     def validate_email(self, value: str) -> str:
-        email = value.strip().lower()
-        if User.objects.filter(email__iexact=email).exists():
-            raise serializers.ValidationError("An account with this email already exists.")
-        return email
+        return value.strip().lower()

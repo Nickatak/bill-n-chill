@@ -201,3 +201,10 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ],
 }
+
+# Email — console backend prints to stdout in dev; swap for SMTP in production.
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@billnchill.com")
+
+# Frontend URL for building verification links in emails.
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")

@@ -60,6 +60,10 @@ describe("isPublicAuthRoute", () => {
     expect(isPublicAuthRoute("/register")).toBe(true);
   });
 
+  it("returns true for /verify-email", () => {
+    expect(isPublicAuthRoute("/verify-email")).toBe(true);
+  });
+
   it("returns true for public document routes", () => {
     expect(isPublicAuthRoute("/estimate/slug--aBcDeFgH")).toBe(true);
   });

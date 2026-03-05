@@ -1,15 +1,16 @@
 """Authentication and registration views with invite-flow support."""
 
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import OrganizationInvite, OrganizationMembership, OrganizationMembershipRecord
+from core.models import EmailVerificationToken, OrganizationInvite, OrganizationMembership, OrganizationMembershipRecord
 from core.serializers import LoginSerializer, RegisterSerializer
+from core.utils.email import send_verification_email
 from core.utils.runtime_metadata import (
     get_app_build_at,
     get_app_revision,
@@ -151,6 +152,14 @@ def login_view(request):
     serializer = LoginSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     user = serializer.validated_data["user"]
+
+    # Email verification gate — legacy/seed users (no tokens) pass through.
+    if not EmailVerificationToken.is_user_verified(user):
+        return Response(
+            {"error": {"code": "email_not_verified", "message": "Please verify your email before signing in."}},
+            status=403,
+        )
+
     membership = _ensure_membership(user)
 
     return Response({"data": _build_auth_response_payload(user, membership)})
@@ -159,22 +168,22 @@ def login_view(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def register_view(request):
-    """Registration endpoint: create user, bootstrap org membership, and return auth context.
+    """Registration endpoint with email verification.
 
     Supports two flows:
-    - Flow A (no invite_token): Standard registration — creates user + new org + owner membership.
-    - Flow B (with invite_token): Invited registration — creates user, joins invited org with
-      invited role, skips org creation, consumes invite token.
+    - Flow A (no invite_token): Creates user + org + sends verification email.
+      Returns a uniform "check your email" response regardless of whether the
+      email already exists (prevents enumeration). No auth token returned.
+    - Flow B (with invite_token): Invited registration — creates user, joins
+      invited org with invited role, consumes invite token. Returns auth token
+      immediately (invite proves email ownership, no verification needed).
 
     Contract:
     - `POST`:
-      - `201`: user created and authenticated context returned.
-        - Guarantees:
-          - newly created user exists with email identity. `[APP]`
-          - primary org membership context is available in response. `[APP]`
-          - token exists for the newly created user. `[APP]`
+      - `200` (Flow A): "check your email" message returned. Same response for
+        new and existing emails (anti-enumeration).
+      - `201` (Flow B): user created and authenticated context returned.
       - `400`: registration payload invalid or invite email mismatch.
-        - Guarantees: no user is created from the failed request. `[APP]`
       - `404`: invite token not found.
       - `410`: invite token expired or already consumed.
 
@@ -190,8 +199,7 @@ def register_view(request):
         }
 
     - Test anchors:
-      - `backend/core/tests/test_health_auth.py::test_register_creates_account_and_returns_token`
-      - `backend/core/tests/test_health_auth.py::test_register_rejects_duplicate_email`
+      - `backend/core/tests/test_email_verification.py::RegisterFlowAVerificationTests`
       - `backend/core/tests/test_invites.py::test_register_with_invite_token_flow_b`
     """
     serializer = RegisterSerializer(data=request.data)
@@ -248,11 +256,25 @@ def register_view(request):
         membership = OrganizationMembership.objects.select_related("organization").get(id=membership.id)
         return Response({"data": _build_auth_response_payload(user, membership)}, status=201)
 
-    # Flow A: standard registration (no invite)
-    user = User.objects.create_user(username=email, email=email, password=password)
-    membership = _ensure_membership(user)
+    # Flow A: standard registration (no invite).
+    # Always return the same response to prevent email enumeration.
+    _CHECK_EMAIL = {"data": {"message": "Check your email to verify your account."}}
 
-    return Response({"data": _build_auth_response_payload(user, membership)}, status=201)
+    if User.objects.filter(email__iexact=email).exists():
+        return Response(_CHECK_EMAIL, status=200)
+
+    try:
+        with transaction.atomic():
+            user = User.objects.create_user(username=email, email=email, password=password)
+            _ensure_membership(user)
+            token_obj = EmailVerificationToken(user=user, email=email)
+            token_obj.save()
+    except IntegrityError:
+        # Concurrent registration with same email — still anti-enumeration.
+        return Response(_CHECK_EMAIL, status=200)
+
+    send_verification_email(user, token_obj)  # Outside atomic — mail failure doesn't roll back user.
+    return Response(_CHECK_EMAIL, status=200)
 
 
 @api_view(["GET"])
@@ -530,3 +552,125 @@ def accept_invite_view(request):
     # Reload for response
     membership = OrganizationMembership.objects.select_related("organization").get(id=membership.id)
     return Response({"data": _build_auth_response_payload(user, membership)})
+
+
+_VERIFY_ERROR_MAP = {
+    "not_found": (404, "not_found", "Invalid verification link."),
+    "consumed": (410, "consumed", "This verification link has already been used."),
+    "expired": (410, "expired", "This verification link has expired. Request a new one."),
+}
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def verify_email_view(request):
+    """Consume a verification token and authenticate the user.
+
+    The verification link is the user's first login — clicking it both
+    verifies email ownership and returns an auth payload.
+
+    Contract:
+    - `POST`:
+      - `200`: token consumed, auth payload returned.
+      - `400`: token field missing.
+      - `404`: token not found.
+      - `410`: token expired or already consumed.
+
+    - Preconditions:
+      - none (`AllowAny`).
+
+    - Object mutations:
+      - `POST`:
+        - Creates: auth token (if missing), organization/membership (if missing).
+        - Edits: `consumed_at` set on verification token.
+
+    - Incoming payload (`POST`) shape:
+      - JSON map: { "token": "string (required)" }
+
+    - Test anchors:
+      - `backend/core/tests/test_email_verification.py::VerifyEmailTests`
+    """
+    token_str = (request.data.get("token") or "").strip()
+    if not token_str:
+        return Response(
+            {"error": {"code": "validation_error", "message": "token is required."}},
+            status=400,
+        )
+
+    token_obj, error_code = EmailVerificationToken.lookup_valid(token_str)
+    if error_code:
+        status, code, message = _VERIFY_ERROR_MAP[error_code]
+        return Response({"error": {"code": code, "message": message}}, status=status)
+
+    token_obj.consumed_at = timezone.now()
+    token_obj.save(update_fields=["consumed_at"])
+
+    user = token_obj.user
+    membership = _ensure_membership(user)
+    return Response({"data": _build_auth_response_payload(user, membership)})
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def resend_verification_view(request):
+    """Resend a verification email. Anti-enumeration: always returns 200.
+
+    Rate-limited: if the most recent token was created less than 60 seconds
+    ago, returns 429.
+
+    Contract:
+    - `POST`:
+      - `200`: always (anti-enumeration). Email sent if applicable.
+      - `400`: email field missing.
+      - `429`: rate limited (last token <60s old).
+
+    - Preconditions:
+      - none (`AllowAny`).
+
+    - Object mutations:
+      - `POST`:
+        - Creates: new `EmailVerificationToken`, `EmailRecord`.
+        - Edits: none.
+
+    - Incoming payload (`POST`) shape:
+      - JSON map: { "email": "string (required)" }
+
+    - Test anchors:
+      - `backend/core/tests/test_email_verification.py::ResendVerificationTests`
+    """
+    email = (request.data.get("email") or "").strip().lower()
+    if not email:
+        return Response(
+            {"error": {"code": "validation_error", "message": "email is required."}},
+            status=400,
+        )
+
+    _RESEND_OK = {"data": {"message": "If that email is registered, a verification link has been sent."}}
+
+    try:
+        user = User.objects.get(email__iexact=email, is_active=True)
+    except User.DoesNotExist:
+        return Response(_RESEND_OK, status=200)
+
+    # Already verified — no-op.
+    if EmailVerificationToken.is_user_verified(user):
+        return Response(_RESEND_OK, status=200)
+
+    # Rate limit: most recent token must be >60s old.
+    from datetime import timedelta
+
+    latest_token = (
+        EmailVerificationToken.objects.filter(user=user).order_by("-created_at").first()
+    )
+    if latest_token and (timezone.now() - latest_token.created_at) < timedelta(seconds=60):
+        wait_seconds = 60 - int((timezone.now() - latest_token.created_at).total_seconds())
+        return Response(
+            {"error": {"code": "rate_limited", "message": f"Please wait {wait_seconds} seconds before requesting another email."}},
+            status=429,
+        )
+
+    token_obj = EmailVerificationToken(user=user, email=user.email)
+    token_obj.save()
+    send_verification_email(user, token_obj)
+
+    return Response(_RESEND_OK, status=200)

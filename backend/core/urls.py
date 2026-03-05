@@ -33,6 +33,8 @@ from core.views import (
     login_view,
     me_view,
     register_view,
+    resend_verification_view,
+    verify_email_view,
     verify_invite_view,
     organization_invite_detail_view,
     organization_invites_view,
@@ -75,6 +77,8 @@ urlpatterns = [
     path("auth/me/", me_view, name="auth-me"),
     path("auth/verify-invite/<str:token>/", verify_invite_view, name="auth-verify-invite"),
     path("auth/accept-invite/", accept_invite_view, name="auth-accept-invite"),
+    path("auth/verify-email/", verify_email_view, name="auth-verify-email"),
+    path("auth/resend-verification/", resend_verification_view, name="auth-resend-verification"),
     path("auth/check-invite/", check_invite_by_email_view, name="auth-check-invite"),
     path("organization/", organization_profile_view, name="organization-profile"),
     path(

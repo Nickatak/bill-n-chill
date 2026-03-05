@@ -22,7 +22,7 @@
 10. [ ] No e-sign / PSK on public approval links
 
 ### Polish / UX
-11. [ ] Onboarding guide arrows designed but not built
+11. [x] Onboarding guide arrows designed but not built
 12. [ ] Nav overlap in 700–1400px viewport range
 13. [ ] Pre-existing TS error in `change-order-public-preview.tsx:382`
 
@@ -31,6 +31,19 @@
 15. [ ] Django default `auth.User` instead of custom model
 16. [ ] Missing immutable invoice/payment lifecycle capture models
 
+## Email Verification + Enumeration Fix (#8, #9, #5)
 
+Scope doc: `docs/deferred/DEFERRED_EMAIL_VERIFICATION.md`
 
+### Status: Scoped, not started
 
+### Summary
+- Add transactional email (SES or Postmark) — one API key, two DNS records
+- `EmailVerificationToken` model (reuse invite token pattern: `secrets.token_urlsafe(32)`, 24h expiry, DB-indexed)
+- `EmailRecord` audit model (immutable append-only log of all emails sent)
+- Registration returns "check your email" regardless of account existence (fixes #9 enumeration)
+- Verification endpoint consumes token, marks user verified
+- Login gated on `is_verified` flag (unverified users get clear error)
+- Invite flow (#5) unblocked: verification happens before invite race window
+- Frontend: post-register redirect to "check your email" screen
+- `send_mail()` inline in view — no Celery/queue needed at current scale

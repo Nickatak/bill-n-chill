@@ -8,7 +8,7 @@ Per-domain call chain docs trace the chronological function-call order for each 
 
 ## Domains
 
-- [auth.md](auth.md) — Registration, login, session verification, RBAC-gated requests
+- [auth.md](auth.md) — Registration, login, email verification, session verification, RBAC-gated requests
 - [customers.md](customers.md) — Customer list, edit, project creation, quick-add intake
 
 ## Format

@@ -27,6 +27,7 @@ type LoginResponse = {
     capabilities?: Record<string, string[]>;
   };
   error?: {
+    code?: string;
     message?: string;
   };
 };
@@ -83,6 +84,8 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [message, setMessage] = useState("");
+  const [emailNotVerified, setEmailNotVerified] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   /**
    * Rewrite Django's generic login error messages into user-friendly
@@ -135,6 +138,13 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
       const nextOrganization = toSessionOrganization(payload.data?.organization);
 
       if (!response.ok || !nextToken) {
+        if (payload.error?.code === "email_not_verified") {
+          setEmailNotVerified(true);
+          setMessage("Please verify your email before signing in.");
+          setMessageTone("error");
+          setIsChecking(false);
+          return;
+        }
         setMessage(normalizeLoginError(payload.error?.message));
         setMessageTone("error");
         setIsChecking(false);
@@ -162,6 +172,34 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
       setMessageTone("error");
     } finally {
       setIsChecking(false);
+    }
+  }
+
+  /** Resend verification email for the current email address. */
+  async function handleResendVerification() {
+    setIsResending(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(`${defaultApiBaseUrl}/auth/resend-verification/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      if (response.status === 429) {
+        setMessage("Please wait before requesting another email.");
+        setMessageTone("error");
+        return;
+      }
+
+      setMessage("Verification email resent. Check your inbox.");
+      setMessageTone("neutral");
+    } catch {
+      setMessage("Could not reach resend endpoint.");
+      setMessageTone("error");
+    } finally {
+      setIsResending(false);
     }
   }
 
@@ -221,6 +259,16 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
               <button className={styles.button} type="submit" disabled={isChecking}>
                 {isChecking ? "Checking..." : "Sign in"}
               </button>
+              {emailNotVerified && (
+                <button
+                  className={styles.buttonSecondary}
+                  type="button"
+                  disabled={isResending}
+                  onClick={handleResendVerification}
+                >
+                  {isResending ? "Sending..." : "Resend verification email"}
+                </button>
+              )}
             </div>
             <p className={styles.formHint}>
               Need an account? <Link href="/register">Create one</Link>.

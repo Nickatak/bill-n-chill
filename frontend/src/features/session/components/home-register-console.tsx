@@ -15,6 +15,7 @@ import styles from "./home-auth-console.module.css";
 type RegisterResponse = {
   data?: {
     token?: string;
+    message?: string;
     user?: {
       email?: string;
       role?: SessionRole;
@@ -100,6 +101,8 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
+  const [checkEmailSent, setCheckEmailSent] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   // Invite flow state
   const [inviteFlow, setInviteFlow] = useState<InviteFlowState>(inviteToken ? "verifying" : "none");
@@ -250,6 +253,13 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
 
       const payload: RegisterResponse = await response.json();
 
+      // Flow A: "check your email" response (no token, has message).
+      if (response.ok && payload.data?.message && !payload.data?.token) {
+        setCheckEmailSent(true);
+        setIsSubmitting(false);
+        return;
+      }
+
       if (!response.ok || !payload.data?.token) {
         setMessage(normalizeRegisterError(payload));
         setMessageTone("error");
@@ -263,6 +273,34 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
       setMessageTone("error");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  /** Resend verification email for the current email address. */
+  async function handleResendVerification() {
+    setIsResending(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(`${defaultApiBaseUrl}/auth/resend-verification/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      if (response.status === 429) {
+        setMessage("Please wait before requesting another email.");
+        setMessageTone("error");
+        return;
+      }
+
+      setMessage("Verification email resent.");
+      setMessageTone("neutral");
+    } catch {
+      setMessage("Could not reach resend endpoint.");
+      setMessageTone("error");
+    } finally {
+      setIsResending(false);
     }
   }
 
@@ -297,6 +335,41 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  // Flow A success — "check your email" screen
+  if (checkEmailSent) {
+    return (
+      <section className={styles.shell}>
+        <div className={styles.card}>
+          <div className={styles.warning} role="note" aria-label="Verification email sent">
+            <p className={styles.warningTitle}>Check your email</p>
+            <p className={styles.warningText}>
+              We sent a verification link to <strong>{email}</strong>. Click the link to activate your
+              account. The link expires in 24 hours.
+            </p>
+          </div>
+          {message && (
+            <p className={`${styles.message} ${messageTone === "error" ? styles.messageError : ""}`}>
+              {message}
+            </p>
+          )}
+          <div className={styles.buttonRow}>
+            <button
+              className={styles.buttonSecondary}
+              type="button"
+              disabled={isResending}
+              onClick={handleResendVerification}
+            >
+              {isResending ? "Sending..." : "Didn\u2019t get it? Resend"}
+            </button>
+          </div>
+          <p className={styles.formHint}>
+            <Link href="/">Back to sign in</Link>
+          </p>
+        </div>
+      </section>
+    );
   }
 
   // Verifying state — show loading

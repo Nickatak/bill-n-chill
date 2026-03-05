@@ -355,13 +355,14 @@ class FlowBTests(InviteTestMixin, TestCase):
             data={"email": "regular@test.com", "password": "secret123"},
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 201)
-        data = response.json()["data"]
-        # Should be in a NEW org (not self.organization)
-        self.assertNotEqual(data["organization"]["id"], self.organization.id)
+        # Flow A now returns 200 with "check your email" (email verification).
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("message", response.json()["data"])
 
+        # User created in a NEW org (not self.organization).
         new_user = User.objects.get(email="regular@test.com")
         membership = OrganizationMembership.objects.get(user=new_user)
+        self.assertNotEqual(membership.organization_id, self.organization.id)
         self.assertEqual(membership.role, OrganizationMembership.Role.OWNER)
 
 
