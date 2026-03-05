@@ -19,6 +19,10 @@ class OrganizationProfileSerializer(serializers.ModelSerializer):
             "logo_url",
             "help_email",
             "billing_address",
+            "phone_number",
+            "website_url",
+            "license_number",
+            "tax_id",
             "default_invoice_due_delta",
             "default_estimate_valid_delta",
             "invoice_terms_and_conditions",
@@ -88,6 +92,10 @@ class OrganizationProfileUpdateSerializer(serializers.Serializer):
     logo_url = serializers.URLField(required=False, allow_blank=True, default="")
     help_email = serializers.EmailField(required=False, allow_blank=True, default="")
     billing_address = serializers.CharField(max_length=5000, required=False, allow_blank=True, default="")
+    phone_number = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
+    website_url = serializers.URLField(required=False, allow_blank=True, default="")
+    license_number = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
+    tax_id = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
     default_invoice_due_delta = serializers.IntegerField(required=False, min_value=1, max_value=365)
     default_estimate_valid_delta = serializers.IntegerField(required=False, min_value=1, max_value=365)
     invoice_terms_and_conditions = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")

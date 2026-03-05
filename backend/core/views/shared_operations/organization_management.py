@@ -52,7 +52,7 @@ def organization_profile_view(request):
     incoming = serializer.validated_data
 
     # Field-level capability gates: identity vs presets
-    _identity_fields = {"display_name", "logo_url", "billing_address"}
+    _identity_fields = {"display_name", "logo_url", "billing_address", "phone_number", "website_url", "license_number", "tax_id"}
     _preset_fields = {
         "help_email", "default_invoice_due_delta", "default_estimate_valid_delta",
         "invoice_terms_and_conditions", "estimate_terms_and_conditions",
@@ -76,6 +76,10 @@ def organization_profile_view(request):
         "logo_url": {"attr": "logo_url", "strip": True},
         "help_email": {"attr": "help_email", "strip": True},
         "billing_address": {"attr": "billing_address", "strip": True},
+        "phone_number": {"attr": "phone_number", "strip": True},
+        "website_url": {"attr": "website_url", "strip": True},
+        "license_number": {"attr": "license_number", "strip": True},
+        "tax_id": {"attr": "tax_id", "strip": True},
         "invoice_terms_and_conditions": {"attr": "invoice_terms_and_conditions", "strip": True},
         "estimate_terms_and_conditions": {"attr": "estimate_terms_and_conditions", "strip": True},
         "change_order_terms_and_conditions": {"attr": "change_order_terms_and_conditions", "strip": True},

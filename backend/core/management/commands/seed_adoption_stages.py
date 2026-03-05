@@ -29,9 +29,12 @@ from core.models import (
     FinancialAuditEvent,
     Invoice,
     InvoiceLine,
+    OrganizationMembership,
+    OrganizationMembershipRecord,
     Payment,
     PaymentAllocation,
     Project,
+    RoleTemplate,
     Vendor,
     VendorBill,
     VendorBillAllocation,
@@ -105,6 +108,44 @@ class Command(BaseCommand):
             v.is_canonical = True
             v.is_active = True
             v.save(update_fields=["vendor_type", "is_canonical", "is_active", "updated_at"])
+
+    def _add_team_member(self, owner_membership, email, full_name, role):
+        """Create a user and add them as a team member on the owner's org."""
+        first, last = full_name.split(" ", 1) if " " in full_name else (full_name, "")
+        member_user, _ = User.objects.get_or_create(
+            email=email,
+            defaults={"username": email, "first_name": first, "last_name": last},
+        )
+        member_user.set_password(PASSWORD)
+        member_user.first_name = first
+        member_user.last_name = last
+        member_user.save(update_fields=["password", "first_name", "last_name"])
+        Token.objects.get_or_create(user=member_user)
+        membership, created = OrganizationMembership.objects.get_or_create(
+            organization=owner_membership.organization,
+            user=member_user,
+            defaults={
+                "role": role,
+                "status": OrganizationMembership.Status.ACTIVE,
+            },
+        )
+        if not created:
+            membership.role = role
+            membership.status = OrganizationMembership.Status.ACTIVE
+            membership.save(update_fields=["role", "status", "updated_at"])
+        OrganizationMembershipRecord.record(
+            membership=membership,
+            event_type=OrganizationMembershipRecord.EventType.CREATED,
+            capture_source=OrganizationMembershipRecord.CaptureSource.AUTH_BOOTSTRAP,
+            recorded_by=member_user,
+            from_status=None,
+            to_status=membership.status,
+            from_role="",
+            to_role=membership.role,
+            note="Seeded team member.",
+            metadata={"seed": True},
+        )
+        return membership
 
     def _make_customer(self, user, name, **kwargs):
         c, _ = Customer.objects.get_or_create(
@@ -651,8 +692,14 @@ class Command(BaseCommand):
             from_status=Invoice.Status.SENT, to_status=Invoice.Status.PAID,
             amount=inv_paid.total)
 
+        # Team members (3 total: owner + PM + worker)
+        self._add_team_member(membership, "mid-pm@test.com", "Sarah Chen",
+            OrganizationMembership.Role.PM)
+        self._add_team_member(membership, "mid-worker@test.com", "Jake Rivera",
+            OrganizationMembership.Role.WORKER)
+
         self.stdout.write(self.style.SUCCESS(
-            "  mid@test.com — 12 customers, 6 projects, full status coverage"
+            "  mid@test.com — 12 customers, 6 projects, 3 team members"
         ))
         return user, token
 
@@ -894,17 +941,51 @@ class Command(BaseCommand):
             f"AP-{pay_num:03d}", Payment.Method.WIRE, Payment.Status.PENDING,
             Decimal("6500.00"))
 
+        # Team members (6 total: owner + PM + bookkeeper + 2 workers + viewer)
+        self._add_team_member(membership, "late-pm@test.com", "Maria Torres",
+            OrganizationMembership.Role.PM)
+        self._add_team_member(membership, "late-books@test.com", "David Park",
+            OrganizationMembership.Role.BOOKKEEPING)
+        self._add_team_member(membership, "late-worker1@test.com", "Chris Nguyen",
+            OrganizationMembership.Role.WORKER)
+        self._add_team_member(membership, "late-worker2@test.com", "Tyler Brooks",
+            OrganizationMembership.Role.WORKER)
+        self._add_team_member(membership, "late-viewer@test.com", "Amanda Ross",
+            OrganizationMembership.Role.VIEWER)
+
         self.stdout.write(self.style.SUCCESS(
-            "  late@test.com — 35 customers, 18 projects, full financial lifecycle"
+            "  late@test.com — 35 customers, 18 projects, 6 team members"
         ))
         return user, token
 
     # ── Entry point ──────────────────────────────────────────────────────
 
     @transaction.atomic
+    def _seed_system_role_templates(self):
+        """Ensure system RoleTemplate rows exist (mirrors migration 0002 data)."""
+        import importlib
+        migration_mod = importlib.import_module("core.migrations.0002_rbac_phase1")
+        SYSTEM_ROLES = migration_mod.SYSTEM_ROLES
+
+        for slug, data in SYSTEM_ROLES.items():
+            RoleTemplate.objects.update_or_create(
+                slug=slug,
+                defaults={
+                    "name": data["name"],
+                    "is_system": True,
+                    "organization": None,
+                    "capability_flags_json": data["capability_flags_json"],
+                    "description": data["description"],
+                    "created_by": None,
+                },
+            )
+        self.stdout.write(f"  System RoleTemplates: {len(SYSTEM_ROLES)} ensured")
+
     def handle(self, *args, **options):
         self.stdout.write("Seeding adoption-stage demo accounts...")
         self.stdout.write("")
+
+        self._seed_system_role_templates()
 
         accounts = [
             self._seed_new(),

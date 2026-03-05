@@ -8,6 +8,10 @@ export type OrganizationProfile = {
   logo_url: string;
   help_email: string;
   billing_address: string;
+  phone_number: string;
+  website_url: string;
+  license_number: string;
+  tax_id: string;
   default_invoice_due_delta: number;
   default_estimate_valid_delta: number;
   invoice_terms_and_conditions: string;

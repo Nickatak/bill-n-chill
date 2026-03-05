@@ -1,7 +1,13 @@
 """Domain-specific helpers for organization management views."""
 
+from django.db.models import Case, Value, When
+
 from core.models import OrganizationMembership
 from core.user_helpers import _resolve_user_capabilities, _resolve_user_role
+
+# Hierarchical role ordering: owner first, viewer last.
+_ROLE_HIERARCHY = ["owner", "pm", "bookkeeping", "worker", "viewer"]
+_ROLE_ORDER_WHENS = [When(role=slug, then=Value(i)) for i, slug in enumerate(_ROLE_HIERARCHY)]
 
 
 def _organization_role_policy(user) -> dict:
@@ -25,10 +31,17 @@ def _organization_role_policy(user) -> dict:
 
 
 def _organization_membership_queryset(organization_id: int):
-    """Return the ordered membership queryset for an organization with user relations loaded."""
-    return OrganizationMembership.objects.select_related("user").filter(
-        organization_id=organization_id
-    ).order_by("status", "role", "user_id")
+    """Return the ordered membership queryset for an organization with user relations loaded.
+
+    Ordering: active before disabled, then hierarchical role order
+    (owner → pm → bookkeeping → worker → viewer), then user_id tiebreaker.
+    """
+    return (
+        OrganizationMembership.objects.select_related("user")
+        .filter(organization_id=organization_id)
+        .annotate(role_order=Case(*_ROLE_ORDER_WHENS, default=Value(99)))
+        .order_by("status", "role_order", "user_id")
+    )
 
 
 def _is_last_active_owner(membership: OrganizationMembership, *, next_role: str, next_status: str) -> bool:

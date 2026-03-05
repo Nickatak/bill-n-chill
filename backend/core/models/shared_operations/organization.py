@@ -27,6 +27,10 @@ class Organization(models.Model):
     logo_url = models.URLField(blank=True, default="")
     help_email = models.EmailField(blank=True, default="")
     billing_address = models.TextField(blank=True, default="")
+    phone_number = models.CharField(max_length=50, blank=True, default="")
+    website_url = models.URLField(blank=True, default="")
+    license_number = models.CharField(max_length=100, blank=True, default="")
+    tax_id = models.CharField(max_length=50, blank=True, default="")
     default_invoice_due_delta = models.PositiveSmallIntegerField(default=30)
     default_estimate_valid_delta = models.PositiveSmallIntegerField(default=30)
     invoice_terms_and_conditions = models.TextField(blank=True, default="")
@@ -52,6 +56,10 @@ class Organization(models.Model):
                 "logo_url": self.logo_url,
                 "help_email": self.help_email,
                 "billing_address": self.billing_address,
+                "phone_number": self.phone_number,
+                "website_url": self.website_url,
+                "license_number": self.license_number,
+                "tax_id": self.tax_id,
                 "default_invoice_due_delta": self.default_invoice_due_delta,
                 "default_estimate_valid_delta": self.default_estimate_valid_delta,
                 "invoice_terms_and_conditions": self.invoice_terms_and_conditions,
