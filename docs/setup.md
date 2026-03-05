@@ -129,25 +129,28 @@ Expected URLs (key surfaces):
 
 For the full API route map see `docs/api.md`. For the full frontend route map see `frontend/ARCHITECTURE_MAP.md`.
 
-## One-Command Demo Seed (Bob Bathroom Remodel)
+## Demo Seed (Adoption Stages)
 
-To load a full MVP walkthrough dataset (lead, project, estimate family revisions, budget, approved + voided change orders, mixed invoice/vendor-bill/payment statuses, allocations, and audit events):
+Seeds four accounts representing different adoption stages of the platform:
+
+| Account | Stage | Data |
+|---|---|---|
+| `new@test.com` | Fresh signup | Empty workspace (org + cost codes only) |
+| `early@test.com` | ~2 months | 4 customers, 2 projects, 2 estimates |
+| `mid@test.com` | ~8 months | 12 customers, 6 projects, full status coverage |
+| `late@test.com` | ~2 years | 35 customers, 18 projects, full financial lifecycle |
 
 ```bash
-backend/.venv/bin/python backend/manage.py seed_bob_demo
+backend/.venv/bin/python backend/manage.py seed_adoption_stages
+# or
+make db-seed
 ```
 
-Optional overrides:
-
-```bash
-backend/.venv/bin/python backend/manage.py seed_bob_demo --email test@ex.com --password Qweqwe123 --project-name "Bathroom Remodel (Demo)"
-```
-
-The command is idempotent and prints demo login credentials + token for manual UI simulation.
+All accounts use password `a`. The command is idempotent and prints login credentials + tokens.
 
 ## Hard Reset to Fresh State (Testing)
 
-To fully reset local data (delete everything) and reseed the Bob demo:
+To fully reset local data (delete everything) and reseed demo accounts:
 
 ```bash
 backend/.venv/bin/python backend/manage.py reset_fresh_demo
@@ -161,7 +164,7 @@ Options:
 
 ```bash
 backend/.venv/bin/python backend/manage.py reset_fresh_demo --skip-seed
-backend/.venv/bin/python backend/manage.py reset_fresh_demo --email test@ex.com --password Qweqwe123 --project-name "Bathroom Remodel (Demo)"
+backend/.venv/bin/python backend/manage.py reset_fresh_demo --skip-seed
 ```
 
 ## Makefile Shortcuts

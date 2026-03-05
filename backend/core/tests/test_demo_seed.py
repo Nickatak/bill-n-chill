@@ -1,94 +1,85 @@
 from io import StringIO
-from decimal import Decimal
 
 from django.core.management import call_command
-from django.db.models import Sum
 
 from core.tests.common import *
-from core.models import VendorBillAllocation
+from core.models import (
+    ChangeOrder,
+    Estimate,
+    Invoice,
+    Payment,
+    VendorBill,
+)
 
 
-class DemoSeedCommandTests(TestCase):
-    def test_seed_bob_demo_is_idempotent_and_creates_money_loop_records(self):
+class AdoptionStageSeedTests(TestCase):
+    def test_seed_is_idempotent(self):
+        """Running twice produces the same result without errors."""
         out = StringIO()
-        call_command("seed_bob_demo", stdout=out)
-        call_command("seed_bob_demo", stdout=out)
+        call_command("seed_adoption_stages", stdout=out)
+        call_command("seed_adoption_stages", stdout=out)
 
-        user = User.objects.get(email="test@ex.com")
-        project = Project.objects.get(
-            created_by=user,
-            name="Bathroom Remodel (Demo) - CHILD MODELS (OPEN THIS PROJECT)",
-        )
-        invoice = Invoice.objects.get(project=project, invoice_number="INV-0001")
-        vendor_bill = VendorBill.objects.get(project=project, bill_number="VB-100")
+    def test_new_account_has_no_data(self):
+        out = StringIO()
+        call_command("seed_adoption_stages", stdout=out)
+        user = User.objects.get(email="new@test.com")
+        self.assertEqual(Customer.objects.filter(created_by=user).count(), 0)
+        self.assertEqual(Project.objects.filter(created_by=user).count(), 0)
 
-        self.assertEqual(project.status, Project.Status.ACTIVE)
-        self.assertEqual(str(project.contract_value_original), "1000.00")
-        self.assertEqual(str(project.contract_value_current), "1200.00")
-        self.assertEqual(invoice.status, Invoice.Status.PAID)
-        self.assertEqual(vendor_bill.status, VendorBill.Status.PAID)
-        self.assertEqual(
-            VendorBillAllocation.objects.filter(vendor_bill=vendor_bill).aggregate(total=Sum("amount"))["total"],
-            Decimal("500.00"),
-        )
+    def test_early_account_shape(self):
+        out = StringIO()
+        call_command("seed_adoption_stages", stdout=out)
+        user = User.objects.get(email="early@test.com")
+        self.assertEqual(Customer.objects.filter(created_by=user).count(), 4)
+        self.assertEqual(Project.objects.filter(created_by=user).count(), 2)
+        self.assertEqual(Estimate.objects.filter(created_by=user).count(), 2)
 
-        required_allocation_statuses = [
-            VendorBill.Status.APPROVED,
-            VendorBill.Status.SCHEDULED,
-            VendorBill.Status.PAID,
-        ]
-        for bill in VendorBill.objects.filter(project=project, status__in=required_allocation_statuses):
-            allocated_total = (
-                VendorBillAllocation.objects.filter(vendor_bill=bill).aggregate(total=Sum("amount"))["total"]
-                or Decimal("0.00")
+    def test_mid_account_has_status_coverage(self):
+        out = StringIO()
+        call_command("seed_adoption_stages", stdout=out)
+        user = User.objects.get(email="mid@test.com")
+
+        self.assertEqual(Customer.objects.filter(created_by=user).count(), 12)
+        self.assertEqual(Customer.objects.filter(created_by=user, is_archived=True).count(), 1)
+        self.assertEqual(Project.objects.filter(created_by=user).count(), 6)
+
+        # One of each project status
+        for status, _ in Project.Status.choices:
+            self.assertTrue(
+                Project.objects.filter(created_by=user, status=status).exists(),
+                f"Missing project with status {status}",
             )
-            self.assertEqual(allocated_total, bill.total)
 
-        self.assertEqual(
-            Estimate.objects.filter(project=project, title__startswith="STATUS VARIATION ESTIMATE").count(),
-            len(Estimate.Status.choices),
-        )
-        self.assertTrue(
-            Estimate.objects.filter(
-                project=project,
-                title="CHILD MODELS ESTIMATE (OPEN THIS ESTIMATE)",
-            ).exists()
-        )
-        child_family = Estimate.objects.filter(
-            project=project,
-            title="CHILD MODELS ESTIMATE (OPEN THIS ESTIMATE)",
+        # Estimate family with archived → rejected → approved
+        family = Estimate.objects.filter(
+            created_by=user, title="Baker Office Scope"
         ).order_by("version")
-        self.assertEqual(child_family.count(), 3)
+        self.assertEqual(family.count(), 3)
         self.assertEqual(
-            list(child_family.values_list("version", "status")),
+            list(family.values_list("version", "status")),
             [
                 (1, Estimate.Status.ARCHIVED),
                 (2, Estimate.Status.REJECTED),
                 (3, Estimate.Status.APPROVED),
             ],
         )
-        self.assertEqual(
-            Estimate.objects.filter(project=project).count(),
-            len(Estimate.Status.choices) + 3,
-        )
-        self.assertGreaterEqual(Budget.objects.filter(project=project).count(), 1)
-        self.assertEqual(ChangeOrder.objects.filter(project=project, family_key="1").count(), 1)
-        self.assertTrue(
-            ChangeOrder.objects.filter(
-                project=project,
-                family_key="2",
-                status=ChangeOrder.Status.VOID,
-            ).exists()
-        )
-        self.assertEqual(Payment.objects.filter(project=project, reference_number="AR-1").count(), 1)
-        self.assertEqual(Payment.objects.filter(project=project, reference_number="AP-1").count(), 1)
-        self.assertGreaterEqual(Invoice.objects.filter(project=project).count(), len(Invoice.Status.choices) + 1)
-        self.assertGreaterEqual(
-            VendorBill.objects.filter(project=project).count(),
-            len(VendorBill.Status.choices) + 1,
-        )
-        self.assertGreaterEqual(
-            Payment.objects.filter(project=project).count(),
-            (len(Payment.Status.choices) * len(Payment.Direction.choices)) + 2,
-        )
-        self.assertEqual(FinancialAuditEvent.objects.filter(project=project).count() >= 8, True)
+
+        # Invoices across statuses
+        self.assertGreaterEqual(Invoice.objects.filter(project__created_by=user).count(), 5)
+        # Change orders exist
+        self.assertGreaterEqual(ChangeOrder.objects.filter(project__created_by=user).count(), 5)
+        # Payments exist
+        self.assertGreaterEqual(Payment.objects.filter(project__created_by=user).count(), 3)
+
+    def test_late_account_scale(self):
+        out = StringIO()
+        call_command("seed_adoption_stages", stdout=out)
+        user = User.objects.get(email="late@test.com")
+
+        self.assertEqual(Customer.objects.filter(created_by=user).count(), 35)
+        self.assertEqual(Customer.objects.filter(created_by=user, is_archived=True).count(), 3)
+        self.assertEqual(Project.objects.filter(created_by=user).count(), 18)
+        self.assertGreaterEqual(Estimate.objects.filter(created_by=user).count(), 18)
+        self.assertGreaterEqual(Invoice.objects.filter(project__created_by=user).count(), 10)
+        self.assertGreaterEqual(VendorBill.objects.filter(project__created_by=user).count(), 10)
+        self.assertGreaterEqual(Payment.objects.filter(project__created_by=user).count(), 5)

@@ -39,8 +39,8 @@ help:
 	@echo "  make docker-down            Stop dev stack"
 	@echo "  make docker-logs            Stream dev stack logs"
 	@echo "  make db-migrate             Apply Django migrations against dev DB"
-	@echo "  make db-seed                Seed Bob demo data into dev DB"
-	@echo "  make db-reset               Destructive app-data reset + Bob demo reseed"
+	@echo "  make db-seed                Seed adoption-stage demo accounts into dev DB"
+	@echo "  make db-reset               Destructive app-data reset + demo reseed"
 	@echo ""
 	@echo "Dev DB Utilities (.env.local)"
 	@echo "  make db-reset-hard          Drop dev DB volume and recreate DB container"
@@ -162,7 +162,7 @@ docker-logs: local-env-local
 	$(DEV_COMPOSE) logs -f --tail=200
 
 db-seed: local-env-local local-check-db
-	$(BACKEND_MANAGE) seed_bob_demo
+	$(BACKEND_MANAGE) seed_adoption_stages
 
 db-migrate: local-env-local local-check-db
 	$(BACKEND_MANAGE) migrate
@@ -191,7 +191,7 @@ docker-prod-logs: local-env-prod
 	$(PROD_COMPOSE) logs -f --tail=200
 
 docker-prod-seed: local-env-prod local-check-db
-	$(BACKEND_MANAGE) seed_bob_demo
+	$(BACKEND_MANAGE) seed_adoption_stages
 
 db-prod-reset: local-env-prod
 	$(PROD_COMPOSE) down -v --remove-orphans

@@ -4,24 +4,9 @@ from core.utils.runtime_metadata import write_last_data_reset_at
 
 
 class Command(BaseCommand):
-    help = "Reset database to a fresh state and optionally reseed Bob demo data."
+    help = "Reset database to a fresh state and optionally reseed demo data."
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            "--email",
-            default="test@ex.com",
-            help="Demo user email used when reseeding.",
-        )
-        parser.add_argument(
-            "--password",
-            default="Qweqwe123",
-            help="Demo user password used when reseeding.",
-        )
-        parser.add_argument(
-            "--project-name",
-            default="Bathroom Remodel (Demo)",
-            help="Demo project name used when reseeding.",
-        )
         parser.add_argument(
             "--skip-seed",
             action="store_true",
@@ -42,14 +27,8 @@ class Command(BaseCommand):
             self.stdout.write("Skipped reseed. Database is empty and ready.")
             return
 
-        self.stdout.write("Reseeding Bob demo data...")
-        call_command(
-            "seed_bob_demo",
-            email=options["email"],
-            password=options["password"],
-            project_name=options["project_name"],
-            verbosity=1,
-        )
+        self.stdout.write("Reseeding adoption-stage demo data...")
+        call_command("seed_adoption_stages", verbosity=1)
         self.stdout.write(
             self.style.SUCCESS(f"Fresh demo reset + seed complete. Last reset marker: {reset_at}")
         )

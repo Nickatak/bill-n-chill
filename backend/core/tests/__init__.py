@@ -4,7 +4,7 @@ from core.tests.test_estimates import EstimateTests
 from core.tests.test_health_auth import AuthEndpointTests, HealthEndpointTests
 from core.tests.test_customer_intake import CustomerIntakeQuickAddTests
 from core.tests.test_invoices import InvoiceTests
-from core.tests.test_demo_seed import DemoSeedCommandTests
+from core.tests.test_demo_seed import AdoptionStageSeedTests
 from core.tests.test_mvp_regression import MvpRegressionMoneyLoopTests
 from core.tests.test_audit_trail import FinancialAuditTrailTests
 from core.tests.test_payments import PaymentTests
@@ -28,7 +28,7 @@ __all__ = [
     "BudgetTests",
     "ChangeOrderTests",
     "InvoiceTests",
-    "DemoSeedCommandTests",
+    "AdoptionStageSeedTests",
     "MvpRegressionMoneyLoopTests",
     "FinancialAuditTrailTests",
     "PaymentTests",
