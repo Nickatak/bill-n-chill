@@ -36,8 +36,8 @@ export default async function ProjectAuditTrailPage({ params }: ProjectAuditTrai
           <Link className={shell.linkButton} href={`/projects?project=${projectId}`}>
             Back to Project Hub
           </Link>
-          <Link className={shell.linkButton} href="/financials-auditing">
-            Next: Financials & Accounting
+          <Link className={shell.linkButton} href="/invoices">
+            Next: Invoices
           </Link>
         </div>
       </header>

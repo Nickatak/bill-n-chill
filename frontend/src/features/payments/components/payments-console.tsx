@@ -546,8 +546,16 @@ export function PaymentsConsole() {
       return;
     }
     void loadPaymentPolicy();
+    void loadProjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  // Auto-load payments when project selection changes.
+  useEffect(() => {
+    if (!token || !selectedProjectId) return;
+    void loadPayments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, selectedProjectId]);
 
   return (
     <section className={styles.console}>
@@ -562,10 +570,6 @@ export function PaymentsConsole() {
           Role `{role}` can view payments but cannot create, edit, or allocate.
         </p>
       ) : null}
-
-      <button type="button" onClick={loadProjects}>
-        Load Projects
-      </button>
 
       {projects.length > 0 ? (
         <label>
@@ -644,10 +648,6 @@ export function PaymentsConsole() {
           Create Payment
         </button>
       </form>
-
-      <button type="button" onClick={loadPayments} disabled={!selectedProjectId}>
-        Load Payments for Selected Project
-      </button>
 
       {payments.length > 0 ? (
         <label>
