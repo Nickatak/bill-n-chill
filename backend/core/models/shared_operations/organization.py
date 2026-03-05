@@ -1,3 +1,5 @@
+"""Organization model — top-level tenant container for multi-user workspaces."""
+
 from django.contrib.auth import get_user_model
 from django.db import models
 

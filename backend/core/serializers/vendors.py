@@ -1,9 +1,13 @@
+"""Vendor serializers for read and write representations."""
+
 from rest_framework import serializers
 
 from core.models import Vendor
 
 
 class VendorSerializer(serializers.ModelSerializer):
+    """Read-only vendor representation."""
+
     class Meta:
         model = Vendor
         fields = [
@@ -23,6 +27,8 @@ class VendorSerializer(serializers.ModelSerializer):
 
 
 class VendorWriteSerializer(serializers.Serializer):
+    """Write serializer for creating or updating a vendor."""
+
     name = serializers.CharField(max_length=255, required=False, allow_blank=False)
     vendor_type = serializers.ChoiceField(choices=Vendor.VendorType.choices, required=False)
     email = serializers.EmailField(required=False, allow_blank=True)

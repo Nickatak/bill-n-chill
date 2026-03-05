@@ -1,3 +1,5 @@
+"""Estimate model — mutable operational record for customer-facing project cost proposals."""
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -100,20 +102,24 @@ class Estimate(StatusTransitionMixin, models.Model):
 
     @property
     def public_slug(self) -> str:
+        """URL-safe slug derived from the estimate title."""
         normalized = slugify((self.title or "").strip())
         return normalized or "estimate"
 
     @property
     def public_ref(self) -> str:
+        """Combined slug--token identifier for public sharing URLs."""
         return f"{self.public_slug}--{self.public_token}"
 
     def clean(self):
+        """Validate status transitions before save."""
         errors = {}
         self.validate_status_transition(errors)
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        """Auto-generate public token if missing, then validate and persist."""
         if not self.public_token:
             while True:
                 candidate = generate_public_token()

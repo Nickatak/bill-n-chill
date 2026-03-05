@@ -1,3 +1,5 @@
+"""ScopeItem model — canonical scope-line identity shared across financial artifacts."""
+
 from django.contrib.auth import get_user_model
 from django.db import models
 

@@ -1,3 +1,5 @@
+"""ChangeOrderSnapshot model — immutable point-in-time capture for change-order decisions."""
+
 from django.contrib.auth import get_user_model
 from django.db import models
 

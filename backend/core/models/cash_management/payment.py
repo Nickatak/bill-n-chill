@@ -1,3 +1,5 @@
+"""Payment and PaymentAllocation models — cash movement records with AR/AP allocation."""
+
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -86,6 +88,7 @@ class Payment(StatusTransitionMixin, models.Model):
 
     @property
     def allocated_total(self) -> Decimal:
+        """Sum of all applied allocation amounts for this payment."""
         return (
             self.allocations.aggregate(total=Sum("applied_amount")).get("total")
             or Decimal("0")
@@ -93,16 +96,19 @@ class Payment(StatusTransitionMixin, models.Model):
 
     @property
     def unapplied_amount(self) -> Decimal:
+        """Remaining payment amount not yet allocated to invoices or bills."""
         remainder = Decimal(str(self.amount)) - self.allocated_total
         return remainder if remainder > Decimal("0") else Decimal("0")
 
     def clean(self):
+        """Validate status transitions before save."""
         errors = {}
         self.validate_status_transition(errors)
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        """Run full_clean before persisting to enforce domain constraints."""
         self.full_clean()
         return super().save(*args, **kwargs)
 

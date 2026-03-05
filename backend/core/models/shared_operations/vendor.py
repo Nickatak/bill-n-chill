@@ -1,3 +1,5 @@
+"""Vendor model — payee directory record for accounts payable and commitments."""
+
 from django.contrib.auth import get_user_model
 from django.db import models
 

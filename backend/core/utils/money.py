@@ -1,3 +1,5 @@
+"""Money precision utilities for consistent currency rounding."""
+
 from decimal import Decimal, ROUND_HALF_UP
 
 MONEY_QUANTUM = Decimal("0.01")

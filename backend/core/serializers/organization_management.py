@@ -1,3 +1,5 @@
+"""Organization profile, membership, and invite serializers."""
+
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
@@ -7,6 +9,8 @@ User = get_user_model()
 
 
 class OrganizationProfileSerializer(serializers.ModelSerializer):
+    """Read-only organization profile with branding and document presets."""
+
     class Meta:
         model = Organization
         fields = [
@@ -27,6 +31,8 @@ class OrganizationProfileSerializer(serializers.ModelSerializer):
 
 
 class OrganizationMembershipSerializer(serializers.ModelSerializer):
+    """Read-only membership representation with computed user display fields."""
+
     user_email = serializers.EmailField(source="user.email", read_only=True)
     user_full_name = serializers.SerializerMethodField()
     is_current_user = serializers.SerializerMethodField()
@@ -61,12 +67,14 @@ class OrganizationMembershipSerializer(serializers.ModelSerializer):
         ]
 
     def get_user_full_name(self, obj: OrganizationMembership) -> str:
+        """Return the member's full name, falling back to username or email."""
         full_name = obj.user.get_full_name().strip()
         if full_name:
             return full_name
         return obj.user.username or obj.user.email or f"user-{obj.user_id}"
 
     def get_is_current_user(self, obj: OrganizationMembership) -> bool:
+        """Return whether this membership belongs to the requesting user."""
         request = self.context.get("request")
         if not request or not request.user or not request.user.is_authenticated:
             return False
@@ -74,6 +82,8 @@ class OrganizationMembershipSerializer(serializers.ModelSerializer):
 
 
 class OrganizationProfileUpdateSerializer(serializers.Serializer):
+    """Write serializer for partial updates to organization profile fields."""
+
     display_name = serializers.CharField(max_length=255, required=False, allow_blank=False)
     logo_url = serializers.URLField(required=False, allow_blank=True, default="")
     help_email = serializers.EmailField(required=False, allow_blank=True, default="")
@@ -93,6 +103,8 @@ class OrganizationProfileUpdateSerializer(serializers.Serializer):
 
 
 class OrganizationMembershipUpdateSerializer(serializers.Serializer):
+    """Write serializer for updating a member's role or status."""
+
     role = serializers.ChoiceField(choices=OrganizationMembership.Role.choices, required=False)
     status = serializers.ChoiceField(choices=OrganizationMembership.Status.choices, required=False)
 

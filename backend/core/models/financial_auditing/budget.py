@@ -1,3 +1,5 @@
+"""Budget model — internal execution baseline derived from an approved estimate."""
+
 from django.contrib.auth import get_user_model
 from django.db import models
 

@@ -1,3 +1,5 @@
+"""LeadContactRecord model — immutable audit capture for customer-intake lifecycle events."""
+
 from django.contrib.auth import get_user_model
 from django.db import models
 

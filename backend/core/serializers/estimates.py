@@ -1,3 +1,5 @@
+"""Estimate serializers for read, write, duplication, and status-event representations."""
+
 from decimal import Decimal
 
 from rest_framework import serializers
@@ -7,10 +9,13 @@ from core.serializers.mixins import resolve_public_actor_customer_id, resolve_pu
 
 
 def _estimate_customer(obj):
+    """Return the customer associated with the status event's estimate project."""
     return getattr(getattr(getattr(obj, "estimate", None), "project", None), "customer", None)
 
 
 class EstimateLineItemSerializer(serializers.ModelSerializer):
+    """Read-only estimate line item with cost code and scope item details."""
+
     scope_item = serializers.IntegerField(source="scope_item_id", read_only=True)
     cost_code_code = serializers.CharField(source="cost_code.code", read_only=True)
     cost_code_name = serializers.CharField(source="cost_code.name", read_only=True)
@@ -37,16 +42,20 @@ class EstimateLineItemSerializer(serializers.ModelSerializer):
 
 
 class EstimateSerializer(serializers.ModelSerializer):
+    """Read-only estimate with nested line items and financial baseline status."""
+
     line_items = EstimateLineItemSerializer(many=True, read_only=True)
     public_ref = serializers.CharField(read_only=True)
     financial_baseline_status = serializers.SerializerMethodField()
     is_active_financial_baseline = serializers.SerializerMethodField()
 
     def get_financial_baseline_status(self, obj: Estimate) -> str:
+        """Return the budget baseline status for this estimate (none, active, or superseded)."""
         status_by_estimate_id = self.context.get("financial_baseline_status_by_estimate_id", {})
         return status_by_estimate_id.get(obj.id, "none")
 
     def get_is_active_financial_baseline(self, obj: Estimate) -> bool:
+        """Return whether this estimate is the active budget baseline."""
         return self.get_financial_baseline_status(obj) == "active"
 
     class Meta:
@@ -86,12 +95,15 @@ class EstimateSerializer(serializers.ModelSerializer):
 
 
 class EstimateStatusEventSerializer(serializers.ModelSerializer):
+    """Read-only estimate status event with computed action type and actor display."""
+
     changed_by_email = serializers.CharField(source="changed_by.email", read_only=True)
     changed_by_display = serializers.SerializerMethodField()
     changed_by_customer_id = serializers.SerializerMethodField()
     action_type = serializers.SerializerMethodField()
 
     def get_action_type(self, obj: EstimateStatusEvent) -> str:
+        """Classify the event as create, transition, resend, notate, or unchanged."""
         from_status = obj.from_status or ""
         to_status = obj.to_status or ""
         note = (obj.note or "").strip()
@@ -106,9 +118,11 @@ class EstimateStatusEventSerializer(serializers.ModelSerializer):
         return "unchanged"
 
     def get_changed_by_display(self, obj: EstimateStatusEvent) -> str:
+        """Return a human-readable display name for the actor who changed the status."""
         return resolve_public_actor_display(obj, actor_field="changed_by", customer_fn=_estimate_customer)
 
     def get_changed_by_customer_id(self, obj: EstimateStatusEvent):
+        """Return the customer ID if the actor acted via a public token."""
         return resolve_public_actor_customer_id(obj, customer_fn=_estimate_customer)
 
     class Meta:
@@ -130,6 +144,8 @@ class EstimateStatusEventSerializer(serializers.ModelSerializer):
 
 
 class EstimateLineItemInputSerializer(serializers.Serializer):
+    """Write serializer for a single estimate line item in a create/update payload."""
+
     cost_code = serializers.IntegerField()
     description = serializers.CharField(max_length=255)
     quantity = serializers.DecimalField(max_digits=12, decimal_places=2)
@@ -141,6 +157,8 @@ class EstimateLineItemInputSerializer(serializers.Serializer):
 
 
 class EstimateWriteSerializer(serializers.Serializer):
+    """Write serializer for creating or updating an estimate with line items."""
+
     title = serializers.CharField(max_length=255, required=True, allow_blank=False)
     allow_existing_title_family = serializers.BooleanField(required=False, default=False)
     status = serializers.ChoiceField(choices=Estimate.Status.choices, required=False)
@@ -165,6 +183,8 @@ class EstimateWriteSerializer(serializers.Serializer):
 
 
 class EstimateDuplicateSerializer(serializers.Serializer):
+    """Write serializer for duplicating an estimate to the same or different project."""
+
     project_id = serializers.IntegerField(required=False)
     title = serializers.CharField(max_length=255, required=True, allow_blank=False)
 

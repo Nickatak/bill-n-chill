@@ -7,6 +7,7 @@ from core.views.helpers import _vendor_scope_filter  # noqa: F401 — re-exporte
 
 
 def _find_duplicate_vendors(user, *, name: str, email: str, exclude_vendor_id=None):
+    """Find existing vendors matching by name or email for duplicate detection."""
     rows = Vendor.objects.filter(_vendor_scope_filter(user))
     if exclude_vendor_id:
         rows = rows.exclude(id=exclude_vendor_id)

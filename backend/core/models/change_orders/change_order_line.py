@@ -1,3 +1,5 @@
+"""ChangeOrderLine model — line-level cost/schedule delta tied to an active budget line."""
+
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
@@ -65,6 +67,7 @@ class ChangeOrderLine(models.Model):
         return f"CO-{self.change_order.family_key} line {self.id} ({self.amount_delta})"
 
     def clean(self):
+        """Ensure budget line belongs to the same project and an active budget."""
         errors = {}
 
         if self.change_order_id and self.budget_line_id:
@@ -93,5 +96,6 @@ class ChangeOrderLine(models.Model):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        """Run full_clean before persisting to enforce domain constraints."""
         self.full_clean()
         return super().save(*args, **kwargs)

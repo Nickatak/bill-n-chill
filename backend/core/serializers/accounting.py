@@ -1,9 +1,13 @@
+"""Accounting sync event serializers for external provider integration tracking."""
+
 from rest_framework import serializers
 
 from core.models import AccountingSyncEvent
 
 
 class AccountingSyncEventSerializer(serializers.ModelSerializer):
+    """Read-only accounting sync event with project name."""
+
     project_name = serializers.CharField(source="project.name", read_only=True)
 
     class Meta:
@@ -36,6 +40,8 @@ class AccountingSyncEventSerializer(serializers.ModelSerializer):
 
 
 class AccountingSyncEventWriteSerializer(serializers.Serializer):
+    """Write serializer for creating or updating accounting sync events."""
+
     provider = serializers.ChoiceField(choices=AccountingSyncEvent.Provider.choices, required=False)
     object_type = serializers.CharField(max_length=50, required=False, allow_blank=False)
     object_id = serializers.IntegerField(required=False, min_value=1, allow_null=True)

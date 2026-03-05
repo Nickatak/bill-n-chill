@@ -1,3 +1,5 @@
+"""Change order serializers for read, write, and line item representations."""
+
 from decimal import Decimal
 
 from django.db.models import Sum
@@ -7,6 +9,8 @@ from core.models import ChangeOrder, ChangeOrderLine
 
 
 class ChangeOrderLineSerializer(serializers.ModelSerializer):
+    """Read-only change order line item with budget line details."""
+
     budget_line_cost_code = serializers.CharField(source="budget_line.cost_code.code", read_only=True)
     budget_line_description = serializers.CharField(source="budget_line.description", read_only=True)
 
@@ -30,6 +34,8 @@ class ChangeOrderLineSerializer(serializers.ModelSerializer):
 
 
 class ChangeOrderSerializer(serializers.ModelSerializer):
+    """Read-only change order with nested line items and revision context."""
+
     requested_by_email = serializers.EmailField(source="requested_by.email", read_only=True)
     approved_by_email = serializers.EmailField(source="approved_by.email", read_only=True)
     public_ref = serializers.CharField(read_only=True)
@@ -38,6 +44,7 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
     is_latest_revision = serializers.SerializerMethodField()
 
     def get_is_latest_revision(self, obj) -> bool:
+        """Return whether this change order is the latest revision in its family."""
         latest_map = self.context.get("is_latest_revision_map")
         if latest_map is not None:
             return latest_map.get(obj.id, False)
@@ -49,6 +56,7 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
         ).exists()
 
     def get_line_total_delta(self, obj) -> str:
+        """Return the sum of all line item amount deltas as a decimal string."""
         if not hasattr(obj, "_prefetched_objects_cache") or "line_items" not in obj._prefetched_objects_cache:
             return str(obj.line_items.all().aggregate(total=Sum("amount_delta")).get("total") or Decimal("0.00"))
         return str(sum((line.amount_delta for line in obj.line_items.all()), Decimal("0.00")))
@@ -100,6 +108,8 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
 
 
 class ChangeOrderLineInputSerializer(serializers.Serializer):
+    """Write serializer for a single change order line item in a create/update payload."""
+
     line_type = serializers.ChoiceField(
         choices=ChangeOrderLine.LineType.choices,
         required=False,
@@ -118,6 +128,8 @@ class ChangeOrderLineInputSerializer(serializers.Serializer):
 
 
 class ChangeOrderWriteSerializer(serializers.Serializer):
+    """Write serializer for creating or updating a change order with line items."""
+
     title = serializers.CharField(max_length=255, required=False, allow_blank=False)
     status = serializers.ChoiceField(choices=ChangeOrder.Status.choices, required=False)
     status_note = serializers.CharField(max_length=5000, required=False, allow_blank=True)

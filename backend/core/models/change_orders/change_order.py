@@ -1,3 +1,5 @@
+"""ChangeOrder model — post-baseline contract delta request for scope, time, and cost changes."""
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -125,16 +127,19 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
 
     @property
     def public_slug(self) -> str:
+        """URL-safe slug derived from family key and revision number."""
         normalized = slugify(f"co-{self.family_key}-v{self.revision_number}")
         return normalized or "change-order"
 
     @property
     def public_ref(self) -> str:
+        """Combined slug--token identifier for public sharing URLs."""
         if not self.public_token:
             return ""
         return f"{self.public_slug}--{self.public_token}"
 
     def clean(self):
+        """Validate approval fields, origin estimate, revision chain, and status transitions."""
         from core.models.estimating.estimate import Estimate
 
         errors = {}
@@ -259,6 +264,7 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
         }
 
     def save(self, *args, **kwargs):
+        """Auto-generate public token if missing, then validate and persist."""
         update_fields = kwargs.get("update_fields")
         if not self.public_token:
             while True:

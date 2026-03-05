@@ -1,3 +1,5 @@
+"""InvoiceStatusEvent model — immutable audit trail of invoice status transitions."""
+
 from django.contrib.auth import get_user_model
 from django.db import models
 

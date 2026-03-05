@@ -1,3 +1,5 @@
+"""RoleTemplate model — preset or custom role definition with capability flags for RBAC."""
+
 from django.contrib.auth import get_user_model
 from django.db import models
 

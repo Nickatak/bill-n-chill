@@ -8,6 +8,7 @@ from core.views.helpers import _ensure_membership, _organization_user_ids
 
 
 def _cost_code_scope_filter(user):
+    """Build a Q filter for cost codes visible to the given user's organization."""
     membership = _ensure_membership(user)
     actor_user_ids = _organization_user_ids(user)
     return Q(organization_id=membership.organization_id) | Q(
@@ -17,6 +18,7 @@ def _cost_code_scope_filter(user):
 
 
 def _duplicate_code_error_response():
+    """Return a 400 response for duplicate cost code code within an organization."""
     return Response(
         {
             "error": {

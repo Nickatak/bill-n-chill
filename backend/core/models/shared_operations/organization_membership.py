@@ -1,3 +1,5 @@
+"""OrganizationMembership model — user-to-org binding with RBAC role and capability flags."""
+
 from django.contrib.auth import get_user_model
 from django.db import models
 

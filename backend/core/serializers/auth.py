@@ -1,3 +1,5 @@
+"""Authentication serializers for login and registration."""
+
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
@@ -5,6 +7,8 @@ User = get_user_model()
 
 
 class LoginSerializer(serializers.Serializer):
+    """Write serializer for email/password login."""
+
     email = serializers.EmailField()
     password = serializers.CharField()
 
@@ -23,6 +27,8 @@ class LoginSerializer(serializers.Serializer):
 
 
 class RegisterSerializer(serializers.Serializer):
+    """Write serializer for new user registration."""
+
     email = serializers.EmailField()
     password = serializers.CharField(min_length=8)
 

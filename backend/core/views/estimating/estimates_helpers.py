@@ -21,6 +21,7 @@ from core.views.helpers import (
 
 
 def _archive_estimate_family(*, project, user, title, exclude_ids, note):
+    """Archive all same-title estimates in a family except the excluded IDs."""
     normalized_title = (title or "").strip()
     if not normalized_title:
         return
@@ -54,6 +55,7 @@ def _archive_estimate_family(*, project, user, title, exclude_ids, note):
 
 
 def _next_estimate_family_version(*, project, user, title):
+    """Return the next version number for an estimate family identified by title."""
     normalized_title = (title or "").strip()
     actor_user_ids = _organization_user_ids(user)
     latest = (
@@ -69,6 +71,7 @@ def _next_estimate_family_version(*, project, user, title):
 
 
 def _estimate_financial_baseline_context(*, project, actor_user_ids):
+    """Build a mapping of estimate IDs to their budget conversion status for serialization."""
     budgets = (
         Budget.objects.filter(project=project, created_by_id__in=actor_user_ids)
         .select_related("source_estimate")
@@ -101,6 +104,7 @@ def _estimate_financial_baseline_context(*, project, actor_user_ids):
 
 
 def _serialize_estimate(*, estimate, actor_user_ids):
+    """Serialize a single estimate with its financial baseline context."""
     context = _estimate_financial_baseline_context(
         project=estimate.project,
         actor_user_ids=actor_user_ids,
@@ -109,6 +113,7 @@ def _serialize_estimate(*, estimate, actor_user_ids):
 
 
 def _serialize_estimates(*, estimates, project, actor_user_ids):
+    """Serialize multiple estimates sharing the same project's financial baseline context."""
     context = _estimate_financial_baseline_context(
         project=project,
         actor_user_ids=actor_user_ids,
@@ -117,6 +122,7 @@ def _serialize_estimates(*, estimates, project, actor_user_ids):
 
 
 def _sync_project_contract_baseline_if_unset(*, estimate):
+    """Set the project's original and current contract values from the estimate if both are zero."""
     project = estimate.project
     if project.contract_value_original != Decimal("0") or project.contract_value_current != Decimal("0"):
         return False
@@ -127,6 +133,7 @@ def _sync_project_contract_baseline_if_unset(*, estimate):
 
 
 def _activate_project_from_estimate_approval(*, estimate, actor, note: str):
+    """Transition a prospect or on-hold project to active when its estimate is approved."""
     project = estimate.project
     if project.status not in (Project.Status.PROSPECT, Project.Status.ON_HOLD):
         return False
@@ -155,6 +162,7 @@ def _activate_project_from_estimate_approval(*, estimate, actor, note: str):
 
 
 def _calculate_line_totals(line_items_data):
+    """Compute per-line totals with markup and return normalized items, subtotal, and markup total."""
     subtotal = MONEY_ZERO
     markup_total = MONEY_ZERO
     normalized_items = []
@@ -184,6 +192,7 @@ def _calculate_line_totals(line_items_data):
 
 
 def _apply_estimate_lines_and_totals(estimate, line_items_data, tax_percent, user):
+    """Replace an estimate's line items and recompute all totals. Returns an error dict on failure."""
     normalized_items, subtotal, markup_total = _calculate_line_totals(line_items_data)
     code_map, missing = _resolve_cost_codes_for_user(user, normalized_items)
     if missing:

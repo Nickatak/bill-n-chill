@@ -1,3 +1,5 @@
+"""AccountingSyncRecord model — immutable audit capture for accounting sync lifecycle events."""
+
 from django.contrib.auth import get_user_model
 from django.db import models
 

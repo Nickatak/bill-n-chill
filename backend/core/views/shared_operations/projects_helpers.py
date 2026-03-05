@@ -16,6 +16,7 @@ from core.views.helpers import _organization_user_ids
 
 
 def _parse_optional_date(value: str):
+    """Parse an ISO date string, returning (date, None) on success or (None, errors) on failure."""
     if not value:
         return None, None
     try:
@@ -25,6 +26,7 @@ def _parse_optional_date(value: str):
 
 
 def _date_filter_from_query(request):
+    """Extract and validate date_from/date_to query params. Returns (date_from, date_to, errors)."""
     date_from_raw = (request.query_params.get("date_from") or "").strip()
     date_to_raw = (request.query_params.get("date_to") or "").strip()
     date_from, date_from_error = _parse_optional_date(date_from_raw)
@@ -42,6 +44,7 @@ def _date_filter_from_query(request):
 
 
 def _project_active_budget_map(*, project_ids, actor_user_ids):
+    """Return a dict mapping project IDs to their most recent active budget."""
     if not project_ids:
         return {}
 
@@ -63,6 +66,7 @@ def _project_active_budget_map(*, project_ids, actor_user_ids):
 
 
 def _project_accepted_contract_totals_map(*, project_ids, actor_user_ids):
+    """Return a dict mapping project IDs to their accepted contract total (estimate + approved COs)."""
     active_budget_by_project = _project_active_budget_map(
         project_ids=project_ids,
         actor_user_ids=actor_user_ids,
@@ -77,6 +81,7 @@ def _project_accepted_contract_totals_map(*, project_ids, actor_user_ids):
 
 
 def _build_project_financial_summary_data(project: Project, user, *, actor_user_ids=None):
+    """Build a complete financial summary dict for a project with AR/AP totals and traceability links."""
     if actor_user_ids is None:
         actor_user_ids = _organization_user_ids(user)
 

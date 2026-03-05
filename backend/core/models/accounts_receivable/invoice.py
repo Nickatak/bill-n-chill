@@ -1,3 +1,5 @@
+"""Invoice and InvoiceLine models — customer-facing AR billing artifacts."""
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -112,16 +114,19 @@ class Invoice(StatusTransitionMixin, models.Model):
 
     @property
     def public_slug(self) -> str:
+        """URL-safe slug derived from the invoice number."""
         normalized = slugify((self.invoice_number or "").strip())
         return normalized or "invoice"
 
     @property
     def public_ref(self) -> str:
+        """Combined slug--token identifier for public sharing URLs."""
         if not self.public_token:
             return ""
         return f"{self.public_slug}--{self.public_token}"
 
     def clean(self):
+        """Validate dates, balance, customer-project match, and status transitions."""
         errors = {}
 
         if self.issue_date and self.due_date and self.due_date < self.issue_date:
@@ -141,6 +146,7 @@ class Invoice(StatusTransitionMixin, models.Model):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        """Auto-generate public token, zero balance on paid status, then validate and persist."""
         update_fields = kwargs.get("update_fields")
         if not self.public_token:
             while True:

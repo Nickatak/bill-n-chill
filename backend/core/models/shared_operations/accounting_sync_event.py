@@ -1,3 +1,5 @@
+"""AccountingSyncEvent model — operational sync-attempt log for external accounting integrations."""
+
 from django.contrib.auth import get_user_model
 from django.db import models
 

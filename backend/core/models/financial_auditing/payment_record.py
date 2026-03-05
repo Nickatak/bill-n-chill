@@ -1,3 +1,5 @@
+"""PaymentRecord model — immutable audit capture for payment lifecycle and provenance."""
+
 from django.contrib.auth import get_user_model
 from django.db import models
 

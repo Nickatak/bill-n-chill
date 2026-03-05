@@ -9,6 +9,7 @@ from core.models import InvoiceLine
 
 
 def _normalize_invoice_line_item(item: dict[str, Any]) -> dict[str, Any]:
+    """Normalize and whitespace-strip a single invoice line item payload dict."""
     return {
         "line_type": item.get("line_type", InvoiceLine.LineType.SCOPE),
         "budget_line": item.get("budget_line"),
@@ -25,6 +26,8 @@ def _normalize_invoice_line_item(item: dict[str, Any]) -> dict[str, Any]:
 
 @dataclass(frozen=True)
 class InvoiceCreateIngress:
+    """Immutable ingress payload for invoice creation with defaults applied."""
+
     issue_date: date
     due_date: date
     sender_name: str
@@ -51,6 +54,7 @@ def build_invoice_create_ingress(
     default_footer_text: str,
     default_notes_text: str,
 ) -> InvoiceCreateIngress:
+    """Build an InvoiceCreateIngress from validated request data, applying org defaults for missing fields."""
     line_items = [
         _normalize_invoice_line_item(item) for item in validated_data.get("line_items", [])
     ]
@@ -73,6 +77,8 @@ def build_invoice_create_ingress(
 
 @dataclass(frozen=True)
 class InvoicePatchIngress:
+    """Immutable ingress payload for invoice PATCH with per-field presence tracking."""
+
     has_status: bool
     status: str | None
     has_status_note: bool
@@ -104,6 +110,7 @@ class InvoicePatchIngress:
 
 
 def build_invoice_patch_ingress(validated_data: dict[str, Any]) -> InvoicePatchIngress:
+    """Build an InvoicePatchIngress from validated request data with has_* presence flags."""
     has_line_items = "line_items" in validated_data
     line_items = (
         [_normalize_invoice_line_item(item) for item in validated_data.get("line_items", [])]

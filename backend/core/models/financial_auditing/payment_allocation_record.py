@@ -1,3 +1,5 @@
+"""PaymentAllocationRecord model — immutable audit capture for payment-allocation events."""
+
 from django.contrib.auth import get_user_model
 from django.db import models
 

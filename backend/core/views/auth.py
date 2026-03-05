@@ -1,3 +1,5 @@
+"""Authentication and registration views with invite-flow support."""
+
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone

@@ -1,3 +1,5 @@
+"""Cross-domain shared helpers and re-exports for the view layer."""
+
 import re
 
 from django.db.models import Q
@@ -35,6 +37,7 @@ SYSTEM_BUDGET_LINE_CODES = {row["cost_code"] for row in SYSTEM_BUDGET_LINE_SPECS
 
 
 def _validate_project_for_user(project_id: int, user):
+    """Look up a project by ID, scoped to the user's organization. Returns None if not found."""
     actor_user_ids = _organization_user_ids(user)
     try:
         return Project.objects.select_related("customer").get(
@@ -46,6 +49,7 @@ def _validate_project_for_user(project_id: int, user):
 
 
 def _resolve_organization_for_public_actor(actor_user):
+    """Resolve the primary organization for a public-facing actor user."""
     if not actor_user:
         return None
     membership = (
@@ -63,6 +67,7 @@ def _resolve_organization_for_public_actor(actor_user):
 
 
 def _serialize_public_organization_context(organization: Organization | None) -> dict:
+    """Serialize organization branding fields for public-facing document contexts."""
     if not organization:
         return {
             "display_name": "",
@@ -86,6 +91,7 @@ def _serialize_public_organization_context(organization: Organization | None) ->
 
 
 def _serialize_public_project_context(project: Project) -> dict:
+    """Serialize project and customer fields for public-facing document contexts."""
     customer = project.customer
     return {
         "id": project.id,
@@ -99,6 +105,7 @@ def _serialize_public_project_context(project: Project) -> dict:
 
 
 def _parse_request_bool(raw_value, *, default: bool = True) -> bool:
+    """Coerce a loosely-typed request value to a boolean."""
     if raw_value is None:
         return default
     if isinstance(raw_value, bool):

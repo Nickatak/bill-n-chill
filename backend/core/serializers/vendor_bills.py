@@ -1,9 +1,13 @@
+"""Vendor bill serializers for read, write, and budget allocation representations."""
+
 from rest_framework import serializers
 
 from core.models import VendorBill, VendorBillAllocation
 
 
 class VendorBillAllocationSerializer(serializers.ModelSerializer):
+    """Read-only vendor bill allocation with budget line details."""
+
     budget_line_cost_code = serializers.CharField(source="budget_line.cost_code.code", read_only=True)
     budget_line_description = serializers.CharField(source="budget_line.description", read_only=True)
 
@@ -23,6 +27,8 @@ class VendorBillAllocationSerializer(serializers.ModelSerializer):
 
 
 class VendorBillSerializer(serializers.ModelSerializer):
+    """Read-only vendor bill with nested allocations and vendor/project names."""
+
     project_name = serializers.CharField(source="project.name", read_only=True)
     vendor_name = serializers.CharField(source="vendor.name", read_only=True)
     allocations = VendorBillAllocationSerializer(many=True, read_only=True)
@@ -63,6 +69,8 @@ class VendorBillSerializer(serializers.ModelSerializer):
 
 
 class VendorBillWriteSerializer(serializers.Serializer):
+    """Write serializer for creating or updating a vendor bill with allocations."""
+
     vendor = serializers.IntegerField(required=False)
     bill_number = serializers.CharField(max_length=50, required=False, allow_blank=False)
     status = serializers.ChoiceField(

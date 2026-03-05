@@ -1,3 +1,5 @@
+"""Invoice serializers for read, write, scope-override, and status-event representations."""
+
 from rest_framework import serializers
 
 from core.models import Invoice, InvoiceLine, InvoiceStatusEvent
@@ -5,6 +7,7 @@ from core.serializers.mixins import resolve_public_actor_customer_id, resolve_pu
 
 
 def _invoice_customer(obj):
+    """Return the customer associated with the status event's invoice."""
     invoice = getattr(obj, "invoice", None)
     return getattr(invoice, "customer", None) or getattr(
         getattr(invoice, "project", None), "customer", None
@@ -12,6 +15,8 @@ def _invoice_customer(obj):
 
 
 class InvoiceLineSerializer(serializers.ModelSerializer):
+    """Read-only invoice line item with budget line, cost code, and scope item details."""
+
     budget_line_description = serializers.CharField(source="budget_line.description", read_only=True)
     budget_line_cost_code = serializers.CharField(source="budget_line.cost_code.code", read_only=True)
     cost_code_code = serializers.CharField(source="cost_code.code", read_only=True)
@@ -57,6 +62,8 @@ class InvoiceLineSerializer(serializers.ModelSerializer):
 
 
 class InvoiceSerializer(serializers.ModelSerializer):
+    """Read-only invoice with nested line items and customer display name."""
+
     customer_display_name = serializers.CharField(source="customer.display_name", read_only=True)
     line_items = InvoiceLineSerializer(many=True, read_only=True)
     public_ref = serializers.CharField(read_only=True)
@@ -106,6 +113,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
 
 class InvoiceLineItemInputSerializer(serializers.Serializer):
+    """Write serializer for a single invoice line item in a create/update payload."""
+
     line_type = serializers.ChoiceField(
         choices=InvoiceLine.LineType.choices,
         required=False,
@@ -133,6 +142,8 @@ class InvoiceLineItemInputSerializer(serializers.Serializer):
 
 
 class InvoiceWriteSerializer(serializers.Serializer):
+    """Write serializer for creating or updating an invoice with line items."""
+
     status = serializers.ChoiceField(choices=Invoice.Status.choices, required=False)
     status_note = serializers.CharField(max_length=5000, required=False, allow_blank=True)
     issue_date = serializers.DateField(required=False)
@@ -156,6 +167,8 @@ class InvoiceWriteSerializer(serializers.Serializer):
 
 
 class InvoiceScopeOverrideSerializer(serializers.Serializer):
+    """Write serializer for toggling scope-override on an invoice."""
+
     scope_override = serializers.BooleanField(required=False, default=False)
     scope_override_note = serializers.CharField(
         max_length=5000,
@@ -166,12 +179,15 @@ class InvoiceScopeOverrideSerializer(serializers.Serializer):
 
 
 class InvoiceStatusEventSerializer(serializers.ModelSerializer):
+    """Read-only invoice status event with computed action type and actor display."""
+
     changed_by_email = serializers.CharField(source="changed_by.email", read_only=True)
     changed_by_display = serializers.SerializerMethodField()
     changed_by_customer_id = serializers.SerializerMethodField()
     action_type = serializers.SerializerMethodField()
 
     def get_action_type(self, obj: InvoiceStatusEvent) -> str:
+        """Classify the event as create, transition, resend, notate, or unchanged."""
         from_status = obj.from_status or ""
         to_status = obj.to_status or ""
         note = (obj.note or "").strip()
@@ -186,9 +202,11 @@ class InvoiceStatusEventSerializer(serializers.ModelSerializer):
         return "unchanged"
 
     def get_changed_by_display(self, obj: InvoiceStatusEvent) -> str:
+        """Return a human-readable display name for the actor who changed the status."""
         return resolve_public_actor_display(obj, actor_field="changed_by", customer_fn=_invoice_customer)
 
     def get_changed_by_customer_id(self, obj: InvoiceStatusEvent):
+        """Return the customer ID if the actor acted via a public token."""
         return resolve_public_actor_customer_id(obj, customer_fn=_invoice_customer)
 
     class Meta:

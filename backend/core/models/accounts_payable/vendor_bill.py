@@ -1,3 +1,5 @@
+"""VendorBill and VendorBillAllocation models — AP bills from vendors with budget-line attribution."""
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -95,6 +97,7 @@ class VendorBill(StatusTransitionMixin, models.Model):
         return f"{self.vendor.name} {self.bill_number}"
 
     def clean(self):
+        """Validate due date, scheduled_for requirement, and status transitions."""
         errors = {}
 
         if self.due_date and self.issue_date and self.due_date < self.issue_date:
@@ -147,6 +150,7 @@ class VendorBill(StatusTransitionMixin, models.Model):
         }
 
     def save(self, *args, **kwargs):
+        """Run full_clean before persisting to enforce domain constraints."""
         self.full_clean()
         return super().save(*args, **kwargs)
 

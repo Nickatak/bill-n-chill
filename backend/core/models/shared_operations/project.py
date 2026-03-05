@@ -1,3 +1,5 @@
+"""Project model — primary execution container for delivery and financial workflows."""
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -90,6 +92,7 @@ class Project(StatusTransitionMixin, models.Model):
         return self.name
 
     def clean(self):
+        """Validate status transitions and prevent activation under an archived customer."""
         errors = {}
 
         if self.status in {self.Status.ACTIVE, self.Status.ON_HOLD} and self.customer_id is not None:
@@ -104,5 +107,6 @@ class Project(StatusTransitionMixin, models.Model):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        """Run full_clean before persisting to enforce domain constraints."""
         self.full_clean()
         return super().save(*args, **kwargs)

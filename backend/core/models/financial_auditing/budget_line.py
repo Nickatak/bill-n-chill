@@ -1,3 +1,5 @@
+"""BudgetLine model — internal working-budget row for expected spend by cost category."""
+
 from django.db import models
 
 

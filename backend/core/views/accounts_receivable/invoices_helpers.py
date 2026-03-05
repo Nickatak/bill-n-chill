@@ -29,10 +29,12 @@ BILLABLE_INVOICE_STATUSES = {
 
 
 def _is_billable_invoice_status(status):
+    """Return True if the invoice status counts toward billed totals."""
     return status in BILLABLE_INVOICE_STATUSES
 
 
 def _project_billable_invoices_total(*, project, user, exclude_invoice_id=None):
+    """Sum the totals of all billable invoices for a project, optionally excluding one."""
     actor_user_ids = _organization_user_ids(user)
     query = Invoice.objects.filter(
         project=project,
@@ -54,6 +56,7 @@ def _enforce_invoice_scope_guard(
     scope_override,
     scope_override_note,
 ):
+    """Check whether the invoice total exceeds the project's approved scope. Returns an error dict or None."""
     if not _is_billable_invoice_status(candidate_status):
         return None
 
@@ -129,6 +132,7 @@ def _enforce_invoice_scope_guard(
 
 
 def _next_invoice_number(*, project, user):
+    """Generate the next unique sequential invoice number for a project."""
     actor_user_ids = _organization_user_ids(user)
     next_number = (
         Invoice.objects.filter(
@@ -145,6 +149,7 @@ def _next_invoice_number(*, project, user):
 
 
 def _calculate_invoice_line_totals(line_items_data):
+    """Compute per-line totals and return normalized items with a running subtotal."""
     subtotal = MONEY_ZERO
     normalized_items = []
 
@@ -166,6 +171,7 @@ def _calculate_invoice_line_totals(line_items_data):
 
 
 def _resolve_invoice_scope_items_for_user(user, line_items_data):
+    """Resolve and validate scope item IDs from line item data for the user's org."""
     ids = [item["scope_item"] for item in line_items_data if item.get("scope_item")]
     if not ids:
         return {}, []
@@ -178,6 +184,7 @@ def _resolve_invoice_scope_items_for_user(user, line_items_data):
 
 
 def _resolve_invoice_budget_lines_for_project(*, project, user, line_items_data):
+    """Resolve and validate budget line IDs from the project's active budget."""
     ids = [item["budget_line"] for item in line_items_data if item.get("budget_line")]
     if not ids:
         return {}, []
@@ -195,6 +202,7 @@ def _resolve_invoice_budget_lines_for_project(*, project, user, line_items_data)
 
 
 def _apply_invoice_lines_and_totals(invoice, line_items_data, tax_percent, user):
+    """Replace an invoice's line items and recompute all totals. Returns an error dict on failure."""
     normalized_items, subtotal = _calculate_invoice_line_totals(line_items_data)
     budget_line_map, missing_budget_lines = _resolve_invoice_budget_lines_for_project(
         project=invoice.project,
@@ -338,6 +346,7 @@ def _apply_invoice_lines_and_totals(invoice, line_items_data, tax_percent, user)
 
 
 def _invoice_line_apply_error_response(apply_error):
+    """Convert an _apply_invoice_lines_and_totals error dict into a (body, status) HTTP response tuple."""
     if "missing_budget_lines" in apply_error:
         return (
             {

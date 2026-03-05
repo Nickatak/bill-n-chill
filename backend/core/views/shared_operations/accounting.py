@@ -12,6 +12,7 @@ from core.views.helpers import _capability_gate, _organization_user_ids, _valida
 
 
 def _build_accounting_sync_snapshot(sync_event: AccountingSyncEvent) -> dict:
+    """Serialize an accounting sync event into an immutable snapshot dict for audit records."""
     return {
         "accounting_sync_event": {
             "id": sync_event.id,
@@ -43,6 +44,7 @@ def _record_accounting_sync_record(
     note: str = "",
     metadata: dict | None = None,
 ):
+    """Create an immutable AccountingSyncRecord with a point-in-time snapshot."""
     AccountingSyncRecord.objects.create(
         accounting_sync_event=sync_event,
         event_type=event_type,

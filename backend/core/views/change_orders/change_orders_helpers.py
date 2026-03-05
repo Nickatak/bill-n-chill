@@ -19,6 +19,7 @@ from core.views.helpers import (
 
 
 def _serialize_public_change_order(change_order) -> dict:
+    """Serialize a change order with project and organization context for public preview."""
     serialized = ChangeOrderSerializer(change_order).data
     organization = _resolve_organization_for_public_actor(change_order.requested_by)
     serialized["project_context"] = _serialize_public_project_context(change_order.project)
@@ -34,6 +35,7 @@ def _serialize_public_change_order(change_order) -> dict:
 
 
 def _validate_change_order_lines(*, project, line_items):
+    """Validate change order line items against budget lines. Returns (line_map, total, error_response)."""
     if not line_items:
         return {}, MONEY_ZERO, None
 
@@ -118,6 +120,7 @@ def _validate_change_order_lines(*, project, line_items):
 
 
 def _sync_change_order_lines(*, change_order, line_items, line_map):
+    """Replace all line items on a change order with the provided set."""
     ChangeOrderLine.objects.filter(change_order=change_order).delete()
     for row in line_items:
         ChangeOrderLine.objects.create(
@@ -132,6 +135,7 @@ def _sync_change_order_lines(*, change_order, line_items, line_map):
 
 
 def _validation_error_response(*, message: str, fields: dict, rule: str | None = None):
+    """Build a standard 400 validation error response with an optional rule code."""
     error = {
         "code": "validation_error",
         "message": message,
@@ -143,6 +147,7 @@ def _validation_error_response(*, message: str, fields: dict, rule: str | None =
 
 
 def _next_change_order_family_key(*, project):
+    """Return the next numeric family key string for change orders in a project."""
     existing_keys = ChangeOrder.objects.filter(project=project).values_list("family_key", flat=True)
     numeric_keys = []
     for key in existing_keys:
@@ -153,6 +158,7 @@ def _next_change_order_family_key(*, project):
 
 
 def _infer_model_validation_rule(*, fields: dict) -> str | None:
+    """Infer a domain-specific rule code from Django model ValidationError field names."""
     field_keys = set(fields.keys())
     if {"approved_by", "approved_at"} & field_keys:
         return "co_approval_metadata_invariant"
@@ -170,6 +176,7 @@ def _infer_model_validation_rule(*, fields: dict) -> str | None:
 
 
 def _model_validation_error_response(*, exc: ValidationError, message: str):
+    """Convert a Django model ValidationError into a standard validation error response."""
     fields = {}
     if hasattr(exc, "message_dict"):
         fields = exc.message_dict

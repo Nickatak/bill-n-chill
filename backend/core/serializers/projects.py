@@ -1,9 +1,13 @@
+"""Project, cost code, financial summary, portfolio, and dashboard serializers."""
+
 from rest_framework import serializers
 
 from core.models import CostCode, Project
 
 
 class ProjectSerializer(serializers.ModelSerializer):
+    """Read-only project representation with customer display fields."""
+
     customer_display_name = serializers.CharField(source="customer.display_name", read_only=True)
     customer_billing_address = serializers.CharField(source="customer.billing_address", read_only=True)
 
@@ -24,6 +28,8 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 
 class ProjectProfileSerializer(serializers.ModelSerializer):
+    """Read/write project profile for editing name, address, status, and contract values."""
+
     customer_display_name = serializers.CharField(source="customer.display_name", read_only=True)
     customer_billing_address = serializers.CharField(source="customer.billing_address", read_only=True)
 
@@ -51,6 +57,8 @@ class ProjectProfileSerializer(serializers.ModelSerializer):
 
 
 class CostCodeSerializer(serializers.ModelSerializer):
+    """Read/write cost code representation."""
+
     def validate(self, attrs):
         if self.instance is None and attrs.get("is_active") is False:
             raise serializers.ValidationError(
@@ -64,6 +72,8 @@ class CostCodeSerializer(serializers.ModelSerializer):
 
 
 class ProjectFinancialSummarySerializer(serializers.Serializer):
+    """Read-only financial summary for a single project with AR/AP breakdowns."""
+
     project_id = serializers.IntegerField()
     contract_value_original = serializers.DecimalField(max_digits=12, decimal_places=2)
     contract_value_current = serializers.DecimalField(max_digits=12, decimal_places=2)
@@ -84,6 +94,8 @@ class ProjectFinancialSummarySerializer(serializers.Serializer):
 
 
 class PortfolioProjectSnapshotSerializer(serializers.Serializer):
+    """Read-only per-project snapshot within a portfolio summary."""
+
     project_id = serializers.IntegerField()
     project_name = serializers.CharField()
     project_status = serializers.CharField()
@@ -93,6 +105,8 @@ class PortfolioProjectSnapshotSerializer(serializers.Serializer):
 
 
 class PortfolioSnapshotSerializer(serializers.Serializer):
+    """Read-only cross-project portfolio summary with aggregate AR/AP totals."""
+
     generated_at = serializers.DateTimeField()
     date_filter = serializers.JSONField()
     active_projects_count = serializers.IntegerField()
@@ -104,6 +118,8 @@ class PortfolioSnapshotSerializer(serializers.Serializer):
 
 
 class ChangeImpactProjectSerializer(serializers.Serializer):
+    """Read-only per-project change order impact breakdown."""
+
     project_id = serializers.IntegerField()
     project_name = serializers.CharField()
     approved_change_order_count = serializers.IntegerField()
@@ -111,6 +127,8 @@ class ChangeImpactProjectSerializer(serializers.Serializer):
 
 
 class ChangeImpactSummarySerializer(serializers.Serializer):
+    """Read-only cross-project change order impact summary."""
+
     generated_at = serializers.DateTimeField()
     date_filter = serializers.JSONField()
     approved_change_order_count = serializers.IntegerField()
@@ -119,6 +137,8 @@ class ChangeImpactSummarySerializer(serializers.Serializer):
 
 
 class AttentionFeedItemSerializer(serializers.Serializer):
+    """Read-only single attention feed item (overdue, upcoming, or action-needed)."""
+
     kind = serializers.CharField()
     severity = serializers.CharField()
     label = serializers.CharField()
@@ -131,6 +151,8 @@ class AttentionFeedItemSerializer(serializers.Serializer):
 
 
 class AttentionFeedSerializer(serializers.Serializer):
+    """Read-only attention feed with prioritized action items across projects."""
+
     generated_at = serializers.DateTimeField()
     due_soon_window_days = serializers.IntegerField()
     item_count = serializers.IntegerField()
@@ -138,6 +160,8 @@ class AttentionFeedSerializer(serializers.Serializer):
 
 
 class QuickJumpItemSerializer(serializers.Serializer):
+    """Read-only single quick-jump search result entry."""
+
     kind = serializers.CharField()
     record_id = serializers.IntegerField()
     label = serializers.CharField()
@@ -149,12 +173,16 @@ class QuickJumpItemSerializer(serializers.Serializer):
 
 
 class QuickJumpSearchSerializer(serializers.Serializer):
+    """Read-only quick-jump search response with matched items."""
+
     query = serializers.CharField()
     item_count = serializers.IntegerField()
     items = QuickJumpItemSerializer(many=True)
 
 
 class ProjectTimelineItemSerializer(serializers.Serializer):
+    """Read-only single project timeline event (financial or workflow)."""
+
     timeline_id = serializers.CharField()
     category = serializers.ChoiceField(choices=["financial", "workflow"])
     event_type = serializers.CharField()
@@ -168,6 +196,8 @@ class ProjectTimelineItemSerializer(serializers.Serializer):
 
 
 class ProjectTimelineSerializer(serializers.Serializer):
+    """Read-only project timeline response with chronological event items."""
+
     project_id = serializers.IntegerField()
     project_name = serializers.CharField()
     category = serializers.ChoiceField(choices=["all", "financial", "workflow"])

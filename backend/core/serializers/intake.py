@@ -1,3 +1,5 @@
+"""Customer intake and management serializers for CRUD and quick-add flows."""
+
 import re
 
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -10,6 +12,7 @@ PHONE_ALLOWED_RE = re.compile(r"^[0-9+\-().\s]+$")
 
 
 def _is_valid_email(value: str) -> bool:
+    """Return whether value passes Django email validation."""
     try:
         validate_email(value)
     except DjangoValidationError:
@@ -18,6 +21,7 @@ def _is_valid_email(value: str) -> bool:
 
 
 def _is_valid_phone(value: str) -> bool:
+    """Return whether value matches allowed phone number format (7-15 digits)."""
     if not PHONE_ALLOWED_RE.fullmatch(value):
         return False
     digits = re.sub(r"\D", "", value)
@@ -25,6 +29,8 @@ def _is_valid_phone(value: str) -> bool:
 
 
 class CustomerIntakeQuickAddSerializer(serializers.Serializer):
+    """Write serializer for the quick-add customer intake flow."""
+
     full_name = serializers.CharField(max_length=255)
     phone = serializers.CharField(required=False, allow_blank=True, max_length=50)
     project_address = serializers.CharField(required=False, allow_blank=True, max_length=255)
@@ -75,6 +81,8 @@ class CustomerIntakeQuickAddSerializer(serializers.Serializer):
 
 
 class CustomerManageSerializer(serializers.ModelSerializer):
+    """Read/write customer representation for the management console."""
+
     project_count = serializers.IntegerField(read_only=True)
     active_project_count = serializers.IntegerField(read_only=True)
 
@@ -124,6 +132,8 @@ class CustomerManageSerializer(serializers.ModelSerializer):
 
 
 class CustomerSerializer(serializers.ModelSerializer):
+    """Lightweight read-only customer representation for nested/reference use."""
+
     class Meta:
         model = Customer
         fields = [
@@ -138,6 +148,8 @@ class CustomerSerializer(serializers.ModelSerializer):
 
 
 class CustomerProjectCreateSerializer(serializers.Serializer):
+    """Write serializer for creating a project under an existing customer."""
+
     name = serializers.CharField(required=False, allow_blank=True, max_length=255)
     site_address = serializers.CharField(required=False, allow_blank=True, max_length=255)
     status = serializers.ChoiceField(

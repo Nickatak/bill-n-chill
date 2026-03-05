@@ -1,3 +1,5 @@
+"""EstimateLineItem model — individual priced scope row within an estimate version."""
+
 from django.db import models
 
 

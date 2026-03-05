@@ -9,6 +9,7 @@ from core.utils.money import MONEY_ZERO, quantize_money
 
 
 def _settled_allocated_total(payment: Payment) -> Decimal:
+    """Return the total amount allocated from a payment's settled allocations only."""
     return quantize_money(
         PaymentAllocation.objects.filter(
             payment=payment,
@@ -19,6 +20,7 @@ def _settled_allocated_total(payment: Payment) -> Decimal:
 
 
 def _all_allocated_total(payment: Payment) -> Decimal:
+    """Return the total amount allocated from a payment across all statuses."""
     return quantize_money(
         PaymentAllocation.objects.filter(payment=payment).aggregate(total=Sum("applied_amount")).get("total")
         or MONEY_ZERO
@@ -26,6 +28,7 @@ def _all_allocated_total(payment: Payment) -> Decimal:
 
 
 def _set_invoice_balance_from_allocations(invoice: Invoice):
+    """Recompute an invoice's balance_due and status from its settled payment allocations."""
     applied_total = (
         PaymentAllocation.objects.filter(
             invoice=invoice,
@@ -56,6 +59,7 @@ def _set_invoice_balance_from_allocations(invoice: Invoice):
 
 
 def _set_vendor_bill_balance_from_allocations(vendor_bill: VendorBill):
+    """Recompute a vendor bill's balance_due and status from its settled payment allocations."""
     applied_total = (
         PaymentAllocation.objects.filter(
             vendor_bill=vendor_bill,
@@ -83,6 +87,7 @@ def _set_vendor_bill_balance_from_allocations(vendor_bill: VendorBill):
 
 
 def _recalculate_payment_allocation_targets(payment: Payment):
+    """Refresh balance_due on all invoices and vendor bills linked to a payment."""
     invoice_ids = set(
         PaymentAllocation.objects.filter(payment=payment, invoice_id__isnull=False).values_list(
             "invoice_id", flat=True
@@ -102,6 +107,7 @@ def _recalculate_payment_allocation_targets(payment: Payment):
 
 
 def _direction_target_mismatch(direction: str, target_type: str) -> bool:
+    """Return True if the allocation target type is incompatible with the payment direction."""
     return (direction == Payment.Direction.INBOUND and target_type != PaymentAllocation.TargetType.INVOICE) or (
         direction == Payment.Direction.OUTBOUND
         and target_type != PaymentAllocation.TargetType.VENDOR_BILL

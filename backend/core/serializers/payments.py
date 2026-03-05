@@ -1,3 +1,5 @@
+"""Payment and payment allocation serializers for read, write, and allocation flows."""
+
 from decimal import Decimal
 
 from rest_framework import serializers
@@ -6,6 +8,8 @@ from core.models import Payment, PaymentAllocation
 
 
 class PaymentAllocationSerializer(serializers.ModelSerializer):
+    """Read-only payment allocation with polymorphic target ID resolution."""
+
     target_id = serializers.SerializerMethodField()
 
     class Meta:
@@ -23,10 +27,13 @@ class PaymentAllocationSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_target_id(self, obj: PaymentAllocation):
+        """Return the invoice or vendor bill ID based on target type."""
         return obj.invoice_id if obj.target_type == PaymentAllocation.TargetType.INVOICE else obj.vendor_bill_id
 
 
 class PaymentSerializer(serializers.ModelSerializer):
+    """Read-only payment with nested allocations and computed totals."""
+
     project_name = serializers.CharField(source="project.name", read_only=True)
     allocations = PaymentAllocationSerializer(many=True, read_only=True)
     allocated_total = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
@@ -64,6 +71,8 @@ class PaymentSerializer(serializers.ModelSerializer):
 
 
 class PaymentWriteSerializer(serializers.Serializer):
+    """Write serializer for creating or updating a payment."""
+
     direction = serializers.ChoiceField(choices=Payment.Direction.choices, required=False)
     method = serializers.ChoiceField(choices=Payment.Method.choices, required=False)
     status = serializers.ChoiceField(choices=Payment.Status.choices, required=False)
@@ -79,6 +88,8 @@ class PaymentWriteSerializer(serializers.Serializer):
 
 
 class PaymentAllocationInputSerializer(serializers.Serializer):
+    """Write serializer for a single allocation entry in an allocate payload."""
+
     target_type = serializers.ChoiceField(choices=PaymentAllocation.TargetType.choices)
     target_id = serializers.IntegerField(min_value=1)
     applied_amount = serializers.DecimalField(
@@ -89,4 +100,6 @@ class PaymentAllocationInputSerializer(serializers.Serializer):
 
 
 class PaymentAllocateSerializer(serializers.Serializer):
+    """Write serializer for batch-allocating a payment to invoices or vendor bills."""
+
     allocations = PaymentAllocationInputSerializer(many=True, required=True)

@@ -1,3 +1,5 @@
+"""OrganizationRecord model — immutable audit capture for organization lifecycle events."""
+
 from django.contrib.auth import get_user_model
 from django.db import models
 

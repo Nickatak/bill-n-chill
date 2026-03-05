@@ -1,3 +1,5 @@
+"""Customer model — mutable client/owner record anchoring projects and invoices."""
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -53,6 +55,7 @@ class Customer(models.Model):
         ordering = ["-created_at"]
 
     def clean(self):
+        """Prevent archiving a customer with active or on-hold projects."""
         errors = {}
 
         if self.is_archived and self.pk:
@@ -68,6 +71,7 @@ class Customer(models.Model):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        """Run full_clean before persisting to enforce domain constraints."""
         self.full_clean()
         return super().save(*args, **kwargs)
 

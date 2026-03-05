@@ -5,6 +5,7 @@ from core.user_helpers import _resolve_user_capabilities, _resolve_user_role
 
 
 def _organization_role_policy(user) -> dict:
+    """Build the role policy dict describing the user's effective permissions for the org console."""
     effective_role = _resolve_user_role(user)
     caps = _resolve_user_capabilities(user)
     can_edit_identity = "edit" in caps.get("org_identity", [])
@@ -24,12 +25,14 @@ def _organization_role_policy(user) -> dict:
 
 
 def _organization_membership_queryset(organization_id: int):
+    """Return the ordered membership queryset for an organization with user relations loaded."""
     return OrganizationMembership.objects.select_related("user").filter(
         organization_id=organization_id
     ).order_by("status", "role", "user_id")
 
 
 def _is_last_active_owner(membership: OrganizationMembership, *, next_role: str, next_status: str) -> bool:
+    """Return True if changing this membership would leave the organization with no active owner."""
     is_owner_now = membership.role == OrganizationMembership.Role.OWNER
     is_active_now = membership.status == OrganizationMembership.Status.ACTIVE
     remains_active_owner = (

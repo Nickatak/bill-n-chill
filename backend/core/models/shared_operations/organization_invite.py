@@ -1,3 +1,5 @@
+"""OrganizationInvite model — time-limited token for inviting users to an organization."""
+
 import secrets
 from datetime import timedelta
 
@@ -57,6 +59,7 @@ class OrganizationInvite(models.Model):
         ordering = ["-created_at"]
 
     def save(self, *args, **kwargs):
+        """Auto-generate token and expiry if not already set, then persist."""
         if not self.token:
             self.token = secrets.token_urlsafe(32)
         if not self.expires_at:
@@ -65,14 +68,17 @@ class OrganizationInvite(models.Model):
 
     @property
     def is_expired(self):
+        """True if the invite's expiry time has passed."""
         return timezone.now() > self.expires_at
 
     @property
     def is_consumed(self):
+        """True if the invite has already been used."""
         return self.consumed_at is not None
 
     @property
     def is_valid(self):
+        """True if the invite is neither expired nor consumed."""
         return not self.is_expired and not self.is_consumed
 
     @classmethod

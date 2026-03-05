@@ -8,6 +8,7 @@ from core.views.helpers import _normalized_phone, _organization_user_ids
 
 
 def _find_duplicate_customers(user, *, phone: str, email: str):
+    """Find existing customers matching by phone or email for duplicate detection."""
     actor_user_ids = _organization_user_ids(user)
     customers = Customer.objects.filter(created_by_id__in=actor_user_ids)
     phone_norm = _normalized_phone(phone)
@@ -32,6 +33,7 @@ def _find_duplicate_customers(user, *, phone: str, email: str):
 
 
 def _build_customer_duplicate_candidate(customer: Customer) -> dict:
+    """Serialize a customer into a lightweight duplicate-candidate dict."""
     return {
         "id": customer.id,
         "display_name": customer.display_name,
@@ -52,6 +54,7 @@ def _build_intake_payload(
     converted_project_id: int | None = None,
     converted_at=None,
 ) -> dict:
+    """Build the customer_intake sub-dict for a LeadContactRecord snapshot."""
     return {
         "id": intake_record_id,
         "full_name": payload.get("full_name", ""),
