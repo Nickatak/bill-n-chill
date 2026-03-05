@@ -613,7 +613,7 @@ export function ProjectsConsole() {
                       <Link href="/invoices">Invoices</Link>
                     </div>
                     <div className={styles.node}>
-                      <Link href={`/financials-auditing?project=${selectedProject.id}`}>
+                      <Link href={`/invoices?project=${selectedProject.id}`}>
                         Payments In (AR)
                       </Link>
                     </div>
@@ -624,7 +624,7 @@ export function ProjectsConsole() {
                       <Link href={`/bills?project=${selectedProject.id}`}>Bills</Link>
                     </div>
                     <div className={styles.node}>
-                      <Link href={`/financials-auditing?project=${selectedProject.id}`}>
+                      <Link href={`/bills?project=${selectedProject.id}`}>
                         Payments Out (AP)
                       </Link>
                     </div>

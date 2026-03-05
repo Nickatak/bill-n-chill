@@ -54,6 +54,7 @@ import {
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import { useClientPagination } from "@/shared/hooks/use-client-pagination";
 import { PaginationControls } from "@/shared/components/pagination-controls";
+import { PaymentRecorder, type AllocationTarget } from "@/features/payments";
 import styles from "./invoices-console.module.css";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import invoiceCreatorStyles from "@/shared/document-creator/invoice-creator.module.css";
@@ -217,6 +218,7 @@ export function InvoicesConsole() {
   const [isStatusSectionOpen, setIsStatusSectionOpen] = useState(true);
   const [isHistorySectionOpen, setIsHistorySectionOpen] = useState(false);
   const [isLineItemsSectionOpen, setIsLineItemsSectionOpen] = useState(false);
+  const [activeContentTab, setActiveContentTab] = useState<"invoices" | "payments">("invoices");
   const [viewerActionMessage, setViewerActionMessage] = useState("");
   const [viewerActionTone, setViewerActionTone] = useState<"success" | "error">("success");
   const [showAllEvents, setShowAllEvents] = useState(false);
@@ -1318,6 +1320,16 @@ export function InvoicesConsole() {
   const statusMessageAtToolbar =
     statusTone === "success" && /^Duplicated\b/i.test(statusMessage);
 
+  const invoiceAllocationTargets: AllocationTarget[] = useMemo(
+    () =>
+      invoices.map((inv) => ({
+        id: inv.id,
+        label: inv.invoice_number || `Invoice #${inv.id}`,
+        balanceDue: inv.balance_due,
+      })),
+    [invoices],
+  );
+
   return (
     <section className={styles.console}>
       {!token ? <p className={styles.authNotice}>{authMessage}</p> : null}
@@ -1362,6 +1374,36 @@ export function InvoicesConsole() {
             statusLabel={projectStatusLabel}
           />
 
+          {selectedProjectId ? (
+            <div className={styles.contentTabBar}>
+              <button
+                type="button"
+                className={`${styles.contentTab} ${activeContentTab === "invoices" ? styles.contentTabActive : ""}`}
+                onClick={() => setActiveContentTab("invoices")}
+              >
+                Invoices
+              </button>
+              <button
+                type="button"
+                className={`${styles.contentTab} ${activeContentTab === "payments" ? styles.contentTabActive : ""}`}
+                onClick={() => setActiveContentTab("payments")}
+              >
+                Payments
+              </button>
+            </div>
+          ) : null}
+
+          {activeContentTab === "payments" && selectedProjectId ? (
+            <PaymentRecorder
+              projectId={Number(selectedProjectId)}
+              direction="inbound"
+              allocationTargets={invoiceAllocationTargets}
+              onPaymentsChanged={() => loadInvoices()}
+            />
+          ) : null}
+
+          {activeContentTab === "invoices" ? (
+          <>
           <section className={`${styles.panel} ${styles.viewerPanel}`}>
               <div className={styles.panelHeader}>
                 <h3>{selectedProject ? `Invoices for: ${selectedProject.name}` : "Invoices"}</h3>
@@ -2069,6 +2111,8 @@ export function InvoicesConsole() {
 
           </div>
         </>
+      ) : null}
+      </>
       ) : null}
     </section>
   );

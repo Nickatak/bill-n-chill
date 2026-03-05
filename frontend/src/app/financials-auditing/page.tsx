@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { FinancialsAuditingConsole } from "@/features/financials-auditing";
-import { PaymentsConsole } from "@/features/payments";
+import { PaymentsConsole } from "@/features/payments/components/payments-console";
 import shell from "@/shared/shell/page-shell.module.css";
 import { PageCard, PageShell } from "@/shared/shell";
 

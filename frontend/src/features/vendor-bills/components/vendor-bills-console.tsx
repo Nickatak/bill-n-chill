@@ -42,6 +42,7 @@ import {
   VendorBillStatus,
   VendorRecord,
 } from "../types";
+import { PaymentRecorder, type AllocationTarget } from "@/features/payments";
 import styles from "./vendor-bills-console.module.css";
 import creatorStyles from "../../../shared/document-creator/creator-foundation.module.css";
 
@@ -184,6 +185,9 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const [isStatusSectionOpen, setIsStatusSectionOpen] = useState(true);
   const [isAllocationsSectionOpen, setIsAllocationsSectionOpen] = useState(false);
   const [isDetailsSectionOpen, setIsDetailsSectionOpen] = useState(false);
+
+  // Content tab (bills vs payments)
+  const [activeContentTab, setActiveContentTab] = useState<"bills" | "payments">("bills");
 
   // Workspace visibility + flash animation
   const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(true);
@@ -1236,6 +1240,18 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     return () => el.removeEventListener("animationend", cleanup);
   }, [creatorFlashCount]);
 
+  const billAllocationTargets: AllocationTarget[] = useMemo(
+    () =>
+      vendorBills.map((bill) => ({
+        id: bill.id,
+        label: bill.bill_number
+          ? `${bill.bill_number} — ${bill.vendor_name}`
+          : `Bill #${bill.id} — ${bill.vendor_name}`,
+        balanceDue: bill.balance_due,
+      })),
+    [vendorBills],
+  );
+
   return (
     <section className={styles.console}>
       {projects.length > 0 ? (
@@ -1272,6 +1288,36 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
         <p>Create or load a project before entering bills.</p>
       )}
 
+      {selectedProjectId ? (
+        <div className={styles.contentTabBar}>
+          <button
+            type="button"
+            className={`${styles.contentTab} ${activeContentTab === "bills" ? styles.contentTabActive : ""}`}
+            onClick={() => setActiveContentTab("bills")}
+          >
+            Bills
+          </button>
+          <button
+            type="button"
+            className={`${styles.contentTab} ${activeContentTab === "payments" ? styles.contentTabActive : ""}`}
+            onClick={() => setActiveContentTab("payments")}
+          >
+            Payments
+          </button>
+        </div>
+      ) : null}
+
+      {activeContentTab === "payments" && selectedProjectId ? (
+        <PaymentRecorder
+          projectId={Number(selectedProjectId)}
+          direction="outbound"
+          allocationTargets={billAllocationTargets}
+          onPaymentsChanged={loadVendorBills}
+        />
+      ) : null}
+
+      {activeContentTab === "bills" ? (
+      <>
       {/* ── Viewer Panel: bill table + inline expansion ──────────── */}
       <div className={styles.viewerPanel}>
         <div className={styles.panelHeader}>
@@ -2051,6 +2097,8 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
             </div>
           ) : null}
         </div>
+      ) : null}
+      </>
       ) : null}
 
       {statusMessage ? <p className={styles.inlineHint}>{statusMessage}</p> : null}

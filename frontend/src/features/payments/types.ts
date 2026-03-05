@@ -14,6 +14,13 @@ export type PaymentMethod = string;
 export type PaymentStatus = string;
 export type PaymentAllocationTargetType = "invoice" | "vendor_bill";
 
+/** Generic allocation target shape accepted by PaymentRecorder. */
+export type AllocationTarget = {
+  id: number;
+  label: string;
+  balanceDue: string;
+};
+
 export type PaymentAllocationRecord = {
   id: number;
   payment: number;

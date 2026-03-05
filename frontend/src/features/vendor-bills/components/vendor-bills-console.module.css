@@ -3,6 +3,37 @@
   gap: var(--space-md);
 }
 
+/* ── Content Tab Bar ── */
+
+.contentTabBar {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+}
+
+.contentTab {
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.contentTab:hover {
+  color: var(--text-primary);
+}
+
+.contentTabActive {
+  color: var(--accent-text);
+  border-bottom-color: var(--accent);
+}
+
 /* ── Viewer panel ─────────────────────────────────────────────── */
 
 .viewerPanel {

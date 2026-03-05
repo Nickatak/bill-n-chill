@@ -18,10 +18,7 @@ export type NavRoute = {
   section?: string;
 };
 
-/**
- * Primary workflow steps shown in the top-level navbar.
- * Numbered labels reflect the intended left-to-right construction workflow.
- */
+/** Primary workflow steps shown in the top-level navbar. */
 export const workflowRoutes: NavRoute[] = [
   {
     href: "/",
@@ -48,11 +45,6 @@ export const workflowRoutes: NavRoute[] = [
     href: "/bills",
     label: "Bills",
     exact: ["/bills"],
-  },
-  {
-    href: "/financials-auditing",
-    label: "Financials",
-    exact: ["/financials-auditing"],
   },
 ];
 

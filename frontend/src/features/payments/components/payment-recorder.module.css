@@ -1,0 +1,109 @@
+.recorder {
+  display: grid;
+  gap: 10px;
+  color: var(--text-primary);
+}
+
+.heading {
+  margin: 0;
+  font-size: 1.06rem;
+}
+
+.copy {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+.readOnlyNotice,
+.statusMessage {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-secondary);
+  color: var(--text-secondary);
+  padding: var(--space-sm) 10px;
+  font-size: 0.84rem;
+}
+
+.readOnlyNotice {
+  composes: noticeWarning from '../../../shared/styles/notices.module.css';
+}
+
+.recorder > form,
+.recorder > section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-secondary);
+  padding: 10px;
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.recorder h3 {
+  margin: 0;
+}
+
+.recorder p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+}
+
+.recorder label {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.recorder input,
+.recorder select,
+.recorder textarea {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-primary);
+  padding: var(--space-sm) 10px;
+  font-size: 0.88rem;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+}
+
+.recorder textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.recorder button {
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  background: var(--accent-light);
+  color: var(--accent-text);
+  padding: var(--space-sm) 10px;
+  font-size: var(--font-sm);
+  font-weight: 700;
+  cursor: pointer;
+  width: fit-content;
+}
+
+.recorder button + button {
+  margin-left: var(--space-sm);
+}
+
+.recorder button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.recorder code {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 1px 6px;
+  color: var(--text-primary);
+}

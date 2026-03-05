@@ -1,3 +1,4 @@
 export * from "./api";
 export * from "./types";
-export { PaymentsConsole } from "./components/payments-console";
+export { PaymentRecorder } from "./components/payment-recorder";
+export type { PaymentRecorderProps } from "./components/payment-recorder";
