@@ -179,7 +179,7 @@ export function OrganizationConsole() {
     <PageShell narrow>
       <header className={shell.hero}>
         <div className={shell.heroTop}>
-          <p className={shell.eyebrow}>Ops / Meta</p>
+          <p className={shell.eyebrow}>Business</p>
           <h1 className={shell.title}>Organization</h1>
           <p className={shell.copy}>
             Company identity, team membership, and document defaults.

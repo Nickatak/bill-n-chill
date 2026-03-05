@@ -19,7 +19,7 @@ export default function OnboardingPage() {
             last &mdash; by the end you&apos;ll have a complete billing workflow.
           </p>
           <p className={shell.copy} style={{ fontSize: "0.82rem", opacity: 0.7 }}>
-            You can always get back to this page from the <strong>Ops / Meta</strong> menu
+            You can always get back to this page from your organization menu
             &rarr; <strong>Get Started</strong>.
           </p>
         </div>

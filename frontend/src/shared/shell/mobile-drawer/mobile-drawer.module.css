@@ -131,15 +131,10 @@
   border-bottom: 1px solid var(--border);
 }
 
-.orgLink {
+.orgLabel {
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--text-primary);
-  text-decoration: none;
-}
-
-.orgLink:hover {
-  text-decoration: underline;
 }
 
 .drawerNav {

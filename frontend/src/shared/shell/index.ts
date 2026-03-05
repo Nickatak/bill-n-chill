@@ -5,7 +5,7 @@ export { WorkflowShell } from "./workflow-shell";
 export { WorkflowNavbar } from "./workflow-navbar";
 export { WorkflowBreadcrumbs } from "./workflow-breadcrumbs";
 export { PageShell, PageCard } from "./page-shell";
-export { isRouteActive, workflowRoutes, opsMetaRoutes } from "./nav-routes";
+export { isRouteActive, workflowRoutes, businessMenuRoutes } from "./nav-routes";
 export type { NavRoute } from "./nav-routes";
 export {
   isNumericRouteId,

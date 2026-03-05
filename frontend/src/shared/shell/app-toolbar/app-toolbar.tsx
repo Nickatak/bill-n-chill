@@ -1,7 +1,7 @@
 /**
  * Top-level application toolbar rendered at the very top of every page.
  *
- * Contains the organization link, ops/meta dropdown, print button,
+ * Contains the organization dropdown menu, print button,
  * theme toggle, and logout. Visibility of individual controls depends
  * on session state and whether the current route is a public document view.
  */
@@ -13,7 +13,7 @@ import { clearClientSession } from "@/features/session/client-session";
 import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { isRouteActive, opsMetaRoutes } from "../nav-routes";
+import { isRouteActive, businessMenuRoutes } from "../nav-routes";
 import styles from "./app-toolbar.module.css";
 
 // ---------------------------------------------------------------------------
@@ -56,8 +56,8 @@ function applyTheme(theme: ThemeMode) {
 /**
  * Render the persistent toolbar at the top of the viewport.
  *
- * Authenticated users see the full set of controls (org link,
- * ops/meta, print, theme, logout). Public document routes show
+ * Authenticated users see the full set of controls (org menu,
+ * print, theme, logout). Public document routes show
  * only a "Home" link, print, and theme toggle so customers get
  * a minimal chrome-free experience.
  */
@@ -67,8 +67,7 @@ export function AppToolbar() {
   const { token, organization } = useSharedSessionAuth();
   const hasSession = Boolean(token);
   const isPublicDocument = isPublicDocumentRoute(pathname);
-  const isOrganizationPath = pathname === "/ops/organization";
-  const hasActiveOpsMeta = opsMetaRoutes.some((route) => isRouteActive(pathname, route));
+  const hasActiveBusinessMenu = businessMenuRoutes.some((route) => isRouteActive(pathname, route));
   const opsMetaMenuRef = useRef<HTMLDetailsElement>(null);
 
   /** Close all open `<details>` menus. */
@@ -120,30 +119,20 @@ export function AppToolbar() {
 
   return (
     <div className={styles.controls}>
-      {hasSession && !isPublicDocument && organization ? (
-        <Link
-          href="/ops/organization"
-          className={`${styles.button} ${isOrganizationPath ? styles.buttonActive : ""}`}
-          title={`Organization: ${organization.displayName}`}
-          data-onboarding-target="organization"
-        >
-          {organization.displayName} Organization (WIP)
-        </Link>
-      ) : null}
       {hasSession && isPublicDocument ? (
         <Link href="/" className={styles.button}>
           Home
         </Link>
       ) : null}
-      {hasSession && !isPublicDocument ? (
-        <details ref={opsMetaMenuRef} className={styles.menu}>
-          <summary className={`${styles.button} ${hasActiveOpsMeta ? styles.buttonActive : ""}`}>
-            Ops / Meta
+      {hasSession && !isPublicDocument && organization ? (
+        <details ref={opsMetaMenuRef} className={styles.menu} data-onboarding-target="organization">
+          <summary className={`${styles.button} ${hasActiveBusinessMenu ? styles.buttonActive : ""}`}>
+            {organization.displayName}
           </summary>
-          <div className={styles.menuList} role="menu" aria-label="Ops and metadata tools">
-            {opsMetaRoutes.map((route, index) => {
+          <div className={styles.menuList} role="menu" aria-label="Business setup and management">
+            {businessMenuRoutes.map((route, index) => {
               const showSection =
-                route.section && (index === 0 || opsMetaRoutes[index - 1].section !== route.section);
+                route.section && (index === 0 || businessMenuRoutes[index - 1].section !== route.section);
               return (
                 <Fragment key={route.href}>
                   {showSection ? (

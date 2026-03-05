@@ -45,7 +45,7 @@ type HierarchyRule = {
 const CUSTOMERS_HUB_CRUMB: CrumbDef = { href: "/customers", label: "Customers" };
 const PROJECTS_HUB_CRUMB: CrumbDef = { href: "/projects", label: "Projects" };
 const BILLING_HUB_CRUMB: CrumbDef = { href: "/invoices", label: "Billing" };
-const META_HUB_CRUMB: CrumbDef = { href: "/customers", label: "Ops / Meta" };
+const META_HUB_CRUMB: CrumbDef = { href: "/ops/organization", label: "Business" };
 
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 

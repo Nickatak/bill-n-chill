@@ -4,7 +4,7 @@
  * Mobile navigation drawer, visible only at ≤700px.
  *
  * Renders a fixed header bar (hamburger + theme toggle) and a slide-out
- * drawer containing all workflow routes, ops/meta routes, and actions.
+ * drawer containing all workflow routes, business menu routes, and actions.
  * On public document routes it renders a minimal header bar instead.
  */
 
@@ -14,7 +14,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { clearClientSession } from "@/features/session/client-session";
 import { isPublicDocumentRoute } from "@/features/session/public-routes";
 import { useSharedSessionAuth } from "@/features/session/use-shared-session";
-import { isRouteActive, opsMetaRoutes, workflowRoutes } from "../nav-routes";
+import { isRouteActive, businessMenuRoutes, workflowRoutes } from "../nav-routes";
 import styles from "./mobile-drawer.module.css";
 
 const THEME_KEY = "bnc-theme";
@@ -102,8 +102,6 @@ export function MobileDrawer() {
   }
 
   // Authenticated: full hamburger + drawer.
-  const isOrganizationPath = pathname === "/ops/organization";
-
   return (
     <div className={styles.root}>
       <header className={styles.header}>
@@ -129,13 +127,7 @@ export function MobileDrawer() {
           <nav className={styles.drawer} aria-label="Mobile navigation">
             {organization ? (
               <div className={styles.drawerHeader}>
-                <Link
-                  href="/ops/organization"
-                  className={`${styles.orgLink} ${isOrganizationPath ? styles.navLinkActive : ""}`}
-                  onClick={() => setIsOpen(false)}
-                >
-                  {organization.displayName} (WIP)
-                </Link>
+                <span className={styles.orgLabel}>{organization.displayName}</span>
               </div>
             ) : null}
 
@@ -156,8 +148,8 @@ export function MobileDrawer() {
             <div className={styles.divider} />
 
             <div className={styles.drawerNav}>
-              <span className={styles.sectionLabel}>Operations</span>
-              {opsMetaRoutes.map((route) => (
+              <span className={styles.sectionLabel}>Business</span>
+              {businessMenuRoutes.map((route) => (
                 <Link
                   key={route.href}
                   href={route.href}

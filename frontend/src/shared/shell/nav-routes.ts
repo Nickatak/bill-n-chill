@@ -1,5 +1,5 @@
 /**
- * Canonical route definitions for the workflow navbar and ops/meta menu.
+ * Canonical route definitions for the workflow navbar and business menu.
  *
  * Each route declares matching rules (`exact`, `startsWith`) so the
  * navbar and breadcrumbs can highlight the active item without coupling
@@ -30,39 +30,39 @@ export const workflowRoutes: NavRoute[] = [
   },
   {
     href: "/customers",
-    label: "1 Customers",
+    label: "Customers",
     exact: ["/customers"],
   },
   {
     href: "/projects",
-    label: "2 Projects",
+    label: "Projects",
     exact: ["/projects"],
     startsWith: ["/projects/"],
   },
   {
     href: "/invoices",
-    label: "3 Invoices",
+    label: "Invoices",
     exact: ["/invoices"],
   },
   {
     href: "/bills",
-    label: "4 Bills",
+    label: "Bills",
     exact: ["/bills"],
   },
   {
     href: "/financials-auditing",
-    label: "5 Financials",
+    label: "Financials",
     exact: ["/financials-auditing"],
   },
 ];
 
 /**
- * Secondary routes shown in the "Ops / Meta" dropdown menu.
- * These are operational and configuration pages that sit outside
- * the main workflow sequence.
+ * Secondary routes shown in the organization dropdown menu.
+ * These are business-setup and configuration pages that sit outside
+ * the main workflow sequence. The dropdown trigger shows the org name.
  */
-export const opsMetaRoutes: NavRoute[] = [
-  { href: "/customers", label: "Customers", exact: ["/customers"] },
+export const businessMenuRoutes: NavRoute[] = [
+  { href: "/ops/organization", label: "Organization", exact: ["/ops/organization"] },
   { href: "/cost-codes", label: "Cost Codes", exact: ["/cost-codes"], section: "Management" },
   { href: "/vendors", label: "Vendors", exact: ["/vendors"], section: "Management" },
   { href: "/onboarding", label: "Get Started", exact: ["/onboarding"] },

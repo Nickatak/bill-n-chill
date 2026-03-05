@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isRouteActive,
-  opsMetaRoutes,
+  businessMenuRoutes,
   workflowRoutes,
   type NavRoute,
 } from "../shell/nav-routes";
@@ -91,13 +91,13 @@ describe("workflowRoutes", () => {
   });
 });
 
-describe("opsMetaRoutes", () => {
+describe("businessMenuRoutes", () => {
   it("has at least one route", () => {
-    expect(opsMetaRoutes.length).toBeGreaterThan(0);
+    expect(businessMenuRoutes.length).toBeGreaterThan(0);
   });
 
   it("every route has a non-empty href and label", () => {
-    for (const route of opsMetaRoutes) {
+    for (const route of businessMenuRoutes) {
       expect(route.href).toBeTruthy();
       expect(route.label).toBeTruthy();
     }
