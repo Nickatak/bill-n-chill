@@ -466,7 +466,8 @@ export function ProjectsConsole() {
 
       {projects.length === 0 ? (
         <p>
-          No projects yet. Create one from <code>/customers</code>.
+          No projects yet. Head to <Link href="/customers" style={{ fontWeight: 600 }}>Customers</Link> and
+          use the &ldquo;Add Project&rdquo; button on any customer to get started.
         </p>
       ) : null}
 

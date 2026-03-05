@@ -18,8 +18,9 @@ export default function OnboardingPage() {
             Follow these steps to go from zero to your first invoice. Each step builds on the
             last &mdash; by the end you&apos;ll have a complete billing workflow.
           </p>
-          <p className={shell.copy} style={{ fontStyle: "italic", fontSize: "0.82rem" }}>
-            These steps are still being fine-tuned. If something looks off or breaks, let Nick know!
+          <p className={shell.copy} style={{ fontSize: "0.82rem", opacity: 0.7 }}>
+            You can always get back to this page from the <strong>Ops / Meta</strong> menu
+            &rarr; <strong>Get Started</strong>.
           </p>
         </div>
       </header>

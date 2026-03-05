@@ -297,7 +297,7 @@ export function CustomersList({
             ? "No customers match the current filters."
             : query
               ? "No customers matched your search."
-              : "No customers yet."}
+              : "No customers yet. Use the Quick Add form above to create your first one."}
         </p>
       ) : null}
     </section>
