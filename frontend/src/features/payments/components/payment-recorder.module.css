@@ -1,8 +1,12 @@
+/* Payment recorder — embedded panel for Invoices (inbound) and Bills (outbound) pages. */
+
 .recorder {
   display: grid;
-  gap: 10px;
+  gap: var(--space-md);
   color: var(--text-primary);
 }
+
+/* ── Header ─────────────────────────────────────────── */
 
 .heading {
   margin: 0;
@@ -12,49 +16,262 @@
 .copy {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 0.88rem;
-}
-
-.readOnlyNotice,
-.statusMessage {
-  margin: 0;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface-secondary);
-  color: var(--text-secondary);
-  padding: var(--space-sm) 10px;
-  font-size: 0.84rem;
+  font-size: 0.86rem;
 }
 
 .readOnlyNotice {
-  composes: noticeWarning from '../../../shared/styles/notices.module.css';
+  composes: noticeWarning from "../../../shared/styles/notices.module.css";
+  margin: 0;
 }
 
-.recorder > form,
-.recorder > section {
+/* ── Status message banner ──────────────────────────── */
+
+.statusBanner {
+  composes: notice from "../../../shared/styles/notices.module.css";
+  margin: 0;
+}
+
+.statusSuccess {
+  composes: noticeSuccess from "../../../shared/styles/notices.module.css";
+}
+
+.statusError {
+  composes: noticeError from "../../../shared/styles/notices.module.css";
+}
+
+/* ── Payment list ───────────────────────────────────── */
+
+.paymentList {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.paymentRow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface-secondary);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+
+.paymentRow:last-child {
+  border-bottom: none;
+}
+
+.paymentRow:hover {
+  background: var(--surface-hover);
+}
+
+.paymentRowSelected {
+  background: var(--surface-hover);
+  border-left: 3px solid var(--accent);
+}
+
+.paymentRowLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-weight: 600;
+  min-width: 0;
+}
+
+.paymentRowAmount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.paymentRowMethod {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Status badges — compose from shared canonical status colors */
+
+.statusPending {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--status-amber-bg);
+  border-color: var(--status-amber-border);
+  color: var(--status-amber-text);
+}
+
+.statusSettled {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--status-green-bg);
+  border-color: var(--status-green-border);
+  color: var(--status-green-text);
+}
+
+.statusVoid {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--status-gray-bg);
+  border-color: var(--status-gray-border);
+  color: var(--status-gray-text);
+}
+
+/* ── Empty state ────────────────────────────────────── */
+
+.emptyState {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: var(--space-md);
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+/* ── Detail card (selected payment) ─────────────────── */
+
+.detailCard {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface-secondary);
-  padding: 10px;
+  padding: var(--space-md);
+  display: grid;
+  gap: var(--space-md);
+}
+
+.detailHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.detailTitle {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.detailMetrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-sm);
+}
+
+.metric {
+  display: grid;
+  gap: 2px;
+}
+
+.metricLabel {
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+}
+
+.metricValue {
+  font-weight: 700;
+  font-size: 0.94rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.quickActions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+/* ── Allocation list ────────────────────────────────── */
+
+.allocationList {
+  display: grid;
+  gap: 0;
+}
+
+.allocationRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+}
+
+.allocationRow:last-child {
+  border-bottom: none;
+}
+
+.allocationTarget {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.allocationAmount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Allocation form ────────────────────────────────── */
+
+.allocationForm {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--space-sm);
+  align-items: end;
+}
+
+/* ── Workspace form (create / edit) ─────────────────── */
+
+.workspace {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-secondary);
+  padding: var(--space-md);
   display: grid;
   gap: var(--space-sm);
 }
 
-.recorder h3 {
+.workspaceTitle {
   margin: 0;
+  font-size: 0.94rem;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
 }
 
-.recorder p {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.86rem;
+.workspaceBadge {
+  font-size: 0.72rem;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--accent-border);
+  background: var(--accent-light);
+  color: var(--accent-text);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
-.recorder label {
+.fieldGrid {
   display: grid;
-  gap: 6px;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm);
+}
+
+.fieldFull {
+  grid-column: 1 / -1;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+}
+
+.fieldLabel {
   color: var(--text-secondary);
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   font-weight: 700;
@@ -69,41 +286,90 @@
   color: var(--text-primary);
   padding: var(--space-sm) 10px;
   font-size: 0.88rem;
-  text-transform: none;
-  letter-spacing: normal;
   font-weight: 600;
 }
 
 .recorder textarea {
-  min-height: 90px;
+  min-height: 72px;
   resize: vertical;
 }
 
-.recorder button {
+/* ── Buttons ────────────────────────────────────────── */
+
+.primaryButton {
   border: 1px solid var(--accent-border);
   border-radius: var(--radius-md);
-  background: var(--accent-light);
-  color: var(--accent-text);
-  padding: var(--space-sm) 10px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  padding: var(--space-sm) var(--space-md);
   font-size: var(--font-sm);
   font-weight: 700;
   cursor: pointer;
   width: fit-content;
 }
 
-.recorder button + button {
-  margin-left: var(--space-sm);
+.primaryButton:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
-.recorder button:disabled {
+.primaryButton:disabled {
   opacity: 0.55;
   cursor: default;
 }
 
-.recorder code {
+.secondaryButton {
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--surface);
-  padding: 1px 6px;
   color: var(--text-primary);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.secondaryButton:hover {
+  background: var(--surface-hover);
+}
+
+.secondaryButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.inlineHint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.sectionLabel {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Responsive ─────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .fieldGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .allocationForm {
+    grid-template-columns: 1fr;
+  }
+
+  .paymentRow {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .detailMetrics {
+    grid-template-columns: 1fr 1fr;
+  }
 }
