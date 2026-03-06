@@ -1,0 +1,249 @@
+/* Signing ceremony: OTP verification + e-sign consent for public document decisions. */
+
+.ceremony {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+  scroll-margin-top: 96px;
+}
+
+.ceremony h3 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.sectionLabel {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* -- No-email blocker -- */
+
+.noEmailNotice {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* -- OTP phase -- */
+
+.otpRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+.field input,
+.field textarea {
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  background: var(--input-bg);
+  color: var(--input-text);
+}
+
+.codeInput {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  text-align: center;
+  width: 140px;
+}
+
+.emailHint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.resendRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.resendButton {
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.resendButton:disabled {
+  color: var(--text-muted);
+  cursor: default;
+  text-decoration: none;
+}
+
+.cooldownLabel {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+/* -- Ceremony / consent phase -- */
+
+.documentSummary {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-secondary);
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.summaryType {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.summaryTitle {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.summaryTotal {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+.consentBox {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-secondary) 50%, transparent);
+  padding: 12px;
+}
+
+.consentText {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+.draftBanner {
+  display: inline-block;
+  border: 1px dashed var(--status-amber-border, #c9a227);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--status-amber-bg, #fef3c7) 60%, transparent);
+  color: var(--status-amber-text, #92400e);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  margin-bottom: 8px;
+}
+
+.consentCheckRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.consentCheckRow input[type="checkbox"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.consentCheckRow label {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* -- Actions -- */
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.primaryButton,
+.secondaryButton {
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.secondaryButton {
+  border: 1px solid var(--border);
+  background: var(--surface-secondary);
+  color: var(--text-primary);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* -- Inline feedback -- */
+
+.inlineHint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.inlineError {
+  margin: 0;
+  color: var(--status-red-text);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 820px) {
+  .otpRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .codeInput {
+    width: 100%;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .ceremony {
+    display: none;
+  }
+}

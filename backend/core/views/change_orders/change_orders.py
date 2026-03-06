@@ -30,6 +30,9 @@ from core.views.change_orders.change_orders_helpers import (
     _validate_change_order_lines,
     _validation_error_response,
 )
+from core.models import SigningCeremonyRecord
+from core.serializers import ChangeOrderSerializer as _ChangeOrderSerializerForHash
+from core.utils.signing import compute_document_content_hash
 from core.views.helpers import (
     _build_public_decision_note,
     _capability_gate,
@@ -37,6 +40,7 @@ from core.views.helpers import (
     _organization_user_ids,
     _validate_project_for_user,
 )
+from core.views.public_signing_helpers import get_ceremony_context, validate_ceremony_on_decision
 
 
 @api_view(["GET"])
@@ -121,11 +125,19 @@ def public_change_order_decision_view(request, public_token: str):
             status=409,
         )
 
+    # --- Ceremony validation ---
+    customer_email = (change_order.project.customer.email or "").strip()
+    ceremony_session, signer_name, ceremony_error = validate_ceremony_on_decision(
+        request, public_token, customer_email,
+    )
+    if ceremony_error:
+        return ceremony_error
+
     decision_note = _build_public_decision_note(
         action_label="Approved" if next_status == ChangeOrder.Status.APPROVED else "Rejected",
         note=str(request.data.get("note", "") or ""),
-        decider_name=str(request.data.get("decider_name", "") or ""),
-        decider_email=str(request.data.get("decider_email", "") or ""),
+        decider_name=signer_name,
+        decider_email=ceremony_session.recipient_email if ceremony_session else "",
     )
 
     previous_status = change_order.status
@@ -195,6 +207,29 @@ def public_change_order_decision_view(request, public_token: str):
         .prefetch_related("line_items", "line_items__budget_line", "line_items__budget_line__cost_code")
         .get()
     )
+
+    # --- Signing ceremony audit artifact ---
+    consent_text, consent_version = get_ceremony_context()
+    content_hash = compute_document_content_hash(
+        "change_order", _ChangeOrderSerializerForHash(refreshed).data,
+    )
+    SigningCeremonyRecord.record(
+        document_type="change_order",
+        document_id=change_order.id,
+        public_token=public_token,
+        decision=decision,
+        signer_name=signer_name,
+        signer_email=ceremony_session.recipient_email if ceremony_session else "",
+        email_verified=ceremony_session is not None,
+        content_hash=content_hash,
+        ip_address=request.META.get("REMOTE_ADDR"),
+        user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        consent_text_version=consent_version,
+        consent_text_snapshot=consent_text,
+        note=str(request.data.get("note", "") or "").strip(),
+        access_session=ceremony_session,
+    )
+
     return Response(
         {
             "data": _serialize_public_change_order(refreshed),

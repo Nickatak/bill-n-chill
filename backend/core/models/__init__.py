@@ -24,6 +24,7 @@ from core.models.shared_operations import (
     AccountingSyncEvent,
     Customer,
     CostCode,
+    DocumentAccessSession,
     EmailRecord,
     EmailVerificationToken,
     Organization,
@@ -31,11 +32,13 @@ from core.models.shared_operations import (
     OrganizationMembership,
     Project,
     RoleTemplate,
+    SigningCeremonyRecord,
     Vendor,
 )
 from core.models.cash_management import Payment, PaymentAllocation
 __all__ = [
     "Customer",
+    "DocumentAccessSession",
     "EmailRecord",
     "EmailVerificationToken",
     "Project",
@@ -68,6 +71,7 @@ __all__ = [
     "OrganizationRecord",
     "PaymentAllocationRecord",
     "PaymentRecord",
+    "SigningCeremonyRecord",
     "VendorBill",
     "VendorBillAllocation",
     "Payment",

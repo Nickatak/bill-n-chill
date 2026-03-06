@@ -113,6 +113,7 @@ class EmailRecord(ImmutableModelMixin):
 
     class EmailType(models.TextChoices):
         VERIFICATION = "verification", "Verification"
+        OTP = "otp", "OTP"
 
     recipient_email = models.EmailField()
     email_type = models.CharField(max_length=32, choices=EmailType.choices)

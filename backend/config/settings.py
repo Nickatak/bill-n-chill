@@ -14,7 +14,10 @@ import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from dotenv import load_dotenv
 import pymysql
+
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 from corsheaders.defaults import default_headers
 
 pymysql.version_info = (2, 2, 1, "final", 0)
@@ -202,9 +205,14 @@ REST_FRAMEWORK = {
     ],
 }
 
-# Email — console backend prints to stdout in dev; swap for SMTP in production.
+# Email — console backend in dev; set EMAIL_BACKEND to anymail.backends.mailgun.EmailBackend
+# and provide MAILGUN_API_KEY for real delivery via Mailgun HTTP API.
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@billnchill.com")
+ANYMAIL = {
+    "MAILGUN_API_KEY": os.getenv("MAILGUN_API_KEY", ""),
+    "MAILGUN_SENDER_DOMAIN": os.getenv("MAILGUN_SENDER_DOMAIN", ""),
+}
 
 # Frontend URL for building verification links in emails.
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")

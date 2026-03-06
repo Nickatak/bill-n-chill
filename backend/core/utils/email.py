@@ -40,3 +40,38 @@ def send_verification_email(user, token_obj):
         sent_by_user=user,
         metadata={"verification_token_id": token_obj.id, "user_id": user.id},
     )
+
+
+def send_otp_email(recipient_email, code, document_type_label, document_title):
+    """Send a 6-digit OTP code for public document verification.
+
+    Called when a customer requests identity verification before making a
+    decision on a public document link. Logs to EmailRecord for audit.
+    """
+    subject = "Your verification code — Bill n' Chill"
+    body = (
+        f"Your verification code is: {code}\n\n"
+        f"Use this code to verify your identity before signing:\n"
+        f"{document_type_label}: {document_title}\n\n"
+        f"This code expires in 10 minutes.\n\n"
+        f"If you did not request this code, you can safely ignore this email."
+    )
+
+    if settings.DEBUG:
+        print(f"[OTP] Code {code} for {recipient_email} ({document_type_label}: {document_title})")
+
+    send_mail(
+        subject=subject,
+        message=body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[recipient_email],
+        fail_silently=False,
+    )
+
+    EmailRecord.record(
+        recipient_email=recipient_email,
+        email_type=EmailRecord.EmailType.OTP,
+        subject=subject,
+        body_text=body,
+        metadata={"document_type_label": document_type_label, "document_title": document_title},
+    )

@@ -5,6 +5,22 @@ from django.utils import timezone
 from core.serializers import EstimateWriteSerializer
 from core.tests.common import *
 
+
+def _verified_session(public_token, document_type, document_id, email):
+    """Create a verified OTP session for public decision tests."""
+    session = DocumentAccessSession(
+        document_type=document_type,
+        document_id=document_id,
+        public_token=public_token,
+        recipient_email=email,
+    )
+    session.save()
+    session.verified_at = timezone.now()
+    session.session_expires_at = timezone.now() + timedelta(minutes=60)
+    session.save(update_fields=["verified_at", "session_expires_at"])
+    return session
+
+
 class EstimateTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -127,9 +143,18 @@ class EstimateTests(TestCase):
             line_total="1100",
         )
 
+        session = _verified_session(
+            estimate.public_token, "estimate", estimate.id, self.customer.email,
+        )
         response = self.client.post(
             f"/api/v1/public/estimates/{estimate.public_token}/decision/",
-            data={"decision": "approve", "decider_name": "Owner", "note": "Looks good."},
+            data={
+                "decision": "approve",
+                "note": "Looks good.",
+                "session_token": session.session_token,
+                "signer_name": "Owner",
+                "consent_accepted": True,
+            },
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
@@ -164,9 +189,17 @@ class EstimateTests(TestCase):
             status=Estimate.Status.SENT,
         )
 
+        session = _verified_session(
+            estimate.public_token, "estimate", estimate.id, self.customer.email,
+        )
         response = self.client.post(
             f"/api/v1/public/estimates/{estimate.public_token}/decision/",
-            data={"decision": "reject", "decider_email": "owner@example.com"},
+            data={
+                "decision": "reject",
+                "session_token": session.session_token,
+                "signer_name": "Owner",
+                "consent_accepted": True,
+            },
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)

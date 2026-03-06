@@ -6,6 +6,22 @@ from django.utils import timezone
 
 from core.tests.common import *
 
+
+def _verified_session(public_token, document_type, document_id, email):
+    """Create a verified OTP session for public decision tests."""
+    session = DocumentAccessSession(
+        document_type=document_type,
+        document_id=document_id,
+        public_token=public_token,
+        recipient_email=email,
+    )
+    session.save()
+    session.verified_at = timezone.now()
+    session.session_expires_at = timezone.now() + timedelta(minutes=60)
+    session.save(update_fields=["verified_at", "session_expires_at"])
+    return session
+
+
 class InvoiceTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -173,9 +189,18 @@ class InvoiceTests(TestCase):
         self.assertEqual(sent.status_code, 200)
         invoice = Invoice.objects.get(id=invoice_id)
 
+        session = _verified_session(
+            invoice.public_token, "invoice", invoice.id, self.customer.email,
+        )
         response = self.client.post(
             f"/api/v1/public/invoices/{invoice.public_token}/decision/",
-            data={"decision": "approve", "decider_name": "Owner", "note": "Payment approved."},
+            data={
+                "decision": "approve",
+                "note": "Payment approved.",
+                "session_token": session.session_token,
+                "signer_name": "Owner",
+                "consent_accepted": True,
+            },
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
@@ -198,9 +223,18 @@ class InvoiceTests(TestCase):
         self.assertEqual(sent.status_code, 200)
         invoice = Invoice.objects.get(id=invoice_id)
 
+        session = _verified_session(
+            invoice.public_token, "invoice", invoice.id, self.customer.email,
+        )
         response = self.client.post(
             f"/api/v1/public/invoices/{invoice.public_token}/decision/",
-            data={"decision": "dispute", "note": "Need itemized backup."},
+            data={
+                "decision": "dispute",
+                "note": "Need itemized backup.",
+                "session_token": session.session_token,
+                "signer_name": "Owner",
+                "consent_accepted": True,
+            },
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)

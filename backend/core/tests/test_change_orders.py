@@ -1,11 +1,28 @@
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from core.tests.common import *
 
 
 SYSTEM_BUDGET_LINE_CODES = {"99-901", "99-902", "99-903"}
+
+
+def _verified_session(public_token, document_type, document_id, email):
+    """Create a verified OTP session for public decision tests."""
+    session = DocumentAccessSession(
+        document_type=document_type,
+        document_id=document_id,
+        public_token=public_token,
+        recipient_email=email,
+    )
+    session.save()
+    session.verified_at = timezone.now()
+    session.session_expires_at = timezone.now() + timedelta(minutes=60)
+    session.save(update_fields=["verified_at", "session_expires_at"])
+    return session
 
 
 class ChangeOrderTests(TestCase):
@@ -224,9 +241,19 @@ class ChangeOrderTests(TestCase):
         )
         self.assertEqual(to_pending.status_code, 200)
 
+        co = ChangeOrder.objects.get(id=change_order_id)
+        session = _verified_session(
+            co.public_token, "change_order", co.id, self.customer.email,
+        )
         response = self.client.post(
-            f"/api/v1/public/change-orders/{ChangeOrder.objects.get(id=change_order_id).public_token}/decision/",
-            data={"decision": "approve", "decider_name": "Owner", "note": "Approved publicly."},
+            f"/api/v1/public/change-orders/{co.public_token}/decision/",
+            data={
+                "decision": "approve",
+                "note": "Approved publicly.",
+                "session_token": session.session_token,
+                "signer_name": "Owner",
+                "consent_accepted": True,
+            },
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
@@ -256,9 +283,18 @@ class ChangeOrderTests(TestCase):
         )
         self.assertEqual(to_pending.status_code, 200)
 
+        co = ChangeOrder.objects.get(id=change_order_id)
+        session = _verified_session(
+            co.public_token, "change_order", co.id, self.customer.email,
+        )
         response = self.client.post(
-            f"/api/v1/public/change-orders/{ChangeOrder.objects.get(id=change_order_id).public_token}/decision/",
-            data={"decision": "reject", "decider_email": "owner@example.com"},
+            f"/api/v1/public/change-orders/{co.public_token}/decision/",
+            data={
+                "decision": "reject",
+                "session_token": session.session_token,
+                "signer_name": "Owner",
+                "consent_accepted": True,
+            },
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)

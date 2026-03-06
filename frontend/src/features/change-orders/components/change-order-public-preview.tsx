@@ -23,6 +23,7 @@ import {
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { ApiResponse, ChangeOrderRecord } from "../types";
 import { usePrintContext } from "@/shared/hooks/use-print-context";
+import { SigningCeremony, type CeremonyPayload } from "@/shared/document-viewer/signing-ceremony";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import stampStyles from "@/shared/styles/decision-stamp.module.css";
 import styles from "./change-order-public-preview.module.css";
@@ -57,9 +58,6 @@ function publicEstimateHref(publicRef?: string): string {
 export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPreviewProps) {
   const [statusMessage, setStatusMessage] = useState("Loading change order...");
   const [changeOrder, setChangeOrder] = useState<ChangeOrderRecord | null>(null);
-  const [decisionNote, setDecisionNote] = useState("");
-  const [deciderName, setDeciderName] = useState("");
-  const [deciderEmail, setDeciderEmail] = useState("");
   const [decisionMessage, setDecisionMessage] = useState("");
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [decisionReceiptName, setDecisionReceiptName] = useState("");
@@ -128,8 +126,8 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
     void loadChangeOrder();
   }, [normalizedBaseUrl, publicToken]);
 
-  /** Submit the customer's approve/reject decision to the public decision endpoint. */
-  async function applyDecision(decision: "approve" | "reject") {
+  /** Submit the customer's approve/reject decision with signing ceremony data. */
+  async function applyDecision(decision: string, ceremony: CeremonyPayload) {
     if (!changeOrder || !canDecide || decisionSubmitting) {
       return;
     }
@@ -145,9 +143,10 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             decision,
-            note: decisionNote,
-            decider_name: deciderName,
-            decider_email: deciderEmail,
+            note: ceremony.note,
+            session_token: ceremony.session_token,
+            signer_name: ceremony.signer_name,
+            consent_accepted: ceremony.consent_accepted,
           }),
         },
       );
@@ -158,7 +157,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
       }
       setChangeOrder(payload.data as ChangeOrderRecord);
 
-      setDecisionReceiptName(deciderName.trim());
+      setDecisionReceiptName(ceremony.signer_name);
       setDecisionMessage("");
       setDecisionFlashCount((c) => c + 1);
     } catch {
@@ -322,60 +321,25 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
           />
 
           {canDecide ? (
-            <section
-              ref={decisionSectionRef}
-              id="change-order-decision"
-              className={`${styles.decisionCard} ${styles.publicDecisionSection}`}
-            >
-              <h3>Decision</h3>
+            <div ref={decisionSectionRef} id="change-order-decision">
               {decisionMessage ? <p className={styles.decisionMessage}>{decisionMessage}</p> : null}
-              <label className={styles.field}>
-                Your name (optional)
-                <input
-                  value={deciderName}
-                  onChange={(event) => setDeciderName(event.target.value)}
-                  placeholder="Homeowner name"
-                  disabled={decisionSubmitting}
-                />
-              </label>
-              <label className={styles.field}>
-                Your email (optional)
-                <input
-                  value={deciderEmail}
-                  onChange={(event) => setDeciderEmail(event.target.value)}
-                  placeholder="owner@example.com"
-                  disabled={decisionSubmitting}
-                />
-              </label>
-              <label className={styles.field}>
-                Note (optional)
-                <textarea
-                  value={decisionNote}
-                  onChange={(event) => setDecisionNote(event.target.value)}
-                  rows={3}
-                  placeholder="Optional decision note."
-                  disabled={decisionSubmitting}
-                />
-              </label>
-              <div className={styles.decisionActions}>
-                <button
-                  type="button"
-                  className={styles.primaryButton}
-                  onClick={() => void applyDecision("approve")}
-                  disabled={decisionSubmitting}
-                >
-                  Approve Change Order
-                </button>
-                <button
-                  type="button"
-                  className={styles.secondaryButton}
-                  onClick={() => void applyDecision("reject")}
-                  disabled={decisionSubmitting}
-                >
-                  Reject Change Order
-                </button>
-              </div>
-            </section>
+              <SigningCeremony
+                publicToken={publicToken}
+                documentType="change_order"
+                documentSummary={{
+                  type: "Change Order",
+                  title: changeOrder.title || `CO-${changeOrder.family_key}`,
+                  total: `$${formatDecimal(parseAmount(changeOrder.amount_delta))}`,
+                }}
+                customerEmailAvailable={Boolean(changeOrder.project_context?.customer_email)}
+                decisions={[
+                  { label: "Approve Change Order", value: "approve", variant: "primary" },
+                  { label: "Reject Change Order", value: "reject", variant: "secondary" },
+                ]}
+                onDecision={applyDecision}
+                disabled={decisionSubmitting}
+              />
+            </div>
           ) : null}
           {hasDecision ? (
             <div

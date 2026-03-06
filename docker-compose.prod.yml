@@ -1,4 +1,0 @@
-services:
-  backend:
-    environment:
-      DJANGO_DEBUG: ${DJANGO_DEBUG:-False}

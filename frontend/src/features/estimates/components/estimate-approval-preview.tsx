@@ -31,6 +31,7 @@ import {
 import { formatDateDisplay, formatDateInputFromIso } from "@/shared/date-format";
 import { formatDecimal } from "@/shared/money-format";
 import { usePrintContext } from "@/shared/hooks/use-print-context";
+import { SigningCeremony, type CeremonyPayload } from "@/shared/document-viewer/signing-ceremony";
 
 type EstimateApprovalPreviewProps = {
   publicToken: string;
@@ -40,9 +41,6 @@ type EstimateApprovalPreviewProps = {
 export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreviewProps) {
   const [statusMessage, setStatusMessage] = useState("Loading estimate...");
   const [estimate, setEstimate] = useState<EstimateRecord | null>(null);
-  const [decisionNote, setDecisionNote] = useState("");
-  const [deciderName, setDeciderName] = useState("");
-  const [deciderEmail, setDeciderEmail] = useState("");
   const [decisionMessage, setDecisionMessage] = useState("");
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [decisionReceiptName, setDecisionReceiptName] = useState("");
@@ -128,8 +126,8 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
     void loadEstimateContext();
   }, [normalizedBaseUrl, publicToken]);
 
-  /** Submit the customer's approve/reject decision to the public decision endpoint. */
-  async function applyDecision(decision: "approve" | "reject") {
+  /** Submit the customer's approve/reject decision with signing ceremony data. */
+  async function applyDecision(decision: string, ceremony: CeremonyPayload) {
     if (!estimate || !canDecide || decisionSubmitting) {
       return;
     }
@@ -143,9 +141,10 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           decision,
-          note: decisionNote,
-          decider_name: deciderName,
-          decider_email: deciderEmail,
+          note: ceremony.note,
+          session_token: ceremony.session_token,
+          signer_name: ceremony.signer_name,
+          consent_accepted: ceremony.consent_accepted,
         }),
       });
       const payload: ApiResponse = await response.json();
@@ -156,7 +155,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
       const nextEstimate = payload.data as EstimateRecord;
 
       setEstimate(nextEstimate);
-      setDecisionReceiptName(deciderName.trim());
+      setDecisionReceiptName(ceremony.signer_name);
       setDecisionMessage("");
       setDecisionFlashCount((c) => c + 1);
     } catch {
@@ -338,62 +337,24 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
             }
           />
           {canDecide ? (
-            <div
-              ref={decisionSectionRef}
-              id="estimate-decision"
-              className={`${styles.lifecycle} ${styles.publicDecisionSection}`}
-            >
-              <h3>Decision</h3>
+            <div ref={decisionSectionRef} id="estimate-decision">
               {decisionMessage ? <p className={styles.inlineHint}>{decisionMessage}</p> : null}
-              <label className={styles.lifecycleField}>
-                Your name (optional)
-                <input
-                  className={styles.fieldInput}
-                  value={deciderName}
-                  onChange={(event) => setDeciderName(event.target.value)}
-                  placeholder="Homeowner name"
-                  disabled={decisionSubmitting}
-                />
-              </label>
-              <label className={styles.lifecycleField}>
-                Your email (optional)
-                <input
-                  className={styles.fieldInput}
-                  value={deciderEmail}
-                  onChange={(event) => setDeciderEmail(event.target.value)}
-                  placeholder="owner@example.com"
-                  disabled={decisionSubmitting}
-                />
-              </label>
-              <label className={styles.lifecycleField}>
-                Note (optional)
-                <textarea
-                  className={styles.statusNote}
-                  value={decisionNote}
-                  onChange={(event) => setDecisionNote(event.target.value)}
-                  placeholder="Optional decision note."
-                  rows={3}
-                  disabled={decisionSubmitting}
-                />
-              </label>
-              <div className={styles.lifecycleActions}>
-                <button
-                  type="button"
-                  className={styles.primaryButton}
-                  onClick={() => void applyDecision("approve")}
-                  disabled={decisionSubmitting}
-                >
-                  Approve Estimate
-                </button>
-                <button
-                  type="button"
-                  className={styles.secondaryButton}
-                  onClick={() => void applyDecision("reject")}
-                  disabled={decisionSubmitting}
-                >
-                  Reject Estimate
-                </button>
-              </div>
+              <SigningCeremony
+                publicToken={publicToken}
+                documentType="estimate"
+                documentSummary={{
+                  type: "Estimate",
+                  title: estimate.title || "Untitled",
+                  total: `$${formatDecimal(totalAmount)}`,
+                }}
+                customerEmailAvailable={Boolean(estimate.project_context?.customer_email)}
+                decisions={[
+                  { label: "Approve Estimate", value: "approve", variant: "primary" },
+                  { label: "Reject Estimate", value: "reject", variant: "secondary" },
+                ]}
+                onDecision={applyDecision}
+                disabled={decisionSubmitting}
+              />
             </div>
           ) : null}
           {hasDecision ? (
