@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SessionAuthorizationProvider } from "@/features/session/session-authorization";
 import "./globals.css";
-import { AuthGate, AppToolbar, MobileDrawer, WorkflowShell } from "@/shared/shell";
+import { AuthGate, AppToolbar, MobileDrawer, PrintableProvider, WorkflowShell } from "@/shared/shell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,10 +31,12 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <SessionAuthorizationProvider>
-          <AppToolbar />
-          <MobileDrawer />
-          <WorkflowShell />
-          <AuthGate>{children}</AuthGate>
+          <PrintableProvider>
+            <AppToolbar />
+            <MobileDrawer />
+            <WorkflowShell />
+            <AuthGate>{children}</AuthGate>
+          </PrintableProvider>
         </SessionAuthorizationProvider>
       </body>
     </html>

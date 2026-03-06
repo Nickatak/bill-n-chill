@@ -55,6 +55,7 @@ import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import { useClientPagination } from "@/shared/hooks/use-client-pagination";
 import { PaginationControls } from "@/shared/components/pagination-controls";
 import { PaymentRecorder, type AllocationTarget } from "@/features/payments";
+import { usePrintable } from "@/shared/shell/printable-context";
 import styles from "./invoices-console.module.css";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import invoiceCreatorStyles from "@/shared/document-creator/invoice-creator.module.css";
@@ -260,6 +261,12 @@ export function InvoicesConsole() {
   const [workspaceContext, setWorkspaceContext] = useState("New invoice draft");
   const invoiceCreatorRef = useRef<HTMLDivElement | null>(null);
   const [creatorFlashCount, setCreatorFlashCount] = useState(0);
+  const { setPrintable } = usePrintable();
+
+  useEffect(() => {
+    setPrintable(invoices.length > 0);
+    return () => setPrintable(false);
+  }, [invoices.length, setPrintable]);
 
   useEffect(() => {
     if (creatorFlashCount === 0) return;

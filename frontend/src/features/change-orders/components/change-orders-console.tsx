@@ -40,6 +40,7 @@ import {
   ChangeOrderRecord,
   LineValidationIssue,
 } from "../types";
+import { usePrintable } from "@/shared/shell/printable-context";
 import styles from "./change-orders-console.module.css";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import changeOrderCreatorStyles from "@/shared/document-creator/change-order-creator.module.css";
@@ -170,6 +171,12 @@ export function ChangeOrdersConsole({
   const editCreatorRef = useRef<HTMLDivElement | null>(null);
   const [createFlashCount, setCreateFlashCount] = useState(0);
   const [editFlashCount, setEditFlashCount] = useState(0);
+  const { setPrintable } = usePrintable();
+
+  useEffect(() => {
+    setPrintable(!!selectedChangeOrderId);
+    return () => setPrintable(false);
+  }, [selectedChangeOrderId, setPrintable]);
 
   useEffect(() => {
     if (createFlashCount === 0) return;

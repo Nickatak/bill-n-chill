@@ -14,23 +14,8 @@ import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { isRouteActive, businessMenuRoutes } from "../nav-routes";
+import { usePrintable } from "../printable-context";
 import styles from "./app-toolbar.module.css";
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-/** Internal routes where the Print button should be visible. */
-const PRINTABLE_ROUTE_PATTERNS = [
-  /^\/projects\/[^/]+\/estimates\/?$/,
-  /^\/projects\/[^/]+\/change-orders\/?$/,
-  /^\/invoices\/?$/,
-  /^\/change-orders\/?$/,
-];
-
-function isPrintableRoute(pathname: string): boolean {
-  return PRINTABLE_ROUTE_PATTERNS.some((pattern) => pattern.test(pathname));
-}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -47,6 +32,7 @@ export function AppToolbar() {
   const pathname = usePathname() ?? "";
   const router = useRouter();
   const { token, organization } = useSharedSessionAuth();
+  const { isPrintable } = usePrintable();
   const hasSession = Boolean(token);
   const isPublicDocument = isPublicDocumentRoute(pathname);
   const hasActiveBusinessMenu = businessMenuRoutes.some((route) => isRouteActive(pathname, route));
@@ -131,7 +117,7 @@ export function AppToolbar() {
           </div>
         </details>
       ) : null}
-      {isPublicDocument || (hasSession && isPrintableRoute(pathname)) ? (
+      {isPublicDocument || (hasSession && isPrintable) ? (
         <button type="button" className={styles.button} onClick={printPage}>
           Print
         </button>

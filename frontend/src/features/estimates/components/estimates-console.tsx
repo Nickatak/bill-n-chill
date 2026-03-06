@@ -18,6 +18,7 @@ import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { canDo } from "../../session/rbac";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import stampStyles from "@/shared/styles/decision-stamp.module.css";
+import { usePrintable } from "@/shared/shell/printable-context";
 import styles from "./estimates-console.module.css";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -169,6 +170,12 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   );
   const estimateComposerRef = useRef<HTMLDivElement | null>(null);
   const [creatorFlashCount, setCreatorFlashCount] = useState(0);
+  const { setPrintable } = usePrintable();
+
+  useEffect(() => {
+    setPrintable(!!selectedEstimateId);
+    return () => setPrintable(false);
+  }, [selectedEstimateId, setPrintable]);
 
   useEffect(() => {
     if (creatorFlashCount === 0) return;

@@ -15,12 +15,14 @@ import { clearClientSession } from "@/features/session/client-session";
 import { isPublicDocumentRoute } from "@/features/session/public-routes";
 import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import { isRouteActive, businessMenuRoutes, workflowRoutes } from "../nav-routes";
+import { usePrintable } from "../printable-context";
 import styles from "./mobile-drawer.module.css";
 
 export function MobileDrawer() {
   const pathname = usePathname() ?? "";
   const router = useRouter();
   const { token, organization } = useSharedSessionAuth();
+  const { isPrintable } = usePrintable();
   const hasSession = Boolean(token);
   const isPublicDocument = isPublicDocumentRoute(pathname);
   const [isOpen, setIsOpen] = useState(false);
@@ -144,9 +146,11 @@ export function MobileDrawer() {
             <div className={styles.divider} />
 
             <div className={styles.drawerNav}>
-              <button type="button" className={styles.actionButton} onClick={printPage}>
-                Print
-              </button>
+              {isPrintable ? (
+                <button type="button" className={styles.actionButton} onClick={printPage}>
+                  Print
+                </button>
+              ) : null}
               <button type="button" className={styles.actionButton} onClick={logout}>
                 Logout
               </button>

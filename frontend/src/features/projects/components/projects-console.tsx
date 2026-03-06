@@ -465,7 +465,7 @@ export function ProjectsConsole() {
       {authMessage.startsWith("No shared session") ? <p>{authMessage}</p> : null}
 
       {projects.length === 0 ? (
-        <p>
+        <p className={styles.emptyState}>
           No projects yet. Head to <Link href="/customers" style={{ fontWeight: 600 }}>Customers</Link> and
           use the &ldquo;Add Project&rdquo; button on any customer to get started.
         </p>

@@ -1,3 +1,11 @@
+.emptyState {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: var(--space-md);
+  margin: 0;
+  color: var(--text-secondary);
+}
+
 .statusMessage {
   composes: notice from "../../../shared/styles/notices.module.css";
   margin-top: var(--space-md);
