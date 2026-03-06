@@ -100,8 +100,8 @@ export function AppToolbar() {
       ) : null}
       {hasSession && !isPublicDocument && organization ? (
         <details ref={opsMetaMenuRef} className={styles.menu} data-onboarding-target="organization">
-          <summary className={`${styles.button} ${hasActiveBusinessMenu ? styles.buttonActive : ""}`}>
-            {organization.displayName}
+          <summary className={`${styles.orgTrigger} ${hasActiveBusinessMenu ? styles.orgTriggerActive : ""}`}>
+            {organization.displayName} <span className={styles.chevron}>&#9662;</span>
           </summary>
           <div className={styles.menuList} role="menu" aria-label="Business setup and management">
             {businessMenuRoutes.map((route, index) => {
