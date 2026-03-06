@@ -107,8 +107,7 @@ Goal: strengthen legal enforceability and signer verification for estimate/chang
 - Every financial number should trace back to source records.
 - Change orders must be impossible to miss in downstream billing.
 - Simple defaults first; advanced controls behind explicit toggles.
-- Support both light and dark mode in v1; default to dark mode (temporary, for current MVP demos).
-- Theme choice should be user-controlled and persisted per user.
+- Dark mode only for MVP v1 (high-contrast, outdoor-legible). Light mode deferred.
 
 ## Mobile and Desktop Strategy (v1)
 
@@ -127,8 +126,8 @@ Primary desktop workflows:
 - Invoice composition, financial reconciliation, and reporting.
 
 Theme requirements:
-- Dark mode is currently the default experience for MVP demos; switchable via user theme toggle.
-- Dark mode must maintain full readability and parity (no reduced feature visibility).
+- Dark mode only for MVP v1 — high-contrast tokens tuned for outdoor/construction-site legibility.
+- Light mode and theme toggle deferred (see `docs/deferred/DEFERRED_THEME_MODES.md`).
 
 ## Core Success Metrics
 

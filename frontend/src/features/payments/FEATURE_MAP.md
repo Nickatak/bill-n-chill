@@ -4,7 +4,8 @@
 Manage project cash movement (inbound and outbound), payment status lifecycle, and allocation to AR/AP targets.
 
 ## Route Surface
-1. `/financials-auditing` (payments console embedded on financials page)
+1. `/invoices` (inbound payment recording embedded on Invoices page)
+2. `/bills` (outbound payment recording embedded on Bills page)
 
 ## Mutation Map
 1. `Payment`
@@ -15,10 +16,11 @@ Manage project cash movement (inbound and outbound), payment status lifecycle, a
 
 ## Composition and Entry Flow
 1. Entry sources:
-   - financials route entry: `frontend/src/app/financials-auditing/page.tsx` renders `PaymentsConsole`
-   - feature export entry: `frontend/src/features/payments/index.ts` exports `PaymentsConsole`
+   - invoices page: `frontend/src/app/invoices/page.tsx` renders `InvoicesConsole` which embeds `PaymentRecorder` (direction=inbound)
+   - bills page: `frontend/src/app/bills/page.tsx` renders `VendorBillsConsole` which embeds `PaymentRecorder` (direction=outbound)
+   - feature export entry: `frontend/src/features/payments/index.ts` exports `PaymentRecorder`
 2. Parent/Owner:
-   `PaymentsConsole` owns project scope, selected payment, policy-driven status actions, and allocation workflow.
+   `PaymentRecorder` is direction-locked by the embedding console. It owns project scope, selected payment, policy-driven status actions, and allocation workflow.
 3. Controller/Hook:
    console-level state/effects coordinate contract bootstrap, payment list loading, and create/update/allocation mutations.
 4. Children:

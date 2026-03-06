@@ -10,7 +10,7 @@ import { formatDateDisplay } from "@/shared/date-format";
 import { formatDecimal } from "@/shared/money-format";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import { CostCode, EstimateLineInput, ProjectRecord } from "../types";
-import { CostCodeCombobox } from "@/shared/components/cost-code-combobox";
+import { CostCodeCombobox } from "./cost-code-combobox";
 import { DocumentCreator } from "@/shared/document-creator";
 import {
   resolveOrganizationBranding,

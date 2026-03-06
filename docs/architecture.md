@@ -120,9 +120,8 @@ Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> M
   - Optimize mobile for short execution tasks.
   - Optimize desktop for high-context editing and analysis.
 - Theme rule:
-  - Provide both light and dark mode.
-  - Default to dark mode for current MVP demos.
-  - Persist user theme preference across sessions/devices when authenticated.
+  - Dark mode only for MVP v1 (high-contrast, outdoor-legible).
+  - Light mode and theme toggle deferred (see `docs/deferred/DEFERRED_THEME_MODES.md`).
 
 ## API Strategy
 
