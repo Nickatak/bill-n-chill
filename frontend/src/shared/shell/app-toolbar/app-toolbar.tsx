@@ -117,7 +117,11 @@ export function AppToolbar() {
                     className={`${styles.menuItem} ${isRouteActive(pathname, route) ? styles.menuItemActive : ""}`}
                     role="menuitem"
                     onClick={closeMenus}
-                    {...(route.href === "/ops/organization" ? { "data-onboarding-target": "organization-item" } : {})}
+                    {...(route.href === "/ops/organization"
+                      ? { "data-onboarding-target": "organization-item" }
+                      : route.href === "/onboarding"
+                        ? { "data-onboarding-target": "get-started-item" }
+                        : {})}
                   >
                     {route.label}
                   </Link>

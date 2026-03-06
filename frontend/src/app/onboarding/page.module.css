@@ -5,6 +5,15 @@
   gap: 14px;
 }
 
+/* ── Return hint (hero sub-text) ─────────────────────────────── */
+
+.returnHint {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent-text);
+}
+
 /* ── Workflow tabs ────────────────────────────────────────────── */
 
 .tabBar {
@@ -154,6 +163,14 @@
   font-size: 0.86rem;
   color: var(--text-secondary);
   line-height: 1.4;
+}
+
+.stepTip {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+  font-style: italic;
 }
 
 .stepLink {

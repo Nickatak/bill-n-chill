@@ -20,7 +20,10 @@ type Step = {
   key: string;
   label: string;
   description: string;
+  tip?: string;
   href: string;
+  /** Override href when a project ID is available (deep link). */
+  dynamicHref?: (projectId: number) => string;
   linkLabel: string;
   optional?: boolean;
 };
@@ -29,21 +32,21 @@ const SHARED_STEPS: Step[] = [
   {
     key: "organization",
     label: "Set up your organization",
-    description: "Name your company and configure your organization profile.",
+    description: "Your company name, logo, and contact info appear on every document you send.",
     href: "/ops/organization",
     linkLabel: "Organization Settings",
   },
   {
     key: "customer",
     label: "Add your first customer",
-    description: "Create a customer record so you can scope projects and send documents.",
+    description: "Customer records let you scope projects and send professional documents under their name.",
     href: "/customers",
     linkLabel: "Customers",
   },
   {
     key: "project",
     label: "Create a project",
-    description: "Projects group estimates, change orders, and invoices under one job.",
+    description: "Projects keep estimates, change orders, invoices, and payments organized per job.",
     href: "/projects",
     linkLabel: "Projects",
   },
@@ -54,15 +57,26 @@ const INDIVIDUAL_STEPS: Step[] = [
   {
     key: "estimate",
     label: "Build an estimate",
-    description: "Optional — formalize scope and pricing if the job needs a contract baseline.",
+    description: "Optional — formalize scope and pricing when the job needs a written contract.",
+    tip: "Open a project to find the Estimates section. You can send estimates directly to your customer for approval.",
     href: "/projects",
+    dynamicHref: (pid) => `/projects/${pid}`,
     linkLabel: "Projects",
     optional: true,
   },
   {
     key: "invoice",
-    label: "Create an invoice",
-    description: "Invoice your customer directly for completed work — no estimate required.",
+    label: "Create and send an invoice",
+    description: "Bill your customer for completed work — no estimate required. Send it directly so they can review and pay.",
+    tip: "Create invoices from the Invoices page or from within a project. Use the Send button to share a professional link with your customer.",
+    href: "/invoices",
+    linkLabel: "Invoices",
+  },
+  {
+    key: "payment",
+    label: "Record a payment",
+    description: "When your customer pays, log it here. Payments track against invoices so you always know what\u2019s outstanding.",
+    tip: "Record payments from the Invoices page \u2014 select an invoice to find the Payments section.",
     href: "/invoices",
     linkLabel: "Invoices",
   },
@@ -73,21 +87,52 @@ const REMODELER_STEPS: Step[] = [
   {
     key: "estimate",
     label: "Build an estimate",
-    description: "Define scope and pricing. Once approved, the estimate becomes your contract baseline.",
+    description: "Define scope, pricing, and terms. Once your customer approves, this becomes your contract baseline and budget.",
+    tip: "Open a project to find the Estimates section at the bottom of the project details.",
     href: "/projects",
+    dynamicHref: (pid) => `/projects/${pid}`,
     linkLabel: "Projects",
   },
   {
     key: "send",
     label: "Send for customer approval",
-    description: "Share a link so your customer can review, approve, or request changes.",
+    description: "Share a professional link so your customer can review, approve, or request changes — all online.",
+    tip: "Use the Send button on your estimate. Your customer gets a branded page to review and approve.",
     href: "/projects",
+    dynamicHref: (pid) => `/projects/${pid}`,
     linkLabel: "Projects",
+  },
+  {
+    key: "change-order",
+    label: "Handle a change order",
+    description: "Scope changes happen. Change orders adjust your contract and budget so everyone stays aligned.",
+    tip: "Open a project\u2019s Change Orders section to add, send, or approve scope changes.",
+    href: "/projects",
+    dynamicHref: (pid) => `/projects/${pid}`,
+    linkLabel: "Projects",
+    optional: true,
   },
   {
     key: "invoice",
     label: "Create an invoice",
-    description: "Bill for your work. Invoice from your budget or add direct line items for simpler jobs.",
+    description: "Bill for completed work. Pull line items from your approved budget, or add direct charges for simpler jobs.",
+    tip: "You can create invoices from the Invoices page or from within a project.",
+    href: "/invoices",
+    linkLabel: "Invoices",
+  },
+  {
+    key: "bill",
+    label: "Track a vendor bill",
+    description: "When a sub or supplier invoices you, log it here. Bills keep your outgoing costs organized per project.",
+    tip: "Vendor bills live on the Bills page. Select a project to add or review bills.",
+    href: "/bills",
+    linkLabel: "Bills",
+  },
+  {
+    key: "payment",
+    label: "Record payments",
+    description: "Log money in and out. Payments allocate against invoices and bills so you always know what\u2019s settled.",
+    tip: "Record inbound payments from Invoices, outbound from Bills \u2014 each has a Payments section.",
     href: "/invoices",
     linkLabel: "Invoices",
   },
@@ -105,8 +150,8 @@ export const ORG_VISITED_KEY = "onboarding:org-visited";
 export function OnboardingChecklist() {
   const { token } = useSharedSessionAuth();
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
+  const [firstProjectId, setFirstProjectId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeGuideStep, setActiveGuideStep] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<WorkflowTab>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(TAB_KEY);
@@ -118,7 +163,6 @@ export function OnboardingChecklist() {
   function switchTab(tab: WorkflowTab) {
     setActiveTab(tab);
     localStorage.setItem(TAB_KEY, tab);
-    setActiveGuideStep(null);
   }
 
   const steps = activeTab === "individual" ? INDIVIDUAL_STEPS : REMODELER_STEPS;
@@ -140,6 +184,8 @@ export function OnboardingChecklist() {
       { key: "invoice", endpoint: "/invoices/" },
     ];
 
+    let detectedProjectId: number | null = null;
+
     await Promise.all(
       checks.map(async ({ key, endpoint }) => {
         try {
@@ -149,12 +195,17 @@ export function OnboardingChecklist() {
           const payload = await response.json();
           if (response.ok && Array.isArray(payload.data) && payload.data.length > 0) {
             completed.add(key);
+            if (key === "project" && payload.data[0]?.id) {
+              detectedProjectId = Number(payload.data[0].id);
+            }
           }
         } catch {
           // Endpoint unavailable — leave step unchecked
         }
       }),
     );
+
+    setFirstProjectId(detectedProjectId);
 
     setCompletedSteps(completed);
     setLoading(false);
@@ -202,13 +253,13 @@ export function OnboardingChecklist() {
       <ol className={styles.steps}>
         {steps.map((step, index) => {
           const isCompleted = completedSteps.has(step.key);
+          const resolvedHref =
+            step.dynamicHref && firstProjectId ? step.dynamicHref(firstProjectId) : step.href;
           return (
             <li
               key={step.key}
               className={`${styles.step} ${isCompleted ? styles.stepCompleted : ""} ${step.optional ? styles.stepOptional : ""}`}
               data-onboarding-step={step.key}
-              onMouseEnter={() => setActiveGuideStep(step.key)}
-              onMouseLeave={() => setActiveGuideStep(null)}
             >
               <span className={styles.stepNumber}>{isCompleted ? "\u2713" : index + 1}</span>
               <div className={styles.stepContent}>
@@ -217,7 +268,8 @@ export function OnboardingChecklist() {
                   {step.optional ? <span className={styles.optionalBadge}>Optional</span> : null}
                 </h3>
                 <p className={styles.stepDescription}>{step.description}</p>
-                <Link href={step.href} className={styles.stepLink}>
+                {step.tip ? <p className={styles.stepTip}>{step.tip}</p> : null}
+                <Link href={resolvedHref} className={styles.stepLink}>
                   {step.linkLabel} &rarr;
                 </Link>
               </div>
@@ -225,7 +277,7 @@ export function OnboardingChecklist() {
           );
         })}
       </ol>
-      <GuideArrowOverlay activeStep={activeGuideStep} />
+      <GuideArrowOverlay />
     </div>
   );
 }

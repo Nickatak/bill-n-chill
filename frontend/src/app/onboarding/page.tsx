@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import shell from "@/shared/shell/page-shell.module.css";
+import styles from "./page.module.css";
 import { PageCard, PageShell } from "@/shared/shell";
 import { OnboardingChecklist } from "./onboarding-checklist";
 
@@ -18,9 +19,8 @@ export default function OnboardingPage() {
             Follow these steps to go from zero to your first invoice. Each step builds on the
             last &mdash; by the end you&apos;ll have a complete billing workflow.
           </p>
-          <p className={shell.copy} style={{ fontSize: "0.82rem", opacity: 0.7 }}>
-            You can always get back to this page from your organization menu
-            &rarr; <strong>Get Started</strong>.
+          <p className={styles.returnHint} data-onboarding-step="return-hint">
+            You can always get back here from your organization menu &rarr; <strong>Get Started</strong>
           </p>
         </div>
       </header>

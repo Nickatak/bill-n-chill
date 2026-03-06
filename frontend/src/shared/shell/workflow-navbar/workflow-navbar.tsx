@@ -15,6 +15,7 @@ const ONBOARDING_TARGETS: Record<string, string> = {
   "/customers": "customers",
   "/projects": "projects",
   "/invoices": "invoices",
+  "/bills": "bills",
 };
 
 /**

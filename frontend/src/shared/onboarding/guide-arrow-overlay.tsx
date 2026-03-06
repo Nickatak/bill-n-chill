@@ -5,8 +5,12 @@
  * to their corresponding navigation elements. Desktop only — hidden
  * when the viewport is too narrow for the navbar to be visible.
  *
- * The "organization" step is special: it opens the toolbar dropdown
- * and points at the Organization menu item inside it.
+ * Uses document-level event delegation: any element with a
+ * `data-onboarding-step` attribute automatically participates in
+ * the guide arrow system on hover — no React state threading needed.
+ *
+ * The "organization" and "return-hint" steps are special: they open
+ * the toolbar dropdown and point at the Organization menu item inside it.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -14,16 +18,20 @@ import styles from "./guide-arrow-overlay.module.css";
 
 /** Maps onboarding step keys to the data-onboarding-target values on nav elements. */
 const STEP_TARGETS: Record<string, string> = {
+  "return-hint": "get-started-item",
   organization: "organization-item",
   customer: "customers",
   project: "projects",
   estimate: "projects",
   send: "projects",
+  "change-order": "projects",
   invoice: "invoices",
+  bill: "bills",
+  payment: "invoices",
 };
 
 /** Steps that require opening the toolbar dropdown first. */
-const MENU_STEPS = new Set(["organization"]);
+const MENU_STEPS = new Set(["organization", "return-hint"]);
 
 /** Minimum viewport width for arrows to render (matches navbar hide breakpoint). */
 const MIN_WIDTH = 700;
@@ -32,10 +40,6 @@ type ArrowState = {
   path: string;
   pathLength: number;
 } | null;
-
-type Props = {
-  activeStep: string | null;
-};
 
 /**
  * Compute a quadratic bezier SVG path from a step card to a nav target.
@@ -65,13 +69,15 @@ function computeArrowPath(fromRect: DOMRect, toRect: DOMRect): string {
   return `M ${startX} ${startY} Q ${cpX} ${cpY} ${endX} ${endY}`;
 }
 
-export function GuideArrowOverlay({ activeStep }: Props) {
+export function GuideArrowOverlay() {
   const svgRef = useRef<SVGSVGElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
   const [arrow, setArrow] = useState<ArrowState>(null);
   const [isWide, setIsWide] = useState(false);
   const highlightedRef = useRef<Element | null>(null);
   const openedMenuRef = useRef<HTMLDetailsElement | null>(null);
+  const activeStepRef = useRef<string | null>(null);
+  const rafRef = useRef<number>(0);
 
   // Track viewport width to hide arrows on mobile.
   useEffect(() => {
@@ -95,72 +101,95 @@ export function GuideArrowOverlay({ activeStep }: Props) {
     }
   }, []);
 
-  // Compute arrow geometry when the active step changes.
-  useEffect(() => {
-    if (!activeStep || !isWide) {
-      setArrow(null);
-      clearHighlight();
-      return;
-    }
+  const showArrow = useCallback(
+    (stepKey: string) => {
+      if (!isWide) return;
 
-    const targetName = STEP_TARGETS[activeStep];
-    if (!targetName) {
-      setArrow(null);
-      clearHighlight();
-      return;
-    }
+      const targetName = STEP_TARGETS[stepKey];
+      if (!targetName) return;
 
-    const stepEl = document.querySelector(`[data-onboarding-step="${activeStep}"]`);
-    if (!stepEl) {
-      setArrow(null);
-      clearHighlight();
-      return;
-    }
+      const stepEl = document.querySelector(`[data-onboarding-step="${stepKey}"]`);
+      if (!stepEl) return;
 
-    const needsMenu = MENU_STEPS.has(activeStep);
+      activeStepRef.current = stepKey;
+      const needsMenu = MENU_STEPS.has(stepKey);
 
-    // Use rAF so we run after React's cleanup of the previous effect
-    // (which closes any previously-opened menu).
-    const frameId = requestAnimationFrame(() => {
-      // For menu steps, open the dropdown first so the target is visible.
-      if (needsMenu) {
-        const menuEl = document.querySelector<HTMLDetailsElement>(
-          `[data-onboarding-target="organization"]`,
-        );
-        if (menuEl && !menuEl.open) {
-          menuEl.open = true;
-          openedMenuRef.current = menuEl;
-        }
-      }
-
-      // Wait another frame for the menu to lay out before measuring.
-      requestAnimationFrame(() => {
-        const targetEl = document.querySelector(`[data-onboarding-target="${targetName}"]`);
-        if (!targetEl) {
-          setArrow(null);
-          return;
+      // Use rAF so we run after any cleanup from a previous arrow.
+      rafRef.current = requestAnimationFrame(() => {
+        if (needsMenu) {
+          const menuEl = document.querySelector<HTMLDetailsElement>(
+            `[data-onboarding-target="organization"]`,
+          );
+          if (menuEl && !menuEl.open) {
+            menuEl.open = true;
+            openedMenuRef.current = menuEl;
+          }
         }
 
-        const fromRect = stepEl.getBoundingClientRect();
-        const toRect = targetEl.getBoundingClientRect();
-        const path = computeArrowPath(fromRect, toRect);
+        // Wait another frame for the menu to lay out before measuring.
+        rafRef.current = requestAnimationFrame(() => {
+          // Guard against race: user may have already left the element.
+          if (activeStepRef.current !== stepKey) return;
 
-        setArrow({ path, pathLength: 0 });
+          const targetEl = document.querySelector(`[data-onboarding-target="${targetName}"]`);
+          if (!targetEl) {
+            setArrow(null);
+            return;
+          }
 
-        // Highlight the target nav element.
-        if (highlightedRef.current) {
-          highlightedRef.current.classList.remove(styles.targetHighlight);
-        }
-        targetEl.classList.add(styles.targetHighlight);
-        highlightedRef.current = targetEl;
+          const fromRect = stepEl.getBoundingClientRect();
+          const toRect = targetEl.getBoundingClientRect();
+          const path = computeArrowPath(fromRect, toRect);
+
+          setArrow({ path, pathLength: 0 });
+
+          if (highlightedRef.current) {
+            highlightedRef.current.classList.remove(styles.targetHighlight);
+          }
+          targetEl.classList.add(styles.targetHighlight);
+          highlightedRef.current = targetEl;
+        });
       });
-    });
+    },
+    [isWide, clearHighlight],
+  );
 
+  const hideArrow = useCallback(() => {
+    activeStepRef.current = null;
+    cancelAnimationFrame(rafRef.current);
+    setArrow(null);
+    clearHighlight();
+  }, [clearHighlight]);
+
+  // Document-level event delegation for hover on [data-onboarding-step] elements.
+  // Uses mouseover/mouseout (which bubble) with relatedTarget checks to avoid
+  // flickering when the mouse moves between child elements within a step card.
+  useEffect(() => {
+    function onOver(e: MouseEvent) {
+      const el = (e.target as Element).closest?.("[data-onboarding-step]");
+      if (!el) return;
+      const stepKey = el.getAttribute("data-onboarding-step");
+      // Only fire if we're entering a new step (skip child-to-child movement).
+      if (stepKey && stepKey !== activeStepRef.current) showArrow(stepKey);
+    }
+
+    function onOut(e: MouseEvent) {
+      const el = (e.target as Element).closest?.("[data-onboarding-step]");
+      if (!el) return;
+      // Only hide if the mouse is actually leaving the step container.
+      const related = e.relatedTarget as Element | null;
+      if (!related || !el.contains(related)) {
+        hideArrow();
+      }
+    }
+
+    document.addEventListener("mouseover", onOver);
+    document.addEventListener("mouseout", onOut);
     return () => {
-      cancelAnimationFrame(frameId);
-      clearHighlight();
+      document.removeEventListener("mouseover", onOver);
+      document.removeEventListener("mouseout", onOut);
     };
-  }, [activeStep, isWide, clearHighlight]);
+  }, [showArrow, hideArrow]);
 
   // Once the path is rendered, measure its length for the draw animation.
   useEffect(() => {
