@@ -59,11 +59,14 @@ class ChangeOrderTests(TestCase):
             contract_value_current="100000.00",
             created_by=self.user,
         )
-        self.cost_code = CostCode.objects.create(
+        self.cost_code, _ = CostCode.objects.get_or_create(
             code="30-300",
-            name="CO Cost Code",
-            is_active=True,
-            created_by=self.user,
+            organization=self.org,
+            defaults={
+                "name": "CO Cost Code",
+                "is_active": True,
+                "created_by": self.user,
+            },
         )
 
         other_customer = Customer.objects.create(
@@ -81,11 +84,14 @@ class ChangeOrderTests(TestCase):
             status=Project.Status.ACTIVE,
             created_by=self.other_user,
         )
-        self.other_cost_code = CostCode.objects.create(
+        self.other_cost_code, _ = CostCode.objects.get_or_create(
             code="31-310",
-            name="Other CO Cost Code",
-            is_active=True,
-            created_by=self.other_user,
+            organization=self.other_org,
+            defaults={
+                "name": "Other CO Cost Code",
+                "is_active": True,
+                "created_by": self.other_user,
+            },
         )
         self.last_approved_estimate_by_project = {}
 

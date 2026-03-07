@@ -76,11 +76,14 @@ class EstimateTests(TestCase):
             created_by=self.other_user,
         )
 
-        self.cost_code = CostCode.objects.create(
+        self.cost_code, _ = CostCode.objects.get_or_create(
             code="01-100",
-            name="General Conditions",
-            is_active=True,
-            created_by=self.user,
+            organization=self.org,
+            defaults={
+                "name": "General Conditions",
+                "is_active": True,
+                "created_by": self.user,
+            },
         )
 
     def _bootstrap_primary_membership(self):
@@ -597,11 +600,14 @@ class EstimateTests(TestCase):
         self.assertEqual(ScopeItem.objects.count(), 2)
 
     def test_project_estimates_create_creates_distinct_scope_items_for_different_cost_codes(self):
-        alt_cost_code = CostCode.objects.create(
+        alt_cost_code, _ = CostCode.objects.get_or_create(
             code="01-200",
-            name="Temporary Facilities",
-            is_active=True,
-            created_by=self.user,
+            organization=self.org,
+            defaults={
+                "name": "Temporary Facilities",
+                "is_active": True,
+                "created_by": self.user,
+            },
         )
 
         first = self.client.post(

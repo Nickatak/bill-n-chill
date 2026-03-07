@@ -4,17 +4,13 @@ from django.db.models import Q
 from rest_framework.response import Response
 
 from core.models import CostCode
-from core.views.helpers import _ensure_membership, _organization_user_ids
+from core.views.helpers import _ensure_membership
 
 
 def _cost_code_scope_filter(user):
     """Build a Q filter for cost codes visible to the given user's organization."""
     membership = _ensure_membership(user)
-    actor_user_ids = _organization_user_ids(user)
-    return Q(organization_id=membership.organization_id) | Q(
-        organization__isnull=True,
-        created_by_id__in=actor_user_ids,
-    )
+    return Q(organization_id=membership.organization_id)
 
 
 def _duplicate_code_error_response():

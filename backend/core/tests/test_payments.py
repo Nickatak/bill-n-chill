@@ -88,7 +88,7 @@ class PaymentTests(TestCase):
 
     def _create_vendor_bill(self, *, total="1000.00", status="scheduled"):
         vendor = Vendor.objects.create(
-            name=f"Vendor {Vendor.objects.filter(created_by=self.user).count() + 1}",
+            name=f"Vendor {Vendor.objects.filter(created_by=self.user, organization=self.org).count() + 1}",
             email=f"vendor{Vendor.objects.filter(created_by=self.user).count() + 1}@example.com",
             created_by=self.user,
         )

@@ -48,11 +48,14 @@ class BudgetTests(TestCase):
             created_by=self.other_user,
         )
 
-        self.cost_code = CostCode.objects.create(
+        self.cost_code, _ = CostCode.objects.get_or_create(
             code="10-100",
-            name="Budget Cost Code",
-            is_active=True,
-            created_by=self.user,
+            organization=self.org,
+            defaults={
+                "name": "Budget Cost Code",
+                "is_active": True,
+                "created_by": self.user,
+            },
         )
 
     def _create_estimate(self, *, title: str, unit_cost: str):
@@ -410,6 +413,7 @@ class BudgetTests(TestCase):
             name="Spend Vendor",
             email="ap@spend-vendor.example.com",
             created_by=self.user,
+            organization=self.org,
         )
         paid_bill = VendorBill.objects.create(
             project=self.project,
