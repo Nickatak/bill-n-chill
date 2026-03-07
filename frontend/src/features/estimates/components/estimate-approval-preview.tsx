@@ -22,7 +22,7 @@ import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import stampStyles from "@/shared/styles/decision-stamp.module.css";
 import styles from "./estimates-console.module.css";
-import { ApiResponse, CostCode, EstimateLineInput, EstimateRecord } from "../types";
+import { ApiResponse, EstimateLineInput, EstimateRecord } from "../types";
 import {
   estimateStatusLabel,
   mapLineCostCodes,

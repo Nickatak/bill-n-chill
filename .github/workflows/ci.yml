@@ -34,6 +34,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r backend/requirements.txt
 
+      - name: Install MySQL client
+        run: sudo apt-get update && sudo apt-get install -y mysql-client
+
       - name: Grant test DB permissions
         run: |
           mysql -h 127.0.0.1 -uroot -pci_root_password -e "
