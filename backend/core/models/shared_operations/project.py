@@ -28,6 +28,8 @@ class Project(StatusTransitionMixin, models.Model):
     Current policy:
     - `contract_value_original` is set at project creation and treated as immutable.
     - `contract_value_current` is system-derived financial truth (for example approved CO deltas).
+    - ``organization`` FK provides direct org scoping — queries filter on
+      ``organization_id=membership.organization_id`` for single-query tenant isolation.
     - `site_address` is job-location context and is distinct from `Customer.billing_address`.
     - Lifecycle control: `user-managed`.
     - Visibility: `internal-facing` primary record with selective customer-facing derivatives.
@@ -52,6 +54,11 @@ class Project(StatusTransitionMixin, models.Model):
         Status.CANCELLED: set(),
     }
 
+    organization = models.ForeignKey(
+        "Organization",
+        on_delete=models.CASCADE,
+        related_name="projects",
+    )
     customer = models.ForeignKey(
         "Customer",
         on_delete=models.PROTECT,

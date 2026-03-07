@@ -13,8 +13,11 @@ class BudgetTests(TestCase):
             password="secret123",
         )
         self.token, _ = Token.objects.get_or_create(user=self.user)
+        self.org = _bootstrap_org(self.user)
+        self.other_org = _bootstrap_org(self.other_user)
 
         self.customer = Customer.objects.create(
+            organization=self.org,
             display_name="Owner E",
             email="ownere@example.com",
             phone="555-5555",
@@ -22,6 +25,7 @@ class BudgetTests(TestCase):
             created_by=self.user,
         )
         self.project = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Budget Project",
             status=Project.Status.ACTIVE,
@@ -29,6 +33,7 @@ class BudgetTests(TestCase):
         )
 
         other_customer = Customer.objects.create(
+            organization=self.other_org,
             display_name="Owner F",
             email="ownerf@example.com",
             phone="555-6666",
@@ -36,6 +41,7 @@ class BudgetTests(TestCase):
             created_by=self.other_user,
         )
         self.other_project = Project.objects.create(
+            organization=self.other_org,
             customer=other_customer,
             name="Other Budget Project",
             status=Project.Status.ACTIVE,
@@ -268,17 +274,9 @@ class BudgetTests(TestCase):
         self.assertIn("status", blocked.json()["error"]["fields"])
 
     def test_pm_role_cannot_supersede_active_baseline(self):
-        org = Organization.objects.create(
-            display_name="Budget PM Org",
-            created_by=self.user,
-        )
-        OrganizationMembership.objects.update_or_create(
-            user=self.user,
-            defaults={
-                "organization": org,
-                "role": OrganizationMembership.Role.PM,
-                "status": OrganizationMembership.Status.ACTIVE,
-            },
+        # Downgrade user to PM role in their existing org
+        OrganizationMembership.objects.filter(user=self.user).update(
+            role=OrganizationMembership.Role.PM,
         )
 
         first_estimate_id = self._create_estimate(title="Approved Estimate A", unit_cost="500")

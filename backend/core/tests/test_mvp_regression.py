@@ -11,8 +11,10 @@ class MvpRegressionMoneyLoopTests(TestCase):
             password="secret123",
         )
         self.token, _ = Token.objects.get_or_create(user=self.user)
+        self.org = _bootstrap_org(self.user)
 
         self.customer = Customer.objects.create(
+            organization=self.org,
             display_name="Bob",
             email="bob@example.com",
             phone="555-1212",
@@ -20,6 +22,7 @@ class MvpRegressionMoneyLoopTests(TestCase):
             created_by=self.user,
         )
         self.project = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Bathroom Remodel",
             status=Project.Status.ACTIVE,

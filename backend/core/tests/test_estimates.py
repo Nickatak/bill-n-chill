@@ -34,8 +34,11 @@ class EstimateTests(TestCase):
             password="secret123",
         )
         self.token, _ = Token.objects.get_or_create(user=self.user)
+        self.org = _bootstrap_org(self.user)
+        self.other_org = _bootstrap_org(self.other_user)
 
         self.customer = Customer.objects.create(
+            organization=self.org,
             display_name="Owner C",
             email="ownerc@example.com",
             phone="555-3333",
@@ -43,12 +46,14 @@ class EstimateTests(TestCase):
             created_by=self.user,
         )
         self.project = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Estimate Project",
             status=Project.Status.PROSPECT,
             created_by=self.user,
         )
         self.second_project = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Second Property Project",
             status=Project.Status.PROSPECT,
@@ -56,6 +61,7 @@ class EstimateTests(TestCase):
         )
 
         other_customer = Customer.objects.create(
+            organization=self.other_org,
             display_name="Owner D",
             email="ownerd@example.com",
             phone="555-4444",
@@ -63,6 +69,7 @@ class EstimateTests(TestCase):
             created_by=self.other_user,
         )
         self.other_project = Project.objects.create(
+            organization=self.other_org,
             customer=other_customer,
             name="Other Estimate Project",
             status=Project.Status.PROSPECT,

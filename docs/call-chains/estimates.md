@@ -43,8 +43,7 @@ Fetches all estimates for the selected project. Called on project selection chan
 
 *── org scope ──*
 
-- [`_ensure_membership(request.user)`](../../backend/core/user_helpers.py#L134)
-- [`_validate_project_for_user(project_id, request.user)`](../../backend/core/views/helpers.py)
+- [`_validate_project_for_user(project_id, request.user)`](../../backend/core/views/helpers.py#L40) — resolves membership, filters `Project` by `organization_id`
 
 *── query ──*
 
@@ -267,7 +266,7 @@ Fetches the immutable status transition history for an estimate.
 
 `BACKEND` — [`estimate_status_events_view`](../../backend/core/views/estimating/estimates.py#L910)
 
-- [`_validate_estimate_for_user(estimate_id, request.user)`](../../backend/core/views/helpers.py)
+- [`_validate_estimate_for_user(estimate_id, request.user)`](../../backend/core/views/helpers.py#L52) — resolves membership, filters `Estimate` by `project__organization_id`
 - `EstimateStatusEvent.objects.filter(estimate=estimate).select_related(…)`
 - `EstimateStatusEventSerializer(events, many=True)`
 
@@ -336,7 +335,7 @@ Duplicates an estimate into a new draft with a different title (or different pro
 - [`_capability_gate(request.user, "estimates", "create")`](../../backend/core/rbac.py#L18)
 - [`EstimateDuplicateSerializer.is_valid()`](../../backend/core/serializers/)
 - same-project + same-title guard → `400` ("use clone version instead")
-- target project validation via [`_validate_project_for_user(…)`](../../backend/core/views/helpers.py)
+- target project validation via [`_validate_project_for_user(…)`](../../backend/core/views/helpers.py#L40) — filters by `organization_id`
 
 *── persist ──*
 

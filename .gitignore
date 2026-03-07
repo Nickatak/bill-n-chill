@@ -38,6 +38,7 @@ backend/db.sqlite3
 # Editor / local workspace
 .vscode/
 .claude/
+HUMAN_MEMORY.md
 
 # Local AI working directory (kept out of repo)
 work/*

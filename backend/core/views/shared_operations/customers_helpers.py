@@ -4,13 +4,13 @@ from django.db.models import Q
 from django.utils import timezone
 
 from core.models import Customer
-from core.views.helpers import _normalized_phone, _organization_user_ids
+from core.views.helpers import _ensure_membership, _normalized_phone
 
 
 def _find_duplicate_customers(user, *, phone: str, email: str):
     """Find existing customers matching by phone or email for duplicate detection."""
-    actor_user_ids = _organization_user_ids(user)
-    customers = Customer.objects.filter(created_by_id__in=actor_user_ids)
+    membership = _ensure_membership(user)
+    customers = Customer.objects.filter(organization_id=membership.organization_id)
     phone_norm = _normalized_phone(phone)
     email_norm = (email or "").strip().lower()
 

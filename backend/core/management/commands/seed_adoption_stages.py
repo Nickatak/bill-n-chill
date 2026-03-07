@@ -148,8 +148,9 @@ class Command(BaseCommand):
         return membership
 
     def _make_customer(self, user, name, **kwargs):
+        membership = _ensure_membership(user)
         c, _ = Customer.objects.get_or_create(
-            created_by=user, display_name=name,
+            organization=membership.organization, created_by=user, display_name=name,
             defaults={
                 "email": kwargs.get("email", ""),
                 "phone": kwargs.get("phone", ""),
@@ -165,8 +166,9 @@ class Command(BaseCommand):
         return c
 
     def _make_project(self, user, customer, name, status, **kwargs):
+        membership = _ensure_membership(user)
         p, _ = Project.objects.get_or_create(
-            created_by=user, customer=customer, name=name,
+            organization=membership.organization, created_by=user, customer=customer, name=name,
             defaults={
                 "status": status,
                 "site_address": kwargs.get("site_address", customer.billing_address or ""),

@@ -16,9 +16,12 @@ class VendorBillTests(TestCase):
             password="secret123",
         )
         self.token, _ = Token.objects.get_or_create(user=self.user)
+        self.org = _bootstrap_org(self.user)
+        self.other_org = _bootstrap_org(self.other_user)
         self.other_token, _ = Token.objects.get_or_create(user=self.other_user)
 
         self.customer = Customer.objects.create(
+            organization=self.org,
             display_name="Owner K",
             email="ownerk@example.com",
             phone="555-2020",
@@ -26,6 +29,7 @@ class VendorBillTests(TestCase):
             created_by=self.user,
         )
         self.project = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="AP Project",
             status=Project.Status.ACTIVE,
@@ -69,6 +73,7 @@ class VendorBillTests(TestCase):
         )
 
         other_customer = Customer.objects.create(
+            organization=self.other_org,
             display_name="Owner L",
             email="ownerl@example.com",
             phone="555-3030",
@@ -76,6 +81,7 @@ class VendorBillTests(TestCase):
             created_by=self.other_user,
         )
         self.other_project = Project.objects.create(
+            organization=self.other_org,
             customer=other_customer,
             name="Other AP Project",
             status=Project.Status.ACTIVE,
