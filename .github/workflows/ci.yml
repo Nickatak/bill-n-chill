@@ -40,8 +40,7 @@ jobs:
       - name: Grant test DB permissions
         run: |
           mysql -h 127.0.0.1 -uroot -pci_root_password -e "
-            GRANT CREATE, DROP ON *.* TO 'bnc'@'%';
-            GRANT ALL PRIVILEGES ON test_bill_n_chill.* TO 'bnc'@'%';
+            GRANT ALL PRIVILEGES ON *.* TO 'bnc'@'%';
             FLUSH PRIVILEGES;
           "
 
