@@ -39,7 +39,6 @@ from core.views.helpers import (
     _build_public_decision_note,
     _capability_gate,
     _ensure_membership,
-    _organization_user_ids,
     _validate_project_for_user,
 )
 from core.views.public_signing_helpers import get_ceremony_context, validate_ceremony_on_decision
@@ -282,7 +281,7 @@ def project_change_orders_view(request, project_id: int):
     - `POST`: requires role `owner|pm`, active budget, approved origin estimate, and valid line totals.
     - Create writes are atomic: change-order row, optional lines, financial audit event.
     """
-    actor_user_ids = _organization_user_ids(request.user)
+    membership = _ensure_membership(request.user)
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -292,12 +291,12 @@ def project_change_orders_view(request, project_id: int):
 
     if request.method == "GET":
         rows = (
-            ChangeOrder.objects.filter(project=project, requested_by_id__in=actor_user_ids)
+            ChangeOrder.objects.filter(project=project)
             .prefetch_related("line_items", "line_items__budget_line", "line_items__budget_line__cost_code")
             .order_by("-created_at", "-revision_number")
         )
         latest_ids = (
-            ChangeOrder.objects.filter(project=project, requested_by_id__in=actor_user_ids)
+            ChangeOrder.objects.filter(project=project)
             .values("family_key")
             .annotate(latest_id=Max("id"))
             .values_list("latest_id", flat=True)
@@ -359,7 +358,6 @@ def project_change_orders_view(request, project_id: int):
         origin_estimate = Estimate.objects.get(
             id=data["origin_estimate"],
             project=project,
-            created_by_id__in=actor_user_ids,
         )
     except Estimate.DoesNotExist:
         return _validation_error_response(
@@ -447,7 +445,7 @@ def change_order_detail_view(request, change_order_id: int):
     - Enforces transition rules, line/amount consistency, and origin-estimate immutability policy.
     - Atomic update path may propagate financial deltas to project/budget and append immutable snapshot/audit rows.
     """
-    actor_user_ids = _organization_user_ids(request.user)
+    membership = _ensure_membership(request.user)
     try:
         change_order = ChangeOrder.objects.select_related("project").prefetch_related(
             "line_items",
@@ -455,7 +453,7 @@ def change_order_detail_view(request, change_order_id: int):
             "line_items__budget_line__cost_code",
         ).get(
             id=change_order_id,
-            requested_by_id__in=actor_user_ids,
+            project__organization_id=membership.organization_id,
         )
     except ChangeOrder.DoesNotExist:
         return Response(
@@ -607,7 +605,6 @@ def change_order_detail_view(request, change_order_id: int):
                 origin_estimate = Estimate.objects.get(
                     id=data["origin_estimate"],
                     project=change_order.project,
-                    created_by_id__in=actor_user_ids,
                 )
             except Estimate.DoesNotExist:
                 return _validation_error_response(
@@ -667,7 +664,6 @@ def change_order_detail_view(request, change_order_id: int):
             if financial_delta != MONEY_ZERO:
                 Project.objects.filter(
                     id=change_order.project_id,
-                    created_by_id__in=actor_user_ids,
                 ).update(
                     contract_value_current=F("contract_value_current") + financial_delta,
                 )
@@ -766,12 +762,12 @@ def change_order_clone_revision_view(request, change_order_id: int):
     - Source must be latest family revision.
     - Clone writes are atomic: cloned row, cloned lines, financial audit event.
     """
-    actor_user_ids = _organization_user_ids(request.user)
+    membership = _ensure_membership(request.user)
     try:
         change_order = (
             ChangeOrder.objects.select_related("project", "origin_estimate")
             .prefetch_related("line_items")
-            .get(id=change_order_id, requested_by_id__in=actor_user_ids)
+            .get(id=change_order_id, project__organization_id=membership.organization_id)
         )
     except ChangeOrder.DoesNotExist:
         return Response(
@@ -787,7 +783,6 @@ def change_order_clone_revision_view(request, change_order_id: int):
         ChangeOrder.objects.filter(
             project=change_order.project,
             family_key=change_order.family_key,
-            requested_by_id__in=actor_user_ids,
         )
         .order_by("-revision_number")
         .first()
