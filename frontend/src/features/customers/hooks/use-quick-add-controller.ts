@@ -38,7 +38,7 @@ export type {
  * the business-workflow hook. The returned object is the single source of
  * truth for every quick-add UI component.
  */
-export function useQuickAddController({ token, baseAuthMessage }: UseQuickAddControllerArgs) {
+export function useQuickAddController({ token, baseAuthMessage, onCustomerCreated }: UseQuickAddControllerArgs) {
   const fullNameRef = useRef<HTMLInputElement>(null);
   const normalizedBaseUrl = useMemo(() => normalizeApiBaseUrl(defaultApiBaseUrl), []);
 
@@ -82,6 +82,7 @@ export function useQuickAddController({ token, baseAuthMessage }: UseQuickAddCon
     setInitialContractValue,
     setNotes,
     setFieldErrors,
+    onCustomerCreated,
   });
 
   // --- Public API surface ---

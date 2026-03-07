@@ -15,11 +15,15 @@ import { QuickAddForm } from "./quick-add-form";
 import { useQuickAddController } from "../hooks/use-quick-add-controller";
 import styles from "./quick-add-console.module.css";
 
+type QuickAddConsoleProps = {
+  onCustomerCreated?: () => void;
+};
+
 /** Orchestrates the quick-add customer workflow, combining auth, form, and duplicate resolution. */
-export function QuickAddConsole() {
+export function QuickAddConsole({ onCustomerCreated }: QuickAddConsoleProps) {
   // Composition owner: bridges shared-session auth into the controller before child workflows run.
   const { token, authMessage: baseAuthMessage } = useSharedSessionAuth();
-  const controllerApi = useQuickAddController({ token, baseAuthMessage });
+  const controllerApi = useQuickAddController({ token, baseAuthMessage, onCustomerCreated });
   const statusMessage = controllerApi.conversionMessage || controllerApi.leadMessage;
   const statusTone = controllerApi.conversionMessage
     ? controllerApi.conversionMessageTone
