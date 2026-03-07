@@ -18,7 +18,6 @@ from core.user_helpers import _ensure_membership
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
     SYSTEM_BUDGET_LINE_CODES,
-    _organization_user_ids,
     _resolve_cost_codes_for_user,
 )
 
@@ -36,10 +35,8 @@ def _is_billable_invoice_status(status):
 
 def _project_billable_invoices_total(*, project, user, exclude_invoice_id=None):
     """Sum the totals of all billable invoices for a project, optionally excluding one."""
-    actor_user_ids = _organization_user_ids(user)
     query = Invoice.objects.filter(
         project=project,
-        created_by_id__in=actor_user_ids,
         status__in=BILLABLE_INVOICE_STATUSES,
     )
     if exclude_invoice_id:
@@ -137,11 +134,9 @@ def _enforce_invoice_scope_guard(
 
 def _next_invoice_number(*, project, user):
     """Generate the next unique sequential invoice number for a project."""
-    actor_user_ids = _organization_user_ids(user)
     next_number = (
         Invoice.objects.filter(
             project=project,
-            created_by_id__in=actor_user_ids,
         ).count()
         + 1
     )
@@ -193,11 +188,9 @@ def _resolve_invoice_budget_lines_for_project(*, project, user, line_items_data)
     if not ids:
         return {}, []
 
-    actor_user_ids = _organization_user_ids(user)
     rows = BudgetLine.objects.select_related("cost_code", "scope_item").filter(
         id__in=ids,
         budget__project=project,
-        budget__created_by_id__in=actor_user_ids,
         budget__status=Budget.Status.ACTIVE,
     )
     line_map = {row.id: row for row in rows}
