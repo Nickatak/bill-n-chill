@@ -1,5 +1,3 @@
-import importlib
-
 from django.core.management import BaseCommand, call_command
 from django.db import transaction
 
@@ -23,21 +21,17 @@ class Command(BaseCommand):
         These are infrastructure, not demo data — every org needs them
         for RBAC capability resolution to work.
         """
-        migration_mod = importlib.import_module("core.migrations.0002_rbac_phase1")
-        payments_mod = importlib.import_module("core.migrations.0003_rbac_phase2_payments_resource")
-        SYSTEM_ROLES = migration_mod.SYSTEM_ROLES
-        PAYMENTS_BY_ROLE = payments_mod.PAYMENTS_BY_ROLE
+        from core.utils.rbac_defaults import SYSTEM_ROLES
 
         for slug, data in SYSTEM_ROLES.items():
-            caps = dict(data["capability_flags_json"])
-            if slug in PAYMENTS_BY_ROLE:
-                caps["payments"] = PAYMENTS_BY_ROLE[slug]
             RoleTemplate.objects.update_or_create(
                 slug=slug,
                 defaults={
                     "name": data["name"],
                     "is_system": True,
-                    "capability_flags_json": caps,
+                    "organization": None,
+                    "capability_flags_json": data["capability_flags_json"],
+                    "description": data["description"],
                     "created_by": None,
                 },
             )

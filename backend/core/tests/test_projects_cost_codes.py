@@ -1357,7 +1357,7 @@ class RoleHardeningTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.viewer_token.key}",
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["data"]["role"], "viewer")
+        self.assertEqual(response.json()["data"]["user"]["role"], "viewer")
 
     def test_viewer_cannot_create_invoice_or_payment(self):
         invoice_response = self.client.post(
