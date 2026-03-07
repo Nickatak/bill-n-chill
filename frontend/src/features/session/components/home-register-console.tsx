@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import type { HealthResult } from "@/shared/api/health";
 import {
+  loadClientSession,
   saveClientSession,
   type SessionOrganization,
   type SessionRole,
@@ -41,12 +42,6 @@ type VerifyInviteData = {
   is_existing_user: boolean;
 };
 
-type DetectedInvite = {
-  organization_name: string;
-  role: string;
-  invite_token: string;
-};
-
 type InviteFlowState = "none" | "verifying" | "flow-b" | "flow-c" | "error";
 
 type HomeRegisterConsoleProps = {
@@ -55,22 +50,6 @@ type HomeRegisterConsoleProps = {
 };
 
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
-
-/**
- * Format an ISO timestamp string for display in the health banner.
- * Returns "unknown" if the value is absent, or the raw string if it
- * can't be parsed as a valid date.
- */
-function formatTimestamp(value?: string): string {
-  if (!value) {
-    return "unknown";
-  }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-  return parsed.toLocaleString();
-}
 
 /**
  * Map the register endpoint's snake_case organization payload to the
@@ -103,35 +82,20 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
   const [message, setMessage] = useState("");
   const [checkEmailSent, setCheckEmailSent] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  // Redirect authenticated users to home (unless they're accepting an invite).
+  useEffect(() => {
+    if (inviteToken) return;
+    const session = loadClientSession();
+    if (session?.token) {
+      router.replace("/");
+    }
+  }, [inviteToken, router]);
 
   // Invite flow state
   const [inviteFlow, setInviteFlow] = useState<InviteFlowState>(inviteToken ? "verifying" : "none");
   const [inviteData, setInviteData] = useState<VerifyInviteData | null>(null);
-
-  // Auto-detected invite (user registered directly without invite link)
-  const [detectedInvite, setDetectedInvite] = useState<DetectedInvite | null>(null);
-
-  // The effective invite token — prop (from URL) or auto-detected
-  const effectiveInviteToken = inviteToken ?? detectedInvite?.invite_token;
-
-  // Check for pending invites when user types their email (no invite token in URL).
-  const checkForPendingInvite = useCallback(async () => {
-    if (inviteToken || !email.trim()) return;
-
-    try {
-      const response = await fetch(
-        `${defaultApiBaseUrl}/auth/check-invite/?email=${encodeURIComponent(email.trim())}`,
-      );
-      if (response.ok) {
-        const body = await response.json();
-        setDetectedInvite(body.data as DetectedInvite);
-      } else {
-        setDetectedInvite(null);
-      }
-    } catch {
-      // Silently fail — this is a convenience check, not critical
-    }
-  }, [inviteToken, email]);
 
   // Verify invite token on mount
   useEffect(() => {
@@ -241,8 +205,8 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
 
     try {
       const body: Record<string, string> = { email, password };
-      if (effectiveInviteToken) {
-        body.invite_token = effectiveInviteToken;
+      if (inviteToken) {
+        body.invite_token = inviteToken;
       }
 
       const response = await fetch(`${defaultApiBaseUrl}/auth/register/`, {
@@ -255,6 +219,7 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
 
       // Flow A: "check your email" response (no token, has message).
       if (response.ok && payload.data?.message && !payload.data?.token) {
+        setMessage("");
         setCheckEmailSent(true);
         setIsSubmitting(false);
         return;
@@ -276,6 +241,17 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
     }
   }
 
+  /** Start a visual countdown that disables the resend button. */
+  function startCooldown(seconds: number) {
+    setResendCooldown(seconds);
+    const id = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) { clearInterval(id); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  }
+
   /** Resend verification email for the current email address. */
   async function handleResendVerification() {
     setIsResending(true);
@@ -289,13 +265,17 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
       });
 
       if (response.status === 429) {
-        setMessage("Please wait before requesting another email.");
-        setMessageTone("error");
+        const body = await response.json();
+        const match = body?.error?.message?.match(/(\d+) seconds/);
+        const wait = match ? parseInt(match[1], 10) : 60;
+        startCooldown(wait);
+        setMessage("");
         return;
       }
 
       setMessage("Verification email resent.");
       setMessageTone("neutral");
+      startCooldown(60);
     } catch {
       setMessage("Could not reach resend endpoint.");
       setMessageTone("error");
@@ -341,7 +321,7 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
   if (checkEmailSent) {
     return (
       <section className={styles.shell}>
-        <div className={styles.card}>
+        <div className={`${styles.card} ${styles.cardCentered}`}>
           <div className={styles.warning} role="note" aria-label="Verification email sent">
             <p className={styles.warningTitle}>Check your email</p>
             <p className={styles.warningText}>
@@ -354,19 +334,19 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
               {message}
             </p>
           )}
-          <div className={styles.buttonRow}>
-            <button
-              className={styles.buttonSecondary}
-              type="button"
-              disabled={isResending}
-              onClick={handleResendVerification}
-            >
-              {isResending ? "Sending..." : "Didn\u2019t get it? Resend"}
-            </button>
-          </div>
-          <p className={styles.formHint}>
-            <Link href="/">Back to sign in</Link>
-          </p>
+          <button
+            className={styles.button}
+            type="button"
+            disabled={isResending || resendCooldown > 0}
+            onClick={handleResendVerification}
+          >
+            {isResending
+              ? "Sending..."
+              : resendCooldown > 0
+                ? `Wait ${resendCooldown}s`
+                : "Didn\u2019t get it? Resend"}
+          </button>
+          <Link href="/" className={styles.formHintLink}>Back to sign in</Link>
         </div>
       </section>
     );
@@ -435,37 +415,17 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
   return (
     <section className={styles.shell}>
       <div className={styles.card}>
-        {inviteFlow === "flow-b" && (inviteData || detectedInvite) ? (
+        {inviteFlow === "flow-b" && inviteData ? (
           <div className={styles.warning} role="note" aria-label="Invite context">
             <p className={styles.warningTitle}>You&apos;re Invited</p>
             <p className={styles.warningText}>
               Create an account to join{" "}
-              <strong>{inviteData?.organization_name ?? detectedInvite?.organization_name}</strong> as{" "}
-              <strong>{inviteData?.role ?? detectedInvite?.role}</strong>.
-            </p>
-          </div>
-        ) : (
-          <div className={styles.warning} role="note" aria-label="Environment warning">
-            <p className={styles.warningTitle}>Under Construction</p>
-            <p className={styles.warningText}>
-              This environment is still in active development. Data may be reset, changed, or removed at any
-              time.
-            </p>
-            <p className={styles.warningMeta}>Last data reset: {formatTimestamp(health.dataResetAt)}</p>
-            <p className={styles.warningMeta}>Last build: {formatTimestamp(health.appBuildAt)}</p>
-            <p className={styles.warningMeta}>
-              Deployed commit: {health.appRevision?.slice(0, 12) || "unknown"}
-            </p>
-          </div>
-        )}
-        {detectedInvite && inviteFlow === "none" ? (
-          <div className={styles.inviteDetected} role="note" aria-label="Pending invite detected">
-            <p className={styles.inviteDetectedText}>
-              You&apos;ve been invited to join <strong>{detectedInvite.organization_name}</strong> as{" "}
-              <strong>{detectedInvite.role}</strong>. Complete registration below to join.
+              <strong>{inviteData.organization_name}</strong> as{" "}
+              <strong>{inviteData.role}</strong>.
             </p>
           </div>
         ) : null}
+        <h2 className={styles.title}>Create account</h2>
         <form className={styles.form} onSubmit={handleRegister}>
           <label>
             Email
@@ -473,7 +433,6 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              onBlur={checkForPendingInvite}
               autoComplete="email"
               required
               readOnly={inviteFlow === "flow-b"}

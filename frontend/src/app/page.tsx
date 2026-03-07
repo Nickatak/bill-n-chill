@@ -3,7 +3,7 @@ import { fetchHealth } from "@/shared/api/health";
 import { HomeRouteContent } from "./home-route-content";
 
 export const metadata: Metadata = {
-  title: "Home",
+  title: "Sign In | Bill n Chill",
 };
 
 export default async function Home() {

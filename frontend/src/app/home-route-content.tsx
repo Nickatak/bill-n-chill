@@ -22,10 +22,25 @@ export function HomeRouteContent({ health }: HomeRouteContentProps) {
   const router = useRouter();
   const [freshOrgChecked, setFreshOrgChecked] = useState(false);
 
+  // Update page title based on auth state.
+  useEffect(() => {
+    document.title = isAuthorized ? "Dashboard | Bill n Chill" : "Sign In | Bill n Chill";
+  }, [isAuthorized]);
+
   // Redirect fresh orgs (no customers yet) to the onboarding checklist.
+  // The `cancelled` flag only guards React state updates (setFreshOrgChecked),
+  // NOT the hard redirect — window.location.href is safe to call from a
+  // "stale" effect since it triggers a full page reload regardless.
+  // This is critical because React Strict Mode cancels the first effect run,
+  // but the redirect must still fire when the fetch completes.
   useEffect(() => {
     if (!isAuthorized || !token) {
       setFreshOrgChecked(false);
+      return;
+    }
+
+    if (localStorage.getItem("onboarding:seen")) {
+      setFreshOrgChecked(true);
       return;
     }
 
@@ -37,15 +52,11 @@ export function HomeRouteContent({ health }: HomeRouteContentProps) {
           headers: buildAuthHeaders(token),
         });
         const payload = await res.json();
-        if (cancelled) return;
 
         if (res.ok && Array.isArray(payload.data) && payload.data.length === 0) {
-          // Only auto-redirect once. After the user has seen onboarding,
-          // let them navigate freely (they can always return via the nav).
-          const seen = localStorage.getItem("onboarding:seen");
-          if (!seen) {
+          if (!localStorage.getItem("onboarding:seen")) {
             localStorage.setItem("onboarding:seen", "1");
-            router.replace("/onboarding");
+            window.location.href = "/onboarding";
             return;
           }
         }

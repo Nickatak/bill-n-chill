@@ -46,9 +46,6 @@ Backend:
 - `MYSQL_ROOT_PASSWORD`
 - `MYSQL_PORT`
 - `CORS_ALLOWED_ORIGINS`
-- `APP_REVISION` (optional; commit/release id shown in `/health/` and login/register warning panel)
-- `DATA_RESET_AT` (optional override for last-reset display in `/health/`)
-- `DATA_RESET_MARKER_PATH` (optional path for persisted last-reset marker file)
 
 Frontend:
 

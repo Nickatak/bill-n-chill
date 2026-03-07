@@ -11,11 +11,6 @@ from rest_framework.response import Response
 from core.models import EmailVerificationToken, OrganizationInvite, OrganizationMembership, OrganizationMembershipRecord
 from core.serializers import LoginSerializer, RegisterSerializer
 from core.utils.email import send_verification_email
-from core.utils.runtime_metadata import (
-    get_app_build_at,
-    get_app_revision,
-    get_last_data_reset_at,
-)
 from core.user_helpers import _ensure_membership, _resolve_user_capabilities
 
 User = get_user_model()
@@ -95,16 +90,7 @@ def health_view(_request):
     - Test anchors:
       - `backend/core/tests/test_health_auth.py::test_health_endpoint_returns_ok_payload`
     """
-    return Response(
-        {
-            "data": {
-                "status": "ok",
-                "app_revision": get_app_revision(),
-                "app_build_at": get_app_build_at(),
-                "data_reset_at": get_last_data_reset_at(),
-            }
-        }
-    )
+    return Response({"data": {"status": "ok"}})
 
 
 @api_view(["POST"])
@@ -556,7 +542,7 @@ def accept_invite_view(request):
 
 _VERIFY_ERROR_MAP = {
     "not_found": (404, "not_found", "Invalid verification link."),
-    "consumed": (410, "consumed", "This verification link has already been used."),
+    "consumed": (410, "consumed", "This link is no longer active. If you\u2019ve already verified, sign in instead."),
     "expired": (410, "expired", "This verification link has expired. Request a new one."),
 }
 
@@ -668,6 +654,11 @@ def resend_verification_view(request):
             {"error": {"code": "rate_limited", "message": f"Please wait {wait_seconds} seconds before requesting another email."}},
             status=429,
         )
+
+    # Invalidate any previous unconsumed tokens so only the latest link works.
+    EmailVerificationToken.objects.filter(user=user, consumed_at__isnull=True).update(
+        consumed_at=timezone.now()
+    )
 
     token_obj = EmailVerificationToken(user=user, email=user.email)
     token_obj.save()

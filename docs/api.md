@@ -170,8 +170,6 @@ Error:
   - Purpose: service liveness/readiness signal for local and deployment checks.
   - Response fields:
     - `status` (`ok`)
-    - `app_revision` (nullable deployment commit/revision identifier from env when configured)
-    - `data_reset_at` (nullable ISO timestamp of last demo data reset marker)
 
 ## Authentication (v1 baseline)
 

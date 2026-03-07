@@ -123,7 +123,7 @@ Errors:   400 (missing fields), 401 (wrong password), 404 (no user/invite), 410 
 
 **Auth:** AllowAny
 
-Liveness probe. Returns `{ "data": { "status": "ok", "app_revision": "...", "app_build_at": "...", "data_reset_at": "..." } }`.
+Liveness probe. Returns `{ "data": { "status": "ok" } }`.
 
 ---
 

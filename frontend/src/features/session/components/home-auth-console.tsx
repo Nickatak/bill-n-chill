@@ -39,22 +39,6 @@ type HomeAuthConsoleProps = {
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
 /**
- * Format an ISO timestamp string for display in the health banner.
- * Returns "unknown" if the value is absent, or the raw string if it
- * can't be parsed as a valid date.
- */
-function formatTimestamp(value?: string): string {
-  if (!value) {
-    return "unknown";
-  }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-  return parsed.toLocaleString();
-}
-
-/**
  * Map the login endpoint's snake_case organization payload to the
  * client-side SessionOrganization shape. Returns undefined if any
  * required field (id, display_name) is missing, so downstream
@@ -217,18 +201,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
     return (
       <section className={styles.shell}>
         <div className={styles.card}>
-          <div className={styles.warning} role="note" aria-label="Environment warning">
-            <p className={styles.warningTitle}>Under Construction</p>
-            <p className={styles.warningText}>
-              This environment is still in active development. Data may be reset, changed, or removed at any
-              time.
-            </p>
-            <p className={styles.warningMeta}>Last data reset: {formatTimestamp(health.dataResetAt)}</p>
-            <p className={styles.warningMeta}>Last build: {formatTimestamp(health.appBuildAt)}</p>
-            <p className={styles.warningMeta}>
-              Deployed commit: {health.appRevision?.slice(0, 12) || "unknown"}
-            </p>
-          </div>
+          <h2 className={styles.title}>Sign in</h2>
           <form className={styles.form} onSubmit={handleLogin}>
             <label>
               Email
