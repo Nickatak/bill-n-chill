@@ -14,13 +14,11 @@ import { parseAmount, formatDecimal } from "@/shared/money-format";
 import {
   financialBaselineStatus,
   formatFinancialBaselineStatus,
-  type FinancialBaselineStatusValue,
 } from "@/shared/financial-baseline";
 import {
   coLabel,
   defaultChangeOrderTitle,
   emptyLine,
-  isFiniteNumericInput,
   publicChangeOrderHref,
   readChangeOrderApiError,
   validateLineItems,
@@ -38,7 +36,6 @@ import {
   ChangeOrderLineInput,
   ChangeOrderPolicyContract,
   ChangeOrderRecord,
-  LineValidationIssue,
 } from "../types";
 import { usePrintable } from "@/shared/shell/printable-context";
 import styles from "./change-orders-console.module.css";
@@ -212,12 +209,7 @@ export function ChangeOrdersConsole({
     changeOrders.find((row) => String(row.id) === selectedChangeOrderId) ?? null;
   const selectedViewerEstimate =
     projectEstimates.find((estimate) => String(estimate.id) === selectedViewerEstimateId) ?? null;
-  const activeFinancialBaselineEstimate =
-    projectEstimates.find(
-      (estimate) => financialBaselineStatus(estimate) === "active",
-    ) ?? null;
   const selectedViewerEstimateBaselineStatus = financialBaselineStatus(selectedViewerEstimate);
-  const selectedViewerEstimateIsActiveBaseline = selectedViewerEstimateBaselineStatus === "active";
   const sortChangeOrdersForViewer = useCallback((rows: ChangeOrderRecord[]) => {
     return [...rows].sort((left, right) => {
       const leftCreatedAt = Date.parse(left.created_at);
@@ -762,7 +754,7 @@ export function ChangeOrdersConsole({
     }
     setQuickStatusNote("");
     setShowAllEvents(false);
-  }, [changeOrderAllowedTransitions]);
+  }, [changeOrderAllowedTransitions, setFeedback]);
 
   const loadChangeOrderPolicy = useCallback(async () => {
     try {

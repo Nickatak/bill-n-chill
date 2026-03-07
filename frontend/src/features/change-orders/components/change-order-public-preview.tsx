@@ -7,8 +7,8 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { parseAmount, formatDecimal } from "@/shared/money-format";
-import { formatDateTimeDisplay } from "@/shared/date-format";
 import { PublicDocumentViewerShell } from "@/shared/document-viewer/public-document-viewer-shell";
 import {
   PublicDocumentFrame,
@@ -80,7 +80,6 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const canDecide = changeOrder?.status === "pending_approval";
   const hasDecision = changeOrder?.status === "approved" || changeOrder?.status === "rejected";
-  const decisionStatusLabel = statusLabel(changeOrder?.status);
   const sender = useMemo(
     () => resolvePublicSender(changeOrder?.organization_context),
     [changeOrder?.organization_context],
@@ -227,10 +226,13 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
               <>
                 <div className={frameStyles.logoBox}>
                   {sender.logoUrl ? (
-                    <img
+                    <Image
                       className={frameStyles.logoImage}
                       src={sender.logoUrl}
                       alt={`${sender.companyName} logo`}
+                      width={200}
+                      height={80}
+                      unoptimized
                     />
                   ) : (
                     <p className={frameStyles.logoPlaceholder}>No logo URL set</p>
