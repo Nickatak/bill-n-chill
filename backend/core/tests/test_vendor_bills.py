@@ -35,11 +35,14 @@ class VendorBillTests(TestCase):
             status=Project.Status.ACTIVE,
             created_by=self.user,
         )
-        self.cost_code = CostCode.objects.create(
+        self.cost_code, _ = CostCode.objects.get_or_create(
             code="50-100",
-            name="Materials",
-            is_active=True,
-            created_by=self.user,
+            organization=self.org,
+            defaults={
+                "name": "Materials",
+                "is_active": True,
+                "created_by": self.user,
+            },
         )
         self.estimate = Estimate.objects.create(
             project=self.project,
@@ -65,11 +68,13 @@ class VendorBillTests(TestCase):
             name="Supply House",
             email="ap@supply-house.example.com",
             created_by=self.user,
+            organization=self.org,
         )
         self.second_vendor = Vendor.objects.create(
             name="Framing Crew",
             email="billing@framing.example.com",
             created_by=self.user,
+            organization=self.org,
         )
 
         other_customer = Customer.objects.create(
@@ -91,6 +96,7 @@ class VendorBillTests(TestCase):
             name="Other User Vendor",
             email="ap@other-vendor.example.com",
             created_by=self.other_user,
+            organization=self.other_org,
         )
 
     def _create_vendor_bill(self, *, bill_number="B-1001", total="1250.00"):
@@ -581,11 +587,14 @@ class VendorBillTests(TestCase):
         self.assertEqual(payload["fields"]["allocations"], ["Allocation total must equal bill total."])
 
     def test_vendor_bill_patch_rejects_allocation_with_wrong_project_budget_line(self):
-        other_code = CostCode.objects.create(
+        other_code, _ = CostCode.objects.get_or_create(
             code="50-200",
-            name="Other",
-            is_active=True,
-            created_by=self.other_user,
+            organization=self.other_org,
+            defaults={
+                "name": "Other",
+                "is_active": True,
+                "created_by": self.other_user,
+            },
         )
         other_estimate = Estimate.objects.create(
             project=self.other_project,

@@ -38,8 +38,6 @@ class CostCode(models.Model):
         "Organization",
         on_delete=models.PROTECT,
         related_name="cost_codes",
-        null=True,
-        blank=True,
     )
     created_by = models.ForeignKey(
         User,

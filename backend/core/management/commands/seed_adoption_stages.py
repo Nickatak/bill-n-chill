@@ -78,18 +78,19 @@ class Command(BaseCommand):
 
     def _cost_codes(self, user):
         """Return two cost codes for estimate/budget line seeding."""
+        membership = _ensure_membership(user)
         codes = list(
-            CostCode.objects.filter(created_by=user, is_active=True)
+            CostCode.objects.filter(organization=membership.organization, is_active=True)
             .order_by("code")[:2]
         )
         if len(codes) < 2:
             c1, _ = CostCode.objects.get_or_create(
-                created_by=user, code="01-100",
-                defaults={"name": "General", "is_active": True},
+                organization=membership.organization, code="01-100",
+                defaults={"name": "General", "is_active": True, "created_by": user},
             )
             c2, _ = CostCode.objects.get_or_create(
-                created_by=user, code="03-100",
-                defaults={"name": "Concrete", "is_active": True},
+                organization=membership.organization, code="03-100",
+                defaults={"name": "Concrete", "is_active": True, "created_by": user},
             )
             codes = [c1, c2]
         return codes[0], codes[1]
@@ -509,6 +510,7 @@ class Command(BaseCommand):
         Vendor.objects.get_or_create(
             created_by=user, name="Pacific Tile & Stone",
             defaults={
+                "organization": membership.organization,
                 "vendor_type": Vendor.VendorType.TRADE,
                 "is_canonical": False,
                 "email": "orders@pacifictile.example",
@@ -635,18 +637,18 @@ class Command(BaseCommand):
         # Custom vendors
         v_trade1, _ = Vendor.objects.get_or_create(
             created_by=user, name="Summit Electrical",
-            defaults={"vendor_type": Vendor.VendorType.TRADE, "is_canonical": False,
-                       "email": "billing@summitelec.example"},
+            defaults={"organization": membership.organization, "vendor_type": Vendor.VendorType.TRADE,
+                       "is_canonical": False, "email": "billing@summitelec.example"},
         )
         v_trade2, _ = Vendor.objects.get_or_create(
             created_by=user, name="Valley Plumbing Supply",
-            defaults={"vendor_type": Vendor.VendorType.TRADE, "is_canonical": False,
-                       "email": "orders@valleyplumb.example"},
+            defaults={"organization": membership.organization, "vendor_type": Vendor.VendorType.TRADE,
+                       "is_canonical": False, "email": "orders@valleyplumb.example"},
         )
         Vendor.objects.get_or_create(
             created_by=user, name="Metro Lumber Co",
-            defaults={"vendor_type": Vendor.VendorType.TRADE, "is_canonical": False,
-                       "email": "sales@metrolumber.example"},
+            defaults={"organization": membership.organization, "vendor_type": Vendor.VendorType.TRADE,
+                       "is_canonical": False, "email": "sales@metrolumber.example"},
         )
 
         # Vendor bills across statuses
@@ -883,7 +885,8 @@ class Command(BaseCommand):
         for vname, vtype, vemail in vendor_names:
             v, _ = Vendor.objects.get_or_create(
                 created_by=user, name=vname,
-                defaults={"vendor_type": vtype, "is_canonical": False, "email": vemail},
+                defaults={"organization": membership.organization, "vendor_type": vtype,
+                           "is_canonical": False, "email": vemail},
             )
             late_vendors.append(v)
 

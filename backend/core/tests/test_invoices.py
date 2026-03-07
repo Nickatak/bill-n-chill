@@ -56,11 +56,14 @@ class InvoiceTests(TestCase):
             contract_value_current="151000.00",
             created_by=self.user,
         )
-        self.cost_code = CostCode.objects.create(
+        self.cost_code, _ = CostCode.objects.get_or_create(
             code="40-400",
-            name="Invoice Cost Code",
-            is_active=True,
-            created_by=self.user,
+            organization=self.org,
+            defaults={
+                "name": "Invoice Cost Code",
+                "is_active": True,
+                "created_by": self.user,
+            },
         )
         self.estimate = Estimate.objects.create(
             project=self.project,
@@ -82,11 +85,14 @@ class InvoiceTests(TestCase):
             description="Invoice Progress Draw",
             budget_amount="5000.00",
         )
-        self.generic_cost_code = CostCode.objects.create(
+        self.generic_cost_code, _ = CostCode.objects.get_or_create(
             code="99-901",
-            name="Project Tools & Consumables",
-            is_active=True,
-            created_by=self.user,
+            organization=self.org,
+            defaults={
+                "name": "Project Tools & Consumables",
+                "is_active": True,
+                "created_by": self.user,
+            },
         )
         self.generic_budget_line = BudgetLine.objects.create(
             budget=self.budget,
@@ -110,11 +116,14 @@ class InvoiceTests(TestCase):
             status=Project.Status.ACTIVE,
             created_by=self.other_user,
         )
-        self.other_cost_code = CostCode.objects.create(
+        self.other_cost_code, _ = CostCode.objects.get_or_create(
             code="40-401",
-            name="Other Invoice Cost Code",
-            is_active=True,
-            created_by=self.other_user,
+            organization=self.other_org,
+            defaults={
+                "name": "Other Invoice Cost Code",
+                "is_active": True,
+                "created_by": self.other_user,
+            },
         )
         self.other_estimate = Estimate.objects.create(
             project=self.other_project,

@@ -168,11 +168,8 @@ def _build_public_decision_note(
 def _vendor_scope_filter(user) -> Q:
     """Build a Q filter for vendors visible to the given user's organization."""
     membership = _ensure_membership(user)
-    actor_user_ids = _organization_user_ids(user)
-    return (
-        Q(organization__isnull=True, is_canonical=True)
-        | Q(organization_id=membership.organization_id)
-        | Q(organization__isnull=True, created_by_id__in=actor_user_ids)
+    return Q(organization__isnull=True, is_canonical=True) | Q(
+        organization_id=membership.organization_id
     )
 
 
@@ -187,10 +184,9 @@ def _resolve_cost_codes_for_user(user, line_items_data, *, cost_code_key="cost_c
         return {}, []
 
     membership = _ensure_membership(user)
-    actor_user_ids = _organization_user_ids(user)
-    codes = CostCode.objects.filter(id__in=ids).filter(
-        Q(organization_id=membership.organization_id)
-        | Q(organization__isnull=True, created_by_id__in=actor_user_ids)
+    codes = CostCode.objects.filter(
+        id__in=ids,
+        organization_id=membership.organization_id,
     )
     code_map = {code.id: code for code in codes}
     missing = [cost_code_id for cost_code_id in ids if cost_code_id not in code_map]

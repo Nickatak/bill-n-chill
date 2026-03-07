@@ -558,6 +558,7 @@ class ProjectFinancialSummaryTests(TestCase):
             name="Summary Vendor",
             email="billing@summary-vendor.example.com",
             created_by=self.user,
+            organization=self.org,
         )
 
     def _seed_financial_records(self):
@@ -832,6 +833,7 @@ class ReportingPackTests(TestCase):
             name="Reporting Vendor",
             email="billing@reporting-vendor.example.com",
             created_by=self.user,
+            organization=self.org,
         )
 
     def _seed_reporting_records(self):
@@ -1328,15 +1330,20 @@ class RoleHardeningTests(TestCase):
             status=Project.Status.ACTIVE,
             created_by=self.viewer_user,
         )
-        self.viewer_cost_code = CostCode.objects.create(
+        self.viewer_cost_code, _ = CostCode.objects.get_or_create(
             code="01-010",
-            name="General Conditions",
-            created_by=self.viewer_user,
+            organization=self.org,
+            defaults={
+                "name": "General Conditions",
+                "is_active": True,
+                "created_by": self.viewer_user,
+            },
         )
         self.viewer_vendor = Vendor.objects.create(
             name="Viewer Vendor",
             email="viewer-vendor@example.com",
             created_by=self.viewer_user,
+            organization=self.org,
         )
 
         self.bookkeeping_customer = Customer.objects.create(

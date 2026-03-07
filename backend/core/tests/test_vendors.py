@@ -15,6 +15,8 @@ class VendorTests(TestCase):
         )
         self.token, _ = Token.objects.get_or_create(user=self.user)
         self.other_token, _ = Token.objects.get_or_create(user=self.other_user)
+        self.org = _bootstrap_org(self.user)
+        self.other_org = _bootstrap_org(self.other_user)
 
     def test_vendor_create_and_search(self):
         create = self.client.post(
@@ -55,11 +57,13 @@ class VendorTests(TestCase):
             name="Owner Vendor",
             email="owner@vendor.example.com",
             created_by=self.user,
+            organization=self.org,
         )
         Vendor.objects.create(
             name="Other Vendor",
             email="other@vendor.example.com",
             created_by=self.other_user,
+            organization=self.other_org,
         )
 
         response = self.client.get(
@@ -150,6 +154,7 @@ class VendorTests(TestCase):
             name="Tile House",
             email="billing@tilehouse.example.com",
             created_by=self.user,
+            organization=self.org,
         )
 
         duplicate_by_name = self.client.post(
@@ -182,6 +187,7 @@ class VendorTests(TestCase):
             name="Concrete Co",
             email="ap@concrete.example.com",
             created_by=self.user,
+            organization=self.org,
         )
 
         response = self.client.post(
@@ -206,11 +212,13 @@ class VendorTests(TestCase):
             name="Framing Team",
             email="frame@example.com",
             created_by=self.user,
+            organization=self.org,
         )
         second = Vendor.objects.create(
             name="Drywall Team",
             email="drywall@example.com",
             created_by=self.user,
+            organization=self.org,
         )
 
         blocked = self.client.patch(
@@ -246,6 +254,7 @@ class VendorTests(TestCase):
             tax_id_last4="1234",
             notes="Old note",
             created_by=self.user,
+            organization=self.org,
         )
 
         response = self.client.patch(
@@ -329,6 +338,7 @@ class VendorTests(TestCase):
             name="Switchable Vendor",
             vendor_type=Vendor.VendorType.TRADE,
             created_by=self.user,
+            organization=self.org,
         )
         response = self.client.patch(
             f"/api/v1/vendors/{vendor.id}/",
@@ -346,6 +356,7 @@ class VendorTests(TestCase):
             vendor_type=Vendor.VendorType.TRADE,
             email="old@stone.example.com",
             created_by=self.user,
+            organization=self.org,
         )
 
         preview = self.client.post(

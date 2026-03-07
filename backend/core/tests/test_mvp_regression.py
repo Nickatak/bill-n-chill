@@ -30,11 +30,14 @@ class MvpRegressionMoneyLoopTests(TestCase):
             contract_value_current="1000.00",
             created_by=self.user,
         )
-        self.cost_code = CostCode.objects.create(
+        self.cost_code, _ = CostCode.objects.get_or_create(
             code="10-100",
-            name="Demo",
-            is_active=True,
-            created_by=self.user,
+            organization=self.org,
+            defaults={
+                "name": "Demo",
+                "is_active": True,
+                "created_by": self.user,
+            },
         )
 
     def test_end_to_end_mvp_money_loop_regression(self):
@@ -186,6 +189,7 @@ class MvpRegressionMoneyLoopTests(TestCase):
             name="Tile Vendor",
             email="vendor@example.com",
             created_by=self.user,
+            organization=self.org,
         )
         vendor_bill_create = self.client.post(
             f"/api/v1/projects/{self.project.id}/vendor-bills/",

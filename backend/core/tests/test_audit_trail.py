@@ -37,11 +37,14 @@ class FinancialAuditTrailTests(TestCase):
             contract_value_current="1000.00",
             created_by=self.user,
         )
-        self.cost_code = CostCode.objects.create(
+        self.cost_code, _ = CostCode.objects.get_or_create(
             code="99-999",
-            name="General",
-            is_active=True,
-            created_by=self.user,
+            organization=self.org,
+            defaults={
+                "name": "General",
+                "is_active": True,
+                "created_by": self.user,
+            },
         )
 
     def test_money_workflow_creates_project_audit_events_and_events_are_immutable(self):
@@ -147,7 +150,7 @@ class FinancialAuditTrailTests(TestCase):
         )
         self.assertEqual(invoice_send.status_code, 200)
 
-        vendor = Vendor.objects.create(name="Audit Vendor", created_by=self.user)
+        vendor = Vendor.objects.create(name="Audit Vendor", created_by=self.user, organization=self.org)
         vendor_bill_create = self.client.post(
             f"/api/v1/projects/{self.project.id}/vendor-bills/",
             data={
