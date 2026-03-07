@@ -2,6 +2,7 @@
 
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
@@ -16,6 +17,7 @@ from core.serializers import (
     InvoiceStatusEventSerializer,
     InvoiceWriteSerializer,
 )
+from core.utils.email import send_document_sent_email
 from core.utils.money import quantize_money
 from core.views.accounts_receivable.invoice_ingress import (
     build_invoice_create_ingress,
@@ -933,6 +935,16 @@ def invoice_send_view(request, invoice_id: int):
             note="Invoice sent.",
             created_by=request.user,
             metadata={"invoice_number": invoice.invoice_number},
+        )
+
+    customer_email = (invoice.customer.email or "").strip()
+    if customer_email:
+        send_document_sent_email(
+            document_type="Invoice",
+            document_title=f"Invoice {invoice.invoice_number}",
+            public_url=f"{settings.FRONTEND_URL}/invoice/{invoice.public_ref}",
+            recipient_email=customer_email,
+            sender_user=request.user,
         )
 
     return Response({"data": InvoiceSerializer(invoice).data})

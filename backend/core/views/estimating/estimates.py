@@ -3,6 +3,7 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
@@ -40,6 +41,7 @@ from core.views.helpers import (
     _serialize_public_project_context,
     _validate_project_for_user,
 )
+from core.utils.email import send_document_sent_email
 from core.views.public_signing_helpers import get_ceremony_context, validate_ceremony_on_decision
 
 
@@ -673,6 +675,16 @@ def estimate_detail_view(request, estimate_id: int):
             note=status_note,
             changed_by=request.user,
         )
+        if estimate.status == Estimate.Status.SENT:
+            customer_email = (estimate.project.customer.email or "").strip()
+            if customer_email:
+                send_document_sent_email(
+                    document_type="Estimate",
+                    document_title=f"{estimate.title} (v{estimate.version})",
+                    public_url=f"{settings.FRONTEND_URL}/estimate/{estimate.public_ref}",
+                    recipient_email=customer_email,
+                    sender_user=request.user,
+                )
         if estimate.status == Estimate.Status.APPROVED:
             _activate_project_from_estimate_approval(
                 estimate=estimate,

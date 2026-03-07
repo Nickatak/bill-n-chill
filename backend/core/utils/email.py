@@ -1,9 +1,13 @@
 """Transactional email helpers with audit logging."""
 
+import logging
+
 from django.conf import settings
 from django.core.mail import send_mail
 
 from core.models import EmailRecord
+
+logger = logging.getLogger(__name__)
 
 
 def send_verification_email(user, token_obj):
@@ -74,4 +78,59 @@ def send_otp_email(recipient_email, code, document_type_label, document_title):
         subject=subject,
         body_text=body,
         metadata={"document_type_label": document_type_label, "document_title": document_title},
+    )
+
+
+def send_document_sent_email(*, document_type, document_title, public_url, recipient_email, sender_user):
+    """Send notification email when a document is sent to a customer.
+
+    Called after an estimate, invoice, or change order transitions to sent/pending.
+    Skips silently if the customer has no email on file. Email delivery failures
+    are logged but never block the status transition.
+    """
+    if not (recipient_email or "").strip():
+        return
+
+    from core.models import OrganizationMembership
+
+    membership = (
+        OrganizationMembership.objects
+        .select_related("organization")
+        .filter(user=sender_user, status=OrganizationMembership.Status.ACTIVE)
+        .first()
+    )
+    org_name = membership.organization.display_name if membership else "Your contractor"
+
+    subject = f"{document_type} from {org_name} — Bill n' Chill"
+    body = (
+        f"{org_name} has sent you a new {document_type.lower()}.\n\n"
+        f"{document_title}\n\n"
+        f"View and respond here:\n"
+        f"{public_url}\n\n"
+        f"If you have questions, please contact {org_name} directly."
+    )
+
+    try:
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[recipient_email.strip()],
+            fail_silently=False,
+        )
+    except Exception as exc:
+        logger.exception("Failed to send %s email to %s", document_type, recipient_email)
+        return
+
+    EmailRecord.record(
+        recipient_email=recipient_email.strip(),
+        email_type=EmailRecord.EmailType.DOCUMENT_SENT,
+        subject=subject,
+        body_text=body,
+        sent_by_user=sender_user,
+        metadata={
+            "document_type": document_type,
+            "document_title": document_title,
+            "public_url": public_url,
+        },
     )

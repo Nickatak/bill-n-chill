@@ -2,6 +2,7 @@
 
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F, Max, Sum
@@ -20,6 +21,7 @@ from core.models import (
 )
 from core.policies import get_change_order_policy_contract
 from core.serializers import ChangeOrderSerializer, ChangeOrderWriteSerializer
+from core.utils.email import send_document_sent_email
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.change_orders.change_orders_helpers import (
     _active_budget_for_project,
@@ -734,6 +736,20 @@ def change_order_detail_view(request, change_order_id: int):
             exc=exc,
             message="Change-order line items are invalid for this project/budget context.",
         )
+
+    if next_status == ChangeOrder.Status.PENDING_APPROVAL and (
+        previous_status != ChangeOrder.Status.PENDING_APPROVAL or is_pending_resend
+    ):
+        customer_email = (change_order.project.customer.email or "").strip()
+        if customer_email:
+            send_document_sent_email(
+                document_type="Change Order",
+                document_title=f"CO-{change_order.family_key} v{change_order.revision_number}: {change_order.title}",
+                public_url=f"{settings.FRONTEND_URL}/change-order/{change_order.public_ref}",
+                recipient_email=customer_email,
+                sender_user=request.user,
+            )
+
     refreshed = (
         ChangeOrder.objects.filter(id=change_order.id)
         .prefetch_related("line_items", "line_items__budget_line", "line_items__budget_line__cost_code")
