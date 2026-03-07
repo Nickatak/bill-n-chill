@@ -17,8 +17,11 @@ class ProjectProfileTests(TestCase):
             password="secret123",
         )
         self.token, _ = Token.objects.get_or_create(user=self.user)
+        self.org = _bootstrap_org(self.user)
+        self.other_org = _bootstrap_org(self.other_user)
 
         self.customer = Customer.objects.create(
+            organization=self.org,
             display_name="Owner A",
             email="ownera@example.com",
             phone="555-1111",
@@ -26,6 +29,7 @@ class ProjectProfileTests(TestCase):
             created_by=self.user,
         )
         self.project = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Basement Remodel",
             status=Project.Status.PROSPECT,
@@ -33,6 +37,7 @@ class ProjectProfileTests(TestCase):
         )
 
         other_customer = Customer.objects.create(
+            organization=self.other_org,
             display_name="Owner B",
             email="ownerb@example.com",
             phone="555-2222",
@@ -40,6 +45,7 @@ class ProjectProfileTests(TestCase):
             created_by=self.other_user,
         )
         Project.objects.create(
+            organization=self.other_org,
             customer=other_customer,
             name="Other Project",
             status=Project.Status.ACTIVE,
@@ -63,26 +69,14 @@ class ProjectProfileTests(TestCase):
         self.assertEqual(projects[0]["accepted_contract_total"], "0.00")
 
     def test_projects_list_includes_rows_created_by_other_user_in_same_org(self):
-        shared_org = Organization.objects.create(
-            display_name="Shared Project Org",
-            created_by=self.user,
-        )
-        OrganizationMembership.objects.update_or_create(
-            user=self.user,
-            defaults={
-                "organization": shared_org,
-                "role": OrganizationMembership.Role.OWNER,
-                "status": OrganizationMembership.Status.ACTIVE,
-            },
-        )
-        OrganizationMembership.objects.update_or_create(
-            user=self.other_user,
-            defaults={
-                "organization": shared_org,
-                "role": OrganizationMembership.Role.PM,
-                "status": OrganizationMembership.Status.ACTIVE,
-            },
-        )
+        """Projects in the same org are visible regardless of who created them."""
+        # Move the other user's project and customer into the same org
+        other_customer = self.project.customer  # just need the other project's customer
+        other_project = Project.objects.filter(name="Other Project").first()
+        other_project.organization = self.org
+        other_project.save(update_fields=["organization_id"])
+        other_project.customer.organization = self.org
+        other_project.customer.save(update_fields=["organization_id"])
 
         response = self.client.get(
             "/api/v1/projects/",
@@ -268,40 +262,26 @@ class CostCodeTests(TestCase):
             password="secret123",
         )
         self.token, _ = Token.objects.get_or_create(user=self.user)
-        self.user_org = Organization.objects.create(
-            display_name="Cost Code Test Org A",
-            created_by=self.user,
-        )
-        self.other_org = Organization.objects.create(
-            display_name="Cost Code Test Org B",
-            created_by=self.other_user,
-        )
-        OrganizationMembership.objects.create(
-            organization=self.user_org,
-            user=self.user,
-            role=OrganizationMembership.Role.OWNER,
-            status=OrganizationMembership.Status.ACTIVE,
-        )
-        OrganizationMembership.objects.create(
-            organization=self.other_org,
-            user=self.other_user,
-            role=OrganizationMembership.Role.OWNER,
-            status=OrganizationMembership.Status.ACTIVE,
-        )
+        self.user_org = _bootstrap_org(self.user)
+        self.other_org = _bootstrap_org(self.other_user)
 
-        self.code = CostCode.objects.create(
+        self.code, _ = CostCode.objects.get_or_create(
             code="01-100",
-            name="General Conditions",
-            is_active=True,
             organization=self.user_org,
-            created_by=self.user,
+            defaults={
+                "name": "General Conditions",
+                "is_active": True,
+                "created_by": self.user,
+            },
         )
-        CostCode.objects.create(
+        CostCode.objects.get_or_create(
             code="02-200",
-            name="Other User Code",
-            is_active=True,
             organization=self.other_org,
-            created_by=self.other_user,
+            defaults={
+                "name": "Other User Code",
+                "is_active": True,
+                "created_by": self.other_user,
+            },
         )
 
     def test_cost_codes_list_requires_auth(self):
@@ -315,8 +295,10 @@ class CostCodeTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         rows = response.json()["data"]
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["code"], "01-100")
+        codes = {row["code"] for row in rows}
+        self.assertIn("01-100", codes)
+        # Should not include codes from other org
+        self.assertNotIn("02-200", codes)
 
     def test_cost_codes_list_includes_rows_created_by_other_user_in_same_org(self):
         shared_org = Organization.objects.create(
@@ -394,7 +376,9 @@ class CostCodeTests(TestCase):
         created_code = CostCode.objects.get(id=response.json()["data"]["id"])
         self.assertEqual(created_code.organization_id, membership.organization_id)
         self.assertTrue(created_code.is_active)
-        self.assertEqual(CostCode.objects.filter(created_by=self.user).count(), 2)
+        self.assertEqual(
+            CostCode.objects.filter(organization_id=membership.organization_id, code="03-300").count(), 1
+        )
 
     def test_cost_code_create_rejects_inactive(self):
         response = self.client.post(
@@ -472,7 +456,8 @@ class CostCodeTests(TestCase):
         preview_data = preview.json()["data"]
         self.assertEqual(preview_data["mode"], "preview")
         self.assertEqual(preview_data["total_rows"], 2)
-        self.assertEqual(CostCode.objects.filter(created_by=self.user).count(), 1)
+        # Preview should not create any new codes
+        self.assertFalse(CostCode.objects.filter(organization=self.user_org, code="03-300").exists())
 
         apply_response = self.client.post(
             "/api/v1/cost-codes/import-csv/",
@@ -487,7 +472,7 @@ class CostCodeTests(TestCase):
         data = apply_response.json()["data"]
         self.assertEqual(data["updated_count"], 1)
         self.assertEqual(data["created_count"], 1)
-        self.assertEqual(CostCode.objects.filter(created_by=self.user).count(), 2)
+        self.assertTrue(CostCode.objects.filter(organization=self.user_org, code="03-300").exists())
         self.code.refresh_from_db()
         self.assertEqual(self.code.name, "General Conditions Updated")
         self.assertTrue(self.code.is_active)
@@ -547,9 +532,12 @@ class ProjectFinancialSummaryTests(TestCase):
             password="secret123",
         )
         self.token, _ = Token.objects.get_or_create(user=self.user)
+        self.org = _bootstrap_org(self.user)
+        self.other_org = _bootstrap_org(self.other_user)
         self.other_token, _ = Token.objects.get_or_create(user=self.other_user)
 
         self.customer = Customer.objects.create(
+            organization=self.org,
             display_name="Owner Summary",
             email="owner-summary@example.com",
             phone="555-8080",
@@ -557,6 +545,7 @@ class ProjectFinancialSummaryTests(TestCase):
             created_by=self.user,
         )
         self.project = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Summary Project",
             status=Project.Status.ACTIVE,
@@ -775,6 +764,7 @@ class ProjectFinancialSummaryTests(TestCase):
         self.assertEqual(no_auth.status_code, 401)
 
         other_customer = Customer.objects.create(
+            organization=self.other_org,
             display_name="Other Owner",
             email="other-owner@example.com",
             phone="555-9090",
@@ -782,6 +772,7 @@ class ProjectFinancialSummaryTests(TestCase):
             created_by=self.other_user,
         )
         other_project = Project.objects.create(
+            organization=self.other_org,
             customer=other_customer,
             name="Other Summary Project",
             status=Project.Status.ACTIVE,
@@ -808,8 +799,11 @@ class ReportingPackTests(TestCase):
             password="secret123",
         )
         self.token, _ = Token.objects.get_or_create(user=self.user)
+        self.org = _bootstrap_org(self.user)
+        self.other_org = _bootstrap_org(self.other_user)
 
         self.customer = Customer.objects.create(
+            organization=self.org,
             display_name="Owner Reporting",
             email="owner-reporting@example.com",
             phone="555-8181",
@@ -817,6 +811,7 @@ class ReportingPackTests(TestCase):
             created_by=self.user,
         )
         self.project = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Reporting Active Project",
             status=Project.Status.ACTIVE,
@@ -825,6 +820,7 @@ class ReportingPackTests(TestCase):
             created_by=self.user,
         )
         self.project_prospect = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Reporting Prospect Project",
             status=Project.Status.PROSPECT,
@@ -964,6 +960,7 @@ class ReportingPackTests(TestCase):
         self.assertEqual(invalid_format.json()["error"]["code"], "validation_error")
 
         other_customer = Customer.objects.create(
+            organization=self.other_org,
             display_name="Other Reporting Owner",
             email="other-reporting-owner@example.com",
             phone="555-9191",
@@ -971,6 +968,7 @@ class ReportingPackTests(TestCase):
             created_by=self.other_user,
         )
         other_project = Project.objects.create(
+            organization=self.other_org,
             customer=other_customer,
             name="Other User Project",
             status=Project.Status.ACTIVE,
@@ -1144,6 +1142,7 @@ class ReportingPackTests(TestCase):
         self.assertEqual(short_data["items"], [])
 
         other_customer = Customer.objects.create(
+            organization=self.other_org,
             display_name="Other Search Owner",
             email="other-search-owner@example.com",
             phone="555-9292",
@@ -1151,6 +1150,7 @@ class ReportingPackTests(TestCase):
             created_by=self.other_user,
         )
         other_project = Project.objects.create(
+            organization=self.other_org,
             customer=other_customer,
             name="Other Kitchen Project",
             status=Project.Status.ACTIVE,
@@ -1188,8 +1188,11 @@ class ProjectTimelineTests(TestCase):
             password="secret123",
         )
         self.token, _ = Token.objects.get_or_create(user=self.user)
+        self.org = _bootstrap_org(self.user)
+        self.other_org = _bootstrap_org(self.other_user)
 
         self.customer = Customer.objects.create(
+            organization=self.org,
             display_name="Owner Timeline",
             email="owner-timeline@example.com",
             phone="555-8383",
@@ -1197,6 +1200,7 @@ class ProjectTimelineTests(TestCase):
             created_by=self.user,
         )
         self.project = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Timeline Project",
             status=Project.Status.ACTIVE,
@@ -1254,6 +1258,7 @@ class ProjectTimelineTests(TestCase):
         self.assertEqual(invalid.json()["error"]["code"], "validation_error")
 
         other_customer = Customer.objects.create(
+            organization=self.other_org,
             display_name="Other Timeline Owner",
             email="other-timeline-owner@example.com",
             phone="555-9393",
@@ -1261,6 +1266,7 @@ class ProjectTimelineTests(TestCase):
             created_by=self.other_user,
         )
         other_project = Project.objects.create(
+            organization=self.other_org,
             customer=other_customer,
             name="Other Timeline Project",
             status=Project.Status.ACTIVE,
@@ -1294,26 +1300,21 @@ class RoleHardeningTests(TestCase):
         self.viewer_token, _ = Token.objects.get_or_create(user=self.viewer_user)
         self.bookkeeping_token, _ = Token.objects.get_or_create(user=self.bookkeeping_user)
 
-        org = Organization.objects.create(
-            display_name="Role Hardening Org", created_by=self.owner_user,
-        )
+        self.org = _bootstrap_org(self.owner_user)
+        # viewer and bookkeeping get memberships in the same org
         OrganizationMembership.objects.create(
-            organization=org, user=self.owner_user,
-            role=OrganizationMembership.Role.OWNER,
-            status=OrganizationMembership.Status.ACTIVE,
-        )
-        OrganizationMembership.objects.create(
-            organization=org, user=self.viewer_user,
+            organization=self.org, user=self.viewer_user,
             role=OrganizationMembership.Role.VIEWER,
             status=OrganizationMembership.Status.ACTIVE,
         )
         OrganizationMembership.objects.create(
-            organization=org, user=self.bookkeeping_user,
+            organization=self.org, user=self.bookkeeping_user,
             role=OrganizationMembership.Role.BOOKKEEPING,
             status=OrganizationMembership.Status.ACTIVE,
         )
 
         self.viewer_customer = Customer.objects.create(
+            organization=self.org,
             display_name="Viewer Owner",
             email="viewer-owner@example.com",
             phone="555-1111",
@@ -1321,6 +1322,7 @@ class RoleHardeningTests(TestCase):
             created_by=self.viewer_user,
         )
         self.viewer_project = Project.objects.create(
+            organization=self.org,
             customer=self.viewer_customer,
             name="Viewer Project",
             status=Project.Status.ACTIVE,
@@ -1338,6 +1340,7 @@ class RoleHardeningTests(TestCase):
         )
 
         self.bookkeeping_customer = Customer.objects.create(
+            organization=self.org,
             display_name="Bookkeeping Owner",
             email="bookkeeping-owner@example.com",
             phone="555-2222",
@@ -1345,6 +1348,7 @@ class RoleHardeningTests(TestCase):
             created_by=self.bookkeeping_user,
         )
         self.bookkeeping_project = Project.objects.create(
+            organization=self.org,
             customer=self.bookkeeping_customer,
             name="Bookkeeping Project",
             status=Project.Status.ACTIVE,

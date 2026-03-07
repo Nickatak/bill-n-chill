@@ -18,7 +18,7 @@ from core.serializers import (
     CustomerSerializer,
     ProjectSerializer,
 )
-from core.views.helpers import _capability_gate, _organization_user_ids
+from core.views.helpers import _capability_gate, _ensure_membership
 from core.views.shared_operations.customers_helpers import (
     _build_customer_duplicate_candidate,
     _build_intake_payload,
@@ -36,9 +36,9 @@ ALLOWED_PROJECT_CREATE_STATUSES = {
 @permission_classes([IsAuthenticated])
 def customers_list_view(request):
     """List organization-scoped customers with optional free-text filtering."""
-    actor_user_ids = _organization_user_ids(request.user)
+    membership = _ensure_membership(request.user)
     rows = (
-        Customer.objects.filter(created_by_id__in=actor_user_ids)
+        Customer.objects.filter(organization_id=membership.organization_id)
         .annotate(
             project_count=Count(
                 "projects",
@@ -102,9 +102,9 @@ def customer_detail_view(request, customer_id: int):
         are transitioned to `cancelled` in the same transaction.
     - `DELETE`: intentionally unsupported (`405`); archive via `PATCH is_archived`.
     """
-    actor_user_ids = _organization_user_ids(request.user)
+    membership = _ensure_membership(request.user)
     customer = (
-        Customer.objects.filter(id=customer_id, created_by_id__in=actor_user_ids)
+        Customer.objects.filter(id=customer_id, organization_id=membership.organization_id)
         .annotate(
             project_count=Count(
                 "projects",
@@ -187,7 +187,7 @@ def customer_detail_view(request, customer_id: int):
     # Re-fetch with fresh annotations — project_count / active_project_count
     # are DB-computed and may have changed after the prospect cancellation.
     annotated_customer = (
-        Customer.objects.filter(id=customer.id, created_by_id__in=actor_user_ids)
+        Customer.objects.filter(id=customer.id, organization_id=membership.organization_id)
         .annotate(
             project_count=Count(
                 "projects",
@@ -221,8 +221,8 @@ def customer_project_create_view(request, customer_id: int):
       - `status`: `prospect`
       - `initial_contract_value`: `0`
     """
-    actor_user_ids = _organization_user_ids(request.user)
-    customer = Customer.objects.filter(id=customer_id, created_by_id__in=actor_user_ids).first()
+    membership = _ensure_membership(request.user)
+    customer = Customer.objects.filter(id=customer_id, organization_id=membership.organization_id).first()
     if customer is None:
         return Response(
             {
@@ -264,6 +264,7 @@ def customer_project_create_view(request, customer_id: int):
     try:
         with transaction.atomic():
             project = Project.objects.create(
+                organization_id=membership.organization_id,
                 customer=customer,
                 name=project_name,
                 site_address=site_address,
@@ -333,6 +334,7 @@ def quick_add_customer_intake_view(request):
     if permission_error:
         return Response(permission_error, status=403)
 
+    membership = _ensure_membership(request.user)
     initial_contract_value = request.data.get("initial_contract_value", None)
     if initial_contract_value == "":
         initial_contract_value = None
@@ -482,6 +484,7 @@ def quick_add_customer_intake_view(request):
                 customer = selected_customer
             else:
                 customer = Customer.objects.create(
+                    organization_id=membership.organization_id,
                     display_name=payload["full_name"],
                     phone=payload["phone"],
                     email=payload["email"],
@@ -515,6 +518,7 @@ def quick_add_customer_intake_view(request):
                 resolved_project_name = project_name or f"{payload['full_name']} Project"
                 requested_project_status = project_status
                 project = Project.objects.create(
+                    organization_id=membership.organization_id,
                     customer=customer,
                     name=resolved_project_name,
                     site_address=payload["project_address"],

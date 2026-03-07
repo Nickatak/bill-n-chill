@@ -11,6 +11,7 @@ class CustomerIntakeQuickAddTests(TestCase):
             password="secret123",
         )
         self.token, _ = Token.objects.get_or_create(user=self.user)
+        self.org = _bootstrap_org(self.user)
 
     def test_quick_add_requires_authentication(self):
         response = self.client.post(
@@ -120,6 +121,7 @@ class CustomerIntakeQuickAddTests(TestCase):
 
     def test_quick_add_returns_duplicate_candidates_without_resolution(self):
         existing = Customer.objects.create(
+            organization=self.org,
             display_name="Existing Customer",
             phone="555-0100",
             billing_address="12 Existing St",
@@ -148,6 +150,7 @@ class CustomerIntakeQuickAddTests(TestCase):
 
     def test_quick_add_use_existing_reuses_customer(self):
         existing = Customer.objects.create(
+            organization=self.org,
             display_name="Existing Customer",
             phone="555-0100",
             billing_address="12 Existing St",
@@ -175,6 +178,7 @@ class CustomerIntakeQuickAddTests(TestCase):
 
     def test_quick_add_merge_existing_is_rejected(self):
         existing = Customer.objects.create(
+            organization=self.org,
             display_name="Existing Customer",
             phone="555-0100",
             billing_address="12 Existing St",

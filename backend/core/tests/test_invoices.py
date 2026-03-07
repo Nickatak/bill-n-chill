@@ -35,9 +35,12 @@ class InvoiceTests(TestCase):
             password="secret123",
         )
         self.token, _ = Token.objects.get_or_create(user=self.user)
+        self.org = _bootstrap_org(self.user)
+        self.other_org = _bootstrap_org(self.other_user)
         self.other_token, _ = Token.objects.get_or_create(user=self.other_user)
 
         self.customer = Customer.objects.create(
+            organization=self.org,
             display_name="Owner I",
             email="owneri@example.com",
             phone="555-9999",
@@ -45,6 +48,7 @@ class InvoiceTests(TestCase):
             created_by=self.user,
         )
         self.project = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Invoice Project",
             status=Project.Status.ACTIVE,
@@ -92,6 +96,7 @@ class InvoiceTests(TestCase):
         )
 
         other_customer = Customer.objects.create(
+            organization=self.other_org,
             display_name="Owner J",
             email="ownerj@example.com",
             phone="555-1010",
@@ -99,6 +104,7 @@ class InvoiceTests(TestCase):
             created_by=self.other_user,
         )
         self.other_project = Project.objects.create(
+            organization=self.other_org,
             customer=other_customer,
             name="Other Invoice Project",
             status=Project.Status.ACTIVE,
@@ -324,6 +330,9 @@ class InvoiceTests(TestCase):
                 "status": OrganizationMembership.Status.ACTIVE,
             },
         )
+        # Move project to the new org so it's visible to the user
+        self.project.organization = organization
+        self.project.save(update_fields=["organization_id"])
 
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/invoices/",
@@ -373,6 +382,9 @@ class InvoiceTests(TestCase):
                 "status": OrganizationMembership.Status.ACTIVE,
             },
         )
+        # Move project to the new org so it's visible to the user
+        self.project.organization = organization
+        self.project.save(update_fields=["organization_id"])
 
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/invoices/",
@@ -1055,6 +1067,7 @@ class InvoiceTests(TestCase):
     def _create_unbudgeted_project(self):
         """Helper: create a project with no estimate/budget."""
         customer = Customer.objects.create(
+            organization=self.org,
             display_name="Direct Client",
             email="direct@example.com",
             phone="555-0000",
@@ -1062,6 +1075,7 @@ class InvoiceTests(TestCase):
             created_by=self.user,
         )
         return Project.objects.create(
+            organization=self.org,
             customer=customer,
             name="Unbudgeted Project",
             status=Project.Status.ACTIVE,
@@ -1211,6 +1225,7 @@ class InvoiceTests(TestCase):
     def test_create_invoice_on_prospect_project_activates_it(self):
         """Creating an invoice on a prospect project promotes it to active."""
         customer = Customer.objects.create(
+            organization=self.org,
             display_name="Prospect Client",
             email="prospect@example.com",
             phone="555-0001",
@@ -1218,6 +1233,7 @@ class InvoiceTests(TestCase):
             created_by=self.user,
         )
         project = Project.objects.create(
+            organization=self.org,
             customer=customer,
             name="Prospect Project",
             status=Project.Status.PROSPECT,

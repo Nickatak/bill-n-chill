@@ -16,8 +16,11 @@ class CustomersManagementTests(TestCase):
             password="secret123",
         )
         self.token, _ = Token.objects.get_or_create(user=self.user)
+        self.org = _bootstrap_org(self.user)
+        self.other_org = _bootstrap_org(self.other)
 
         self.customer = Customer.objects.create(
+            organization=self.org,
             display_name="Alice Customer",
             phone="555-7777",
             billing_address="44 Test Ave",
@@ -25,6 +28,7 @@ class CustomersManagementTests(TestCase):
             created_by=self.user,
         )
         self.other_customer = Customer.objects.create(
+            organization=self.other_org,
             display_name="Other Customer",
             phone="555-2222",
             billing_address="Other St",
@@ -48,27 +52,10 @@ class CustomersManagementTests(TestCase):
         self.assertEqual(rows[0]["display_name"], "Alice Customer")
 
     def test_customers_list_includes_customers_from_same_organization(self):
-        shared_org = Organization.objects.create(
-            display_name="Shared Contact Org",
-
-            created_by=self.user,
-        )
-        OrganizationMembership.objects.update_or_create(
-            user=self.user,
-            defaults={
-                "organization": shared_org,
-                "role": OrganizationMembership.Role.OWNER,
-                "status": OrganizationMembership.Status.ACTIVE,
-            },
-        )
-        OrganizationMembership.objects.update_or_create(
-            user=self.other,
-            defaults={
-                "organization": shared_org,
-                "role": OrganizationMembership.Role.PM,
-                "status": OrganizationMembership.Status.ACTIVE,
-            },
-        )
+        """Both customers in the same org are visible to any org member."""
+        # Move other_customer into the same org
+        self.other_customer.organization = self.org
+        self.other_customer.save(update_fields=["organization_id"])
 
         response = self.client.get(
             "/api/v1/customers/",
@@ -81,27 +68,10 @@ class CustomersManagementTests(TestCase):
         self.assertIn(self.other_customer.id, returned_ids)
 
     def test_customer_detail_allows_access_to_same_organization_customer(self):
-        shared_org = Organization.objects.create(
-            display_name="Shared Contact Detail Org",
-
-            created_by=self.user,
-        )
-        OrganizationMembership.objects.update_or_create(
-            user=self.user,
-            defaults={
-                "organization": shared_org,
-                "role": OrganizationMembership.Role.OWNER,
-                "status": OrganizationMembership.Status.ACTIVE,
-            },
-        )
-        OrganizationMembership.objects.update_or_create(
-            user=self.other,
-            defaults={
-                "organization": shared_org,
-                "role": OrganizationMembership.Role.PM,
-                "status": OrganizationMembership.Status.ACTIVE,
-            },
-        )
+        """A customer in the same org is accessible to any org member."""
+        # Move other_customer into the same org
+        self.other_customer.organization = self.org
+        self.other_customer.save(update_fields=["organization_id"])
 
         response = self.client.get(
             f"/api/v1/customers/{self.other_customer.id}/",
@@ -122,6 +92,7 @@ class CustomersManagementTests(TestCase):
 
     def test_customers_list_project_count_excludes_prospect_projects(self):
         Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Prospect Shell",
             status=Project.Status.PROSPECT,
@@ -191,6 +162,7 @@ class CustomersManagementTests(TestCase):
 
     def test_customer_patch_archiving_cancels_prospect_projects(self):
         prospect = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Prospect Project",
             site_address="88 Prospect Way",
@@ -200,6 +172,7 @@ class CustomersManagementTests(TestCase):
             created_by=self.user,
         )
         completed = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Completed Project",
             site_address="77 Finished Ave",
@@ -230,6 +203,7 @@ class CustomersManagementTests(TestCase):
 
     def test_customer_patch_rejects_archive_when_customer_has_active_project(self):
         active = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Guarded Project",
             site_address="11 Guard Ln",
@@ -239,6 +213,7 @@ class CustomersManagementTests(TestCase):
             created_by=self.user,
         )
         prospect = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Prospect Should Stay Prospect",
             site_address="22 Prospect Ln",
@@ -267,6 +242,7 @@ class CustomersManagementTests(TestCase):
 
     def test_customer_patch_allows_archive_when_customer_projects_are_closed(self):
         Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Completed Project",
             site_address="44 Closed Ln",
@@ -319,27 +295,10 @@ class CustomersManagementTests(TestCase):
         self.assertEqual(str(created_project.contract_value_current), "25000.00")
 
     def test_customer_project_create_allows_same_org_customer(self):
-        shared_org = Organization.objects.create(
-            display_name="Shared Customer Project Org",
-
-            created_by=self.user,
-        )
-        OrganizationMembership.objects.update_or_create(
-            user=self.user,
-            defaults={
-                "organization": shared_org,
-                "role": OrganizationMembership.Role.OWNER,
-                "status": OrganizationMembership.Status.ACTIVE,
-            },
-        )
-        OrganizationMembership.objects.update_or_create(
-            user=self.other,
-            defaults={
-                "organization": shared_org,
-                "role": OrganizationMembership.Role.PM,
-                "status": OrganizationMembership.Status.ACTIVE,
-            },
-        )
+        """A user can create a project under another user's customer if both are in the same org."""
+        # Move other_customer into the same org
+        self.other_customer.organization = self.org
+        self.other_customer.save(update_fields=["organization_id"])
 
         response = self.client.post(
             f"/api/v1/customers/{self.other_customer.id}/projects/",
@@ -411,6 +370,7 @@ class CustomersManagementTests(TestCase):
 
     def test_customer_delete_not_allowed_even_with_projects(self):
         Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Project Preventing Delete",
             status=Project.Status.PROSPECT,
@@ -477,6 +437,7 @@ class CustomersManagementTests(TestCase):
         self.customer.is_archived = True
         self.customer.save(update_fields=["is_archived", "updated_at"])
         project = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Archived Customer Project",
             status=Project.Status.PROSPECT,

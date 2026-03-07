@@ -38,9 +38,12 @@ class ChangeOrderTests(TestCase):
             password="secret123",
         )
         self.token, _ = Token.objects.get_or_create(user=self.user)
+        self.org = _bootstrap_org(self.user)
+        self.other_org = _bootstrap_org(self.other_user)
         self.other_token, _ = Token.objects.get_or_create(user=self.other_user)
 
         self.customer = Customer.objects.create(
+            organization=self.org,
             display_name="Owner G",
             email="ownerg@example.com",
             phone="555-7777",
@@ -48,6 +51,7 @@ class ChangeOrderTests(TestCase):
             created_by=self.user,
         )
         self.project = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="CO Project",
             status=Project.Status.ACTIVE,
@@ -63,6 +67,7 @@ class ChangeOrderTests(TestCase):
         )
 
         other_customer = Customer.objects.create(
+            organization=self.other_org,
             display_name="Owner H",
             email="ownerh@example.com",
             phone="555-8888",
@@ -70,6 +75,7 @@ class ChangeOrderTests(TestCase):
             created_by=self.other_user,
         )
         self.other_project = Project.objects.create(
+            organization=self.other_org,
             customer=other_customer,
             name="Other CO Project",
             status=Project.Status.ACTIVE,

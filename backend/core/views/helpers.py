@@ -39,11 +39,11 @@ SYSTEM_BUDGET_LINE_CODES = {row["cost_code"] for row in SYSTEM_BUDGET_LINE_SPECS
 
 def _validate_project_for_user(project_id: int, user):
     """Look up a project by ID, scoped to the user's organization. Returns None if not found."""
-    actor_user_ids = _organization_user_ids(user)
+    membership = _ensure_membership(user)
     try:
         return Project.objects.select_related("customer").get(
             id=project_id,
-            created_by_id__in=actor_user_ids,
+            organization_id=membership.organization_id,
         )
     except Project.DoesNotExist:
         return None
@@ -52,13 +52,12 @@ def _validate_project_for_user(project_id: int, user):
 def _validate_estimate_for_user(estimate_id: int, user, *, prefetch_lines=False):
     """Look up an estimate by ID, authorized via its project's org scope. Returns None if not found.
 
-    Uses the same org-scoping mechanism as ``_validate_project_for_user`` — the
-    estimate is accessible if its project belongs to the requesting user's organization.
+    The estimate is accessible if its project belongs to the requesting user's organization.
     """
-    actor_user_ids = _organization_user_ids(user)
+    membership = _ensure_membership(user)
     qs = Estimate.objects.select_related("project", "project__customer").filter(
         id=estimate_id,
-        project__created_by_id__in=actor_user_ids,
+        project__organization_id=membership.organization_id,
     )
     if prefetch_lines:
         qs = qs.prefetch_related("line_items", "line_items__cost_code")

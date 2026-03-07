@@ -104,15 +104,10 @@ def _organization_user_ids(user) -> list[int]:
     caller's own ID is always included (even if their membership row is
     missing or stale — a defensive guard).
 
-    This is the primary scoping primitive for multi-tenant data isolation:
-    virtually every queryset in the views layer filters on
-    ``created_by_id__in=_organization_user_ids(user)`` to ensure users only
-    see records owned by their organization.
-
-    See ``Customer`` model docstring (``models/shared_operations/customers.py``)
-    for the full rationale on why org-scoped models use this indirect
-    ``created_by`` → membership resolution instead of a direct
-    ``organization_id`` FK.
+    Used for scoping models that lack a direct ``organization`` FK (e.g.
+    Invoice, VendorBill, Payment, CostCode).  Models with a direct
+    ``organization`` FK (Customer, Project) use
+    ``organization_id=membership.organization_id`` instead.
     """
     membership = _ensure_membership(user)
     user_ids = list(

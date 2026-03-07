@@ -289,7 +289,9 @@ class OtpViewFlowTests(TestCase):
             email="signing_pm@example.com",
             password="secret123",
         )
+        self.org = _bootstrap_org(self.user)
         self.customer = Customer.objects.create(
+            organization=self.org,
             display_name="Signing Owner",
             email="owner@example.com",
             phone="555-1111",
@@ -297,6 +299,7 @@ class OtpViewFlowTests(TestCase):
             created_by=self.user,
         )
         self.project = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="OTP Test Project",
             status=Project.Status.PROSPECT,
@@ -439,7 +442,9 @@ class CeremonyDecisionValidationTests(TestCase):
             email="ceremony_pm@example.com",
             password="secret123",
         )
+        self.org = _bootstrap_org(self.user)
         self.customer = Customer.objects.create(
+            organization=self.org,
             display_name="Ceremony Owner",
             email="ceremony_owner@example.com",
             phone="555-2222",
@@ -447,6 +452,7 @@ class CeremonyDecisionValidationTests(TestCase):
             created_by=self.user,
         )
         self.project = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Ceremony Project",
             status=Project.Status.PROSPECT,

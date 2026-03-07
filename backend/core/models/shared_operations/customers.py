@@ -16,18 +16,9 @@ class Customer(models.Model):
     - Serves as the customer anchor for projects and owner invoices.
 
     Tenant isolation:
-    - Customer has no direct ``organization_id`` FK.  Org scoping is resolved
-      indirectly: ``created_by`` → ``OrganizationMembership`` → organization.
-      Every org-scoped query filters on
-      ``created_by_id__in=_organization_user_ids(user)`` to collect records
-      owned by any member of the caller's organization.
-    - This means two organizations can each have a customer with the same
-      phone/email and they remain naturally isolated — no cross-org leakage
-      because the user-ID sets never overlap.
-    - Trade-off: every scoped query must resolve the membership list first
-      (one extra query).  A direct ``organization_id`` FK would be simpler but
-      would require a migration across all org-scoped models.  Acceptable for
-      current scale; revisit if the membership fan-out becomes a bottleneck.
+    - ``organization`` FK provides direct org scoping — queries filter on
+      ``organization_id=membership.organization_id`` for single-query tenant
+      isolation without resolving the membership user-ID fan-out.
 
     Current policy:
     - `billing_address` is billing-only and intentionally separate from
@@ -38,6 +29,11 @@ class Customer(models.Model):
     - Visibility: `internal-facing`.
     """
 
+    organization = models.ForeignKey(
+        "Organization",
+        on_delete=models.CASCADE,
+        related_name="customers",
+    )
     display_name = models.CharField(max_length=255)
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=50, blank=True)

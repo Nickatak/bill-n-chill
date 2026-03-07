@@ -18,9 +18,12 @@ class AccountingSyncEventTests(TestCase):
             password="secret123",
         )
         self.token, _ = Token.objects.get_or_create(user=self.user)
+        self.org = _bootstrap_org(self.user)
+        self.other_org = _bootstrap_org(self.other_user)
         self.other_token, _ = Token.objects.get_or_create(user=self.other_user)
 
         customer = Customer.objects.create(
+            organization=self.org,
             display_name="Owner Sync",
             email="owner-sync@example.com",
             phone="555-1112",
@@ -28,6 +31,7 @@ class AccountingSyncEventTests(TestCase):
             created_by=self.user,
         )
         self.project = Project.objects.create(
+            organization=self.org,
             customer=customer,
             name="Sync Project",
             status=Project.Status.ACTIVE,
@@ -35,6 +39,7 @@ class AccountingSyncEventTests(TestCase):
         )
 
         other_customer = Customer.objects.create(
+            organization=self.other_org,
             display_name="Owner Other Sync",
             email="owner-other-sync@example.com",
             phone="555-1113",
@@ -42,6 +47,7 @@ class AccountingSyncEventTests(TestCase):
             created_by=self.other_user,
         )
         self.other_project = Project.objects.create(
+            organization=self.other_org,
             customer=other_customer,
             name="Other Sync Project",
             status=Project.Status.ACTIVE,

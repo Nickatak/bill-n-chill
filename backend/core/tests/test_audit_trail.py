@@ -16,9 +16,12 @@ class FinancialAuditTrailTests(TestCase):
             password="secret123",
         )
         self.token, _ = Token.objects.get_or_create(user=self.user)
+        self.org = _bootstrap_org(self.user)
+        self.other_org = _bootstrap_org(self.other_user)
         self.other_token, _ = Token.objects.get_or_create(user=self.other_user)
 
         self.customer = Customer.objects.create(
+            organization=self.org,
             display_name="Audit Owner",
             email="audit-owner@example.com",
             phone="555-8888",
@@ -26,6 +29,7 @@ class FinancialAuditTrailTests(TestCase):
             created_by=self.user,
         )
         self.project = Project.objects.create(
+            organization=self.org,
             customer=self.customer,
             name="Audit Project",
             status=Project.Status.ACTIVE,
@@ -226,10 +230,12 @@ class FinancialAuditTrailTests(TestCase):
         self.assertEqual(no_auth.status_code, 401)
 
         other_customer = Customer.objects.create(
+            organization=self.other_org,
             display_name="Other Owner",
             created_by=self.other_user,
         )
         other_project = Project.objects.create(
+            organization=self.other_org,
             customer=other_customer,
             name="Other Project",
             status=Project.Status.ACTIVE,

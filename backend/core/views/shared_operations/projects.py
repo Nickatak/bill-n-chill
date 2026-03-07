@@ -21,7 +21,7 @@ from core.serializers import (
     ProjectProfileSerializer,
     ProjectSerializer,
 )
-from core.views.helpers import _capability_gate, _organization_user_ids
+from core.views.helpers import _capability_gate, _ensure_membership, _organization_user_ids
 from core.views.shared_operations.projects_helpers import (
     _build_project_financial_summary_data,
     _project_accepted_contract_totals_map,
@@ -32,9 +32,10 @@ from core.views.shared_operations.projects_helpers import (
 @permission_classes([IsAuthenticated])
 def projects_list_view(request):
     """List projects visible to the authenticated owner context."""
+    membership = _ensure_membership(request.user)
     actor_user_ids = _organization_user_ids(request.user)
     rows = list(
-        Project.objects.filter(created_by_id__in=actor_user_ids).select_related("customer")
+        Project.objects.filter(organization_id=membership.organization_id).select_related("customer")
     )
     accepted_totals_by_project = _project_accepted_contract_totals_map(
         project_ids=[row.id for row in rows],
@@ -52,11 +53,12 @@ def projects_list_view(request):
 @permission_classes([IsAuthenticated])
 def project_detail_view(request, project_id: int):
     """Fetch or patch a project profile with terminal-state and transition protections."""
+    membership = _ensure_membership(request.user)
     actor_user_ids = _organization_user_ids(request.user)
     try:
         project = Project.objects.select_related("customer").get(
             id=project_id,
-            created_by_id__in=actor_user_ids,
+            organization_id=membership.organization_id,
         )
     except Project.DoesNotExist:
         return Response(
@@ -188,20 +190,16 @@ def project_detail_view(request, project_id: int):
 @permission_classes([IsAuthenticated])
 def project_financial_summary_view(request, project_id: int):
     """Return normalized AR/AP/CO financial summary plus traceability for one project."""
-    actor_user_ids = _organization_user_ids(request.user)
+    membership = _ensure_membership(request.user)
     try:
-        project = Project.objects.get(id=project_id, created_by_id__in=actor_user_ids)
+        project = Project.objects.get(id=project_id, organization_id=membership.organization_id)
     except Project.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Project not found.", "fields": {}}},
             status=404,
         )
 
-    response_data = _build_project_financial_summary_data(
-        project,
-        request.user,
-        actor_user_ids=actor_user_ids,
-    )
+    response_data = _build_project_financial_summary_data(project, request.user)
 
     return Response({"data": ProjectFinancialSummarySerializer(response_data).data})
 
@@ -210,20 +208,16 @@ def project_financial_summary_view(request, project_id: int):
 @permission_classes([IsAuthenticated])
 def project_accounting_export_view(request, project_id: int):
     """Export project accounting summary as JSON or CSV (`export_format` query param)."""
-    actor_user_ids = _organization_user_ids(request.user)
+    membership = _ensure_membership(request.user)
     try:
-        project = Project.objects.get(id=project_id, created_by_id__in=actor_user_ids)
+        project = Project.objects.get(id=project_id, organization_id=membership.organization_id)
     except Project.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Project not found.", "fields": {}}},
             status=404,
         )
 
-    summary = _build_project_financial_summary_data(
-        project,
-        request.user,
-        actor_user_ids=actor_user_ids,
-    )
+    summary = _build_project_financial_summary_data(project, request.user)
     serialized_summary = ProjectFinancialSummarySerializer(summary).data
     export_format = (request.query_params.get("export_format") or "csv").lower()
     generated_at = datetime.now(timezone.utc).isoformat()
@@ -304,9 +298,10 @@ def project_accounting_export_view(request, project_id: int):
 @permission_classes([IsAuthenticated])
 def project_audit_events_view(request, project_id: int):
     """Return immutable financial audit events for the requested project."""
+    membership = _ensure_membership(request.user)
     actor_user_ids = _organization_user_ids(request.user)
     try:
-        project = Project.objects.get(id=project_id, created_by_id__in=actor_user_ids)
+        project = Project.objects.get(id=project_id, organization_id=membership.organization_id)
     except Project.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Project not found.", "fields": {}}},
