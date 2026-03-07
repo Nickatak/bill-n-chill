@@ -9,14 +9,13 @@ from rest_framework.response import Response
 
 from core.models import Budget, BudgetLine, ChangeOrder, ChangeOrderLine, Invoice, InvoiceLine, VendorBill, VendorBillAllocation
 from core.serializers import BudgetLineSerializer, BudgetLineUpdateSerializer, BudgetSerializer
-from core.views.helpers import _capability_gate, _organization_user_ids, _validate_project_for_user
+from core.views.helpers import _capability_gate, _ensure_membership, _validate_project_for_user
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def project_budgets_view(request, project_id: int):
     """List project budgets with computed spend and approved-CO deltas per line item."""
-    actor_user_ids = _organization_user_ids(request.user)
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -25,7 +24,7 @@ def project_budgets_view(request, project_id: int):
         )
 
     budgets = (
-        Budget.objects.filter(project=project, created_by_id__in=actor_user_ids)
+        Budget.objects.filter(project=project)
         .select_related("source_estimate")
         .prefetch_related("line_items", "line_items__cost_code")
         .order_by("-created_at")
@@ -42,7 +41,6 @@ def project_budgets_view(request, project_id: int):
             VendorBillAllocation.objects.filter(
                 budget_line_id__in=line_ids,
                 vendor_bill__project=project,
-                vendor_bill__created_by_id__in=actor_user_ids,
                 vendor_bill__status=VendorBill.Status.PAID,
             )
             .values("budget_line_id")
@@ -55,7 +53,6 @@ def project_budgets_view(request, project_id: int):
             ChangeOrderLine.objects.filter(
                 budget_line_id__in=line_ids,
                 change_order__project=project,
-                change_order__requested_by_id__in=actor_user_ids,
                 change_order__status=ChangeOrder.Status.APPROVED,
             )
             .values("budget_line_id")
@@ -69,7 +66,6 @@ def project_budgets_view(request, project_id: int):
             InvoiceLine.objects.filter(
                 budget_line_id__in=line_ids,
                 invoice__project=project,
-                invoice__created_by_id__in=actor_user_ids,
                 invoice__status__in=billable_statuses,
             )
             .values("budget_line_id")
@@ -105,10 +101,10 @@ def budget_line_detail_view(request, budget_id: int, line_id: int):
     if permission_error:
         return Response(permission_error, status=403)
 
-    actor_user_ids = _organization_user_ids(request.user)
+    membership = _ensure_membership(request.user)
 
     try:
-        budget = Budget.objects.get(id=budget_id, created_by_id__in=actor_user_ids)
+        budget = Budget.objects.get(id=budget_id, project__organization_id=membership.organization_id)
     except Budget.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Budget not found.", "fields": {}}},
@@ -153,7 +149,6 @@ def budget_line_detail_view(request, budget_id: int, line_id: int):
         VendorBillAllocation.objects.filter(
             budget_line_id=line.id,
             vendor_bill__project=budget.project,
-            vendor_bill__created_by_id__in=actor_user_ids,
             vendor_bill__status=VendorBill.Status.PAID,
         ).aggregate(total=Sum("amount"))["total"]
         or Decimal("0")
@@ -163,7 +158,6 @@ def budget_line_detail_view(request, budget_id: int, line_id: int):
         InvoiceLine.objects.filter(
             budget_line_id=line.id,
             invoice__project=budget.project,
-            invoice__created_by_id__in=actor_user_ids,
             invoice__status__in=billable_statuses,
         ).aggregate(total=Sum("line_total"))["total"]
         or Decimal("0")
@@ -177,7 +171,6 @@ def budget_line_detail_view(request, budget_id: int, line_id: int):
                     ChangeOrderLine.objects.filter(
                         budget_line_id=line.id,
                         change_order__project=budget.project,
-                        change_order__requested_by_id__in=actor_user_ids,
                         change_order__status=ChangeOrder.Status.APPROVED,
                     ).aggregate(total=Sum("amount_delta"))["total"]
                     or Decimal("0")
