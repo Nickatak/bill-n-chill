@@ -34,11 +34,11 @@ from core.views.helpers import (
     _build_public_decision_note,
     _capability_gate,
     _ensure_membership,
-    _organization_user_ids,
     _parse_request_bool,
     _resolve_organization_for_public_actor,
     _serialize_public_organization_context,
     _serialize_public_project_context,
+    _validate_estimate_for_user,
     _validate_project_for_user,
 )
 from core.utils.email import send_document_sent_email
@@ -179,8 +179,7 @@ def public_estimate_decision_view(request, public_token: str):
             access_session=ceremony_session,
         )
 
-    actor_user_ids = _organization_user_ids(estimate.created_by)
-    serialized = _serialize_estimate(estimate=estimate, actor_user_ids=actor_user_ids)
+    serialized = _serialize_estimate(estimate=estimate)
     organization = _resolve_organization_for_public_actor(estimate.created_by)
     serialized["project_context"] = _serialize_public_project_context(estimate.project)
     serialized["organization_context"] = _serialize_public_organization_context(organization)
@@ -231,7 +230,6 @@ def project_estimates_view(request, project_id: int):
     - `POST`: requires role `owner|pm`, at least one line item, and valid cost-code scope.
     - Applies duplicate-submit suppression window and archives superseded family rows after create.
     """
-    actor_user_ids = _organization_user_ids(request.user)
     membership = _ensure_membership(request.user)
     organization = membership.organization
     project = _validate_project_for_user(project_id, request.user)
@@ -243,7 +241,7 @@ def project_estimates_view(request, project_id: int):
 
     if request.method == "GET":
         estimates = (
-            Estimate.objects.filter(project=project, created_by_id__in=actor_user_ids)
+            Estimate.objects.filter(project=project)
             .prefetch_related("line_items", "line_items__cost_code")
             .order_by("-version")
         )
@@ -252,7 +250,6 @@ def project_estimates_view(request, project_id: int):
                 "data": _serialize_estimates(
                     estimates=estimates,
                     project=project,
-                    actor_user_ids=actor_user_ids,
                 )
             }
         )
@@ -332,7 +329,6 @@ def project_estimates_view(request, project_id: int):
     recent_estimates = (
         Estimate.objects.filter(
             project=project,
-            created_by_id__in=actor_user_ids,
             created_at__gte=window_start,
         )
         .prefetch_related("line_items")
@@ -354,7 +350,7 @@ def project_estimates_view(request, project_id: int):
         if _estimate_signature(candidate) == input_signature:
             return Response(
                 {
-                    "data": _serialize_estimate(estimate=candidate, actor_user_ids=actor_user_ids),
+                    "data": _serialize_estimate(estimate=candidate),
                     "meta": {"deduped": True},
                 },
                 status=200,
@@ -362,7 +358,6 @@ def project_estimates_view(request, project_id: int):
 
     same_title_family = Estimate.objects.filter(
         project=project,
-        created_by_id__in=actor_user_ids,
         title=data.get("title", ""),
     ).order_by("-version", "-id")
     approved_family_row = same_title_family.filter(status=Estimate.Status.APPROVED).first()
@@ -411,7 +406,6 @@ def project_estimates_view(request, project_id: int):
 
     next_version = _next_estimate_family_version(
         project=project,
-        user=request.user,
         title=data.get("title", ""),
     )
     terms_text = (organization.estimate_terms_and_conditions or "").strip()
@@ -462,7 +456,7 @@ def project_estimates_view(request, project_id: int):
         note=f"Archived because estimate #{estimate.id} superseded this version.",
     )
     return Response(
-        {"data": _serialize_estimate(estimate=estimate, actor_user_ids=actor_user_ids)},
+        {"data": _serialize_estimate(estimate=estimate)},
         status=201,
     )
 
@@ -478,17 +472,15 @@ def estimate_detail_view(request, estimate_id: int):
     - Records immutable status events for workflow transitions.
     - Approved transitions trigger budget conversion guard path.
     """
-    actor_user_ids = _organization_user_ids(request.user)
-    try:
-        estimate = Estimate.objects.get(id=estimate_id, created_by_id__in=actor_user_ids)
-    except Estimate.DoesNotExist:
+    estimate = _validate_estimate_for_user(estimate_id, request.user)
+    if not estimate:
         return Response(
             {"error": {"code": "not_found", "message": "Estimate not found.", "fields": {}}},
             status=404,
         )
 
     if request.method == "GET":
-        return Response({"data": _serialize_estimate(estimate=estimate, actor_user_ids=actor_user_ids)})
+        return Response({"data": _serialize_estimate(estimate=estimate)})
 
     permission_error, _ = _capability_gate(request.user, "estimates", "edit")
     if permission_error:
@@ -700,7 +692,7 @@ def estimate_detail_view(request, estimate_id: int):
             budget_conversion_meta["budget_conversion_status"] = conversion_status
 
     estimate.refresh_from_db()
-    response_payload = {"data": _serialize_estimate(estimate=estimate, actor_user_ids=actor_user_ids)}
+    response_payload = {"data": _serialize_estimate(estimate=estimate)}
     if budget_conversion_meta:
         response_payload["meta"] = budget_conversion_meta
     return Response(response_payload)
@@ -710,13 +702,8 @@ def estimate_detail_view(request, estimate_id: int):
 @permission_classes([IsAuthenticated])
 def estimate_clone_version_view(request, estimate_id: int):
     """Create a new draft revision from a prior estimate version in the same title family."""
-    actor_user_ids = _organization_user_ids(request.user)
-    try:
-        estimate = Estimate.objects.prefetch_related("line_items").get(
-            id=estimate_id,
-            created_by_id__in=actor_user_ids,
-        )
-    except Estimate.DoesNotExist:
+    estimate = _validate_estimate_for_user(estimate_id, request.user, prefetch_lines=True)
+    if not estimate:
         return Response(
             {"error": {"code": "not_found", "message": "Estimate not found.", "fields": {}}},
             status=404,
@@ -749,7 +736,6 @@ def estimate_clone_version_view(request, estimate_id: int):
 
     next_version = _next_estimate_family_version(
         project=estimate.project,
-        user=request.user,
         title=estimate.title,
     )
 
@@ -803,7 +789,7 @@ def estimate_clone_version_view(request, estimate_id: int):
         )
     return Response(
         {
-            "data": _serialize_estimate(estimate=cloned, actor_user_ids=actor_user_ids),
+            "data": _serialize_estimate(estimate=cloned),
             "meta": {"cloned_from": estimate.id},
         },
         status=201,
@@ -814,13 +800,8 @@ def estimate_clone_version_view(request, estimate_id: int):
 @permission_classes([IsAuthenticated])
 def estimate_duplicate_view(request, estimate_id: int):
     """Duplicate an estimate into a draft for same or another project/title context."""
-    actor_user_ids = _organization_user_ids(request.user)
-    try:
-        estimate = Estimate.objects.prefetch_related("line_items").get(
-            id=estimate_id,
-            created_by_id__in=actor_user_ids,
-        )
-    except Estimate.DoesNotExist:
+    estimate = _validate_estimate_for_user(estimate_id, request.user, prefetch_lines=True)
+    if not estimate:
         return Response(
             {"error": {"code": "not_found", "message": "Estimate not found.", "fields": {}}},
             status=404,
@@ -869,7 +850,6 @@ def estimate_duplicate_view(request, estimate_id: int):
 
     next_version = _next_estimate_family_version(
         project=target_project,
-        user=request.user,
         title=target_title,
     )
 
@@ -913,7 +893,7 @@ def estimate_duplicate_view(request, estimate_id: int):
     )
     return Response(
         {
-            "data": _serialize_estimate(estimate=duplicated, actor_user_ids=actor_user_ids),
+            "data": _serialize_estimate(estimate=duplicated),
             "meta": {"duplicated_from": estimate.id},
         },
         status=201,
@@ -924,10 +904,8 @@ def estimate_duplicate_view(request, estimate_id: int):
 @permission_classes([IsAuthenticated])
 def estimate_status_events_view(request, estimate_id: int):
     """Return immutable estimate status transition history."""
-    actor_user_ids = _organization_user_ids(request.user)
-    try:
-        estimate = Estimate.objects.get(id=estimate_id, created_by_id__in=actor_user_ids)
-    except Estimate.DoesNotExist:
+    estimate = _validate_estimate_for_user(estimate_id, request.user)
+    if not estimate:
         return Response(
             {"error": {"code": "not_found", "message": "Estimate not found.", "fields": {}}},
             status=404,
@@ -944,14 +922,8 @@ def estimate_status_events_view(request, estimate_id: int):
 @permission_classes([IsAuthenticated])
 def estimate_convert_to_budget_view(request, estimate_id: int):
     """Convert an approved estimate to a budget (idempotent if already converted)."""
-    actor_user_ids = _organization_user_ids(request.user)
-    try:
-        estimate = (
-            Estimate.objects.select_related("project")
-            .prefetch_related("line_items", "line_items__cost_code")
-            .get(id=estimate_id, created_by_id__in=actor_user_ids)
-        )
-    except Estimate.DoesNotExist:
+    estimate = _validate_estimate_for_user(estimate_id, request.user, prefetch_lines=True)
+    if not estimate:
         return Response(
             {"error": {"code": "not_found", "message": "Estimate not found.", "fields": {}}},
             status=404,
