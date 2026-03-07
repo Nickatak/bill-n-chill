@@ -47,11 +47,6 @@ export function VerifyEmailConsole({ token }: VerifyEmailConsoleProps) {
   const router = useRouter();
   const [status, setStatus] = useState<"verifying" | "success" | "error">("verifying");
   const [errorMessage, setErrorMessage] = useState("");
-  const [showResend, setShowResend] = useState(false);
-  const [resendEmail, setResendEmail] = useState("");
-  const [isResending, setIsResending] = useState(false);
-  const [resendMessage, setResendMessage] = useState("");
-  const [resendTone, setResendTone] = useState<"neutral" | "error">("neutral");
 
   useEffect(() => {
     if (!token) {
@@ -87,15 +82,12 @@ export function VerifyEmailConsole({ token }: VerifyEmailConsoleProps) {
           });
 
           setStatus("success");
-          router.push("/");
+          setTimeout(() => { if (!ignore) router.push("/"); }, 2500);
           return;
         }
 
         setStatus("error");
         setErrorMessage(payload.error?.message ?? "Verification failed.");
-        if (response.status === 410) {
-          setShowResend(true);
-        }
       } catch {
         if (!ignore) {
           setStatus("error");
@@ -107,35 +99,6 @@ export function VerifyEmailConsole({ token }: VerifyEmailConsoleProps) {
     verify();
     return () => { ignore = true; };
   }, [token, router]);
-
-  async function handleResend() {
-    if (!resendEmail.trim()) return;
-
-    setIsResending(true);
-    setResendMessage("");
-
-    try {
-      const response = await fetch(`${defaultApiBaseUrl}/auth/resend-verification/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: resendEmail }),
-      });
-
-      if (response.status === 429) {
-        setResendMessage("Please wait before requesting another email.");
-        setResendTone("error");
-        return;
-      }
-
-      setResendMessage("If that email is registered, a new verification link has been sent.");
-      setResendTone("neutral");
-    } catch {
-      setResendMessage("Could not reach resend endpoint.");
-      setResendTone("error");
-    } finally {
-      setIsResending(false);
-    }
-  }
 
   if (status === "verifying") {
     return (
@@ -150,8 +113,9 @@ export function VerifyEmailConsole({ token }: VerifyEmailConsoleProps) {
   if (status === "success") {
     return (
       <section className={styles.shell}>
-        <div className={styles.card}>
-          <p className={styles.message}>Email verified! Redirecting...</p>
+        <div className={`${styles.card} ${styles.cardCentered}`}>
+          <p className={styles.message}>Email confirmed! Welcome to Bill n&apos; Chill.</p>
+          <p className={styles.message}>Redirecting to your dashboard&hellip;</p>
         </div>
       </section>
     );
@@ -164,35 +128,6 @@ export function VerifyEmailConsole({ token }: VerifyEmailConsoleProps) {
           <p className={styles.warningTitle}>Verification Failed</p>
           <p className={styles.warningText}>{errorMessage}</p>
         </div>
-        {showResend && (
-          <div className={styles.form}>
-            <label>
-              Email address
-              <input
-                type="email"
-                value={resendEmail}
-                onChange={(e) => setResendEmail(e.target.value)}
-                autoComplete="email"
-                required
-              />
-            </label>
-            {resendMessage && (
-              <p className={`${styles.message} ${resendTone === "error" ? styles.messageError : ""}`}>
-                {resendMessage}
-              </p>
-            )}
-            <div className={styles.buttonRow}>
-              <button
-                className={styles.button}
-                type="button"
-                disabled={isResending || !resendEmail.trim()}
-                onClick={handleResend}
-              >
-                {isResending ? "Sending..." : "Send new verification link"}
-              </button>
-            </div>
-          </div>
-        )}
         <p className={styles.formHint}>
           <Link href="/">Back to sign in</Link>
         </p>

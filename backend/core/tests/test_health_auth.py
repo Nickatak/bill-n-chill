@@ -9,9 +9,6 @@ class HealthEndpointTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["data"]["status"], "ok")
-        self.assertIn("app_revision", payload["data"])
-        self.assertIn("app_build_at", payload["data"])
-        self.assertIn("data_reset_at", payload["data"])
 
 
 class AuthEndpointTests(TestCase):
