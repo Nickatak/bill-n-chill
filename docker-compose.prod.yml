@@ -1,0 +1,23 @@
+services:
+  db:
+    ports:
+      - "127.0.0.1:3306:3306"
+
+  backend:
+    environment:
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-}
+      MAILGUN_API_KEY: ${MAILGUN_API_KEY:-}
+      MAILGUN_SENDER_DOMAIN: ${MAILGUN_SENDER_DOMAIN:-}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-}
+    ports:
+      - "127.0.0.1:8000:8000"
+    command: >-
+      sh -c "pip install --no-cache-dir -r requirements.txt &&
+      python manage.py migrate &&
+      gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120"
+
+  frontend:
+    ports:
+      - "127.0.0.1:3000:3000"
+    command: >-
+      sh -c "npm install && npm run build && npm start -- --hostname 0.0.0.0 --port 3000"
