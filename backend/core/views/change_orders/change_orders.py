@@ -153,7 +153,6 @@ def public_change_order_decision_view(request, public_token: str):
     if next_status == ChangeOrder.Status.APPROVED:
         active_budget = _active_budget_for_project(
             project=change_order.project,
-            actor_user_ids=_organization_user_ids(change_order.requested_by),
         )
         if not active_budget:
             return Response(
@@ -342,7 +341,7 @@ def project_change_orders_view(request, project_id: int):
             rule="co_create_missing_required_fields",
         )
 
-    active_budget = _active_budget_for_project(project=project, actor_user_ids=actor_user_ids)
+    active_budget = _active_budget_for_project(project=project)
     if not active_budget:
         return _validation_error_response(
             message="Project must have an active budget before creating change orders.",
@@ -552,7 +551,6 @@ def change_order_detail_view(request, change_order_id: int):
     if financial_delta != MONEY_ZERO:
         active_budget = _active_budget_for_project(
             project=change_order.project,
-            actor_user_ids=actor_user_ids,
         )
         if not active_budget:
             return _validation_error_response(

@@ -12,7 +12,6 @@ from core.user_helpers import _ensure_membership
 from core.views.helpers import (
     SYSTEM_BUDGET_LINE_SPECS,
     _active_budget_for_project,
-    _organization_user_ids,
 )
 
 
@@ -62,11 +61,12 @@ def _supersede_active_project_budgets(*, project, user, superseded_by_estimate=N
     Records a ``FinancialAuditEvent`` for each superseded budget.  When
     *superseded_by_estimate* is provided, the audit metadata includes the
     estimate that triggered the supersession.
+
+    Authorization: caller must have already validated that *project* belongs to the
+    requesting user's organization.
     """
-    actor_user_ids = _organization_user_ids(user)
     active_budgets = Budget.objects.filter(
         project=project,
-        created_by_id__in=actor_user_ids,
         status=Budget.Status.ACTIVE,
     ).select_related("source_estimate")
     for budget in active_budgets:
@@ -174,9 +174,8 @@ def _ensure_budget_from_approved_estimate(
     from core.views.estimating.estimates_helpers import _sync_project_contract_baseline_if_unset
 
     _sync_project_contract_baseline_if_unset(estimate=estimate)
-    actor_user_ids = _organization_user_ids(user)
     existing = (
-        Budget.objects.filter(source_estimate=estimate, created_by_id__in=actor_user_ids)
+        Budget.objects.filter(source_estimate=estimate, project=estimate.project)
         .select_related("source_estimate")
         .prefetch_related("line_items", "line_items__cost_code")
         .order_by("-created_at", "-id")
@@ -187,7 +186,6 @@ def _ensure_budget_from_approved_estimate(
 
     active_budget = _active_budget_for_project(
         project=estimate.project,
-        actor_user_ids=actor_user_ids,
         select_related=["source_estimate"],
     )
     active_budget_conflict = (

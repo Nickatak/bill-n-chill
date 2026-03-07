@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from core.models import (
     Budget,
     CostCode,
+    Estimate,
     Organization,
     OrganizationMembership,
     Project,
@@ -46,6 +47,22 @@ def _validate_project_for_user(project_id: int, user):
         )
     except Project.DoesNotExist:
         return None
+
+
+def _validate_estimate_for_user(estimate_id: int, user, *, prefetch_lines=False):
+    """Look up an estimate by ID, authorized via its project's org scope. Returns None if not found.
+
+    Uses the same org-scoping mechanism as ``_validate_project_for_user`` — the
+    estimate is accessible if its project belongs to the requesting user's organization.
+    """
+    actor_user_ids = _organization_user_ids(user)
+    qs = Estimate.objects.select_related("project", "project__customer").filter(
+        id=estimate_id,
+        project__created_by_id__in=actor_user_ids,
+    )
+    if prefetch_lines:
+        qs = qs.prefetch_related("line_items", "line_items__cost_code")
+    return qs.first()
 
 
 def _resolve_organization_for_public_actor(actor_user):
@@ -181,15 +198,17 @@ def _resolve_cost_codes_for_user(user, line_items_data, *, cost_code_key="cost_c
     return code_map, missing
 
 
-def _active_budget_for_project(*, project, actor_user_ids, select_related=None):
+def _active_budget_for_project(*, project, select_related=None):
     """Return the most recent active budget for a project, or None.
 
-    Accepts a pre-resolved *actor_user_ids* list.  Pass *select_related* as a
-    list of FK names to eagerly load (e.g., ``["source_estimate"]``).
+    Pass *select_related* as a list of FK names to eagerly load
+    (e.g., ``["source_estimate"]``).
+
+    Authorization: caller must have already validated that *project* belongs to the
+    requesting user's organization.
     """
     qs = Budget.objects.filter(
         project=project,
-        created_by_id__in=actor_user_ids,
         status=Budget.Status.ACTIVE,
     )
     if select_related:

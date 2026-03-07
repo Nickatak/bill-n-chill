@@ -14,23 +14,22 @@ from core.models import (
 from core.serializers import EstimateSerializer
 from core.user_helpers import _ensure_membership
 from core.utils.money import MONEY_ZERO, quantize_money
-from core.views.helpers import (
-    _organization_user_ids,
-    _resolve_cost_codes_for_user,
-)
+from core.views.helpers import _resolve_cost_codes_for_user
 
 
 def _archive_estimate_family(*, project, user, title, exclude_ids, note):
-    """Archive all same-title estimates in a family except the excluded IDs."""
+    """Archive all same-title estimates in a family except the excluded IDs.
+
+    Authorization: caller must have already validated that *project* belongs to the
+    requesting user's organization.
+    """
     normalized_title = (title or "").strip()
     if not normalized_title:
         return
-    actor_user_ids = _organization_user_ids(user)
 
     candidates = (
         Estimate.objects.filter(
             project=project,
-            created_by_id__in=actor_user_ids,
             title=normalized_title,
         )
         .exclude(id__in=exclude_ids)
@@ -54,14 +53,16 @@ def _archive_estimate_family(*, project, user, title, exclude_ids, note):
         )
 
 
-def _next_estimate_family_version(*, project, user, title):
-    """Return the next version number for an estimate family identified by title."""
+def _next_estimate_family_version(*, project, title):
+    """Return the next version number for an estimate family identified by title.
+
+    Authorization: caller must have already validated that *project* belongs to the
+    requesting user's organization.
+    """
     normalized_title = (title or "").strip()
-    actor_user_ids = _organization_user_ids(user)
     latest = (
         Estimate.objects.filter(
             project=project,
-            created_by_id__in=actor_user_ids,
             title=normalized_title,
         )
         .order_by("-version")
@@ -70,10 +71,14 @@ def _next_estimate_family_version(*, project, user, title):
     return (latest.version + 1) if latest else 1
 
 
-def _estimate_financial_baseline_context(*, project, actor_user_ids):
-    """Build a mapping of estimate IDs to their budget conversion status for serialization."""
+def _estimate_financial_baseline_context(*, project):
+    """Build a mapping of estimate IDs to their budget conversion status for serialization.
+
+    Authorization: caller must have already validated that *project* belongs to the
+    requesting user's organization.
+    """
     budgets = (
-        Budget.objects.filter(project=project, created_by_id__in=actor_user_ids)
+        Budget.objects.filter(project=project)
         .select_related("source_estimate")
         .order_by("-created_at", "-id")
     )
@@ -103,21 +108,15 @@ def _estimate_financial_baseline_context(*, project, actor_user_ids):
     }
 
 
-def _serialize_estimate(*, estimate, actor_user_ids):
+def _serialize_estimate(*, estimate):
     """Serialize a single estimate with its financial baseline context."""
-    context = _estimate_financial_baseline_context(
-        project=estimate.project,
-        actor_user_ids=actor_user_ids,
-    )
+    context = _estimate_financial_baseline_context(project=estimate.project)
     return EstimateSerializer(estimate, context=context).data
 
 
-def _serialize_estimates(*, estimates, project, actor_user_ids):
+def _serialize_estimates(*, estimates, project):
     """Serialize multiple estimates sharing the same project's financial baseline context."""
-    context = _estimate_financial_baseline_context(
-        project=project,
-        actor_user_ids=actor_user_ids,
-    )
+    context = _estimate_financial_baseline_context(project=project)
     return EstimateSerializer(estimates, many=True, context=context).data
 
 
