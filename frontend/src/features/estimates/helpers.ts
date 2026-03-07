@@ -11,6 +11,7 @@ import type {
   CostCode,
   EstimateLineInput,
   EstimateLineItemRecord,
+  EstimatePolicyContract,
   EstimateRecord,
   EstimateStatusEventRecord,
 } from "./types";
@@ -29,6 +30,103 @@ const STATUS_LABELS: Record<string, string> = {
   archived: "Archived",
   void: "Void",
 };
+
+// ---------------------------------------------------------------------------
+// Policy contract normalization
+// ---------------------------------------------------------------------------
+
+export type NormalizedEstimatePolicy = {
+  statuses: string[];
+  statusLabels: Record<string, string>;
+  allowedTransitions: Record<string, string[]>;
+  quickActionByStatus: Record<string, "change_order" | "revision">;
+  defaultCreateStatus: string;
+  defaultStatusFilters: string[];
+};
+
+export function normalizeEstimatePolicy(
+  contract: EstimatePolicyContract,
+  fallbacks: {
+    statuses: string[];
+    statusLabels: Record<string, string>;
+    defaultStatusFilters: string[];
+    quickActionByStatus: Record<string, "change_order" | "revision">;
+  },
+): NormalizedEstimatePolicy | null {
+  if (
+    !Array.isArray(contract.statuses) ||
+    !contract.statuses.length ||
+    !contract.allowed_status_transitions
+  ) {
+    return null;
+  }
+
+  const allowedTransitions: Record<string, string[]> = {};
+  for (const status of contract.statuses) {
+    const next = contract.allowed_status_transitions[status];
+    allowedTransitions[status] = Array.isArray(next) ? next : [];
+  }
+
+  const defaultCreateStatus =
+    contract.default_create_status || contract.statuses[0] || fallbacks.statuses[0];
+
+  const candidateFilters =
+    Array.isArray(contract.default_status_filters) && contract.default_status_filters.length
+      ? contract.default_status_filters
+      : fallbacks.defaultStatusFilters;
+  const validFilters = candidateFilters.filter((v) => contract.statuses.includes(v));
+  const defaultStatusFilters = validFilters.length ? validFilters : contract.statuses;
+
+  return {
+    statuses: contract.statuses,
+    statusLabels: { ...fallbacks.statusLabels, ...(contract.status_labels || {}) },
+    allowedTransitions,
+    quickActionByStatus: { ...fallbacks.quickActionByStatus, ...(contract.quick_action_by_status || {}) },
+    defaultCreateStatus,
+    defaultStatusFilters,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Estimate auto-selection
+// ---------------------------------------------------------------------------
+
+/**
+ * Pick the best estimate to auto-select after a list load.
+ *
+ * Priority cascade (first visible match wins):
+ *  1. `preferredId` — explicitly requested (e.g. just-created or preserving selection)
+ *  2. `scopedId`    — deep-linked from URL or cross-page navigation
+ *  3. Active financial baseline
+ *  4. First visible estimate in the list
+ *
+ * "Visible" means the estimate's status is included in the current filter set.
+ */
+export function resolveAutoSelectEstimate(
+  rows: EstimateRecord[],
+  activeFilters: string[],
+  hints: {
+    preferredId?: number | null;
+    scopedId?: number | null;
+  },
+): EstimateRecord | null {
+  const isVisible = (e: EstimateRecord) => activeFilters.includes(e.status);
+
+  if (hints.preferredId) {
+    const match = rows.find((e) => e.id === hints.preferredId);
+    if (match && isVisible(match)) return match;
+  }
+
+  if (hints.scopedId) {
+    const match = rows.find((e) => e.id === hints.scopedId);
+    if (match && isVisible(match)) return match;
+  }
+
+  const activeBaseline = rows.find((e) => e.is_active_financial_baseline && isVisible(e));
+  if (activeBaseline) return activeBaseline;
+
+  return rows.find(isVisible) ?? null;
+}
 
 // ---------------------------------------------------------------------------
 // Console helpers

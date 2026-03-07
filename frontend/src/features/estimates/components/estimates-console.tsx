@@ -47,7 +47,9 @@ import {
   isNotatedStatusEvent,
   mapEstimateLineItemsToInputs,
   normalizeFamilyTitle,
+  normalizeEstimatePolicy,
   readEstimateApiError,
+  resolveAutoSelectEstimate,
   resolveEstimateValidationDeltaDays,
 } from "../helpers";
 import { EstimateSheet, OrganizationDocumentDefaults } from "./estimate-sheet";
@@ -60,6 +62,11 @@ type EstimateFamilyCollisionPrompt = {
   latestEstimateId: number | null;
   latestVersion: number | null;
   familySize: number | null;
+};
+type LoadEstimatesOptions = {
+  preserveSelection?: boolean;
+  preferredEstimateId?: number | null;
+  quiet?: boolean;
 };
 type EstimatesConsoleProps = {
   scopedProjectId?: number | null;
@@ -333,51 +340,31 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       if (!response.ok || !payload.data || Array.isArray(payload.data)) {
         return;
       }
-      const contract = payload.data as EstimatePolicyContract;
-      if (
-        !Array.isArray(contract.statuses) ||
-        !contract.statuses.length ||
-        !contract.allowed_status_transitions
-      ) {
+      const policy = normalizeEstimatePolicy(
+        payload.data as EstimatePolicyContract,
+        {
+          statuses: ESTIMATE_STATUSES_FALLBACK,
+          statusLabels: ESTIMATE_STATUS_LABELS_FALLBACK,
+          defaultStatusFilters: ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK,
+          quickActionByStatus: ESTIMATE_QUICK_ACTION_BY_STATUS_FALLBACK,
+        },
+      );
+      if (!policy) {
         return;
       }
-      const normalizedTransitions = contract.statuses.reduce<Record<string, string[]>>(
-        (acc, statusValue) => {
-          const nextStatuses = contract.allowed_status_transitions[statusValue];
-          acc[statusValue] = Array.isArray(nextStatuses) ? nextStatuses : [];
-          return acc;
-        },
-        {},
-      );
-      const nextDefaultCreateStatus =
-        contract.default_create_status || contract.statuses[0] || ESTIMATE_STATUSES_FALLBACK[0];
-      const nextDefaultFilters =
-        Array.isArray(contract.default_status_filters) && contract.default_status_filters.length
-          ? contract.default_status_filters.filter((value) => contract.statuses.includes(value))
-          : ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK.filter((value) => contract.statuses.includes(value));
-      const resolvedDefaultFilters = nextDefaultFilters.length ? nextDefaultFilters : contract.statuses;
 
-      setEstimateStatuses(contract.statuses);
-      setEstimateStatusLabels({
-        ...ESTIMATE_STATUS_LABELS_FALLBACK,
-        ...(contract.status_labels || {}),
-      });
-      setEstimateAllowedStatusTransitions(normalizedTransitions);
-      setEstimateQuickActionByStatus({
-        ...ESTIMATE_QUICK_ACTION_BY_STATUS_FALLBACK,
-        ...(contract.quick_action_by_status || {}),
-      });
-      setDefaultCreateStatus(nextDefaultCreateStatus);
-      setDefaultEstimateStatusFilters(resolvedDefaultFilters);
+      setEstimateStatuses(policy.statuses);
+      setEstimateStatusLabels(policy.statusLabels);
+      setEstimateAllowedStatusTransitions(policy.allowedTransitions);
+      setEstimateQuickActionByStatus(policy.quickActionByStatus);
+      setDefaultCreateStatus(policy.defaultCreateStatus);
+      setDefaultEstimateStatusFilters(policy.defaultStatusFilters);
       setEstimateStatusFilters((current) => {
-        const retained = current.filter((value) => contract.statuses.includes(value));
-        if (retained.length) {
-          return retained;
-        }
-        return resolvedDefaultFilters;
+        const retained = current.filter((value) => policy.statuses.includes(value));
+        return retained.length ? retained : policy.defaultStatusFilters;
       });
       setSelectedStatus((current) =>
-        contract.statuses.includes(current) ? current : nextDefaultCreateStatus,
+        policy.statuses.includes(current) ? current : policy.defaultCreateStatus,
       );
     } catch {
       // Policy load is best-effort; static fallback remains active.
@@ -716,13 +703,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     }
   }, [normalizedBaseUrl, scopedProjectId, token]);
 
-  const loadEstimates = useCallback(async (
-    options?: {
-      preserveSelection?: boolean;
-      preferredEstimateId?: number | null;
-      quiet?: boolean;
-    },
-  ) => {
+  const loadEstimates = useCallback(async (options?: LoadEstimatesOptions) => {
     const projectId = Number(selectedProjectId);
     if (!projectId) {
       if (!options?.quiet) {
@@ -739,62 +720,44 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     if (!options?.quiet) {
       setActionMessage("");
     }
+
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
         headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
+
       if (!response.ok) {
         if (!options?.quiet) {
           setActionMessage(readEstimateApiError(payload, "Failed loading estimates."));
         }
         return;
       }
+
       const rows = (payload.data as EstimateRecord[]) ?? [];
       setEstimates(rows);
+
       if (!rows[0]) {
         return;
       }
-      const activeFilters = estimateStatusFiltersRef.current;
-      const retainedEstimateId =
+
+      // Use the explicitly requested estimate if provided, otherwise fall back
+      // to the currently selected estimate when preserving selection (e.g. after
+      // a status transition that reloads the list but should keep focus).
+      const preferredId =
         options?.preferredEstimateId ??
         (options?.preserveSelection && /^\d+$/.test(selectedEstimateIdRef.current)
           ? Number(selectedEstimateIdRef.current)
           : null);
-      const retainedEstimate = retainedEstimateId
-        ? rows.find((estimate) => estimate.id === retainedEstimateId)
-        : null;
-      const retainedEstimateAllowed =
-        retainedEstimate &&
-        activeFilters.includes(retainedEstimate.status as EstimateStatusValue);
-      if (retainedEstimateAllowed) {
-        handleSelectEstimate(retainedEstimate);
-        return;
-      }
-      const scopedEstimateMatch = scopedEstimateId
-        ? rows.find((estimate) => estimate.id === scopedEstimateId)
-        : null;
-      const scopedEstimateAllowed =
-        scopedEstimateMatch &&
-        activeFilters.includes(scopedEstimateMatch.status as EstimateStatusValue);
-      if (scopedEstimateAllowed) {
-        handleSelectEstimate(scopedEstimateMatch);
-        return;
-      }
-      const activeBaseline = rows.find(
-        (estimate) =>
-          estimate.is_active_financial_baseline &&
-          activeFilters.includes(estimate.status as EstimateStatusValue),
+
+      const autoSelected = resolveAutoSelectEstimate(
+        rows,
+        estimateStatusFiltersRef.current,
+        { preferredId, scopedId: scopedEstimateId },
       );
-      if (activeBaseline) {
-        handleSelectEstimate(activeBaseline);
-        return;
-      }
-      const firstVisibleEstimate = rows.find((estimate) =>
-        activeFilters.includes(estimate.status as EstimateStatusValue),
-      );
-      if (firstVisibleEstimate) {
-        handleSelectEstimate(firstVisibleEstimate);
+
+      if (autoSelected) {
+        handleSelectEstimate(autoSelected);
       }
     } catch {
       if (!options?.quiet) {

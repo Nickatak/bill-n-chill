@@ -10,10 +10,222 @@ import {
   mapLineCostCodes,
   mapPublicEstimateLineItems,
   normalizeFamilyTitle,
+  normalizeEstimatePolicy,
   readEstimateApiError,
+  resolveAutoSelectEstimate,
   resolveEstimateValidationDeltaDays,
 } from "../helpers";
-import type { EstimateLineItemRecord, EstimateRecord, EstimateStatusEventRecord } from "../types";
+import type {
+  EstimateLineItemRecord,
+  EstimatePolicyContract,
+  EstimateRecord,
+  EstimateStatusEventRecord,
+} from "../types";
+
+// ---------------------------------------------------------------------------
+// normalizeEstimatePolicy
+// ---------------------------------------------------------------------------
+
+const FALLBACKS = {
+  statuses: ["draft", "sent", "approved", "rejected", "void", "archived"],
+  statusLabels: { draft: "Draft", sent: "Sent", approved: "Approved", rejected: "Rejected", void: "Void", archived: "Archived" },
+  defaultStatusFilters: ["draft", "sent", "approved", "rejected"],
+  quickActionByStatus: { approved: "change_order" as const, rejected: "revision" as const },
+};
+
+function contract(overrides: Partial<EstimatePolicyContract> = {}): EstimatePolicyContract {
+  return {
+    policy_version: "1",
+    statuses: ["draft", "sent", "approved", "rejected", "void", "archived"],
+    status_labels: { draft: "Draft", sent: "Sent", approved: "Approved", rejected: "Rejected", void: "Void", archived: "Archived" },
+    default_create_status: "draft",
+    default_status_filters: ["draft", "sent", "approved", "rejected"],
+    allowed_status_transitions: {
+      draft: ["sent", "void"],
+      sent: ["approved", "rejected"],
+      approved: [],
+      rejected: ["void"],
+      void: [],
+      archived: [],
+    },
+    terminal_statuses: ["void", "archived"],
+    quick_action_by_status: { approved: "change_order", rejected: "revision" },
+    ...overrides,
+  };
+}
+
+describe("normalizeEstimatePolicy", () => {
+  it("returns null when statuses is empty", () => {
+    expect(normalizeEstimatePolicy(contract({ statuses: [] }), FALLBACKS)).toBeNull();
+  });
+
+  it("returns null when allowed_status_transitions is missing", () => {
+    const c = contract();
+    // @ts-expect-error — testing runtime guard
+    c.allowed_status_transitions = undefined;
+    expect(normalizeEstimatePolicy(c, FALLBACKS)).toBeNull();
+  });
+
+  it("normalizes a valid contract", () => {
+    const result = normalizeEstimatePolicy(contract(), FALLBACKS);
+    expect(result).not.toBeNull();
+    expect(result!.statuses).toEqual(["draft", "sent", "approved", "rejected", "void", "archived"]);
+    expect(result!.defaultCreateStatus).toBe("draft");
+    expect(result!.allowedTransitions.draft).toEqual(["sent", "void"]);
+    expect(result!.allowedTransitions.approved).toEqual([]);
+  });
+
+  it("coerces missing transition arrays to empty", () => {
+    const c = contract({
+      allowed_status_transitions: {
+        draft: ["sent"],
+        sent: null as unknown as string[],
+        approved: undefined as unknown as string[],
+        rejected: [],
+        void: [],
+        archived: [],
+      },
+    });
+    const result = normalizeEstimatePolicy(c, FALLBACKS)!;
+    expect(result.allowedTransitions.sent).toEqual([]);
+    expect(result.allowedTransitions.approved).toEqual([]);
+  });
+
+  it("falls back to first status when default_create_status is empty", () => {
+    const result = normalizeEstimatePolicy(
+      contract({ default_create_status: "" }),
+      FALLBACKS,
+    )!;
+    expect(result.defaultCreateStatus).toBe("draft");
+  });
+
+  it("merges status labels with fallbacks", () => {
+    const result = normalizeEstimatePolicy(
+      contract({ status_labels: { draft: "New" } }),
+      FALLBACKS,
+    )!;
+    expect(result.statusLabels.draft).toBe("New");
+    expect(result.statusLabels.sent).toBe("Sent");
+  });
+
+  it("merges quick actions with fallbacks", () => {
+    const result = normalizeEstimatePolicy(
+      contract({ quick_action_by_status: { void: "revision" } }),
+      FALLBACKS,
+    )!;
+    expect(result.quickActionByStatus.void).toBe("revision");
+    expect(result.quickActionByStatus.approved).toBe("change_order");
+  });
+
+  it("uses fallback filters when contract has none", () => {
+    const result = normalizeEstimatePolicy(
+      contract({ default_status_filters: [] }),
+      FALLBACKS,
+    )!;
+    expect(result.defaultStatusFilters).toEqual(["draft", "sent", "approved", "rejected"]);
+  });
+
+  it("filters out invalid statuses from default_status_filters", () => {
+    const result = normalizeEstimatePolicy(
+      contract({ default_status_filters: ["draft", "nonexistent", "sent"] }),
+      FALLBACKS,
+    )!;
+    expect(result.defaultStatusFilters).toEqual(["draft", "sent"]);
+  });
+
+  it("falls back to all statuses when no filters are valid", () => {
+    const result = normalizeEstimatePolicy(
+      contract({ default_status_filters: ["nonexistent"] }),
+      FALLBACKS,
+    )!;
+    expect(result.defaultStatusFilters).toEqual(contract().statuses);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveAutoSelectEstimate
+// ---------------------------------------------------------------------------
+
+function estimate(overrides: Partial<EstimateRecord>): EstimateRecord {
+  return {
+    id: 1,
+    project: 1,
+    version: 1,
+    status: "draft",
+    title: "Test",
+    valid_through: null,
+    terms_text: "",
+    subtotal: "0",
+    tax_percent: "0",
+    grand_total: "0",
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+    ...overrides,
+  };
+}
+
+describe("resolveAutoSelectEstimate", () => {
+  const filters = ["draft", "sent", "approved", "rejected"];
+
+  it("returns null for empty rows", () => {
+    expect(resolveAutoSelectEstimate([], filters, {})).toBeNull();
+  });
+
+  it("selects preferred estimate when visible", () => {
+    const rows = [estimate({ id: 1, status: "sent" }), estimate({ id: 2, status: "draft" })];
+    const result = resolveAutoSelectEstimate(rows, filters, { preferredId: 2 });
+    expect(result?.id).toBe(2);
+  });
+
+  it("skips preferred estimate when not visible", () => {
+    const rows = [estimate({ id: 1, status: "sent" }), estimate({ id: 2, status: "archived" })];
+    const result = resolveAutoSelectEstimate(rows, filters, { preferredId: 2 });
+    expect(result?.id).toBe(1);
+  });
+
+  it("falls back to scoped estimate when preferred is missing", () => {
+    const rows = [estimate({ id: 1, status: "sent" }), estimate({ id: 3, status: "approved" })];
+    const result = resolveAutoSelectEstimate(rows, filters, { preferredId: 99, scopedId: 3 });
+    expect(result?.id).toBe(3);
+  });
+
+  it("prefers active financial baseline over first visible", () => {
+    const rows = [
+      estimate({ id: 1, status: "draft" }),
+      estimate({ id: 2, status: "approved", is_active_financial_baseline: true }),
+    ];
+    const result = resolveAutoSelectEstimate(rows, filters, {});
+    expect(result?.id).toBe(2);
+  });
+
+  it("falls back to first visible estimate", () => {
+    const rows = [
+      estimate({ id: 1, status: "archived" }),
+      estimate({ id: 2, status: "void" }),
+      estimate({ id: 3, status: "sent" }),
+    ];
+    const result = resolveAutoSelectEstimate(rows, filters, {});
+    expect(result?.id).toBe(3);
+  });
+
+  it("returns null when no estimates match active filters", () => {
+    const rows = [estimate({ id: 1, status: "archived" }), estimate({ id: 2, status: "void" })];
+    const result = resolveAutoSelectEstimate(rows, filters, {});
+    expect(result).toBeNull();
+  });
+
+  it("respects priority order: preferred > scoped > baseline > first", () => {
+    const rows = [
+      estimate({ id: 1, status: "draft" }),
+      estimate({ id: 2, status: "approved", is_active_financial_baseline: true }),
+      estimate({ id: 3, status: "sent" }),
+    ];
+    expect(resolveAutoSelectEstimate(rows, filters, { preferredId: 3, scopedId: 2 })?.id).toBe(3);
+    expect(resolveAutoSelectEstimate(rows, filters, { preferredId: 99, scopedId: 3 })?.id).toBe(3);
+    expect(resolveAutoSelectEstimate(rows, filters, { preferredId: 99, scopedId: 99 })?.id).toBe(2);
+    expect(resolveAutoSelectEstimate(rows, filters, {})?.id).toBe(2);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // resolveEstimateValidationDeltaDays
