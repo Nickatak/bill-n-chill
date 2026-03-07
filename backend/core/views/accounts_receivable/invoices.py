@@ -38,7 +38,6 @@ from core.views.helpers import (
     _build_public_decision_note,
     _capability_gate,
     _ensure_membership,
-    _organization_user_ids,
     _resolve_cost_codes_for_user,
     _resolve_organization_for_public_actor,
     _serialize_public_organization_context,
@@ -340,7 +339,6 @@ def project_invoices_view(request, project_id: int):
       - `backend/core/tests/test_invoices.py::test_invoice_create_calculates_totals_and_lines`
       - `backend/core/tests/test_invoices.py::test_invoice_create_rolls_back_when_status_event_write_fails`
     """
-    actor_user_ids = _organization_user_ids(request.user)
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -350,7 +348,7 @@ def project_invoices_view(request, project_id: int):
 
     if request.method == "GET":
         rows = (
-            Invoice.objects.filter(project=project, created_by_id__in=actor_user_ids)
+            Invoice.objects.filter(project=project)
             .select_related("customer")
             .prefetch_related(
                 "line_items",
@@ -541,7 +539,7 @@ def invoice_detail_view(request, invoice_id: int):
       - `backend/core/tests/test_invoices.py::test_invoice_patch_line_items_recalculates_totals`
       - `backend/core/tests/test_invoices.py::test_invoice_patch_billable_totals_over_scope_requires_override`
     """
-    actor_user_ids = _organization_user_ids(request.user)
+    membership = _ensure_membership(request.user)
     try:
         invoice = (
             Invoice.objects.select_related("customer")
@@ -554,7 +552,7 @@ def invoice_detail_view(request, invoice_id: int):
             )
             .get(
                 id=invoice_id,
-                created_by_id__in=actor_user_ids,
+                project__organization_id=membership.organization_id,
             )
         )
     except Invoice.DoesNotExist:
@@ -869,9 +867,9 @@ def invoice_send_view(request, invoice_id: int):
       - `backend/core/tests/test_invoices.py::test_invoice_send_blocks_when_total_exceeds_approved_scope_without_override`
       - `backend/core/tests/test_invoices.py::test_invoice_send_scope_override_creates_audit_note`
     """
-    actor_user_ids = _organization_user_ids(request.user)
+    membership = _ensure_membership(request.user)
     try:
-        invoice = Invoice.objects.get(id=invoice_id, created_by_id__in=actor_user_ids)
+        invoice = Invoice.objects.get(id=invoice_id, project__organization_id=membership.organization_id)
     except Invoice.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Invoice not found.", "fields": {}}},
@@ -975,9 +973,9 @@ def invoice_status_events_view(request, invoice_id: int):
     - Test anchors:
       - `backend/core/tests/test_invoices.py::test_invoice_status_events_endpoint_returns_history`
     """
-    actor_user_ids = _organization_user_ids(request.user)
+    membership = _ensure_membership(request.user)
     try:
-        invoice = Invoice.objects.get(id=invoice_id, created_by_id__in=actor_user_ids)
+        invoice = Invoice.objects.get(id=invoice_id, project__organization_id=membership.organization_id)
     except Invoice.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Invoice not found.", "fields": {}}},
