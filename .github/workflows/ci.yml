@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: test_bill_n_chill
+          MYSQL_USER: bnc
+          MYSQL_PASSWORD: ci_password
+          MYSQL_ROOT_PASSWORD: ci_root_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci_root_password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Grant test DB permissions
+        run: |
+          mysql -h 127.0.0.1 -uroot -pci_root_password -e "
+            GRANT CREATE, DROP ON *.* TO 'bnc'@'%';
+            GRANT ALL PRIVILEGES ON test_bill_n_chill.* TO 'bnc'@'%';
+            FLUSH PRIVILEGES;
+          "
+
+      - name: Run tests
+        working-directory: backend
+        env:
+          DATABASE_URL: mysql://bnc:ci_password@127.0.0.1:3306/test_bill_n_chill
+          DJANGO_SECRET_KEY: ci-test-secret-key
+          DJANGO_DEBUG: "False"
+          DJANGO_ALLOWED_HOSTS: localhost
+          CORS_ALLOWED_ORIGINS: http://localhost:3000
+        run: python manage.py test core.tests --noinput
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Test
+        working-directory: frontend
+        run: npx vitest run
+
+      - name: Build
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8000/api/v1
+        run: npm run build
