@@ -8,6 +8,7 @@ from django.utils import timezone
 
 OTP_EXPIRY_MINUTES = 10
 SESSION_EXPIRY_MINUTES = 60
+MAX_VERIFY_ATTEMPTS = 10
 
 
 class DocumentAccessSession(models.Model):
@@ -36,6 +37,7 @@ class DocumentAccessSession(models.Model):
     expires_at = models.DateTimeField()
     verified_at = models.DateTimeField(null=True, blank=True)
     session_expires_at = models.DateTimeField(null=True, blank=True)
+    failed_attempts = models.PositiveSmallIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -92,7 +94,8 @@ class DocumentAccessSession(models.Model):
         """Find a session by public_token + code and validate it's verifiable.
 
         Returns (session, None) on success, or (None, error_code) where
-        error_code is one of: "not_found", "expired", "already_verified".
+        error_code is one of: "not_found", "expired", "already_verified",
+        "max_attempts".
         """
         try:
             session = cls.objects.get(
@@ -101,13 +104,36 @@ class DocumentAccessSession(models.Model):
                 verified_at__isnull=True,
             )
         except cls.DoesNotExist:
+            # Wrong code — increment failed_attempts on the latest unverified session.
+            cls._record_failed_attempt(public_token)
             # Check if it was already verified (separate error code).
             if cls.objects.filter(public_token=public_token, code=code, verified_at__isnull=False).exists():
                 return None, "already_verified"
             return None, "not_found"
         if session.is_expired:
             return None, "expired"
+        if session.failed_attempts >= MAX_VERIFY_ATTEMPTS:
+            return None, "max_attempts"
         return session, None
+
+    @classmethod
+    def _record_failed_attempt(cls, public_token):
+        """Increment failed_attempts on the latest unverified session for this token.
+
+        When MAX_VERIFY_ATTEMPTS is reached, the session is effectively expired —
+        lookup_for_verification will reject further attempts.
+        """
+        latest = (
+            cls.objects.filter(
+                public_token=public_token,
+                verified_at__isnull=True,
+            )
+            .order_by("-created_at")
+            .first()
+        )
+        if latest and latest.failed_attempts < MAX_VERIFY_ATTEMPTS:
+            latest.failed_attempts += 1
+            latest.save(update_fields=["failed_attempts"])
 
     @classmethod
     def lookup_valid_session(cls, public_token, session_token):

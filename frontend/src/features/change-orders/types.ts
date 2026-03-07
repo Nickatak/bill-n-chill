@@ -73,6 +73,8 @@ export type ChangeOrderRecord = {
     customer_phone?: string | null;
   };
   organization_context?: OrganizationPublicContext;
+  ceremony_consent_text?: string;
+  ceremony_consent_text_version?: string;
   origin_estimate_context?: {
     id: number;
     title: string;

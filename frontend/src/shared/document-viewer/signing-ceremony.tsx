@@ -19,19 +19,6 @@ const API_BASE =
   (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1").trim().replace(/\/$/, "");
 
 // ---------------------------------------------------------------------------
-// Consent text (must match backend CEREMONY_CONSENT_TEXT in utils/signing.py)
-// ---------------------------------------------------------------------------
-
-const CONSENT_TEXT = `[DRAFT — REQUIRES ATTORNEY REVIEW BEFORE PRODUCTION USE]
-
-By typing my name and checking this box, I confirm that:
-1. I have reviewed the document above in its entirety.
-2. I intend this action to serve as my electronic signature.
-3. I understand this constitutes a legally binding agreement under
-   applicable electronic signature laws (ESIGN Act / UETA).
-4. I consent to conducting this transaction electronically.`;
-
-// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -53,12 +40,13 @@ type SigningCeremonyProps = {
   documentType: "estimate" | "change_order" | "invoice";
   documentSummary: { type: string; title: string; total: string };
   customerEmailAvailable: boolean;
+  consentText: string;
   decisions: DecisionOption[];
   onDecision: (decision: string, ceremony: CeremonyPayload) => Promise<void>;
   disabled?: boolean;
 };
 
-type Phase = "no_email" | "idle" | "otp_requested" | "otp_verified" | "ceremony_ready";
+type Phase = "no_email" | "idle" | "otp_requested" | "ceremony_ready";
 
 // ---------------------------------------------------------------------------
 // API path mapping
@@ -79,6 +67,7 @@ export function SigningCeremony({
   documentType,
   documentSummary,
   customerEmailAvailable,
+  consentText,
   decisions,
   onDecision,
   disabled = false,
@@ -357,7 +346,7 @@ export function SigningCeremony({
 
       <div className={styles.consentBox}>
         <span className={styles.draftBanner}>DRAFT — NOT YET LEGALLY REVIEWED</span>
-        <p className={styles.consentText}>{CONSENT_TEXT.replace("[DRAFT — REQUIRES ATTORNEY REVIEW BEFORE PRODUCTION USE]\n\n", "")}</p>
+        <p className={styles.consentText}>{consentText.replace("[DRAFT — REQUIRES ATTORNEY REVIEW BEFORE PRODUCTION USE]\n\n", "")}</p>
         <div className={styles.consentCheckRow}>
           <input
             type="checkbox"

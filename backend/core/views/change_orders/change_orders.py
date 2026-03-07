@@ -68,7 +68,11 @@ def public_change_order_detail_view(request, public_token: str):
             status=404,
         )
 
-    return Response({"data": _serialize_public_change_order(change_order)})
+    serialized = _serialize_public_change_order(change_order)
+    consent_text, consent_version = get_ceremony_context()
+    serialized["ceremony_consent_text"] = consent_text
+    serialized["ceremony_consent_text_version"] = consent_version
+    return Response({"data": serialized})
 
 
 @api_view(["POST"])
@@ -165,6 +169,7 @@ def public_change_order_decision_view(request, public_token: str):
         change_order.approved_at = timezone.now()
         update_fields.extend(["approved_by", "approved_at"])
 
+    consent_text, consent_version = get_ceremony_context()
     with transaction.atomic():
         change_order.status = next_status
         change_order.save(update_fields=update_fields)
@@ -201,33 +206,31 @@ def public_change_order_decision_view(request, public_token: str):
             decided_by=change_order.requested_by,
         )
 
+        content_hash = compute_document_content_hash(
+            "change_order", _ChangeOrderSerializerForHash(change_order).data,
+        )
+        SigningCeremonyRecord.record(
+            document_type="change_order",
+            document_id=change_order.id,
+            public_token=public_token,
+            decision=decision,
+            signer_name=signer_name,
+            signer_email=ceremony_session.recipient_email if ceremony_session else "",
+            email_verified=ceremony_session is not None,
+            content_hash=content_hash,
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            consent_text_version=consent_version,
+            consent_text_snapshot=consent_text,
+            note=str(request.data.get("note", "") or "").strip(),
+            access_session=ceremony_session,
+        )
+
     refreshed = (
         ChangeOrder.objects.filter(id=change_order.id)
         .select_related("project__customer", "origin_estimate", "requested_by", "approved_by")
         .prefetch_related("line_items", "line_items__budget_line", "line_items__budget_line__cost_code")
         .get()
-    )
-
-    # --- Signing ceremony audit artifact ---
-    consent_text, consent_version = get_ceremony_context()
-    content_hash = compute_document_content_hash(
-        "change_order", _ChangeOrderSerializerForHash(refreshed).data,
-    )
-    SigningCeremonyRecord.record(
-        document_type="change_order",
-        document_id=change_order.id,
-        public_token=public_token,
-        decision=decision,
-        signer_name=signer_name,
-        signer_email=ceremony_session.recipient_email if ceremony_session else "",
-        email_verified=ceremony_session is not None,
-        content_hash=content_hash,
-        ip_address=request.META.get("REMOTE_ADDR"),
-        user_agent=request.META.get("HTTP_USER_AGENT", ""),
-        consent_text_version=consent_version,
-        consent_text_snapshot=consent_text,
-        note=str(request.data.get("note", "") or "").strip(),
-        access_session=ceremony_session,
     )
 
     return Response(

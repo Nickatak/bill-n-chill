@@ -331,6 +331,7 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
                   total: `$${formatDecimal(parseAmount(invoice.total))}`,
                 }}
                 customerEmailAvailable={Boolean(invoice.project_context?.customer_email)}
+                consentText={invoice.ceremony_consent_text ?? ""}
                 decisions={[
                   { label: "Approve Invoice", value: "approve", variant: "primary" },
                   { label: "Dispute Invoice", value: "dispute", variant: "secondary" },

@@ -348,6 +348,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
                   total: `$${formatDecimal(totalAmount)}`,
                 }}
                 customerEmailAvailable={Boolean(estimate.project_context?.customer_email)}
+                consentText={estimate.ceremony_consent_text ?? ""}
                 decisions={[
                   { label: "Approve Estimate", value: "approve", variant: "primary" },
                   { label: "Reject Estimate", value: "reject", variant: "secondary" },

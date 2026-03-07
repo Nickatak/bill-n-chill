@@ -120,6 +120,8 @@ def _request_otp_handler(request, document_type, public_token):
     session.save()
 
     document_title = _resolve_document_title(document_type, document)
+    # TODO: send_otp_email blocks the request — move to async task (Celery/background)
+    # so Mailgun latency/failures don't hang the customer's browser.
     send_otp_email(
         recipient_email=customer_email,
         code=session.code,
@@ -145,6 +147,7 @@ _VERIFY_ERROR_MAP = {
     "not_found": (404, "not_found", "Invalid verification code."),
     "expired": (410, "expired", "This verification code has expired. Request a new one."),
     "already_verified": (409, "already_verified", "This code has already been verified."),
+    "max_attempts": (429, "max_attempts", "Too many failed attempts. Request a new code."),
 }
 
 

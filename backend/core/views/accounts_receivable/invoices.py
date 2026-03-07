@@ -72,6 +72,9 @@ def public_invoice_detail_view(request, public_token: str):
     organization = _resolve_organization_for_public_actor(invoice.created_by)
     serialized["project_context"] = _serialize_public_project_context(invoice.project)
     serialized["organization_context"] = _serialize_public_organization_context(organization)
+    consent_text, consent_version = get_ceremony_context()
+    serialized["ceremony_consent_text"] = consent_text
+    serialized["ceremony_consent_text_version"] = consent_version
     return Response({"data": serialized})
 
 
@@ -147,6 +150,7 @@ def public_invoice_decision_view(request, public_token: str):
         decider_email=ceremony_session.recipient_email if ceremony_session else "",
     )
 
+    consent_text, consent_version = get_ceremony_context()
     with transaction.atomic():
         previous_status = invoice.status
         if decision_type == "approve":
@@ -213,6 +217,24 @@ def public_invoice_decision_view(request, public_token: str):
                 },
             )
 
+        content_hash = compute_document_content_hash("invoice", InvoiceSerializer(invoice).data)
+        SigningCeremonyRecord.record(
+            document_type="invoice",
+            document_id=invoice.id,
+            public_token=public_token,
+            decision=decision,
+            signer_name=signer_name,
+            signer_email=ceremony_session.recipient_email if ceremony_session else "",
+            email_verified=ceremony_session is not None,
+            content_hash=content_hash,
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            consent_text_version=consent_version,
+            consent_text_snapshot=consent_text,
+            note=str(request.data.get("note", "") or "").strip(),
+            access_session=ceremony_session,
+        )
+
     refreshed = (
         Invoice.objects.filter(id=invoice.id)
         .select_related("project__customer", "created_by")
@@ -229,26 +251,6 @@ def public_invoice_decision_view(request, public_token: str):
     organization = _resolve_organization_for_public_actor(refreshed.created_by)
     serialized["project_context"] = _serialize_public_project_context(refreshed.project)
     serialized["organization_context"] = _serialize_public_organization_context(organization)
-
-    # --- Signing ceremony audit artifact ---
-    consent_text, consent_version = get_ceremony_context()
-    content_hash = compute_document_content_hash("invoice", InvoiceSerializer(refreshed).data)
-    SigningCeremonyRecord.record(
-        document_type="invoice",
-        document_id=invoice.id,
-        public_token=public_token,
-        decision=decision,
-        signer_name=signer_name,
-        signer_email=ceremony_session.recipient_email if ceremony_session else "",
-        email_verified=ceremony_session is not None,
-        content_hash=content_hash,
-        ip_address=request.META.get("REMOTE_ADDR"),
-        user_agent=request.META.get("HTTP_USER_AGENT", ""),
-        consent_text_version=consent_version,
-        consent_text_snapshot=consent_text,
-        note=str(request.data.get("note", "") or "").strip(),
-        access_session=ceremony_session,
-    )
 
     return Response({"data": serialized, "meta": {"public_decision_applied": decision_type}})
 

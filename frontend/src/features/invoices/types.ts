@@ -69,6 +69,8 @@ export type InvoiceRecord = {
     customer_phone?: string | null;
   };
   organization_context?: OrganizationPublicContext;
+  ceremony_consent_text?: string;
+  ceremony_consent_text_version?: string;
 };
 
 export type InvoiceStatusEventRecord = {

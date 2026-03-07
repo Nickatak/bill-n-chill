@@ -63,6 +63,9 @@ def public_estimate_detail_view(request, public_token: str):
     organization = _resolve_organization_for_public_actor(estimate.created_by)
     serialized["project_context"] = _serialize_public_project_context(estimate.project)
     serialized["organization_context"] = _serialize_public_organization_context(organization)
+    consent_text, consent_version = get_ceremony_context()
+    serialized["ceremony_consent_text"] = consent_text
+    serialized["ceremony_consent_text_version"] = consent_version
     return Response({"data": serialized})
 
 
@@ -131,6 +134,7 @@ def public_estimate_decision_view(request, public_token: str):
 
     previous_status = estimate.status
     budget_conversion_meta = {}
+    consent_text, consent_version = get_ceremony_context()
     with transaction.atomic():
         estimate.status = next_status
         estimate.save(update_fields=["status", "updated_at"])
@@ -155,31 +159,29 @@ def public_estimate_decision_view(request, public_token: str):
             )
             budget_conversion_meta["budget_conversion_status"] = conversion_status
 
+        content_hash = compute_document_content_hash("estimate", EstimateSerializer(estimate).data)
+        SigningCeremonyRecord.record(
+            document_type="estimate",
+            document_id=estimate.id,
+            public_token=public_token,
+            decision=decision,
+            signer_name=signer_name,
+            signer_email=ceremony_session.recipient_email if ceremony_session else "",
+            email_verified=ceremony_session is not None,
+            content_hash=content_hash,
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            consent_text_version=consent_version,
+            consent_text_snapshot=consent_text,
+            note=str(request.data.get("note", "") or "").strip(),
+            access_session=ceremony_session,
+        )
+
     actor_user_ids = _organization_user_ids(estimate.created_by)
     serialized = _serialize_estimate(estimate=estimate, actor_user_ids=actor_user_ids)
     organization = _resolve_organization_for_public_actor(estimate.created_by)
     serialized["project_context"] = _serialize_public_project_context(estimate.project)
     serialized["organization_context"] = _serialize_public_organization_context(organization)
-
-    # --- Signing ceremony audit artifact ---
-    consent_text, consent_version = get_ceremony_context()
-    content_hash = compute_document_content_hash("estimate", EstimateSerializer(estimate).data)
-    SigningCeremonyRecord.record(
-        document_type="estimate",
-        document_id=estimate.id,
-        public_token=public_token,
-        decision=decision,
-        signer_name=signer_name,
-        signer_email=ceremony_session.recipient_email if ceremony_session else "",
-        email_verified=ceremony_session is not None,
-        content_hash=content_hash,
-        ip_address=request.META.get("REMOTE_ADDR"),
-        user_agent=request.META.get("HTTP_USER_AGENT", ""),
-        consent_text_version=consent_version,
-        consent_text_snapshot=consent_text,
-        note=str(request.data.get("note", "") or "").strip(),
-        access_session=ceremony_session,
-    )
 
     response_payload = {"data": serialized}
     if budget_conversion_meta:

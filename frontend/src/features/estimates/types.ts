@@ -41,6 +41,8 @@ export type EstimateRecord = {
   line_items?: EstimateLineItemRecord[];
   project_context?: ProjectRecord;
   organization_context?: OrganizationPublicContext;
+  ceremony_consent_text?: string;
+  ceremony_consent_text_version?: string;
 };
 
 export type EstimateLineItemRecord = {

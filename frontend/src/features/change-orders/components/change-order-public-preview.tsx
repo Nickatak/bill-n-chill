@@ -332,6 +332,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
                   total: `$${formatDecimal(parseAmount(changeOrder.amount_delta))}`,
                 }}
                 customerEmailAvailable={Boolean(changeOrder.project_context?.customer_email)}
+                consentText={changeOrder.ceremony_consent_text ?? ""}
                 decisions={[
                   { label: "Approve Change Order", value: "approve", variant: "primary" },
                   { label: "Reject Change Order", value: "reject", variant: "secondary" },
