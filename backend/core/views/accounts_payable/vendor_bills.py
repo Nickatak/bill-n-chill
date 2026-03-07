@@ -26,7 +26,7 @@ from core.views.accounts_payable.vendor_bills_helpers import (
 )
 from core.views.helpers import (
     _capability_gate,
-    _organization_user_ids,
+    _ensure_membership,
     _validate_project_for_user,
 )
 
@@ -146,7 +146,6 @@ def project_vendor_bills_view(request, project_id: int):
       - `backend/core/tests/test_vendor_bills.py::test_vendor_bill_duplicate_requires_existing_match_to_be_void`
       - `backend/core/tests/test_vendor_bills.py::test_vendor_bill_create_rolls_back_when_audit_write_fails`
     """
-    actor_user_ids = _organization_user_ids(request.user)
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -156,7 +155,7 @@ def project_vendor_bills_view(request, project_id: int):
 
     if request.method == "GET":
         rows = (
-            VendorBill.objects.filter(project=project, created_by_id__in=actor_user_ids)
+            VendorBill.objects.filter(project=project)
             .select_related("project", "vendor")
             .prefetch_related("allocations", "allocations__budget_line", "allocations__budget_line__cost_code")
             .order_by("-created_at")
@@ -432,11 +431,11 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
       - `backend/core/tests/test_vendor_bills.py::test_vendor_bill_patch_rejects_bill_number_change`
       - `backend/core/tests/test_vendor_bills.py::test_vendor_bill_status_transitions_create_snapshots_for_all_captured_statuses`
     """
-    actor_user_ids = _organization_user_ids(request.user)
+    membership = _ensure_membership(request.user)
     try:
         vendor_bill = VendorBill.objects.select_related("project", "vendor").get(
             id=vendor_bill_id,
-            created_by_id__in=actor_user_ids,
+            project__organization_id=membership.organization_id,
         )
     except VendorBill.DoesNotExist:
         return Response(
