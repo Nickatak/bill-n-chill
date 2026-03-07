@@ -46,6 +46,7 @@ type UseQuickAddBusinessWorkflowArgs = {
   setInitialContractValue: (value: string) => void;
   setNotes: (value: string) => void;
   setFieldErrors: (errors: LeadFieldErrors) => void;
+  onCustomerCreated?: () => void;
 };
 
 /**
@@ -76,6 +77,7 @@ export function useQuickAddBusinessWorkflow({
   setInitialContractValue,
   setNotes,
   setFieldErrors,
+  onCustomerCreated,
 }: UseQuickAddBusinessWorkflowArgs) {
   // --- User-facing feedback messages ---
 
@@ -227,6 +229,7 @@ export function useQuickAddBusinessWorkflow({
       setNotes("");
       setFieldErrors({});
       fullNameRef.current?.focus();
+      onCustomerCreated?.();
     }
   }
 

@@ -28,6 +28,7 @@ export type PendingSubmission = {
 export type UseQuickAddControllerArgs = {
   token: string;
   baseAuthMessage: string;
+  onCustomerCreated?: () => void;
 };
 
 export type QuickAddControllerApi = {

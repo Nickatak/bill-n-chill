@@ -62,6 +62,7 @@ export function CustomersConsole() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState("");
@@ -182,7 +183,7 @@ export function CustomersConsole() {
     }, 250);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, query, page, normalizedBaseUrl, scopedCustomerId]);
+  }, [token, query, page, normalizedBaseUrl, scopedCustomerId, refreshKey]);
 
   // Fetch project index once on mount for the per-customer project accordion
   useEffect(() => {
@@ -346,7 +347,9 @@ export function CustomersConsole() {
             {isQuickAddExpanded ? "Collapse" : "Expand"}
           </button>
         </div>
-        {isQuickAddExpanded ? <QuickAddConsole /> : null}
+        {isQuickAddExpanded ? (
+          <QuickAddConsole onCustomerCreated={() => setRefreshKey((k) => k + 1)} />
+        ) : null}
       </div>
 
       {/* Browse — search, filters, customer list, pagination */}
