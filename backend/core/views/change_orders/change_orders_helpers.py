@@ -11,7 +11,6 @@ from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
     SYSTEM_BUDGET_LINE_CODES,
     _active_budget_for_project,  # noqa: F401 — re-exported for change_orders.py
-    _organization_user_ids,
     _resolve_organization_for_public_actor,
     _serialize_public_organization_context,
     _serialize_public_project_context,
