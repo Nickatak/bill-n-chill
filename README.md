@@ -62,23 +62,58 @@ Next.js App  <----HTTP/JSON---->  Django/DRF API  <---->  Database
 - Use `docs/setup.md` for full backend/frontend setup and run steps.
 - Use `docs/api.md` and `docs/domain-model.md` as the current contract references.
 
-## Orchestration Contract
+## Docker Compose Layout
 
-This repo is orchestration-ready as a base Docker Compose app repo.
+- `docker-compose.yml` — base service definitions (shared across all environments)
+- `docker-compose.local.yml` — local dev override (publishes ports to host)
+- `docker-compose.prod.yml` — production override (gunicorn, `npm run build`, localhost-only ports for Caddy)
+- Runtime config is environment-variable driven (no required service `env_file`)
+- Local host ports are configurable with `FRONTEND_PORT`, `BACKEND_PORT`, and `MYSQL_PORT`
 
-- Base stack is defined in `docker-compose.yml`.
-- Local host port publishing is defined separately in `docker-compose.local.yml`.
-- Runtime config is environment-variable driven (no required service `env_file`).
-- Local host ports are configurable with `FRONTEND_PORT`, `BACKEND_PORT`, and `MYSQL_PORT`.
-- External orchestration (for example `ntakemori-deploy`) should apply an override file to:
-  - attach services to the shared ingress network (for example `edge`)
-  - set environment-specific values via `--env-file`
+Service names: `frontend`, `backend`, `db`
 
-Stable service names for overrides:
+## Production Deployment
 
-- `frontend`
-- `backend`
-- `db`
+**Live at:** [https://bill-n-chill.com](https://bill-n-chill.com)
+
+- **Host:** Hostinger VPS (16GB / 4 vCPU / 200GB NVMe), Ubuntu
+- **Reverse proxy:** Caddy (auto-SSL via Let's Encrypt)
+- **Stack:** Same Docker Compose as local, with production override
+
+### Domain Routing
+
+| Domain | Service |
+|---|---|
+| `bill-n-chill.com` | Next.js frontend (port 3000) |
+| `api.bill-n-chill.com` | Django/Gunicorn backend (port 8000) |
+| `mg.bill-n-chill.com` | Mailgun sender domain |
+
+### Deployment Files
+
+- `docker-compose.yml` — base service definitions (shared with local dev)
+- `docker-compose.prod.yml` — production overrides (gunicorn, `npm run build`, localhost-only ports)
+- `/etc/caddy/Caddyfile` — reverse proxy config (on VPS, not in repo)
+- `.env` on VPS — production secrets (not committed)
+
+### Deploy Process
+
+```bash
+ssh bnc
+cd ~/bill-n-chill
+git pull
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate
+```
+
+### SSH Access
+
+Configured via `~/.ssh/config` (WSL):
+
+```
+Host bnc
+    HostName REDACTED_IP
+    User deploy
+    IdentityFile ~/.ssh/bill_n_chill_vps
+```
 
 ## Documentation
 
