@@ -1,19 +1,23 @@
 .PHONY: help \
 	env-init \
 	local-install local-install-frontend local-install-backend \
-	local-env-local \
+	local-env-local local-env-prod \
 	local-stop-docker-frontend local-stop-docker-backend \
 	local-run-frontend local-run-backend local-check-db \
 	local-makemigrations local-superuser \
 	local-test local-test-backend local-test-frontend local-clean local-kill-ports \
 	docker-up docker-down docker-logs db-migrate \
-	db-seed db-reset db-reset-hard db-grant-test-db-perms
+	db-seed db-reset db-reset-hard db-grant-test-db-perms \
+	docker-prod-up docker-prod-down docker-prod-logs \
+	db-prod-reset db-prod-reset-hard
 
 BACKEND_PYTHON := .venv/bin/python
 BACKEND_MANAGE := $(BACKEND_PYTHON) backend/manage.py
 COMPOSE_BASE_FILE ?= docker-compose.yml
 COMPOSE_LOCAL_FILE ?= docker-compose.local.yml
+COMPOSE_PROD_FILE ?= docker-compose.prod.yml
 DEV_COMPOSE ?= docker compose -f $(COMPOSE_BASE_FILE) -f $(COMPOSE_LOCAL_FILE)
+PROD_COMPOSE ?= docker compose -f $(COMPOSE_BASE_FILE) -f $(COMPOSE_PROD_FILE)
 DB_SERVICE ?= db
 LOCAL_KILL_PORTS ?= 3000 3001 3002 3003 3004 3005 8000
 
@@ -42,6 +46,13 @@ help:
 	@echo "  make db-reset-hard          Drop dev DB volume and recreate DB container"
 	@echo "  make db-grant-test-db-perms Grant MySQL CREATE/DROP perms for Django tests"
 	@echo ""
+	@echo "Prod Docker Workflow (.env.prod)"
+	@echo "  make docker-prod-up         Full cycle: force-recreate all prod containers"
+	@echo "  make docker-prod-down       Stop prod stack"
+	@echo "  make docker-prod-logs       Stream prod stack logs"
+	@echo "  make db-prod-reset          Flush all prod app data (no reseed)"
+	@echo "  make db-prod-reset-hard     Drop prod DB volume and recreate DB container"
+	@echo ""
 	@echo "Local Utilities"
 	@echo "  make env-init               Switch environment to local (.env.local)"
 	@echo "  make local-makemigrations   Create Django migration files"
@@ -66,6 +77,9 @@ local-install-backend:
 
 local-env-local:
 	./scripts/toggle-env.sh local
+
+local-env-prod:
+	./scripts/toggle-env.sh prod
 
 local-stop-docker-frontend: local-env-local
 	@$(DEV_COMPOSE) stop frontend >/dev/null 2>&1 || true
@@ -165,5 +179,29 @@ db-reset-hard: local-env-local
 
 db-grant-test-db-perms: local-env-local
 	$(DEV_COMPOSE) exec -T $(DB_SERVICE) sh -lc 'mysql -uroot -p"$$MYSQL_ROOT_PASSWORD" -e "GRANT CREATE, DROP ON *.* TO '\''$$MYSQL_USER'\''@'\''%'\''; GRANT ALL PRIVILEGES ON test_bill_n_chill.* TO '\''$$MYSQL_USER'\''@'\''%'\''; FLUSH PRIVILEGES;"'
+
+# ============================================================================
+# DOCKER PROD (.env.prod)
+# ============================================================================
+
+docker-prod-up: local-env-prod
+	$(PROD_COMPOSE) up -d --force-recreate
+
+docker-prod-down: local-env-prod
+	$(PROD_COMPOSE) down --remove-orphans
+
+docker-prod-logs: local-env-prod
+	$(PROD_COMPOSE) logs -f --tail=200
+
+db-prod-reset: local-env-prod
+	@echo "This will flush ALL prod app data with no reseed. Type 'yes' to confirm:"
+	@read ans && [ "$$ans" = "yes" ] || (echo "Aborted."; exit 1)
+	$(PROD_COMPOSE) exec -T backend python manage.py reset_fresh_demo --skip-seed
+
+db-prod-reset-hard: local-env-prod
+	@echo "This will destroy the prod DB volume and all data. Type 'yes' to confirm:"
+	@read ans && [ "$$ans" = "yes" ] || (echo "Aborted."; exit 1)
+	$(PROD_COMPOSE) down -v --remove-orphans
+	$(PROD_COMPOSE) up -d $(DB_SERVICE)
 
 .DEFAULT_GOAL := help
