@@ -3,8 +3,8 @@
 from django.db.models import Sum
 
 from core.models import BudgetLine, VendorBill, VendorBillAllocation
+from core.user_helpers import _ensure_membership
 from core.utils.money import MONEY_ZERO, quantize_money
-from core.views.helpers import _organization_user_ids
 from core.views.helpers import _vendor_scope_filter  # noqa: F401 — re-exported for vendor_bills.py
 
 
@@ -19,10 +19,10 @@ def _find_duplicate_vendor_bills(
     bill_number_norm = (bill_number or "").strip()
     if not vendor_id or not bill_number_norm:
         return []
-    actor_user_ids = _organization_user_ids(user)
+    membership = _ensure_membership(user)
 
     rows = VendorBill.objects.filter(
-        created_by_id__in=actor_user_ids,
+        project__organization_id=membership.organization_id,
         vendor_id=vendor_id,
         bill_number__iexact=bill_number_norm,
     )
@@ -46,11 +46,9 @@ def _validate_allocation_budget_lines(*, project, user, allocations):
     budget_line_ids = [entry["budget_line"] for entry in allocations]
     if not budget_line_ids:
         return {}
-    actor_user_ids = _organization_user_ids(user)
     rows = BudgetLine.objects.filter(
         id__in=budget_line_ids,
         budget__project=project,
-        budget__created_by_id__in=actor_user_ids,
     ).select_related("budget")
     return {row.id: row for row in rows}
 
