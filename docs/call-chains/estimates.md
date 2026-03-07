@@ -43,18 +43,17 @@ Fetches all estimates for the selected project. Called on project selection chan
 
 *── org scope ──*
 
-- [`_organization_user_ids(request.user)`](../../backend/core/views/helpers.py)
 - [`_ensure_membership(request.user)`](../../backend/core/user_helpers.py#L134)
 - [`_validate_project_for_user(project_id, request.user)`](../../backend/core/views/helpers.py)
 
 *── query ──*
 
-- `Estimate.objects.filter(project=project, created_by_id__in=actor_user_ids).prefetch_related("line_items", "line_items__cost_code").order_by("-version")`
+- `Estimate.objects.filter(project=project).prefetch_related("line_items", "line_items__cost_code").order_by("-version")`
 
 *── serialize ──*
 
-- [`_serialize_estimates(estimates, project, actor_user_ids)`](../../backend/core/views/estimating/estimates_helpers.py#L115)
-  - [`_estimate_financial_baseline_context(project, actor_user_ids)`](../../backend/core/views/estimating/estimates_helpers.py#L73)
+- [`_serialize_estimates(estimates, project)`](../../backend/core/views/estimating/estimates_helpers.py#L112)
+  - [`_estimate_financial_baseline_context(project)`](../../backend/core/views/estimating/estimates_helpers.py#L75)
     - `Budget.objects.filter(project=…).select_related("source_estimate")` — builds financial baseline status map
   - `EstimateSerializer(estimates, many=True, context=context)`
 
@@ -94,7 +93,7 @@ Creates a new estimate version within a title family. Includes duplicate-submit 
 
 - [`_line_items_signature(items)`](../../backend/core/views/estimating/estimates.py#L302) — builds tuple signature from input
 - [`_estimate_signature(estimate)`](../../backend/core/views/estimating/estimates.py#L317) — builds tuple signature from DB
-- `Estimate.objects.filter(project, created_by__in, created_at__gte=window_start)` — scan recent
+- `Estimate.objects.filter(project, created_at__gte=window_start)` — scan recent
 - if exact match found → return `200 { data, meta: { deduped: true } }`
 
 *── family guards ──*
@@ -104,7 +103,7 @@ Creates a new estimate version within a title family. Includes duplicate-submit 
 
 *── persist ──*
 
-- [`_next_estimate_family_version(project, user, title)`](../../backend/core/views/estimating/estimates_helpers.py#L57)
+- [`_next_estimate_family_version(project, title)`](../../backend/core/views/estimating/estimates_helpers.py#L57)
 - `Estimate.objects.create(…)` — version, status=draft, terms from org
 - [`_apply_estimate_lines_and_totals(estimate, line_items, tax_percent, user)`](../../backend/core/views/estimating/estimates_helpers.py#L194)
   - [`_calculate_line_totals(line_items_data)`](../../backend/core/views/estimating/estimates_helpers.py#L164) — per-line markup math
@@ -145,7 +144,7 @@ Saves edits to an existing draft estimate (title, valid_through, tax_percent, li
 
 ---
 
-`BACKEND` — [`estimate_detail_view`](../../backend/core/views/estimating/estimates.py#L472) (PATCH path, value-edit branch)
+`BACKEND` — [`estimate_detail_view`](../../backend/core/views/estimating/estimates.py#L466) (PATCH path, value-edit branch)
 
 *── auth ──*
 
@@ -184,7 +183,7 @@ Applies a workflow status change (e.g. draft→sent, sent→approved, →void). 
 
 ---
 
-`BACKEND` — [`estimate_detail_view`](../../backend/core/views/estimating/estimates.py#L472) (PATCH path, status branch)
+`BACKEND` — [`estimate_detail_view`](../../backend/core/views/estimating/estimates.py#L466) (PATCH path, status branch)
 
 *── capability gates ──*
 
@@ -244,7 +243,7 @@ Appends a note to the status history without changing the estimate's status.
 
 ---
 
-`BACKEND` — [`estimate_detail_view`](../../backend/core/views/estimating/estimates.py#L472) (PATCH path)
+`BACKEND` — [`estimate_detail_view`](../../backend/core/views/estimating/estimates.py#L466) (PATCH path)
 
 - same view, `same_status_note_request` branch
 - [`EstimateStatusEvent.record(from_status=current, to_status=current, note=status_note)`](../../backend/core/models/estimating/)
@@ -266,9 +265,9 @@ Fetches the immutable status transition history for an estimate.
 
 ---
 
-`BACKEND` — [`estimate_status_events_view`](../../backend/core/views/estimating/estimates.py#L925)
+`BACKEND` — [`estimate_status_events_view`](../../backend/core/views/estimating/estimates.py#L910)
 
-- [`_organization_user_ids(request.user)`](../../backend/core/views/helpers.py)
+- [`_validate_estimate_for_user(estimate_id, request.user)`](../../backend/core/views/helpers.py)
 - `EstimateStatusEvent.objects.filter(estimate=estimate).select_related(…)`
 - `EstimateStatusEventSerializer(events, many=True)`
 
@@ -289,7 +288,7 @@ Creates a new draft from an existing sent/rejected/voided/archived estimate in t
 
 ---
 
-`BACKEND` — [`estimate_clone_version_view`](../../backend/core/views/estimating/estimates.py#L711)
+`BACKEND` — [`estimate_clone_version_view`](../../backend/core/views/estimating/estimates.py#L703)
 
 *── auth + guards ──*
 
@@ -298,7 +297,7 @@ Creates a new draft from an existing sent/rejected/voided/archived estimate in t
 
 *── persist ──*
 
-- [`_next_estimate_family_version(project, user, title)`](../../backend/core/views/estimating/estimates_helpers.py#L57)
+- [`_next_estimate_family_version(project, title)`](../../backend/core/views/estimating/estimates_helpers.py#L57)
 - `Estimate.objects.create(…)` — same title/terms/tax, new version, status=draft
 - line items copied as dicts → [`_apply_estimate_lines_and_totals(…)`](../../backend/core/views/estimating/estimates_helpers.py#L194)
 
@@ -330,7 +329,7 @@ Duplicates an estimate into a new draft with a different title (or different pro
 
 ---
 
-`BACKEND` — [`estimate_duplicate_view`](../../backend/core/views/estimating/estimates.py#L815)
+`BACKEND` — [`estimate_duplicate_view`](../../backend/core/views/estimating/estimates.py#L801)
 
 *── auth + validation ──*
 
@@ -341,7 +340,7 @@ Duplicates an estimate into a new draft with a different title (or different pro
 
 *── persist ──*
 
-- [`_next_estimate_family_version(target_project, user, target_title)`](../../backend/core/views/estimating/estimates_helpers.py#L57)
+- [`_next_estimate_family_version(target_project, target_title)`](../../backend/core/views/estimating/estimates_helpers.py#L57)
 - `Estimate.objects.create(…)` — target project/title, status=draft
 - line items copied → [`_apply_estimate_lines_and_totals(…)`](../../backend/core/views/estimating/estimates_helpers.py#L194)
 - [`EstimateStatusEvent.record(duplicated, note="Duplicated from…")`](../../backend/core/models/estimating/)
@@ -366,7 +365,7 @@ Manually converts an approved estimate to the active financial baseline (budget)
 
 ---
 
-`BACKEND` — [`estimate_convert_to_budget_view`](../../backend/core/views/estimating/estimates.py#L945)
+`BACKEND` — [`estimate_convert_to_budget_view`](../../backend/core/views/estimating/estimates.py#L923)
 
 *── auth ──*
 
@@ -502,7 +501,7 @@ Customer submits their approve/reject decision through the public share link, wi
 
 *── serialize response ──*
 
-- [`_serialize_estimate(estimate, actor_user_ids)`](../../backend/core/views/estimating/estimates_helpers.py#L106)
+- [`_serialize_estimate(estimate)`](../../backend/core/views/estimating/estimates_helpers.py#L106)
 - [`_serialize_public_project_context(…)`](../../backend/core/views/helpers.py)
 - [`_serialize_public_organization_context(…)`](../../backend/core/views/helpers.py)
 
