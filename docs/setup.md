@@ -1,6 +1,6 @@
 # Setup
 
-Last reviewed: 2026-02-28
+Last reviewed: 2026-03-07
 
 ## Prerequisites
 
@@ -8,6 +8,25 @@ Last reviewed: 2026-02-28
 - Node.js 20+
 - npm or pnpm
 - Git
+- Docker + Docker Compose (for DB and full stack)
+- make
+
+## System Dependencies (Ubuntu/Debian)
+
+The following apt packages must be installed on the host before running `make local-install`:
+
+```bash
+sudo apt-get install -y make python3.12-venv
+```
+
+Node.js 20+ is not in the default Ubuntu apt repos. Install via NodeSource:
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+
+Docker and Docker Compose are also required for the DB container. Install via the official Docker docs for your distro.
 
 ## Services
 
