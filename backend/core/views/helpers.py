@@ -15,7 +15,6 @@ from core.models import (
 )
 from core.rbac import _capability_gate  # noqa: F401 — re-exported for view modules
 from core.user_helpers import _ensure_membership  # noqa: F401 — re-exported for view modules
-from core.user_helpers import _organization_user_ids  # noqa: F401 — re-exported for view modules
 
 SYSTEM_BUDGET_LINE_SPECS = [
     {

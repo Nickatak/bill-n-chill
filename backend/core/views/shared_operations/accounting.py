@@ -8,7 +8,7 @@ from rest_framework.response import Response
 
 from core.models import AccountingSyncEvent, AccountingSyncRecord
 from core.serializers import AccountingSyncEventSerializer, AccountingSyncEventWriteSerializer
-from core.views.helpers import _capability_gate, _organization_user_ids, _validate_project_for_user
+from core.views.helpers import _capability_gate, _ensure_membership, _validate_project_for_user
 
 
 def _build_accounting_sync_snapshot(sync_event: AccountingSyncEvent) -> dict:
@@ -69,7 +69,6 @@ def project_accounting_sync_events_view(request, project_id: int):
     - `POST`: requires `accounting_sync.create` capability and core sync identity fields.
     - Create writes are atomic: sync row plus immutable `AccountingSyncRecord(created)`.
     """
-    actor_user_ids = _organization_user_ids(request.user)
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -80,7 +79,6 @@ def project_accounting_sync_events_view(request, project_id: int):
     if request.method == "GET":
         rows = AccountingSyncEvent.objects.filter(
             project=project,
-            created_by_id__in=actor_user_ids,
         ).order_by("-created_at", "-id")
         return Response({"data": AccountingSyncEventSerializer(rows, many=True).data})
 
@@ -155,11 +153,11 @@ def accounting_sync_event_retry_view(request, sync_event_id: int):
     - Successful sync rows are not retryable; already queued rows return no-op meta.
     - Retry writes are atomic: status fields update plus immutable `AccountingSyncRecord(retried)`.
     """
-    actor_user_ids = _organization_user_ids(request.user)
+    membership = _ensure_membership(request.user)
     try:
         sync_event = AccountingSyncEvent.objects.get(
             id=sync_event_id,
-            created_by_id__in=actor_user_ids,
+            project__organization_id=membership.organization_id,
         )
     except AccountingSyncEvent.DoesNotExist:
         return Response(
