@@ -677,10 +677,7 @@ class ProjectFinancialSummaryTests(TestCase):
         data = response.json()["data"]
         self.assertEqual(data["contract_value_original"], "100000.00")
         self.assertEqual(data["contract_value_current"], "103000.00")
-        self.assertEqual(data["accepted_contract_total"], "0.00")
-        self.assertIsNone(data["active_budget_id"])
-        self.assertIsNone(data["active_budget_source_estimate_id"])
-        self.assertIsNone(data["active_budget_source_estimate_version"])
+        self.assertEqual(data["accepted_contract_total"], "2000.00")
         self.assertEqual(data["approved_change_orders_total"], "2000.00")
         self.assertEqual(data["invoiced_to_date"], "1200.00")
         self.assertEqual(data["paid_to_date"], "800.00")
@@ -713,7 +710,7 @@ class ProjectFinancialSummaryTests(TestCase):
         self.assertEqual(len(data["traceability"]["ap_vendor_bills"]["records"]), 1)
         self.assertEqual(len(data["traceability"]["ap_payments"]["records"]), 1)
 
-    def test_project_financial_summary_accepted_contract_total_is_zero_without_active_budget(self):
+    def test_project_financial_summary_accepted_contract_total_is_zero_without_approved_docs(self):
         response = self.client.get(
             f"/api/v1/projects/{self.project.id}/financial-summary/",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -723,9 +720,6 @@ class ProjectFinancialSummaryTests(TestCase):
         self.assertEqual(data["contract_value_original"], "100000.00")
         self.assertEqual(data["contract_value_current"], "103000.00")
         self.assertEqual(data["accepted_contract_total"], "0.00")
-        self.assertIsNone(data["active_budget_id"])
-        self.assertIsNone(data["active_budget_source_estimate_id"])
-        self.assertIsNone(data["active_budget_source_estimate_version"])
 
     def test_project_accounting_export_json_and_csv_match_summary_totals(self):
         self._seed_financial_records()
@@ -1209,7 +1203,7 @@ class ProjectTimelineTests(TestCase):
             created_by=self.user,
         )
 
-    def test_project_timeline_merges_financial_and_workflow_events(self):
+    def test_project_timeline_returns_workflow_events(self):
         estimate = Estimate.objects.create(
             project=self.project,
             version=1,
@@ -1224,17 +1218,6 @@ class ProjectTimelineTests(TestCase):
             note="Sent for review",
             changed_by=self.user,
         )
-        FinancialAuditEvent.objects.create(
-            project=self.project,
-            event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
-            object_type="invoice",
-            object_id=123,
-            from_status=Invoice.Status.DRAFT,
-            to_status=Invoice.Status.SENT,
-            amount="125.00",
-            note="Invoice sent",
-            created_by=self.user,
-        )
 
         response = self.client.get(
             f"/api/v1/projects/{self.project.id}/timeline/?category=all",
@@ -1244,12 +1227,11 @@ class ProjectTimelineTests(TestCase):
         data = response.json()["data"]
         self.assertEqual(data["project_id"], self.project.id)
         self.assertEqual(data["category"], "all")
-        self.assertEqual(data["item_count"], 2)
-        categories = {item["category"] for item in data["items"]}
-        self.assertEqual(categories, {"financial", "workflow"})
-        for item in data["items"]:
-            self.assertIn("ui_route", item)
-            self.assertIn("detail_endpoint", item)
+        self.assertEqual(data["item_count"], 1)
+        self.assertEqual(data["items"][0]["category"], "workflow")
+        self.assertEqual(data["items"][0]["event_type"], "estimate_status_event")
+        self.assertIn("ui_route", data["items"][0])
+        self.assertIn("detail_endpoint", data["items"][0])
 
     def test_project_timeline_category_filter_validation_and_scope(self):
         invalid = self.client.get(

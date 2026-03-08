@@ -73,7 +73,7 @@ class Command(BaseCommand):
         return user, token, membership
 
     def _cost_codes(self, user):
-        """Return two cost codes for estimate/budget line seeding."""
+        """Return two cost codes for estimate line seeding."""
         membership = _ensure_membership(user)
         codes = list(
             CostCode.objects.filter(organization=membership.organization, is_active=True)

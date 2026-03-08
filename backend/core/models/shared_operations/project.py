@@ -65,10 +65,7 @@ class Project(StatusTransitionMixin, models.Model):
         related_name="projects",
     )
     name = models.CharField(max_length=255)
-    site_address = models.CharField(
-        max_length=255,
-        blank=True,
-    )
+    site_address = models.TextField(blank=True)
     status = models.CharField(
         max_length=32,
         choices=Status.choices,

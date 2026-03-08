@@ -13,9 +13,7 @@ Manage estimate authoring, revision flow, status lifecycle, and customer-facing 
    - update estimate fields/status (`PATCH /estimates/{id}/`)
    - clone version (`POST /estimates/{id}/clone-version/`)
    - duplicate as new draft (`POST /estimates/{id}/duplicate/`)
-2. `Budget`
-   - create baseline from estimate (`POST /estimates/{id}/convert-to-budget/`)
-3. `PublicEstimateDecision`
+2. `PublicEstimateDecision`
    - approve/reject actions through public preview workflow (`GET /public/estimates/{public_token}/` + decision mutation path in preview flow)
 
 ## Composition and Entry Flow
@@ -51,9 +49,7 @@ Manage estimate authoring, revision flow, status lifecycle, and customer-facing 
    clones selected estimate into next revision.
 7. `POST /estimates/{id}/duplicate/`:
    duplicates selected estimate as new draft lineage.
-8. `POST /estimates/{id}/convert-to-budget/`:
-   converts approved estimate to budget baseline.
-9. `GET /estimates/{id}/status-events/`:
+8. `GET /estimates/{id}/status-events/`:
    loads status-history events for selected estimate.
 10. `GET /public/estimates/{public_token}/`:
    hydrates customer-facing public estimate preview.

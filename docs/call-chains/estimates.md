@@ -2,7 +2,7 @@
 
 > **Line anchors are pinned manually.** Update after refactors that move function definitions.
 
-End-to-end function call order for each estimate action. View logic lives in [`estimates.py`](../../backend/core/views/estimating/estimates.py); domain helpers in [`estimates_helpers.py`](../../backend/core/views/estimating/estimates_helpers.py); budget conversion in [`budgets_helpers.py`](../../backend/core/views/estimating/budgets_helpers.py).
+End-to-end function call order for each estimate action. View logic lives in [`estimates.py`](../../backend/core/views/estimating/estimates.py); domain helpers in [`estimates_helpers.py`](../../backend/core/views/estimating/estimates_helpers.py).
 
 ## Load Policy Contract
 
@@ -52,8 +52,6 @@ Fetches all estimates for the selected project. Called on project selection chan
 *── serialize ──*
 
 - [`_serialize_estimates(estimates, project)`](../../backend/core/views/estimating/estimates_helpers.py#L117)
-  - [`_estimate_financial_baseline_context(project)`](../../backend/core/views/estimating/estimates_helpers.py#L74)
-    - `Budget.objects.filter(project=…).select_related("source_estimate")` — builds financial baseline status map
   - `EstimateSerializer(estimates, many=True, context=context)`
 
 ---
@@ -108,7 +106,6 @@ Creates a new estimate version within a title family. Includes duplicate-submit 
   - [`_calculate_line_totals(line_items_data)`](../../backend/core/views/estimating/estimates_helpers.py#L163) — per-line markup math
   - [`_resolve_cost_codes_for_user(user, items)`](../../backend/core/views/helpers.py#L175) — validates cost code ownership
   - `estimate.line_items.all().delete()` + `EstimateLineItem.objects.bulk_create(…)`
-  - `ScopeItem` get-or-create for each described line
   - saves totals: `subtotal`, `markup_total`, `tax_total`, `grand_total`
 
 *── audit + archive ──*
@@ -211,24 +208,13 @@ Applies a workflow status change (e.g. draft→sent, sent→approved, →void). 
 
 - [`_activate_project_from_estimate_approval(estimate, actor, note)`](../../backend/core/views/estimating/estimates_helpers.py#L134)
   - prospect/on-hold → active transition
-  - [`FinancialAuditEvent.record(…)`](../../backend/core/models/financial_auditing/)
-- [`_ensure_budget_from_approved_estimate(estimate, user, note, allow_supersede=True)`](../../backend/core/views/estimating/budgets_helpers.py#L157)
-  - [`_sync_project_contract_baseline_if_unset(estimate)`](../../backend/core/views/estimating/estimates_helpers.py#L123) — sets contract values if zero
-  - idempotency: returns `"already_converted"` if budget exists
-  - conflict: returns `"requires_supersede"` if another estimate's budget is active
-  - [`_create_budget_from_estimate(estimate, user)`](../../backend/core/views/estimating/budgets_helpers.py#L102)
-    - [`_supersede_active_project_budgets(…)`](../../backend/core/views/estimating/budgets_helpers.py#L58)
-    - `Budget.objects.create(…)` with [`_build_budget_baseline_snapshot(estimate)`](../../backend/core/views/estimating/budgets_helpers.py#L18)
-    - `BudgetLine.objects.bulk_create(…)` — estimate lines + system overhead lines
-  - [`FinancialAuditEvent.record(…)`](../../backend/core/models/financial_auditing/)
 
 ---
 
 `HTTP 200` → `FRONTEND`
 
-- `setEstimates(current.map(…))` — replaces updated, marks superseded baselines
+- `setEstimates(current.map(…))` — replaces updated record
 - `loadStatusEvents({ estimateId, quiet: true })` — refreshes history panel
-- budget conversion feedback: `"Estimate approved and set as the active estimate."`
 
 ## Add Status Note (PATCH)
 
@@ -352,41 +338,6 @@ Duplicates an estimate into a new draft with a different title (or different pro
 - if different project: `setSelectedProjectId(…)` — triggers project switch + reload
 - `handleSelectEstimate(duplicated)`
 
-## Convert to Budget
-
-Manually converts an approved estimate to the active financial baseline (budget). Idempotent.
-
-`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1273)
-
-- [`handleActivateFinancialBaseline()`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1273)
-  - `fetch POST /estimates/{estimateId}/convert-to-budget/`
-  - body: `{ supersede_active: true }`
-
----
-
-`BACKEND` — [`estimate_convert_to_budget_view`](../../backend/core/views/estimating/estimates.py#L923)
-
-*── auth ──*
-
-- [`_capability_gate(request.user, "estimates", "approve")`](../../backend/core/rbac.py#L18)
-- `supersede_active` requires `org_identity.edit` capability (owner-only)
-
-*── validation ──*
-
-- estimate must be `approved` status
-
-*── conversion ──*
-
-- [`_ensure_budget_from_approved_estimate(estimate, user, note, allow_supersede)`](../../backend/core/views/estimating/budgets_helpers.py#L157)
-  - see [Status Transition → if approved](#status-transition-patch) for full sub-chain
-
----
-
-`HTTP 201` (converted) / `HTTP 200` (already_converted) / `HTTP 409` (requires_supersede) → `FRONTEND`
-
-- `loadEstimates({ preserveSelection: true })` — full reload to reflect baseline changes
-- `loadStatusEvents(…)` — refresh history
-
 ## Public Estimate Detail
 
 Public (unauthenticated) endpoint for customer estimate review. Served at `/estimate/{publicRef}`.
@@ -493,7 +444,6 @@ Customer submits their approve/reject decision through the public share link, wi
   - [`EstimateStatusEvent.record(…)`](../../backend/core/models/estimating/)
   - *── if approved ──*
   - [`_activate_project_from_estimate_approval(…)`](../../backend/core/views/estimating/estimates_helpers.py#L134)
-  - [`_ensure_budget_from_approved_estimate(…, allow_supersede=True)`](../../backend/core/views/estimating/budgets_helpers.py#L157)
   - *── signing ceremony record ──*
   - [`compute_document_content_hash("estimate", serialized)`](../../backend/core/utils/signing.py)
   - [`SigningCeremonyRecord.record(…)`](../../backend/core/models/) — document_type, decision, signer info, IP, user agent, consent snapshot, content hash
@@ -523,7 +473,6 @@ Customer submits their approve/reject decision through the public share link, wi
 | `/estimates/{id}/status-events/` | GET | `estimate_status_events_view` | Token |
 | `/estimates/{id}/clone-version/` | POST | `estimate_clone_version_view` | Token + `estimates.create` |
 | `/estimates/{id}/duplicate/` | POST | `estimate_duplicate_view` | Token + `estimates.create` |
-| `/estimates/{id}/convert-to-budget/` | POST | `estimate_convert_to_budget_view` | Token + `estimates.approve` (+ `org_identity.edit` for supersede) |
 | `/public/estimates/{token}/` | GET | `public_estimate_detail_view` | None |
 | `/public/estimates/{token}/otp/` | POST | `public_estimate_request_otp_view` | None |
 | `/public/estimates/{token}/otp/verify/` | POST | `public_estimate_verify_otp_view` | None |

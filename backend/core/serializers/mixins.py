@@ -1,9 +1,9 @@
 """Shared helpers for serializer method fields.
 
 These functions extract the duplicated public-decision display logic that
-appears in FinancialAuditEventSerializer, EstimateStatusEventSerializer,
-and InvoiceStatusEventSerializer.  Each serializer provides a ``customer_fn``
-callable that navigates from the event object to the associated Customer.
+appears in EstimateStatusEventSerializer and InvoiceStatusEventSerializer.
+Each serializer provides a ``customer_fn`` callable that navigates from the
+event object to the associated Customer.
 """
 
 from __future__ import annotations
@@ -16,8 +16,8 @@ def _is_public_decision(obj: Any) -> bool:
 
     Checks two signals:
     * ``"via public link"`` substring in ``obj.note`` (all event models).
-    * ``metadata_json.public_decision is True`` (FinancialAuditEvent only,
-      but the extra attribute access is harmless for models that lack it).
+    * ``metadata_json.public_decision is True`` (legacy signal, harmless
+      extra attribute access for models that lack it).
     """
     note = getattr(obj, "note", "") or ""
     if "via public link" in note.lower():

@@ -18,8 +18,8 @@ Status: Accepted
 - The product already had public read-only estimate/invoice share links.
 - We needed actionable public approval to reduce back-and-forth and preserve audit trace.
 - Approval semantics differ by object type:
-  - estimates govern budget activation lineage,
-  - change orders affect financial deltas against active baseline,
+  - estimates establish the project contract baseline,
+  - change orders affect financial deltas against the contract value,
   - invoices represent payment/dispute signals.
 
 ## Rationale
@@ -37,7 +37,7 @@ Status: Accepted
 - Endpoint: `POST /api/v1/public/estimates/<token>/decision/`
 - Allowed from: `sent`
 - Decisions:
-  - `approve` -> `approved` + estimate status event + existing budget conversion path
+  - `approve` -> `approved` + estimate status event
   - `reject` -> `rejected` + estimate status event
 
 ### Change Orders
@@ -48,17 +48,17 @@ Status: Accepted
   - `POST /api/v1/public/change-orders/<token>/decision/`
 - Allowed from: `pending_approval`
 - Decisions:
-  - `approve` -> `approved` + applied financial delta to `Project.contract_value_current` and active `Budget.approved_change_order_total`
+  - `approve` -> `approved` + applied financial delta to `Project.contract_value_current`
   - `reject` -> `rejected`
-- Both write financial audit + immutable decision snapshot.
+- Both write immutable decision snapshot.
 
 ### Invoices
 
 - Endpoint: `POST /api/v1/public/invoices/<token>/decision/`
 - Allowed from: `sent`, `partially_paid`, `overdue`
 - Decisions:
-  - `approve` -> transition to `paid` + status event + financial audit note
-  - `dispute` -> note-only event (`from_status == to_status`) + financial audit note
+  - `approve` -> transition to `paid` + status event
+  - `dispute` -> note-only event (`from_status == to_status`)
 
 ## Tradeoffs
 

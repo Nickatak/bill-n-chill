@@ -36,7 +36,7 @@ Bill n' Chill uses **DRF token authentication** with a **capability-based RBAC**
 | Layer | File | Purpose |
 |---|---|---|
 | Backend | [`views/auth.py`](../backend/core/views/auth.py) | Login, register, me, verify-invite, accept-invite |
-| Backend | [`views/helpers.py`](../backend/core/views/helpers.py) | Financial helpers, org scoping, re-exports RBAC gates |
+| Backend | [`views/helpers.py`](../backend/core/views/helpers.py) | Cross-domain shared helpers, org scoping, re-exports RBAC gates |
 | Backend | [`user_helpers.py`](../backend/core/user_helpers.py) | `_resolve_user_role`, `_resolve_user_capabilities`, `_ensure_membership` |
 | Backend | [`rbac.py`](../backend/core/rbac.py) | `_capability_gate` (enforcement) |
 | Backend | [`models/shared_operations/organization_invite.py`](../backend/core/models/shared_operations/organization_invite.py) | OrganizationInvite model |
@@ -333,7 +333,7 @@ The `hasAnyRole(role, allowedRoles)` helper still exists for legacy compatibilit
 
 ## Permission Matrix
 
-Five system roles with preset capability matrices, seeded in migration [`0002_rbac_phase1.py`](../backend/core/migrations/0002_rbac_phase1.py):
+Five system roles with preset capability matrices, seeded in migration [`0001_initial.py`](../backend/core/migrations/0001_initial.py):
 
 | Resource | Owner | PM | Worker | Bookkeeping | Viewer |
 |---|---|---|---|---|---|
@@ -345,11 +345,11 @@ Five system roles with preset capability matrices, seeded in migration [`0002_rb
 | customers | view, create, edit, disable | view, create, edit, disable | view, create, edit | view | view |
 | cost_codes | view, create, edit, disable | view, create, edit, disable | view, create, edit | view, create, edit | view |
 | vendors | view, create, edit, disable | view, create, edit, disable | view, create, edit | view, create, edit | view |
-| budgets | view | view | view | view | view |
+| payments | view, create, edit, allocate | view, create, edit, allocate | view | view, create, edit, allocate | view |
+| accounting_sync | view, create, retry | view | view | view, create, retry | view |
 | org_identity | view, edit | view | view | view | view |
 | org_presets | view, edit | view, edit | view | view | view |
 | users | view, invite, edit_role, disable | view, invite, edit_role, disable | — | — | — |
-| financial_audit | view | view | view | view | view |
 
 ### Role Summaries
 
@@ -371,11 +371,9 @@ customers:        view, create, edit, disable
 cost_codes:       view, create, edit, disable
 vendors:          view, create, edit, disable
 payments:         view, create, edit, allocate
-budgets:          view, edit
 org_identity:     view, edit
 org_presets:      view, edit
 users:            view, invite, edit_role, disable
-financial_audit:  view
 accounting_sync:  view, create, retry
 ```
 

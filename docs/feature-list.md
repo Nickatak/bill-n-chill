@@ -9,7 +9,7 @@ Track implementation-complete feature slices without duplicating full API/domain
 ## Current Status
 
 - Current Feature: `Complete`
-- Completed Features: `36/36`
+- Completed Features: `34/34`
 - State: all MVP v1 slices and RBAC phases listed below are shipped.
 
 ## How To Use This File
@@ -35,52 +35,50 @@ Track implementation-complete feature slices without duplicating full API/domain
 6. `INT-03` Convert lead to customer + project shell
 7. `PRJ-01` Project profile and contract baseline
 
-### Phase 2: Estimating and Budget Baseline
+### Phase 2: Estimating
 
 8. `EST-01` Cost code management
 9. `EST-02` Estimate authoring and versioning
 10. `EST-03` Estimate approval lifecycle
-11. `BGT-01` Convert approved estimate to budget
 
 ### Phase 3: Change Management and Billing
 
-12. `CO-01` Change order creation and lifecycle
-13. `CO-02` Change order financial propagation
-14. `CO-03` Change order decision snapshots
-15. `INV-01` Invoice composition and send
-16. `INV-02` Unapproved scope billing protection
+11. `CO-01` Change order creation and lifecycle
+12. `CO-02` Change order financial propagation
+13. `CO-03` Change order decision snapshots
+14. `INV-01` Invoice composition and send
+15. `INV-02` Unapproved scope billing protection
 
 ### Phase 4: AP and Payments
 
-17. `VEN-01` Vendor directory
-18. `AP-01` Vendor bill intake and lifecycle
-19. `PAY-01` Payment recording (inbound/outbound)
-20. `PAY-02` Payment allocation engine
+16. `VEN-01` Vendor directory
+17. `AP-01` Vendor bill intake and lifecycle
+18. `PAY-01` Payment recording (inbound/outbound)
+19. `PAY-02` Payment allocation engine
 
 ### Phase 5: Financial Visibility and Accounting
 
-21. `FIN-01` Project financial summary
-22. `FIN-02` Drill-down traceability
-23. `RPT-01` Reporting pack (portfolio + change-impact)
-24. `RPT-02` Attention feed
-25. `ACC-01` Accounting export bridge
-26. `ACC-02` QuickBooks sync foundation
+20. `FIN-01` Project financial summary
+21. `FIN-02` Drill-down traceability
+22. `RPT-01` Reporting pack (portfolio + change-impact)
+23. `RPT-02` Attention feed
+24. `ACC-01` Accounting export bridge
+25. `ACC-02` QuickBooks sync foundation
 
 ### Phase 6: UX, Quality, and Operational Readiness
 
-27. `OPS-ORG-01` Organization management and RBAC console
-28. `NAV-01` Search + quick jump
-29. `UX-01` Mobile-first core action UX
-30. `UX-02` Desktop deep-work UX
-31. `UX-03` Theme system (light + dark)
-32. `QA-01` Financial audit trail
-33. `QA-02` Project timeline / activity center
+26. `OPS-ORG-01` Organization management and RBAC console
+27. `NAV-01` Search + quick jump
+28. `UX-01` Mobile-first core action UX
+29. `UX-02` Desktop deep-work UX
+30. `UX-03` Theme system (light + dark)
+31. `QA-02` Project timeline / activity center
 
 ### Phase 7: RBAC and Capability Enforcement
 
-34. `RBAC-01` Org model cleanup, RoleTemplate with capability flags, system role presets
-35. `RBAC-02` Backend capability-based enforcement across all views
-36. `RBAC-03` Frontend capability wiring (`canDo` replaces `hasAnyRole`)
+32. `RBAC-01` Org model cleanup, RoleTemplate with capability flags, system role presets
+33. `RBAC-02` Backend capability-based enforcement across all views
+34. `RBAC-03` Frontend capability wiring (`canDo` replaces `hasAnyRole`)
 
 ## Workflow IA Note
 

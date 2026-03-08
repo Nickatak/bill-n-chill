@@ -41,13 +41,13 @@ bill-n-chill is the operational and financial thread that keeps project scope ch
 2. Project and contract setup
 - Create project, customer, contract value, and baseline start/end dates.
 
-3. Estimate to budget handoff
+3. Estimating
 - Define line items with cost codes and markup.
-- Convert approved estimate to project budget/SOV baseline.
+- Approve estimates to establish project contract baseline.
 
 4. Change order workflow
 - Draft, approve/reject, and apply change orders.
-- Auto-adjust budget and billing availability after approval.
+- Auto-adjust contract value after approval.
 
 5. Customer invoicing
 - Generate progress or milestone invoices from approved scope.
@@ -107,7 +107,7 @@ Goal: strengthen legal enforceability and signer verification for estimate/chang
 - Every financial number should trace back to source records.
 - Change orders must be impossible to miss in downstream billing.
 - Simple defaults first; advanced controls behind explicit toggles.
-- Dark mode only for MVP v1 (high-contrast, outdoor-legible). Light mode deferred.
+- Both dark mode and light mode are implemented, with a theme toggle. Dark mode provides high-contrast, outdoor-legible tokens; light mode is the default for public-facing pages.
 
 ## Mobile and Desktop Strategy (v1)
 
@@ -122,12 +122,14 @@ Primary mobile workflows:
 
 Primary desktop workflows:
 - Estimate authoring and revision.
-- Budget and cost-code management.
+- Cost-code management.
 - Invoice composition, financial reconciliation, and reporting.
 
 Theme requirements:
-- Dark mode only for MVP v1 — high-contrast tokens tuned for outdoor/construction-site legibility.
-- Light mode and theme toggle deferred (see `docs/deferred/DEFERRED_THEME_MODES.md`).
+- Both dark and light modes are implemented with a user-facing theme toggle.
+- Dark mode provides high-contrast tokens tuned for outdoor/construction-site legibility.
+- Light mode is forced on public-facing pages; internal pages respect the user's toggle.
+- *(Original plan was dark-mode-only for MVP; light mode shipped ahead of schedule.)*
 
 ## Core Success Metrics
 
@@ -145,11 +147,11 @@ Theme requirements:
 
 ## v1 Functional Acceptance Criteria
 
-1. Estimate conversion
-- Converting an estimate creates immutable baseline snapshot and editable working budget.
+1. Estimate approval
+- Approving an estimate establishes the project contract baseline.
 
 2. CO propagation
-- Approved change order updates project financial summary and invoice availability automatically.
+- Approved change order updates project contract value and financial summary automatically.
 
 3. Invoice lifecycle
 - Invoice supports draft, sent, partial, paid, void states with audit trail.
@@ -163,7 +165,7 @@ Theme requirements:
 ## Delivery Phases
 
 Phase 1: Financial Backbone
-- Projects, customers, estimates, budgets, change orders, invoices.
+- Projects, customers, estimates, change orders, invoices.
 
 Phase 2: AP + Payment Operations
 - Vendor bills, payment records, reconciliation views.
@@ -175,8 +177,8 @@ Phase 3: Integrations + Stabilization
 
 1. Data model and API contracts for core entities.
 2. Project financial summary endpoint and UI.
-3. Estimate-to-budget conversion flow.
-4. Change order approval + budget impact logic.
+3. Estimate approval + contract baseline flow.
+4. Change order approval + contract value impact logic.
 5. Invoice and payment workflows.
 6. Accounting export/sync adapter.
 

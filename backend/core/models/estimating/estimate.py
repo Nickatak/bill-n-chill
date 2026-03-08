@@ -17,8 +17,7 @@ class Estimate(StatusTransitionMixin, models.Model):
     Business workflow:
     - Pre-baseline commercial entity discussed with the customer.
     - Revised by version/status lifecycle until customer approval.
-    - Approved estimate can be converted into an internal Budget baseline.
-    - Distinction: an approved Estimate is still customer-facing; Budget is internal.
+    - Approved estimate becomes the active financial baseline for the project.
 
     Current policy:
     - Plain English: this is the proposal the customer reviews/approves.

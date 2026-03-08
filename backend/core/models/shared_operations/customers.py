@@ -37,7 +37,7 @@ class Customer(models.Model):
     display_name = models.CharField(max_length=255)
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=50, blank=True)
-    billing_address = models.CharField(max_length=255, blank=True)
+    billing_address = models.TextField(blank=True)
     is_archived = models.BooleanField(default=False)
     created_by = models.ForeignKey(
         User,

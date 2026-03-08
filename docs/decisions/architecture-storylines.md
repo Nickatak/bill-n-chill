@@ -34,7 +34,7 @@ Last updated: 2026-02-28
 
 ## Bug Report Angles To Reuse
 - State-transition mismatch: expected allowed transition vs denied transition and current status.
-- Financial propagation mismatch: change order approval/void not reflected in contract/budget aggregates.
+- Financial propagation mismatch: change order approval/void not reflected in contract value aggregates.
 - Traceability mismatch: summary metric does not match source record subtotal.
 - Public decision conflict: token valid but object no longer in decision-eligible status.
 

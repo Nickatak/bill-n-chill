@@ -15,7 +15,7 @@ class VendorBill(StatusTransitionMixin, models.Model):
     Business workflow:
     - Internal payable document (vendor-facing), not customer-facing billing.
     - Tracks AP lifecycle from intake through approval/scheduling/payment.
-    - Vendor + bill number must be unique for non-void bills (reuse allowed after void).
+    - Project + vendor + bill number must be unique for non-void bills (reuse allowed after void).
     - `created_by` captures who created/owns the bill record, not who performed
       later lifecycle decisions (those belong in immutable decision captures).
     """
@@ -85,11 +85,11 @@ class VendorBill(StatusTransitionMixin, models.Model):
         ordering = ["-created_at"]
         constraints = [
             models.UniqueConstraint(
-                "created_by",
+                "project",
                 "vendor",
                 models.functions.Lower("bill_number"),
                 condition=~models.Q(status="void"),
-                name="uniq_active_vendor_bill_number_per_user_vendor_ci",
+                name="uniq_active_vendor_bill_number_per_project_vendor_ci",
             )
         ]
 
