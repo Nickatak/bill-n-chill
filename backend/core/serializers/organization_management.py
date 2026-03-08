@@ -42,7 +42,7 @@ class OrganizationProfileSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if request:
             return request.build_absolute_uri(obj.logo.url)
-        return obj.logo.url
+        return ""
 
 
 class OrganizationMembershipSerializer(serializers.ModelSerializer):

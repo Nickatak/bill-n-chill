@@ -72,7 +72,7 @@ def public_invoice_detail_view(request, public_token: str):
     serialized = InvoiceSerializer(invoice).data
     organization = _resolve_organization_for_public_actor(invoice.created_by)
     serialized["project_context"] = _serialize_public_project_context(invoice.project)
-    serialized["organization_context"] = _serialize_public_organization_context(organization)
+    serialized["organization_context"] = _serialize_public_organization_context(organization, request=request)
     consent_text, consent_version = get_ceremony_context()
     serialized["ceremony_consent_text"] = consent_text
     serialized["ceremony_consent_text_version"] = consent_version
@@ -251,7 +251,7 @@ def public_invoice_decision_view(request, public_token: str):
     serialized = InvoiceSerializer(refreshed).data
     organization = _resolve_organization_for_public_actor(refreshed.created_by)
     serialized["project_context"] = _serialize_public_project_context(refreshed.project)
-    serialized["organization_context"] = _serialize_public_organization_context(organization)
+    serialized["organization_context"] = _serialize_public_organization_context(organization, request=request)
 
     return Response({"data": serialized, "meta": {"public_decision_applied": decision_type}})
 
@@ -378,7 +378,7 @@ def project_invoices_view(request, project_id: int):
         default_sender_name=(organization.display_name or "").strip(),
         default_sender_email="",
         default_sender_address=(organization.billing_address or "").strip(),
-        default_sender_logo_url=organization.logo.url if organization.logo else "",
+        default_sender_logo_url=request.build_absolute_uri(organization.logo.url) if organization.logo else "",
         default_terms_text=(organization.invoice_terms_and_conditions or "").strip(),
         default_footer_text="",
         default_notes_text="",

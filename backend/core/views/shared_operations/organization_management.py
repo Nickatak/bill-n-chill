@@ -29,7 +29,7 @@ def organization_profile_view(request):
     organization = membership.organization
 
     if request.method == "GET":
-        profile_payload = OrganizationProfileSerializer(organization).data
+        profile_payload = OrganizationProfileSerializer(organization, context={"request": request}).data
         current_membership_payload = OrganizationMembershipSerializer(
             membership, context={"request": request}
         ).data
@@ -121,7 +121,7 @@ def organization_profile_view(request):
     return Response(
         {
             "data": {
-                "organization": OrganizationProfileSerializer(organization).data,
+                "organization": OrganizationProfileSerializer(organization, context={"request": request}).data,
                 "role_policy": _organization_role_policy(request.user),
             },
             "meta": {"changed_fields": changed_fields},

@@ -16,12 +16,12 @@ from core.views.helpers import (
 )
 
 
-def _serialize_public_change_order(change_order) -> dict:
+def _serialize_public_change_order(change_order, request=None) -> dict:
     """Serialize a change order with project and organization context for public preview."""
     serialized = ChangeOrderSerializer(change_order).data
     organization = _resolve_organization_for_public_actor(change_order.requested_by)
     serialized["project_context"] = _serialize_public_project_context(change_order.project)
-    serialized["organization_context"] = _serialize_public_organization_context(organization)
+    serialized["organization_context"] = _serialize_public_organization_context(organization, request=request)
     if change_order.origin_estimate_id:
         serialized["origin_estimate_context"] = {
             "id": change_order.origin_estimate_id,

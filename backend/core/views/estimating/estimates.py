@@ -64,7 +64,7 @@ def public_estimate_detail_view(request, public_token: str):
     serialized = EstimateSerializer(estimate).data
     organization = _resolve_organization_for_public_actor(estimate.created_by)
     serialized["project_context"] = _serialize_public_project_context(estimate.project)
-    serialized["organization_context"] = _serialize_public_organization_context(organization)
+    serialized["organization_context"] = _serialize_public_organization_context(organization, request=request)
     consent_text, consent_version = get_ceremony_context()
     serialized["ceremony_consent_text"] = consent_text
     serialized["ceremony_consent_text_version"] = consent_version
@@ -182,7 +182,7 @@ def public_estimate_decision_view(request, public_token: str):
     serialized = _serialize_estimate(estimate=estimate)
     organization = _resolve_organization_for_public_actor(estimate.created_by)
     serialized["project_context"] = _serialize_public_project_context(estimate.project)
-    serialized["organization_context"] = _serialize_public_organization_context(organization)
+    serialized["organization_context"] = _serialize_public_organization_context(organization, request=request)
 
     response_payload = {"data": serialized}
     if budget_conversion_meta:
