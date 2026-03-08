@@ -114,7 +114,6 @@ export type ApiResponse = {
     cloned_from?: number;
     duplicated_from?: number;
     conversion_status?: string;
-    budget_conversion_status?: string;
   };
   error?: {
     code?: string;

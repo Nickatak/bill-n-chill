@@ -40,11 +40,7 @@ export function validateLineItems(lines: ChangeOrderLineInput[]): LineValidation
     const rowNumber = index + 1;
     const rowIssues: string[] = [];
 
-    if (line.lineType === "original" && !line.budgetLineId.trim()) {
-      rowIssues.push("Select a budget line.");
-    }
-
-    if (line.lineType === "new" && !line.costCodeId.trim()) {
+    if (!line.costCodeId.trim()) {
       rowIssues.push("Select a cost code.");
     }
 
@@ -84,11 +80,9 @@ export function validateLineItems(lines: ChangeOrderLineInput[]): LineValidation
 export function emptyLine(localId: number): ChangeOrderLineInput {
   return {
     localId,
-    lineType: "new",
-    adjustmentReason: "",
-    budgetLineId: "",
     costCodeId: "",
     description: "",
+    adjustmentReason: "",
     amountDelta: "0.00",
     daysDelta: "0",
   };

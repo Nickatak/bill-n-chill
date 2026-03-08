@@ -54,18 +54,11 @@ export function normalizeDecimalInput(value: number, fallback = "0"): string {
 // ---------------------------------------------------------------------------
 
 /** Create a blank line item with sensible defaults for the creator workspace. */
-export function emptyLine(
-  localId: number,
-  defaultBudgetLineId = "",
-  lineType: InvoiceLineInput["lineType"] = "scope",
-): InvoiceLineInput {
+export function emptyLine(localId: number): InvoiceLineInput {
   return {
     localId,
-    lineType,
-    budgetLineId: lineType === "scope" ? defaultBudgetLineId : "",
-    adjustmentReason: "",
-    internalNote: "",
-    description: lineType === "direct" ? "Direct invoice item" : "Invoice scope item",
+    costCode: "",
+    description: "",
     quantity: "1",
     unit: "ea",
     unitPrice: "0",

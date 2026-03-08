@@ -60,53 +60,29 @@ describe("validateLineItems", () => {
   function line(overrides: Partial<ChangeOrderLineInput> = {}): ChangeOrderLineInput {
     return {
       localId: 1,
-      lineType: "original",
-      adjustmentReason: "",
-      budgetLineId: "10",
-      costCodeId: "",
+      costCodeId: "10",
       description: "Test",
+      adjustmentReason: "",
       amountDelta: "500.00",
       daysDelta: "5",
       ...overrides,
     };
   }
 
-  it("returns no issues for a valid original line", () => {
+  it("returns no issues for a valid line", () => {
     const result = validateLineItems([line()]);
     expect(result.issues).toHaveLength(0);
     expect(result.issuesByLocalId.size).toBe(0);
   });
 
-  it("returns no issues for a valid new line", () => {
-    const result = validateLineItems([line({ lineType: "new", budgetLineId: "", costCodeId: "5" })]);
-    expect(result.issues).toHaveLength(0);
-  });
-
-  it("flags missing budget line for original lines", () => {
-    const result = validateLineItems([line({ budgetLineId: "" })]);
-    expect(result.issues.some((i) => i.message === "Select a budget line.")).toBe(true);
-  });
-
-  it("flags missing cost code for new lines", () => {
-    const result = validateLineItems([line({ lineType: "new", budgetLineId: "", costCodeId: "" })]);
+  it("flags missing cost code", () => {
+    const result = validateLineItems([line({ costCodeId: "" })]);
     expect(result.issues.some((i) => i.message === "Select a cost code.")).toBe(true);
   });
 
-  it("allows duplicate budget lines", () => {
-    const result = validateLineItems([
-      line({ localId: 1, budgetLineId: "10" }),
-      line({ localId: 2, budgetLineId: "10" }),
-    ]);
-    expect(result.issues.some((i) => i.message.includes("duplicated"))).toBe(false);
-    expect(result.issues.length).toBe(0);
-  });
-
-  it("does not require adjustment reason on any line type", () => {
-    const original = validateLineItems([line({ adjustmentReason: "" })]);
-    expect(original.issues).toHaveLength(0);
-
-    const newLine = validateLineItems([line({ lineType: "new", budgetLineId: "", costCodeId: "5", adjustmentReason: "" })]);
-    expect(newLine.issues).toHaveLength(0);
+  it("does not require adjustment reason", () => {
+    const result = validateLineItems([line({ adjustmentReason: "" })]);
+    expect(result.issues).toHaveLength(0);
   });
 
   it("flags non-numeric amount delta", () => {
@@ -126,7 +102,7 @@ describe("validateLineItems", () => {
 
   it("collects multiple issues per line", () => {
     const result = validateLineItems([
-      line({ budgetLineId: "", amountDelta: "bad", daysDelta: "bad" }),
+      line({ costCodeId: "", amountDelta: "bad", daysDelta: "bad" }),
     ]);
     expect(result.issues.length).toBeGreaterThanOrEqual(3);
   });
@@ -134,7 +110,7 @@ describe("validateLineItems", () => {
   it("includes correct row numbers", () => {
     const result = validateLineItems([
       line({ localId: 1 }),
-      line({ localId: 2, budgetLineId: "" }),
+      line({ localId: 2, costCodeId: "" }),
     ]);
     const issue = result.issues.find((i) => i.localId === 2);
     expect(issue?.rowNumber).toBe(2);
@@ -149,11 +125,9 @@ describe("emptyLine", () => {
   it("creates a line with the given localId", () => {
     const result = emptyLine(3);
     expect(result.localId).toBe(3);
-    expect(result.lineType).toBe("new");
-    expect(result.adjustmentReason).toBe("");
-    expect(result.budgetLineId).toBe("");
     expect(result.costCodeId).toBe("");
     expect(result.description).toBe("");
+    expect(result.adjustmentReason).toBe("");
     expect(result.amountDelta).toBe("0.00");
     expect(result.daysDelta).toBe("0");
   });

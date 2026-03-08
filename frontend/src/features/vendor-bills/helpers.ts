@@ -5,29 +5,26 @@
  * None of these touch React state or DOM — they're plain data transforms.
  */
 
-import type { VendorBillAllocationInput } from "./types";
+import type { VendorBillLineInput } from "./types";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type AllocationFormRow = VendorBillAllocationInput & {
-  ui_line_key?: string;
-  ui_target_budget_id?: number;
-};
+export type VendorBillLineFormRow = VendorBillLineInput;
 
 // ---------------------------------------------------------------------------
 // Factory helpers
 // ---------------------------------------------------------------------------
 
-/** Creates a blank allocation row for the bill allocation form. */
-export function createEmptyAllocationRow(): AllocationFormRow {
+/** Creates a blank line item row for the vendor bill form. */
+export function createEmptyVendorBillLineRow(): VendorBillLineFormRow {
   return {
-    budget_line: 0,
-    amount: "",
-    note: "",
-    ui_line_key: "",
-    ui_target_budget_id: undefined,
+    costCode: null,
+    description: "",
+    quantity: "",
+    unit: "",
+    unitPrice: "",
   };
 }
 

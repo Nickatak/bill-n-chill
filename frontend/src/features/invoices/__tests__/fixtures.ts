@@ -95,10 +95,7 @@ export const formState = {
   lineItems: [
     {
       localId: 1,
-      lineType: "scope" as const,
-      budgetLineId: "50",
-      adjustmentReason: "",
-      internalNote: "",
+      costCode: "50",
       description: "Foundation work",
       quantity: "1",
       unit: "lot",

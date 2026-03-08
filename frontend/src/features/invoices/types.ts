@@ -45,14 +45,7 @@ export type InvoiceRecord = {
   balance_due: string;
   line_items?: Array<{
     id: number;
-    line_type: string;
-    budget_line: number | null;
-    budget_line_description?: string;
-    budget_line_cost_code?: string;
     cost_code: number | null;
-    scope_item: number | null;
-    adjustment_reason: string;
-    internal_note: string;
     description: string;
     quantity: string;
     unit: string;
@@ -101,18 +94,11 @@ export type InvoicePolicyContract = {
   default_status_filters: string[];
   allowed_status_transitions: Record<string, string[]>;
   terminal_statuses: string[];
-  scope_guard_rules?: {
-    billable_statuses: string[];
-    scope_override_event_required_for_out_of_scope_billable: boolean;
-  };
 };
 
 export type InvoiceLineInput = {
   localId: number;
-  lineType: "scope" | "adjustment" | "direct";
-  budgetLineId: string;
-  adjustmentReason: string;
-  internalNote: string;
+  costCode: string;
   description: string;
   quantity: string;
   unit: string;

@@ -65,42 +65,6 @@ class InvoiceTests(TestCase):
                 "created_by": self.user,
             },
         )
-        self.estimate = Estimate.objects.create(
-            project=self.project,
-            version=1,
-            status=Estimate.Status.APPROVED,
-            title="Invoice Baseline",
-            created_by=self.user,
-        )
-        self.budget = Budget.objects.create(
-            project=self.project,
-            status=Budget.Status.ACTIVE,
-            source_estimate=self.estimate,
-            baseline_snapshot_json={},
-            created_by=self.user,
-        )
-        self.budget_line = BudgetLine.objects.create(
-            budget=self.budget,
-            cost_code=self.cost_code,
-            description="Invoice Progress Draw",
-            budget_amount="5000.00",
-        )
-        self.generic_cost_code, _ = CostCode.objects.get_or_create(
-            code="99-901",
-            organization=self.org,
-            defaults={
-                "name": "Project Tools & Consumables",
-                "is_active": True,
-                "created_by": self.user,
-            },
-        )
-        self.generic_budget_line = BudgetLine.objects.create(
-            budget=self.budget,
-            cost_code=self.generic_cost_code,
-            description="System: Project tools and consumables (non-client-billable)",
-            budget_amount="0.00",
-        )
-
         other_customer = Customer.objects.create(
             organization=self.other_org,
             display_name="Owner J",
@@ -116,35 +80,6 @@ class InvoiceTests(TestCase):
             status=Project.Status.ACTIVE,
             created_by=self.other_user,
         )
-        self.other_cost_code, _ = CostCode.objects.get_or_create(
-            code="40-401",
-            organization=self.other_org,
-            defaults={
-                "name": "Other Invoice Cost Code",
-                "is_active": True,
-                "created_by": self.other_user,
-            },
-        )
-        self.other_estimate = Estimate.objects.create(
-            project=self.other_project,
-            version=1,
-            status=Estimate.Status.APPROVED,
-            title="Other Invoice Baseline",
-            created_by=self.other_user,
-        )
-        self.other_budget = Budget.objects.create(
-            project=self.other_project,
-            status=Budget.Status.ACTIVE,
-            source_estimate=self.other_estimate,
-            baseline_snapshot_json={},
-            created_by=self.other_user,
-        )
-        self.other_budget_line = BudgetLine.objects.create(
-            budget=self.other_budget,
-            cost_code=self.other_cost_code,
-            description="Other Invoice Draw",
-            budget_amount="5000.00",
-        )
 
     def _create_invoice(self):
         response = self.client.post(
@@ -155,7 +90,6 @@ class InvoiceTests(TestCase):
                 "tax_percent": "10.00",
                 "line_items": [
                     {
-                        "budget_line": self.budget_line.id,
                         "description": "Progress draw",
                         "quantity": "2",
                         "unit": "phase",
@@ -296,7 +230,6 @@ class InvoiceTests(TestCase):
                 "tax_percent": "10.00",
                 "line_items": [
                     {
-                        "budget_line": self.budget_line.id,
                         "description": "Progress draw",
                         "quantity": "2",
                         "unit": "phase",
@@ -347,7 +280,6 @@ class InvoiceTests(TestCase):
             data={
                 "line_items": [
                     {
-                        "budget_line": self.budget_line.id,
                         "description": "Defaulted invoice draw",
                         "quantity": "1",
                         "unit": "phase",
@@ -407,7 +339,6 @@ class InvoiceTests(TestCase):
                 "notes_text": "Manual notes",
                 "line_items": [
                     {
-                        "budget_line": self.budget_line.id,
                         "description": "Manual invoice draw",
                         "quantity": "1",
                         "unit": "phase",
@@ -464,7 +395,6 @@ class InvoiceTests(TestCase):
                 "tax_percent": "10.00",
                 "line_items": [
                     {
-                        "budget_line": self.budget_line.id,
                         "description": "Tiny taxable draw",
                         "quantity": "1",
                         "unit": "ea",
@@ -496,7 +426,6 @@ class InvoiceTests(TestCase):
                         "tax_percent": "10.00",
                         "line_items": [
                             {
-                                "budget_line": self.budget_line.id,
                                 "description": "Progress draw",
                                 "quantity": "2",
                                 "unit": "phase",
@@ -511,7 +440,6 @@ class InvoiceTests(TestCase):
         self.assertEqual(Invoice.objects.count(), 0)
         self.assertEqual(InvoiceLine.objects.count(), 0)
         self.assertEqual(InvoiceStatusEvent.objects.count(), 0)
-        self.assertEqual(FinancialAuditEvent.objects.filter(object_type="invoice").count(), 0)
 
     def test_project_invoices_list_scoped_by_project_and_user(self):
         self._create_invoice()
@@ -656,7 +584,6 @@ class InvoiceTests(TestCase):
             data={
                 "line_items": [
                     {
-                        "budget_line": self.budget_line.id,
                         "description": "Updated draw",
                         "quantity": "3",
                         "unit": "phase",
@@ -674,280 +601,6 @@ class InvoiceTests(TestCase):
         self.assertEqual(payload["tax_total"], "60.00")
         self.assertEqual(payload["total"], "1260.00")
         self.assertEqual(payload["balance_due"], "1260.00")
-
-    def test_invoice_send_blocks_when_total_exceeds_approved_scope_without_override(self):
-        invoice_id = self._create_invoice()
-        self.project.contract_value_current = "1000.00"
-        self.project.save(update_fields=["contract_value_current", "updated_at"])
-
-        response = self.client.post(
-            f"/api/v1/invoices/{invoice_id}/send/",
-            data={},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 400)
-        payload = response.json()
-        self.assertEqual(payload["error"]["code"], "validation_error")
-        self.assertIn("scope_override", payload["error"]["fields"])
-        self.assertEqual(InvoiceScopeOverrideEvent.objects.count(), 0)
-
-    def test_invoice_send_scope_override_requires_note(self):
-        invoice_id = self._create_invoice()
-        self.project.contract_value_current = "1000.00"
-        self.project.save(update_fields=["contract_value_current", "updated_at"])
-
-        response = self.client.post(
-            f"/api/v1/invoices/{invoice_id}/send/",
-            data={"scope_override": True},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 400)
-        payload = response.json()
-        self.assertEqual(payload["error"]["code"], "validation_error")
-        self.assertIn("scope_override_note", payload["error"]["fields"])
-        invoice = Invoice.objects.get(id=invoice_id)
-        self.assertEqual(invoice.status, Invoice.Status.DRAFT)
-
-    def test_invoice_send_scope_override_creates_audit_note(self):
-        invoice_id = self._create_invoice()
-        self.project.contract_value_current = "1000.00"
-        self.project.save(update_fields=["contract_value_current", "updated_at"])
-
-        response = self.client.post(
-            f"/api/v1/invoices/{invoice_id}/send/",
-            data={
-                "scope_override": True,
-                "scope_override_note": "Emergency work billed before CO approval finalization.",
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["data"]["status"], "sent")
-
-        events = InvoiceScopeOverrideEvent.objects.filter(invoice_id=invoice_id)
-        self.assertEqual(events.count(), 1)
-        event = events.first()
-        self.assertEqual(event.note, "Emergency work billed before CO approval finalization.")
-        self.assertEqual(str(event.approved_scope_limit), "1000.00")
-        self.assertEqual(str(event.projected_billed_total), "1100.00")
-        self.assertEqual(str(event.overage_amount), "100.00")
-
-    def test_invoice_patch_billable_totals_over_scope_requires_override(self):
-        invoice_id = self._create_invoice()
-        self.project.contract_value_current = "1300.00"
-        self.project.save(update_fields=["contract_value_current", "updated_at"])
-
-        sent = self.client.post(
-            f"/api/v1/invoices/{invoice_id}/send/",
-            data={},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(sent.status_code, 200)
-
-        blocked = self.client.patch(
-            f"/api/v1/invoices/{invoice_id}/",
-            data={
-                "line_items": [
-                    {
-                        "budget_line": self.budget_line.id,
-                        "description": "Expanded draw",
-                        "quantity": "3",
-                        "unit": "phase",
-                        "unit_price": "500.00",
-                    }
-                ]
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(blocked.status_code, 400)
-        self.assertIn("scope_override", blocked.json()["error"]["fields"])
-
-        overridden = self.client.patch(
-            f"/api/v1/invoices/{invoice_id}/",
-            data={
-                "line_items": [
-                    {
-                        "budget_line": self.budget_line.id,
-                        "description": "Expanded draw",
-                        "quantity": "3",
-                        "unit": "phase",
-                        "unit_price": "500.00",
-                    }
-                ],
-                "scope_override": True,
-                "scope_override_note": "Owner-approved out-of-scope item pending formal CO.",
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(overridden.status_code, 200)
-        self.assertEqual(overridden.json()["data"]["total"], "1650.00")
-        self.assertEqual(InvoiceScopeOverrideEvent.objects.filter(invoice_id=invoice_id).count(), 1)
-
-    def test_invoice_create_adjustment_line_requires_adjustment_reason(self):
-        response = self.client.post(
-            f"/api/v1/projects/{self.project.id}/invoices/",
-            data={
-                "issue_date": "2026-02-13",
-                "due_date": "2026-03-15",
-                "line_items": [
-                    {
-                        "line_type": "adjustment",
-                        "description": "Manual billing adjustment",
-                        "quantity": "1",
-                        "unit": "ea",
-                        "unit_price": "100.00",
-                    }
-                ],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 400)
-        payload = response.json()
-        self.assertEqual(payload["error"]["code"], "validation_error")
-        self.assertIn("line_items", payload["error"]["fields"])
-
-    def test_invoice_create_adjustment_line_with_reason_succeeds(self):
-        response = self.client.post(
-            f"/api/v1/projects/{self.project.id}/invoices/",
-            data={
-                "issue_date": "2026-02-13",
-                "due_date": "2026-03-15",
-                "line_items": [
-                    {
-                        "line_type": "adjustment",
-                        "adjustment_reason": "mobilization",
-                        "internal_note": "Allowed quick adjustment for kickoff expense.",
-                        "description": "Mobilization adjustment",
-                        "quantity": "1",
-                        "unit": "ea",
-                        "unit_price": "100.00",
-                    }
-                ],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 201)
-        payload = response.json()["data"]
-        self.assertEqual(payload["line_items"][0]["line_type"], "adjustment")
-        self.assertEqual(payload["line_items"][0]["adjustment_reason"], "mobilization")
-
-    def test_invoice_create_scope_line_requires_budget_line(self):
-        response = self.client.post(
-            f"/api/v1/projects/{self.project.id}/invoices/",
-            data={
-                "issue_date": "2026-02-13",
-                "due_date": "2026-03-15",
-                "line_items": [
-                    {
-                        "line_type": "scope",
-                        "description": "Scope draw missing budget attribution",
-                        "quantity": "1",
-                        "unit": "ea",
-                        "unit_price": "100.00",
-                    }
-                ],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 400)
-        payload = response.json()
-        self.assertEqual(payload["error"]["code"], "validation_error")
-        self.assertIn("line_items", payload["error"]["fields"])
-
-    def test_invoice_create_scope_line_rejects_budget_line_from_other_project(self):
-        response = self.client.post(
-            f"/api/v1/projects/{self.project.id}/invoices/",
-            data={
-                "issue_date": "2026-02-13",
-                "due_date": "2026-03-15",
-                "line_items": [
-                    {
-                        "line_type": "scope",
-                        "budget_line": self.other_budget_line.id,
-                        "description": "Scope draw with foreign budget line",
-                        "quantity": "1",
-                        "unit": "ea",
-                        "unit_price": "100.00",
-                    }
-                ],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 400)
-        payload = response.json()
-        self.assertEqual(payload["error"]["code"], "validation_error")
-        self.assertIn("budget_line", payload["error"]["fields"])
-
-    def test_invoice_create_scope_line_rejects_generic_budget_line(self):
-        response = self.client.post(
-            f"/api/v1/projects/{self.project.id}/invoices/",
-            data={
-                "issue_date": "2026-02-13",
-                "due_date": "2026-03-15",
-                "line_items": [
-                    {
-                        "line_type": "scope",
-                        "budget_line": self.generic_budget_line.id,
-                        "description": "Attempted generic billable scope",
-                        "quantity": "1",
-                        "unit": "ea",
-                        "unit_price": "100.00",
-                    }
-                ],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 400)
-        payload = response.json()
-        self.assertEqual(payload["error"]["code"], "validation_error")
-        self.assertIn("line_items", payload["error"]["fields"])
-
-    def test_invoice_tax_only_patch_preserves_adjustment_line_metadata(self):
-        create = self.client.post(
-            f"/api/v1/projects/{self.project.id}/invoices/",
-            data={
-                "issue_date": "2026-02-13",
-                "due_date": "2026-03-15",
-                "line_items": [
-                    {
-                        "line_type": "adjustment",
-                        "adjustment_reason": "mobilization",
-                        "internal_note": "Initial mobilization note.",
-                        "description": "Mobilization adjustment",
-                        "quantity": "1",
-                        "unit": "ea",
-                        "unit_price": "100.00",
-                    }
-                ],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(create.status_code, 201)
-        invoice_id = create.json()["data"]["id"]
-
-        patch = self.client.patch(
-            f"/api/v1/invoices/{invoice_id}/",
-            data={"tax_percent": "8.25"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(patch.status_code, 200)
-        line = patch.json()["data"]["line_items"][0]
-        self.assertEqual(line["line_type"], "adjustment")
-        self.assertEqual(line["adjustment_reason"], "mobilization")
-        self.assertEqual(line["internal_note"], "Initial mobilization note.")
 
     def test_invoice_model_blocks_invalid_status_transition_on_direct_save(self):
         invoice_id = self._create_invoice()
@@ -1069,10 +722,10 @@ class InvoiceTests(TestCase):
             "overdue should not be in Invoice.Status choices",
         )
 
-    # ── Direct invoicing ──────────────────────────────────────────────
+    # ── Additional create scenarios ─────────────────────────────────
 
-    def _create_unbudgeted_project(self):
-        """Helper: create a project with no estimate/budget."""
+    def _create_simple_project(self):
+        """Helper: create a simple project for additional invoice tests."""
         customer = Customer.objects.create(
             organization=self.org,
             display_name="Direct Client",
@@ -1084,26 +737,25 @@ class InvoiceTests(TestCase):
         return Project.objects.create(
             organization=self.org,
             customer=customer,
-            name="Unbudgeted Project",
+            name="Simple Project",
             status=Project.Status.ACTIVE,
             contract_value_original="0.00",
             contract_value_current="0.00",
             created_by=self.user,
         )
 
-    def test_create_invoice_with_direct_lines_no_budget(self):
-        """DIRECT lines succeed on a project with no budget."""
-        project = self._create_unbudgeted_project()
+    def test_create_invoice_on_simple_project(self):
+        """Invoice creation succeeds on a minimal project."""
+        project = self._create_simple_project()
         response = self.client.post(
             f"/api/v1/projects/{project.id}/invoices/",
             data={
-                "invoice_number": "INV-DIRECT-1",
+                "invoice_number": "INV-SIMPLE-1",
                 "issue_date": "2025-01-01",
                 "due_date": "2025-01-31",
                 "customer": self.customer.id,
                 "line_items": [
                     {
-                        "line_type": "direct",
                         "description": "Consulting services",
                         "quantity": "1",
                         "unit_price": "500.00",
@@ -1117,19 +769,18 @@ class InvoiceTests(TestCase):
         invoice_data = response.json()["data"]
         self.assertEqual(invoice_data["total"], "500.00")
 
-    def test_direct_line_missing_description_rejected(self):
-        """DIRECT lines without a description are rejected."""
-        project = self._create_unbudgeted_project()
+    def test_line_missing_description_rejected(self):
+        """Lines without a description are rejected."""
+        project = self._create_simple_project()
         response = self.client.post(
             f"/api/v1/projects/{project.id}/invoices/",
             data={
-                "invoice_number": "INV-DIRECT-2",
+                "invoice_number": "INV-NODESC",
                 "issue_date": "2025-01-01",
                 "due_date": "2025-01-31",
                 "customer": self.customer.id,
                 "line_items": [
                     {
-                        "line_type": "direct",
                         "description": "",
                         "quantity": "1",
                         "unit_price": "100.00",
@@ -1140,94 +791,6 @@ class InvoiceTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 400)
-
-    def test_direct_lines_on_budgeted_project(self):
-        """DIRECT lines work on a project that already has a budget."""
-        response = self.client.post(
-            f"/api/v1/projects/{self.project.id}/invoices/",
-            data={
-                "invoice_number": "INV-DIRECT-3",
-                "issue_date": "2025-01-01",
-                "due_date": "2025-01-31",
-                "customer": self.customer.id,
-                "line_items": [
-                    {
-                        "line_type": "direct",
-                        "description": "Extra work outside scope",
-                        "quantity": "2",
-                        "unit_price": "250.00",
-                    },
-                ],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 201, response.json())
-        self.assertEqual(response.json()["data"]["total"], "500.00")
-
-    def test_mixed_scope_and_direct_lines(self):
-        """Mixed SCOPE + DIRECT lines on a budgeted project succeed."""
-        response = self.client.post(
-            f"/api/v1/projects/{self.project.id}/invoices/",
-            data={
-                "invoice_number": "INV-MIXED-1",
-                "issue_date": "2025-01-01",
-                "due_date": "2025-01-31",
-                "customer": self.customer.id,
-                "line_items": [
-                    {
-                        "line_type": "scope",
-                        "budget_line": self.budget_line.id,
-                        "description": "Foundation work",
-                        "quantity": "1",
-                        "unit_price": "1000.00",
-                    },
-                    {
-                        "line_type": "direct",
-                        "description": "Emergency repair",
-                        "quantity": "1",
-                        "unit_price": "300.00",
-                    },
-                ],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 201, response.json())
-        self.assertEqual(response.json()["data"]["total"], "1300.00")
-
-    def test_send_direct_invoice_no_budget_skips_scope_guard(self):
-        """Sending a DIRECT-only invoice on unbudgeted project skips scope guard."""
-        project = self._create_unbudgeted_project()
-        create_response = self.client.post(
-            f"/api/v1/projects/{project.id}/invoices/",
-            data={
-                "invoice_number": "INV-DIRECT-SEND",
-                "issue_date": "2025-01-01",
-                "due_date": "2025-01-31",
-                "customer": self.customer.id,
-                "line_items": [
-                    {
-                        "line_type": "direct",
-                        "description": "Consulting",
-                        "quantity": "1",
-                        "unit_price": "10000.00",
-                    },
-                ],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(create_response.status_code, 201)
-        invoice_id = create_response.json()["data"]["id"]
-
-        send_response = self.client.patch(
-            f"/api/v1/invoices/{invoice_id}/",
-            data={"status": "sent"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(send_response.status_code, 200, send_response.json())
 
     def test_create_invoice_on_prospect_project_activates_it(self):
         """Creating an invoice on a prospect project promotes it to active."""
@@ -1259,7 +822,6 @@ class InvoiceTests(TestCase):
                 "customer": customer.id,
                 "line_items": [
                     {
-                        "line_type": "direct",
                         "description": "Quick job",
                         "quantity": "1",
                         "unit_price": "500.00",
@@ -1275,7 +837,7 @@ class InvoiceTests(TestCase):
 
     def test_create_invoice_on_active_project_stays_active(self):
         """Creating an invoice on an already-active project doesn't change status."""
-        project = self._create_unbudgeted_project()  # already ACTIVE
+        project = self._create_simple_project()  # already ACTIVE
         response = self.client.post(
             f"/api/v1/projects/{project.id}/invoices/",
             data={
@@ -1285,7 +847,6 @@ class InvoiceTests(TestCase):
                 "customer": project.customer_id,
                 "line_items": [
                     {
-                        "line_type": "direct",
                         "description": "Follow-up",
                         "quantity": "1",
                         "unit_price": "200.00",

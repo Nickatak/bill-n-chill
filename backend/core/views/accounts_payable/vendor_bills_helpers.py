@@ -1,11 +1,10 @@
-"""Domain-specific helpers for vendor-bill views."""
+"""Domain-specific helpers for vendor bill views."""
 
-from django.db.models import Sum
+from decimal import Decimal
 
-from core.models import BudgetLine, VendorBill, VendorBillAllocation
-from core.user_helpers import _ensure_membership
+from core.models import VendorBill, VendorBillLine
 from core.utils.money import MONEY_ZERO, quantize_money
-from core.views.helpers import _vendor_scope_filter  # noqa: F401 — re-exported for vendor_bills.py
+from core.views.helpers import _resolve_cost_codes_for_user, _vendor_scope_filter  # noqa: F401 — re-exported for vendor_bills.py
 
 
 def _find_duplicate_vendor_bills(
@@ -16,6 +15,8 @@ def _find_duplicate_vendor_bills(
     exclude_vendor_bill_id=None,
 ):
     """Return same-user vendor bills matching vendor+bill number (case-insensitive)."""
+    from core.user_helpers import _ensure_membership
+
     bill_number_norm = (bill_number or "").strip()
     if not vendor_id or not bill_number_norm:
         return []
@@ -32,40 +33,94 @@ def _find_duplicate_vendor_bills(
     return list(rows.select_related("vendor", "project").order_by("-created_at", "-id"))
 
 
-def _allocation_total(*, vendor_bill):
-    """Return the quantized sum of allocations currently attached to a vendor bill."""
-    total = (
-        VendorBillAllocation.objects.filter(vendor_bill=vendor_bill).aggregate(sum=Sum("amount"))["sum"]
-        or MONEY_ZERO
-    )
-    return quantize_money(total)
+def _calculate_vendor_bill_line_totals(line_items_data):
+    """Compute per-line totals and return normalized items with a running subtotal."""
+    subtotal = MONEY_ZERO
+    normalized_items = []
+    for item in line_items_data:
+        quantity = Decimal(str(item["quantity"]))
+        unit_price = Decimal(str(item["unit_price"]))
+        line_total = quantize_money(quantity * unit_price)
+        subtotal = quantize_money(subtotal + line_total)
+        normalized_items.append({
+            **item,
+            "quantity": quantity,
+            "unit_price": unit_price,
+            "line_total": line_total,
+        })
+    return normalized_items, subtotal
 
 
-def _validate_allocation_budget_lines(*, project, user, allocations):
-    """Resolve allocation budget lines scoped to the same project and owner."""
-    budget_line_ids = [entry["budget_line"] for entry in allocations]
-    if not budget_line_ids:
-        return {}
-    rows = BudgetLine.objects.filter(
-        id__in=budget_line_ids,
-        budget__project=project,
-    ).select_related("budget")
-    return {row.id: row for row in rows}
+def _apply_vendor_bill_lines_and_totals(vendor_bill, line_items_data, tax_amount, shipping_amount, user):
+    """Replace a vendor bill's line items and recompute all totals.
 
+    Returns an error dict on failure, or None on success.
+    Unlike invoices (which use tax_percent), vendor bills store tax_amount
+    and shipping_amount as flat values — total = subtotal + tax + shipping.
+    """
+    normalized_items, subtotal = _calculate_vendor_bill_line_totals(line_items_data)
+    code_map, missing = _resolve_cost_codes_for_user(user, normalized_items)
+    if missing:
+        return {"missing_cost_codes": missing}
 
-def _sync_vendor_bill_allocations(*, vendor_bill, allocations):
-    """Replace all allocations for a vendor bill with the provided allocation set."""
-    VendorBillAllocation.objects.filter(vendor_bill=vendor_bill).delete()
-    if not allocations:
-        return
-    VendorBillAllocation.objects.bulk_create(
-        [
-            VendorBillAllocation(
+    tax_amount = quantize_money(Decimal(str(tax_amount)))
+    shipping_amount = quantize_money(Decimal(str(shipping_amount)))
+    total = quantize_money(subtotal + tax_amount + shipping_amount)
+
+    vendor_bill.line_items.all().delete()
+    new_lines = []
+    for item in normalized_items:
+        cost_code_id = item.get("cost_code")
+        cost_code = code_map.get(cost_code_id) if cost_code_id else None
+        new_lines.append(
+            VendorBillLine(
                 vendor_bill=vendor_bill,
-                budget_line_id=entry["budget_line"],
-                amount=entry["amount"],
-                note=entry.get("note", ""),
+                cost_code=cost_code,
+                description=item["description"],
+                quantity=item["quantity"],
+                unit=item.get("unit", "ea"),
+                unit_price=item["unit_price"],
+                line_total=item["line_total"],
             )
-            for entry in allocations
+        )
+    VendorBillLine.objects.bulk_create(new_lines)
+
+    vendor_bill.subtotal = subtotal
+    vendor_bill.tax_amount = tax_amount
+    vendor_bill.shipping_amount = shipping_amount
+    vendor_bill.total = total
+    vendor_bill.save(
+        update_fields=[
+            "subtotal",
+            "tax_amount",
+            "shipping_amount",
+            "total",
+            "updated_at",
         ]
+    )
+    return None
+
+
+def _vendor_bill_line_apply_error_response(apply_error):
+    """Convert an _apply_vendor_bill_lines_and_totals error dict into a (body, status) HTTP response tuple."""
+    if "missing_cost_codes" in apply_error:
+        return (
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "One or more cost codes are invalid for this user.",
+                    "fields": {"cost_code": apply_error["missing_cost_codes"]},
+                }
+            },
+            400,
+        )
+    return (
+        {
+            "error": {
+                "code": "validation_error",
+                "message": "Vendor bill line validation failed.",
+                "fields": {},
+            }
+        },
+        400,
     )

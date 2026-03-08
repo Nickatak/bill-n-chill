@@ -38,27 +38,30 @@ export type VendorBillRecord = {
   shipping_amount: string;
   total: string;
   balance_due: string;
-  allocations?: VendorBillAllocationRecord[];
+  line_items: VendorBillLineRecord[];
   notes: string;
   created_at: string;
   updated_at: string;
 };
 
-export type VendorBillAllocationRecord = {
+export type VendorBillLineRecord = {
   id: number;
-  vendor_bill: number;
-  budget_line: number;
-  budget_line_cost_code: string;
-  budget_line_description: string;
-  amount: string;
-  note: string;
-  created_at: string;
+  cost_code: number | null;
+  cost_code_code: string;
+  cost_code_description: string;
+  description: string;
+  quantity: string;
+  unit: string;
+  unit_price: string;
+  line_total: string;
 };
 
-export type VendorBillAllocationInput = {
-  budget_line: number;
-  amount: string;
-  note: string;
+export type VendorBillLineInput = {
+  costCode: number | null;
+  description: string;
+  quantity: string;
+  unit: string;
+  unitPrice: string;
 };
 
 export type VendorBillPayload = {
@@ -75,7 +78,7 @@ export type VendorBillPayload = {
   shipping_amount?: string;
   total: string;
   notes: string;
-  allocations?: VendorBillAllocationInput[];
+  line_items?: VendorBillLineInput[];
 };
 
 export type VendorBillPolicyContract = {

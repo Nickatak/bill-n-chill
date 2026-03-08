@@ -267,7 +267,7 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
               cells: [
                 line.quantity,
                 line.description || "No description",
-                line.budget_line_cost_code || "N/A",
+                line.cost_code ? String(line.cost_code) : "N/A",
                 line.unit || "ea",
                 `$${formatDecimal(parseAmount(line.unit_price))}`,
                 `$${formatDecimal(parseAmount(line.line_total))}`,

@@ -1,4 +1,4 @@
-"""Invoice serializers for read, write, scope-override, and status-event representations."""
+"""Invoice serializers for read, write, and status-event representations."""
 
 from rest_framework import serializers
 
@@ -15,30 +15,19 @@ def _invoice_customer(obj):
 
 
 class InvoiceLineSerializer(serializers.ModelSerializer):
-    """Read-only invoice line item with budget line, cost code, and scope item details."""
+    """Read-only invoice line item with cost code details."""
 
-    budget_line_description = serializers.CharField(source="budget_line.description", read_only=True)
-    budget_line_cost_code = serializers.CharField(source="budget_line.cost_code.code", read_only=True)
     cost_code_code = serializers.CharField(source="cost_code.code", read_only=True)
     cost_code_name = serializers.CharField(source="cost_code.name", read_only=True)
-    scope_item_name = serializers.CharField(source="scope_item.name", read_only=True)
 
     class Meta:
         model = InvoiceLine
         fields = [
             "id",
             "invoice",
-            "line_type",
-            "budget_line",
-            "budget_line_description",
-            "budget_line_cost_code",
             "cost_code",
             "cost_code_code",
             "cost_code_name",
-            "scope_item",
-            "scope_item_name",
-            "adjustment_reason",
-            "internal_note",
             "description",
             "quantity",
             "unit",
@@ -50,11 +39,8 @@ class InvoiceLineSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "invoice",
-            "budget_line_description",
-            "budget_line_cost_code",
             "cost_code_code",
             "cost_code_name",
-            "scope_item_name",
             "line_total",
             "created_at",
             "updated_at",
@@ -115,26 +101,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
 class InvoiceLineItemInputSerializer(serializers.Serializer):
     """Write serializer for a single invoice line item in a create/update payload."""
 
-    line_type = serializers.ChoiceField(
-        choices=InvoiceLine.LineType.choices,
-        required=False,
-        default=InvoiceLine.LineType.SCOPE,
-    )
-    budget_line = serializers.IntegerField(required=False, allow_null=True)
     cost_code = serializers.IntegerField(required=False, allow_null=True)
-    scope_item = serializers.IntegerField(required=False, allow_null=True)
-    adjustment_reason = serializers.CharField(
-        max_length=64,
-        required=False,
-        allow_blank=True,
-        default="",
-    )
-    internal_note = serializers.CharField(
-        max_length=5000,
-        required=False,
-        allow_blank=True,
-        default="",
-    )
     description = serializers.CharField(max_length=255)
     quantity = serializers.DecimalField(max_digits=12, decimal_places=2)
     unit = serializers.CharField(max_length=30, required=False, default="ea")
@@ -157,25 +124,6 @@ class InvoiceWriteSerializer(serializers.Serializer):
     notes_text = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
     tax_percent = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, default=0)
     line_items = InvoiceLineItemInputSerializer(many=True, required=False)
-    scope_override = serializers.BooleanField(required=False, default=False)
-    scope_override_note = serializers.CharField(
-        max_length=5000,
-        required=False,
-        allow_blank=True,
-        default="",
-    )
-
-
-class InvoiceScopeOverrideSerializer(serializers.Serializer):
-    """Write serializer for toggling scope-override on an invoice."""
-
-    scope_override = serializers.BooleanField(required=False, default=False)
-    scope_override_note = serializers.CharField(
-        max_length=5000,
-        required=False,
-        allow_blank=True,
-        default="",
-    )
 
 
 class InvoiceStatusEventSerializer(serializers.ModelSerializer):

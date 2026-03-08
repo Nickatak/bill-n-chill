@@ -24,8 +24,7 @@ class Payment(StatusTransitionMixin, models.Model):
     Current policy:
     - Lifecycle control: `user-managed` with transition rules enforced in payment flows.
     - Visibility: `internal-facing` operational ledger object.
-    - Immutable event trail is currently captured via `FinancialAuditEvent`;
-      dedicated payment capture objects are planned.
+    - Immutable event trail captured via `PaymentRecord` and `PaymentAllocationRecord`.
     """
 
     class Direction(models.TextChoices):

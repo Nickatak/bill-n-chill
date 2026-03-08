@@ -1,30 +1,30 @@
 import { describe, expect, it } from "vitest";
 import {
-  createEmptyAllocationRow,
+  createEmptyVendorBillLineRow,
   defaultBillStatusFilters,
   formatMoney,
   projectStatusLabel,
 } from "../helpers";
 
 // ---------------------------------------------------------------------------
-// createEmptyAllocationRow
+// createEmptyVendorBillLineRow
 // ---------------------------------------------------------------------------
 
-describe("createEmptyAllocationRow", () => {
-  it("returns a blank allocation row with zero budget_line", () => {
-    const row = createEmptyAllocationRow();
+describe("createEmptyVendorBillLineRow", () => {
+  it("returns a blank line item row with null cost code", () => {
+    const row = createEmptyVendorBillLineRow();
     expect(row).toEqual({
-      budget_line: 0,
-      amount: "",
-      note: "",
-      ui_line_key: "",
-      ui_target_budget_id: undefined,
+      costCode: null,
+      description: "",
+      quantity: "",
+      unit: "",
+      unitPrice: "",
     });
   });
 
   it("returns a fresh object on each call", () => {
-    const a = createEmptyAllocationRow();
-    const b = createEmptyAllocationRow();
+    const a = createEmptyVendorBillLineRow();
+    const b = createEmptyVendorBillLineRow();
     expect(a).not.toBe(b);
     expect(a).toEqual(b);
   });

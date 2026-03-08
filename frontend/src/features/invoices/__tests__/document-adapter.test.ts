@@ -180,10 +180,7 @@ describe("createInvoiceDocumentAdapter", () => {
         terms_text: "Net 30",
         line_items: [
           {
-            line_type: "scope",
-            budget_line: 50,
-            adjustment_reason: "",
-            internal_note: "",
+            cost_code: 50,
             description: "Foundation work",
             quantity: "1",
             unit: "lot",

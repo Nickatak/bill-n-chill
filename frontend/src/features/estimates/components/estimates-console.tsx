@@ -1211,8 +1211,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       }
       const updated = payload.data as EstimateRecord;
       const scrollY = window.scrollY;
-      const budgetConversionStatus = payload.meta?.budget_conversion_status;
-      const didSupersede = budgetConversionStatus === "superseded_and_converted";
+      const conversionStatus = payload.meta?.conversion_status;
+      const didSupersede = conversionStatus === "superseded_and_converted";
       setEstimates((current) =>
         current.map((estimate) => {
           if (estimate.id === updated.id) return updated;
@@ -1226,7 +1226,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setSelectedStatus("");
       setStatusNote("");
       await loadStatusEvents({ estimateId: updated.id, quiet: true });
-      if (budgetConversionStatus === "converted" || didSupersede || budgetConversionStatus === "already_converted") {
+      if (conversionStatus === "converted" || didSupersede || conversionStatus === "already_converted") {
         setActionMessage("Estimate approved and set as the active estimate. History updated.");
         setActionTone("success");
         return;

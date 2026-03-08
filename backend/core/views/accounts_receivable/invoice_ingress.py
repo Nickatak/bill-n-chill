@@ -5,18 +5,11 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 
-from core.models import InvoiceLine
-
 
 def _normalize_invoice_line_item(item: dict[str, Any]) -> dict[str, Any]:
     """Normalize and whitespace-strip a single invoice line item payload dict."""
     return {
-        "line_type": item.get("line_type", InvoiceLine.LineType.SCOPE),
-        "budget_line": item.get("budget_line"),
         "cost_code": item.get("cost_code"),
-        "scope_item": item.get("scope_item"),
-        "adjustment_reason": (item.get("adjustment_reason") or "").strip(),
-        "internal_note": (item.get("internal_note") or "").strip(),
         "description": (item.get("description") or "").strip(),
         "quantity": item.get("quantity"),
         "unit": (item.get("unit") or "ea").strip() or "ea",
@@ -105,8 +98,6 @@ class InvoicePatchIngress:
     tax_percent: Decimal | None
     has_line_items: bool
     line_items: list[dict[str, Any]]
-    scope_override: bool
-    scope_override_note: str
 
 
 def build_invoice_patch_ingress(validated_data: dict[str, Any]) -> InvoicePatchIngress:
@@ -144,6 +135,4 @@ def build_invoice_patch_ingress(validated_data: dict[str, Any]) -> InvoicePatchI
         tax_percent=validated_data.get("tax_percent"),
         has_line_items=has_line_items,
         line_items=line_items,
-        scope_override=validated_data.get("scope_override", False),
-        scope_override_note=validated_data.get("scope_override_note", ""),
     )

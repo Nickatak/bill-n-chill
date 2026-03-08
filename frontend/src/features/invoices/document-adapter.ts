@@ -128,10 +128,7 @@ export function createInvoiceDocumentAdapter(
       tax_percent: form.taxPercent,
       terms_text: form.termsText,
       line_items: form.lineItems.map((line) => ({
-        line_type: line.lineType,
-        budget_line: line.budgetLineId ? Number(line.budgetLineId) : null,
-        adjustment_reason: line.adjustmentReason,
-        internal_note: line.internalNote,
+        cost_code: line.costCode ? Number(line.costCode) : null,
         description: line.description,
         quantity: line.quantity,
         unit: line.unit,
@@ -145,10 +142,7 @@ export function createInvoiceDocumentAdapter(
       tax_percent: form.taxPercent,
       terms_text: form.termsText,
       line_items: form.lineItems.map((line) => ({
-        line_type: line.lineType,
-        budget_line: line.budgetLineId ? Number(line.budgetLineId) : null,
-        adjustment_reason: line.adjustmentReason,
-        internal_note: line.internalNote,
+        cost_code: line.costCode ? Number(line.costCode) : null,
         description: line.description,
         quantity: line.quantity,
         unit: line.unit,

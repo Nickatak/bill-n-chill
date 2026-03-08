@@ -11,12 +11,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import (
-    FinancialAuditEvent,
-    Project,
-)
+from core.models import Project
 from core.serializers import (
-    FinancialAuditEventSerializer,
     ProjectFinancialSummarySerializer,
     ProjectProfileSerializer,
     ProjectSerializer,
@@ -292,26 +288,5 @@ def project_accounting_export_view(request, project_id: int):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def project_audit_events_view(request, project_id: int):
-    """Return immutable financial audit events for the requested project."""
-    membership = _ensure_membership(request.user)
-    try:
-        project = Project.objects.get(id=project_id, organization_id=membership.organization_id)
-    except Project.DoesNotExist:
-        return Response(
-            {"error": {"code": "not_found", "message": "Project not found.", "fields": {}}},
-            status=404,
-        )
-
-    rows = FinancialAuditEvent.objects.filter(
-        project=project,
-    ).select_related("created_by", "project__customer")
-    object_type_filters = [value.strip() for value in request.query_params.getlist("object_type") if value.strip()]
-    if len(object_type_filters) == 1 and "," in object_type_filters[0]:
-        object_type_filters = [
-            value.strip() for value in object_type_filters[0].split(",") if value.strip()
-        ]
-    if object_type_filters:
-        rows = rows.filter(object_type__in=object_type_filters)
-
-    rows = rows.order_by("-created_at", "-id")
-    return Response({"data": FinancialAuditEventSerializer(rows, many=True).data})
+    """Audit events endpoint — removed. Returns an empty list for backward compatibility."""
+    return Response({"data": []})

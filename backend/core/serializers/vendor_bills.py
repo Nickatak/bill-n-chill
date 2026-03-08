@@ -1,37 +1,41 @@
-"""Vendor bill serializers for read, write, and budget allocation representations."""
+"""Vendor bill serializers for read, write, and line item representations."""
 
 from rest_framework import serializers
 
-from core.models import VendorBill, VendorBillAllocation
+from core.models import VendorBill, VendorBillLine
 
 
-class VendorBillAllocationSerializer(serializers.ModelSerializer):
-    """Read-only vendor bill allocation with budget line details."""
+class VendorBillLineSerializer(serializers.ModelSerializer):
+    """Read-only vendor bill line item with cost code details."""
 
-    budget_line_cost_code = serializers.CharField(source="budget_line.cost_code.code", read_only=True)
-    budget_line_description = serializers.CharField(source="budget_line.description", read_only=True)
+    cost_code_code = serializers.CharField(source="cost_code.code", read_only=True)
+    cost_code_name = serializers.CharField(source="cost_code.name", read_only=True)
 
     class Meta:
-        model = VendorBillAllocation
+        model = VendorBillLine
         fields = [
             "id",
             "vendor_bill",
-            "budget_line",
-            "budget_line_cost_code",
-            "budget_line_description",
-            "amount",
-            "note",
+            "cost_code",
+            "cost_code_code",
+            "cost_code_name",
+            "description",
+            "quantity",
+            "unit",
+            "unit_price",
+            "line_total",
             "created_at",
+            "updated_at",
         ]
         read_only_fields = fields
 
 
 class VendorBillSerializer(serializers.ModelSerializer):
-    """Read-only vendor bill with nested allocations and vendor/project names."""
+    """Read-only vendor bill with nested line items and vendor/project names."""
 
     project_name = serializers.CharField(source="project.name", read_only=True)
     vendor_name = serializers.CharField(source="vendor.name", read_only=True)
-    allocations = VendorBillAllocationSerializer(many=True, read_only=True)
+    line_items = VendorBillLineSerializer(many=True, read_only=True)
 
     class Meta:
         model = VendorBill
@@ -52,7 +56,7 @@ class VendorBillSerializer(serializers.ModelSerializer):
             "shipping_amount",
             "total",
             "balance_due",
-            "allocations",
+            "line_items",
             "notes",
             "created_at",
             "updated_at",
@@ -68,8 +72,19 @@ class VendorBillSerializer(serializers.ModelSerializer):
         ]
 
 
+class VendorBillLineInputSerializer(serializers.Serializer):
+    """Write serializer for a single vendor bill line item."""
+
+    cost_code = serializers.IntegerField(required=False, allow_null=True)
+    description = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
+    quantity = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=1)
+    unit = serializers.CharField(max_length=30, required=False, default="ea")
+    unit_price = serializers.DecimalField(max_digits=12, decimal_places=2)
+    line_total = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
+
+
 class VendorBillWriteSerializer(serializers.Serializer):
-    """Write serializer for creating or updating a vendor bill with allocations."""
+    """Write serializer for creating or updating a vendor bill with line items."""
 
     vendor = serializers.IntegerField(required=False)
     bill_number = serializers.CharField(max_length=50, required=False, allow_blank=False)
@@ -86,10 +101,7 @@ class VendorBillWriteSerializer(serializers.Serializer):
     shipping_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
     total = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
     notes = serializers.CharField(max_length=5000, required=False, allow_blank=True)
-    allocations = serializers.ListField(
-        child=serializers.DictField(),
-        required=False,
-    )
+    line_items = VendorBillLineInputSerializer(many=True, required=False)
     duplicate_override = serializers.BooleanField(required=False, default=False)
 
     def validate_status(self, value):
@@ -97,31 +109,3 @@ class VendorBillWriteSerializer(serializers.Serializer):
         if value == "draft":
             return VendorBill.Status.PLANNED
         return value
-
-    def validate_allocations(self, value):
-        normalized = []
-        for item in value:
-            budget_line = item.get("budget_line")
-            amount = item.get("amount")
-            note = item.get("note", "")
-            if budget_line in (None, ""):
-                raise serializers.ValidationError("Each allocation requires a budget_line.")
-            if amount in (None, ""):
-                raise serializers.ValidationError("Each allocation requires an amount.")
-            try:
-                amount_decimal = serializers.DecimalField(
-                    max_digits=12,
-                    decimal_places=2,
-                ).to_internal_value(amount)
-            except serializers.ValidationError as error:
-                raise serializers.ValidationError(error.detail) from error
-            if amount_decimal <= 0:
-                raise serializers.ValidationError("Allocation amount must be greater than zero.")
-            normalized.append(
-                {
-                    "budget_line": int(budget_line),
-                    "amount": amount_decimal,
-                    "note": str(note or "").strip(),
-                }
-            )
-        return normalized

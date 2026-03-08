@@ -18,15 +18,12 @@ from django.utils import timezone
 from rest_framework.authtoken.models import Token
 
 from core.models import (
-    Budget,
-    BudgetLine,
     ChangeOrder,
     CostCode,
     Customer,
     Estimate,
     EstimateLineItem,
     EstimateStatusEvent,
-    FinancialAuditEvent,
     Invoice,
     InvoiceLine,
     OrganizationMembership,
@@ -37,10 +34,9 @@ from core.models import (
     RoleTemplate,
     Vendor,
     VendorBill,
-    VendorBillAllocation,
+    VendorBillLine,
 )
 from core.user_helpers import _ensure_membership
-from core.views.estimating.budgets_helpers import _build_budget_baseline_snapshot
 
 User = get_user_model()
 
@@ -279,31 +275,6 @@ class Command(BaseCommand):
                 note=note, changed_by=user,
             )
 
-    def _make_budget(self, user, project, estimate, co_total=Decimal("0.00")):
-        budget, _ = Budget.objects.get_or_create(
-            created_by=user, project=project, source_estimate=estimate,
-            defaults={
-                "status": Budget.Status.ACTIVE,
-                "baseline_snapshot_json": _build_budget_baseline_snapshot(estimate),
-                "approved_change_order_total": co_total,
-            },
-        )
-        budget.status = Budget.Status.ACTIVE
-        budget.baseline_snapshot_json = _build_budget_baseline_snapshot(estimate)
-        budget.approved_change_order_total = co_total
-        budget.save(update_fields=[
-            "status", "baseline_snapshot_json", "approved_change_order_total", "updated_at",
-        ])
-        # Create budget lines from estimate lines
-        for line in EstimateLineItem.objects.filter(estimate=estimate):
-            bl, _ = BudgetLine.objects.get_or_create(
-                budget=budget, cost_code=line.cost_code, description=line.description,
-                defaults={"budget_amount": line.line_total},
-            )
-            bl.budget_amount = line.line_total
-            bl.save(update_fields=["budget_amount", "updated_at"])
-        return budget
-
     def _make_change_order(self, user, project, family_key, title, status, amount, **kwargs):
         co, _ = ChangeOrder.objects.get_or_create(
             project=project, family_key=family_key,
@@ -385,6 +356,9 @@ class Command(BaseCommand):
                     if status in {VendorBill.Status.SCHEDULED, VendorBill.Status.PAID}
                     else None
                 ),
+                "subtotal": total,
+                "tax_amount": Decimal("0.00"),
+                "shipping_amount": Decimal("0.00"),
                 "total": total,
                 "balance_due": balance_due,
                 "notes": kwargs.get("notes", ""),
@@ -399,11 +373,27 @@ class Command(BaseCommand):
             if status in {VendorBill.Status.SCHEDULED, VendorBill.Status.PAID}
             else None
         )
+        vb.subtotal = total
+        vb.tax_amount = Decimal("0.00")
+        vb.shipping_amount = Decimal("0.00")
         vb.total = total
         vb.balance_due = balance_due
         vb.notes = kwargs.get("notes", "")
         vb.created_by = user
         vb.save()
+        # Create a single vendor bill line
+        cost_code = kwargs.get("cost_code")
+        VendorBillLine.objects.get_or_create(
+            vendor_bill=vb,
+            description=kwargs.get("notes", "") or f"Materials — {bill_number}",
+            defaults={
+                "cost_code": cost_code,
+                "quantity": Decimal("1"),
+                "unit": "ea",
+                "unit_price": total,
+                "line_total": total,
+            },
+        )
         return vb
 
     def _make_payment(self, user, project, direction, ref, method, status, amount, **kwargs):
@@ -440,21 +430,6 @@ class Command(BaseCommand):
             invoice=invoice,
             vendor_bill=vendor_bill,
             defaults={"applied_amount": amount or payment.amount, "created_by": user},
-        )
-
-    def _audit(self, project, user, event_type, object_type, object_id, note, **kwargs):
-        if FinancialAuditEvent.objects.filter(
-            project=project, created_by=user, event_type=event_type,
-            object_type=object_type, object_id=object_id, note=note,
-        ).exists():
-            return
-        FinancialAuditEvent.objects.create(
-            project=project, created_by=user, event_type=event_type,
-            object_type=object_type, object_id=object_id, note=note,
-            from_status=kwargs.get("from_status", ""),
-            to_status=kwargs.get("to_status", ""),
-            amount=kwargs.get("amount"),
-            metadata_json=kwargs.get("metadata", {}),
         )
 
     # ── Stage: New ───────────────────────────────────────────────────────
@@ -583,27 +558,20 @@ class Command(BaseCommand):
             Estimate.Status.ARCHIVED, Decimal("22000.00"), code1, code2)
         self._make_estimate(user, p_active1, "Baker Office Scope", 2,
             Estimate.Status.REJECTED, Decimal("23500.00"), code1, code2)
-        est_approved = self._make_estimate(user, p_active1, "Baker Office Scope", 3,
+        self._make_estimate(user, p_active1, "Baker Office Scope", 3,
             Estimate.Status.APPROVED, Decimal("24000.00"), code1, code2)
-
-        # Budget from the approved estimate
-        budget = self._make_budget(user, p_active1, est_approved, co_total=Decimal("2500.00"))
-        budget_lines = list(BudgetLine.objects.filter(budget=budget).order_by("id"))
 
         # More estimates in other statuses
         self._make_estimate(user, p_prospect, "Anderson Bath Scope", 1,
             Estimate.Status.DRAFT, Decimal("14000.00"), code1, code2)
         self._make_estimate(user, p_active2, "Clark Kitchen Scope", 1,
             Estimate.Status.SENT, Decimal("18000.00"), code1, code2)
-        est_completed = self._make_estimate(user, p_completed, "Evans Garage Scope", 1,
+        self._make_estimate(user, p_completed, "Evans Garage Scope", 1,
             Estimate.Status.APPROVED, Decimal("32000.00"), code1, code2)
         self._make_estimate(user, p_cancelled, "Foster Basement Scope", 1,
             Estimate.Status.VOID, Decimal("15000.00"), code1, code2)
         self._make_estimate(user, p_hold, "Davis Deck Scope", 1,
             Estimate.Status.APPROVED, Decimal("9500.00"), code1, code2)
-
-        # Budget for the completed project
-        self._make_budget(user, p_completed, est_completed, co_total=Decimal("1200.00"))
 
         # Change orders: draft, pending, approved, rejected, void
         self._make_change_order(user, p_active1, "1", "Add conference room outlets",
@@ -655,7 +623,7 @@ class Command(BaseCommand):
         self._make_vendor_bill(user, p_active1, v_trade1, "VB-001",
             VendorBill.Status.RECEIVED, Decimal("3200.00"), Decimal("3200.00"),
             notes="Electrical rough-in materials.")
-        vb_approved = self._make_vendor_bill(user, p_active1, v_trade2, "VB-002",
+        self._make_vendor_bill(user, p_active1, v_trade2, "VB-002",
             VendorBill.Status.APPROVED, Decimal("1800.00"), Decimal("1800.00"),
             notes="Plumbing fixtures.")
         vb_paid = self._make_vendor_bill(user, p_completed, v_trade1, "VB-003",
@@ -671,14 +639,6 @@ class Command(BaseCommand):
             VendorBill.Status.SCHEDULED, Decimal("2200.00"), Decimal("2200.00"),
             notes="Scheduled plumbing payment.")
 
-        # Vendor bill allocations for approved/scheduled/paid bills
-        if budget_lines:
-            for vb in [vb_approved, vb_paid]:
-                VendorBillAllocation.objects.get_or_create(
-                    vendor_bill=vb, budget_line=budget_lines[0],
-                    defaults={"amount": vb.total, "note": "Seeded allocation."},
-                )
-
         # Payments
         pay_in = self._make_payment(user, p_completed, Payment.Direction.INBOUND,
             "AR-001", Payment.Method.ACH, Payment.Status.SETTLED, Decimal("16000.00"))
@@ -688,13 +648,6 @@ class Command(BaseCommand):
         self._allocate_payment(user, pay_out, vendor_bill=vb_paid)
         self._make_payment(user, p_active1, Payment.Direction.INBOUND,
             "AR-002", Payment.Method.CARD, Payment.Status.PENDING, Decimal("3000.00"))
-
-        # Audit events for the completed project
-        self._audit(p_completed, user,
-            FinancialAuditEvent.EventType.INVOICE_UPDATED,
-            "invoice", inv_paid.id, "Invoice paid in full.",
-            from_status=Invoice.Status.SENT, to_status=Invoice.Status.PAID,
-            amount=inv_paid.total)
 
         # Team members (3 total: owner + PM + worker)
         self._add_team_member(membership, "mid-pm@test.com", "Sarah Chen",
@@ -795,7 +748,6 @@ class Command(BaseCommand):
             late_projects.append(p)
 
         # Estimates for every project — active/completed get full families
-        budgets = {}
         for i, p in enumerate(late_projects):
             base_amount = Decimal(str(3000 + i * 2500))
             if p.status in {Project.Status.ACTIVE, Project.Status.COMPLETED}:
@@ -804,16 +756,14 @@ class Command(BaseCommand):
                     Estimate.Status.ARCHIVED, base_amount * Decimal("0.90"), code1, code2)
                 self._make_estimate(user, p, f"{p.name} Scope", 2,
                     Estimate.Status.REJECTED, base_amount * Decimal("0.95"), code1, code2)
-                est = self._make_estimate(user, p, f"{p.name} Scope", 3,
+                self._make_estimate(user, p, f"{p.name} Scope", 3,
                     Estimate.Status.APPROVED, base_amount, code1, code2)
-                budgets[p.id] = self._make_budget(user, p, est)
             elif p.status == Project.Status.PROSPECT:
                 self._make_estimate(user, p, f"{p.name} Scope", 1,
                     Estimate.Status.DRAFT, base_amount, code1, code2)
             elif p.status == Project.Status.ON_HOLD:
-                est = self._make_estimate(user, p, f"{p.name} Scope", 1,
+                self._make_estimate(user, p, f"{p.name} Scope", 1,
                     Estimate.Status.APPROVED, base_amount, code1, code2)
-                budgets[p.id] = self._make_budget(user, p, est)
             elif p.status == Project.Status.CANCELLED:
                 self._make_estimate(user, p, f"{p.name} Scope", 1,
                     Estimate.Status.VOID, base_amount, code1, code2)
@@ -911,16 +861,6 @@ class Command(BaseCommand):
                 f"VB-{vb_num:03d}", status, Decimal(total), Decimal(balance))
             if status == VendorBill.Status.PAID:
                 paid_vendor_bills.append(vb)
-            # Allocate approved/scheduled/paid bills to budget lines
-            if status in {VendorBill.Status.APPROVED, VendorBill.Status.SCHEDULED, VendorBill.Status.PAID}:
-                budget = budgets.get(late_projects[p_idx].id)
-                if budget:
-                    bl = BudgetLine.objects.filter(budget=budget).first()
-                    if bl:
-                        VendorBillAllocation.objects.get_or_create(
-                            vendor_bill=vb, budget_line=bl,
-                            defaults={"amount": vb.total, "note": "Seeded allocation."},
-                        )
             vb_num += 1
 
         # Payments — inbound for paid invoices, outbound for paid vendor bills

@@ -74,29 +74,11 @@ describe("emptyLine", () => {
   it("creates a line with the given localId", () => {
     const result = emptyLine(3);
     expect(result.localId).toBe(3);
-    expect(result.lineType).toBe("scope");
-    expect(result.budgetLineId).toBe("");
-    expect(result.description).toBe("Invoice scope item");
+    expect(result.costCode).toBe("");
+    expect(result.description).toBe("");
     expect(result.quantity).toBe("1");
     expect(result.unit).toBe("ea");
     expect(result.unitPrice).toBe("0");
-  });
-
-  it("uses defaultBudgetLineId when provided", () => {
-    const result = emptyLine(1, "42");
-    expect(result.budgetLineId).toBe("42");
-  });
-
-  it("creates a direct line when lineType is direct", () => {
-    const result = emptyLine(1, "", "direct");
-    expect(result.lineType).toBe("direct");
-    expect(result.budgetLineId).toBe("");
-    expect(result.description).toBe("Direct invoice item");
-  });
-
-  it("ignores defaultBudgetLineId for direct lines", () => {
-    const result = emptyLine(1, "99", "direct");
-    expect(result.budgetLineId).toBe("");
   });
 });
 

@@ -3,13 +3,10 @@
 from decimal import Decimal
 
 from core.models import (
-    Budget,
     Estimate,
     EstimateLineItem,
     EstimateStatusEvent,
-    FinancialAuditEvent,
     Project,
-    ScopeItem,
 )
 from core.serializers import EstimateSerializer
 from core.user_helpers import _ensure_membership
@@ -71,53 +68,14 @@ def _next_estimate_family_version(*, project, title):
     return (latest.version + 1) if latest else 1
 
 
-def _estimate_financial_baseline_context(*, project):
-    """Build a mapping of estimate IDs to their budget conversion status for serialization.
-
-    Authorization: caller must have already validated that *project* belongs to the
-    requesting user's organization.
-    """
-    budgets = (
-        Budget.objects.filter(project=project)
-        .select_related("source_estimate")
-        .order_by("-created_at", "-id")
-    )
-    financial_baseline_status_by_estimate_id: dict[int, str] = {}
-    active_budget = None
-    for budget in budgets:
-        source_estimate_id = budget.source_estimate_id
-        if source_estimate_id is None:
-            continue
-        if budget.status == Budget.Status.ACTIVE:
-            if source_estimate_id not in financial_baseline_status_by_estimate_id:
-                financial_baseline_status_by_estimate_id[source_estimate_id] = "active"
-            if active_budget is None:
-                active_budget = budget
-            continue
-        if source_estimate_id not in financial_baseline_status_by_estimate_id:
-            financial_baseline_status_by_estimate_id[source_estimate_id] = "superseded"
-    return {
-        "financial_baseline_status_by_estimate_id": financial_baseline_status_by_estimate_id,
-        "active_budget_id": active_budget.id if active_budget else None,
-        "active_budget_source_estimate_id": active_budget.source_estimate_id if active_budget else None,
-        "active_budget_source_estimate_version": (
-            active_budget.source_estimate.version
-            if active_budget and active_budget.source_estimate_id
-            else None
-        ),
-    }
-
-
 def _serialize_estimate(*, estimate):
-    """Serialize a single estimate with its financial baseline context."""
-    context = _estimate_financial_baseline_context(project=estimate.project)
-    return EstimateSerializer(estimate, context=context).data
+    """Serialize a single estimate."""
+    return EstimateSerializer(estimate).data
 
 
 def _serialize_estimates(*, estimates, project):
-    """Serialize multiple estimates sharing the same project's financial baseline context."""
-    context = _estimate_financial_baseline_context(project=project)
-    return EstimateSerializer(estimates, many=True, context=context).data
+    """Serialize multiple estimates sharing the same project."""
+    return EstimateSerializer(estimates, many=True).data
 
 
 def _sync_project_contract_baseline_if_unset(*, estimate):
@@ -142,21 +100,6 @@ def _activate_project_from_estimate_approval(*, estimate, actor, note: str):
     previous_status = project.status
     project.status = Project.Status.ACTIVE
     project.save(update_fields=["status", "updated_at"])
-    FinancialAuditEvent.record(
-        project=project,
-        event_type="project_status_changed",
-        object_type="project",
-        object_id=project.id,
-        from_status=previous_status,
-        to_status=project.status,
-        note=note,
-        created_by=actor,
-        metadata={
-            "trigger": "estimate_approved",
-            "estimate_id": estimate.id,
-            "estimate_version": estimate.version,
-        },
-    )
     return True
 
 
@@ -170,8 +113,6 @@ def _calculate_line_totals(line_items_data):
         quantity = Decimal(str(item["quantity"]))
         unit_cost = Decimal(str(item["unit_cost"]))
         markup_percent = Decimal(str(item.get("markup_percent", 0)))
-        # Markup can be applied before or after quantity multiplication:
-        # q * u * (1 + m) == q * (u * (1 + m))
         base_total = quantize_money(quantity * unit_cost)
         line_markup = quantize_money(base_total * (markup_percent / Decimal("100")))
         line_total = quantize_money(base_total + line_markup)
@@ -196,7 +137,6 @@ def _apply_estimate_lines_and_totals(estimate, line_items_data, tax_percent, use
     code_map, missing = _resolve_cost_codes_for_user(user, normalized_items)
     if missing:
         return {"missing_cost_codes": missing}
-    membership = _ensure_membership(user)
 
     tax_percent = Decimal(str(tax_percent))
     tax_total = quantize_money((subtotal + markup_total) * (tax_percent / Decimal("100")))
@@ -206,34 +146,11 @@ def _apply_estimate_lines_and_totals(estimate, line_items_data, tax_percent, use
     new_lines = []
     for item in normalized_items:
         description = (item.get("description") or "").strip()
-        normalized_scope_name = " ".join(description.lower().split())
         unit_value = (item.get("unit") or "ea").strip().lower() or "ea"
-        scope_item = None
-        if normalized_scope_name:
-            scope_item = (
-                ScopeItem.objects.filter(
-                    organization_id=membership.organization_id,
-                    cost_code=code_map[item["cost_code"]],
-                    normalized_name=normalized_scope_name,
-                    unit=unit_value,
-                )
-                .order_by("id")
-                .first()
-            )
-            if not scope_item:
-                scope_item = ScopeItem.objects.create(
-                    organization_id=membership.organization_id,
-                    cost_code=code_map[item["cost_code"]],
-                    name=description[:255],
-                    normalized_name=normalized_scope_name,
-                    unit=unit_value,
-                    created_by=user,
-                )
 
         new_lines.append(
             EstimateLineItem(
                 estimate=estimate,
-                scope_item=scope_item,
                 cost_code=code_map[item["cost_code"]],
                 description=description,
                 quantity=item["quantity"],

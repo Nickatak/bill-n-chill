@@ -271,8 +271,8 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
             rows={(changeOrder.line_items ?? []).map((line) => ({
               key: line.id,
               cells: [
-                `#${line.budget_line} ${line.budget_line_cost_code}`,
-                line.description || line.budget_line_description,
+                line.cost_code_code || "—",
+                line.description || "—",
                 `$${formatDecimal(parseAmount(line.amount_delta))}`,
                 line.days_delta,
               ],
