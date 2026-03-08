@@ -605,3 +605,230 @@ class CeremonyDecisionValidationTests(TestCase):
         )
         self.assertEqual(response.status_code, 422)
         self.assertEqual(response.json()["error"]["code"], "customer_email_required")
+
+
+class PublicSigningEdgeCaseTests(TestCase):
+    """Edge case tests for public signing — double-approve, cross-doc reuse, OTP limits, etc."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="edge_pm",
+            email="edge_pm@example.com",
+            password="secret123",
+        )
+        self.org = _bootstrap_org(self.user)
+        self.customer = Customer.objects.create(
+            organization=self.org,
+            display_name="Edge Owner",
+            email="edge_owner@example.com",
+            phone="555-3333",
+            billing_address="3 Main St",
+            created_by=self.user,
+        )
+        self.project = Project.objects.create(
+            organization=self.org,
+            customer=self.customer,
+            name="Edge Project",
+            status=Project.Status.PROSPECT,
+            created_by=self.user,
+        )
+        self.estimate = Estimate.objects.create(
+            project=self.project,
+            version=1,
+            title="Edge Estimate",
+            created_by=self.user,
+            status=Estimate.Status.SENT,
+        )
+
+    def _ceremony_payload(self, session, **overrides):
+        base = {
+            "decision": "approve",
+            "session_token": session.session_token,
+            "signer_name": "Edge Owner",
+            "consent_accepted": True,
+        }
+        base.update(overrides)
+        return base
+
+    def test_double_approve_returns_409_conflict(self):
+        """Approving an already-approved estimate returns 409."""
+        session_1 = _create_verified_session(
+            self.estimate.public_token,
+            document_type="estimate",
+            document_id=self.estimate.id,
+            email=self.customer.email,
+        )
+        response_1 = self.client.post(
+            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
+            data=self._ceremony_payload(session_1),
+            content_type="application/json",
+        )
+        self.assertEqual(response_1.status_code, 200)
+        self.assertEqual(response_1.json()["data"]["status"], Estimate.Status.APPROVED)
+
+        # Second attempt with a fresh session should fail — estimate is no longer SENT.
+        session_2 = _create_verified_session(
+            self.estimate.public_token,
+            document_type="estimate",
+            document_id=self.estimate.id,
+            email=self.customer.email,
+        )
+        response_2 = self.client.post(
+            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
+            data=self._ceremony_payload(session_2),
+            content_type="application/json",
+        )
+        self.assertEqual(response_2.status_code, 409)
+        self.assertEqual(response_2.json()["error"]["code"], "conflict")
+
+    def test_session_token_scoped_to_document(self):
+        """A session token for estimate_a cannot be used on estimate_b's decision endpoint."""
+        estimate_b = Estimate.objects.create(
+            project=self.project,
+            version=2,
+            title="Edge Estimate B",
+            created_by=self.user,
+            status=Estimate.Status.SENT,
+        )
+        session_a = _create_verified_session(
+            self.estimate.public_token,
+            document_type="estimate",
+            document_id=self.estimate.id,
+            email=self.customer.email,
+        )
+        # Use session_a's token against estimate_b's endpoint.
+        response = self.client.post(
+            f"/api/v1/public/estimates/{estimate_b.public_token}/decision/",
+            data=self._ceremony_payload(session_a),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_max_otp_attempts_then_new_otp_succeeds(self):
+        """After max failed attempts, requesting a new OTP and verifying it works."""
+        # Request first OTP.
+        self.client.post(
+            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/",
+            content_type="application/json",
+        )
+        session = DocumentAccessSession.objects.filter(
+            public_token=self.estimate.public_token,
+        ).first()
+
+        # Max out failed attempts.
+        session.failed_attempts = 10
+        session.save(update_fields=["failed_attempts"])
+
+        # Verify should fail with max_attempts.
+        response = self.client.post(
+            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/verify/",
+            data={"code": session.code},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response.json()["error"]["code"], "max_attempts")
+
+        # Bypass rate limit by aging the first session.
+        session.created_at = timezone.now() - timedelta(seconds=120)
+        session.save(update_fields=["created_at"])
+
+        # Request new OTP.
+        response = self.client.post(
+            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/",
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        new_session = DocumentAccessSession.objects.filter(
+            public_token=self.estimate.public_token,
+            verified_at__isnull=True,
+        ).order_by("-created_at").first()
+        self.assertNotEqual(new_session.id, session.id)
+
+        # Verify the new OTP — fresh counter should allow it.
+        response = self.client.post(
+            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/verify/",
+            data={"code": new_session.code},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("session_token", response.json()["data"])
+
+    def test_reject_decision_creates_ceremony_record(self):
+        """Rejecting an estimate creates a SigningCeremonyRecord with decision='reject'."""
+        session = _create_verified_session(
+            self.estimate.public_token,
+            document_type="estimate",
+            document_id=self.estimate.id,
+            email=self.customer.email,
+        )
+        response = self.client.post(
+            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
+            data=self._ceremony_payload(session, decision="reject"),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["status"], Estimate.Status.REJECTED)
+
+        record = SigningCeremonyRecord.objects.filter(
+            document_type="estimate",
+            document_id=self.estimate.id,
+        ).first()
+        self.assertIsNotNone(record)
+        self.assertEqual(record.decision, "reject")
+
+    def test_empty_whitespace_otp_code_returns_400(self):
+        """Submitting a whitespace-only OTP code returns 400 validation_error."""
+        response = self.client.post(
+            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/verify/",
+            data={"code": "   "},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "validation_error")
+
+    def test_decision_on_draft_estimate_returns_409(self):
+        """Attempting a decision on a DRAFT estimate returns 409 conflict."""
+        draft_estimate = Estimate.objects.create(
+            project=self.project,
+            version=2,
+            title="Draft Estimate",
+            created_by=self.user,
+            status=Estimate.Status.DRAFT,
+        )
+        session = _create_verified_session(
+            draft_estimate.public_token,
+            document_type="estimate",
+            document_id=draft_estimate.id,
+            email=self.customer.email,
+        )
+        response = self.client.post(
+            f"/api/v1/public/estimates/{draft_estimate.public_token}/decision/",
+            data=self._ceremony_payload(session),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["error"]["code"], "conflict")
+
+    def test_max_attempts_blocks_correct_code(self):
+        """Even the correct OTP code is rejected after max failed attempts."""
+        self.client.post(
+            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/",
+            content_type="application/json",
+        )
+        session = DocumentAccessSession.objects.filter(
+            public_token=self.estimate.public_token,
+        ).first()
+
+        # Set failed_attempts to MAX_VERIFY_ATTEMPTS.
+        session.failed_attempts = 10
+        session.save(update_fields=["failed_attempts"])
+
+        # Submit the correct code — should still be rejected.
+        response = self.client.post(
+            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/verify/",
+            data={"code": session.code},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response.json()["error"]["code"], "max_attempts")

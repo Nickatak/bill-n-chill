@@ -96,30 +96,6 @@ def _resolve_user_capabilities(user, *, membership=None) -> dict:
     return base
 
 
-def _organization_user_ids(user) -> list[int]:
-    """Return all active user IDs in the caller's organization.
-
-    Resolves the user's active membership via ``_ensure_membership``, then
-    collects every active member's ``user_id`` from that organization.  The
-    caller's own ID is always included (even if their membership row is
-    missing or stale — a defensive guard).
-
-    Used for scoping models that lack a direct ``organization`` FK (e.g.
-    Invoice, VendorBill, Payment, CostCode).  Models with a direct
-    ``organization`` FK (Customer, Project) use
-    ``organization_id=membership.organization_id`` instead.
-    """
-    membership = _ensure_membership(user)
-    user_ids = list(
-        OrganizationMembership.objects.filter(
-            organization_id=membership.organization_id,
-            status=OrganizationMembership.Status.ACTIVE,
-        ).values_list("user_id", flat=True)
-    )
-    if user.id not in user_ids:
-        user_ids.append(user.id)
-    return user_ids
-
 
 # ---------------------------------------------------------------------------
 # Membership bootstrap / self-heal

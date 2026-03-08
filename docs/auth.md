@@ -404,11 +404,11 @@ Normal registration ([Flow A](#flow-a-standard-registration-no-invite)) also goe
 ## Security Notes
 
 - **No token expiry:** DRF tokens do not expire. The token lives until the user logs out (client-side clear) or the token row is deleted server-side. This is a known tradeoff for simplicity at current scale.
-- **Invite security:** See [`docs/meta/invite-flow-security.md`](meta/invite-flow-security.md) for threat model and mitigations. Key points:
+- **Invite security:** See [`docs/decisions/invite-flow-security.md`](decisions/invite-flow-security.md) for threat model and mitigations. Key points:
   - Tokens are `secrets.token_urlsafe(32)` (43 chars, ~192 bits of entropy).
   - 24-hour expiry limits exposure window.
   - Email-bound: only the invited email can consume the token.
   - [Flow C](#flow-c-invited-existing-user-org-switch) requires password confirmation to prevent silent org-switching.
-- **Email enumeration:** Registration currently reveals whether an email is taken (standard Django behavior). Deferred — see [`docs/meta/DEFERRED_REGISTRATION_EMAIL_ENUMERATION.md`](meta/DEFERRED_REGISTRATION_EMAIL_ENUMERATION.md).
-- **Org scoping:** All data queries filter by `_organization_user_ids(user)`, ensuring users can only access data belonging to their org's members. This is the primary data isolation boundary.
+- **Email enumeration:** Registration currently reveals whether an email is taken (standard Django behavior). Deferred.
+- **Org scoping:** All data queries filter by `organization_id=membership.organization_id` (direct org scoping via `_ensure_membership()`), ensuring users can only access data belonging to their org. This is the primary data isolation boundary.
 - **Optimistic auth:** The frontend [auth gate](#auth-gate) optimistically shows the authorized UI while [`/me/`](#get-authme) verification is in flight. Only hard 401/403 triggers logout. Transient errors (network, 5xx) preserve the session to avoid login-screen flicker.
