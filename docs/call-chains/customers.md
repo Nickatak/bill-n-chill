@@ -31,8 +31,8 @@ End-to-end function call order for each customer action. All backend view functi
 
 *── org scoping ──*
 
-- [`_organization_user_ids(request.user)`](../../backend/core/user_helpers.py#L99)
-- `Customer.objects.filter(created_by_id__in=…).annotate(project_count, active_project_count)`
+- [`_ensure_membership(request.user)`](../../backend/core/views/helpers.py) → `membership`
+- `Customer.objects.filter(organization_id=membership.organization_id).annotate(project_count, active_project_count)`
 
 *── search filter ──*
 
@@ -65,8 +65,8 @@ End-to-end function call order for each customer action. All backend view functi
 
 *── org scoping ──*
 
-- [`_organization_user_ids(request.user)`](../../backend/core/user_helpers.py#L99)
-- `Customer.objects.filter(id=…, created_by_id__in=…).first()`
+- [`_ensure_membership(request.user)`](../../backend/core/views/helpers.py) → `membership`
+- `Customer.objects.filter(id=…, organization_id=membership.organization_id).first()`
 
 *── capability gate ──*
 
@@ -107,8 +107,8 @@ End-to-end function call order for each customer action. All backend view functi
 
 *── org scoping ──*
 
-- [`_organization_user_ids(request.user)`](../../backend/core/user_helpers.py#L99)
-- `Customer.objects.filter(id=…, created_by_id__in=…).first()`
+- [`_ensure_membership(request.user)`](../../backend/core/views/helpers.py) → `membership`
+- `Customer.objects.filter(id=…, organization_id=membership.organization_id).first()`
 
 *── capability gate ──*
 
@@ -168,7 +168,8 @@ End-to-end function call order for each customer action. All backend view functi
 *── duplicate detection ──*
 
 - [`_find_duplicate_customers(user, phone=…, email=…)`](../../backend/core/views/shared_operations/customers_helpers.py#L10)
-  - [`_organization_user_ids(user)`](../../backend/core/user_helpers.py#L99)
+  - [`_ensure_membership(user)`](../../backend/core/views/helpers.py) → `membership`
+  - `Customer.objects.filter(organization_id=membership.organization_id)`
   - direct match by phone/email
   - [`_normalized_phone()`](../../backend/core/views/helpers.py#L114) secondary pass
 - if duplicates found and no resolution: `HTTP 409` with [`_build_customer_duplicate_candidate(…)`](../../backend/core/views/shared_operations/customers_helpers.py#L34)
