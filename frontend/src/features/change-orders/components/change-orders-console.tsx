@@ -1926,6 +1926,12 @@ export function ChangeOrdersConsole({
         )}
       </section>
 
+      {projectEstimates.length === 0 && !selectedChangeOrder ? (
+        <p className={styles.viewerHint}>
+          Approve an estimate on this project first to start creating change orders.
+        </p>
+      ) : (
+      <>
       <div className={styles.formToolbar}>
         <div className={styles.formContext}>
           <span className={styles.formContextLabel}>
@@ -2578,6 +2584,8 @@ export function ChangeOrdersConsole({
         ) : null}
         </div>
       ) : null}
+      </>
+      )}
     </section>
   );
 }
