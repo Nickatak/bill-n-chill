@@ -39,14 +39,13 @@ export function validateLineItems(lines: ChangeOrderLineInput[]): LineValidation
   lines.forEach((line, index) => {
     const rowNumber = index + 1;
     const rowIssues: string[] = [];
-    const budgetLineId = line.budgetLineId.trim();
 
-    if (!budgetLineId) {
+    if (line.lineType === "original" && !line.budgetLineId.trim()) {
       rowIssues.push("Select a budget line.");
     }
 
-    if (line.lineType === "adjustment" && !line.adjustmentReason.trim()) {
-      rowIssues.push("Adjustment lines require a reason.");
+    if (line.lineType === "new" && !line.costCodeId.trim()) {
+      rowIssues.push("Select a cost code.");
     }
 
     if (!isFiniteNumericInput(line.amountDelta)) {
@@ -85,9 +84,10 @@ export function validateLineItems(lines: ChangeOrderLineInput[]): LineValidation
 export function emptyLine(localId: number): ChangeOrderLineInput {
   return {
     localId,
-    lineType: "scope",
+    lineType: "new",
     adjustmentReason: "",
     budgetLineId: "",
+    costCodeId: "",
     description: "",
     amountDelta: "0.00",
     daysDelta: "0",

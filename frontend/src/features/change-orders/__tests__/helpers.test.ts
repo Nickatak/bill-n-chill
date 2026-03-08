@@ -60,9 +60,10 @@ describe("validateLineItems", () => {
   function line(overrides: Partial<ChangeOrderLineInput> = {}): ChangeOrderLineInput {
     return {
       localId: 1,
-      lineType: "scope",
+      lineType: "original",
       adjustmentReason: "",
       budgetLineId: "10",
+      costCodeId: "",
       description: "Test",
       amountDelta: "500.00",
       daysDelta: "5",
@@ -70,15 +71,25 @@ describe("validateLineItems", () => {
     };
   }
 
-  it("returns no issues for a valid line", () => {
+  it("returns no issues for a valid original line", () => {
     const result = validateLineItems([line()]);
     expect(result.issues).toHaveLength(0);
     expect(result.issuesByLocalId.size).toBe(0);
   });
 
-  it("flags missing budget line", () => {
+  it("returns no issues for a valid new line", () => {
+    const result = validateLineItems([line({ lineType: "new", budgetLineId: "", costCodeId: "5" })]);
+    expect(result.issues).toHaveLength(0);
+  });
+
+  it("flags missing budget line for original lines", () => {
     const result = validateLineItems([line({ budgetLineId: "" })]);
     expect(result.issues.some((i) => i.message === "Select a budget line.")).toBe(true);
+  });
+
+  it("flags missing cost code for new lines", () => {
+    const result = validateLineItems([line({ lineType: "new", budgetLineId: "", costCodeId: "" })]);
+    expect(result.issues.some((i) => i.message === "Select a cost code.")).toBe(true);
   });
 
   it("allows duplicate budget lines", () => {
@@ -90,14 +101,12 @@ describe("validateLineItems", () => {
     expect(result.issues.length).toBe(0);
   });
 
-  it("flags adjustment line without reason", () => {
-    const result = validateLineItems([line({ lineType: "adjustment", adjustmentReason: "" })]);
-    expect(result.issues.some((i) => i.message.includes("reason"))).toBe(true);
-  });
+  it("does not require adjustment reason on any line type", () => {
+    const original = validateLineItems([line({ adjustmentReason: "" })]);
+    expect(original.issues).toHaveLength(0);
 
-  it("does not flag scope line without reason", () => {
-    const result = validateLineItems([line({ lineType: "scope", adjustmentReason: "" })]);
-    expect(result.issues).toHaveLength(0);
+    const newLine = validateLineItems([line({ lineType: "new", budgetLineId: "", costCodeId: "5", adjustmentReason: "" })]);
+    expect(newLine.issues).toHaveLength(0);
   });
 
   it("flags non-numeric amount delta", () => {
@@ -140,9 +149,10 @@ describe("emptyLine", () => {
   it("creates a line with the given localId", () => {
     const result = emptyLine(3);
     expect(result.localId).toBe(3);
-    expect(result.lineType).toBe("scope");
+    expect(result.lineType).toBe("new");
     expect(result.adjustmentReason).toBe("");
     expect(result.budgetLineId).toBe("");
+    expect(result.costCodeId).toBe("");
     expect(result.description).toBe("");
     expect(result.amountDelta).toBe("0.00");
     expect(result.daysDelta).toBe("0");

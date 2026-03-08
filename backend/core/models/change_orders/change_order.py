@@ -224,9 +224,34 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
             )
 
         line_rows = list(
-            self.line_items.select_related("budget_line", "budget_line__cost_code")
-            .order_by("id")
+            self.line_items.select_related(
+                "budget_line", "budget_line__cost_code", "cost_code",
+            ).order_by("id")
         )
+
+        def _line_snapshot(row):
+            if row.budget_line_id:
+                cc_id = row.budget_line.cost_code_id
+                cc_code = row.budget_line.cost_code.code
+                cc_name = row.budget_line.cost_code.name
+            elif row.cost_code_id:
+                cc_id = row.cost_code_id
+                cc_code = row.cost_code.code
+                cc_name = row.cost_code.name
+            else:
+                cc_id = cc_code = cc_name = None
+            return {
+                "change_order_line_id": row.id,
+                "budget_line_id": row.budget_line_id,
+                "cost_code_id": cc_id,
+                "cost_code_code": cc_code,
+                "cost_code_name": cc_name,
+                "description": row.description,
+                "line_type": row.line_type,
+                "adjustment_reason": row.adjustment_reason,
+                "amount_delta": str(row.amount_delta),
+                "days_delta": row.days_delta,
+            }
 
         return {
             "change_order": {
@@ -246,21 +271,7 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
                 "approved_by_id": self.approved_by_id,
                 "approved_at": self.approved_at.isoformat() if self.approved_at else None,
             },
-            "line_items": [
-                {
-                    "change_order_line_id": row.id,
-                    "budget_line_id": row.budget_line_id,
-                    "cost_code_id": row.budget_line.cost_code_id,
-                    "cost_code_code": row.budget_line.cost_code.code,
-                    "cost_code_name": row.budget_line.cost_code.name,
-                    "description": row.description,
-                    "line_type": row.line_type,
-                    "adjustment_reason": row.adjustment_reason,
-                    "amount_delta": str(row.amount_delta),
-                    "days_delta": row.days_delta,
-                }
-                for row in line_rows
-            ],
+            "line_items": [_line_snapshot(row) for row in line_rows],
         }
 
     def save(self, *args, **kwargs):

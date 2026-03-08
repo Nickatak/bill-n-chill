@@ -36,6 +36,7 @@ import {
   ChangeOrderLineInput,
   ChangeOrderPolicyContract,
   ChangeOrderRecord,
+  CostCodeOption,
 } from "../types";
 import { usePrintable } from "@/shared/shell/printable-context";
 import styles from "./change-orders-console.module.css";
@@ -114,7 +115,6 @@ const CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]>
   void: [],
 };
 const CHANGE_ORDER_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
-const CO_GENERIC_BUDGET_LINE_CODES = new Set(["99-901", "99-902", "99-903"]);
 
 /** Internal change-orders workspace: estimate-linked viewer, dual creators (create + edit), and status lifecycle. */
 export function ChangeOrdersConsole({
@@ -131,6 +131,7 @@ export function ChangeOrdersConsole({
   const [selectedViewerEstimateId, setSelectedViewerEstimateId] = useState("");
   const [isViewerExpanded, setIsViewerExpanded] = useState(true);
   const [budgetLines, setBudgetLines] = useState<BudgetLineRecord[]>([]);
+  const [costCodes, setCostCodes] = useState<CostCodeOption[]>([]);
   const [originEstimateOriginalTotals, setOriginEstimateOriginalTotals] = useState<
     Record<number, number>
   >({});
@@ -428,10 +429,6 @@ export function ChangeOrdersConsole({
       .join(" ");
   }
 
-  /** Check whether a budget line is a system-reserved generic adjustment bin. */
-  function isGenericBudgetLine(line: BudgetLineRecord | undefined): boolean {
-    return Boolean(line?.cost_code_code && CO_GENERIC_BUDGET_LINE_CODES.has(line.cost_code_code));
-  }
 
   const setFeedback = useCallback((message: string, tone: "error" | "success" | "info" = "info") => {
     setActionMessage(message);
@@ -731,11 +728,10 @@ export function ChangeOrdersConsole({
       changeOrder.line_items.length > 0
         ? changeOrder.line_items.map((line, index) => ({
             localId: index + 1,
-            lineType: (line.line_type === "adjustment" ? "adjustment" : "scope") as
-              | "scope"
-              | "adjustment",
+            lineType: (line.line_type === "new" ? "new" : "original") as "original" | "new",
             adjustmentReason: line.adjustment_reason ?? "",
-            budgetLineId: String(line.budget_line),
+            budgetLineId: line.budget_line ? String(line.budget_line) : "",
+            costCodeId: line.cost_code_id ? String(line.cost_code_id) : "",
             description: line.description ?? "",
             amountDelta: line.amount_delta,
             daysDelta: String(line.days_delta),
@@ -945,6 +941,23 @@ export function ChangeOrdersConsole({
     }
   }, [normalizedBaseUrl, token]);
 
+  const loadCostCodes = useCallback(async () => {
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/cost-codes/`, {
+        headers: buildAuthHeaders(token),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setCostCodes([]);
+        return;
+      }
+      const rows = ((payload.data as CostCodeOption[]) ?? []).filter((c) => c.is_active);
+      setCostCodes(rows);
+    } catch {
+      setCostCodes([]);
+    }
+  }, [normalizedBaseUrl, token]);
+
   const prefillNewLinesFromBudgetLines = useCallback((lines: BudgetLineRecord[]) => {
     if (!lines.length) {
       setNewLineItems([emptyLine(1)]);
@@ -964,9 +977,10 @@ export function ChangeOrdersConsole({
     }
     const mapped: ChangeOrderLineInput[] = starterLines.map((line, index) => ({
       localId: index + 1,
-      lineType: "scope",
+      lineType: "original",
       adjustmentReason: "",
       budgetLineId: String(line.id),
+      costCodeId: "",
       description: line.description || "",
       amountDelta: "0.00",
       daysDelta: "0",
@@ -1048,6 +1062,7 @@ export function ChangeOrdersConsole({
           loadBudgetLines(nextProject.id),
           loadProjectEstimates(nextProject.id),
           loadProjectAuditEvents(nextProject.id),
+          loadCostCodes(),
         ]);
         const { rows: changeOrderRows, error } = await fetchProjectChangeOrders(nextProject.id);
         if (!changeOrderRows) {
@@ -1081,6 +1096,7 @@ export function ChangeOrdersConsole({
     hydrateEditForm,
     initialOriginEstimateId,
     loadBudgetLines,
+    loadCostCodes,
     loadProjectAuditEvents,
     loadProjectEstimates,
     normalizedBaseUrl,
@@ -1169,10 +1185,13 @@ export function ChangeOrdersConsole({
   /** Convert local line-item state into the API payload shape. */
   function toLinePayload(lines: ChangeOrderLineInput[]) {
     return lines
-      .filter((line) => line.budgetLineId.trim() !== "")
+      .filter((line) =>
+        line.lineType === "original" ? line.budgetLineId.trim() !== "" : line.costCodeId.trim() !== "",
+      )
       .map((line) => ({
         line_type: line.lineType,
-        budget_line: Number(line.budgetLineId),
+        budget_line: line.lineType === "original" ? Number(line.budgetLineId) : null,
+        cost_code: line.lineType === "new" ? Number(line.costCodeId) : null,
         description: line.description,
         adjustment_reason: line.adjustmentReason,
         amount_delta: line.amountDelta,
@@ -1876,9 +1895,11 @@ export function ChangeOrdersConsole({
                                       <tbody>
                                         {selectedViewerChangeOrder.line_items.map((line) => (
                                           <tr key={line.id}>
-                                            <td>{line.line_type === "adjustment" ? "Adjustment" : "Scope"}</td>
+                                            <td>{line.line_type === "new" ? "New" : "Original"}</td>
                                             <td>
-                                              #{line.budget_line} {line.budget_line_cost_code}
+                                              {line.line_type === "new"
+                                                ? (line.cost_code_code || "—")
+                                                : `#${line.budget_line} ${line.budget_line_cost_code}`}
                                             </td>
                                             <td>{line.description || line.budget_line_description}</td>
                                             <td>${line.amount_delta}</td>
@@ -1886,9 +1907,9 @@ export function ChangeOrdersConsole({
                                             {showBudgetColumns ? (
                                               <>
                                                 <td>{line.adjustment_reason || "—"}</td>
-                                                <td>${originalApprovedAmountForLine(String(line.budget_line))}</td>
-                                                <td>${approvedChangeOrderDeltaForLine(String(line.budget_line))}</td>
-                                                <td>${currentWorkingAmountForLine(String(line.budget_line))}</td>
+                                                <td>{line.line_type === "original" ? `$${originalApprovedAmountForLine(String(line.budget_line))}` : "—"}</td>
+                                                <td>{line.line_type === "original" ? `$${approvedChangeOrderDeltaForLine(String(line.budget_line))}` : "—"}</td>
+                                                <td>{line.line_type === "original" ? `$${currentWorkingAmountForLine(String(line.budget_line))}` : "—"}</td>
                                               </>
                                             ) : null}
                                           </tr>
@@ -2069,11 +2090,6 @@ export function ChangeOrdersConsole({
                   </div>
                   {newLineItems.map((line, index) => {
                     const rowIssues = newLineValidation.issuesByLocalId.get(line.localId) ?? [];
-                    const availableBudgetLines = budgetLines.filter((budgetLine) =>
-                      line.lineType === "adjustment"
-                        ? isGenericBudgetLine(budgetLine)
-                        : !isGenericBudgetLine(budgetLine),
-                    );
                     return (
                       <div key={line.localId} className={changeOrderCreatorStyles.coLineRowGroup}>
                         <div
@@ -2085,66 +2101,79 @@ export function ChangeOrdersConsole({
                             className={creatorStyles.lineSelect}
                             value={line.lineType}
                             onChange={(event) => {
-                              const nextLineType = event.target.value as "scope" | "adjustment";
-                              const selectedBudgetLine = budgetLineById.get(line.budgetLineId);
-                              const selectedIsGeneric = isGenericBudgetLine(selectedBudgetLine);
-                              const keepBudgetSelection = nextLineType === "adjustment"
-                                ? selectedIsGeneric
-                                : !selectedIsGeneric;
+                              const nextLineType = event.target.value as "original" | "new";
                               updateLine(setNewLineItems, line.localId, {
                                 lineType: nextLineType,
-                                adjustmentReason:
-                                  nextLineType === "adjustment" ? line.adjustmentReason : "",
-                                budgetLineId: keepBudgetSelection ? line.budgetLineId : "",
+                                budgetLineId: nextLineType === "original" ? line.budgetLineId : "",
+                                costCodeId: nextLineType === "new" ? line.costCodeId : "",
                               });
                             }}
                           >
-                            <option value="scope">Scope</option>
-                            <option value="adjustment">Adjustment</option>
+                            <option value="original">Original</option>
+                            <option value="new">New</option>
                           </select>
                           <input
                             className={creatorStyles.lineInput}
                             value={line.adjustmentReason}
-                            placeholder={line.lineType === "adjustment" ? "Required reason" : "Not used for scope"}
+                            placeholder="Optional reason"
                             onChange={(event) =>
                               updateLine(setNewLineItems, line.localId, { adjustmentReason: event.target.value })
                             }
-                            disabled={line.lineType !== "adjustment"}
                           />
                           <div>
-                            <span className={creatorStyles.printOnly}>
-                              {availableBudgetLines.find((b) => String(b.id) === line.budgetLineId)?.cost_code_code || "—"}
-                            </span>
-                            <select
-                              className={`${creatorStyles.lineSelect} ${creatorStyles.screenOnly}`}
-                              value={line.budgetLineId}
-                              onChange={(event) =>
-                                updateLine(setNewLineItems, line.localId, { budgetLineId: event.target.value })
-                              }
-                            >
-                              <option value="">
-                                {line.lineType === "adjustment" ? "Select adjustment bin" : "Select cost code"}
-                              </option>
-                              {availableBudgetLines.map((budgetLine) => (
-                                <option key={budgetLine.id} value={budgetLine.id}>
-                                  #{budgetLine.id} {budgetLine.cost_code_code} - {budgetLine.description}
-                                </option>
-                              ))}
-                            </select>
+                            {line.lineType === "original" ? (
+                              <>
+                                <span className={creatorStyles.printOnly}>
+                                  {budgetLines.find((b) => String(b.id) === line.budgetLineId)?.cost_code_code || "—"}
+                                </span>
+                                <select
+                                  className={`${creatorStyles.lineSelect} ${creatorStyles.screenOnly}`}
+                                  value={line.budgetLineId}
+                                  onChange={(event) =>
+                                    updateLine(setNewLineItems, line.localId, { budgetLineId: event.target.value })
+                                  }
+                                >
+                                  <option value="">Select budget line</option>
+                                  {budgetLines.map((budgetLine) => (
+                                    <option key={budgetLine.id} value={budgetLine.id}>
+                                      #{budgetLine.id} {budgetLine.cost_code_code} - {budgetLine.description}
+                                    </option>
+                                  ))}
+                                </select>
+                              </>
+                            ) : (
+                              <>
+                                <span className={creatorStyles.printOnly}>
+                                  {costCodes.find((c) => String(c.id) === line.costCodeId)?.code || "—"}
+                                </span>
+                                <select
+                                  className={`${creatorStyles.lineSelect} ${creatorStyles.screenOnly}`}
+                                  value={line.costCodeId}
+                                  onChange={(event) =>
+                                    updateLine(setNewLineItems, line.localId, { costCodeId: event.target.value })
+                                  }
+                                >
+                                  <option value="">Select cost code</option>
+                                  {costCodes.map((cc) => (
+                                    <option key={cc.id} value={cc.id}>
+                                      {cc.code} - {cc.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </>
+                            )}
                           </div>
                           <input
                             className={creatorStyles.lineInput}
                             value={line.description}
-                            placeholder={
-                              line.lineType === "adjustment"
-                                ? "Optional adjustment note"
-                                : "Optional CO scope note"
-                            }
+                            placeholder="Optional CO scope note"
                             onChange={(event) =>
                               updateLine(setNewLineItems, line.localId, { description: event.target.value })
                             }
                           />
-                          <span className={changeOrderCreatorStyles.coReadValue}>${originalApprovedAmountForLine(line.budgetLineId)}</span>
+                          <span className={changeOrderCreatorStyles.coReadValue}>
+                            {line.lineType === "original" ? `$${originalApprovedAmountForLine(line.budgetLineId)}` : "—"}
+                          </span>
                           <input
                             className={creatorStyles.lineInput}
                             value={line.amountDelta}
@@ -2342,8 +2371,7 @@ export function ChangeOrdersConsole({
                 <div className={changeOrderCreatorStyles.coLineSectionIntro}>
                   <h3>Line Items</h3>
                   <p>
-                    These rows are budget-line anchored. Update flat USD deltas and schedule days for this
-                    revision.
+                    Original lines adjust existing budget items. New lines add scope not in the original estimate.
                   </p>
                 </div>
 
@@ -2360,11 +2388,6 @@ export function ChangeOrdersConsole({
                   </div>
                   {editLineItems.map((line, index) => {
                     const rowIssues = editLineValidation.issuesByLocalId.get(line.localId) ?? [];
-                    const availableBudgetLines = budgetLines.filter((budgetLine) =>
-                      line.lineType === "adjustment"
-                        ? isGenericBudgetLine(budgetLine)
-                        : !isGenericBudgetLine(budgetLine),
-                    );
                     return (
                       <div key={line.localId} className={changeOrderCreatorStyles.coLineRowGroup}>
                         <div
@@ -2376,69 +2399,84 @@ export function ChangeOrdersConsole({
                             className={`${creatorStyles.lineSelect} ${changeOrderCreatorStyles.lockableControl}`}
                             value={line.lineType}
                             onChange={(event) => {
-                              const nextLineType = event.target.value as "scope" | "adjustment";
-                              const selectedBudgetLine = budgetLineById.get(line.budgetLineId);
-                              const selectedIsGeneric = isGenericBudgetLine(selectedBudgetLine);
-                              const keepBudgetSelection = nextLineType === "adjustment"
-                                ? selectedIsGeneric
-                                : !selectedIsGeneric;
+                              const nextLineType = event.target.value as "original" | "new";
                               updateLine(setEditLineItems, line.localId, {
                                 lineType: nextLineType,
-                                adjustmentReason:
-                                  nextLineType === "adjustment" ? line.adjustmentReason : "",
-                                budgetLineId: keepBudgetSelection ? line.budgetLineId : "",
+                                budgetLineId: nextLineType === "original" ? line.budgetLineId : "",
+                                costCodeId: nextLineType === "new" ? line.costCodeId : "",
                               });
                             }}
                             disabled={!isSelectedChangeOrderEditable}
                           >
-                            <option value="scope">Scope</option>
-                            <option value="adjustment">Adjustment</option>
+                            <option value="original">Original</option>
+                            <option value="new">New</option>
                           </select>
                           <input
                             className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
                             value={line.adjustmentReason}
-                            placeholder={line.lineType === "adjustment" ? "Required reason" : "Not used for scope"}
+                            placeholder="Optional reason"
                             onChange={(event) =>
                               updateLine(setEditLineItems, line.localId, { adjustmentReason: event.target.value })
                             }
-                            disabled={!isSelectedChangeOrderEditable || line.lineType !== "adjustment"}
+                            disabled={!isSelectedChangeOrderEditable}
                           />
                           <div>
-                            <span className={creatorStyles.printOnly}>
-                              {availableBudgetLines.find((b) => String(b.id) === line.budgetLineId)?.cost_code_code || "—"}
-                            </span>
-                            <select
-                              className={`${creatorStyles.lineSelect} ${changeOrderCreatorStyles.lockableControl} ${creatorStyles.screenOnly}`}
-                              value={line.budgetLineId}
-                              onChange={(event) =>
-                                updateLine(setEditLineItems, line.localId, { budgetLineId: event.target.value })
-                              }
-                              disabled={!isSelectedChangeOrderEditable}
-                            >
-                              <option value="">
-                                {line.lineType === "adjustment" ? "Select adjustment bin" : "Select cost code"}
-                              </option>
-                              {availableBudgetLines.map((budgetLine) => (
-                                <option key={budgetLine.id} value={budgetLine.id}>
-                                  #{budgetLine.id} {budgetLine.cost_code_code} - {budgetLine.description}
-                                </option>
-                              ))}
-                            </select>
+                            {line.lineType === "original" ? (
+                              <>
+                                <span className={creatorStyles.printOnly}>
+                                  {budgetLines.find((b) => String(b.id) === line.budgetLineId)?.cost_code_code || "—"}
+                                </span>
+                                <select
+                                  className={`${creatorStyles.lineSelect} ${changeOrderCreatorStyles.lockableControl} ${creatorStyles.screenOnly}`}
+                                  value={line.budgetLineId}
+                                  onChange={(event) =>
+                                    updateLine(setEditLineItems, line.localId, { budgetLineId: event.target.value })
+                                  }
+                                  disabled={!isSelectedChangeOrderEditable}
+                                >
+                                  <option value="">Select budget line</option>
+                                  {budgetLines.map((budgetLine) => (
+                                    <option key={budgetLine.id} value={budgetLine.id}>
+                                      #{budgetLine.id} {budgetLine.cost_code_code} - {budgetLine.description}
+                                    </option>
+                                  ))}
+                                </select>
+                              </>
+                            ) : (
+                              <>
+                                <span className={creatorStyles.printOnly}>
+                                  {costCodes.find((c) => String(c.id) === line.costCodeId)?.code || "—"}
+                                </span>
+                                <select
+                                  className={`${creatorStyles.lineSelect} ${changeOrderCreatorStyles.lockableControl} ${creatorStyles.screenOnly}`}
+                                  value={line.costCodeId}
+                                  onChange={(event) =>
+                                    updateLine(setEditLineItems, line.localId, { costCodeId: event.target.value })
+                                  }
+                                  disabled={!isSelectedChangeOrderEditable}
+                                >
+                                  <option value="">Select cost code</option>
+                                  {costCodes.map((cc) => (
+                                    <option key={cc.id} value={cc.id}>
+                                      {cc.code} - {cc.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </>
+                            )}
                           </div>
                           <input
                             className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
                             value={line.description}
-                            placeholder={
-                              line.lineType === "adjustment"
-                                ? "Optional adjustment note"
-                                : "Optional CO scope note"
-                            }
+                            placeholder="Optional CO scope note"
                             onChange={(event) =>
                               updateLine(setEditLineItems, line.localId, { description: event.target.value })
                             }
                             disabled={!isSelectedChangeOrderEditable}
                           />
-                          <span className={changeOrderCreatorStyles.coReadValue}>${originalApprovedAmountForLine(line.budgetLineId)}</span>
+                          <span className={changeOrderCreatorStyles.coReadValue}>
+                            {line.lineType === "original" ? `$${originalApprovedAmountForLine(line.budgetLineId)}` : "—"}
+                          </span>
                           <input
                             className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
                             value={line.amountDelta}
