@@ -8,15 +8,15 @@ End-to-end function call order for each estimate action. View logic lives in [`e
 
 Fetches the canonical estimate workflow policy (statuses, transitions, quick-actions) to drive frontend UX guards. Called on console mount.
 
-`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L326)
+`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L333)
 
-- [`loadEstimatePolicy()`](../../frontend/src/features/estimates/components/estimates-console.tsx#L326)
+- [`loadEstimatePolicy()`](../../frontend/src/features/estimates/components/estimates-console.tsx#L333)
   - [`fetchEstimatePolicyContract({ baseUrl, token })`](../../frontend/src/features/estimates/api.ts#L25)
     - `fetch GET /contracts/estimates/`
 
 ---
 
-`BACKEND` — [`estimate_contract_view`](../../backend/core/views/estimating/estimates.py#L196)
+`BACKEND` — [`estimate_contract_view`](../../backend/core/views/estimating/estimates.py#L195)
 
 - [`get_estimate_policy_contract()`](../../backend/core/policies/__init__.py) — returns static policy dict
 
@@ -32,18 +32,18 @@ Fetches the canonical estimate workflow policy (statuses, transitions, quick-act
 
 Fetches all estimates for the selected project. Called on project selection change and after mutations.
 
-`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L719)
+`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L705)
 
-- [`loadEstimates(options?)`](../../frontend/src/features/estimates/components/estimates-console.tsx#L719)
+- [`loadEstimates(options?)`](../../frontend/src/features/estimates/components/estimates-console.tsx#L705)
   - `fetch GET /projects/{projectId}/estimates/`
 
 ---
 
-`BACKEND` — [`project_estimates_view`](../../backend/core/views/estimating/estimates.py#L226) (GET path)
+`BACKEND` — [`project_estimates_view`](../../backend/core/views/estimating/estimates.py#L225) (GET path)
 
 *── org scope ──*
 
-- [`_validate_project_for_user(project_id, request.user)`](../../backend/core/views/helpers.py#L40) — resolves membership, filters `Project` by `organization_id`
+- [`_validate_project_for_user(project_id, request.user)`](../../backend/core/views/helpers.py#L39) — resolves membership, filters `Project` by `organization_id`
 
 *── query ──*
 
@@ -51,8 +51,8 @@ Fetches all estimates for the selected project. Called on project selection chan
 
 *── serialize ──*
 
-- [`_serialize_estimates(estimates, project)`](../../backend/core/views/estimating/estimates_helpers.py#L112)
-  - [`_estimate_financial_baseline_context(project)`](../../backend/core/views/estimating/estimates_helpers.py#L75)
+- [`_serialize_estimates(estimates, project)`](../../backend/core/views/estimating/estimates_helpers.py#L117)
+  - [`_estimate_financial_baseline_context(project)`](../../backend/core/views/estimating/estimates_helpers.py#L74)
     - `Budget.objects.filter(project=…).select_related("source_estimate")` — builds financial baseline status map
   - `EstimateSerializer(estimates, many=True, context=context)`
 
@@ -67,19 +67,19 @@ Fetches all estimates for the selected project. Called on project selection chan
 
 Creates a new estimate version within a title family. Includes duplicate-submit suppression and family collision detection.
 
-`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1045)
+`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1007)
 
-- [`handleCreateEstimate(event)`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1045)
+- [`handleCreateEstimate(event)`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1007)
   - client-side guards: `canMutateEstimates`, `isReadOnly`, project selected, title present, all lines have cost codes
   - if editing existing draft → routes to [Save Draft](#save-draft-patch) instead
   - if title family exists + not yet confirmed → shows collision prompt, returns
-  - [`submitNewEstimateWithTitle({ projectId, title, allowExistingTitleFamily })`](../../frontend/src/features/estimates/components/estimates-console.tsx#L967)
+  - [`submitNewEstimateWithTitle({ projectId, title, allowExistingTitleFamily })`](../../frontend/src/features/estimates/components/estimates-console.tsx#L929)
     - `fetch POST /projects/{projectId}/estimates/`
     - body: `{ title, allow_existing_title_family, valid_through, tax_percent, line_items[] }`
 
 ---
 
-`BACKEND` — [`project_estimates_view`](../../backend/core/views/estimating/estimates.py#L226) (POST path)
+`BACKEND` — [`project_estimates_view`](../../backend/core/views/estimating/estimates.py#L225) (POST path)
 
 *── auth + validation ──*
 
@@ -90,8 +90,8 @@ Creates a new estimate version within a title family. Includes duplicate-submit 
 
 *── duplicate-submit suppression (5s window) ──*
 
-- [`_line_items_signature(items)`](../../backend/core/views/estimating/estimates.py#L302) — builds tuple signature from input
-- [`_estimate_signature(estimate)`](../../backend/core/views/estimating/estimates.py#L317) — builds tuple signature from DB
+- [`_line_items_signature(items)`](../../backend/core/views/estimating/estimates.py#L299) — builds tuple signature from input
+- [`_estimate_signature(estimate)`](../../backend/core/views/estimating/estimates.py#L314) — builds tuple signature from DB
 - `Estimate.objects.filter(project, created_at__gte=window_start)` — scan recent
 - if exact match found → return `200 { data, meta: { deduped: true } }`
 
@@ -102,11 +102,11 @@ Creates a new estimate version within a title family. Includes duplicate-submit 
 
 *── persist ──*
 
-- [`_next_estimate_family_version(project, title)`](../../backend/core/views/estimating/estimates_helpers.py#L57)
+- [`_next_estimate_family_version(project, title)`](../../backend/core/views/estimating/estimates_helpers.py#L56)
 - `Estimate.objects.create(…)` — version, status=draft, terms from org
-- [`_apply_estimate_lines_and_totals(estimate, line_items, tax_percent, user)`](../../backend/core/views/estimating/estimates_helpers.py#L194)
-  - [`_calculate_line_totals(line_items_data)`](../../backend/core/views/estimating/estimates_helpers.py#L164) — per-line markup math
-  - [`_resolve_cost_codes_for_user(user, items)`](../../backend/core/views/helpers.py) — validates cost code ownership
+- [`_apply_estimate_lines_and_totals(estimate, line_items, tax_percent, user)`](../../backend/core/views/estimating/estimates_helpers.py#L193)
+  - [`_calculate_line_totals(line_items_data)`](../../backend/core/views/estimating/estimates_helpers.py#L163) — per-line markup math
+  - [`_resolve_cost_codes_for_user(user, items)`](../../backend/core/views/helpers.py#L175) — validates cost code ownership
   - `estimate.line_items.all().delete()` + `EstimateLineItem.objects.bulk_create(…)`
   - `ScopeItem` get-or-create for each described line
   - saves totals: `subtotal`, `markup_total`, `tax_total`, `grand_total`
@@ -114,7 +114,7 @@ Creates a new estimate version within a title family. Includes duplicate-submit 
 *── audit + archive ──*
 
 - [`EstimateStatusEvent.record(estimate, from_status=None, to_status, note, changed_by)`](../../backend/core/models/estimating/)
-- [`_archive_estimate_family(project, user, title, exclude_ids, note)`](../../backend/core/views/estimating/estimates_helpers.py#L23)
+- [`_archive_estimate_family(project, user, title, exclude_ids, note)`](../../backend/core/views/estimating/estimates_helpers.py#L20)
   - archives (status→archived) all same-title siblings with allowed transitions
   - records `EstimateStatusEvent` for each archived row
 
@@ -135,9 +135,9 @@ Creates a new estimate version within a title family. Includes duplicate-submit 
 
 Saves edits to an existing draft estimate (title, valid_through, tax_percent, line_items).
 
-`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1078)
+`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1007)
 
-- [`handleCreateEstimate(event)`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1045) — `isEditingDraft && selectedEstimate` branch
+- [`handleCreateEstimate(event)`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1007) — `isEditingDraft && selectedEstimate` branch
   - `fetch PATCH /estimates/{estimateId}/`
   - body: `{ title, valid_through, tax_percent, line_items[] }`
 
@@ -160,7 +160,7 @@ Saves edits to an existing draft estimate (title, valid_through, tax_percent, li
 
 - field-by-field update: `title`, `valid_through`, `status`, `tax_percent`
 - `estimate.save(update_fields=[…])`
-- if `line_items` present → [`_apply_estimate_lines_and_totals(…)`](../../backend/core/views/estimating/estimates_helpers.py#L194)
+- if `line_items` present → [`_apply_estimate_lines_and_totals(…)`](../../backend/core/views/estimating/estimates_helpers.py#L193)
 - if only `tax_percent` changed → recalculates totals with existing lines
 
 ---
@@ -174,9 +174,9 @@ Saves edits to an existing draft estimate (title, valid_through, tax_percent, li
 
 Applies a workflow status change (e.g. draft→sent, sent→approved, →void). Triggers side effects based on target status.
 
-`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1218)
+`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1180)
 
-- [`handleUpdateEstimateStatus()`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1218)
+- [`handleUpdateEstimateStatus()`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1180)
   - `fetch PATCH /estimates/{estimateId}/`
   - body: `{ status, status_note }`
 
@@ -205,20 +205,20 @@ Applies a workflow status change (e.g. draft→sent, sent→approved, →void). 
 - [`send_document_sent_email(document_type="Estimate", …)`](../../backend/core/utils/email.py#L84)
   - resolves org name via `OrganizationMembership`
   - `django.core.mail.send_mail(…)` — Mailgun in prod, console in dev
-  - [`EmailRecord.record(…)`](../../backend/core/models/shared_operations/email_verification.py#L135) — immutable audit
+  - [`EmailRecord.record(…)`](../../backend/core/models/shared_operations/email_verification.py#L137) — immutable audit
 
 *── if status == approved ──*
 
-- [`_activate_project_from_estimate_approval(estimate, actor, note)`](../../backend/core/views/estimating/estimates_helpers.py#L135)
+- [`_activate_project_from_estimate_approval(estimate, actor, note)`](../../backend/core/views/estimating/estimates_helpers.py#L134)
   - prospect/on-hold → active transition
   - [`FinancialAuditEvent.record(…)`](../../backend/core/models/financial_auditing/)
 - [`_ensure_budget_from_approved_estimate(estimate, user, note, allow_supersede=True)`](../../backend/core/views/estimating/budgets_helpers.py#L157)
-  - [`_sync_project_contract_baseline_if_unset(estimate)`](../../backend/core/views/estimating/estimates_helpers.py#L124) — sets contract values if zero
+  - [`_sync_project_contract_baseline_if_unset(estimate)`](../../backend/core/views/estimating/estimates_helpers.py#L123) — sets contract values if zero
   - idempotency: returns `"already_converted"` if budget exists
   - conflict: returns `"requires_supersede"` if another estimate's budget is active
   - [`_create_budget_from_estimate(estimate, user)`](../../backend/core/views/estimating/budgets_helpers.py#L102)
-    - [`_supersede_active_project_budgets(…)`](../../backend/core/views/estimating/budgets_helpers.py#L59)
-    - `Budget.objects.create(…)` with [`_build_budget_baseline_snapshot(estimate)`](../../backend/core/views/estimating/budgets_helpers.py#L19)
+    - [`_supersede_active_project_budgets(…)`](../../backend/core/views/estimating/budgets_helpers.py#L58)
+    - `Budget.objects.create(…)` with [`_build_budget_baseline_snapshot(estimate)`](../../backend/core/views/estimating/budgets_helpers.py#L18)
     - `BudgetLine.objects.bulk_create(…)` — estimate lines + system overhead lines
   - [`FinancialAuditEvent.record(…)`](../../backend/core/models/financial_auditing/)
 
@@ -234,9 +234,9 @@ Applies a workflow status change (e.g. draft→sent, sent→approved, →void). 
 
 Appends a note to the status history without changing the estimate's status.
 
-`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1270)
+`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1231)
 
-- [`handleAddEstimateStatusNote()`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1270)
+- [`handleAddEstimateStatusNote()`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1231)
   - `fetch PATCH /estimates/{estimateId}/`
   - body: `{ status_note }` (no `status` field)
 
@@ -257,16 +257,16 @@ Appends a note to the status history without changing the estimate's status.
 
 Fetches the immutable status transition history for an estimate.
 
-`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1356)
+`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1316)
 
-- [`loadStatusEvents(options?)`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1356)
+- [`loadStatusEvents(options?)`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1316)
   - `fetch GET /estimates/{estimateId}/status-events/`
 
 ---
 
-`BACKEND` — [`estimate_status_events_view`](../../backend/core/views/estimating/estimates.py#L910)
+`BACKEND` — [`estimate_status_events_view`](../../backend/core/views/estimating/estimates.py#L905)
 
-- [`_validate_estimate_for_user(estimate_id, request.user)`](../../backend/core/views/helpers.py#L52) — resolves membership, filters `Estimate` by `project__organization_id`
+- [`_validate_estimate_for_user(estimate_id, request.user)`](../../backend/core/views/helpers.py#L51) — resolves membership, filters `Estimate` by `project__organization_id`
 - `EstimateStatusEvent.objects.filter(estimate=estimate).select_related(…)`
 - `EstimateStatusEventSerializer(events, many=True)`
 
@@ -280,9 +280,9 @@ Fetches the immutable status transition history for an estimate.
 
 Creates a new draft from an existing sent/rejected/voided/archived estimate in the same title family. If source was `sent`, auto-rejects it.
 
-`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L388)
+`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L375)
 
-- [`cloneEstimateRevision(sourceEstimate)`](../../frontend/src/features/estimates/components/estimates-console.tsx#L388)
+- [`cloneEstimateRevision(sourceEstimate)`](../../frontend/src/features/estimates/components/estimates-console.tsx#L375)
   - `fetch POST /estimates/{estimateId}/clone-version/`
 
 ---
@@ -296,9 +296,9 @@ Creates a new draft from an existing sent/rejected/voided/archived estimate in t
 
 *── persist ──*
 
-- [`_next_estimate_family_version(project, title)`](../../backend/core/views/estimating/estimates_helpers.py#L57)
+- [`_next_estimate_family_version(project, title)`](../../backend/core/views/estimating/estimates_helpers.py#L56)
 - `Estimate.objects.create(…)` — same title/terms/tax, new version, status=draft
-- line items copied as dicts → [`_apply_estimate_lines_and_totals(…)`](../../backend/core/views/estimating/estimates_helpers.py#L194)
+- line items copied as dicts → [`_apply_estimate_lines_and_totals(…)`](../../backend/core/views/estimating/estimates_helpers.py#L193)
 
 *── audit ──*
 
@@ -320,9 +320,9 @@ Creates a new draft from an existing sent/rejected/voided/archived estimate in t
 
 Duplicates an estimate into a new draft with a different title (or different project). Starts a new family.
 
-`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1172)
+`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1134)
 
-- [`handleDuplicateEstimate()`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1172)
+- [`handleDuplicateEstimate()`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1134)
   - `fetch POST /estimates/{estimateId}/duplicate/`
   - body: `{ title, project_id? }`
 
@@ -335,13 +335,13 @@ Duplicates an estimate into a new draft with a different title (or different pro
 - [`_capability_gate(request.user, "estimates", "create")`](../../backend/core/rbac.py#L18)
 - [`EstimateDuplicateSerializer.is_valid()`](../../backend/core/serializers/)
 - same-project + same-title guard → `400` ("use clone version instead")
-- target project validation via [`_validate_project_for_user(…)`](../../backend/core/views/helpers.py#L40) — filters by `organization_id`
+- target project validation via [`_validate_project_for_user(…)`](../../backend/core/views/helpers.py#L39) — filters by `organization_id`
 
 *── persist ──*
 
-- [`_next_estimate_family_version(target_project, target_title)`](../../backend/core/views/estimating/estimates_helpers.py#L57)
+- [`_next_estimate_family_version(target_project, target_title)`](../../backend/core/views/estimating/estimates_helpers.py#L56)
 - `Estimate.objects.create(…)` — target project/title, status=draft
-- line items copied → [`_apply_estimate_lines_and_totals(…)`](../../backend/core/views/estimating/estimates_helpers.py#L194)
+- line items copied → [`_apply_estimate_lines_and_totals(…)`](../../backend/core/views/estimating/estimates_helpers.py#L193)
 - [`EstimateStatusEvent.record(duplicated, note="Duplicated from…")`](../../backend/core/models/estimating/)
 
 ---
@@ -356,9 +356,9 @@ Duplicates an estimate into a new draft with a different title (or different pro
 
 Manually converts an approved estimate to the active financial baseline (budget). Idempotent.
 
-`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1313)
+`FRONTEND` — [`EstimatesConsole`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1273)
 
-- [`handleActivateFinancialBaseline()`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1313)
+- [`handleActivateFinancialBaseline()`](../../frontend/src/features/estimates/components/estimates-console.tsx#L1273)
   - `fetch POST /estimates/{estimateId}/convert-to-budget/`
   - body: `{ supersede_active: true }`
 
@@ -391,7 +391,7 @@ Manually converts an approved estimate to the active financial baseline (budget)
 
 Public (unauthenticated) endpoint for customer estimate review. Served at `/estimate/{publicRef}`.
 
-`FRONTEND` — [`EstimateApprovalPreview`](../../frontend/src/features/estimates/components/estimate-approval-preview.tsx#L107)
+`FRONTEND` — [`EstimateApprovalPreview`](../../frontend/src/features/estimates/components/estimate-approval-preview.tsx#L51)
 
 - `useEffect` on mount
   - `fetch GET /public/estimates/{publicToken}/`
@@ -402,9 +402,9 @@ Public (unauthenticated) endpoint for customer estimate review. Served at `/esti
 
 - `Estimate.objects.select_related("project__customer", "created_by").prefetch_related("line_items", "line_items__cost_code").get(public_token=…)`
 - `EstimateSerializer(estimate)`
-- [`_resolve_organization_for_public_actor(estimate.created_by)`](../../backend/core/views/helpers.py)
-- [`_serialize_public_project_context(estimate.project)`](../../backend/core/views/helpers.py)
-- [`_serialize_public_organization_context(organization)`](../../backend/core/views/helpers.py)
+- [`_resolve_organization_for_public_actor(estimate.created_by)`](../../backend/core/views/helpers.py#L66)
+- [`_serialize_public_project_context(estimate.project)`](../../backend/core/views/helpers.py#L108)
+- [`_serialize_public_organization_context(organization)`](../../backend/core/views/helpers.py#L84)
 - [`get_ceremony_context()`](../../backend/core/views/public_signing_helpers.py#L237) — consent text + version
 
 ---
@@ -484,7 +484,7 @@ Customer submits their approve/reject decision through the public share link, wi
 - [`validate_ceremony_on_decision(request, public_token, customer_email)`](../../backend/core/views/public_signing_helpers.py#L187)
   - session token lookup via [`DocumentAccessSession.lookup_valid_session(…)`](../../backend/core/models/shared_operations/document_access_session.py)
   - `signer_name` required, `consent_accepted` must be `true`
-- [`_build_public_decision_note(…)`](../../backend/core/views/helpers.py) — formats note with signer info
+- [`_build_public_decision_note(…)`](../../backend/core/views/helpers.py#L151) — formats note with signer info
 
 *── atomic: status + audit + ceremony record ──*
 
@@ -492,7 +492,7 @@ Customer submits their approve/reject decision through the public share link, wi
   - `estimate.status = next_status` + `estimate.save(…)`
   - [`EstimateStatusEvent.record(…)`](../../backend/core/models/estimating/)
   - *── if approved ──*
-  - [`_activate_project_from_estimate_approval(…)`](../../backend/core/views/estimating/estimates_helpers.py#L135)
+  - [`_activate_project_from_estimate_approval(…)`](../../backend/core/views/estimating/estimates_helpers.py#L134)
   - [`_ensure_budget_from_approved_estimate(…, allow_supersede=True)`](../../backend/core/views/estimating/budgets_helpers.py#L157)
   - *── signing ceremony record ──*
   - [`compute_document_content_hash("estimate", serialized)`](../../backend/core/utils/signing.py)
@@ -500,9 +500,9 @@ Customer submits their approve/reject decision through the public share link, wi
 
 *── serialize response ──*
 
-- [`_serialize_estimate(estimate)`](../../backend/core/views/estimating/estimates_helpers.py#L106)
-- [`_serialize_public_project_context(…)`](../../backend/core/views/helpers.py)
-- [`_serialize_public_organization_context(…)`](../../backend/core/views/helpers.py)
+- [`_serialize_estimate(estimate)`](../../backend/core/views/estimating/estimates_helpers.py#L111)
+- [`_serialize_public_project_context(…)`](../../backend/core/views/helpers.py#L108)
+- [`_serialize_public_organization_context(…)`](../../backend/core/views/helpers.py#L84)
 
 ---
 

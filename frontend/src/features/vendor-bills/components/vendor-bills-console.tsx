@@ -1056,6 +1056,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       setVendorBills((current) => current.map((item) => (item.id === updated.id ? updated : item)));
       hydrate(updated);
       setViewerErrorMessage("");
+      setViewerNextStatus("");
       setStatusMessage(`Updated vendor bill #${updated.id} to ${updated.status}. History updated.`);
     } catch {
       const message = "Could not reach vendor bill quick status endpoint.";
@@ -1194,8 +1195,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       setViewerNextStatus("");
       return;
     }
-    const nextStatuses = allowedStatusTransitions[selectedVendorBill.status] ?? [];
-    setViewerNextStatus((current) => (nextStatuses.includes(current) ? current : (nextStatuses[0] ?? "")));
+    setViewerNextStatus("");
   }, [allowedStatusTransitions, selectedVendorBill]);
 
   // Back-fill generic scope UI keys on allocation rows once budget line metadata loads.
