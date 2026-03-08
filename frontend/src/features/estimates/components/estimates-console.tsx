@@ -14,6 +14,8 @@ import {
   fetchEstimatePolicyContract,
   normalizeApiBaseUrl,
 } from "../api";
+import { usePolicyContract } from "@/shared/hooks/use-policy-contract";
+import { useStatusFilters } from "@/shared/hooks/use-status-filters";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { canDo } from "../../session/rbac";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
@@ -47,7 +49,6 @@ import {
   isNotatedStatusEvent,
   mapEstimateLineItemsToInputs,
   normalizeFamilyTitle,
-  normalizeEstimatePolicy,
   readEstimateApiError,
   resolveAutoSelectEstimate,
   resolveEstimateValidationDeltaDays,
@@ -140,17 +141,49 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
   const [estimates, setEstimates] = useState<EstimateRecord[]>([]);
   const [selectedEstimateId, setSelectedEstimateId] = useState("");
-  const [estimateStatuses, setEstimateStatuses] = useState<string[]>(ESTIMATE_STATUSES_FALLBACK);
-  const [estimateStatusLabels, setEstimateStatusLabels] = useState<Record<string, string>>(
-    ESTIMATE_STATUS_LABELS_FALLBACK,
-  );
-  const [estimateAllowedStatusTransitions, setEstimateAllowedStatusTransitions] = useState<
-    Record<string, string[]>
-  >(ESTIMATE_ALLOWED_STATUS_TRANSITIONS_FALLBACK);
+
+  const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+  const {
+    statuses: estimateStatuses,
+    statusLabels: estimateStatusLabels,
+    allowedTransitions: estimateAllowedStatusTransitions,
+    defaultCreateStatus,
+  } = usePolicyContract<EstimatePolicyContract>({
+    fetchContract: fetchEstimatePolicyContract,
+    fallbackStatuses: ESTIMATE_STATUSES_FALLBACK,
+    fallbackLabels: ESTIMATE_STATUS_LABELS_FALLBACK,
+    fallbackTransitions: ESTIMATE_ALLOWED_STATUS_TRANSITIONS_FALLBACK,
+    baseUrl: normalizedBaseUrl,
+    token,
+    onLoaded(contract, base) {
+      // Domain-specific: quick-action map and filter reconciliation.
+      const quickActionMap = {
+        ...ESTIMATE_QUICK_ACTION_BY_STATUS_FALLBACK,
+        ...(contract.quick_action_by_status || {}),
+      };
+      setEstimateQuickActionByStatus(quickActionMap);
+
+      const candidateFilters =
+        Array.isArray(contract.default_status_filters) && contract.default_status_filters.length
+          ? contract.default_status_filters
+          : ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK;
+      const validFilters = candidateFilters.filter((v) => base.statuses.includes(v));
+      const resolvedDefaults = validFilters.length ? validFilters : base.statuses;
+      setDefaultEstimateStatusFilters(resolvedDefaults);
+
+      setEstimateStatusFilters((current) => {
+        const retained = current.filter((v) => base.statuses.includes(v));
+        return retained.length ? retained : resolvedDefaults;
+      });
+      setSelectedStatus((current) =>
+        current && base.statuses.includes(current) ? current : "",
+      );
+    },
+  });
+
   const [estimateQuickActionByStatus, setEstimateQuickActionByStatus] = useState<
     Record<string, "change_order" | "revision">
   >(ESTIMATE_QUICK_ACTION_BY_STATUS_FALLBACK);
-  const [defaultCreateStatus, setDefaultCreateStatus] = useState("draft");
   const [selectedStatus, setSelectedStatus] = useState<EstimateStatusValue>("draft");
   const [statusNote, setStatusNote] = useState("");
   const [statusEvents, setStatusEvents] = useState<EstimateStatusEventRecord[]>([]);
@@ -177,9 +210,16 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const [defaultEstimateStatusFilters, setDefaultEstimateStatusFilters] = useState<string[]>(
     ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK,
   );
-  const [estimateStatusFilters, setEstimateStatusFilters] = useState<EstimateStatusValue[]>(
-    ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK,
-  );
+  const viewerStatuses = estimateStatuses.filter(s => !ESTIMATE_SYSTEM_ONLY_STATUSES.has(s));
+  const {
+    filters: estimateStatusFilters,
+    setFilters: setEstimateStatusFilters,
+    toggleFilter: toggleEstimateStatusFilter,
+  } = useStatusFilters({
+    allStatuses: viewerStatuses,
+    defaultFilters: ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK,
+    preserveOrder: true,
+  });
   const estimateStatusFiltersRef = useRef<EstimateStatusValue[]>(
     ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK,
   );
@@ -212,7 +252,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   // Derived values
   // -------------------------------------------------------------------------
 
-  const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const scopedProjectId = scopedProjectIdProp;
   const scopedEstimateIdParam = searchParams.get("estimate");
   const scopedEstimateId =
@@ -353,47 +392,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   // -------------------------------------------------------------------------
   // Data loading & form hydration
   // -------------------------------------------------------------------------
-
-  const loadEstimatePolicy = useCallback(async () => {
-    try {
-      const response = await fetchEstimatePolicyContract({
-        baseUrl: normalizedBaseUrl,
-        token,
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok || !payload.data || Array.isArray(payload.data)) {
-        return;
-      }
-      const policy = normalizeEstimatePolicy(
-        payload.data as EstimatePolicyContract,
-        {
-          statuses: ESTIMATE_STATUSES_FALLBACK,
-          statusLabels: ESTIMATE_STATUS_LABELS_FALLBACK,
-          defaultStatusFilters: ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK,
-          quickActionByStatus: ESTIMATE_QUICK_ACTION_BY_STATUS_FALLBACK,
-        },
-      );
-      if (!policy) {
-        return;
-      }
-
-      setEstimateStatuses(policy.statuses);
-      setEstimateStatusLabels(policy.statusLabels);
-      setEstimateAllowedStatusTransitions(policy.allowedTransitions);
-      setEstimateQuickActionByStatus(policy.quickActionByStatus);
-      setDefaultCreateStatus(policy.defaultCreateStatus);
-      setDefaultEstimateStatusFilters(policy.defaultStatusFilters);
-      setEstimateStatusFilters((current) => {
-        const retained = current.filter((value) => policy.statuses.includes(value));
-        return retained.length ? retained : policy.defaultStatusFilters;
-      });
-      setSelectedStatus((current) =>
-        current && policy.statuses.includes(current) ? current : "",
-      );
-    } catch {
-      // Policy load is best-effort; static fallback remains active.
-    }
-  }, [normalizedBaseUrl, token]);
 
   /** Clone an existing estimate as a new revision in its family. */
   async function cloneEstimateRevision(sourceEstimate: EstimateRecord) {
@@ -613,16 +611,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     });
   }
 
-  /** Toggle a status value in the viewer's active filter set. */
-  function toggleEstimateStatusFilter(nextStatus: EstimateStatusValue) {
-    setEstimateStatusFilters((current) =>
-      current.includes(nextStatus)
-        ? current.filter((statusValue) => statusValue !== nextStatus)
-        : estimateStatusFilterValues.filter(
-            (statusValue) => statusValue === nextStatus || current.includes(statusValue),
-          ),
-    );
-  }
 
   /** Update the title and clear stale family-collision prompts when the title diverges. */
   function handleEstimateTitleChange(value: string) {
@@ -795,14 +783,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     selectedProjectId,
     token,
   ]);
-
-  // Load the estimate workflow policy contract on auth.
-  useEffect(() => {
-    if (!token) {
-      return;
-    }
-    void loadEstimatePolicy();
-  }, [loadEstimatePolicy, token]);
 
   // Fetch projects, cost codes, and organization defaults on auth.
   useEffect(() => {

@@ -23,6 +23,8 @@ import {
   fetchVendorBillPolicyContract,
   normalizeApiBaseUrl,
 } from "../api";
+import { usePolicyContract } from "@/shared/hooks/use-policy-contract";
+import { useStatusFilters } from "@/shared/hooks/use-status-filters";
 import {
   AllocationFormRow,
   createEmptyAllocationRow,
@@ -141,19 +143,56 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [selectedVendorBillId, setSelectedVendorBillId] = useState("");
-  const [billStatuses, setBillStatuses] = useState<string[]>(VENDOR_BILL_STATUSES_FALLBACK);
-  const [billStatusLabels, setBillStatusLabels] = useState<Record<string, string>>(
-    VENDOR_BILL_STATUS_LABELS_FALLBACK,
-  );
-  const [allowedStatusTransitions, setAllowedStatusTransitions] = useState<Record<string, string[]>>(
-    VENDOR_BILL_ALLOWED_STATUS_TRANSITIONS_FALLBACK,
-  );
+
+  const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+  const {
+    statuses: billStatuses,
+    statusLabels: billStatusLabels,
+    allowedTransitions: allowedStatusTransitions,
+    defaultCreateStatus: policyDefaultCreateStatus,
+  } = usePolicyContract<VendorBillPolicyContract>({
+    fetchContract: fetchVendorBillPolicyContract,
+    fallbackStatuses: VENDOR_BILL_STATUSES_FALLBACK,
+    fallbackLabels: VENDOR_BILL_STATUS_LABELS_FALLBACK,
+    fallbackTransitions: VENDOR_BILL_ALLOWED_STATUS_TRANSITIONS_FALLBACK,
+    baseUrl: normalizedBaseUrl,
+    token,
+    onLoaded(contract) {
+      // Resolve create-shortcut statuses from contract.
+      const shortcuts =
+        Array.isArray(contract.create_shortcut_statuses) && contract.create_shortcut_statuses.length
+          ? contract.create_shortcut_statuses
+          : VENDOR_BILL_CREATE_SHORTCUT_STATUSES_FALLBACK.filter((s) =>
+              contract.statuses.includes(s),
+            );
+      const fallbackCreate =
+        contract.default_create_status || contract.statuses[0] || VENDOR_BILL_STATUSES_FALLBACK[0];
+      setCreateStatusOptions(shortcuts.length ? shortcuts : [fallbackCreate]);
+      setBillStatusFilters((current) => {
+        const retained = current.filter((s) => contract.statuses.includes(s));
+        return retained.length ? retained : defaultBillStatusFilters(contract.statuses);
+      });
+      setNewStatus((current) => {
+        if (contract.statuses.includes(current)) return current;
+        return shortcuts[0] || fallbackCreate;
+      });
+      setStatus((current) =>
+        contract.statuses.includes(current) ? current : fallbackCreate,
+      );
+    },
+  });
+
   const [createStatusOptions, setCreateStatusOptions] = useState<string[]>(
     VENDOR_BILL_CREATE_SHORTCUT_STATUSES_FALLBACK,
   );
-  const [billStatusFilters, setBillStatusFilters] = useState<string[]>(
-    defaultBillStatusFilters(VENDOR_BILL_STATUSES_FALLBACK),
-  );
+  const {
+    filters: billStatusFilters,
+    setFilters: setBillStatusFilters,
+    toggleFilter: toggleBillStatusFilter,
+  } = useStatusFilters({
+    allStatuses: billStatuses,
+    defaultFilters: defaultBillStatusFilters(VENDOR_BILL_STATUSES_FALLBACK),
+  });
   const [dueFilter, setDueFilter] = useState<"all" | "due_soon" | "overdue">("all");
 
   const [newVendorId, setNewVendorId] = useState("");
@@ -302,7 +341,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     return next;
   }, [budgetLineGroups]);
 
-  const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const canMutateVendorBills = canDo(capabilities, "vendor_bills", "create");
   const canApproveVendorBills = canDo(capabilities, "vendor_bills", "approve");
   const canPayVendorBills = canDo(capabilities, "vendor_bills", "pay");
@@ -572,15 +610,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     return styles[`statusPill${value[0].toUpperCase()}${value.slice(1)}`] ?? "";
   }
 
-  /** Toggles a bill status in or out of the active filter set. */
-  function toggleBillStatusFilter(nextStatus: VendorBillStatus) {
-    setBillStatusFilters((current) =>
-      current.includes(nextStatus)
-        ? current.filter((status) => status !== nextStatus)
-        : [...current, nextStatus],
-    );
-  }
-
   /** Toggles a project status in or out of the project list filter. */
   function toggleProjectStatusFilter(statusValue: ProjectStatusValue) {
     setProjectStatusFilters((current) =>
@@ -601,65 +630,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   // -------------------------------------------------------------------------
   // Data loading & form hydration
   // -------------------------------------------------------------------------
-
-  /** Fetches the policy contract that drives status options, transitions, and labels. */
-  async function loadVendorBillPolicy() {
-    try {
-      const response = await fetchVendorBillPolicyContract({
-        baseUrl: normalizedBaseUrl,
-        token,
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok || !payload.data || Array.isArray(payload.data)) {
-        return;
-      }
-      const contract = payload.data as VendorBillPolicyContract;
-      if (
-        !Array.isArray(contract.statuses) ||
-        !contract.statuses.length ||
-        !contract.allowed_status_transitions
-      ) {
-        return;
-      }
-      const normalizedTransitions = contract.statuses.reduce<Record<string, string[]>>(
-        (acc, statusValue) => {
-          const nextStatuses = contract.allowed_status_transitions[statusValue];
-          acc[statusValue] = Array.isArray(nextStatuses) ? nextStatuses : [];
-          return acc;
-        },
-        {},
-      );
-      const shortcuts =
-        Array.isArray(contract.create_shortcut_statuses) && contract.create_shortcut_statuses.length
-          ? contract.create_shortcut_statuses
-          : VENDOR_BILL_CREATE_SHORTCUT_STATUSES_FALLBACK.filter((statusValue) =>
-              contract.statuses.includes(statusValue),
-            );
-      const fallbackCreateStatus =
-        contract.default_create_status || contract.statuses[0] || VENDOR_BILL_STATUSES_FALLBACK[0];
-
-      setBillStatuses(contract.statuses);
-      setBillStatusLabels({
-        ...VENDOR_BILL_STATUS_LABELS_FALLBACK,
-        ...(contract.status_labels || {}),
-      });
-      setAllowedStatusTransitions(normalizedTransitions);
-      setCreateStatusOptions(shortcuts.length ? shortcuts : [fallbackCreateStatus]);
-      setBillStatusFilters((current) => {
-        const retained = current.filter((statusValue) => contract.statuses.includes(statusValue));
-        return retained.length ? retained : defaultBillStatusFilters(contract.statuses);
-      });
-      setNewStatus((current) => {
-        if (contract.statuses.includes(current)) {
-          return current;
-        }
-        return shortcuts[0] || fallbackCreateStatus;
-      });
-      setStatus((current) => (contract.statuses.includes(current) ? current : fallbackCreateStatus));
-    } catch {
-      // Contract load is best-effort; static fallback remains active.
-    }
-  }
 
   /** Loads projects and vendors in parallel on initial mount. */
   async function loadDependencies() {
@@ -1145,13 +1115,12 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   // Effects
   // -------------------------------------------------------------------------
 
-  // Bootstrap: load the policy contract and project/vendor lists once authenticated.
+  // Bootstrap: load project/vendor lists once authenticated.
   useEffect(() => {
     if (!token) {
       return;
     }
     const timer = window.setTimeout(() => {
-      void loadVendorBillPolicy();
       void loadDependencies();
     }, 0);
     return () => window.clearTimeout(timer);
