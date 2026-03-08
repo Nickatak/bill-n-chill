@@ -136,7 +136,8 @@ export function ChangeOrdersConsole({
   >({});
   const [projectEstimates, setProjectEstimates] = useState<OriginEstimateRecord[]>([]);
   const [projectAuditEvents, setProjectAuditEvents] = useState<AuditEventRecord[]>([]);
-  const [nextLineLocalId, setNextLineLocalId] = useState(2);
+  const [newLineNextLocalId, setNewLineNextLocalId] = useState(2);
+  const [editLineNextLocalId, setEditLineNextLocalId] = useState(2);
   const [selectedProjectName, setSelectedProjectName] = useState("");
   const [organizationDefaults, setOrganizationDefaults] =
     useState<OrganizationDocumentDefaults | null>(null);
@@ -715,7 +716,7 @@ export function ChangeOrdersConsole({
       setEditReason("");
       setEditTermsText("");
       setEditLineItems([emptyLine(1)]);
-      setNextLineLocalId(2);
+      setEditLineNextLocalId(2);
       setQuickStatus("");
       setQuickStatusNote("");
       return;
@@ -742,7 +743,7 @@ export function ChangeOrdersConsole({
         : [emptyLine(1)];
     setEditLineItems(hydratedLines);
     const maxLocalId = hydratedLines.reduce((maxId, line) => Math.max(maxId, line.localId), 1);
-    setNextLineLocalId(maxLocalId + 1);
+    setEditLineNextLocalId(maxLocalId + 1);
     if (changeOrder.origin_estimate) {
       setSelectedViewerEstimateId(String(changeOrder.origin_estimate));
     }
@@ -947,7 +948,7 @@ export function ChangeOrdersConsole({
   const prefillNewLinesFromBudgetLines = useCallback((lines: BudgetLineRecord[]) => {
     if (!lines.length) {
       setNewLineItems([emptyLine(1)]);
-      setNextLineLocalId(2);
+      setNewLineNextLocalId(2);
       return;
     }
     const estimateDerivedLines = lines.filter(
@@ -958,7 +959,7 @@ export function ChangeOrdersConsole({
       : lines.filter((line) => !line.description.startsWith("System:"));
     if (!starterLines.length) {
       setNewLineItems([emptyLine(1)]);
-      setNextLineLocalId(2);
+      setNewLineNextLocalId(2);
       return;
     }
     const mapped: ChangeOrderLineInput[] = starterLines.map((line, index) => ({
@@ -971,7 +972,7 @@ export function ChangeOrdersConsole({
       daysDelta: "0",
     }));
     setNewLineItems(mapped);
-    setNextLineLocalId(mapped.length + 1);
+    setNewLineNextLocalId(mapped.length + 1);
   }, []);
 
   const fetchProjectChangeOrders = useCallback(async (projectId: number) => {
@@ -1031,7 +1032,7 @@ export function ChangeOrdersConsole({
       }
       const rows = (payload.data as Array<{ id: number; name: string }>) ?? [];
       setNewLineItems([emptyLine(1)]);
-      setNextLineLocalId(2);
+      setNewLineNextLocalId(2);
       if (rows[0]) {
         const scopedMatch = scopedProjectId
           ? rows.find((project) => project.id === scopedProjectId)
@@ -1056,7 +1057,10 @@ export function ChangeOrdersConsole({
           return;
         }
         setChangeOrders(changeOrderRows);
-        hydrateEditForm(changeOrderRows[0]);
+        const initialCO = initialOriginEstimateId
+          ? changeOrderRows.find((co) => co.origin_estimate === initialOriginEstimateId)
+          : changeOrderRows[0];
+        hydrateEditForm(initialCO ?? changeOrderRows[0]);
         setFeedback("");
       } else {
         setSelectedProjectId("");
@@ -1187,12 +1191,16 @@ export function ChangeOrdersConsole({
   }
 
   /** Append a new blank line to the given line-item set. */
-  function addLine(setter: LineSetter) {
+  function addLine(
+    setter: LineSetter,
+    idCounter: number,
+    setIdCounter: React.Dispatch<React.SetStateAction<number>>,
+  ) {
     if (actionTone === "error" && actionMessage === CHANGE_ORDER_MIN_LINE_ITEMS_ERROR) {
       setFeedback("");
     }
-    const localId = nextLineLocalId;
-    setNextLineLocalId((current) => current + 1);
+    const localId = idCounter;
+    setIdCounter((current) => current + 1);
     setter((current) => [...current, emptyLine(localId)]);
   }
 
@@ -1220,7 +1228,7 @@ export function ChangeOrdersConsole({
       prefillNewLinesFromBudgetLines(budgetLines);
     } else {
       setNewLineItems([emptyLine(1)]);
-      setNextLineLocalId(2);
+      setNewLineNextLocalId(2);
     }
     setFeedback("Ready for a new change order draft.", "info");
     setCreateFlashCount((c) => c + 1);
@@ -1278,7 +1286,7 @@ export function ChangeOrdersConsole({
       }
       setFeedback(`Created change order #${created.id}.`, "success");
       setNewLineItems([emptyLine(1)]);
-      setNextLineLocalId(2);
+      setNewLineNextLocalId(2);
       setNewTitleManuallyEdited(false);
       setNewTitle(defaultChangeOrderTitle(selectedProjectName));
       setNewReason(defaultChangeOrderReason);
@@ -2180,7 +2188,7 @@ export function ChangeOrdersConsole({
                   <button
                     type="button"
                     className={`${creatorStyles.secondaryButton} ${changeOrderCreatorStyles.coLineAddButton}`}
-                    onClick={() => addLine(setNewLineItems)}
+                    onClick={() => addLine(setNewLineItems, newLineNextLocalId, setNewLineNextLocalId)}
                   >
                     Add Line Item
                   </button>
@@ -2484,7 +2492,7 @@ export function ChangeOrdersConsole({
                     <button
                       type="button"
                       className={`${creatorStyles.secondaryButton} ${changeOrderCreatorStyles.coLineAddButton}`}
-                      onClick={() => addLine(setEditLineItems)}
+                      onClick={() => addLine(setEditLineItems, editLineNextLocalId, setEditLineNextLocalId)}
                     >
                       Add Line Item
                     </button>
