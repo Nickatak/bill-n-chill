@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PageCard, PageShell } from "@/shared/shell";
+import lightTheme from "@/shared/styles/light-theme.module.css";
 import { InvoicePublicPreview } from "@/features/invoices/components/invoice-public-preview";
 import {
   composePublicDocumentMetadataTitle,
@@ -30,7 +31,7 @@ export default async function InvoiceReviewPage({ params }: InvoiceReviewPagePro
   }
 
   return (
-    <PageShell narrow>
+    <PageShell narrow className={lightTheme.lightTheme}>
       <PageCard>
         <InvoicePublicPreview publicToken={publicToken} />
       </PageCard>

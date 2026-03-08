@@ -1813,12 +1813,7 @@ export function InvoicesConsole() {
                         </div>
                         <div className={creatorStyles.headerRight}>
                           <div className={creatorStyles.logoBox}>
-                            {senderLogoUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={senderLogoUrl} alt="Organization logo" className={invoiceCreatorStyles.invoiceLogoImage} />
-                            ) : (
-                              "Logo"
-                            )}
+                            {senderLogoUrl ? "Logo" : "No logo set"}
                           </div>
                           <div className={creatorStyles.sheetTitle}>Invoice</div>
                         </div>

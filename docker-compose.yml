@@ -32,6 +32,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backend:/app/backend
+      - media_data:/app/backend/media
     command: >-
       sh -c "pip install --no-cache-dir -r requirements.txt &&
       python manage.py migrate &&
@@ -52,3 +53,4 @@ services:
 
 volumes:
   mysql_data:
+  media_data:

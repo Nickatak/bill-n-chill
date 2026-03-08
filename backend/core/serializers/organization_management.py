@@ -11,6 +11,8 @@ User = get_user_model()
 class OrganizationProfileSerializer(serializers.ModelSerializer):
     """Read-only organization profile with branding and document presets."""
 
+    logo_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Organization
         fields = [
@@ -32,6 +34,15 @@ class OrganizationProfileSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_logo_url(self, obj: Organization) -> str:
+        """Return the absolute URL for the uploaded logo, or empty string."""
+        if not obj.logo:
+            return ""
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(obj.logo.url)
+        return obj.logo.url
 
 
 class OrganizationMembershipSerializer(serializers.ModelSerializer):
@@ -89,7 +100,6 @@ class OrganizationProfileUpdateSerializer(serializers.Serializer):
     """Write serializer for partial updates to organization profile fields."""
 
     display_name = serializers.CharField(max_length=255, required=False, allow_blank=False)
-    logo_url = serializers.URLField(required=False, allow_blank=True, default="")
     help_email = serializers.EmailField(required=False, allow_blank=True, default="")
     billing_address = serializers.CharField(max_length=5000, required=False, allow_blank=True, default="")
     phone_number = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")

@@ -509,7 +509,7 @@
   }
 
   .logoBox {
-    display: none;
+    border: none;
   }
 
   .metaLink {

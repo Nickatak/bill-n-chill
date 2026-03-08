@@ -378,7 +378,7 @@ def project_invoices_view(request, project_id: int):
         default_sender_name=(organization.display_name or "").strip(),
         default_sender_email="",
         default_sender_address=(organization.billing_address or "").strip(),
-        default_sender_logo_url=(organization.logo_url or "").strip(),
+        default_sender_logo_url=organization.logo.url if organization.logo else "",
         default_terms_text=(organization.invoice_terms_and_conditions or "").strip(),
         default_footer_text="",
         default_notes_text="",

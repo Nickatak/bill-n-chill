@@ -242,19 +242,7 @@ export function EstimateSheet({
             </div>
             <div className={creatorStyles.headerRight}>
               <div className={creatorStyles.logoBox}>
-                {/* TODO(nick): Replace temporary logo URL link with uploaded logo image rendering. */}
-                {senderLogoUrl ? (
-                  <a
-                    className={creatorStyles.logoUrlLink}
-                    href={senderLogoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {senderLogoUrl}
-                  </a>
-                ) : (
-                  "No logo URL set"
-                )}
+                {senderLogoUrl ? "Logo" : "No logo set"}
               </div>
               {titlePresentation === "header" ? (
                 <div className={creatorStyles.sheetTitleValue}>{estimateTitle || "Untitled"}</div>

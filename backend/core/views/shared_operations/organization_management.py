@@ -52,7 +52,7 @@ def organization_profile_view(request):
     incoming = serializer.validated_data
 
     # Field-level capability gates: identity vs presets
-    _identity_fields = {"display_name", "logo_url", "billing_address", "phone_number", "website_url", "license_number", "tax_id"}
+    _identity_fields = {"display_name", "billing_address", "phone_number", "website_url", "license_number", "tax_id"}
     _preset_fields = {
         "help_email", "default_invoice_due_delta", "default_estimate_valid_delta",
         "invoice_terms_and_conditions", "estimate_terms_and_conditions",
@@ -73,7 +73,6 @@ def organization_profile_view(request):
     # Simple string fields: check each for change and stage update
     _string_fields = {
         "display_name": {"attr": "display_name", "strip": True, "allow_blank": False},
-        "logo_url": {"attr": "logo_url", "strip": True},
         "help_email": {"attr": "help_email", "strip": True},
         "billing_address": {"attr": "billing_address", "strip": True},
         "phone_number": {"attr": "phone_number", "strip": True},
@@ -126,6 +125,85 @@ def organization_profile_view(request):
                 "role_policy": _organization_role_policy(request.user),
             },
             "meta": {"changed_fields": changed_fields},
+        }
+    )
+
+
+LOGO_MAX_SIZE_BYTES = 2 * 1024 * 1024  # 2 MB
+LOGO_ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def organization_logo_upload_view(request):
+    """Upload or replace the organization logo image.
+
+    Accepts multipart/form-data with a single ``logo`` file field.
+    Validates content type (JPEG, PNG, WebP) and size (2 MB max).
+    Gated by ``org_identity.edit`` capability.
+    """
+    permission_error, _ = _capability_gate(request.user, "org_identity", "edit")
+    if permission_error:
+        return Response(permission_error, status=403)
+
+    membership = _ensure_membership(request.user)
+    organization = membership.organization
+
+    logo_file = request.FILES.get("logo")
+    if not logo_file:
+        return Response(
+            {"error": {"code": "validation_error", "message": "No logo file provided.", "fields": {}}},
+            status=400,
+        )
+
+    if logo_file.content_type not in LOGO_ALLOWED_CONTENT_TYPES:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": f"Unsupported file type: {logo_file.content_type}. Use JPEG, PNG, or WebP.",
+                    "fields": {},
+                }
+            },
+            status=400,
+        )
+
+    if logo_file.size > LOGO_MAX_SIZE_BYTES:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Logo file exceeds 2 MB size limit.",
+                    "fields": {},
+                }
+            },
+            status=400,
+        )
+
+    # Delete the previous logo file if one exists.
+    if organization.logo:
+        organization.logo.delete(save=False)
+
+    organization.logo = logo_file
+    organization.save(update_fields=["logo", "updated_at"])
+
+    with transaction.atomic():
+        OrganizationRecord.record(
+            organization=organization,
+            event_type=OrganizationRecord.EventType.UPDATED,
+            capture_source=OrganizationRecord.CaptureSource.MANUAL_UI,
+            recorded_by=request.user,
+            note="Organization logo uploaded.",
+            metadata={"changed_fields": ["logo"]},
+        )
+
+    return Response(
+        {
+            "data": {
+                "organization": OrganizationProfileSerializer(
+                    organization, context={"request": request}
+                ).data,
+            }
         }
     )
 
