@@ -12,7 +12,6 @@ from core.models import (
     Project,
     VendorBill,
 )
-from core.views.helpers import _organization_user_ids
 
 
 def _parse_optional_date(value: str):
@@ -43,7 +42,7 @@ def _date_filter_from_query(request):
     return date_from, date_to, None
 
 
-def _project_active_budget_map(*, project_ids, actor_user_ids):
+def _project_active_budget_map(*, project_ids):
     """Return a dict mapping project IDs to their most recent active budget."""
     if not project_ids:
         return {}
@@ -51,7 +50,6 @@ def _project_active_budget_map(*, project_ids, actor_user_ids):
     active_budgets = (
         Budget.objects.filter(
             project_id__in=project_ids,
-            created_by_id__in=actor_user_ids,
             status=Budget.Status.ACTIVE,
         )
         .select_related("source_estimate")
@@ -65,11 +63,10 @@ def _project_active_budget_map(*, project_ids, actor_user_ids):
     return active_budget_by_project
 
 
-def _project_accepted_contract_totals_map(*, project_ids, actor_user_ids):
+def _project_accepted_contract_totals_map(*, project_ids):
     """Return a dict mapping project IDs to their accepted contract total (estimate + approved COs)."""
     active_budget_by_project = _project_active_budget_map(
         project_ids=project_ids,
-        actor_user_ids=actor_user_ids,
     )
     totals: dict[int, Decimal] = {}
     for project_id, budget in active_budget_by_project.items():
@@ -80,14 +77,10 @@ def _project_accepted_contract_totals_map(*, project_ids, actor_user_ids):
     return totals
 
 
-def _build_project_financial_summary_data(project: Project, user, *, actor_user_ids=None):
+def _build_project_financial_summary_data(project: Project, user):
     """Build a complete financial summary dict for a project with AR/AP totals and traceability links."""
-    if actor_user_ids is None:
-        actor_user_ids = _organization_user_ids(user)
-
     active_budget = _project_active_budget_map(
         project_ids=[project.id],
-        actor_user_ids=actor_user_ids,
     ).get(project.id)
     if active_budget and active_budget.source_estimate_id:
         accepted_contract_total = (
@@ -107,7 +100,6 @@ def _build_project_financial_summary_data(project: Project, user, *, actor_user_
     invoice_rows = list(
         Invoice.objects.filter(
             project=project,
-            created_by_id__in=actor_user_ids,
         )
         .exclude(status=Invoice.Status.VOID)
         .order_by("-created_at", "-id")
@@ -117,7 +109,6 @@ def _build_project_financial_summary_data(project: Project, user, *, actor_user_
     inbound_alloc_rows = list(
         PaymentAllocation.objects.filter(
             payment__project=project,
-            payment__created_by_id__in=actor_user_ids,
             payment__status=Payment.Status.SETTLED,
             payment__direction=Payment.Direction.INBOUND,
         )
@@ -129,7 +120,6 @@ def _build_project_financial_summary_data(project: Project, user, *, actor_user_
     vendor_bill_rows = list(
         VendorBill.objects.filter(
             project=project,
-            created_by_id__in=actor_user_ids,
         )
         .exclude(status=VendorBill.Status.VOID)
         .order_by("-created_at", "-id")
@@ -139,7 +129,6 @@ def _build_project_financial_summary_data(project: Project, user, *, actor_user_
     outbound_alloc_rows = list(
         PaymentAllocation.objects.filter(
             payment__project=project,
-            payment__created_by_id__in=actor_user_ids,
             payment__status=Payment.Status.SETTLED,
             payment__direction=Payment.Direction.OUTBOUND,
         )
@@ -158,7 +147,6 @@ def _build_project_financial_summary_data(project: Project, user, *, actor_user_
 
     inbound_payment_rows = list(
         project.payments.filter(
-            created_by_id__in=actor_user_ids,
             status=Payment.Status.SETTLED,
             direction=Payment.Direction.INBOUND,
         )
@@ -170,7 +158,6 @@ def _build_project_financial_summary_data(project: Project, user, *, actor_user_
 
     outbound_payment_rows = list(
         project.payments.filter(
-            created_by_id__in=actor_user_ids,
             status=Payment.Status.SETTLED,
             direction=Payment.Direction.OUTBOUND,
         )

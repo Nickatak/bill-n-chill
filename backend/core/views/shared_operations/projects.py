@@ -21,7 +21,7 @@ from core.serializers import (
     ProjectProfileSerializer,
     ProjectSerializer,
 )
-from core.views.helpers import _capability_gate, _ensure_membership, _organization_user_ids
+from core.views.helpers import _capability_gate, _ensure_membership
 from core.views.shared_operations.projects_helpers import (
     _build_project_financial_summary_data,
     _project_accepted_contract_totals_map,
@@ -33,13 +33,11 @@ from core.views.shared_operations.projects_helpers import (
 def projects_list_view(request):
     """List projects visible to the authenticated owner context."""
     membership = _ensure_membership(request.user)
-    actor_user_ids = _organization_user_ids(request.user)
     rows = list(
         Project.objects.filter(organization_id=membership.organization_id).select_related("customer")
     )
     accepted_totals_by_project = _project_accepted_contract_totals_map(
         project_ids=[row.id for row in rows],
-        actor_user_ids=actor_user_ids,
     )
     serialized_rows = ProjectSerializer(rows, many=True).data
     for row in serialized_rows:
@@ -54,7 +52,6 @@ def projects_list_view(request):
 def project_detail_view(request, project_id: int):
     """Fetch or patch a project profile with terminal-state and transition protections."""
     membership = _ensure_membership(request.user)
-    actor_user_ids = _organization_user_ids(request.user)
     try:
         project = Project.objects.select_related("customer").get(
             id=project_id,
@@ -69,7 +66,6 @@ def project_detail_view(request, project_id: int):
     if request.method == "GET":
         accepted_total = _project_accepted_contract_totals_map(
             project_ids=[project.id],
-            actor_user_ids=actor_user_ids,
         ).get(project.id, Decimal("0"))
         payload = ProjectProfileSerializer(project).data
         payload["accepted_contract_total"] = f"{accepted_total:.2f}"
@@ -179,7 +175,6 @@ def project_detail_view(request, project_id: int):
         )
     accepted_total = _project_accepted_contract_totals_map(
         project_ids=[project.id],
-        actor_user_ids=actor_user_ids,
     ).get(project.id, Decimal("0"))
     payload = ProjectProfileSerializer(project).data
     payload["accepted_contract_total"] = f"{accepted_total:.2f}"
@@ -299,7 +294,6 @@ def project_accounting_export_view(request, project_id: int):
 def project_audit_events_view(request, project_id: int):
     """Return immutable financial audit events for the requested project."""
     membership = _ensure_membership(request.user)
-    actor_user_ids = _organization_user_ids(request.user)
     try:
         project = Project.objects.get(id=project_id, organization_id=membership.organization_id)
     except Project.DoesNotExist:
@@ -310,7 +304,6 @@ def project_audit_events_view(request, project_id: int):
 
     rows = FinancialAuditEvent.objects.filter(
         project=project,
-        created_by_id__in=actor_user_ids,
     ).select_related("created_by", "project__customer")
     object_type_filters = [value.strip() for value in request.query_params.getlist("object_type") if value.strip()]
     if len(object_type_filters) == 1 and "," in object_type_filters[0]:

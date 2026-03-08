@@ -25,7 +25,7 @@ from core.serializers import (
     ProjectTimelineSerializer,
     QuickJumpSearchSerializer,
 )
-from core.views.helpers import _organization_user_ids
+from core.views.helpers import _ensure_membership
 from core.views.shared_operations.projects_helpers import (
     _build_project_financial_summary_data,
     _date_filter_from_query,
@@ -49,10 +49,10 @@ def portfolio_snapshot_view(request):
             status=400,
         )
 
-    actor_user_ids = _organization_user_ids(request.user)
+    membership = _ensure_membership(request.user)
     today = django_timezone.localdate()
     project_rows = list(
-        Project.objects.filter(created_by_id__in=actor_user_ids)
+        Project.objects.filter(organization_id=membership.organization_id)
         .select_related("customer")
         .order_by("-created_at", "-id")
     )
@@ -67,7 +67,6 @@ def portfolio_snapshot_view(request):
         summary = _build_project_financial_summary_data(
             project,
             request.user,
-            actor_user_ids=actor_user_ids,
         )
         ar_total_outstanding += summary["ar_outstanding"]
         ap_total_outstanding += summary["ap_outstanding"]
@@ -83,13 +82,11 @@ def portfolio_snapshot_view(request):
         )
 
     overdue_invoices = Invoice.objects.filter(
-        project__created_by_id__in=actor_user_ids,
-        created_by_id__in=actor_user_ids,
+        project__organization_id=membership.organization_id,
         due_date__lt=today,
     ).exclude(status__in=[Invoice.Status.PAID, Invoice.Status.VOID])
     overdue_vendor_bills = VendorBill.objects.filter(
-        project__created_by_id__in=actor_user_ids,
-        created_by_id__in=actor_user_ids,
+        project__organization_id=membership.organization_id,
         due_date__lt=today,
     ).exclude(status__in=[VendorBill.Status.PAID, VendorBill.Status.VOID])
 
@@ -133,9 +130,9 @@ def change_impact_summary_view(request):
             status=400,
         )
 
-    actor_user_ids = _organization_user_ids(request.user)
+    membership = _ensure_membership(request.user)
     approved_rows = ChangeOrder.objects.filter(
-        requested_by_id__in=actor_user_ids,
+        project__organization_id=membership.organization_id,
         status=ChangeOrder.Status.APPROVED,
     ).select_related("project")
     if date_from:
@@ -178,7 +175,7 @@ def change_impact_summary_view(request):
 @permission_classes([IsAuthenticated])
 def attention_feed_view(request):
     """Return prioritized operational attention items (overdue, pending, and problem states)."""
-    actor_user_ids = _organization_user_ids(request.user)
+    membership = _ensure_membership(request.user)
     today = django_timezone.localdate()
     due_soon_window_days = 7
     due_soon_date = today + timedelta(days=due_soon_window_days)
@@ -186,8 +183,7 @@ def attention_feed_view(request):
 
     overdue_invoices = (
         Invoice.objects.filter(
-            project__created_by_id__in=actor_user_ids,
-            created_by_id__in=actor_user_ids,
+            project__organization_id=membership.organization_id,
             due_date__lt=today,
         )
         .exclude(status__in=[Invoice.Status.PAID, Invoice.Status.VOID])
@@ -211,8 +207,7 @@ def attention_feed_view(request):
 
     due_soon_vendor_bills = (
         VendorBill.objects.filter(
-            project__created_by_id__in=actor_user_ids,
-            created_by_id__in=actor_user_ids,
+            project__organization_id=membership.organization_id,
             due_date__gte=today,
             due_date__lte=due_soon_date,
         )
@@ -237,7 +232,7 @@ def attention_feed_view(request):
 
     pending_change_orders = (
         ChangeOrder.objects.filter(
-            requested_by_id__in=actor_user_ids,
+            project__organization_id=membership.organization_id,
             status=ChangeOrder.Status.PENDING_APPROVAL,
         )
         .select_related("project")
@@ -260,8 +255,7 @@ def attention_feed_view(request):
 
     problem_payments = (
         Payment.objects.filter(
-            project__created_by_id__in=actor_user_ids,
-            created_by_id__in=actor_user_ids,
+            project__organization_id=membership.organization_id,
             status=Payment.Status.VOID,
         )
         .select_related("project")
@@ -313,11 +307,11 @@ def quick_jump_search_view(request):
     if len(query) < 2:
         return Response({"data": QuickJumpSearchSerializer({"query": query, "item_count": 0, "items": []}).data})
 
-    actor_user_ids = _organization_user_ids(request.user)
+    membership = _ensure_membership(request.user)
     query_lower = query.lower()
     items = []
 
-    projects = Project.objects.filter(created_by_id__in=actor_user_ids).select_related("customer")
+    projects = Project.objects.filter(organization_id=membership.organization_id).select_related("customer")
     for row in projects:
         if query_lower in row.name.lower() or query_lower in str(row.id):
             items.append(
@@ -333,7 +327,7 @@ def quick_jump_search_view(request):
                 }
             )
 
-    estimates = Estimate.objects.filter(created_by_id__in=actor_user_ids).select_related("project")
+    estimates = Estimate.objects.filter(project__organization_id=membership.organization_id).select_related("project")
     for row in estimates:
         if (
             query_lower in (row.title or "").lower()
@@ -353,7 +347,7 @@ def quick_jump_search_view(request):
                 }
             )
 
-    change_orders = ChangeOrder.objects.filter(requested_by_id__in=actor_user_ids).select_related("project")
+    change_orders = ChangeOrder.objects.filter(project__organization_id=membership.organization_id).select_related("project")
     for row in change_orders:
         candidate = f"co-{row.family_key} v{row.revision_number} {row.title or ''}".lower()
         if query_lower in candidate or query_lower in str(row.id):
@@ -370,7 +364,7 @@ def quick_jump_search_view(request):
                 }
             )
 
-    invoices = Invoice.objects.filter(created_by_id__in=actor_user_ids).select_related("project")
+    invoices = Invoice.objects.filter(project__organization_id=membership.organization_id).select_related("project")
     for row in invoices:
         if query_lower in row.invoice_number.lower() or query_lower in str(row.id):
             items.append(
@@ -386,7 +380,7 @@ def quick_jump_search_view(request):
                 }
             )
 
-    vendor_bills = VendorBill.objects.filter(created_by_id__in=actor_user_ids).select_related("project")
+    vendor_bills = VendorBill.objects.filter(project__organization_id=membership.organization_id).select_related("project")
     for row in vendor_bills:
         if query_lower in row.bill_number.lower() or query_lower in str(row.id):
             items.append(
@@ -402,7 +396,7 @@ def quick_jump_search_view(request):
                 }
             )
 
-    payments = Payment.objects.filter(created_by_id__in=actor_user_ids).select_related("project")
+    payments = Payment.objects.filter(project__organization_id=membership.organization_id).select_related("project")
     for row in payments:
         candidate = f"{row.reference_number or ''} {row.id} {row.direction} {row.status}".lower()
         if query_lower in candidate:
@@ -440,9 +434,9 @@ def quick_jump_search_view(request):
 @permission_classes([IsAuthenticated])
 def project_timeline_events_view(request, project_id: int):
     """Return merged project timeline events by category (`all|financial|workflow`)."""
-    actor_user_ids = _organization_user_ids(request.user)
+    membership = _ensure_membership(request.user)
     try:
-        project = Project.objects.get(id=project_id, created_by_id__in=actor_user_ids)
+        project = Project.objects.get(id=project_id, organization_id=membership.organization_id)
     except Project.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Project not found.", "fields": {}}},
@@ -466,7 +460,6 @@ def project_timeline_events_view(request, project_id: int):
     if category in {"all", "financial"}:
         financial_rows = FinancialAuditEvent.objects.filter(
             project=project,
-            created_by_id__in=actor_user_ids,
         ).order_by("-created_at", "-id")
         for row in financial_rows:
             ui_route = "/financials-auditing"
@@ -505,7 +498,6 @@ def project_timeline_events_view(request, project_id: int):
         workflow_rows = (
             EstimateStatusEvent.objects.filter(
                 estimate__project=project,
-                changed_by_id__in=actor_user_ids,
             )
             .select_related("estimate")
             .order_by("-changed_at", "-id")
