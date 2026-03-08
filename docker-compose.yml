@@ -51,6 +51,14 @@ services:
     command: >-
       sh -c "npm install && npm run dev -- --hostname 0.0.0.0 --port 3000"
 
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    profiles: [dev]
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+
 volumes:
   mysql_data:
   media_data:

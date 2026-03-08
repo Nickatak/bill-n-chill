@@ -209,9 +209,11 @@ REST_FRAMEWORK = {
     ],
 }
 
-# Email — console backend in dev; set EMAIL_BACKEND to anymail.backends.mailgun.EmailBackend
-# and provide MAILGUN_API_KEY for real delivery via Mailgun HTTP API.
+# Email — defaults to console backend. Local dev uses Mailpit (SMTP);
+# prod uses anymail.backends.mailgun.EmailBackend with MAILGUN_API_KEY.
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "1025"))
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@billnchill.com")
 ANYMAIL = {
     "MAILGUN_API_KEY": os.getenv("MAILGUN_API_KEY", ""),
