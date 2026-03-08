@@ -25,6 +25,7 @@ from core.utils.email import send_document_sent_email
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.change_orders.change_orders_helpers import (
     _active_budget_for_project,
+    _create_budget_lines_for_new_scope,
     _model_validation_error_response,
     _next_change_order_family_key,
     _serialize_public_change_order,
@@ -180,6 +181,11 @@ def public_change_order_decision_view(request, public_token: str):
             Budget.objects.filter(id=active_budget.id).update(
                 approved_change_order_total=F("approved_change_order_total") + financial_delta,
             )
+        if next_status == ChangeOrder.Status.APPROVED and active_budget is not None:
+            _create_budget_lines_for_new_scope(
+                change_order=change_order,
+                budget=active_budget,
+            )
         FinancialAuditEvent.record(
             project=change_order.project,
             event_type=FinancialAuditEvent.EventType.CHANGE_ORDER_UPDATED,
@@ -229,7 +235,7 @@ def public_change_order_decision_view(request, public_token: str):
     refreshed = (
         ChangeOrder.objects.filter(id=change_order.id)
         .select_related("project__customer", "origin_estimate", "requested_by", "approved_by")
-        .prefetch_related("line_items", "line_items__budget_line", "line_items__budget_line__cost_code")
+        .prefetch_related("line_items", "line_items__budget_line", "line_items__budget_line__cost_code", "line_items__cost_code")
         .get()
     )
 
@@ -292,7 +298,7 @@ def project_change_orders_view(request, project_id: int):
     if request.method == "GET":
         rows = (
             ChangeOrder.objects.filter(project=project)
-            .prefetch_related("line_items", "line_items__budget_line", "line_items__budget_line__cost_code")
+            .prefetch_related("line_items", "line_items__budget_line", "line_items__budget_line__cost_code", "line_items__cost_code")
             .order_by("-created_at", "-revision_number")
         )
         latest_ids = (
@@ -372,12 +378,14 @@ def project_change_orders_view(request, project_id: int):
             rule="co_origin_estimate_approved_required",
         )
 
-    line_map = {}
+    budget_line_map = {}
+    cost_code_map = {}
     line_total_delta = MONEY_ZERO
     if incoming_line_items:
-        line_map, line_total_delta, line_error = _validate_change_order_lines(
+        budget_line_map, cost_code_map, line_total_delta, line_error = _validate_change_order_lines(
             project=project,
             line_items=incoming_line_items,
+            organization_id=organization.id,
         )
         if line_error:
             return line_error
@@ -419,7 +427,8 @@ def project_change_orders_view(request, project_id: int):
                 _sync_change_order_lines(
                     change_order=change_order,
                     line_items=incoming_line_items,
-                    line_map=line_map,
+                    budget_line_map=budget_line_map,
+                    cost_code_map=cost_code_map,
                 )
     except ValidationError as exc:
         return _model_validation_error_response(
@@ -428,7 +437,7 @@ def project_change_orders_view(request, project_id: int):
         )
     created = (
         ChangeOrder.objects.filter(id=change_order.id)
-        .prefetch_related("line_items", "line_items__budget_line", "line_items__budget_line__cost_code")
+        .prefetch_related("line_items", "line_items__budget_line", "line_items__budget_line__cost_code", "line_items__cost_code")
         .get()
     )
     return Response({"data": ChangeOrderSerializer(created).data}, status=201)
@@ -557,10 +566,13 @@ def change_order_detail_view(request, change_order_id: int):
                 rule="co_budget_active_required_for_propagation",
             )
 
+    budget_line_map = {}
+    cost_code_map = {}
     if incoming_line_items is not None:
-        line_map, line_total_delta, line_error = _validate_change_order_lines(
+        budget_line_map, cost_code_map, line_total_delta, line_error = _validate_change_order_lines(
             project=change_order.project,
             line_items=incoming_line_items,
+            organization_id=membership.organization_id,
         )
         if line_error:
             return line_error
@@ -659,7 +671,8 @@ def change_order_detail_view(request, change_order_id: int):
                 _sync_change_order_lines(
                     change_order=change_order,
                     line_items=incoming_line_items,
-                    line_map=line_map,
+                    budget_line_map=budget_line_map,
+                    cost_code_map=cost_code_map,
                 )
             if financial_delta != MONEY_ZERO:
                 Project.objects.filter(
@@ -669,6 +682,16 @@ def change_order_detail_view(request, change_order_id: int):
                 )
                 Budget.objects.filter(id=active_budget.id).update(
                     approved_change_order_total=F("approved_change_order_total") + financial_delta,
+                )
+            # Materialize new-scope CO lines as budget lines on approval.
+            if (
+                previous_status != ChangeOrder.Status.APPROVED
+                and next_status == ChangeOrder.Status.APPROVED
+                and active_budget is not None
+            ):
+                _create_budget_lines_for_new_scope(
+                    change_order=change_order,
+                    budget=active_budget,
                 )
             should_record_audit_event = (
                 previous_status != next_status
@@ -746,7 +769,7 @@ def change_order_detail_view(request, change_order_id: int):
 
     refreshed = (
         ChangeOrder.objects.filter(id=change_order.id)
-        .prefetch_related("line_items", "line_items__budget_line", "line_items__budget_line__cost_code")
+        .prefetch_related("line_items", "line_items__budget_line", "line_items__budget_line__cost_code", "line_items__cost_code")
         .get()
     )
     return Response({"data": ChangeOrderSerializer(refreshed).data})
@@ -810,20 +833,31 @@ def change_order_clone_revision_view(request, change_order_id: int):
             previous_change_order=change_order,
             requested_by=request.user,
         )
+        source_lines = list(change_order.line_items.select_related("budget_line", "cost_code").all())
         _sync_change_order_lines(
             change_order=clone,
             line_items=[
                 {
                     "budget_line": line.budget_line_id,
+                    "cost_code": line.cost_code_id,
                     "description": line.description,
                     "line_type": line.line_type,
                     "adjustment_reason": line.adjustment_reason,
                     "amount_delta": str(line.amount_delta),
                     "days_delta": line.days_delta,
                 }
-                for line in change_order.line_items.all()
+                for line in source_lines
             ],
-            line_map={line.budget_line_id: line.budget_line for line in change_order.line_items.all()},
+            budget_line_map={
+                line.budget_line_id: line.budget_line
+                for line in source_lines
+                if line.budget_line_id
+            },
+            cost_code_map={
+                line.cost_code_id: line.cost_code
+                for line in source_lines
+                if line.cost_code_id
+            },
         )
         FinancialAuditEvent.record(
             project=clone.project,
@@ -870,7 +904,7 @@ def change_order_clone_revision_view(request, change_order_id: int):
 
     created = (
         ChangeOrder.objects.filter(id=clone.id)
-        .prefetch_related("line_items", "line_items__budget_line", "line_items__budget_line__cost_code")
+        .prefetch_related("line_items", "line_items__budget_line", "line_items__budget_line__cost_code", "line_items__cost_code")
         .get()
     )
     return Response({"data": ChangeOrderSerializer(created).data}, status=201)

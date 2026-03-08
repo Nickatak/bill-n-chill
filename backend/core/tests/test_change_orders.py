@@ -7,8 +7,6 @@ from django.utils import timezone
 from core.tests.common import *
 
 
-SYSTEM_BUDGET_LINE_CODES = {"99-901", "99-902", "99-903"}
-
 
 def _verified_session(public_token, document_type, document_id, email):
     """Create a verified OTP session for public decision tests."""
@@ -177,15 +175,6 @@ class ChangeOrderTests(TestCase):
         return BudgetLine.objects.filter(
             budget__project=self.project,
             budget__status=Budget.Status.ACTIVE,
-        ).exclude(
-            cost_code__code__in=SYSTEM_BUDGET_LINE_CODES,
-        ).order_by("id").first()
-
-    def _generic_budget_line(self):
-        return BudgetLine.objects.filter(
-            budget__project=self.project,
-            budget__status=Budget.Status.ACTIVE,
-            cost_code__code__in=SYSTEM_BUDGET_LINE_CODES,
         ).order_by("id").first()
 
     def _create_change_order(self, *, title="Owner requested upgraded finish", amount_delta="1500.00"):
@@ -374,11 +363,8 @@ class ChangeOrderTests(TestCase):
                 "co_origin_estimate_approved_required": "origin_estimate must be approved.",
                 "co_origin_estimate_immutable_once_set": "origin_estimate cannot change/clear once set.",
                 "co_line_total_must_match_amount_delta": "Sum of line_items amount_delta must match change-order amount_delta.",
-                "co_line_duplicate_budget_line": "Each budget_line can appear at most once per change order.",
                 "co_line_budget_line_invalid": "Each budget_line must exist, match project, and come from active budget.",
-                "co_line_scope_budget_line_disallows_generic": "Scope lines cannot use internal generic budget lines.",
-                "co_line_adjustment_requires_reason": "Adjustment lines require adjustment_reason.",
-                "co_line_adjustment_requires_generic_budget_line": "Adjustment lines must use a generic system budget line.",
+                "co_line_cost_code_invalid": "Each cost_code must exist and belong to the organization.",
                 "co_edit_latest_revision_only": "Only latest revision in family can be edited.",
                 "co_edit_requires_draft_status": "Only draft change orders can edit content fields.",
                 "co_clone_requires_latest_revision": "Clone revision only from latest revision in family.",
@@ -835,7 +821,7 @@ class ChangeOrderTests(TestCase):
         )
         self._assert_validation_rule(cleared, "co_origin_estimate_immutable_once_set")
 
-    def test_change_order_create_rejects_duplicate_line_items_for_same_budget_line(self):
+    def test_change_order_create_allows_duplicate_budget_lines(self):
         self._create_active_budget(
             project_id=self.project.id,
             cost_code_id=self.cost_code.id,
@@ -850,16 +836,18 @@ class ChangeOrderTests(TestCase):
                 "title": "Duplicate Budget Line CO",
                 "amount_delta": "200.00",
                 "days_delta": 1,
-                "reason": "Prevent duplicate line items for the same budget line",
+                "reason": "Multiple adjustments to same budget line",
                 "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
                 "line_items": [
                     {
+                        "line_type": "original",
                         "budget_line": budget_line.id,
                         "description": "Row 1",
                         "amount_delta": "100.00",
                         "days_delta": 1,
                     },
                     {
+                        "line_type": "original",
                         "budget_line": budget_line.id,
                         "description": "Row 2",
                         "amount_delta": "100.00",
@@ -870,7 +858,43 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self._assert_validation_rule(response, "co_line_duplicate_budget_line")
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(len(response.json()["data"]["line_items"]), 2)
+
+    def test_change_order_create_new_line_with_cost_code(self):
+        self._create_active_budget(
+            project_id=self.project.id,
+            cost_code_id=self.cost_code.id,
+            token=self.token.key,
+        )
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/change-orders/",
+            data={
+                "title": "New scope CO",
+                "amount_delta": "500.00",
+                "days_delta": 2,
+                "reason": "Adding new scope",
+                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+                "line_items": [
+                    {
+                        "line_type": "new",
+                        "cost_code": self.cost_code.id,
+                        "description": "New scope item",
+                        "amount_delta": "500.00",
+                        "days_delta": 2,
+                    },
+                ],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        line = response.json()["data"]["line_items"][0]
+        self.assertEqual(line["line_type"], "new")
+        self.assertEqual(line["cost_code_id"], self.cost_code.id)
+        self.assertEqual(line["cost_code_code"], self.cost_code.code)
+        self.assertIsNone(line["budget_line"])
 
     def test_change_order_line_rejects_budget_line_from_different_project(self):
         self._create_active_budget(
@@ -911,140 +935,6 @@ class ChangeOrderTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self._assert_validation_rule(cross_project_response, "co_line_budget_line_invalid")
-
-    def test_change_order_line_scope_rejects_generic_budget_line(self):
-        self._create_active_budget(
-            project_id=self.project.id,
-            cost_code_id=self.cost_code.id,
-            token=self.token.key,
-        )
-        generic_budget_line = self._generic_budget_line()
-        self.assertIsNotNone(generic_budget_line)
-
-        response = self.client.post(
-            f"/api/v1/projects/{self.project.id}/change-orders/",
-            data={
-                "title": "Generic line used as scope",
-                "amount_delta": "100.00",
-                "days_delta": 1,
-                "reason": "Should fail",
-                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
-                "line_items": [
-                    {
-                        "line_type": "scope",
-                        "budget_line": generic_budget_line.id,
-                        "description": "Invalid scope/generic linkage",
-                        "amount_delta": "100.00",
-                        "days_delta": 1,
-                    }
-                ],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self._assert_validation_rule(response, "co_line_scope_budget_line_disallows_generic")
-
-    def test_change_order_line_adjustment_requires_reason(self):
-        self._create_active_budget(
-            project_id=self.project.id,
-            cost_code_id=self.cost_code.id,
-            token=self.token.key,
-        )
-        generic_budget_line = self._generic_budget_line()
-        self.assertIsNotNone(generic_budget_line)
-
-        response = self.client.post(
-            f"/api/v1/projects/{self.project.id}/change-orders/",
-            data={
-                "title": "Adjustment missing reason",
-                "amount_delta": "75.00",
-                "days_delta": 0,
-                "reason": "Should fail",
-                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
-                "line_items": [
-                    {
-                        "line_type": "adjustment",
-                        "budget_line": generic_budget_line.id,
-                        "description": "Adjustment row",
-                        "adjustment_reason": "",
-                        "amount_delta": "75.00",
-                        "days_delta": 0,
-                    }
-                ],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self._assert_validation_rule(response, "co_line_adjustment_requires_reason")
-
-    def test_change_order_line_adjustment_requires_generic_budget_line(self):
-        self._create_active_budget(
-            project_id=self.project.id,
-            cost_code_id=self.cost_code.id,
-            token=self.token.key,
-        )
-        scope_budget_line = self._active_budget_line()
-        self.assertIsNotNone(scope_budget_line)
-
-        response = self.client.post(
-            f"/api/v1/projects/{self.project.id}/change-orders/",
-            data={
-                "title": "Adjustment non-generic budget line",
-                "amount_delta": "60.00",
-                "days_delta": 0,
-                "reason": "Should fail",
-                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
-                "line_items": [
-                    {
-                        "line_type": "adjustment",
-                        "budget_line": scope_budget_line.id,
-                        "description": "Invalid adjustment target",
-                        "adjustment_reason": "Rounding adjustment",
-                        "amount_delta": "60.00",
-                        "days_delta": 0,
-                    }
-                ],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self._assert_validation_rule(response, "co_line_adjustment_requires_generic_budget_line")
-
-    def test_change_order_line_adjustment_allows_generic_budget_line_with_reason(self):
-        self._create_active_budget(
-            project_id=self.project.id,
-            cost_code_id=self.cost_code.id,
-            token=self.token.key,
-        )
-        generic_budget_line = self._generic_budget_line()
-        self.assertIsNotNone(generic_budget_line)
-
-        response = self.client.post(
-            f"/api/v1/projects/{self.project.id}/change-orders/",
-            data={
-                "title": "Valid adjustment line",
-                "amount_delta": "125.00",
-                "days_delta": 0,
-                "reason": "Valid adjustment flow",
-                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
-                "line_items": [
-                    {
-                        "line_type": "adjustment",
-                        "budget_line": generic_budget_line.id,
-                        "description": "General correction",
-                        "adjustment_reason": "Reconciliation adjustment",
-                        "amount_delta": "125.00",
-                        "days_delta": 0,
-                    }
-                ],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 201)
-        line = response.json()["data"]["line_items"][0]
-        self.assertEqual(line["line_type"], "adjustment")
-        self.assertEqual(line["adjustment_reason"], "Reconciliation adjustment")
 
     def test_change_order_line_rejects_budget_line_from_non_active_budget(self):
         self._create_active_budget(

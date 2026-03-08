@@ -12,6 +12,13 @@ export type OrganizationPublicContext = {
   change_order_terms_and_conditions: string;
 };
 
+export type CostCodeOption = {
+  id: number;
+  code: string;
+  name: string;
+  is_active: boolean;
+};
+
 export type BudgetLineRecord = {
   id: number;
   scope_item?: number | null;
@@ -26,11 +33,15 @@ export type BudgetLineRecord = {
 export type ChangeOrderLineRecord = {
   id: number;
   change_order: number;
-  budget_line: number;
-  budget_line_cost_code: string;
-  budget_line_description: string;
+  budget_line: number | null;
+  budget_line_cost_code: string | null;
+  budget_line_description: string | null;
+  cost_code: number | null;
+  cost_code_id: number | null;
+  cost_code_code: string | null;
+  cost_code_name: string | null;
   description: string;
-  line_type?: "scope" | "adjustment";
+  line_type?: "original" | "new";
   adjustment_reason?: string;
   amount_delta: string;
   days_delta: number;
@@ -111,9 +122,12 @@ export type ChangeOrderPolicyContract = {
 
 export type ChangeOrderLineInput = {
   localId: number;
-  lineType: "scope" | "adjustment";
+  lineType: "original" | "new";
   adjustmentReason: string;
+  /** Budget line ID — required for "original" lines, empty for "new" lines. */
   budgetLineId: string;
+  /** Cost code ID — required for "new" lines, empty for "original" lines. */
+  costCodeId: string;
   description: string;
   amountDelta: string;
   daysDelta: string;

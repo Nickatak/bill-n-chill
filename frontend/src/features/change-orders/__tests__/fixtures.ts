@@ -86,18 +86,20 @@ export const formState = {
   lineItems: [
     {
       localId: 1,
-      lineType: "scope" as const,
+      lineType: "original" as const,
       adjustmentReason: "",
       budgetLineId: "100",
+      costCodeId: "",
       description: "Tile installation",
       amountDelta: "2000.00",
       daysDelta: "3",
     },
     {
       localId: 2,
-      lineType: "adjustment" as const,
+      lineType: "new" as const,
       adjustmentReason: "Material upgrade",
-      budgetLineId: "200",
+      budgetLineId: "",
+      costCodeId: "50",
       description: "Premium tile upgrade",
       amountDelta: "500.00",
       daysDelta: "2",
