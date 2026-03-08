@@ -15,6 +15,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { isRouteActive, businessMenuRoutes } from "../nav-routes";
 import { usePrintable } from "../printable-context";
+import lightTheme from "@/shared/styles/light-theme.module.css";
 import styles from "./app-toolbar.module.css";
 
 // ---------------------------------------------------------------------------
@@ -78,9 +79,9 @@ export function AppToolbar() {
   }, []);
 
   return (
-    <div className={styles.controls}>
+    <div className={`${styles.controls} ${isPublicDocument ? lightTheme.lightTheme : ""}`}>
       {hasSession && isPublicDocument ? (
-        <Link href="/" className={styles.button}>
+        <Link href="/" className={styles.publicButton}>
           Home
         </Link>
       ) : null}
@@ -118,12 +119,16 @@ export function AppToolbar() {
         </details>
       ) : null}
       {isPublicDocument || (hasSession && isPrintable) ? (
-        <button type="button" className={styles.button} onClick={printPage}>
+        <button type="button" className={isPublicDocument ? styles.publicButton : styles.button} onClick={printPage}>
           Print
         </button>
       ) : null}
       {hasSession ? (
-        <button type="button" className={styles.logout} onClick={logout}>
+        <button
+          type="button"
+          className={isPublicDocument ? styles.publicButtonSecondary : styles.logout}
+          onClick={logout}
+        >
           Logout
         </button>
       ) : null}
