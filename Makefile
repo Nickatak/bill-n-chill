@@ -208,4 +208,10 @@ db-prod-reset-hard: local-env-prod
 	$(PROD_COMPOSE) down -v --remove-orphans
 	$(PROD_COMPOSE) up -d $(DB_SERVICE)
 
+docker-shell-backend:
+	$(DEV_COMPOSE) exec backend bash
+
+docker-shell-frontend:
+	$(DEV_COMPOSE) exec frontend sh
+
 .DEFAULT_GOAL := help
