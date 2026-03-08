@@ -9,6 +9,7 @@ from core.views.shared_operations.organization_invites import (
     organization_invites_view,
 )
 from core.views.shared_operations.organization_management import (
+    organization_logo_upload_view,
     organization_membership_detail_view,
     organization_memberships_view,
     organization_profile_view,
@@ -99,6 +100,7 @@ __all__ = [
     "verify_email_view",
     "verify_invite_view",
     "me_view",
+    "organization_logo_upload_view",
     "organization_profile_view",
     "organization_invites_view",
     "organization_invite_detail_view",

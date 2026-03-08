@@ -96,7 +96,7 @@ def _serialize_public_organization_context(organization: Organization | None) ->
 
     return {
         "display_name": (organization.display_name or "").strip(),
-        "logo_url": (organization.logo_url or "").strip(),
+        "logo_url": organization.logo.url if organization.logo else "",
         "billing_address": (organization.billing_address or "").strip(),
         "help_email": (organization.help_email or "").strip(),
         "invoice_terms_and_conditions": (organization.invoice_terms_and_conditions or "").strip(),

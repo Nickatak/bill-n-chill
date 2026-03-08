@@ -179,6 +179,10 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
+# Media files (user-uploaded content such as organization logos)
+MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_URL = "/media/"
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CORS_ALLOWED_ORIGINS = [

@@ -2007,12 +2007,7 @@ export function ChangeOrdersConsole({
                   </div>
                   <div className={creatorStyles.headerRight}>
                     <div className={creatorStyles.logoBox}>
-                      {senderLogoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={senderLogoUrl} alt="Organization logo" className={creatorStyles.logoImage} />
-                      ) : (
-                        "Logo"
-                      )}
+                      {senderLogoUrl ? "Logo" : "No logo set"}
                     </div>
                     <div className={creatorStyles.sheetTitle}>Change Order</div>
                     <div className={`${creatorStyles.sheetTitleValue} ${creatorStyles.printOnly}`}>
@@ -2300,12 +2295,7 @@ export function ChangeOrdersConsole({
                   </div>
                   <div className={creatorStyles.headerRight}>
                     <div className={creatorStyles.logoBox}>
-                      {senderLogoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={senderLogoUrl} alt="Organization logo" className={creatorStyles.logoImage} />
-                      ) : (
-                        "Logo"
-                      )}
+                      {senderLogoUrl ? "Logo" : "No logo set"}
                     </div>
                     <div className={`${creatorStyles.sheetTitle} ${creatorStyles.screenOnly}`}>Change Order Revision</div>
                     <div className={`${creatorStyles.sheetTitle} ${creatorStyles.printOnly}`}>Change Order</div>

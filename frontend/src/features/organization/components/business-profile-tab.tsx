@@ -2,11 +2,11 @@
 
 /**
  * "My Business" tab — identity fields for the organization profile.
- * Covers: display name, logo, phone, website, license #, tax ID, billing address.
+ * Covers: display name, logo upload, phone, website, license #, tax ID, billing address.
  * All fields gated by `org_identity.edit` capability (owner-only).
  */
 
-import { FormEvent, useState } from "react";
+import { ChangeEvent, FormEvent, useRef, useState } from "react";
 
 import { buildAuthHeaders } from "@/features/session/auth-headers";
 import { normalizeApiBaseUrl, defaultApiBaseUrl } from "../api";
@@ -41,22 +41,58 @@ export function BusinessProfileTab({
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
 
   const [displayNameDraft, setDisplayNameDraft] = useState(profile.display_name);
-  const [logoUrlDraft, setLogoUrlDraft] = useState(profile.logo_url ?? "");
   const [phoneNumberDraft, setPhoneNumberDraft] = useState(profile.phone_number ?? "");
   const [websiteUrlDraft, setWebsiteUrlDraft] = useState(profile.website_url ?? "");
   const [licenseNumberDraft, setLicenseNumberDraft] = useState(profile.license_number ?? "");
   const [taxIdDraft, setTaxIdDraft] = useState(profile.tax_id ?? "");
   const [billingAddressDraft, setBillingAddressDraft] = useState(profile.billing_address ?? "");
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [logoUrl, setLogoUrl] = useState(profile.logo_url ?? "");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const hasChanges =
     displayNameDraft.trim() !== profile.display_name ||
-    logoUrlDraft.trim() !== (profile.logo_url || "") ||
     phoneNumberDraft.trim() !== (profile.phone_number || "") ||
     websiteUrlDraft.trim() !== (profile.website_url || "") ||
     licenseNumberDraft.trim() !== (profile.license_number || "") ||
     taxIdDraft.trim() !== (profile.tax_id || "") ||
     billingAddressDraft.trim() !== (profile.billing_address || "");
+
+  async function handleLogoUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingLogo(true);
+    onError("");
+
+    const formData = new FormData();
+    formData.append("logo", file);
+
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/organization/logo/`, {
+        method: "POST",
+        headers: buildAuthHeaders(token),
+        body: formData,
+      });
+      const body: ApiResponse = await response.json();
+      if (!response.ok) {
+        onError(extractErrorMessage(body, "Could not upload logo."));
+        return;
+      }
+
+      const data = body.data as { organization?: OrganizationProfile } | undefined;
+      if (data?.organization) {
+        setLogoUrl(data.organization.logo_url ?? "");
+        onProfileUpdate(data.organization);
+      }
+    } catch {
+      onError("Could not reach logo upload endpoint.");
+    } finally {
+      setIsUploadingLogo(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
 
   async function handleSave(event: FormEvent) {
     event.preventDefault();
@@ -67,7 +103,6 @@ export function BusinessProfileTab({
 
     const payload = {
       display_name: displayNameDraft.trim(),
-      logo_url: logoUrlDraft.trim(),
       phone_number: phoneNumberDraft.trim(),
       website_url: websiteUrlDraft.trim(),
       license_number: licenseNumberDraft.trim(),
@@ -93,12 +128,12 @@ export function BusinessProfileTab({
       if (data?.organization) {
         const org = data.organization;
         setDisplayNameDraft(org.display_name);
-        setLogoUrlDraft(org.logo_url ?? "");
         setPhoneNumberDraft(org.phone_number ?? "");
         setWebsiteUrlDraft(org.website_url ?? "");
         setLicenseNumberDraft(org.license_number ?? "");
         setTaxIdDraft(org.tax_id ?? "");
         setBillingAddressDraft(org.billing_address ?? "");
+        setLogoUrl(org.logo_url ?? "");
         onProfileUpdate(org, data.role_policy ?? undefined);
       }
     } catch {
@@ -121,15 +156,36 @@ export function BusinessProfileTab({
         />
       </label>
 
-      <label className={styles.field}>
-        <span className={styles.fieldLabel}>Logo URL</span>
-        <input
-          value={logoUrlDraft}
-          onChange={(e) => setLogoUrlDraft(e.target.value)}
-          placeholder="https://example.com/logo.png"
-          disabled={disabled}
-        />
-      </label>
+      <div className={styles.field}>
+        <span className={styles.fieldLabel}>Logo</span>
+        <div className={styles.logoUploadArea}>
+          {logoUrl ? (
+            <div className={styles.logoPreviewBox}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={logoUrl} alt="Organization logo" className={styles.logoPreviewImage} />
+            </div>
+          ) : (
+            <div className={styles.logoPlaceholder}>No logo uploaded</div>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleLogoUpload}
+            disabled={disabled || isUploadingLogo}
+            className={styles.logoFileInput}
+          />
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={disabled || isUploadingLogo}
+          >
+            {isUploadingLogo ? "Uploading\u2026" : logoUrl ? "Replace Logo" : "Upload Logo"}
+          </button>
+          <span className={styles.logoHint}>JPEG, PNG, or WebP. Max 2 MB.</span>
+        </div>
+      </div>
 
       <hr className={styles.fieldGroupDivider} />
 

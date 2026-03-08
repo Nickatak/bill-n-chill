@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { EstimateApprovalPreview } from "@/features/estimates/components/estimate-approval-preview";
 import { notFound } from "next/navigation";
 import { PageCard, PageShell } from "@/shared/shell";
+import lightTheme from "@/shared/styles/light-theme.module.css";
 import {
   composePublicDocumentMetadataTitle,
   parsePublicTokenFromRef,
@@ -30,7 +31,7 @@ export default async function EstimateReviewPage({ params }: EstimateReviewPageP
   }
 
   return (
-    <PageShell>
+    <PageShell className={lightTheme.lightTheme}>
       <PageCard>
         <EstimateApprovalPreview publicToken={publicToken} />
       </PageCard>

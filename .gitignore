@@ -25,6 +25,7 @@ __pycache__/
 backend/.venv/
 backend/.runtime/
 backend/db.sqlite3
+backend/media/
 *.sqlite3
 
 # Env files

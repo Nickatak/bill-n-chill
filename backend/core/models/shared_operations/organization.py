@@ -24,7 +24,7 @@ class Organization(models.Model):
     """
 
     display_name = models.CharField(max_length=255)
-    logo_url = models.URLField(blank=True, default="")
+    logo = models.ImageField(upload_to="logos/", blank=True, default="")
     help_email = models.EmailField(blank=True, default="")
     billing_address = models.TextField(blank=True, default="")
     phone_number = models.CharField(max_length=50, blank=True, default="")
@@ -53,7 +53,7 @@ class Organization(models.Model):
             "organization": {
                 "id": self.id,
                 "display_name": self.display_name,
-                "logo_url": self.logo_url,
+                "logo_url": self.logo.url if self.logo else "",
                 "help_email": self.help_email,
                 "billing_address": self.billing_address,
                 "phone_number": self.phone_number,

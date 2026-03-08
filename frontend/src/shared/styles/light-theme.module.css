@@ -1,0 +1,105 @@
+/**
+ * Light theme override for public-facing document pages.
+ *
+ * Applied as a className to PageShell on public routes so that
+ * all CSS variable consumers render in light mode without
+ * affecting the rest of the application.
+ */
+
+.lightTheme {
+  color-scheme: light;
+
+  --background: #f8f9fa;
+  --foreground: #1a1a1a;
+
+  /* --- Accent / Primary --- */
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-light: #eff6ff;
+  --accent-lighter: #f0f7ff;
+  --accent-border: #93c5fd;
+  --accent-text: #1d4ed8;
+
+  /* --- Surface / Layout --- */
+  --surface: #ffffff;
+  --surface-secondary: #f3f4f6;
+  --surface-hover: #e5e7eb;
+  --surface-inset: #f9fafb;
+  --border: #d1d5db;
+  --border-light: #e5e7eb;
+  --border-accent: #9ca3af;
+
+  /* --- Text --- */
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+  --text-on-accent: #ffffff;
+
+  /* --- Status palette (badge) --- */
+  --status-blue-bg: #dbeafe;
+  --status-blue-border: #3b82f6;
+  --status-blue-text: #1e40af;
+
+  --status-amber-bg: #fef3c7;
+  --status-amber-border: #f59e0b;
+  --status-amber-text: #92400e;
+
+  --status-green-bg: #dcfce7;
+  --status-green-border: #22c55e;
+  --status-green-text: #166534;
+
+  --status-red-bg: #fee2e2;
+  --status-red-border: #ef4444;
+  --status-red-text: #991b1b;
+
+  --status-gray-bg: #f3f4f6;
+  --status-gray-border: #9ca3af;
+  --status-gray-text: #374151;
+
+  --status-emerald-bg: #d1fae5;
+  --status-emerald-border: #10b981;
+  --status-emerald-text: #065f46;
+
+  --status-orange-bg: #fff7ed;
+  --status-orange-border: #f97316;
+  --status-orange-text: #9a3412;
+
+  --status-violet-bg: #ede9fe;
+  --status-violet-border: #a78bfa;
+  --status-violet-text: #5b21b6;
+
+  /* --- Semantic Tones --- */
+  --tone-success-bg: #dcfce7;
+  --tone-success-border: #22c55e;
+  --tone-success-text: #166534;
+
+  --tone-error-bg: #fee2e2;
+  --tone-error-border: #ef4444;
+  --tone-error-text: #991b1b;
+
+  --tone-warning-bg: #fef3c7;
+  --tone-warning-border: #f59e0b;
+  --tone-warning-text: #92400e;
+
+  --tone-neutral-bg: #f3f4f6;
+  --tone-neutral-border: #d1d5db;
+  --tone-neutral-text: #374151;
+
+  /* --- Table --- */
+  --table-header-bg: #f3f4f6;
+  --table-header-text: #1d4ed8;
+  --table-row-alt: #f9fafb;
+  --table-row-hover: #f3f4f6;
+  --table-row-active: #e5e7eb;
+  --table-border: #e5e7eb;
+
+  /* --- Inputs / Forms --- */
+  --input-bg: #ffffff;
+  --input-border: #d1d5db;
+  --input-text: #111827;
+  --input-readonly-bg: #f3f4f6;
+  --input-readonly-text: #4b5563;
+  --input-disabled-bg: #f3f4f6;
+  --input-disabled-text: #9ca3af;
+  --input-disabled-border: #e5e7eb;
+}

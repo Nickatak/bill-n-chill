@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PageCard, PageShell } from "@/shared/shell";
+import lightTheme from "@/shared/styles/light-theme.module.css";
 import { ChangeOrderPublicPreview } from "@/features/change-orders/components/change-order-public-preview";
 import {
   composePublicDocumentMetadataTitle,
@@ -30,7 +31,7 @@ export default async function ChangeOrderPublicPage({ params }: ChangeOrderPubli
   }
 
   return (
-    <PageShell narrow>
+    <PageShell narrow className={lightTheme.lightTheme}>
       <PageCard>
         <ChangeOrderPublicPreview publicToken={publicToken} />
       </PageCard>

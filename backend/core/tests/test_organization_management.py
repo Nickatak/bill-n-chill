@@ -144,7 +144,6 @@ class OrganizationManagementTests(TestCase):
         response = self.client.patch(
             "/api/v1/organization/",
             data={
-                "logo_url": "https://example.com/new-logo.png",
                 "help_email": "help@example.com",
                 "billing_address": "123 Main St\nAustin, TX 78701",
                 "default_invoice_due_delta": 21,
@@ -158,7 +157,6 @@ class OrganizationManagementTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.organization.refresh_from_db()
-        self.assertEqual(self.organization.logo_url, "https://example.com/new-logo.png")
         self.assertEqual(self.organization.help_email, "help@example.com")
         self.assertEqual(self.organization.billing_address, "123 Main St\nAustin, TX 78701")
         self.assertEqual(self.organization.default_invoice_due_delta, 21)
