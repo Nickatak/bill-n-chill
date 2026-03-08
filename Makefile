@@ -208,6 +208,9 @@ db-prod-reset-hard: local-env-prod
 	$(PROD_COMPOSE) down -v --remove-orphans
 	$(PROD_COMPOSE) up -d $(DB_SERVICE)
 
+nuke-account:
+	$(DEV_COMPOSE) exec backend python manage.py nuke_account nickle87@gmail.com
+
 docker-shell-backend:
 	$(DEV_COMPOSE) exec backend bash
 
