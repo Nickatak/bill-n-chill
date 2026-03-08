@@ -81,7 +81,7 @@ def _resolve_organization_for_public_actor(actor_user):
     return Organization.objects.filter(created_by=actor_user).order_by("id").first()
 
 
-def _serialize_public_organization_context(organization: Organization | None) -> dict:
+def _serialize_public_organization_context(organization: Organization | None, request=None) -> dict:
     """Serialize organization branding fields for public-facing document contexts."""
     if not organization:
         return {
@@ -94,9 +94,13 @@ def _serialize_public_organization_context(organization: Organization | None) ->
             "change_order_terms_and_conditions": "",
         }
 
+    logo_url = ""
+    if organization.logo:
+        logo_url = request.build_absolute_uri(organization.logo.url) if request else organization.logo.url
+
     return {
         "display_name": (organization.display_name or "").strip(),
-        "logo_url": organization.logo.url if organization.logo else "",
+        "logo_url": logo_url,
         "billing_address": (organization.billing_address or "").strip(),
         "help_email": (organization.help_email or "").strip(),
         "invoice_terms_and_conditions": (organization.invoice_terms_and_conditions or "").strip(),

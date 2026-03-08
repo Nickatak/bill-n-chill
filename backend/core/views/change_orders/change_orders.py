@@ -70,7 +70,7 @@ def public_change_order_detail_view(request, public_token: str):
             status=404,
         )
 
-    serialized = _serialize_public_change_order(change_order)
+    serialized = _serialize_public_change_order(change_order, request=request)
     consent_text, consent_version = get_ceremony_context()
     serialized["ceremony_consent_text"] = consent_text
     serialized["ceremony_consent_text_version"] = consent_version
@@ -241,7 +241,7 @@ def public_change_order_decision_view(request, public_token: str):
 
     return Response(
         {
-            "data": _serialize_public_change_order(refreshed),
+            "data": _serialize_public_change_order(refreshed, request=request),
             "meta": {"applied_financial_delta": str(financial_delta)},
         }
     )
