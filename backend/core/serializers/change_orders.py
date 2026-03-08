@@ -9,60 +9,20 @@ from core.models import ChangeOrder, ChangeOrderLine
 
 
 class ChangeOrderLineSerializer(serializers.ModelSerializer):
-    """Read-only change order line item with budget/cost code details."""
+    """Read-only change order line item with cost code details."""
 
-    budget_line_cost_code = serializers.SerializerMethodField()
-    budget_line_description = serializers.SerializerMethodField()
-    cost_code_id = serializers.SerializerMethodField()
-    cost_code_code = serializers.SerializerMethodField()
-    cost_code_name = serializers.SerializerMethodField()
-
-    def get_budget_line_cost_code(self, obj) -> str | None:
-        if obj.budget_line_id and obj.budget_line:
-            return obj.budget_line.cost_code.code
-        return None
-
-    def get_budget_line_description(self, obj) -> str | None:
-        if obj.budget_line_id and obj.budget_line:
-            return obj.budget_line.description
-        return None
-
-    def get_cost_code_id(self, obj) -> int | None:
-        """Return the effective cost code ID (from budget line or direct FK)."""
-        if obj.budget_line_id and obj.budget_line:
-            return obj.budget_line.cost_code_id
-        if obj.cost_code_id:
-            return obj.cost_code_id
-        return None
-
-    def get_cost_code_code(self, obj) -> str | None:
-        if obj.budget_line_id and obj.budget_line:
-            return obj.budget_line.cost_code.code
-        if obj.cost_code_id and obj.cost_code:
-            return obj.cost_code.code
-        return None
-
-    def get_cost_code_name(self, obj) -> str | None:
-        if obj.budget_line_id and obj.budget_line:
-            return obj.budget_line.cost_code.name
-        if obj.cost_code_id and obj.cost_code:
-            return obj.cost_code.name
-        return None
+    cost_code_code = serializers.CharField(source="cost_code.code", read_only=True)
+    cost_code_name = serializers.CharField(source="cost_code.name", read_only=True)
 
     class Meta:
         model = ChangeOrderLine
         fields = [
             "id",
             "change_order",
-            "budget_line",
-            "budget_line_cost_code",
-            "budget_line_description",
             "cost_code",
-            "cost_code_id",
             "cost_code_code",
             "cost_code_name",
             "description",
-            "line_type",
             "adjustment_reason",
             "amount_delta",
             "days_delta",
@@ -149,13 +109,7 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
 class ChangeOrderLineInputSerializer(serializers.Serializer):
     """Write serializer for a single change order line item in a create/update payload."""
 
-    line_type = serializers.ChoiceField(
-        choices=ChangeOrderLine.LineType.choices,
-        required=False,
-        default=ChangeOrderLine.LineType.ORIGINAL,
-    )
-    budget_line = serializers.IntegerField(required=False, allow_null=True, default=None)
-    cost_code = serializers.IntegerField(required=False, allow_null=True, default=None)
+    cost_code = serializers.IntegerField()
     description = serializers.CharField(max_length=255, required=False, allow_blank=True)
     adjustment_reason = serializers.CharField(
         max_length=64,

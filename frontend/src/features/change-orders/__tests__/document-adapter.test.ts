@@ -187,17 +187,13 @@ describe("createChangeOrderDocumentAdapter", () => {
         days_delta: 5,
         line_items: [
           {
-            line_type: "original",
-            budget_line: 100,
-            cost_code: null,
+            cost_code: 100,
             description: "Tile installation",
             adjustment_reason: "",
             amount_delta: "2000.00",
             days_delta: 3,
           },
           {
-            line_type: "new",
-            budget_line: null,
             cost_code: 50,
             description: "Premium tile upgrade",
             adjustment_reason: "Material upgrade",

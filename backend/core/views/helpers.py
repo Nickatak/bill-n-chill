@@ -6,7 +6,6 @@ from django.db.models import Q
 from rest_framework.response import Response
 
 from core.models import (
-    Budget,
     CostCode,
     Estimate,
     Organization,
@@ -15,25 +14,6 @@ from core.models import (
 )
 from core.rbac import _capability_gate  # noqa: F401 — re-exported for view modules
 from core.user_helpers import _ensure_membership  # noqa: F401 — re-exported for view modules
-
-SYSTEM_BUDGET_LINE_SPECS = [
-    {
-        "cost_code": "99-901",
-        "cost_code_name": "Project Tools & Consumables",
-        "description": "System: Project tools and consumables (non-client-billable)",
-    },
-    {
-        "cost_code": "99-902",
-        "cost_code_name": "Project Overhead",
-        "description": "System: Project overhead and indirect spend (non-client-billable)",
-    },
-    {
-        "cost_code": "99-903",
-        "cost_code_name": "Unplanned Project Spend",
-        "description": "System: Unplanned project spend bucket (non-client-billable)",
-    },
-]
-SYSTEM_BUDGET_LINE_CODES = {row["cost_code"] for row in SYSTEM_BUDGET_LINE_SPECS}
 
 
 def _validate_project_for_user(project_id: int, user):
@@ -194,24 +174,6 @@ def _resolve_cost_codes_for_user(user, line_items_data, *, cost_code_key="cost_c
     code_map = {code.id: code for code in codes}
     missing = [cost_code_id for cost_code_id in ids if cost_code_id not in code_map]
     return code_map, missing
-
-
-def _active_budget_for_project(*, project, select_related=None):
-    """Return the most recent active budget for a project, or None.
-
-    Pass *select_related* as a list of FK names to eagerly load
-    (e.g., ``["source_estimate"]``).
-
-    Authorization: caller must have already validated that *project* belongs to the
-    requesting user's organization.
-    """
-    qs = Budget.objects.filter(
-        project=project,
-        status=Budget.Status.ACTIVE,
-    )
-    if select_related:
-        qs = qs.select_related(*select_related)
-    return qs.order_by("-created_at", "-id").first()
 
 
 def _not_found_response(message: str = "Not found."):

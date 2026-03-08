@@ -1,6 +1,6 @@
-from core.models.accounts_payable.vendor_bill import VendorBill, VendorBillAllocation
+from core.models.accounts_payable.vendor_bill import VendorBill, VendorBillLine
 
 __all__ = [
     "VendorBill",
-    "VendorBillAllocation",
+    "VendorBillLine",
 ]

@@ -44,13 +44,11 @@ def get_change_order_policy_contract() -> dict:
     }
     error_rules = {
         "co_create_missing_required_fields": "Create requires title and amount_delta.",
-        "co_budget_active_required_for_propagation": "Project must have an active budget before CO create/propagation.",
         "co_create_origin_estimate_required": "Create requires origin_estimate.",
         "co_origin_estimate_project_scope": "origin_estimate must belong to the same project.",
         "co_origin_estimate_approved_required": "origin_estimate must be approved.",
         "co_origin_estimate_immutable_once_set": "origin_estimate cannot change/clear once set.",
         "co_line_total_must_match_amount_delta": "Sum of line_items amount_delta must match change-order amount_delta.",
-        "co_line_budget_line_invalid": "Each budget_line must exist, match project, and come from active budget.",
         "co_line_cost_code_invalid": "Each cost_code must exist and belong to the organization.",
         "co_edit_latest_revision_only": "Only latest revision in family can be edited.",
         "co_edit_requires_draft_status": "Only draft change orders can edit content fields.",

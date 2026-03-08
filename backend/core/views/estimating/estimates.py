@@ -1,4 +1,4 @@
-"""Estimate authoring, public sharing, and budget-conversion endpoints."""
+"""Estimate authoring and public sharing endpoints."""
 
 from datetime import timedelta
 from decimal import Decimal
@@ -13,13 +13,11 @@ from rest_framework.response import Response
 from core.models import Estimate, EstimateStatusEvent
 from core.policies import get_estimate_policy_contract
 from core.serializers import (
-    BudgetSerializer,
     EstimateDuplicateSerializer,
     EstimateSerializer,
     EstimateStatusEventSerializer,
     EstimateWriteSerializer,
 )
-from core.views.estimating.budgets_helpers import _ensure_budget_from_approved_estimate
 from core.views.estimating.estimates_helpers import (
     _activate_project_from_estimate_approval,
     _apply_estimate_lines_and_totals,
@@ -34,7 +32,6 @@ from core.views.helpers import (
     _build_public_decision_note,
     _capability_gate,
     _ensure_membership,
-    _parse_request_bool,
     _resolve_organization_for_public_actor,
     _serialize_public_organization_context,
     _serialize_public_project_context,
@@ -135,7 +132,6 @@ def public_estimate_decision_view(request, public_token: str):
     )
 
     previous_status = estimate.status
-    budget_conversion_meta = {}
     consent_text, consent_version = get_ceremony_context()
     with transaction.atomic():
         estimate.status = next_status
@@ -153,13 +149,6 @@ def public_estimate_decision_view(request, public_token: str):
                 actor=estimate.created_by,
                 note=f"Project moved to active after public approval of estimate #{estimate.id}.",
             )
-            budget_row, conversion_status = _ensure_budget_from_approved_estimate(
-                estimate=estimate,
-                user=estimate.created_by,
-                note=f"Budget auto-converted from publicly approved estimate #{estimate.id}.",
-                allow_supersede=True,
-            )
-            budget_conversion_meta["budget_conversion_status"] = conversion_status
 
         content_hash = compute_document_content_hash("estimate", EstimateSerializer(estimate).data)
         SigningCeremonyRecord.record(
@@ -184,10 +173,7 @@ def public_estimate_decision_view(request, public_token: str):
     serialized["project_context"] = _serialize_public_project_context(estimate.project)
     serialized["organization_context"] = _serialize_public_organization_context(organization, request=request)
 
-    response_payload = {"data": serialized}
-    if budget_conversion_meta:
-        response_payload["meta"] = budget_conversion_meta
-    return Response(response_payload)
+    return Response({"data": serialized})
 
 
 @api_view(["GET"])
@@ -470,7 +456,6 @@ def estimate_detail_view(request, estimate_id: int):
     - `GET`: returns estimate detail.
     - `PATCH`: requires role `owner|pm`; non-draft value edits are blocked.
     - Records immutable status events for workflow transitions.
-    - Approved transitions trigger budget conversion guard path.
     """
     estimate = _validate_estimate_for_user(estimate_id, request.user)
     if not estimate:
@@ -658,7 +643,6 @@ def estimate_detail_view(request, estimate_id: int):
             and status_note_requested
         )
     )
-    budget_conversion_meta = {}
     if should_record_status_event:
         EstimateStatusEvent.record(
             estimate=estimate,
@@ -683,19 +667,9 @@ def estimate_detail_view(request, estimate_id: int):
                 actor=request.user,
                 note=f"Project moved to active after approval of estimate #{estimate.id}.",
             )
-            budget_row, conversion_status = _ensure_budget_from_approved_estimate(
-                estimate=estimate,
-                user=request.user,
-                note=f"Budget auto-converted from approved estimate #{estimate.id}.",
-                allow_supersede=True,
-            )
-            budget_conversion_meta["budget_conversion_status"] = conversion_status
 
     estimate.refresh_from_db()
-    response_payload = {"data": _serialize_estimate(estimate=estimate)}
-    if budget_conversion_meta:
-        response_payload["meta"] = budget_conversion_meta
-    return Response(response_payload)
+    return Response({"data": _serialize_estimate(estimate=estimate)})
 
 
 @api_view(["POST"])
@@ -916,82 +890,3 @@ def estimate_status_events_view(request, estimate_id: int):
         "estimate__project__customer",
     )
     return Response({"data": EstimateStatusEventSerializer(events, many=True).data})
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def estimate_convert_to_budget_view(request, estimate_id: int):
-    """Convert an approved estimate to a budget (idempotent if already converted)."""
-    estimate = _validate_estimate_for_user(estimate_id, request.user, prefetch_lines=True)
-    if not estimate:
-        return Response(
-            {"error": {"code": "not_found", "message": "Estimate not found.", "fields": {}}},
-            status=404,
-        )
-
-    supersede_active = _parse_request_bool(
-        request.data.get("supersede_active", False),
-        default=False,
-    )
-    permission_error, capabilities = _capability_gate(request.user, "estimates", "approve")
-    if permission_error:
-        return Response(permission_error, status=403)
-    if supersede_active and "edit" not in capabilities.get("org_identity", []):
-        return Response(
-            {
-                "error": {
-                    "code": "forbidden",
-                    "message": "Only owners can supersede an active financial baseline.",
-                    "fields": {
-                        "capability": [
-                            "org_identity.edit is required when supersede_active=true."
-                        ]
-                    },
-                }
-            },
-            status=403,
-        )
-
-    if estimate.status != Estimate.Status.APPROVED:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "Only approved estimates can be converted to budgets.",
-                    "fields": {
-                        "status": ["Estimate status must be approved before conversion."]
-                    },
-                }
-            },
-            status=400,
-        )
-
-    budget, conversion_status = _ensure_budget_from_approved_estimate(
-        estimate=estimate,
-        user=request.user,
-        note=f"Budget converted from estimate #{estimate.id}.",
-        allow_supersede=supersede_active,
-    )
-    if conversion_status == "requires_supersede":
-        active_financial_estimate_id = budget.source_estimate_id if budget else None
-        return Response(
-            {
-                "error": {
-                    "code": "conflict",
-                    "message": "An active financial baseline already exists for this project.",
-                    "fields": {
-                        "supersede_active": [
-                            "Set supersede_active=true to explicitly activate this estimate for financials."
-                        ],
-                    },
-                    "meta": {
-                        "active_financial_estimate_id": active_financial_estimate_id,
-                    },
-                }
-            },
-            status=409,
-        )
-    return Response(
-        {"data": BudgetSerializer(budget).data, "meta": {"conversion_status": conversion_status}},
-        status=201 if conversion_status in {"converted", "superseded_and_converted"} else 200,
-    )

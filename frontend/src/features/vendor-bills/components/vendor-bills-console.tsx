@@ -3,8 +3,8 @@
 /**
  * Vendor bills (accounts payable) console. Lets users browse, create, edit,
  * and manage the lifecycle of vendor bills for a selected project. Includes
- * line-item allocation to budget scope items, duplicate detection, status
- * transitions driven by a policy contract, and a "recreate as new" workflow.
+ * line items, duplicate detection, status transitions driven by a policy
+ * contract, and a "recreate as new" workflow.
  */
 
 import { buildAuthHeaders } from "@/features/session/auth-headers";
@@ -26,10 +26,9 @@ import {
 import { usePolicyContract } from "@/shared/hooks/use-policy-contract";
 import { useStatusFilters } from "@/shared/hooks/use-status-filters";
 import {
-  AllocationFormRow,
-  createEmptyAllocationRow,
+  VendorBillLineFormRow,
+  createEmptyVendorBillLineRow,
   defaultBillStatusFilters,
-  formatMoney,
   projectStatusLabel,
 } from "../helpers";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
@@ -37,7 +36,7 @@ import { canDo } from "../../session/rbac";
 import {
   ApiResponse,
   ProjectRecord,
-  VendorBillAllocationInput,
+  VendorBillLineInput,
   VendorBillPolicyContract,
   VendorBillPayload,
   VendorBillRecord,
@@ -81,30 +80,11 @@ type ProjectStatusValue = ProjectListStatusValue;
 const DEFAULT_PROJECT_STATUS_FILTERS: ProjectStatusValue[] = ["active", "prospect"];
 const PROJECT_STATUS_VALUES: ProjectStatusValue[] = ["prospect", "active", "on_hold", "completed", "cancelled"];
 
-const GENERIC_BUDGET_LINE_SPECS = [
-  { costCode: "99-901", label: "Generic: Tools & Consumables" },
-  { costCode: "99-902", label: "Generic: Project Overhead" },
-  { costCode: "99-903", label: "Generic: Unplanned Spend" },
-] as const;
-const GENERIC_BUDGET_COST_CODES = new Set<string>(
-  GENERIC_BUDGET_LINE_SPECS.map((item) => item.costCode),
-);
-
-type BudgetLineOption = {
+type CostCodeOption = {
   id: number;
-  budgetId: number;
-  label: string;
-  cost_code_code?: string;
-  planned_amount: string;
-  actual_spend: string;
-  remaining_amount: string;
-};
-
-type BudgetLineGroup = {
-  budgetId: number;
-  budgetLabel: string;
-  originEstimateLabel: string;
-  lines: BudgetLineOption[];
+  code: string;
+  name: string;
+  is_active: boolean;
 };
 
 type VendorBillsConsoleProps = {
@@ -139,7 +119,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [vendors, setVendors] = useState<VendorRecord[]>([]);
   const [vendorBills, setVendorBills] = useState<VendorBillRecord[]>([]);
-  const [budgetLineGroups, setBudgetLineGroups] = useState<BudgetLineGroup[]>([]);
+  const [costCodes, setCostCodes] = useState<CostCodeOption[]>([]);
 
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [selectedVendorBillId, setSelectedVendorBillId] = useState("");
@@ -207,8 +187,8 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const [newStatus, setNewStatus] = useState<string>("planned");
   const [newTotal, setNewTotal] = useState("0.00");
   const [newNotes, setNewNotes] = useState("");
-  const [newAllocations, setNewAllocations] = useState<AllocationFormRow[]>([
-    createEmptyAllocationRow(),
+  const [newLineItems, setNewLineItems] = useState<VendorBillLineFormRow[]>([
+    createEmptyVendorBillLineRow(),
   ]);
 
   const [vendorId, setVendorId] = useState("");
@@ -222,7 +202,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const [scheduledFor, setScheduledFor] = useState("");
   const [total, setTotal] = useState("0.00");
   const [notes, setNotes] = useState("");
-  const [allocations, setAllocations] = useState<AllocationFormRow[]>([createEmptyAllocationRow()]);
+  const [lineItems, setLineItems] = useState<VendorBillLineFormRow[]>([createEmptyVendorBillLineRow()]);
   const [status, setStatus] = useState<string>("planned");
   const [viewerNextStatus, setViewerNextStatus] = useState<string>("");
 
@@ -230,7 +210,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   // Accordion section state for inline viewer expansion
   const [isStatusSectionOpen, setIsStatusSectionOpen] = useState(true);
-  const [isAllocationsSectionOpen, setIsAllocationsSectionOpen] = useState(false);
+  const [isLineItemsSectionOpen, setIsLineItemsSectionOpen] = useState(false);
   const [isDetailsSectionOpen, setIsDetailsSectionOpen] = useState(false);
 
   // Content tab (bills vs payments)
@@ -299,47 +279,10 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     const dueSoonDate = futureDateInput(dueSoonWindowDays);
     return bill.due_date >= today && bill.due_date <= dueSoonDate;
   });
-  const createAllocationTotal = newAllocations.reduce((sum, row) => {
-    const amount = row.budget_line ? Number(row.amount || 0) : 0;
-    return sum + (Number.isFinite(amount) ? amount : 0);
-  }, 0);
-  const createBillTotal = Number(newTotal || 0);
-  const createUnallocated = createBillTotal - createAllocationTotal;
-  const editAllocationTotal = allocations.reduce((sum, row) => {
-    const amount = row.budget_line ? Number(row.amount || 0) : 0;
-    return sum + (Number.isFinite(amount) ? amount : 0);
-  }, 0);
-  const editBillTotal = Number(total || 0);
-  const editUnallocated = editBillTotal - editAllocationTotal;
-  const allocationEpsilon = 0.000001;
-  const createIsOverAllocated = createUnallocated < -allocationEpsilon;
-  const editIsOverAllocated = editUnallocated < -allocationEpsilon;
-  const hasBudgetLineOptions = budgetLineGroups.length > 0;
-  const createSuggestedTotal = createAllocationTotal.toFixed(2);
-  const editSuggestedTotal = editAllocationTotal.toFixed(2);
-  const budgetLineMetaById = useMemo(() => {
-    const entries = budgetLineGroups.flatMap((group) =>
-      group.lines.map((line) => [line.id, line] as const),
-    );
-    return new Map(entries);
-  }, [budgetLineGroups]);
-  const originEstimateLabelByBudgetId = useMemo(
-    () => new Map(budgetLineGroups.map((group) => [group.budgetId, group.originEstimateLabel] as const)),
-    [budgetLineGroups],
+  const activeCostCodes = useMemo(
+    () => costCodes.filter((cc) => cc.is_active),
+    [costCodes],
   );
-  const genericLineOptionsByCostCode = useMemo(() => {
-    const next = new Map<string, BudgetLineOption[]>();
-    for (const group of budgetLineGroups) {
-      for (const line of group.lines) {
-        const code = line.cost_code_code ?? "";
-        if (!GENERIC_BUDGET_COST_CODES.has(code)) {
-          continue;
-        }
-        next.set(code, [...(next.get(code) ?? []), line]);
-      }
-    }
-    return next;
-  }, [budgetLineGroups]);
 
   const canMutateVendorBills = canDo(capabilities, "vendor_bills", "create");
   const canApproveVendorBills = canDo(capabilities, "vendor_bills", "approve");
@@ -377,16 +320,10 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const formScheduledFor = isEditingMode ? scheduledFor : newScheduledFor;
   const formTotal = isEditingMode ? total : newTotal;
   const formNotes = isEditingMode ? notes : newNotes;
-  const formAllocations = isEditingMode ? allocations : newAllocations;
-  const formAllocationTotal = isEditingMode ? editAllocationTotal : createAllocationTotal;
-  const formUnallocated = isEditingMode ? editUnallocated : createUnallocated;
-  const formIsOverAllocated = isEditingMode ? editIsOverAllocated : createIsOverAllocated;
-  const formSuggestedTotal = isEditingMode ? editSuggestedTotal : createSuggestedTotal;
+  const formLineItems = isEditingMode ? lineItems : newLineItems;
   const formStatus: VendorBillStatus = isEditingMode ? status : newStatus;
   const canEditScheduledFor = formStatus === "approved" || formStatus === "scheduled";
-  const formRequiresFullAllocation = false;
   const scheduledForMissing = canEditScheduledFor && !formScheduledFor;
-  const hasAllocationMismatch = Math.abs(formUnallocated) > allocationEpsilon;
   const formSubtotalAmount = Number(formSubtotal || 0);
   const formTaxAmountValue = Number(formTaxAmount || 0);
   const formShippingAmountValue = Number(formShippingAmount || 0);
@@ -504,56 +441,32 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
   }
 
-  function setFormAllocations(next: AllocationFormRow[]) {
+  function setFormLineItems(next: VendorBillLineFormRow[]) {
     if (isEditingMode) {
-      setAllocations(next);
+      setLineItems(next);
     } else {
-      setNewAllocations(next);
+      setNewLineItems(next);
     }
   }
 
-  /** Patches a single allocation row by index. */
-  function updateFormAllocation(index: number, patch: Partial<AllocationFormRow>) {
-    const next = [...formAllocations];
+  /** Patches a single line item row by index. */
+  function updateFormLineItem(index: number, patch: Partial<VendorBillLineFormRow>) {
+    const next = [...formLineItems];
     next[index] = { ...next[index], ...patch };
-    setFormAllocations(next);
+    setFormLineItems(next);
   }
 
-  /** Removes an allocation row, keeping at least one row. */
-  function removeFormAllocation(index: number) {
-    const current = formAllocations;
-    setFormAllocations(
+  /** Removes a line item row, keeping at least one row. */
+  function removeFormLineItem(index: number) {
+    const current = formLineItems;
+    setFormLineItems(
       current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : current,
     );
   }
 
-  /** Appends a new blank allocation row to the form. */
-  function addFormAllocation() {
-    setFormAllocations([...formAllocations, createEmptyAllocationRow()]);
-  }
-
-  /** Derives the UI key and target budget for a generic-scope budget line. */
-  function resolveGenericUiState(budgetLineId: number): Pick<AllocationFormRow, "ui_line_key" | "ui_target_budget_id"> {
-    const meta = budgetLineMetaById.get(Number(budgetLineId));
-    const code = meta?.cost_code_code ?? "";
-    if (!meta || !GENERIC_BUDGET_COST_CODES.has(code)) {
-      return { ui_line_key: "", ui_target_budget_id: undefined };
-    }
-    return {
-      ui_line_key: `generic:${code}`,
-      ui_target_budget_id: meta.budgetId,
-    };
-  }
-
-  /** Converts an API allocation input into a form row with resolved generic-scope UI state. */
-  function toAllocationFormRow(row: VendorBillAllocationInput): AllocationFormRow {
-    const genericUi = resolveGenericUiState(Number(row.budget_line));
-    return {
-      budget_line: Number(row.budget_line || 0),
-      amount: row.amount,
-      note: row.note || "",
-      ...genericUi,
-    };
+  /** Appends a new blank line item row to the form. */
+  function addFormLineItem() {
+    setFormLineItems([...formLineItems, createEmptyVendorBillLineRow()]);
   }
 
   /** Routes form submission to create or save based on the current editing mode. */
@@ -584,15 +497,14 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setTotal(item.total);
     setNotes(item.notes);
     setStatus(item.status);
-    const mapped =
-      item.allocations?.map((row) =>
-        toAllocationFormRow({
-          budget_line: row.budget_line,
-          amount: row.amount,
-          note: row.note || "",
-        }),
-      ) ?? [];
-    setAllocations(mapped.length > 0 ? mapped : [createEmptyAllocationRow()]);
+    const mapped = (item.line_items ?? []).map((row) => ({
+      costCode: row.cost_code,
+      description: row.description,
+      quantity: row.quantity,
+      unit: row.unit,
+      unitPrice: row.unit_price,
+    }));
+    setLineItems(mapped.length > 0 ? mapped : [createEmptyVendorBillLineRow()]);
   }
 
   /** Returns the display label for a bill status, using policy-provided labels. */
@@ -725,65 +637,20 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
   }
 
-  /** Loads budget line items grouped by estimate origin for the allocation dropdown. */
-  async function loadBudgetLineOptions(projectId: number) {
+  /** Fetches the organization's cost codes for the line item cost code dropdown. */
+  async function loadCostCodes() {
     try {
-      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/budgets/`, {
+      const response = await fetch(`${normalizedBaseUrl}/cost-codes/`, {
         headers: buildAuthHeaders(token),
       });
-      const payload: ApiResponse = await response.json();
+      const payload = await response.json();
       if (!response.ok) {
-        setBudgetLineGroups([]);
+        setCostCodes([]);
         return;
       }
-      const rows =
-        ((payload.data as Array<{
-          id: number;
-          source_estimate?: number;
-          source_estimate_version?: number;
-          baseline_snapshot_json?: {
-            estimate?: {
-              title?: string;
-            };
-          };
-          line_items: Array<{
-            id: number;
-            cost_code_code?: string;
-            description?: string;
-            planned_amount?: string;
-            actual_spend?: string;
-            remaining_amount?: string;
-          }>;
-        }>) ?? []) || [];
-      const groups = rows
-        .map((budget) => {
-          const estimateTitle = budget.baseline_snapshot_json?.estimate?.title?.trim();
-          const baseLabel =
-            estimateTitle ||
-            (budget.source_estimate ? `Estimate #${budget.source_estimate}` : "Unlinked estimate baseline");
-          const originEstimateLabel =
-            budget.source_estimate_version != null
-              ? `${baseLabel} (v${budget.source_estimate_version})`
-              : baseLabel;
-          return {
-            budgetId: budget.id,
-            budgetLabel: `${originEstimateLabel} · Scope Items`,
-            originEstimateLabel,
-            lines: (budget.line_items ?? []).map((line) => ({
-              id: line.id,
-              budgetId: budget.id,
-              label: `${line.cost_code_code ?? "CC"} - ${line.description ?? "Line"} (#${line.id})`,
-              cost_code_code: line.cost_code_code ?? "",
-              planned_amount: line.planned_amount ?? "0.00",
-              actual_spend: line.actual_spend ?? "0.00",
-              remaining_amount: line.remaining_amount ?? "0.00",
-            })),
-          };
-        })
-        .filter((group) => group.lines.length > 0);
-      setBudgetLineGroups(groups);
+      setCostCodes((payload.data as CostCodeOption[]) ?? []);
     } catch {
-      setBudgetLineGroups([]);
+      setCostCodes([]);
     }
   }
 
@@ -807,7 +674,13 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
           scheduled_for: payloadBody.scheduled_for ?? null,
           total: payloadBody.total,
           notes: payloadBody.notes,
-          allocations: payloadBody.allocations ?? [],
+          line_items: (payloadBody.line_items ?? []).map((row) => ({
+            cost_code: row.costCode || null,
+            description: row.description,
+            quantity: row.quantity,
+            unit: row.unit,
+            unit_price: row.unitPrice,
+          })),
         }),
       },
     );
@@ -836,7 +709,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setNewBillNumber("");
     setNewTotal("0.00");
     setNewNotes("");
-    setNewAllocations([createEmptyAllocationRow()]);
+    setNewLineItems([createEmptyVendorBillLineRow()]);
     setDuplicateCandidates([]);
     setStatusMessage(`Created vendor bill #${created.id}.`);
   }
@@ -859,18 +732,15 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       setCreateErrorMessage("Selected vendor is inactive. Pick an active vendor.");
       return;
     }
-    if (createIsOverAllocated) {
-      setCreateErrorMessage("Allocated amount cannot exceed bill total.");
-      return;
-    }
-
     setStatusMessage("Creating vendor bill...");
-    const normalizedAllocations = newAllocations
-      .filter((row) => row.budget_line && row.amount)
+    const normalizedLineItems: VendorBillLineInput[] = newLineItems
+      .filter((row) => row.description || row.quantity || row.unitPrice)
       .map((row) => ({
-        budget_line: Number(row.budget_line),
-        amount: row.amount,
-        note: row.note,
+        costCode: row.costCode || null,
+        description: row.description,
+        quantity: row.quantity,
+        unit: row.unit,
+        unitPrice: row.unitPrice,
       }));
     await createVendorBill({
       projectId,
@@ -886,7 +756,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       shipping_amount: newShippingAmount,
       total: newTotal,
       notes: newNotes,
-      allocations: normalizedAllocations,
+      line_items: normalizedLineItems,
     });
   }
 
@@ -897,7 +767,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setStatusMessage("");
     // Reset accordion sections to defaults on selection change
     setIsStatusSectionOpen(true);
-    setIsAllocationsSectionOpen(false);
+    setIsLineItemsSectionOpen(false);
     setIsDetailsSectionOpen(false);
     const selected = vendorBills.find((row) => String(row.id) === id);
     if (!selected) return;
@@ -926,7 +796,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setNewStatus(createStatusOptions[0] ?? billStatuses[0] ?? "planned");
     setNewTotal("0.00");
     setNewNotes("");
-    setNewAllocations([createEmptyAllocationRow()]);
+    setNewLineItems([createEmptyVendorBillLineRow()]);
     if (activeVendors[0]) {
       setNewVendorId(String(activeVendors[0].id));
     }
@@ -976,12 +846,14 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
           shipping_amount: shippingAmount,
           total,
           notes,
-          allocations: allocations
-            .filter((row) => row.budget_line && row.amount)
+          line_items: lineItems
+            .filter((row) => row.description || row.quantity || row.unitPrice)
             .map((row) => ({
-              budget_line: Number(row.budget_line),
-              amount: row.amount,
-              note: row.note,
+              cost_code: row.costCode || null,
+              description: row.description,
+              quantity: row.quantity,
+              unit: row.unit,
+              unit_price: row.unitPrice,
             })),
           status,
         }),
@@ -1092,16 +964,15 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setNewScheduledFor(selected.scheduled_for ?? "");
     setNewTotal(selected.total);
     setNewNotes(selected.notes || "");
-    const copiedAllocations =
-      selected.allocations?.map((row) =>
-        toAllocationFormRow({
-          budget_line: row.budget_line,
-          amount: row.amount,
-          note: row.note || "",
-        }),
-      ) ?? [];
-    setNewAllocations(
-      copiedAllocations.length > 0 ? copiedAllocations : [createEmptyAllocationRow()],
+    const copiedLineItems = (selected.line_items ?? []).map((row) => ({
+      costCode: row.cost_code,
+      description: row.description,
+      quantity: row.quantity,
+      unit: row.unit,
+      unitPrice: row.unit_price,
+    }));
+    setNewLineItems(
+      copiedLineItems.length > 0 ? copiedLineItems : [createEmptyVendorBillLineRow()],
     );
     setSelectedVendorBillId("");
     setDuplicateCandidates([]);
@@ -1144,7 +1015,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     if (!token || !selectedProjectId) {
       return;
     }
-    void loadBudgetLineOptions(Number(selectedProjectId));
+    void loadCostCodes();
     const timer = window.setTimeout(() => {
       void loadVendorBills();
     }, 0);
@@ -1195,34 +1066,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setViewerNextStatus("");
   }, [allowedStatusTransitions, selectedVendorBill]);
 
-  // Back-fill generic scope UI keys on allocation rows once budget line metadata loads.
-  useEffect(() => {
-    if (!budgetLineMetaById.size) {
-      return;
-    }
-    const hydrateGenericRows = (rows: AllocationFormRow[]) => {
-      let changed = false;
-      const next = rows.map((row) => {
-        if (!row.budget_line || row.ui_line_key) {
-          return row;
-        }
-        const meta = budgetLineMetaById.get(Number(row.budget_line));
-        const code = meta?.cost_code_code ?? "";
-        if (!meta || !GENERIC_BUDGET_COST_CODES.has(code)) {
-          return row;
-        }
-        changed = true;
-        return {
-          ...row,
-          ui_line_key: `generic:${code}`,
-          ui_target_budget_id: meta.budgetId,
-        };
-      });
-      return changed ? next : rows;
-    };
-    setAllocations((current) => hydrateGenericRows(current));
-    setNewAllocations((current) => hydrateGenericRows(current));
-  }, [budgetLineMetaById]);
+
 
   // Flash animation for the workspace form when switching bills or creating new.
   useEffect(() => {
@@ -1492,45 +1336,48 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                               ) : null}
                             </div>
 
-                            {/* Allocations */}
+                            {/* Line Items */}
                             <div className={styles.viewerSection}>
                               <button
                                 type="button"
                                 className={styles.viewerSectionToggle}
-                                onClick={(e) => { e.stopPropagation(); setIsAllocationsSectionOpen((v) => !v); }}
-                                aria-expanded={isAllocationsSectionOpen}
+                                onClick={(e) => { e.stopPropagation(); setIsLineItemsSectionOpen((v) => !v); }}
+                                aria-expanded={isLineItemsSectionOpen}
                               >
-                                <h4>Allocations ({vendorBill.allocations?.length ?? 0})</h4>
+                                <h4>Line Items ({vendorBill.line_items?.length ?? 0})</h4>
                                 <span className={styles.viewerSectionArrow}>&#9660;</span>
                               </button>
-                              {isAllocationsSectionOpen ? (
+                              {isLineItemsSectionOpen ? (
                                 <div className={styles.viewerSectionContent} onClick={(e) => e.stopPropagation()}>
-                                  {vendorBill.allocations && vendorBill.allocations.length > 0 ? (
+                                  {vendorBill.line_items && vendorBill.line_items.length > 0 ? (
                                     <div className={styles.readOnlyTableWrap}>
                                       <table className={styles.readOnlyTable}>
                                         <thead>
                                           <tr>
                                             <th>Cost Code</th>
-                                            <th>Amount</th>
-                                            <th>Note</th>
+                                            <th>Description</th>
+                                            <th>Qty</th>
+                                            <th>Unit</th>
+                                            <th>Unit Price</th>
+                                            <th>Total</th>
                                           </tr>
                                         </thead>
                                         <tbody>
-                                          {vendorBill.allocations.map((alloc, allocIdx) => {
-                                            const lineMeta = budgetLineMetaById.get(Number(alloc.budget_line));
-                                            return (
-                                              <tr key={allocIdx}>
-                                                <td>{lineMeta?.label ?? `#${alloc.budget_line}`}</td>
-                                                <td>${alloc.amount}</td>
-                                                <td>{alloc.note || "—"}</td>
+                                          {vendorBill.line_items.map((lineItem, lineIdx) => (
+                                              <tr key={lineIdx}>
+                                                <td>{lineItem.cost_code_code || "—"}</td>
+                                                <td>{lineItem.description || "—"}</td>
+                                                <td>{lineItem.quantity}</td>
+                                                <td>{lineItem.unit || "—"}</td>
+                                                <td>${lineItem.unit_price}</td>
+                                                <td>${lineItem.line_total}</td>
                                               </tr>
-                                            );
-                                          })}
+                                          ))}
                                         </tbody>
                                       </table>
                                     </div>
                                   ) : (
-                                    <p className={styles.viewerHint}>No allocations on this bill.</p>
+                                    <p className={styles.viewerHint}>No line items on this bill.</p>
                                   )}
                                 </div>
                               ) : null}
@@ -1802,219 +1649,95 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
                 <div className={`${styles.fieldSpan2} ${styles.allocationsBlock}`}>
                   <div className={styles.formSectionHeader}>
-                    <h4 className={styles.formSectionTitle}>Line Item Allocation</h4>
-                    <p className={styles.formSectionHint}>Map this bill to project estimate lines.</p>
+                    <h4 className={styles.formSectionTitle}>Line Items</h4>
+                    <p className={styles.formSectionHint}>Itemize this bill with cost codes, quantities, and unit prices.</p>
                   </div>
-                  {!hasBudgetLineOptions ? (
-                    <p className={creatorStyles.inlineHint}>
-                      No estimate-backed lines available for this project yet. Approve an estimate first.
-                    </p>
-                  ) : null}
                   <div className={creatorStyles.lineTable}>
                     <div className={`${creatorStyles.lineHeader} ${styles.allocationLineHeader}`}>
-                      <div className={creatorStyles.lineHeaderCell}>Estimate Line</div>
-                      <div className={creatorStyles.lineHeaderCell}>Origin Estimate</div>
-                      <div className={creatorStyles.lineHeaderCell}>Amount</div>
-                      <div className={creatorStyles.lineHeaderCell}>Note</div>
+                      <div className={creatorStyles.lineHeaderCell}>Cost Code</div>
+                      <div className={creatorStyles.lineHeaderCell}>Description</div>
+                      <div className={creatorStyles.lineHeaderCell}>Qty</div>
+                      <div className={creatorStyles.lineHeaderCell}>Unit</div>
+                      <div className={creatorStyles.lineHeaderCell}>Unit Price</div>
                       <div className={creatorStyles.lineHeaderCell} />
                     </div>
-                    {formAllocations.map((row, index) => {
-                      const selectedLineMeta = budgetLineMetaById.get(Number(row.budget_line));
-                      const inferredGenericCode =
-                        selectedLineMeta && GENERIC_BUDGET_COST_CODES.has(selectedLineMeta.cost_code_code ?? "")
-                          ? (selectedLineMeta.cost_code_code ?? "")
-                          : "";
-                      const selectedLineKey =
-                        row.ui_line_key ||
-                        (inferredGenericCode ? `generic:${inferredGenericCode}` : (row.budget_line ? String(row.budget_line) : ""));
-                      const selectedGenericCode = selectedLineKey.startsWith("generic:")
-                        ? selectedLineKey.slice("generic:".length)
-                        : "";
-                      const genericTargets = selectedGenericCode
-                        ? (genericLineOptionsByCostCode.get(selectedGenericCode) ?? [])
-                        : [];
-                      const selectedTargetBudgetId =
-                        row.ui_target_budget_id ?? selectedLineMeta?.budgetId;
-                      return (
-                        <div key={`form-allocation-${index}`}>
-                          <div className={`${creatorStyles.lineRow} ${styles.allocationLineRow}`}>
-                            <div className={creatorStyles.lineCell}>
-                              <span className={creatorStyles.printOnly}>
-                                {selectedLineMeta?.cost_code_code || "—"}
-                              </span>
-                              <select
-                                className={`${creatorStyles.lineSelect} ${creatorStyles.screenOnly}`}
-                                value={selectedLineKey}
-                                onChange={(event) => {
-                                  const nextLineKey = event.target.value;
-                                  if (nextLineKey.startsWith("generic:")) {
-                                    const genericCode = nextLineKey.slice("generic:".length);
-                                    const targetOptions = genericLineOptionsByCostCode.get(genericCode) ?? [];
-                                    const targetBudgetId =
-                                      row.ui_target_budget_id ?? selectedLineMeta?.budgetId ?? targetOptions[0]?.budgetId;
-                                    const matchedLine = targetOptions.find((option) => option.budgetId === targetBudgetId);
-                                    updateFormAllocation(index, {
-                                      ui_line_key: nextLineKey,
-                                      ui_target_budget_id: targetBudgetId,
-                                      budget_line: matchedLine?.id ?? 0,
-                                    });
-                                    return;
-                                  }
-                                  const nextLineId = Number(nextLineKey || 0);
-                                  const nextLineMeta = budgetLineMetaById.get(nextLineId);
-                                  updateFormAllocation(index, {
-                                    ui_line_key: "",
-                                    ui_target_budget_id: nextLineMeta?.budgetId,
-                                    budget_line: nextLineId,
-                                  });
-                                }}
-                                disabled={!hasBudgetLineOptions}
-                              >
-                                <option value="">Select estimate line</option>
-                                <optgroup label="Generic scope buckets">
-                                  {GENERIC_BUDGET_LINE_SPECS.filter(
-                                    (spec) => (genericLineOptionsByCostCode.get(spec.costCode)?.length ?? 0) > 0,
-                                  ).map((spec) => (
-                                    <option key={spec.costCode} value={`generic:${spec.costCode}`}>
-                                      {spec.label}
-                                    </option>
-                                  ))}
-                                </optgroup>
-                                {budgetLineGroups.map((group) => (
-                                  <optgroup key={group.budgetId} label={group.budgetLabel}>
-                                    {group.lines
-                                      .filter(
-                                        (option) => !GENERIC_BUDGET_COST_CODES.has(option.cost_code_code ?? ""),
-                                      )
-                                      .map((option) => (
-                                      <option key={option.id} value={option.id}>
-                                        {option.label}
-                                      </option>
-                                      ))}
-                                  </optgroup>
-                                ))}
-                              </select>
-                            </div>
-                            <div className={creatorStyles.lineCell}>
-                              <select
-                                className={creatorStyles.lineSelect}
-                                value={selectedTargetBudgetId ? String(selectedTargetBudgetId) : ""}
-                                onChange={(event) => {
-                                  if (!selectedGenericCode) {
-                                    return;
-                                  }
-                                  const nextBudgetId = Number(event.target.value || 0);
-                                  const matchedLine = genericTargets.find(
-                                    (option) => option.budgetId === nextBudgetId,
-                                  );
-                                  updateFormAllocation(index, {
-                                    ui_line_key: `generic:${selectedGenericCode}`,
-                                    ui_target_budget_id: nextBudgetId || undefined,
-                                    budget_line: matchedLine?.id ?? 0,
-                                  });
-                                }}
-                                disabled={!selectedGenericCode || genericTargets.length === 0}
-                              >
-                                <option value="">
-                                  {selectedGenericCode
-                                    ? "Select origin estimate"
-                                    : selectedTargetBudgetId
-                                      ? "Origin estimate"
-                                      : "—"}
+                    {formLineItems.map((row, index) => (
+                      <div key={`form-line-${index}`}>
+                        <div className={`${creatorStyles.lineRow} ${styles.allocationLineRow}`}>
+                          <div className={creatorStyles.lineCell}>
+                            <select
+                              className={creatorStyles.lineSelect}
+                              value={row.costCode != null ? String(row.costCode) : ""}
+                              onChange={(event) => {
+                                const val = event.target.value;
+                                updateFormLineItem(index, { costCode: val ? Number(val) : null });
+                              }}
+                            >
+                              <option value="">None</option>
+                              {activeCostCodes.map((cc) => (
+                                <option key={cc.id} value={cc.id}>
+                                  {cc.code} - {cc.name}
                                 </option>
-                                {!selectedGenericCode && selectedTargetBudgetId ? (
-                                  <option value={selectedTargetBudgetId}>
-                                    {originEstimateLabelByBudgetId.get(selectedTargetBudgetId) ??
-                                      `Estimate baseline (${selectedTargetBudgetId})`}
-                                  </option>
-                                ) : null}
-                                {genericTargets.map((option) => (
-                                  <option key={`${selectedGenericCode}-${option.budgetId}`} value={option.budgetId}>
-                                    {originEstimateLabelByBudgetId.get(option.budgetId) ??
-                                      `Estimate baseline (${option.budgetId})`}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div className={creatorStyles.lineCell}>
-                              <input
-                                className={creatorStyles.lineInput}
-                                value={row.amount}
-                                onChange={(event) => {
-                                  updateFormAllocation(index, { amount: event.target.value });
-                                }}
-                                placeholder="0.00"
-                                inputMode="decimal"
-                                disabled={!hasBudgetLineOptions}
-                              />
-                            </div>
-                            <div className={creatorStyles.lineCell}>
-                              <input
-                                className={creatorStyles.lineInput}
-                                value={row.note}
-                                onChange={(event) => {
-                                  updateFormAllocation(index, { note: event.target.value });
-                                }}
-                                placeholder="Optional"
-                                disabled={!hasBudgetLineOptions}
-                              />
-                            </div>
-                            <div className={`${creatorStyles.lineCell} ${creatorStyles.lineActionsCell}`}>
-                              <button
-                                type="button"
-                                className={creatorStyles.removeButton}
-                                onClick={() => removeFormAllocation(index)}
-                                disabled={formAllocations.length <= 1}
-                              >
-                                Remove
-                              </button>
-                            </div>
+                              ))}
+                            </select>
                           </div>
-                          {selectedLineMeta ? (
-                            <p className={styles.allocationMetaRow}>
-                              Approved: {formatMoney(selectedLineMeta.planned_amount)} · Spent:{" "}
-                              {formatMoney(selectedLineMeta.actual_spend)} · Remaining:{" "}
-                              {formatMoney(selectedLineMeta.remaining_amount)}
-                            </p>
-                          ) : null}
+                          <div className={creatorStyles.lineCell}>
+                            <input
+                              className={creatorStyles.lineInput}
+                              value={row.description}
+                              onChange={(event) => updateFormLineItem(index, { description: event.target.value })}
+                              placeholder="Description"
+                            />
+                          </div>
+                          <div className={creatorStyles.lineCell}>
+                            <input
+                              className={creatorStyles.lineInput}
+                              value={row.quantity}
+                              onChange={(event) => updateFormLineItem(index, { quantity: event.target.value })}
+                              placeholder="1"
+                              inputMode="decimal"
+                            />
+                          </div>
+                          <div className={creatorStyles.lineCell}>
+                            <input
+                              className={creatorStyles.lineInput}
+                              value={row.unit}
+                              onChange={(event) => updateFormLineItem(index, { unit: event.target.value })}
+                              placeholder="ea"
+                            />
+                          </div>
+                          <div className={creatorStyles.lineCell}>
+                            <input
+                              className={creatorStyles.lineInput}
+                              value={row.unitPrice}
+                              onChange={(event) => updateFormLineItem(index, { unitPrice: event.target.value })}
+                              placeholder="0.00"
+                              inputMode="decimal"
+                            />
+                          </div>
+                          <div className={`${creatorStyles.lineCell} ${creatorStyles.lineActionsCell}`}>
+                            <button
+                              type="button"
+                              className={creatorStyles.removeButton}
+                              onClick={() => removeFormLineItem(index)}
+                              disabled={formLineItems.length <= 1}
+                            >
+                              Remove
+                            </button>
+                          </div>
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
                   </div>
                   <div className={creatorStyles.lineActions}>
                     <button
                       type="button"
                       className={creatorStyles.secondaryButton}
-                      onClick={addFormAllocation}
-                      disabled={!hasBudgetLineOptions}
+                      onClick={addFormLineItem}
                     >
-                      Add Allocation Row
+                      Add Line Item
                     </button>
-                    <div className={styles.allocationTotals}>
-                      <span>
-                        Bill total: ${formTotal} · Allocated: ${formAllocationTotal.toFixed(2)} · Unallocated:{" "}
-                        <span className={hasAllocationMismatch ? styles.unallocatedMismatch : undefined}>
-                          ${formUnallocated.toFixed(2)}
-                        </span>
-                      </span>
-                      <button
-                        type="button"
-                        className={creatorStyles.secondaryButton}
-                        onClick={() => setFormTotal(formSuggestedTotal)}
-                        disabled={!isEditingMode && !hasBudgetLineOptions}
-                      >
-                        Use allocated total ({formSuggestedTotal})
-                      </button>
-                    </div>
                   </div>
-                  {formIsOverAllocated ? (
-                    <p className={styles.errorText}>Allocated amount cannot exceed bill total.</p>
-                  ) : null}
-                  {formRequiresFullAllocation ? (
-                    <p className={styles.errorText}>
-                      Status <strong>{status}</strong> requires full allocation (unallocated must be 0.00).
-                    </p>
-                  ) : null}
                   {scheduledForMissing ? (
                     <p className={styles.errorText}>
                       Set a <strong>scheduled for</strong> date before saving.
@@ -2073,8 +1796,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                       !canMutateVendorBills ||
                       !selectedProjectId ||
                       !formVendorId ||
-                      formIsOverAllocated ||
-                      (formRequiresFullAllocation && Math.abs(formUnallocated) > allocationEpsilon) ||
                       scheduledForMissing
                     }
                   >

@@ -2,7 +2,6 @@ from django.urls import path
 
 from core.views import (
     accept_invite_view,
-    budget_line_detail_view,
     check_invite_by_email_view,
     change_order_clone_revision_view,
     change_order_contract_view,
@@ -17,7 +16,6 @@ from core.views import (
     customer_detail_view,
     customer_project_create_view,
     customers_list_view,
-    estimate_convert_to_budget_view,
     estimate_clone_version_view,
     estimate_contract_view,
     estimate_duplicate_view,
@@ -54,7 +52,6 @@ from core.views import (
     payment_detail_view,
     payment_allocate_view,
     payment_contract_view,
-    project_budgets_view,
     project_change_orders_view,
     project_estimates_view,
     project_invoices_view,
@@ -153,11 +150,6 @@ urlpatterns = [
         "projects/<int:project_id>/estimates/",
         project_estimates_view,
         name="project-estimates",
-    ),
-    path(
-        "projects/<int:project_id>/budgets/",
-        project_budgets_view,
-        name="project-budgets",
     ),
     path(
         "projects/<int:project_id>/change-orders/",
@@ -279,16 +271,6 @@ urlpatterns = [
         "estimates/<int:estimate_id>/duplicate/",
         estimate_duplicate_view,
         name="estimate-duplicate",
-    ),
-    path(
-        "estimates/<int:estimate_id>/convert-to-budget/",
-        estimate_convert_to_budget_view,
-        name="estimate-convert-to-budget",
-    ),
-    path(
-        "budgets/<int:budget_id>/lines/<int:line_id>/",
-        budget_line_detail_view,
-        name="budget-line-detail",
     ),
     path(
         "change-orders/<int:change_order_id>/",

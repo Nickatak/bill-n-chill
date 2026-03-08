@@ -1,4 +1,4 @@
-"""Accounts payable vendor-bill endpoints and allocation lifecycle."""
+"""Accounts payable vendor-bill endpoints and line item lifecycle."""
 
 from datetime import timedelta
 
@@ -9,7 +9,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.models import (
-    FinancialAuditEvent,
     Vendor,
     VendorBill,
     VendorBillSnapshot,
@@ -18,10 +17,9 @@ from core.policies import get_vendor_bill_policy_contract
 from core.serializers import VendorBillSerializer, VendorBillWriteSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.accounts_payable.vendor_bills_helpers import (
-    _allocation_total,
+    _apply_vendor_bill_lines_and_totals,
     _find_duplicate_vendor_bills,
-    _sync_vendor_bill_allocations,
-    _validate_allocation_budget_lines,
+    _vendor_bill_line_apply_error_response,
     _vendor_scope_filter,
 )
 from core.views.helpers import (
@@ -40,6 +38,13 @@ RECEIVED_PLUS_STATUSES = {
     VendorBill.Status.SCHEDULED,
     VendorBill.Status.PAID,
 }
+
+
+def _prefetch_vendor_bill_qs(qs):
+    """Apply standard select/prefetch for vendor bill queries."""
+    return qs.select_related("project", "vendor").prefetch_related(
+        "line_items", "line_items__cost_code"
+    )
 
 
 @api_view(["GET"])
@@ -75,7 +80,7 @@ def vendor_bill_contract_view(_request):
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_vendor_bills_view(request, project_id: int):
-    """Project vendor-bill collection endpoint: `GET` lists bills, `POST` creates a planned bill.
+    """Project vendor-bill collection endpoint: `GET` lists bills, `POST` creates a bill with line items.
 
     Contract:
     - `GET` (user/project-scoped list):
@@ -84,11 +89,11 @@ def project_vendor_bills_view(request, project_id: int):
       - `404`: project not found for this user.
         - Guarantees: no object mutations. `[APP]`
     - `POST` (requires role `owner|pm|bookkeeping`):
-      - `201`: planned vendor bill created and returned.
+      - `201`: vendor bill created with line items and returned.
         - Guarantees:
-          - newly created vendor bill status is `planned`. `[APP]`
+          - newly created vendor bill status is `planned` or `received`. `[APP]`
           - newly created vendor bill satisfies `due_date >= issue_date`. `[DB+APP]`
-          - allocation total (if provided) is less than or equal to bill total. `[APP]`
+          - totals computed from line items + tax_amount + shipping_amount. `[APP]`
       - `400`: validation or business-rule failure.
         - Guarantees: no durable partial mutation from failed request path. `[DB+APP]`
       - `403`: role gate denied for create.
@@ -107,31 +112,32 @@ def project_vendor_bills_view(request, project_id: int):
       - `GET`: none.
       - `POST`:
         - Creates:
-          - Standard: `VendorBill` and optional `VendorBillAllocation` rows.
-          - Audit: `FinancialAuditEvent`.
+          - Standard: `VendorBill` and `VendorBillLine` rows.
         - Edits:
-          - Standard: initial computed `balance_due` on the created bill.
-          - Audit: none.
+          - Standard: computed subtotal/tax_amount/shipping_amount/total/balance_due on the created bill.
         - Deletes: none.
 
     - Incoming payload (`POST`) shape:
       - `_comment_*` keys in this example are documentation-only (not accepted API fields).
       - JSON map:
         {
-          "_comment_required": "vendor, bill_number, status, and total are required",
+          "_comment_required": "vendor, bill_number, status, and line_items are required",
           "vendor": "integer (required)",
           "bill_number": "string (required)",
           "status": "planned|received (required)",
-          "total": "decimal (required)",
           "issue_date": "YYYY-MM-DD (required when status=received; optional for planned, default=today)",
           "due_date": "YYYY-MM-DD (required when status=received; optional for planned, must be >= issue_date, default=issue_date+30d)",
+          "tax_amount": "decimal (optional, default=0)",
+          "shipping_amount": "decimal (optional, default=0)",
           "scheduled_for": "YYYY-MM-DD (optional)",
           "notes": "string (optional)",
-          "allocations": [
+          "line_items": [
             {
-              "budget_line": "integer (required)",
-              "amount": "decimal (required)",
-              "note": "string (optional)"
+              "cost_code": "integer (optional)",
+              "description": "string (optional)",
+              "quantity": "decimal (optional, default=1)",
+              "unit": "string (optional, default='ea')",
+              "unit_price": "decimal (required)"
             }
           ]
         }
@@ -144,7 +150,6 @@ def project_vendor_bills_view(request, project_id: int):
     - Test anchors:
       - `backend/core/tests/test_vendor_bills.py::test_vendor_bill_create_and_project_list`
       - `backend/core/tests/test_vendor_bills.py::test_vendor_bill_duplicate_requires_existing_match_to_be_void`
-      - `backend/core/tests/test_vendor_bills.py::test_vendor_bill_create_rolls_back_when_audit_write_fails`
     """
     project = _validate_project_for_user(project_id, request.user)
     if not project:
@@ -157,7 +162,7 @@ def project_vendor_bills_view(request, project_id: int):
         rows = (
             VendorBill.objects.filter(project=project)
             .select_related("project", "vendor")
-            .prefetch_related("allocations", "allocations__budget_line", "allocations__budget_line__cost_code")
+            .prefetch_related("line_items", "line_items__cost_code")
             .order_by("-created_at")
         )
         return Response({"data": VendorBillSerializer(rows, many=True).data})
@@ -177,8 +182,6 @@ def project_vendor_bills_view(request, project_id: int):
         fields["bill_number"] = ["This field is required."]
     if "status" not in data:
         fields["status"] = ["This field is required."]
-    if "total" not in data:
-        fields["total"] = ["This field is required."]
     if fields:
         return Response(
             {
@@ -186,6 +189,19 @@ def project_vendor_bills_view(request, project_id: int):
                     "code": "validation_error",
                     "message": "Missing required fields for vendor bill creation.",
                     "fields": fields,
+                }
+            },
+            status=400,
+        )
+
+    line_items = data.get("line_items", [])
+    if not line_items:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "At least one line item is required.",
+                    "fields": {"line_items": ["At least one line item is required."]},
                 }
             },
             status=400,
@@ -276,44 +292,11 @@ def project_vendor_bills_view(request, project_id: int):
             status=409,
         )
 
-    subtotal = quantize_money(data.get("subtotal", 0))
     tax_amount = quantize_money(data.get("tax_amount", 0))
     shipping_amount = quantize_money(data.get("shipping_amount", 0))
-    total = quantize_money(data["total"])
     received_date = data.get("received_date")
     scheduled_for = data.get("scheduled_for")
-    allocations = data.get("allocations", [])
-    if allocations:
-        line_map = _validate_allocation_budget_lines(
-            project=project,
-            user=request.user,
-            allocations=allocations,
-        )
-        if len(line_map) != len({entry["budget_line"] for entry in allocations}):
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_error",
-                        "message": "One or more allocation budget lines are invalid for this project.",
-                        "fields": {"allocations": ["Use budget lines from this project."]},
-                    }
-                },
-                status=400,
-            )
-        allocation_total = MONEY_ZERO
-        for entry in allocations:
-            allocation_total = quantize_money(allocation_total + entry["amount"])
-        if allocation_total > total:
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_error",
-                        "message": "Allocation total cannot exceed bill total.",
-                        "fields": {"allocations": ["Allocated amount exceeds bill total."]},
-                    }
-                },
-                status=400,
-            )
+
     with transaction.atomic():
         vendor_bill = VendorBill.objects.create(
             project=project,
@@ -324,34 +307,26 @@ def project_vendor_bills_view(request, project_id: int):
             issue_date=issue_date,
             due_date=due_date,
             scheduled_for=scheduled_for,
-            subtotal=subtotal,
-            tax_amount=tax_amount,
-            shipping_amount=shipping_amount,
-            total=total,
-            balance_due=total,
             notes=data.get("notes", ""),
             created_by=request.user,
         )
-        if allocations:
-            _sync_vendor_bill_allocations(vendor_bill=vendor_bill, allocations=allocations)
-        FinancialAuditEvent.record(
-            project=project,
-            event_type=FinancialAuditEvent.EventType.VENDOR_BILL_UPDATED,
-            object_type="vendor_bill",
-            object_id=vendor_bill.id,
-            from_status="",
-            to_status=requested_status,
-            amount=vendor_bill.total,
-            note="Vendor bill created.",
-            created_by=request.user,
-            metadata={"bill_number": vendor_bill.bill_number},
+
+        apply_error = _apply_vendor_bill_lines_and_totals(
+            vendor_bill, line_items, tax_amount, shipping_amount, request.user,
         )
+        if apply_error:
+            transaction.set_rollback(True)
+            payload, status_code = _vendor_bill_line_apply_error_response(apply_error)
+            return Response(payload, status=status_code)
+
+        vendor_bill.refresh_from_db()
+        vendor_bill.balance_due = vendor_bill.total
+        vendor_bill.save(update_fields=["balance_due", "updated_at"])
+
     return Response(
         {
             "data": VendorBillSerializer(
-                VendorBill.objects.select_related("project", "vendor")
-                .prefetch_related("allocations", "allocations__budget_line", "allocations__budget_line__cost_code")
-                .get(id=vendor_bill.id)
+                _prefetch_vendor_bill_qs(VendorBill.objects.filter(id=vendor_bill.id)).get()
             ).data,
             "meta": {"duplicate_override_used": False},
         },
@@ -362,7 +337,7 @@ def project_vendor_bills_view(request, project_id: int):
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def vendor_bill_detail_view(request, vendor_bill_id: int):
-    """Fetch or patch one vendor bill with lifecycle and allocation guardrails.
+    """Fetch or patch one vendor bill with lifecycle and line item guardrails.
 
     Contract:
     - `GET`:
@@ -373,9 +348,10 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
     - `PATCH` (requires role `owner|pm|bookkeeping`):
       - `200`: patch applied and updated bill returned.
         - Guarantees:
-          - status/date/allocation invariants remain valid. `[DB+APP]`
+          - status/date invariants remain valid. `[DB+APP]`
           - bill `balance_due` remains aligned with status and totals. `[APP]`
-      - `400`: validation/transition/allocation failure.
+          - totals recomputed when line_items provided. `[APP]`
+      - `400`: validation/transition failure.
         - Guarantees: no durable partial mutation from failed request path. `[DB+APP]`
       - `403`: role gate denied for patch.
         - Guarantees: no object mutations. `[APP]`
@@ -393,12 +369,11 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
       - `GET`: none.
       - `PATCH`:
         - Creates:
-          - Standard: replacement `VendorBillAllocation` rows when `allocations` is provided.
-          - Audit: `FinancialAuditEvent`; `VendorBillSnapshot` on captured terminal transitions.
+          - Standard: replacement `VendorBillLine` rows when `line_items` is provided.
+          - Audit: `VendorBillSnapshot` on captured terminal transitions.
         - Edits:
           - Standard: `VendorBill` fields (`vendor`, dates, status, totals, notes, balance).
-          - Audit: none.
-        - Deletes: existing `VendorBillAllocation` rows when replacing allocations.
+        - Deletes: existing `VendorBillLine` rows when replacing line items.
 
     - Incoming payload (`PATCH`) shape:
       - `_comment_*` keys in this example are documentation-only (not accepted API fields).
@@ -410,13 +385,16 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
           "issue_date": "YYYY-MM-DD (optional)",
           "due_date": "YYYY-MM-DD (optional, must be >= issue_date)",
           "scheduled_for": "YYYY-MM-DD (required when status=scheduled)",
-          "total": "decimal (optional)",
+          "tax_amount": "decimal (optional)",
+          "shipping_amount": "decimal (optional)",
           "notes": "string (optional)",
-          "allocations": [
+          "line_items": [
             {
-              "budget_line": "integer (required)",
-              "amount": "decimal (required)",
-              "note": "string (optional)"
+              "cost_code": "integer (optional)",
+              "description": "string (optional)",
+              "quantity": "decimal (optional, default=1)",
+              "unit": "string (optional, default='ea')",
+              "unit_price": "decimal (required)"
             }
           ]
         }
@@ -444,11 +422,9 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
         )
 
     if request.method == "GET":
-        vendor_bill = (
-            VendorBill.objects.select_related("project", "vendor")
-            .prefetch_related("allocations", "allocations__budget_line", "allocations__budget_line__cost_code")
-            .get(id=vendor_bill.id)
-        )
+        vendor_bill = _prefetch_vendor_bill_qs(
+            VendorBill.objects.filter(id=vendor_bill.id)
+        ).get()
         return Response({"data": VendorBillSerializer(vendor_bill).data})
 
     permission_error, _ = _capability_gate(request.user, "vendor_bills", "edit")
@@ -528,8 +504,8 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
     next_status = data.get("status", previous_status)
     status_changing = "status" in data
 
-    # Compound transition: received → scheduled is allowed as a shortcut that
-    # atomically walks through the approved intermediate (received → approved → scheduled).
+    # Compound transition: received -> scheduled is allowed as a shortcut that
+    # atomically walks through the approved intermediate (received -> approved -> scheduled).
     compound_received_to_scheduled = (
         status_changing
         and previous_status == VendorBill.Status.RECEIVED
@@ -594,53 +570,15 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
             status=400,
         )
 
-    candidate_total = quantize_money(data.get("total", vendor_bill.total))
-    candidate_balance_due = (
-        MONEY_ZERO if next_status == VendorBill.Status.PAID else candidate_total
-    )
-    allocations = data.get("allocations")
-    if allocations is not None:
-        line_map = _validate_allocation_budget_lines(
-            project=vendor_bill.project,
-            user=request.user,
-            allocations=allocations,
-        )
-        if len(line_map) != len({entry["budget_line"] for entry in allocations}):
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_error",
-                        "message": "One or more allocation budget lines are invalid for this project.",
-                        "fields": {"allocations": ["Use budget lines from this project."]},
-                    }
-                },
-                status=400,
-            )
-        allocation_total = MONEY_ZERO
-        for entry in allocations:
-            allocation_total = quantize_money(allocation_total + entry["amount"])
-    else:
-        allocation_total = _allocation_total(vendor_bill=vendor_bill)
-
-    if allocation_total > candidate_total:
+    line_items = data.get("line_items")
+    has_line_items = line_items is not None
+    if has_line_items and not line_items:
         return Response(
             {
                 "error": {
                     "code": "validation_error",
-                    "message": "Allocation total cannot exceed bill total.",
-                    "fields": {"allocations": ["Allocated amount exceeds bill total."]},
-                }
-            },
-            status=400,
-        )
-
-    if next_status in {VendorBill.Status.APPROVED, VendorBill.Status.SCHEDULED, VendorBill.Status.PAID} and allocation_total != candidate_total:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "Approved, scheduled, and paid bills must be fully allocated.",
-                    "fields": {"allocations": ["Allocation total must equal bill total."]},
+                    "message": "At least one line item is required.",
+                    "fields": {"line_items": ["At least one line item is required."]},
                 }
             },
             status=400,
@@ -665,18 +603,6 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
     if "scheduled_for" in data:
         vendor_bill.scheduled_for = data["scheduled_for"]
         update_fields.append("scheduled_for")
-    if "subtotal" in data:
-        vendor_bill.subtotal = quantize_money(data["subtotal"])
-        update_fields.append("subtotal")
-    if "tax_amount" in data:
-        vendor_bill.tax_amount = quantize_money(data["tax_amount"])
-        update_fields.append("tax_amount")
-    if "shipping_amount" in data:
-        vendor_bill.shipping_amount = quantize_money(data["shipping_amount"])
-        update_fields.append("shipping_amount")
-    if "total" in data:
-        vendor_bill.total = data["total"]
-        update_fields.append("total")
     if "notes" in data:
         vendor_bill.notes = data["notes"]
         update_fields.append("notes")
@@ -684,60 +610,32 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
         vendor_bill.status = next_status
         update_fields.append("status")
 
-    if candidate_balance_due != vendor_bill.balance_due:
-        vendor_bill.balance_due = candidate_balance_due
-        update_fields.append("balance_due")
-
     with transaction.atomic():
         if compound_received_to_scheduled:
-            # Step 1: received → approved (intermediate)
+            # Step 1: received -> approved (intermediate)
             vendor_bill.status = VendorBill.Status.APPROVED
             intermediate_update_fields = [f for f in update_fields if f != "status"] + ["status"]
             vendor_bill.save(update_fields=intermediate_update_fields)
-            FinancialAuditEvent.record(
-                project=vendor_bill.project,
-                event_type=FinancialAuditEvent.EventType.VENDOR_BILL_UPDATED,
-                object_type="vendor_bill",
-                object_id=vendor_bill.id,
-                from_status=previous_status,
-                to_status=VendorBill.Status.APPROVED,
-                amount=candidate_total,
-                note="Vendor bill approved (compound received → scheduled).",
-                created_by=request.user,
-                metadata={
-                    "bill_number": vendor_bill.bill_number,
-                    "status_changed": True,
-                    "compound_transition": True,
-                },
-            )
             VendorBillSnapshot.record(
                 vendor_bill=vendor_bill,
                 capture_status=VendorBill.Status.APPROVED,
                 previous_status=previous_status,
                 acted_by=request.user,
             )
-            if allocations is not None:
-                _sync_vendor_bill_allocations(vendor_bill=vendor_bill, allocations=allocations)
+            if has_line_items:
+                next_tax = quantize_money(data.get("tax_amount", vendor_bill.tax_amount))
+                next_shipping = quantize_money(data.get("shipping_amount", vendor_bill.shipping_amount))
+                apply_error = _apply_vendor_bill_lines_and_totals(
+                    vendor_bill, line_items, next_tax, next_shipping, request.user,
+                )
+                if apply_error:
+                    transaction.set_rollback(True)
+                    payload, status_code = _vendor_bill_line_apply_error_response(apply_error)
+                    return Response(payload, status=status_code)
 
-            # Step 2: approved → scheduled (final)
+            # Step 2: approved -> scheduled (final)
             vendor_bill.status = VendorBill.Status.SCHEDULED
             vendor_bill.save(update_fields=["status", "updated_at"])
-            FinancialAuditEvent.record(
-                project=vendor_bill.project,
-                event_type=FinancialAuditEvent.EventType.VENDOR_BILL_UPDATED,
-                object_type="vendor_bill",
-                object_id=vendor_bill.id,
-                from_status=VendorBill.Status.APPROVED,
-                to_status=VendorBill.Status.SCHEDULED,
-                amount=candidate_total,
-                note="Vendor bill scheduled (compound received → scheduled).",
-                created_by=request.user,
-                metadata={
-                    "bill_number": vendor_bill.bill_number,
-                    "status_changed": True,
-                    "compound_transition": True,
-                },
-            )
             VendorBillSnapshot.record(
                 vendor_bill=vendor_bill,
                 capture_status=VendorBill.Status.SCHEDULED,
@@ -747,24 +645,45 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
         else:
             if len(update_fields) > 1:
                 vendor_bill.save(update_fields=update_fields)
-                if previous_status != next_status or "total" in data:
-                    FinancialAuditEvent.record(
-                        project=vendor_bill.project,
-                        event_type=FinancialAuditEvent.EventType.VENDOR_BILL_UPDATED,
-                        object_type="vendor_bill",
-                        object_id=vendor_bill.id,
-                        from_status=previous_status,
-                        to_status=next_status,
-                        amount=candidate_total,
-                        note="Vendor bill updated.",
-                        created_by=request.user,
-                        metadata={
-                            "bill_number": vendor_bill.bill_number,
-                            "status_changed": previous_status != next_status,
-                        },
+
+            if has_line_items:
+                next_tax = quantize_money(data.get("tax_amount", vendor_bill.tax_amount))
+                next_shipping = quantize_money(data.get("shipping_amount", vendor_bill.shipping_amount))
+                apply_error = _apply_vendor_bill_lines_and_totals(
+                    vendor_bill, line_items, next_tax, next_shipping, request.user,
+                )
+                if apply_error:
+                    transaction.set_rollback(True)
+                    payload, status_code = _vendor_bill_line_apply_error_response(apply_error)
+                    return Response(payload, status=status_code)
+            elif "tax_amount" in data or "shipping_amount" in data:
+                # Tax or shipping changed without new line items — recompute totals from existing lines.
+                existing_lines = [
+                    {
+                        "cost_code": line.cost_code_id,
+                        "description": line.description,
+                        "quantity": line.quantity,
+                        "unit": line.unit,
+                        "unit_price": line.unit_price,
+                    }
+                    for line in vendor_bill.line_items.all()
+                ]
+                if existing_lines:
+                    next_tax = quantize_money(data.get("tax_amount", vendor_bill.tax_amount))
+                    next_shipping = quantize_money(data.get("shipping_amount", vendor_bill.shipping_amount))
+                    _apply_vendor_bill_lines_and_totals(
+                        vendor_bill, existing_lines, next_tax, next_shipping, request.user,
                     )
-            if allocations is not None:
-                _sync_vendor_bill_allocations(vendor_bill=vendor_bill, allocations=allocations)
+
+            # Recompute balance_due based on status
+            vendor_bill.refresh_from_db()
+            candidate_balance_due = (
+                MONEY_ZERO if next_status == VendorBill.Status.PAID else vendor_bill.total
+            )
+            if candidate_balance_due != vendor_bill.balance_due:
+                vendor_bill.balance_due = candidate_balance_due
+                vendor_bill.save(update_fields=["balance_due", "updated_at"])
+
             if (
                 status_changing
                 and previous_status != next_status
@@ -784,11 +703,7 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
                     acted_by=request.user,
                 )
 
-    vendor_bill = (
-        VendorBill.objects.select_related("project", "vendor")
-        .prefetch_related("allocations", "allocations__budget_line", "allocations__budget_line__cost_code")
-        .get(id=vendor_bill.id)
-    )
+    vendor_bill = _prefetch_vendor_bill_qs(VendorBill.objects.filter(id=vendor_bill.id)).get()
 
     return Response(
         {

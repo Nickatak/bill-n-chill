@@ -1,4 +1,4 @@
-"""VendorBill and VendorBillAllocation models — AP bills from vendors with budget-line attribution."""
+"""VendorBill and VendorBillLine models — AP bills from vendors."""
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -113,9 +113,8 @@ class VendorBill(StatusTransitionMixin, models.Model):
 
     def build_snapshot(self) -> dict:
         """Point-in-time snapshot for immutable audit records."""
-        allocation_rows = list(
-            self.allocations.select_related("budget_line", "budget_line__cost_code")
-            .order_by("id")
+        line_rows = list(
+            self.line_items.select_related("cost_code").order_by("id")
         )
         return {
             "vendor_bill": {
@@ -135,17 +134,19 @@ class VendorBill(StatusTransitionMixin, models.Model):
                 "balance_due": str(self.balance_due),
                 "notes": self.notes,
             },
-            "allocations": [
+            "line_items": [
                 {
-                    "vendor_bill_allocation_id": row.id,
-                    "budget_line_id": row.budget_line_id,
-                    "cost_code_id": row.budget_line.cost_code_id,
-                    "cost_code_code": row.budget_line.cost_code.code,
-                    "cost_code_name": row.budget_line.cost_code.name,
-                    "amount": str(row.amount),
-                    "note": row.note,
+                    "vendor_bill_line_id": row.id,
+                    "cost_code_id": row.cost_code_id,
+                    "cost_code_code": row.cost_code.code if row.cost_code else None,
+                    "cost_code_name": row.cost_code.name if row.cost_code else None,
+                    "description": row.description,
+                    "quantity": str(row.quantity),
+                    "unit": row.unit,
+                    "unit_price": str(row.unit_price),
+                    "line_total": str(row.line_total),
                 }
-                for row in allocation_rows
+                for row in line_rows
             ],
         }
 
@@ -155,31 +156,36 @@ class VendorBill(StatusTransitionMixin, models.Model):
         return super().save(*args, **kwargs)
 
 
-class VendorBillAllocation(models.Model):
-    """Allocation row that maps a vendor bill amount to a budget line.
+class VendorBillLine(models.Model):
+    """Individual line item on a vendor bill.
 
     Business workflow:
-    - A single vendor bill can be split across multiple budget lines.
-    - Enables accurate committed/actual attribution and line-level history.
+    - Captures quantity/unit/price for vendor-billed work or materials.
+    - Uses cost codes for internal categorization.
     """
 
     vendor_bill = models.ForeignKey(
         "VendorBill",
         on_delete=models.CASCADE,
-        related_name="allocations",
+        related_name="line_items",
     )
-    # BudgetLine is our financial-audit proxy for scope/line-item attribution.
-    budget_line = models.ForeignKey(
-        "BudgetLine",
+    cost_code = models.ForeignKey(
+        "CostCode",
         on_delete=models.PROTECT,
-        related_name="vendor_bill_allocations",
+        related_name="vendor_bill_lines",
+        null=True,
+        blank=True,
     )
-    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    note = models.CharField(max_length=255, blank=True)
+    description = models.CharField(max_length=255, blank=True)
+    quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    unit = models.CharField(max_length=30, default="ea")
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    line_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["id"]
 
     def __str__(self) -> str:
-        return f"Bill {self.vendor_bill_id} -> budget line {self.budget_line_id}: {self.amount}"
+        return f"Bill {self.vendor_bill_id} line: {self.description}"

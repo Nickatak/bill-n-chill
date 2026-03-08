@@ -1,4 +1,3 @@
-from unittest.mock import patch
 
 from core.tests.common import *
 
@@ -44,26 +43,6 @@ class VendorBillTests(TestCase):
                 "created_by": self.user,
             },
         )
-        self.estimate = Estimate.objects.create(
-            project=self.project,
-            version=1,
-            status=Estimate.Status.APPROVED,
-            title="AP Seed Estimate",
-            created_by=self.user,
-        )
-        self.budget = Budget.objects.create(
-            project=self.project,
-            source_estimate=self.estimate,
-            status=Budget.Status.ACTIVE,
-            baseline_snapshot_json={},
-            created_by=self.user,
-        )
-        self.budget_line = BudgetLine.objects.create(
-            budget=self.budget,
-            cost_code=self.cost_code,
-            description="Materials bucket",
-            budget_amount="1500.00",
-        )
         self.vendor = Vendor.objects.create(
             name="Supply House",
             email="ap@supply-house.example.com",
@@ -108,8 +87,10 @@ class VendorBillTests(TestCase):
                 "status": "planned",
                 "issue_date": "2026-02-13",
                 "due_date": "2026-03-15",
-                "total": total,
                 "notes": "Initial AP intake.",
+                "line_items": [
+                    {"description": "Initial AP intake", "quantity": "1", "unit": "ea", "unit_price": total}
+                ],
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -160,8 +141,10 @@ class VendorBillTests(TestCase):
                 "status": "planned",
                 "issue_date": "2026-02-13",
                 "due_date": "2026-03-15",
-                "total": "1250.00",
                 "notes": "Tile package.",
+                "line_items": [
+                    {"description": "Tile package", "quantity": "1", "unit": "ea", "unit_price": "1250.00"}
+                ],
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -189,7 +172,9 @@ class VendorBillTests(TestCase):
             data={
                 "vendor": self.vendor.id,
                 "bill_number": "B-2002",
-                "total": "1250.00",
+                "line_items": [
+                    {"description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "1250.00"}
+                ],
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -206,7 +191,9 @@ class VendorBillTests(TestCase):
                 "vendor": self.vendor.id,
                 "bill_number": "B-2003",
                 "status": "received",
-                "total": "1250.00",
+                "line_items": [
+                    {"description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "1250.00"}
+                ],
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -226,8 +213,10 @@ class VendorBillTests(TestCase):
                 "status": "received",
                 "issue_date": "2026-02-13",
                 "due_date": "2026-03-15",
-                "total": "1250.00",
                 "notes": "Received bill path.",
+                "line_items": [
+                    {"description": "Received bill", "quantity": "1", "unit": "ea", "unit_price": "1250.00"}
+                ],
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -238,32 +227,6 @@ class VendorBillTests(TestCase):
         self.assertEqual(payload["issue_date"], "2026-02-13")
         self.assertEqual(payload["due_date"], "2026-03-15")
 
-    def test_vendor_bill_create_rolls_back_when_audit_write_fails(self):
-        with patch(
-            "core.models.financial_auditing.financial_audit_event.FinancialAuditEvent.record",
-            side_effect=RuntimeError("capture-write-failed"),
-        ):
-            with self.assertRaises(RuntimeError):
-                self.client.post(
-                    f"/api/v1/projects/{self.project.id}/vendor-bills/",
-                    data={
-                        "vendor": self.vendor.id,
-                        "bill_number": "B-ROLLBACK",
-                        "status": "planned",
-                        "issue_date": "2026-02-13",
-                        "due_date": "2026-03-15",
-                        "total": "1250.00",
-                        "notes": "Rollback path.",
-                    },
-                    content_type="application/json",
-                    HTTP_AUTHORIZATION=f"Token {self.token.key}",
-                )
-
-        self.assertFalse(VendorBill.objects.filter(bill_number="B-ROLLBACK").exists())
-        self.assertEqual(
-            FinancialAuditEvent.objects.filter(object_type="vendor_bill").count(),
-            0,
-        )
 
     def test_vendor_bill_list_scoped_by_project_and_user(self):
         self._create_vendor_bill()
@@ -308,7 +271,9 @@ class VendorBillTests(TestCase):
                 "vendor": self.vendor.id,
                 "bill_number": "b-3100",
                 "status": "planned",
-                "total": "500.00",
+                "line_items": [
+                    {"description": "Duplicate test", "quantity": "1", "unit": "ea", "unit_price": "500.00"}
+                ],
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -338,7 +303,9 @@ class VendorBillTests(TestCase):
                 "vendor": self.vendor.id,
                 "bill_number": "B-3100",
                 "status": "planned",
-                "total": "500.00",
+                "line_items": [
+                    {"description": "Duplicate test", "quantity": "1", "unit": "ea", "unit_price": "500.00"}
+                ],
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -366,27 +333,18 @@ class VendorBillTests(TestCase):
         )
         self.assertEqual(received.status_code, 200)
 
-        blocked_approved = self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "approved"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(blocked_approved.status_code, 400)
-        self.assertEqual(blocked_approved.json()["error"]["code"], "validation_error")
-
         for status in ["approved", "scheduled", "paid"]:
-            payload = {
+            patch_payload = {
                 "status": status,
-                "allocations": [
-                    {"budget_line": self.budget_line.id, "amount": "900.00", "note": "Full alloc"}
+                "line_items": [
+                    {"cost_code": self.cost_code.id, "description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "900.00"}
                 ],
             }
             if status == "scheduled":
-                payload["scheduled_for"] = "2026-02-25"
+                patch_payload["scheduled_for"] = "2026-02-25"
             response = self.client.patch(
                 f"/api/v1/vendor-bills/{vendor_bill_id}/",
-                data=payload,
+                data=patch_payload,
                 content_type="application/json",
                 HTTP_AUTHORIZATION=f"Token {self.token.key}",
             )
@@ -395,8 +353,8 @@ class VendorBillTests(TestCase):
         payload = response.json()["data"]
         self.assertEqual(payload["status"], "paid")
         self.assertEqual(payload["balance_due"], "0.00")
-        self.assertEqual(len(payload["allocations"]), 1)
-        self.assertEqual(payload["allocations"][0]["budget_line"], self.budget_line.id)
+        self.assertEqual(len(payload["line_items"]), 1)
+        self.assertEqual(payload["line_items"][0]["cost_code"], self.cost_code.id)
 
     def test_vendor_bill_can_move_from_approved_to_paid_directly(self):
         vendor_bill_id = self._create_vendor_bill(total="900.00")
@@ -413,8 +371,8 @@ class VendorBillTests(TestCase):
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
             data={
                 "status": "approved",
-                "allocations": [
-                    {"budget_line": self.budget_line.id, "amount": "900.00", "note": "Full alloc"}
+                "line_items": [
+                    {"cost_code": self.cost_code.id, "description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "900.00"}
                 ],
             },
             content_type="application/json",
@@ -426,8 +384,8 @@ class VendorBillTests(TestCase):
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
             data={
                 "status": "paid",
-                "allocations": [
-                    {"budget_line": self.budget_line.id, "amount": "900.00", "note": "Paid direct"}
+                "line_items": [
+                    {"cost_code": self.cost_code.id, "description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "900.00"}
                 ],
             },
             content_type="application/json",
@@ -489,29 +447,16 @@ class VendorBillTests(TestCase):
                 "status": "planned",
                 "issue_date": "2026-02-13",
                 "due_date": "2026-03-15",
-                "total": "1250.00",
                 "notes": "Canonical vendor intake path.",
+                "line_items": [
+                    {"description": "Canonical vendor intake", "quantity": "1", "unit": "ea", "unit_price": "1250.00"}
+                ],
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["data"]["vendor"], canonical_vendor.id)
-
-    def test_vendor_bill_patch_rejects_allocation_total_exceeding_bill_total(self):
-        vendor_bill_id = self._create_vendor_bill(total="100.00")
-        response = self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={
-                "allocations": [
-                    {"budget_line": self.budget_line.id, "amount": "120.00", "note": "Over alloc"}
-                ]
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"]["code"], "validation_error")
 
     def test_vendor_bill_patch_requires_scheduled_for_when_status_scheduled(self):
         vendor_bill_id = self._create_vendor_bill(total="200.00")
@@ -526,8 +471,8 @@ class VendorBillTests(TestCase):
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
             data={
                 "status": "approved",
-                "allocations": [
-                    {"budget_line": self.budget_line.id, "amount": "200.00", "note": "Full alloc"}
+                "line_items": [
+                    {"cost_code": self.cost_code.id, "description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "200.00"}
                 ],
             },
             content_type="application/json",
@@ -543,50 +488,7 @@ class VendorBillTests(TestCase):
         self.assertEqual(scheduled.status_code, 400)
         self.assertEqual(scheduled.json()["error"]["code"], "validation_error")
 
-    def test_vendor_bill_patch_requires_full_allocation_when_status_scheduled(self):
-        vendor_bill_id = self._create_vendor_bill(total="200.00")
-        received = self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "received"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(received.status_code, 200)
-        approved = self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={
-                "status": "approved",
-                "allocations": [
-                    {"budget_line": self.budget_line.id, "amount": "200.00", "note": "Full alloc"}
-                ],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(approved.status_code, 200)
-
-        scheduled = self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={
-                "status": "scheduled",
-                "scheduled_for": "2026-02-25",
-                "allocations": [
-                    {"budget_line": self.budget_line.id, "amount": "150.00", "note": "Partial alloc"}
-                ],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(scheduled.status_code, 400)
-        payload = scheduled.json()["error"]
-        self.assertEqual(payload["code"], "validation_error")
-        self.assertEqual(
-            payload["message"],
-            "Approved, scheduled, and paid bills must be fully allocated.",
-        )
-        self.assertEqual(payload["fields"]["allocations"], ["Allocation total must equal bill total."])
-
-    def test_vendor_bill_patch_rejects_allocation_with_wrong_project_budget_line(self):
+    def test_vendor_bill_patch_rejects_line_items_with_wrong_org_cost_code(self):
         other_code, _ = CostCode.objects.get_or_create(
             code="50-200",
             organization=self.other_org,
@@ -596,32 +498,12 @@ class VendorBillTests(TestCase):
                 "created_by": self.other_user,
             },
         )
-        other_estimate = Estimate.objects.create(
-            project=self.other_project,
-            version=1,
-            status=Estimate.Status.APPROVED,
-            title="Other AP Seed Estimate",
-            created_by=self.other_user,
-        )
-        other_budget = Budget.objects.create(
-            project=self.other_project,
-            source_estimate=other_estimate,
-            status=Budget.Status.ACTIVE,
-            baseline_snapshot_json={},
-            created_by=self.other_user,
-        )
-        other_line = BudgetLine.objects.create(
-            budget=other_budget,
-            cost_code=other_code,
-            description="Other line",
-            budget_amount="100.00",
-        )
         vendor_bill_id = self._create_vendor_bill(total="100.00")
         response = self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
             data={
-                "allocations": [
-                    {"budget_line": other_line.id, "amount": "50.00", "note": "Invalid project line"}
+                "line_items": [
+                    {"cost_code": other_code.id, "description": "Invalid org code", "quantity": "1", "unit": "ea", "unit_price": "50.00"}
                 ]
             },
             content_type="application/json",
@@ -645,8 +527,8 @@ class VendorBillTests(TestCase):
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
             data={
                 "status": "approved",
-                "allocations": [
-                    {"budget_line": self.budget_line.id, "amount": "300.00", "note": "Full alloc"}
+                "line_items": [
+                    {"cost_code": self.cost_code.id, "description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "300.00"}
                 ],
             },
             content_type="application/json",
@@ -685,7 +567,7 @@ class VendorBillTests(TestCase):
         # Walk to paid status
         for status, extra in [
             ("received", {}),
-            ("approved", {"allocations": [{"budget_line": self.budget_line.id, "amount": "500.00", "note": ""}]}),
+            ("approved", {"line_items": [{"cost_code": self.cost_code.id, "description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "500.00"}]}),
             ("scheduled", {"scheduled_for": "2026-03-01"}),
             ("paid", {}),
         ]:
@@ -707,7 +589,7 @@ class VendorBillTests(TestCase):
         self.assertEqual(voided.status_code, 400)
         self.assertEqual(voided.json()["error"]["code"], "validation_error")
 
-    def test_vendor_bill_snapshot_payload_captures_allocation_and_context(self):
+    def test_vendor_bill_snapshot_payload_captures_line_items_and_context(self):
         vendor_bill_id = self._create_vendor_bill(total="200.00")
 
         self.client.patch(
@@ -720,8 +602,8 @@ class VendorBillTests(TestCase):
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
             data={
                 "status": "approved",
-                "allocations": [
-                    {"budget_line": self.budget_line.id, "amount": "200.00", "note": "Approved alloc"}
+                "line_items": [
+                    {"cost_code": self.cost_code.id, "description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "200.00"}
                 ],
             },
             content_type="application/json",
@@ -736,8 +618,8 @@ class VendorBillTests(TestCase):
         self.assertEqual(snapshot.snapshot_json["vendor_bill"]["total"], "200.00")
         self.assertEqual(snapshot.snapshot_json["decision_context"]["previous_status"], "received")
         self.assertEqual(snapshot.snapshot_json["decision_context"]["capture_status"], "approved")
-        self.assertEqual(len(snapshot.snapshot_json["allocations"]), 1)
-        self.assertEqual(snapshot.snapshot_json["allocations"][0]["budget_line_id"], self.budget_line.id)
+        self.assertEqual(len(snapshot.snapshot_json["line_items"]), 1)
+        self.assertEqual(snapshot.snapshot_json["line_items"][0]["cost_code_id"], self.cost_code.id)
 
     def test_vendor_bill_compound_received_to_scheduled_creates_two_snapshots(self):
         """Compound transition: received → scheduled atomically walks through approved."""
@@ -754,8 +636,8 @@ class VendorBillTests(TestCase):
             data={
                 "status": "scheduled",
                 "scheduled_for": "2026-03-10",
-                "allocations": [
-                    {"budget_line": self.budget_line.id, "amount": "200.00", "note": "Full alloc"}
+                "line_items": [
+                    {"cost_code": self.cost_code.id, "description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "200.00"}
                 ],
             },
             content_type="application/json",
@@ -774,11 +656,3 @@ class VendorBillTests(TestCase):
         self.assertEqual(snapshots[1].snapshot_json["decision_context"]["previous_status"], "received")
         self.assertEqual(snapshots[2].capture_status, "scheduled")
         self.assertEqual(snapshots[2].snapshot_json["decision_context"]["previous_status"], "approved")
-
-        # Should have TWO financial audit events for the compound transition
-        audit_events = FinancialAuditEvent.objects.filter(
-            object_type="vendor_bill",
-            object_id=vendor_bill_id,
-        ).order_by("id")
-        compound_events = [e for e in audit_events if e.metadata_json.get("compound_transition")]
-        self.assertEqual(len(compound_events), 2)

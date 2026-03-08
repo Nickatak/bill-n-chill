@@ -87,17 +87,6 @@ class MvpRegressionMoneyLoopTests(TestCase):
         )
         self.assertEqual(approve_estimate.status_code, 200)
 
-        budget_convert = self.client.post(
-            f"/api/v1/estimates/{estimate_id}/convert-to-budget/",
-            data={},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertIn(budget_convert.status_code, {200, 201})
-        budget = budget_convert.json()["data"]
-        self.assertEqual(budget["status"], "active")
-        self.assertEqual(len(budget["line_items"]), 5)
-
         create_co = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
             data={
@@ -135,7 +124,7 @@ class MvpRegressionMoneyLoopTests(TestCase):
             data={
                 "line_items": [
                     {
-                        "budget_line": budget["line_items"][0]["id"],
+                        "cost_code": self.cost_code.id,
                         "description": "Draw 1",
                         "quantity": "1",
                         "unit": "ea",
@@ -196,8 +185,12 @@ class MvpRegressionMoneyLoopTests(TestCase):
             data={
                 "vendor": vendor.id,
                 "bill_number": "VB-100",
-                "status": "planned",
-                "total": "500.00",
+                "status": "received",
+                "issue_date": "2026-02-13",
+                "due_date": "2026-03-15",
+                "line_items": [
+                    {"description": "Tile materials", "quantity": "1", "unit": "ea", "unit_price": "500.00"}
+                ],
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -205,21 +198,9 @@ class MvpRegressionMoneyLoopTests(TestCase):
         self.assertEqual(vendor_bill_create.status_code, 201)
         vendor_bill_id = vendor_bill_create.json()["data"]["id"]
 
-        to_received = self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "received"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(to_received.status_code, 200)
         to_approved = self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={
-                "status": "approved",
-                "allocations": [
-                    {"budget_line": budget["line_items"][0]["id"], "amount": "500.00", "note": "Full alloc"}
-                ],
-            },
+            data={"status": "approved"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )

@@ -4,8 +4,8 @@ from datetime import date
 from decimal import Decimal
 
 from core.models import (
-    Budget,
     ChangeOrder,
+    Estimate,
     Invoice,
     Payment,
     PaymentAllocation,
@@ -42,52 +42,46 @@ def _date_filter_from_query(request):
     return date_from, date_to, None
 
 
-def _project_active_budget_map(*, project_ids):
-    """Return a dict mapping project IDs to their most recent active budget."""
+def _project_accepted_contract_totals_map(*, project_ids):
+    """Return a dict mapping project IDs to their accepted contract total (approved estimate + approved COs)."""
     if not project_ids:
         return {}
 
-    active_budgets = (
-        Budget.objects.filter(
+    # Find approved estimates per project (latest approved by project).
+    approved_estimates = (
+        Estimate.objects.filter(
             project_id__in=project_ids,
-            status=Budget.Status.ACTIVE,
+            status=Estimate.Status.APPROVED,
         )
-        .select_related("source_estimate")
         .order_by("project_id", "-created_at", "-id")
     )
-    active_budget_by_project: dict[int, Budget] = {}
-    for budget in active_budgets:
-        if budget.project_id in active_budget_by_project:
-            continue
-        active_budget_by_project[budget.project_id] = budget
-    return active_budget_by_project
+    estimate_total_by_project: dict[int, Decimal] = {}
+    for est in approved_estimates:
+        if est.project_id not in estimate_total_by_project:
+            estimate_total_by_project[est.project_id] = est.grand_total
 
-
-def _project_accepted_contract_totals_map(*, project_ids):
-    """Return a dict mapping project IDs to their accepted contract total (estimate + approved COs)."""
-    active_budget_by_project = _project_active_budget_map(
-        project_ids=project_ids,
+    # Sum approved CO deltas per project.
+    approved_cos = ChangeOrder.objects.filter(
+        project_id__in=project_ids,
+        status=ChangeOrder.Status.APPROVED,
     )
+    co_total_by_project: dict[int, Decimal] = {}
+    for co in approved_cos:
+        co_total_by_project[co.project_id] = co_total_by_project.get(co.project_id, Decimal("0")) + co.amount_delta
+
     totals: dict[int, Decimal] = {}
-    for project_id, budget in active_budget_by_project.items():
-        if not budget.source_estimate_id:
-            totals[project_id] = Decimal("0")
-            continue
-        totals[project_id] = budget.source_estimate.grand_total + budget.approved_change_order_total
+    for project_id in project_ids:
+        est_total = estimate_total_by_project.get(project_id, Decimal("0"))
+        co_total = co_total_by_project.get(project_id, Decimal("0"))
+        totals[project_id] = est_total + co_total
     return totals
 
 
 def _build_project_financial_summary_data(project: Project, user):
     """Build a complete financial summary dict for a project with AR/AP totals and traceability links."""
-    active_budget = _project_active_budget_map(
+    accepted_contract_total = _project_accepted_contract_totals_map(
         project_ids=[project.id],
-    ).get(project.id)
-    if active_budget and active_budget.source_estimate_id:
-        accepted_contract_total = (
-            active_budget.source_estimate.grand_total + active_budget.approved_change_order_total
-        )
-    else:
-        accepted_contract_total = Decimal("0")
+    ).get(project.id, Decimal("0"))
 
     approved_co_rows = list(
         ChangeOrder.objects.filter(
@@ -250,13 +244,6 @@ def _build_project_financial_summary_data(project: Project, user):
         "contract_value_original": project.contract_value_original,
         "contract_value_current": project.contract_value_current,
         "accepted_contract_total": accepted_contract_total,
-        "active_budget_id": active_budget.id if active_budget else None,
-        "active_budget_source_estimate_id": active_budget.source_estimate_id if active_budget else None,
-        "active_budget_source_estimate_version": (
-            active_budget.source_estimate.version
-            if active_budget and active_budget.source_estimate_id
-            else None
-        ),
         "approved_change_orders_total": approved_change_orders_total,
         "invoiced_to_date": invoiced_to_date,
         "paid_to_date": paid_to_date,

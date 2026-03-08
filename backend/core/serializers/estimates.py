@@ -14,9 +14,8 @@ def _estimate_customer(obj):
 
 
 class EstimateLineItemSerializer(serializers.ModelSerializer):
-    """Read-only estimate line item with cost code and scope item details."""
+    """Read-only estimate line item with cost code details."""
 
-    scope_item = serializers.IntegerField(source="scope_item_id", read_only=True)
     cost_code_code = serializers.CharField(source="cost_code.code", read_only=True)
     cost_code_name = serializers.CharField(source="cost_code.name", read_only=True)
 
@@ -25,7 +24,6 @@ class EstimateLineItemSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "estimate",
-            "scope_item",
             "cost_code",
             "cost_code_code",
             "cost_code_name",
@@ -42,21 +40,10 @@ class EstimateLineItemSerializer(serializers.ModelSerializer):
 
 
 class EstimateSerializer(serializers.ModelSerializer):
-    """Read-only estimate with nested line items and financial baseline status."""
+    """Read-only estimate with nested line items."""
 
     line_items = EstimateLineItemSerializer(many=True, read_only=True)
     public_ref = serializers.CharField(read_only=True)
-    financial_baseline_status = serializers.SerializerMethodField()
-    is_active_financial_baseline = serializers.SerializerMethodField()
-
-    def get_financial_baseline_status(self, obj: Estimate) -> str:
-        """Return the budget baseline status for this estimate (none, active, or superseded)."""
-        status_by_estimate_id = self.context.get("financial_baseline_status_by_estimate_id", {})
-        return status_by_estimate_id.get(obj.id, "none")
-
-    def get_is_active_financial_baseline(self, obj: Estimate) -> bool:
-        """Return whether this estimate is the active budget baseline."""
-        return self.get_financial_baseline_status(obj) == "active"
 
     class Meta:
         model = Estimate
@@ -74,8 +61,6 @@ class EstimateSerializer(serializers.ModelSerializer):
             "tax_total",
             "grand_total",
             "public_ref",
-            "financial_baseline_status",
-            "is_active_financial_baseline",
             "line_items",
             "created_at",
             "updated_at",

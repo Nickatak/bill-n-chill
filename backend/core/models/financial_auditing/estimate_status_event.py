@@ -55,26 +55,13 @@ class EstimateStatusEvent(models.Model):
 
     @classmethod
     def record(cls, *, estimate, from_status, to_status, note, changed_by):
-        """Append an immutable estimate status transition row + financial audit event."""
-        from core.models.financial_auditing.financial_audit_event import FinancialAuditEvent
-
+        """Append an immutable estimate status transition row."""
         cls.objects.create(
             estimate=estimate,
             from_status=from_status,
             to_status=to_status,
             note=note,
             changed_by=changed_by,
-        )
-        FinancialAuditEvent.record(
-            project=estimate.project,
-            event_type=FinancialAuditEvent.EventType.ESTIMATE_STATUS_CHANGED,
-            object_type="estimate",
-            object_id=estimate.id,
-            from_status=from_status or "",
-            to_status=to_status or "",
-            note=note,
-            created_by=changed_by,
-            metadata={"version": estimate.version},
         )
 
     def __str__(self) -> str:

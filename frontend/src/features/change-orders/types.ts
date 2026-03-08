@@ -19,30 +19,15 @@ export type CostCodeOption = {
   is_active: boolean;
 };
 
-export type BudgetLineRecord = {
-  id: number;
-  scope_item?: number | null;
-  cost_code: number;
-  cost_code_code: string;
-  description: string;
-  budget_amount: string;
-  approved_change_order_delta?: string;
-  current_working_amount?: string;
-};
-
 export type ChangeOrderLineRecord = {
   id: number;
   change_order: number;
-  budget_line: number | null;
-  budget_line_cost_code: string | null;
-  budget_line_description: string | null;
-  cost_code: number | null;
+  cost_code: number;
   cost_code_id: number | null;
   cost_code_code: string | null;
   cost_code_name: string | null;
   description: string;
-  line_type?: "original" | "new";
-  adjustment_reason?: string;
+  adjustment_reason: string;
   amount_delta: string;
   days_delta: number;
   created_at: string;
@@ -122,13 +107,9 @@ export type ChangeOrderPolicyContract = {
 
 export type ChangeOrderLineInput = {
   localId: number;
-  lineType: "original" | "new";
-  adjustmentReason: string;
-  /** Budget line ID — required for "original" lines, empty for "new" lines. */
-  budgetLineId: string;
-  /** Cost code ID — required for "new" lines, empty for "original" lines. */
   costCodeId: string;
   description: string;
+  adjustmentReason: string;
   amountDelta: string;
   daysDelta: string;
 };
@@ -146,6 +127,6 @@ export type ApiResponse = {
     | ChangeOrderRecord[]
     | ChangeOrderRecord
     | ChangeOrderPolicyContract
-    | Array<{ id: number; status: string; line_items: BudgetLineRecord[] }>;
+    | Array<{ id: number; status: string }>;
   error?: { code?: string; message?: string; fields?: Record<string, string[]>; rule?: string };
 };

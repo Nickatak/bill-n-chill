@@ -18,13 +18,11 @@ class Invoice(StatusTransitionMixin, models.Model):
     Business workflow:
     - Built from billed scope lines and moved through billing/payment statuses.
     - Represents what the customer sees and pays.
-    - Guarded against billing beyond approved scope unless explicitly overridden.
     - `created_by` captures who created/owns the invoice record, not who later
       decided lifecycle transitions.
 
     Current policy:
     - Lifecycle control: `user-managed` with status-transition guards.
-    - Scope guard exceptions are tracked via immutable `InvoiceScopeOverrideEvent`.
     """
 
     class Status(models.TextChoices):
@@ -173,29 +171,14 @@ class InvoiceLine(models.Model):
     """Individual billed scope line included on a customer invoice.
 
     Business workflow:
-    - Canonical invoice row used for both customer-facing and internal-facing views.
-    - Customer view uses billed descriptors/amounts; internal view can additionally
-      use linkage metadata (for example `line_type`, `scope_item`).
-    - Scope lines are anchored to a project budget line for deterministic attribution.
-    - May additionally reference cost code/scope identity metadata for internal traceability.
+    - Captures quantity/unit/price for billed work.
+    - Uses cost codes for internal categorization.
     """
-
-    class LineType(models.TextChoices):
-        SCOPE = "scope", "Scope"
-        ADJUSTMENT = "adjustment", "Adjustment"
-        DIRECT = "direct", "Direct"
 
     invoice = models.ForeignKey(
         "Invoice",
         on_delete=models.CASCADE,
         related_name="line_items",
-    )
-    budget_line = models.ForeignKey(
-        "BudgetLine",
-        on_delete=models.PROTECT,
-        related_name="invoice_lines",
-        null=True,
-        blank=True,
     )
     cost_code = models.ForeignKey(
         "CostCode",
@@ -204,20 +187,6 @@ class InvoiceLine(models.Model):
         null=True,
         blank=True,
     )
-    scope_item = models.ForeignKey(
-        "ScopeItem",
-        on_delete=models.PROTECT,
-        related_name="invoice_lines",
-        null=True,
-        blank=True,
-    )
-    line_type = models.CharField(
-        max_length=24,
-        choices=LineType.choices,
-        default=LineType.SCOPE,
-    )
-    adjustment_reason = models.CharField(max_length=64, blank=True, default="")
-    internal_note = models.TextField(blank=True, default="")
     description = models.CharField(max_length=255)
     quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     unit = models.CharField(max_length=30, default="ea")
@@ -228,13 +197,6 @@ class InvoiceLine(models.Model):
 
     class Meta:
         ordering = ["id"]
-        constraints = [
-            models.CheckConstraint(
-                condition=Q(line_type="adjustment", adjustment_reason__gt="")
-                | ~Q(line_type="adjustment"),
-                name="invoice_line_adjustment_requires_reason",
-            ),
-        ]
 
     def __str__(self) -> str:
         return self.description

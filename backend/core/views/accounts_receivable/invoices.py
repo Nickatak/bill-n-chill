@@ -9,10 +9,9 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import FinancialAuditEvent, Invoice, InvoiceStatusEvent
+from core.models import Invoice, InvoiceStatusEvent
 from core.policies import get_invoice_policy_contract
 from core.serializers import (
-    InvoiceScopeOverrideSerializer,
     InvoiceSerializer,
     InvoiceStatusEventSerializer,
     InvoiceWriteSerializer,
@@ -27,9 +26,7 @@ from core.views.accounts_receivable.invoices_helpers import (
     _activate_project_from_invoice_creation,
     _apply_invoice_lines_and_totals,
     _calculate_invoice_line_totals,
-    _enforce_invoice_scope_guard,
     _invoice_line_apply_error_response,
-    _is_billable_invoice_status,
     _next_invoice_number,
 )
 from core.models import SigningCeremonyRecord
@@ -56,10 +53,7 @@ def public_invoice_detail_view(request, public_token: str):
             Invoice.objects.select_related("project__customer", "created_by")
             .prefetch_related(
                 "line_items",
-                "line_items__budget_line",
-                "line_items__budget_line__cost_code",
                 "line_items__cost_code",
-                "line_items__scope_item",
             )
             .get(public_token=public_token)
         )
@@ -88,10 +82,7 @@ def public_invoice_decision_view(request, public_token: str):
             Invoice.objects.select_related("project", "project__customer", "created_by")
             .prefetch_related(
                 "line_items",
-                "line_items__budget_line",
-                "line_items__budget_line__cost_code",
                 "line_items__cost_code",
-                "line_items__scope_item",
             )
             .get(public_token=public_token)
         )
@@ -175,23 +166,6 @@ def public_invoice_decision_view(request, public_token: str):
                 note=public_note,
                 changed_by=invoice.created_by,
             )
-            FinancialAuditEvent.record(
-                project=invoice.project,
-                event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
-                object_type="invoice",
-                object_id=invoice.id,
-                from_status=previous_status,
-                to_status=invoice.status,
-                amount=invoice.total,
-                note=public_note,
-                created_by=invoice.created_by,
-                metadata={
-                    "invoice_number": invoice.invoice_number,
-                    "public_decision": True,
-                    "public_decision_value": decision,
-                    "status_action": "transition",
-                },
-            )
         else:
             InvoiceStatusEvent.record(
                 invoice=invoice,
@@ -199,23 +173,6 @@ def public_invoice_decision_view(request, public_token: str):
                 to_status=previous_status,
                 note=public_note,
                 changed_by=invoice.created_by,
-            )
-            FinancialAuditEvent.record(
-                project=invoice.project,
-                event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
-                object_type="invoice",
-                object_id=invoice.id,
-                from_status=previous_status,
-                to_status=previous_status,
-                amount=invoice.total,
-                note=public_note,
-                created_by=invoice.created_by,
-                metadata={
-                    "invoice_number": invoice.invoice_number,
-                    "public_decision": True,
-                    "public_decision_value": decision,
-                    "status_action": "notate",
-                },
             )
 
         content_hash = compute_document_content_hash("invoice", InvoiceSerializer(invoice).data)
@@ -241,10 +198,7 @@ def public_invoice_decision_view(request, public_token: str):
         .select_related("project__customer", "created_by")
         .prefetch_related(
             "line_items",
-            "line_items__budget_line",
-            "line_items__budget_line__cost_code",
             "line_items__cost_code",
-            "line_items__scope_item",
         )
         .get()
     )
@@ -266,79 +220,7 @@ def invoice_contract_view(_request):
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_invoices_view(request, project_id: int):
-    """Project invoice collection endpoint: `GET` lists invoices, `POST` creates a draft with audit trail.
-
-    Contract:
-    - `GET` (user/project-scoped list):
-      - `200`: invoice list returned.
-        - Guarantees: no object mutations. `[APP]`
-      - `404`: project not found for this user.
-        - Guarantees: no object mutations. `[APP]`
-    - `POST` (requires role `owner|pm|bookkeeping`):
-      - `201`: draft invoice created and returned.
-        - Guarantees:
-          - newly created invoice status is `draft`. `[APP]`
-          - newly created invoice satisfies `due_date >= issue_date`. `[DB+APP]`
-          - newly created invoice totals and balance are recalculated from canonical line items + tax. `[APP]`
-          - newly created invoice number remains unique per project. `[DB+APP]`
-      - `400`: validation or business-rule failure.
-        - Guarantees:
-          - no durable partial mutation from the failed request (atomic rollback). `[DB+APP]`
-      - `403`: role gate denied for create.
-        - Guarantees: no object mutations. `[APP]`
-      - `404`: project not found for this user.
-        - Guarantees: no object mutations. `[APP]`
-
-    - Preconditions:
-      - caller is authenticated (`IsAuthenticated`).
-      - project must resolve through user scope (`_validate_project_for_user`).
-      - `POST` requires effective role in `owner|pm|bookkeeping`.
-
-    - Object mutations:
-      - `GET`: none.
-      - `POST`:
-        - Creates:
-          - Standard: `Invoice`, `InvoiceLine` rows.
-          - Audit: `InvoiceStatusEvent`, `FinancialAuditEvent`.
-        - Edits:
-          - Standard: computed invoice totals/balance fields.
-          - Audit: none.
-        - Deletes: none.
-
-    - Incoming payload (`POST`) shape:
-      - requires `line_items` with at least 1 row.
-      - `_comment_*` keys in this example are documentation-only (not accepted API fields).
-      - JSON map:
-        {
-          "issue_date": "YYYY-MM-DD (optional, default=today)",
-          "due_date": "YYYY-MM-DD (optional, must be >= issue_date, default=issue_date+30d)",
-          "tax_percent": "decimal (optional, default=0)",
-          "_comment_line_items_requirement": "line_items is required and must include at least 1 row",
-          "line_items": [
-            {
-              "line_type": "scope|adjustment (optional, default=scope)",
-              "cost_code": "integer|null (optional)",
-              "scope_item": "integer|null (optional)",
-              "adjustment_reason": "string (required when line_type=adjustment)",
-              "internal_note": "string (optional)",
-              "description": "string (required)",
-              "quantity": "decimal (required)",
-              "unit": "string (optional, default=ea)",
-              "unit_price": "decimal (required)"
-            }
-          ]
-        }
-
-    - Idempotency and retry semantics:
-      - `GET` is read-only and idempotent.
-      - `POST` is not idempotent; each successful retry creates another invoice.
-      - failed `POST` writes are rolled back atomically (no partial invoice/line/event persistence).
-
-    - Test anchors:
-      - `backend/core/tests/test_invoices.py::test_project_invoices_list_scoped_by_project_and_user`
-      - `backend/core/tests/test_invoices.py::test_invoice_create_calculates_totals_and_lines`
-      - `backend/core/tests/test_invoices.py::test_invoice_create_rolls_back_when_status_event_write_fails`
-    """
+    """Project invoice collection endpoint: `GET` lists invoices, `POST` creates a draft."""
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -352,10 +234,7 @@ def project_invoices_view(request, project_id: int):
             .select_related("customer")
             .prefetch_related(
                 "line_items",
-                "line_items__budget_line",
-                "line_items__budget_line__cost_code",
                 "line_items__cost_code",
-                "line_items__scope_item",
             )
             .order_by("-created_at")
         )
@@ -448,18 +327,6 @@ def project_invoices_view(request, project_id: int):
             note="Invoice created.",
             changed_by=request.user,
         )
-        FinancialAuditEvent.record(
-            project=project,
-            event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
-            object_type="invoice",
-            object_id=invoice.id,
-            from_status="",
-            to_status=Invoice.Status.DRAFT,
-            amount=invoice.total,
-            note="Invoice created.",
-            created_by=request.user,
-            metadata={"invoice_number": invoice.invoice_number},
-        )
         _activate_project_from_invoice_creation(invoice=invoice, actor=request.user)
     return Response({"data": InvoiceSerializer(invoice).data}, status=201)
 
@@ -467,88 +334,14 @@ def project_invoices_view(request, project_id: int):
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def invoice_detail_view(request, invoice_id: int):
-    """Fetch or update one invoice while enforcing lifecycle, totals, and scope-guard rules.
-
-    Contract:
-    - `GET`:
-      - `200`: invoice detail returned.
-        - Guarantees: no object mutations. `[APP]`
-      - `404`: invoice not found for this user.
-        - Guarantees: no object mutations. `[APP]`
-    - `PATCH` (requires role `owner|pm|bookkeeping`):
-      - `200`: patch applied and updated invoice returned.
-        - Guarantees:
-          - updated invoice satisfies lifecycle/date invariants. `[DB+APP]`
-          - invoice totals/balance remain consistent with stored lines and tax settings. `[APP]`
-      - `400`: validation, transition, scope-guard, or line/totals failure.
-        - Guarantees: no durable partial mutation from failed request path. `[DB+APP]`
-      - `403`: role gate denied for patch.
-        - Guarantees: no object mutations. `[APP]`
-      - `404`: invoice not found for this user.
-        - Guarantees: no object mutations. `[APP]`
-
-    - Preconditions:
-      - caller is authenticated (`IsAuthenticated`).
-      - invoice must belong to requesting user.
-      - `PATCH` requires effective role in `owner|pm|bookkeeping`.
-
-    - Object mutations:
-      - `GET`: none.
-      - `PATCH`:
-        - Creates:
-          - Standard: `InvoiceLine` replacement rows (when `line_items` is provided).
-          - Audit: `InvoiceStatusEvent`, `FinancialAuditEvent`, and `InvoiceScopeOverrideEvent` when applicable.
-        - Edits:
-          - Standard: `Invoice` fields (`status`, dates, tax/totals, balance).
-          - Audit: none.
-        - Deletes: existing `InvoiceLine` rows when replacing line items.
-
-    - Incoming payload (`PATCH`) shape:
-      - `_comment_*` keys in this example are documentation-only (not accepted API fields).
-      - JSON map:
-        {
-          "status": "draft|sent|partially_paid|paid|void (optional)",
-          "issue_date": "YYYY-MM-DD (optional)",
-          "due_date": "YYYY-MM-DD (optional, must be >= issue_date)",
-          "tax_percent": "decimal (optional)",
-          "_comment_line_items": "if present, line_items must include at least 1 row",
-          "line_items": [
-            {
-              "line_type": "scope|adjustment (optional, default=scope)",
-              "cost_code": "integer|null (optional)",
-              "scope_item": "integer|null (optional)",
-              "adjustment_reason": "string (required when line_type=adjustment)",
-              "internal_note": "string (optional)",
-              "description": "string (required)",
-              "quantity": "decimal (required)",
-              "unit": "string (optional, default=ea)",
-              "unit_price": "decimal (required)"
-            }
-          ],
-          "scope_override": "boolean (optional)",
-          "scope_override_note": "string (required when scope override is needed)"
-        }
-
-    - Idempotency and retry semantics:
-      - `GET` is read-only and idempotent.
-      - `PATCH` is conditionally idempotent when payload values equal current persisted values.
-      - `PATCH` retries that fail validation do not persist partial writes.
-
-    - Test anchors:
-      - `backend/core/tests/test_invoices.py::test_invoice_status_transition_validation_and_paid_balance`
-      - `backend/core/tests/test_invoices.py::test_invoice_patch_line_items_recalculates_totals`
-      - `backend/core/tests/test_invoices.py::test_invoice_patch_billable_totals_over_scope_requires_override`
-    """
+    """Fetch or update one invoice while enforcing lifecycle and totals rules."""
     membership = _ensure_membership(request.user)
     try:
         invoice = (
             Invoice.objects.select_related("customer")
             .prefetch_related(
                 "line_items",
-                "line_items__budget_line",
-                "line_items__budget_line__cost_code",
                 "line_items__cost_code",
-                "line_items__scope_item",
             )
             .get(
                 id=invoice_id,
@@ -571,8 +364,6 @@ def invoice_detail_view(request, invoice_id: int):
     serializer = InvoiceWriteSerializer(data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
     ingress = build_invoice_patch_ingress(serializer.validated_data)
-    scope_override = ingress.scope_override
-    scope_override_note = ingress.scope_override_note
     status_note = ingress.status_note
 
     status_changing = ingress.has_status
@@ -630,7 +421,7 @@ def invoice_detail_view(request, invoice_id: int):
             ingress.has_notes_text,
         ]
     )
-    candidate_total = invoice.total
+
     if ingress.has_line_items:
         line_items = ingress.line_items
         if not line_items:
@@ -656,54 +447,8 @@ def invoice_detail_view(request, invoice_id: int):
                 },
                 status=400,
             )
-        line_items_for_preview = line_items
-    else:
-        line_items_for_preview = [
-            {
-                "line_type": line.line_type,
-                "budget_line": line.budget_line_id,
-                "cost_code": line.cost_code_id,
-                "scope_item": line.scope_item_id,
-                "adjustment_reason": line.adjustment_reason,
-                "internal_note": line.internal_note,
-                "description": line.description,
-                "quantity": line.quantity,
-                "unit": line.unit,
-                "unit_price": line.unit_price,
-            }
-            for line in invoice.line_items.all()
-        ]
-
-    if totals_changing:
-        _, candidate_subtotal = _calculate_invoice_line_totals(line_items_for_preview)
-        candidate_tax_percent = Decimal(
-            str(ingress.tax_percent if ingress.has_tax_percent else invoice.tax_percent)
-        )
-        candidate_tax_total = quantize_money(candidate_subtotal * (candidate_tax_percent / Decimal("100")))
-        candidate_total = quantize_money(candidate_subtotal + candidate_tax_total)
-
-    status_is_entering_billable = _is_billable_invoice_status(next_status) and not _is_billable_invoice_status(
-        invoice.status
-    )
-    scope_guard_required = status_is_entering_billable or (
-        totals_changing and _is_billable_invoice_status(next_status)
-    )
 
     with transaction.atomic():
-        scope_error = None
-        if scope_guard_required:
-            scope_error = _enforce_invoice_scope_guard(
-                invoice=invoice,
-                project=invoice.project,
-                user=request.user,
-                candidate_status=next_status,
-                candidate_total=candidate_total,
-                scope_override=scope_override,
-                scope_override_note=scope_override_note,
-            )
-        if scope_error:
-            return Response(scope_error, status=400)
-
         update_fields = ["updated_at"]
         if ingress.has_issue_date:
             invoice.issue_date = ingress.issue_date
@@ -755,12 +500,7 @@ def invoice_detail_view(request, invoice_id: int):
         elif ingress.has_tax_percent:
             existing_lines = [
                 {
-                    "line_type": line.line_type,
-                    "budget_line": line.budget_line_id,
                     "cost_code": line.cost_code_id,
-                    "scope_item": line.scope_item_id,
-                    "adjustment_reason": line.adjustment_reason,
-                    "internal_note": line.internal_note,
                     "description": line.description,
                     "quantity": line.quantity,
                     "unit": line.unit,
@@ -781,35 +521,16 @@ def invoice_detail_view(request, invoice_id: int):
             invoice.save(update_fields=["balance_due", "updated_at"])
 
         should_record_status_event = previous_status != next_status or is_resend or status_note_requested
-        if previous_status != next_status or totals_changing or template_changing or should_record_status_event:
-            if should_record_status_event:
-                status_event_note = status_note.strip()
-                if not status_event_note:
-                    status_event_note = "Invoice re-sent." if is_resend else "Invoice status updated."
-                InvoiceStatusEvent.record(
-                    invoice=invoice,
-                    from_status=previous_status,
-                    to_status=next_status,
-                    note=status_event_note,
-                    changed_by=request.user,
-                )
-            FinancialAuditEvent.record(
-                project=invoice.project,
-                event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
-                object_type="invoice",
-                object_id=invoice.id,
+        if should_record_status_event:
+            status_event_note = status_note.strip()
+            if not status_event_note:
+                status_event_note = "Invoice re-sent." if is_resend else "Invoice status updated."
+            InvoiceStatusEvent.record(
+                invoice=invoice,
                 from_status=previous_status,
                 to_status=next_status,
-                amount=candidate_total if totals_changing else invoice.total,
-                note="Invoice updated.",
-                created_by=request.user,
-                metadata={
-                    "invoice_number": invoice.invoice_number,
-                    "totals_changed": totals_changing,
-                    "status_changed": previous_status != next_status,
-                    "status_note_logged": status_note_requested,
-                    "template_changed": template_changing,
-                },
+                note=status_event_note,
+                changed_by=request.user,
             )
 
     invoice.refresh_from_db()
@@ -819,54 +540,7 @@ def invoice_detail_view(request, invoice_id: int):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def invoice_send_view(request, invoice_id: int):
-    """Send an invoice by transitioning to `sent` with optional scope override metadata.
-
-    Contract:
-    - `POST` (requires role `owner|pm|bookkeeping`):
-      - `200`: invoice transitioned to `sent` and returned.
-        - Guarantees:
-          - invoice status is `sent`. `[APP]`
-          - send-path audit/status records are persisted. `[APP]`
-      - `400`: transition invalid or scope-guard/override validation failed.
-        - Guarantees: no durable partial mutation from failed request path. `[DB+APP]`
-      - `403`: role gate denied for send.
-        - Guarantees: no object mutations. `[APP]`
-      - `404`: invoice not found for this user.
-        - Guarantees: no object mutations. `[APP]`
-
-    - Preconditions:
-      - caller is authenticated (`IsAuthenticated`).
-      - invoice must belong to requesting user.
-      - caller role must be `owner|pm|bookkeeping`.
-
-    - Object mutations:
-      - `POST`:
-        - Creates:
-          - Standard: none.
-          - Audit: `InvoiceStatusEvent`, `FinancialAuditEvent`, and possibly `InvoiceScopeOverrideEvent`.
-        - Edits:
-          - Standard: `Invoice.status` (to `sent`).
-          - Audit: none.
-        - Deletes: none.
-
-    - Incoming payload (`POST`) shape:
-      - `_comment_*` keys in this example are documentation-only (not accepted API fields).
-      - JSON map:
-        {
-          "scope_override": "boolean (optional)",
-          "_comment_scope_override_note": "required when scope override is needed",
-          "scope_override_note": "string (optional)"
-        }
-
-    - Idempotency and retry semantics:
-      - `POST` is not idempotent for state transitions.
-      - retries after success may fail transition validation if already `sent`.
-
-    - Test anchors:
-      - `backend/core/tests/test_invoices.py::test_invoice_send_endpoint_moves_draft_to_sent`
-      - `backend/core/tests/test_invoices.py::test_invoice_send_blocks_when_total_exceeds_approved_scope_without_override`
-      - `backend/core/tests/test_invoices.py::test_invoice_send_scope_override_creates_audit_note`
-    """
+    """Send an invoice by transitioning to `sent`."""
     membership = _ensure_membership(request.user)
     try:
         invoice = Invoice.objects.get(id=invoice_id, project__organization_id=membership.organization_id)
@@ -895,24 +569,8 @@ def invoice_send_view(request, invoice_id: int):
             status=400,
         )
 
-    override_serializer = InvoiceScopeOverrideSerializer(data=request.data)
-    override_serializer.is_valid(raise_exception=True)
-    override_data = override_serializer.validated_data
-
     with transaction.atomic():
         previous_status = invoice.status
-        scope_error = _enforce_invoice_scope_guard(
-            invoice=invoice,
-            project=invoice.project,
-            user=request.user,
-            candidate_status=Invoice.Status.SENT,
-            candidate_total=invoice.total,
-            scope_override=override_data.get("scope_override", False),
-            scope_override_note=override_data.get("scope_override_note", ""),
-        )
-        if scope_error:
-            return Response(scope_error, status=400)
-
         invoice.status = Invoice.Status.SENT
         invoice.save(update_fields=["status", "updated_at"])
         InvoiceStatusEvent.record(
@@ -921,18 +579,6 @@ def invoice_send_view(request, invoice_id: int):
             to_status=Invoice.Status.SENT,
             note="Invoice sent.",
             changed_by=request.user,
-        )
-        FinancialAuditEvent.record(
-            project=invoice.project,
-            event_type=FinancialAuditEvent.EventType.INVOICE_UPDATED,
-            object_type="invoice",
-            object_id=invoice.id,
-            from_status=previous_status,
-            to_status=Invoice.Status.SENT,
-            amount=invoice.total,
-            note="Invoice sent.",
-            created_by=request.user,
-            metadata={"invoice_number": invoice.invoice_number},
         )
 
     customer_email = (invoice.customer.email or "").strip()
@@ -951,28 +597,7 @@ def invoice_send_view(request, invoice_id: int):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def invoice_status_events_view(request, invoice_id: int):
-    """Return immutable invoice status transition history for one invoice.
-
-    Contract:
-    - `GET`:
-      - `200`: status-event list returned.
-        - Guarantees: no object mutations. `[APP]`
-      - `404`: invoice not found for this user.
-        - Guarantees: no object mutations. `[APP]`
-
-    - Preconditions:
-      - caller is authenticated (`IsAuthenticated`).
-      - invoice must belong to requesting user.
-
-    - Object mutations:
-      - `GET`: none.
-
-    - Idempotency and retry semantics:
-      - `GET` is read-only and idempotent.
-
-    - Test anchors:
-      - `backend/core/tests/test_invoices.py::test_invoice_status_events_endpoint_returns_history`
-    """
+    """Return immutable invoice status transition history for one invoice."""
     membership = _ensure_membership(request.user)
     try:
         invoice = Invoice.objects.get(id=invoice_id, project__organization_id=membership.organization_id)

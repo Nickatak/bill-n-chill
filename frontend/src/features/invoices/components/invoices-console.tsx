@@ -19,7 +19,6 @@ import {
   invoiceStatusEventActionLabel,
   invoiceStatusLabel,
   nextInvoiceNumberPreview,
-  normalizeDecimalInput,
   projectStatusLabel,
   publicInvoiceHref,
   readInvoiceApiError,
@@ -68,43 +67,6 @@ import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/pro
 // ---------------------------------------------------------------------------
 
 type ProjectStatusValue = ProjectListStatusValue;
-type ProjectBudgetRecord = {
-  id: number;
-  status: string;
-  source_estimate: number | null;
-  source_estimate_version?: number | null;
-  baseline_snapshot_json?: {
-    estimate?: {
-      title?: string;
-    };
-    line_items?: Array<{
-      scope_item_id?: number | null;
-      quantity?: string | number;
-      unit_cost?: string | number;
-      line_total?: string | number;
-    }>;
-  };
-  line_items?: Array<{
-    id: number;
-    scope_item: number | null;
-    cost_code_code: string;
-    description: string;
-    budget_amount?: string;
-    remaining_billable?: string;
-  }>;
-};
-type BudgetLineOption = {
-  id: number;
-  scopeItemId: number | null;
-  costCodeCode: string;
-  description: string;
-  label: string;
-  groupLabel: string;
-  defaultQuantity: string;
-  defaultUnitPrice: string;
-  remainingBillable: string;
-};
-
 const INVOICE_STATUSES_FALLBACK = ["draft", "sent", "partially_paid", "paid", "void"];
 
 const INVOICE_STATUS_LABELS_FALLBACK: Record<string, string> = {
@@ -128,8 +90,6 @@ const INVOICE_TERMINAL_STATUSES_FALLBACK = ["paid", "partially_paid", "void"];
 const INVOICE_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
 const DEFAULT_PROJECT_STATUS_FILTERS: ProjectStatusValue[] = ["active", "prospect"];
 const PROJECT_STATUS_VALUES: ProjectStatusValue[] = ["prospect", "active", "on_hold", "completed", "cancelled"];
-const GENERIC_BUDGET_COST_CODES = new Set(["99-901", "99-902", "99-903"]);
-
 // ---------------------------------------------------------------------------
 // Display helpers
 // ---------------------------------------------------------------------------
@@ -242,7 +202,6 @@ export function InvoicesConsole() {
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [budgetLineOptions, setBudgetLineOptions] = useState<BudgetLineOption[]>([]);
 
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
   const [selectedInvoiceStatusEvents, setSelectedInvoiceStatusEvents] = useState<
@@ -333,17 +292,6 @@ export function InvoicesConsole() {
     () => invoices.find((invoice) => invoice.id === workspaceSourceInvoiceId) ?? null,
     [invoices, workspaceSourceInvoiceId],
   );
-  const budgetLineById = useMemo(
-    () => new Map(budgetLineOptions.map((option) => [String(option.id), option])),
-    [budgetLineOptions],
-  );
-  const budgetLineGroups = useMemo(() => {
-    const next = new Map<string, BudgetLineOption[]>();
-    for (const option of budgetLineOptions) {
-      next.set(option.groupLabel, [...(next.get(option.groupLabel) ?? []), option]);
-    }
-    return [...next.entries()];
-  }, [budgetLineOptions]);
   const projectNeedle = projectSearch.trim().toLowerCase();
   const filteredProjects = !projectNeedle
     ? projects
@@ -539,95 +487,6 @@ export function InvoicesConsole() {
     [normalizedBaseUrl, selectedProjectId, setErrorStatus, setStatusMessage, token],
   );
 
-  const loadBudgetLineOptions = useCallback(
-    async (projectIdArg?: number) => {
-      const resolvedProjectId = projectIdArg ?? Number(selectedProjectId);
-      if (!token || !resolvedProjectId) {
-        setBudgetLineOptions([]);
-        return [];
-      }
-      try {
-        const response = await fetch(`${normalizedBaseUrl}/projects/${resolvedProjectId}/budgets/`, {
-          headers: buildAuthHeaders(token),
-        });
-        const payload = (await response.json()) as { data?: ProjectBudgetRecord[] };
-        if (!response.ok) {
-          setBudgetLineOptions([]);
-          return [];
-        }
-        const budgets = payload.data ?? [];
-        const activeBudget = budgets.find((row) => row.status === "active");
-        const estimateTitle = activeBudget?.baseline_snapshot_json?.estimate?.title?.trim();
-        const baseGroupLabel =
-          estimateTitle ||
-          (activeBudget?.source_estimate ? `Estimate #${activeBudget.source_estimate}` : "Estimate scope");
-        const groupLabel =
-          activeBudget?.source_estimate_version != null
-            ? `${baseGroupLabel} (v${activeBudget.source_estimate_version})`
-            : baseGroupLabel;
-        const baselineLineByScopeItemId = new Map<
-          string,
-          {
-            quantity: string | number | undefined;
-            unit_cost: string | number | undefined;
-            line_total: string | number | undefined;
-          }
-        >();
-        const baselineLineItems = activeBudget?.baseline_snapshot_json?.line_items ?? [];
-        for (const line of baselineLineItems) {
-          if (line.scope_item_id == null) {
-            continue;
-          }
-          baselineLineByScopeItemId.set(String(line.scope_item_id), {
-            quantity: line.quantity,
-            unit_cost: line.unit_cost,
-            line_total: line.line_total,
-          });
-        }
-        const options =
-          activeBudget?.line_items?.map((line) => {
-            const baselineLine =
-              line.scope_item != null
-                ? baselineLineByScopeItemId.get(String(line.scope_item))
-                : undefined;
-            const baselineQuantity = parseAmount(String(baselineLine?.quantity ?? ""));
-            const baselineLineTotal = parseAmount(String(baselineLine?.line_total ?? ""));
-            const baselineUnitCost = parseAmount(String(baselineLine?.unit_cost ?? ""));
-            const budgetAmount = parseAmount(String(line.budget_amount ?? ""));
-            const defaultQuantity =
-              baselineQuantity > 0 ? normalizeDecimalInput(baselineQuantity, "1") : "1";
-            let defaultUnitPrice = "0";
-            if (baselineQuantity > 0 && baselineLineTotal > 0) {
-              defaultUnitPrice = normalizeDecimalInput(baselineLineTotal / baselineQuantity, "0");
-            } else if (baselineUnitCost > 0) {
-              defaultUnitPrice = normalizeDecimalInput(baselineUnitCost, "0");
-            } else if (budgetAmount > 0) {
-              defaultUnitPrice = normalizeDecimalInput(budgetAmount, "0");
-            }
-            return {
-              id: line.id,
-              scopeItemId: line.scope_item,
-              costCodeCode: line.cost_code_code,
-              description: line.description,
-              label: `${line.cost_code_code || "CC"} - ${line.description}`,
-              groupLabel,
-              defaultQuantity,
-              defaultUnitPrice,
-              remainingBillable: normalizeDecimalInput(parseAmount(String(line.remaining_billable ?? "0")), "0"),
-            };
-          })
-            .filter((line) => !GENERIC_BUDGET_COST_CODES.has(line.costCodeCode))
-            ?? [];
-        setBudgetLineOptions(options);
-        return options;
-      } catch {
-        setBudgetLineOptions([]);
-        return [];
-      }
-    },
-    [normalizedBaseUrl, selectedProjectId, token],
-  );
-
   const loadInvoiceStatusEvents = useCallback(
     async (invoiceId: number) => {
       if (!token || !invoiceId) {
@@ -667,21 +526,18 @@ export function InvoicesConsole() {
     void loadDependencies();
   }, [loadDependencies, token]);
 
-  // Reload invoices and budget line options whenever the selected project changes.
-  // Also reset the workspace draft so line items reflect the new project's budget.
+  // Reload invoices whenever the selected project changes.
+  // Also reset the workspace draft.
   useEffect(() => {
     const projectId = Number(selectedProjectId);
     if (!token || !projectId) {
       setInvoices([]);
       setSelectedInvoiceId("");
-      setBudgetLineOptions([]);
       return;
     }
     void loadInvoices(projectId);
-    void loadBudgetLineOptions(projectId).then((options) => {
-      resetCreateDraft(options);
-    });
-  }, [loadBudgetLineOptions, loadInvoices, selectedProjectId, token]);
+    resetCreateDraft();
+  }, [loadInvoices, selectedProjectId, token]);
 
   // Auto-select the first project that has invoices when the default project is empty.
   useEffect(() => {
@@ -801,25 +657,6 @@ export function InvoicesConsole() {
     void loadInvoiceStatusEvents(invoiceId);
   }, [loadInvoiceStatusEvents, selectedInvoiceId]);
 
-  // Backfill orphaned scope lines with a valid budget line when options change.
-  useEffect(() => {
-    const defaultBudgetLineId = budgetLineOptions[0] ? String(budgetLineOptions[0].id) : "";
-    if (!defaultBudgetLineId) {
-      return;
-    }
-    setLineItems((current) =>
-      current.map((line) => {
-        if (line.lineType !== "scope") {
-          return line;
-        }
-        if (line.budgetLineId && budgetLineById.has(line.budgetLineId)) {
-          return line;
-        }
-        return { ...line, budgetLineId: defaultBudgetLineId };
-      }),
-    );
-  }, [budgetLineById, budgetLineOptions]);
-
   // -------------------------------------------------------------------------
   // Line item handlers
   // -------------------------------------------------------------------------
@@ -829,8 +666,7 @@ export function InvoicesConsole() {
     if (statusTone === "error" && statusMessage === INVOICE_MIN_LINE_ITEMS_ERROR) {
       clearStatus();
     }
-    const defaultBudgetLineId = budgetLineOptions[0] ? String(budgetLineOptions[0].id) : "";
-    setLineItems((current) => [...current, emptyLine(nextLineId, defaultBudgetLineId)]);
+    setLineItems((current) => [...current, emptyLine(nextLineId)]);
     setNextLineId((value) => value + 1);
   }
 
@@ -843,25 +679,12 @@ export function InvoicesConsole() {
     setLineItems((current) => current.filter((line) => line.localId !== localId));
   }
 
-  /** Update a single field on a line item; auto-populates defaults when changing budget line. */
+  /** Update a single field on a line item. */
   function updateLineItem(localId: number, key: keyof Omit<InvoiceLineInput, "localId">, value: string) {
     setLineItems((current) =>
       current.map((line) => {
         if (line.localId !== localId) {
           return line;
-        }
-        if (key === "budgetLineId" && line.lineType === "scope") {
-          const selectedOption = budgetLineById.get(value);
-          if (!selectedOption) {
-            return { ...line, budgetLineId: value };
-          }
-          return {
-            ...line,
-            budgetLineId: value,
-            description: selectedOption.description,
-            quantity: "1",
-            unitPrice: selectedOption.remainingBillable,
-          };
         }
         return { ...line, [key]: value };
       }),
@@ -880,34 +703,19 @@ export function InvoicesConsole() {
   const invoiceToWorkspaceLines = useCallback(
     (invoice: InvoiceRecord): InvoiceLineInput[] => {
       const sourceLines = invoice.line_items ?? [];
-      const fallbackBudgetLineId = budgetLineOptions[0] ? String(budgetLineOptions[0].id) : "";
       if (!sourceLines.length) {
-        return [emptyLine(1, fallbackBudgetLineId)];
+        return [emptyLine(1)];
       }
-      return sourceLines.map((line, index) => {
-        const lineType: InvoiceLineInput["lineType"] =
-          line.line_type === "adjustment" ? "adjustment" : line.line_type === "direct" ? "direct" : "scope";
-        const rawBudgetLineId = line.budget_line ? String(line.budget_line) : "";
-        const budgetLineId =
-          lineType === "scope"
-            ? budgetLineById.has(rawBudgetLineId)
-              ? rawBudgetLineId
-              : fallbackBudgetLineId
-            : "";
-        return {
-          localId: index + 1,
-          lineType,
-          budgetLineId,
-          adjustmentReason: line.adjustment_reason || "",
-          internalNote: line.internal_note || "",
-          description: line.description || "Invoice scope item",
-          quantity: line.quantity || "1",
-          unit: line.unit || "ea",
-          unitPrice: line.unit_price || "0",
-        };
-      });
+      return sourceLines.map((line, index) => ({
+        localId: index + 1,
+        costCode: line.cost_code ? String(line.cost_code) : "",
+        description: line.description || "",
+        quantity: line.quantity || "1",
+        unit: line.unit || "ea",
+        unitPrice: line.unit_price || "0",
+      }));
     },
-    [budgetLineById, budgetLineOptions],
+    [],
   );
 
   const loadInvoiceIntoWorkspace = useCallback(
@@ -931,7 +739,7 @@ export function InvoicesConsole() {
     [invoiceToWorkspaceLines],
   );
 
-  /** Switch the active project, triggering invoice and budget line reloads. */
+  /** Switch the active project, triggering invoice reload. */
   function handleSelectProject(project: { id: number }) {
     if (String(project.id) === selectedProjectId) {
       return;
@@ -951,43 +759,16 @@ export function InvoicesConsole() {
     loadInvoiceIntoWorkspace(invoice);
   }
 
-  /** Reset the creator workspace to a fresh new-draft state.
-   *  Pre-populates line items from the active budget with remaining billable amounts.
-   *  Accepts optional budget line options for use before state has settled. */
-  function resetCreateDraft(optionsOverride?: BudgetLineOption[]) {
-    const options = optionsOverride ?? budgetLineOptions;
+  /** Reset the creator workspace to a fresh new-draft state. */
+  function resetCreateDraft() {
     const nextIssueDate = todayDateInput();
     const dueDays = organizationInvoiceDefaults?.default_invoice_due_delta ?? 30;
     setIssueDate(nextIssueDate);
     setDueDate(dueDateFromIssueDate(nextIssueDate, dueDays));
     setTaxPercent("0");
     setTermsText(organizationInvoiceDefaults?.invoice_terms_and_conditions || "");
-
-    const billableLines = options
-      .filter((opt) => parseAmount(opt.remainingBillable) > 0)
-      .map((opt, idx) => ({
-        localId: idx + 1,
-        lineType: "scope" as const,
-        budgetLineId: String(opt.id),
-        adjustmentReason: "",
-        internalNote: "",
-        description: opt.description,
-        quantity: "1",
-        unit: "ea",
-        unitPrice: opt.remainingBillable,
-      }));
-
-    if (billableLines.length > 0) {
-      setLineItems(billableLines);
-      setNextLineId(billableLines.length + 1);
-    } else if (options.length > 0) {
-      setLineItems([emptyLine(1, String(options[0].id))]);
-      setNextLineId(2);
-    } else {
-      setLineItems([emptyLine(1, "", "direct")]);
-      setNextLineId(2);
-    }
-
+    setLineItems([emptyLine(1)]);
+    setNextLineId(2);
     setWorkspaceSourceInvoiceId(null);
     setEditingDraftInvoiceId(null);
     setWorkspaceContext("New invoice draft");
@@ -1016,24 +797,8 @@ export function InvoicesConsole() {
       return;
     }
 
-    if (lineItems.some((line) => line.lineType === "scope" && !line.budgetLineId)) {
-      setErrorStatus("Each scope line requires a project budget line.");
-      return;
-    }
-    if (
-      lineItems.some(
-        (line) => line.lineType === "adjustment" && !line.adjustmentReason.trim(),
-      )
-    ) {
-      setErrorStatus("Each adjustment line requires a reason.");
-      return;
-    }
-    if (
-      lineItems.some(
-        (line) => line.lineType === "direct" && !line.description.trim(),
-      )
-    ) {
-      setErrorStatus("Each direct line requires a description.");
+    if (lineItems.some((line) => !line.description.trim())) {
+      setErrorStatus("Each line item requires a description.");
       return;
     }
 
@@ -1701,7 +1466,7 @@ export function InvoicesConsole() {
                                         <tbody>
                                           {invoice.line_items!.map((line) => (
                                             <tr key={line.id}>
-                                              <td>{line.description || line.budget_line_description || "—"}</td>
+                                              <td>{line.description || "—"}</td>
                                               <td>{line.quantity}</td>
                                               <td>{line.unit}</td>
                                               <td>${line.unit_price}</td>
@@ -1880,19 +1645,11 @@ export function InvoicesConsole() {
                       <div className={invoiceCreatorStyles.invoiceLineSectionIntro}>
                         <h3>Line Items</h3>
                       </div>
-                      {budgetLineOptions.length === 0 ? (
-                        <p className={creatorStyles.inlineHint}>
-                          Scope lines require an active project budget line. Convert an approved estimate to budget or
-                          use adjustment lines with a reason. Internal generic lines are not billable here.
-                        </p>
-                      ) : null}
-
                       <div className={creatorStyles.lineTable}>
                         <div className={invoiceCreatorStyles.invoiceLineHeader}>
-                          <span>Type</span>
-                          <span>Scope source / Reason</span>
-                          <span>Qty</span>
+                          <span>Cost Code</span>
                           <span>Description</span>
+                          <span>Qty</span>
                           <span>Unit</span>
                           <span>Unit price</span>
                           <span>Amount</span>
@@ -1905,74 +1662,13 @@ export function InvoicesConsole() {
                               key={line.localId}
                               className={`${invoiceCreatorStyles.invoiceLineRow} ${index % 2 === 1 ? invoiceCreatorStyles.invoiceLineRowAlt : ""}`}
                             >
-                              {budgetLineOptions.length > 0 ? (
-                                <select
-                                  className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                                  value={line.lineType}
-                                  onChange={(event) =>
-                                    updateLineItem(
-                                      line.localId,
-                                      "lineType",
-                                      event.target.value as InvoiceLineInput["lineType"],
-                                    )
-                                  }
-                                  disabled={workspaceIsLocked}
-                                >
-                                  <option value="scope">Scope</option>
-                                  <option value="adjustment">Adjustment</option>
-                                  <option value="direct">Direct</option>
-                                </select>
-                              ) : (
-                                <span className={creatorStyles.lineInput} style={{ color: "var(--text-secondary)" }}>Direct</span>
-                              )}
-                              {line.lineType === "scope" ? (
-                                <div>
-                                  <span className={creatorStyles.printOnly}>
-                                    {budgetLineById.get(line.budgetLineId)?.costCodeCode || "—"}
-                                  </span>
-                                  <select
-                                    className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl} ${creatorStyles.screenOnly}`}
-                                    value={line.budgetLineId}
-                                    onChange={(event) =>
-                                      updateLineItem(line.localId, "budgetLineId", event.target.value)
-                                    }
-                                    required
-                                    disabled={workspaceIsLocked}
-                                  >
-                                    <option value="">Select cost code</option>
-                                    {budgetLineGroups.map(([groupLabel, options]) => (
-                                      <optgroup key={groupLabel} label={groupLabel}>
-                                        {options.map((option) => (
-                                          <option key={option.id} value={option.id}>
-                                            {option.label}
-                                          </option>
-                                        ))}
-                                      </optgroup>
-                                    ))}
-                                  </select>
-                                </div>
-                              ) : line.lineType === "adjustment" ? (
-                                <input
-                                  className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                                  value={line.adjustmentReason}
-                                  onChange={(event) =>
-                                    updateLineItem(line.localId, "adjustmentReason", event.target.value)
-                                  }
-                                  placeholder="Adjustment reason"
-                                  required
-                                  disabled={workspaceIsLocked}
-                                />
-                              ) : (
-                                <span className={creatorStyles.lineInput} style={{ color: "var(--text-secondary)" }}>—</span>
-                              )}
                               <input
                                 className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                                value={line.quantity}
+                                value={line.costCode}
                                 onChange={(event) =>
-                                  updateLineItem(line.localId, "quantity", event.target.value)
+                                  updateLineItem(line.localId, "costCode", event.target.value)
                                 }
-                                inputMode="decimal"
-                                required
+                                placeholder="Optional"
                                 disabled={workspaceIsLocked}
                               />
                               <input
@@ -1981,6 +1677,16 @@ export function InvoicesConsole() {
                                 onChange={(event) =>
                                   updateLineItem(line.localId, "description", event.target.value)
                                 }
+                                required
+                                disabled={workspaceIsLocked}
+                              />
+                              <input
+                                className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
+                                value={line.quantity}
+                                onChange={(event) =>
+                                  updateLineItem(line.localId, "quantity", event.target.value)
+                                }
+                                inputMode="decimal"
                                 required
                                 disabled={workspaceIsLocked}
                               />

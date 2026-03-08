@@ -144,9 +144,7 @@ export function createChangeOrderDocumentAdapter(
       amount_delta: form.amountDelta,
       days_delta: Number(form.daysDelta || "0"),
       line_items: form.lineItems.map((line) => ({
-        line_type: line.lineType,
-        budget_line: line.lineType === "original" ? Number(line.budgetLineId) : null,
-        cost_code: line.lineType === "new" ? Number(line.costCodeId) : null,
+        cost_code: Number(line.costCodeId),
         description: line.description,
         adjustment_reason: line.adjustmentReason,
         amount_delta: line.amountDelta,
@@ -160,9 +158,7 @@ export function createChangeOrderDocumentAdapter(
       amount_delta: form.amountDelta,
       days_delta: Number(form.daysDelta || "0"),
       line_items: form.lineItems.map((line) => ({
-        line_type: line.lineType,
-        budget_line: line.lineType === "original" ? Number(line.budgetLineId) : null,
-        cost_code: line.lineType === "new" ? Number(line.costCodeId) : null,
+        cost_code: Number(line.costCodeId),
         description: line.description,
         adjustment_reason: line.adjustmentReason,
         amount_delta: line.amountDelta,

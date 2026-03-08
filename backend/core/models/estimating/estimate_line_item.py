@@ -20,13 +20,6 @@ class EstimateLineItem(models.Model):
         on_delete=models.CASCADE,
         related_name="line_items",
     )
-    scope_item = models.ForeignKey(
-        "ScopeItem",
-        on_delete=models.PROTECT,
-        related_name="estimate_line_items",
-        null=True,
-        blank=True,
-    )
     cost_code = models.ForeignKey(
         "CostCode",
         on_delete=models.PROTECT,

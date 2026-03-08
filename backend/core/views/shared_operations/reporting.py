@@ -12,7 +12,6 @@ from core.models import (
     ChangeOrder,
     Estimate,
     EstimateStatusEvent,
-    FinancialAuditEvent,
     Invoice,
     Payment,
     Project,
@@ -457,43 +456,6 @@ def project_timeline_events_view(request, project_id: int):
         )
 
     items = []
-    if category in {"all", "financial"}:
-        financial_rows = FinancialAuditEvent.objects.filter(
-            project=project,
-        ).order_by("-created_at", "-id")
-        for row in financial_rows:
-            ui_route = "/financials-auditing"
-            detail_endpoint = f"/api/v1/projects/{project.id}/audit-events/"
-            if row.object_type == "estimate":
-                ui_route = f"/projects/{project.id}/estimates?estimate={row.object_id}"
-                detail_endpoint = f"/api/v1/estimates/{row.object_id}/"
-            elif row.object_type == "change_order":
-                ui_route = f"/projects/{project.id}/change-orders"
-                detail_endpoint = f"/api/v1/change-orders/{row.object_id}/"
-            elif row.object_type == "invoice":
-                ui_route = f"/invoices?project={project.id}"
-                detail_endpoint = f"/api/v1/invoices/{row.object_id}/"
-            elif row.object_type == "vendor_bill":
-                ui_route = f"/vendor-bills?project={project.id}"
-                detail_endpoint = f"/api/v1/vendor-bills/{row.object_id}/"
-            elif row.object_type == "payment":
-                ui_route = f"/financials-auditing?project={project.id}"
-                detail_endpoint = f"/api/v1/payments/{row.object_id}/"
-            items.append(
-                {
-                    "timeline_id": f"financial-{row.id}",
-                    "category": "financial",
-                    "event_type": row.event_type,
-                    "occurred_at": row.created_at,
-                    "label": row.event_type.replace("_", " "),
-                    "detail": row.note or "",
-                    "object_type": row.object_type,
-                    "object_id": row.object_id,
-                    "ui_route": ui_route,
-                    "detail_endpoint": detail_endpoint,
-                }
-            )
-
     if category in {"all", "workflow"}:
         workflow_rows = (
             EstimateStatusEvent.objects.filter(

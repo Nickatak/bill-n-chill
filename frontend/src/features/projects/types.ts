@@ -19,9 +19,6 @@ export type ProjectFinancialSummary = {
   contract_value_original: string;
   contract_value_current: string;
   accepted_contract_total: string;
-  active_budget_id: number | null;
-  active_budget_source_estimate_id: number | null;
-  active_budget_source_estimate_version: number | null;
   approved_change_orders_total: string;
   invoiced_to_date: string;
   paid_to_date: string;
@@ -57,33 +54,6 @@ export type AccountingSyncEventRecord = {
   updated_at: string;
 };
 
-export type FinancialAuditEventRecord = {
-  id: number;
-  project: number;
-  event_type:
-    | "estimate_status_changed"
-    | "budget_converted"
-    | "change_order_updated"
-    | "invoice_updated"
-    | "vendor_bill_updated"
-    | "payment_updated"
-    | "payment_allocated"
-    | "invoice_scope_override"
-    | "project_status_changed";
-  object_type: string;
-  object_id: number;
-  from_status: string;
-  to_status: string;
-  amount: string | null;
-  note: string;
-  metadata_json: Record<string, unknown>;
-  created_by: number;
-  created_by_email?: string | null;
-  created_by_display?: string | null;
-  created_by_customer_id?: number | null;
-  created_at: string;
-};
-
 export type ProjectTraceabilityRecord = {
   id: number;
   label: string;
@@ -110,8 +80,7 @@ export type ApiResponse = {
     | AttentionFeed
     | ProjectTimeline
     | AccountingSyncEventRecord[]
-    | AccountingSyncEventRecord
-    | FinancialAuditEventRecord[];
+    | AccountingSyncEventRecord;
   meta?: {
     retry_status?: string;
   };

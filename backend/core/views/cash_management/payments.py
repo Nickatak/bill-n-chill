@@ -9,7 +9,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.models import (
-    FinancialAuditEvent,
     Invoice,
     Payment,
     PaymentAllocation,
@@ -84,7 +83,7 @@ def project_payments_view(request, project_id: int):
       - `201`: payment created and returned.
         - Guarantees:
           - newly created payment includes valid direction/method/amount fields. `[APP]`
-          - immutable `PaymentRecord(created)` and `FinancialAuditEvent(payment_updated)` are appended. `[APP]`
+          - immutable `PaymentRecord(created)` is appended. `[APP]`
       - `400`: payload/business validation failed.
         - Guarantees: no durable partial mutation from failed request path. `[DB+APP]`
       - `403`: role gate denied for create.
@@ -102,7 +101,7 @@ def project_payments_view(request, project_id: int):
       - `POST`:
         - Creates:
           - Standard: `Payment`.
-          - Audit: `PaymentRecord`, `FinancialAuditEvent`.
+          - Audit: `PaymentRecord`.
         - Edits: none.
         - Deletes: none.
 
@@ -194,18 +193,6 @@ def project_payments_view(request, project_id: int):
             note="Payment created.",
             metadata={"direction": payment.direction, "method": payment.method},
         )
-        FinancialAuditEvent.record(
-            project=project,
-            event_type=FinancialAuditEvent.EventType.PAYMENT_UPDATED,
-            object_type="payment",
-            object_id=payment.id,
-            from_status="",
-            to_status=payment.status,
-            amount=payment.amount,
-            note="Payment created.",
-            created_by=request.user,
-            metadata={"direction": payment.direction, "method": payment.method},
-        )
     return Response({"data": PaymentSerializer(payment).data}, status=201)
 
 
@@ -224,7 +211,7 @@ def payment_detail_view(request, payment_id: int):
       - `200`: patch applied and updated payment returned.
         - Guarantees:
           - payment transition/allocation safety rules remain satisfied. `[APP]`
-          - immutable payment record and financial audit row are appended when fields changed. `[APP]`
+          - immutable payment record is appended when fields changed. `[APP]`
       - `400`: validation or transition/allocation safety failure.
         - Guarantees: no durable partial mutation from failed request path. `[DB+APP]`
       - `403`: role gate denied for patch.
@@ -242,7 +229,7 @@ def payment_detail_view(request, payment_id: int):
       - `PATCH`:
         - Creates:
           - Standard: none.
-          - Audit: `PaymentRecord`, `FinancialAuditEvent` when updates occur.
+          - Audit: `PaymentRecord` when updates occur.
         - Edits:
           - Standard: `Payment` fields (direction/method/status/amount/date/reference/notes).
           - Audit: none.
@@ -384,22 +371,6 @@ def payment_detail_view(request, payment_id: int):
                     "status_changed": status_changed,
                 },
             )
-            FinancialAuditEvent.record(
-                project=payment.project,
-                event_type=FinancialAuditEvent.EventType.PAYMENT_UPDATED,
-                object_type="payment",
-                object_id=payment.id,
-                from_status=previous_status,
-                to_status=payment.status,
-                amount=payment.amount,
-                note="Payment updated.",
-                created_by=request.user,
-                metadata={
-                    "direction": payment.direction,
-                    "method": payment.method,
-                    "status_changed": status_changed,
-                },
-            )
 
     payment.refresh_from_db()
     return Response({"data": PaymentSerializer(payment).data})
@@ -416,7 +387,7 @@ def payment_allocate_view(request, payment_id: int):
         - Guarantees:
           - all allocation rows satisfy direction/target/scope eligibility rules. `[APP]`
           - target balances/statuses and payment allocation totals are recalculated consistently. `[APP]`
-          - immutable allocation records and financial audit row are appended. `[APP]`
+          - immutable allocation records are appended. `[APP]`
       - `400`: validation/allocation eligibility failure.
         - Guarantees: no durable partial mutation from failed request path. `[DB+APP]`
       - `403`: role gate denied for allocation.
@@ -434,7 +405,7 @@ def payment_allocate_view(request, payment_id: int):
       - `POST`:
         - Creates:
           - Standard: `PaymentAllocation` rows.
-          - Audit: `PaymentRecord`, `PaymentAllocationRecord`, `FinancialAuditEvent`.
+          - Audit: `PaymentRecord`, `PaymentAllocationRecord`.
         - Edits:
           - Standard: payment allocation totals plus target invoice/vendor-bill balances and statuses.
           - Audit: none.
@@ -629,23 +600,6 @@ def payment_allocate_view(request, payment_id: int):
         for allocation, row, invoice, vendor_bill in created_allocations:
             target_id = invoice.id if invoice else vendor_bill.id
             target_type = "invoice" if invoice else "vendor_bill"
-            FinancialAuditEvent.record(
-                project=payment.project,
-                event_type=FinancialAuditEvent.EventType.PAYMENT_ALLOCATED,
-                object_type="payment_allocation",
-                object_id=payment.id,
-                from_status=payment.status,
-                to_status=payment.status,
-                amount=row["applied_amount"],
-                note=f"Payment allocated to {target_type} #{target_id}.",
-                created_by=request.user,
-                metadata={
-                    "payment_id": payment.id,
-                    "payment_allocation_id": allocation.id,
-                    "target_type": target_type,
-                    "target_id": target_id,
-                },
-            )
             PaymentAllocationRecord.record(
                 payment=payment,
                 allocation=allocation,
