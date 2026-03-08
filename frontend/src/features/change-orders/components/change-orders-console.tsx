@@ -28,6 +28,7 @@ import {
   fetchChangeOrderPolicyContract,
   normalizeApiBaseUrl,
 } from "../api";
+import { usePolicyContract } from "@/shared/hooks/use-policy-contract";
 import { useSharedSessionAuth } from "../../session/use-shared-session";
 import { canDo } from "../../session/rbac";
 import {
@@ -168,12 +169,16 @@ export function ChangeOrdersConsole({
   const [isLineItemsSectionOpen, setIsLineItemsSectionOpen] = useState(true);
   const [showAllEvents, setShowAllEvents] = useState(false);
   const [showBudgetColumns, setShowBudgetColumns] = useState(false);
-  const [changeOrderStatusLabels, setChangeOrderStatusLabels] = useState<
-    Record<string, string>
-  >(CHANGE_ORDER_STATUS_LABELS_FALLBACK);
-  const [changeOrderAllowedTransitions, setChangeOrderAllowedTransitions] = useState<
-    Record<string, string[]>
-  >(CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK);
+  const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+  const { statusLabels: changeOrderStatusLabels, allowedTransitions: changeOrderAllowedTransitions } =
+    usePolicyContract<ChangeOrderPolicyContract>({
+      fetchContract: fetchChangeOrderPolicyContract,
+      fallbackStatuses: CHANGE_ORDER_STATUSES_FALLBACK,
+      fallbackLabels: CHANGE_ORDER_STATUS_LABELS_FALLBACK,
+      fallbackTransitions: CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK,
+      baseUrl: normalizedBaseUrl,
+      token,
+    });
   const createCreatorRef = useRef<HTMLDivElement | null>(null);
   const editCreatorRef = useRef<HTMLDivElement | null>(null);
   const [createFlashCount, setCreateFlashCount] = useState(0);
@@ -217,7 +222,6 @@ export function ChangeOrdersConsole({
   // Derived values
   // -------------------------------------------------------------------------
 
-  const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const canMutateChangeOrders = canDo(capabilities, "change_orders", "create");
   const canSendChangeOrders = canDo(capabilities, "change_orders", "send");
   const canApproveChangeOrders = canDo(capabilities, "change_orders", "approve");
@@ -772,42 +776,6 @@ export function ChangeOrdersConsole({
     setShowAllEvents(false);
   }, [changeOrderAllowedTransitions, setFeedback]);
 
-  const loadChangeOrderPolicy = useCallback(async () => {
-    try {
-      const response = await fetchChangeOrderPolicyContract({
-        baseUrl: normalizedBaseUrl,
-        token,
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok || !payload.data || Array.isArray(payload.data)) {
-        return;
-      }
-      const contract = payload.data as ChangeOrderPolicyContract;
-      if (
-        !Array.isArray(contract.statuses) ||
-        !contract.statuses.length ||
-        !contract.allowed_status_transitions
-      ) {
-        return;
-      }
-      const normalizedTransitions = contract.statuses.reduce<Record<string, string[]>>(
-        (acc, status) => {
-          const nextStatuses = contract.allowed_status_transitions[status];
-          acc[status] = Array.isArray(nextStatuses) ? nextStatuses : [];
-          return acc;
-        },
-        {},
-      );
-      setChangeOrderStatusLabels({
-        ...CHANGE_ORDER_STATUS_LABELS_FALLBACK,
-        ...(contract.status_labels || {}),
-      });
-      setChangeOrderAllowedTransitions(normalizedTransitions);
-    } catch {
-      // Policy contract fetch is best-effort; fallback map remains active.
-    }
-  }, [normalizedBaseUrl, token]);
-
   const loadBudgetLines = useCallback(async (projectId: number, sourceEstimateId?: number | null) => {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/budgets/`, {
@@ -1132,17 +1100,6 @@ export function ChangeOrdersConsole({
   // -------------------------------------------------------------------------
   // Effects (data loading)
   // -------------------------------------------------------------------------
-
-  // Load the change-order workflow policy contract on auth.
-  useEffect(() => {
-    if (!token) {
-      return;
-    }
-    const run = window.setTimeout(() => {
-      void loadChangeOrderPolicy();
-    }, 0);
-    return () => window.clearTimeout(run);
-  }, [loadChangeOrderPolicy, token]);
 
   // Fetch projects and related data on auth.
   useEffect(() => {

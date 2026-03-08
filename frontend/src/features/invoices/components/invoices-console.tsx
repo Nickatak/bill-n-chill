@@ -24,6 +24,7 @@ import {
   publicInvoiceHref,
   readInvoiceApiError,
 } from "../helpers";
+import { useStatusFilters } from "@/shared/hooks/use-status-filters";
 import { ProjectListStatusValue, ProjectListViewer } from "@/shared/project-list-viewer";
 import {
   defaultApiBaseUrl,
@@ -54,6 +55,7 @@ import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import { useClientPagination } from "@/shared/hooks/use-client-pagination";
 import { PaginationControls } from "@/shared/components/pagination-controls";
 import { PaymentRecorder, type AllocationTarget } from "@/features/payments";
+import { usePolicyContract } from "@/shared/hooks/use-policy-contract";
 import { usePrintable } from "@/shared/shell/printable-context";
 import styles from "./invoices-console.module.css";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
@@ -249,16 +251,39 @@ export function InvoicesConsole() {
   const [statusEventsLoading, setStatusEventsLoading] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("draft");
-  const [invoiceStatuses, setInvoiceStatuses] = useState<string[]>(INVOICE_STATUSES_FALLBACK);
-  const [invoiceStatusLabels, setInvoiceStatusLabels] = useState<Record<string, string>>(
-    INVOICE_STATUS_LABELS_FALLBACK,
-  );
-  const [invoiceAllowedStatusTransitions, setInvoiceAllowedStatusTransitions] = useState<
-    Record<string, string[]>
-  >(INVOICE_ALLOWED_STATUS_TRANSITIONS_FALLBACK);
-  const [invoiceStatusFilters, setInvoiceStatusFilters] = useState<string[]>(
-    INVOICE_DEFAULT_STATUS_FILTERS_FALLBACK,
-  );
+  const {
+    statuses: invoiceStatuses,
+    statusLabels: invoiceStatusLabels,
+    allowedTransitions: invoiceAllowedStatusTransitions,
+    defaultCreateStatus,
+  } = usePolicyContract<InvoicePolicyContract>({
+    fetchContract: fetchInvoicePolicyContract,
+    fallbackStatuses: INVOICE_STATUSES_FALLBACK,
+    fallbackLabels: INVOICE_STATUS_LABELS_FALLBACK,
+    fallbackTransitions: INVOICE_ALLOWED_STATUS_TRANSITIONS_FALLBACK,
+    baseUrl: normalizedBaseUrl,
+    token,
+    onLoaded(contract) {
+      // Reconcile filter state with server-provided statuses.
+      const candidateFilters =
+        Array.isArray(contract.default_status_filters) && contract.default_status_filters.length
+          ? contract.default_status_filters.filter((v) => contract.statuses.includes(v))
+          : INVOICE_DEFAULT_STATUS_FILTERS_FALLBACK.filter((v) => contract.statuses.includes(v));
+      const resolvedFilters = candidateFilters.length ? candidateFilters : contract.statuses;
+      setInvoiceStatusFilters((current) => {
+        const preserved = current.filter((v) => contract.statuses.includes(v));
+        return preserved.length ? preserved : resolvedFilters;
+      });
+    },
+  });
+  const {
+    filters: invoiceStatusFilters,
+    setFilters: setInvoiceStatusFilters,
+    toggleFilter: toggleInvoiceStatusFilter,
+  } = useStatusFilters({
+    allStatuses: invoiceStatuses,
+    defaultFilters: INVOICE_DEFAULT_STATUS_FILTERS_FALLBACK,
+  });
   const [statusNote, setStatusNote] = useState("");
   const [organizationInvoiceDefaults, setOrganizationInvoiceDefaults] = useState<OrganizationInvoiceDefaults | null>(null);
 
@@ -478,50 +503,6 @@ export function InvoicesConsole() {
     [issueDate, normalizedBaseUrl, scopedProjectId, setErrorStatus, setNeutralStatus, setStatusMessage, token],
   );
 
-  const loadInvoicePolicy = useCallback(async () => {
-    if (!token) {
-      return;
-    }
-    try {
-      const response = await fetchInvoicePolicyContract({
-        baseUrl: normalizedBaseUrl,
-        token,
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok || !payload.data || Array.isArray(payload.data)) {
-        return;
-      }
-      const contract = payload.data as InvoicePolicyContract;
-      if (!Array.isArray(contract.statuses) || !contract.statuses.length) {
-        return;
-      }
-      const normalizedTransitions = contract.statuses.reduce<Record<string, string[]>>((acc, statusValue) => {
-        const nextStatuses = contract.allowed_status_transitions?.[statusValue];
-        acc[statusValue] = Array.isArray(nextStatuses) ? nextStatuses : [];
-        return acc;
-      }, {});
-      const nextDefaultFilters =
-        Array.isArray(contract.default_status_filters) && contract.default_status_filters.length
-          ? contract.default_status_filters.filter((value) => contract.statuses.includes(value))
-          : INVOICE_DEFAULT_STATUS_FILTERS_FALLBACK.filter((value) => contract.statuses.includes(value));
-      const resolvedFilters = nextDefaultFilters.length ? nextDefaultFilters : contract.statuses;
-      setInvoiceStatuses(contract.statuses);
-      setInvoiceStatusLabels({
-        ...INVOICE_STATUS_LABELS_FALLBACK,
-        ...(contract.status_labels || {}),
-      });
-      setInvoiceAllowedStatusTransitions({
-        ...INVOICE_ALLOWED_STATUS_TRANSITIONS_FALLBACK,
-        ...normalizedTransitions,
-      });
-      setInvoiceStatusFilters((current) => {
-        const preserved = current.filter((value) => contract.statuses.includes(value));
-        return preserved.length ? preserved : resolvedFilters;
-      });
-    } catch {
-      // Contract load is best-effort; fallbacks remain active.
-    }
-  }, [normalizedBaseUrl, token]);
 
   const loadInvoices = useCallback(
     async (projectIdArg?: number) => {
@@ -677,13 +658,6 @@ export function InvoicesConsole() {
   // Data-loading effects
   // -------------------------------------------------------------------------
 
-  // Hydrate invoice policy (statuses, transitions, labels) from the backend on auth.
-  useEffect(() => {
-    if (!token) {
-      return;
-    }
-    void loadInvoicePolicy();
-  }, [loadInvoicePolicy, token]);
 
   // Load projects and organization defaults on auth.
   useEffect(() => {
@@ -891,15 +865,6 @@ export function InvoicesConsole() {
         }
         return { ...line, [key]: value };
       }),
-    );
-  }
-
-  /** Toggle a status value in the invoice list filter pill bar. */
-  function toggleInvoiceStatusFilter(statusValue: string) {
-    setInvoiceStatusFilters((current) =>
-      current.includes(statusValue)
-        ? current.filter((status) => status !== statusValue)
-        : [...current, statusValue],
     );
   }
 
