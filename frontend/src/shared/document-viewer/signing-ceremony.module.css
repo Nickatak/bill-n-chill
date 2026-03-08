@@ -21,7 +21,7 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 /* -- No-email blocker -- */
@@ -68,7 +68,7 @@
 
 .emailHint {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 0.82rem;
 }
 
@@ -81,7 +81,7 @@
 .resendButton {
   border: none;
   background: none;
-  color: var(--accent);
+  color: var(--pub-accent);
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
@@ -90,13 +90,13 @@
 }
 
 .resendButton:disabled {
-  color: var(--text-muted);
+  color: var(--text-secondary);
   cursor: default;
   text-decoration: none;
 }
 
 .cooldownLabel {
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 0.82rem;
 }
 
@@ -116,7 +116,7 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .summaryTitle {
@@ -195,9 +195,9 @@
 }
 
 .primaryButton {
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: var(--text-on-accent);
+  border: 1px solid var(--pub-accent);
+  background: var(--pub-accent);
+  color: var(--pub-text-on-accent);
 }
 
 .secondaryButton {

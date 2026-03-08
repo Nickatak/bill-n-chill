@@ -31,42 +31,63 @@
 }
 
 .decisionStampApproved {
-  border-color: var(--status-green-border);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--status-green-bg) 30%, transparent),
-    var(--surface)
+  border-color: var(--pub-stamp-approved-border, var(--status-green-border));
+  background: var(
+    --pub-stamp-approved-bg,
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--status-green-bg) 30%, transparent),
+      var(--surface)
+    )
   );
 }
 
 .decisionStampApproved .decisionStampLabel {
-  color: var(--status-green-text);
+  color: var(--pub-stamp-approved-text, var(--status-green-text));
+}
+
+.decisionStampApproved .decisionStampDetail {
+  color: var(--pub-stamp-approved-text, var(--text-secondary));
 }
 
 .decisionStampRejected {
-  border-color: var(--status-red-border);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--status-red-bg) 30%, transparent),
-    var(--surface)
+  border-color: var(--pub-stamp-rejected-border, var(--status-red-border));
+  background: var(
+    --pub-stamp-rejected-bg,
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--status-red-bg) 30%, transparent),
+      var(--surface)
+    )
   );
 }
 
 .decisionStampRejected .decisionStampLabel {
-  color: var(--status-red-text);
+  color: var(--pub-stamp-rejected-text, var(--status-red-text));
+}
+
+.decisionStampRejected .decisionStampDetail {
+  color: var(--pub-stamp-rejected-text, var(--text-secondary));
 }
 
 .decisionStampPaid {
-  border-color: var(--status-green-border);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--status-green-bg) 30%, transparent),
-    var(--surface)
+  border-color: var(--pub-stamp-paid-border, var(--status-green-border));
+  background: var(
+    --pub-stamp-paid-bg,
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--status-green-bg) 30%, transparent),
+      var(--surface)
+    )
   );
 }
 
 .decisionStampPaid .decisionStampLabel {
-  color: var(--status-green-text);
+  color: var(--pub-stamp-paid-text, var(--status-green-text));
+}
+
+.decisionStampPaid .decisionStampDetail {
+  color: var(--pub-stamp-paid-text, var(--text-secondary));
 }
 
 @media print {

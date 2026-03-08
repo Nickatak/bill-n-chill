@@ -26,6 +26,51 @@
   align-items: center;
 }
 
+.publicButton {
+  border: 1px solid var(--pub-accent);
+  border-radius: var(--radius-md);
+  background: var(--pub-accent);
+  color: var(--pub-text-on-accent);
+  padding: 8px 16px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.publicButton:hover,
+.publicButton:focus-visible {
+  background: var(--pub-accent-hover);
+  border-color: var(--pub-accent-hover);
+  outline: none;
+}
+
+.publicButtonSecondary {
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  background: var(--surface-secondary);
+  color: var(--text-secondary);
+  padding: 8px 16px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.publicButtonSecondary:hover,
+.publicButtonSecondary:focus-visible {
+  background: var(--surface-hover);
+  border-color: var(--text-secondary);
+  outline: none;
+}
+
 .buttonActive {
   border-color: var(--accent);
   background: var(--accent);

@@ -26,8 +26,8 @@
 }
 
 .bannerPending {
-  border-color: var(--accent-border);
-  background: var(--accent-lighter);
+  border-color: var(--pub-accent-heading);
+  background: var(--pub-accent-banner);
 }
 
 .bannerComplete {
@@ -46,7 +46,7 @@
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--pub-accent);
 }
 
 .bannerText {
@@ -56,10 +56,10 @@
 }
 
 .bannerLink {
-  border: 1px solid var(--accent);
+  border: 1px solid var(--pub-accent);
   border-radius: var(--radius-md);
-  background: var(--accent);
-  color: var(--text-on-accent);
+  background: var(--pub-accent);
+  color: var(--pub-text-on-accent);
   padding: var(--space-sm) var(--space-md);
   font-size: 0.84rem;
   font-weight: 600;
@@ -72,8 +72,8 @@
 
 .bannerLink:hover,
 .bannerLink:focus-visible {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
+  background: var(--pub-accent-hover);
+  border-color: var(--pub-accent-hover);
   outline: none;
 }
 
@@ -112,7 +112,7 @@
   font-size: 1rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--pub-accent);
   font-weight: 700;
 }
 
@@ -166,7 +166,7 @@
   font-size: 1rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--pub-accent);
   font-weight: 700;
   text-align: right;
 }
@@ -218,11 +218,11 @@
   justify-self: start;
   display: inline-flex;
   align-items: center;
-  border: 1px solid var(--accent);
+  border: 1px solid var(--pub-accent);
   border-radius: var(--radius-pill);
   padding: var(--space-xs) 10px;
-  color: var(--text-on-accent);
-  background: var(--accent);
+  color: var(--pub-text-on-accent);
+  background: var(--pub-accent);
   font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -232,8 +232,8 @@
 
 .metaLink:hover,
 .metaLink:focus-visible {
-  background: var(--accent-hover);
-  border-color: var(--accent);
+  background: var(--pub-accent-hover);
+  border-color: var(--pub-accent);
   outline: none;
 }
 
@@ -252,7 +252,7 @@
   font-size: 1rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--pub-accent);
   font-weight: 700;
 }
 
@@ -279,7 +279,7 @@
   font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: var(--accent-border);
+  color: var(--pub-accent-heading);
 }
 
 .tableWrap {
@@ -307,8 +307,8 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--accent-border);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--pub-accent-heading);
+  background: var(--pub-accent-bg);
   white-space: nowrap;
 }
 
@@ -363,7 +363,7 @@
 }
 
 .summaryTotal {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  background: var(--pub-accent-bg);
   color: var(--text-primary);
   font-weight: 700;
 }
@@ -380,7 +380,7 @@
   font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: var(--accent-border);
+  color: var(--pub-accent-heading);
 }
 
 .terms p {
@@ -534,8 +534,8 @@
   .bannerEyebrow,
   .terms h4,
   .table th {
-    color: var(--accent-border) !important;
-    -webkit-text-fill-color: var(--accent-border) !important;
+    color: var(--pub-accent-heading) !important;
+    -webkit-text-fill-color: var(--pub-accent-heading) !important;
   }
 
   .table {

@@ -118,9 +118,9 @@
 }
 
 .primaryButton {
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: var(--text-on-accent);
+  border: 1px solid var(--pub-accent);
+  background: var(--pub-accent);
+  color: var(--pub-text-on-accent);
 }
 
 .secondaryButton {

@@ -12,13 +12,34 @@
   --background: #f8f9fa;
   --foreground: #1a1a1a;
 
-  /* --- Accent / Primary --- */
+  /* --- Accent / Primary (internal fallbacks) --- */
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
   --accent-light: #eff6ff;
   --accent-lighter: #f0f7ff;
   --accent-border: #93c5fd;
   --accent-text: #1d4ed8;
+
+  /* --- Public page accent tokens --- */
+  --pub-accent: #2563eb;
+  --pub-accent-hover: #1d4ed8;
+  --pub-accent-text: #1e40af;
+  --pub-accent-heading: #2563eb;
+  --pub-accent-border: #60a5fa;
+  --pub-accent-bg: rgba(37, 99, 235, 0.08);
+  --pub-accent-banner: #eff6ff;
+  --pub-text-on-accent: #ffffff;
+
+  /* --- Public decision stamp tokens --- */
+  --pub-stamp-approved-bg: #16a34a;
+  --pub-stamp-approved-border: #15803d;
+  --pub-stamp-approved-text: #ffffff;
+  --pub-stamp-rejected-bg: #dc2626;
+  --pub-stamp-rejected-border: #b91c1c;
+  --pub-stamp-rejected-text: #ffffff;
+  --pub-stamp-paid-bg: #16a34a;
+  --pub-stamp-paid-border: #15803d;
+  --pub-stamp-paid-text: #ffffff;
 
   /* --- Surface / Layout --- */
   --surface: #ffffff;
@@ -31,8 +52,8 @@
 
   /* --- Text --- */
   --text-primary: #111827;
-  --text-secondary: #4b5563;
-  --text-muted: #9ca3af;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
   --text-on-accent: #ffffff;
 
   /* --- Status palette (badge) --- */
