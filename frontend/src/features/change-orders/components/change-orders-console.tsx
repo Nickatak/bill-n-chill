@@ -1668,50 +1668,52 @@ export function ChangeOrdersConsole({
                         const active = String(changeOrder.id) === selectedChangeOrderId;
                         const lastStatusEvent = lastStatusEventForChangeOrder(changeOrder.id);
                         return (
-                          <div key={changeOrder.id} className={styles.viewerHistoryCardWrap}>
-                            <button
-                              type="button"
-                              className={`${styles.viewerRailItem} ${styles.viewerHistoryItem} ${viewerHistoryStatusClass(changeOrder.status)} ${
-                                active ? `${styles.viewerRailItemActive} ${styles.viewerHistoryItemActive}` : ""
-                              }`}
-                              onMouseDown={() => {
-                                hydrateEditForm(changeOrder);
-                              }}
-                            >
-                              <span className={styles.viewerRailTitle}>
-                                {changeOrder.title || "Untitled"} · {coLabel(changeOrder)}
-                              </span>
-                              <span className={styles.viewerHistoryStatusText}>{statusLabel(changeOrder.status)}</span>
-                              <span
-                                className={`${styles.viewerHistoryMetaText} ${styles.viewerHistoryLineDelta} ${
-                                  ["approved", "accepted"].includes(changeOrder.status)
-                                    ? styles.viewerHistoryLineDeltaApproved
-                                    : ""
-                                }`}
-                              >
-                                Line delta: ${changeOrder.line_total_delta}
-                              </span>
-                              {lastStatusEvent ? (
-                                <span className={styles.viewerHistoryMetaText}>
-                                  Last action: {statusEventActionLabel(lastStatusEvent)} on{" "}
-                                  {formatEventDateTime(lastStatusEvent.created_at)} by {eventActorLabel(lastStatusEvent)}
-                                </span>
-                              ) : (
-                                <span className={styles.viewerHistoryMetaText}>No status events yet.</span>
-                              )}
-                            </button>
+                          <div
+                            key={changeOrder.id}
+                            role="button"
+                            tabIndex={0}
+                            className={`${styles.viewerRailItem} ${styles.viewerHistoryItem} ${viewerHistoryStatusClass(changeOrder.status)} ${
+                              active ? `${styles.viewerRailItemActive} ${styles.viewerHistoryItemActive}` : ""
+                            }`}
+                            onClick={() => hydrateEditForm(changeOrder)}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); hydrateEditForm(changeOrder); } }}
+                          >
                             {changeOrder.public_ref ? (
-                              <Link
-                                href={publicChangeOrderHref(changeOrder.public_ref)}
-                                className={styles.viewerHistoryPublicLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                aria-label={`Open public view for ${coLabel(changeOrder)}`}
-                                title="Open public view"
-                              >
-                                Public ↗
-                              </Link>
+                              <div className={styles.viewerCardPublicBar}>
+                                <Link
+                                  href={publicChangeOrderHref(changeOrder.public_ref)}
+                                  className={styles.viewerCardPublicLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  aria-label={`Open customer view for ${coLabel(changeOrder)}`}
+                                  title="Open customer view"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  Customer View ↗
+                                </Link>
+                              </div>
                             ) : null}
+                            <span className={styles.viewerRailTitle}>
+                              {changeOrder.title || "Untitled"} · {coLabel(changeOrder)}
+                            </span>
+                            <span className={styles.viewerHistoryStatusText}>{statusLabel(changeOrder.status)}</span>
+                            <span
+                              className={`${styles.viewerHistoryMetaText} ${styles.viewerHistoryLineDelta} ${
+                                ["approved", "accepted"].includes(changeOrder.status)
+                                  ? styles.viewerHistoryLineDeltaApproved
+                                  : ""
+                              }`}
+                            >
+                              Line delta: ${changeOrder.line_total_delta}
+                            </span>
+                            {lastStatusEvent ? (
+                              <span className={styles.viewerHistoryMetaText}>
+                                Last action: {statusEventActionLabel(lastStatusEvent)} on{" "}
+                                {formatEventDateTime(lastStatusEvent.created_at)} by {eventActorLabel(lastStatusEvent)}
+                              </span>
+                            ) : (
+                              <span className={styles.viewerHistoryMetaText}>No status events yet.</span>
+                            )}
                           </div>
                         );
                       })}
