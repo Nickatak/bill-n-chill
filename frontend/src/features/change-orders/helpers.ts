@@ -32,17 +32,8 @@ type LineValidationResult = {
   issuesByLocalId: Map<number, string[]>;
 };
 
-/** Validate change-order line items for completeness and duplicates. */
+/** Validate change-order line items for completeness. */
 export function validateLineItems(lines: ChangeOrderLineInput[]): LineValidationResult {
-  const budgetLineCounts = new Map<string, number>();
-  for (const line of lines) {
-    const budgetLineId = line.budgetLineId.trim();
-    if (!budgetLineId) {
-      continue;
-    }
-    budgetLineCounts.set(budgetLineId, (budgetLineCounts.get(budgetLineId) ?? 0) + 1);
-  }
-
   const issues: LineValidationIssue[] = [];
   const issuesByLocalId = new Map<number, string[]>();
   lines.forEach((line, index) => {
@@ -52,8 +43,6 @@ export function validateLineItems(lines: ChangeOrderLineInput[]): LineValidation
 
     if (!budgetLineId) {
       rowIssues.push("Select a budget line.");
-    } else if ((budgetLineCounts.get(budgetLineId) ?? 0) > 1) {
-      rowIssues.push("Budget line is duplicated in this change order.");
     }
 
     if (line.lineType === "adjustment" && !line.adjustmentReason.trim()) {

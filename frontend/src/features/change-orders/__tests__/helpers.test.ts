@@ -81,14 +81,13 @@ describe("validateLineItems", () => {
     expect(result.issues.some((i) => i.message === "Select a budget line.")).toBe(true);
   });
 
-  it("flags duplicate budget lines", () => {
+  it("allows duplicate budget lines", () => {
     const result = validateLineItems([
       line({ localId: 1, budgetLineId: "10" }),
       line({ localId: 2, budgetLineId: "10" }),
     ]);
-    expect(result.issues.some((i) => i.message.includes("duplicated"))).toBe(true);
-    expect(result.issuesByLocalId.has(1)).toBe(true);
-    expect(result.issuesByLocalId.has(2)).toBe(true);
+    expect(result.issues.some((i) => i.message.includes("duplicated"))).toBe(false);
+    expect(result.issues.length).toBe(0);
   });
 
   it("flags adjustment line without reason", () => {
