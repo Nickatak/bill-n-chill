@@ -17,6 +17,7 @@ type HomeRouteContentProps = {
   health: HealthResult;
 };
 
+/** Root route content — shows login form for guests, dashboard for authenticated users, and redirects fresh orgs to onboarding. */
 export function HomeRouteContent({ health }: HomeRouteContentProps) {
   const { token, isAuthorized, isChecking } = useSessionAuthorization();
   const router = useRouter();

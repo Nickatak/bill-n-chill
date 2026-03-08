@@ -60,6 +60,11 @@ import creatorStyles from "@/shared/document-creator/creator-foundation.module.c
 import invoiceCreatorStyles from "@/shared/document-creator/invoice-creator.module.css";
 import stampStyles from "@/shared/styles/decision-stamp.module.css";
 import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
+
+// ---------------------------------------------------------------------------
+// Types & constants
+// ---------------------------------------------------------------------------
+
 type ProjectStatusValue = ProjectListStatusValue;
 type ProjectBudgetRecord = {
   id: number;
@@ -122,6 +127,10 @@ const INVOICE_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
 const DEFAULT_PROJECT_STATUS_FILTERS: ProjectStatusValue[] = ["active", "prospect"];
 const PROJECT_STATUS_VALUES: ProjectStatusValue[] = ["prospect", "active", "on_hold", "completed", "cancelled"];
 const GENERIC_BUDGET_COST_CODES = new Set(["99-901", "99-902", "99-903"]);
+
+// ---------------------------------------------------------------------------
+// Display helpers
+// ---------------------------------------------------------------------------
 
 /** Map an invoice status to its CSS module class for badge coloring. */
 function invoiceStatusClass(status: string): string {
@@ -194,6 +203,10 @@ function invoiceStatusEventToneClass(event: InvoiceStatusEventRecord): string {
   return invoiceStatusToneClass(event.to_status);
 }
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 /** Primary invoice management console with project selection, invoice viewer, and creator workspace. */
 export function InvoicesConsole() {
   const { token, authMessage, role, capabilities } = useSharedSessionAuth();
@@ -262,6 +275,10 @@ export function InvoicesConsole() {
   const [creatorFlashCount, setCreatorFlashCount] = useState(0);
   const { setPrintable } = usePrintable();
 
+  // -------------------------------------------------------------------------
+  // Effects
+  // -------------------------------------------------------------------------
+
   useEffect(() => {
     setPrintable(invoices.length > 0);
     return () => setPrintable(false);
@@ -278,6 +295,10 @@ export function InvoicesConsole() {
     el.addEventListener("animationend", cleanup, { once: true });
     return () => el.removeEventListener("animationend", cleanup);
   }, [creatorFlashCount]);
+
+  // -------------------------------------------------------------------------
+  // Derived values
+  // -------------------------------------------------------------------------
 
   const selectedInvoice = useMemo(
     () => invoices.find((invoice) => String(invoice.id) === selectedInvoiceId) ?? null,
@@ -396,6 +417,10 @@ export function InvoicesConsole() {
     (status: string) => invoiceStatusLabels[status] ?? invoiceStatusLabel(status),
     [invoiceStatusLabels],
   );
+
+  // -------------------------------------------------------------------------
+  // Data loading & form hydration
+  // -------------------------------------------------------------------------
 
   const loadDependencies = useCallback(
     async (options?: { keepStatusOnSuccess?: boolean }) => {
@@ -648,6 +673,10 @@ export function InvoicesConsole() {
     [normalizedBaseUrl, token],
   );
 
+  // -------------------------------------------------------------------------
+  // Data-loading effects
+  // -------------------------------------------------------------------------
+
   // Hydrate invoice policy (statuses, transitions, labels) from the backend on auth.
   useEffect(() => {
     if (!token) {
@@ -816,6 +845,10 @@ export function InvoicesConsole() {
       }),
     );
   }, [budgetLineById, budgetLineOptions]);
+
+  // -------------------------------------------------------------------------
+  // Line item handlers
+  // -------------------------------------------------------------------------
 
   /** Append a new blank line item to the workspace draft. */
   function addLineItem() {
@@ -994,6 +1027,10 @@ export function InvoicesConsole() {
     setEditingDraftInvoiceId(null);
     setWorkspaceContext("New invoice draft");
   }
+
+  // -------------------------------------------------------------------------
+  // Submit & mutation handlers
+  // -------------------------------------------------------------------------
 
   /** Clear the workspace and start a new invoice draft. */
   function handleStartNewInvoiceDraft() {
@@ -1270,6 +1307,10 @@ export function InvoicesConsole() {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Document adapter & branding
+  // -------------------------------------------------------------------------
+
   const selectedProject = projects.find((project) => String(project.id) === selectedProjectId) ?? null;
   const organizationBranding = useMemo(
     () => resolveOrganizationBranding(organizationInvoiceDefaults),
@@ -1334,6 +1375,10 @@ export function InvoicesConsole() {
       })),
     [invoices],
   );
+
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
 
   return (
     <section className={styles.console}>

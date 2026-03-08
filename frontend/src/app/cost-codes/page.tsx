@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "Cost Codes",
 };
 
+/** Route page for the cost codes management console. */
 export default function CostCodesPage() {
   return (
     <PageShell>

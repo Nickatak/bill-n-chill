@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "Change Orders",
 };
 
+/** Route page for the change orders list. */
 export default function ChangeOrdersPage() {
   return (
     <PageShell>

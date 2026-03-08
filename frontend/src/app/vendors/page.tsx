@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "Vendors",
 };
 
+/** Route page for the vendors management console. */
 export default function VendorsPage() {
   return (
     <PageShell>

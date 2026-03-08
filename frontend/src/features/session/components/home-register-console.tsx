@@ -73,6 +73,11 @@ function toSessionOrganization(
   };
 }
 
+/**
+ * Registration console supporting three flows: standard signup (Flow A),
+ * new-user invite acceptance (Flow B), and existing-user org switch (Flow C).
+ * Verifies invite tokens on mount and routes to the appropriate form.
+ */
 export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsoleProps) {
   const router = useRouter();
   const [messageTone, setMessageTone] = useState<"neutral" | "error">("neutral");

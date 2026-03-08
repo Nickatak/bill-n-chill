@@ -39,6 +39,7 @@ function extractErrorMessage(payload: ApiResponse | null, fallback: string): str
   return payload.error.message || fieldErrors || fallback;
 }
 
+/** Editable form for org-level document defaults (help email, due/valid days, T&Cs per doc type). */
 export function DocumentSettingsTab({
   token,
   profile,

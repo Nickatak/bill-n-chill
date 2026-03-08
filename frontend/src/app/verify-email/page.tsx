@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "Verify Email",
 };
 
+/** Route page that processes an email verification token from the `?token=` query param. */
 export default async function VerifyEmailPage({
   searchParams,
 }: {

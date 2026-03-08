@@ -55,6 +55,10 @@ import {
 import { EstimateSheet, OrganizationDocumentDefaults } from "./estimate-sheet";
 import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
 
+// ---------------------------------------------------------------------------
+// Types & constants
+// ---------------------------------------------------------------------------
+
 type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amount";
 type EstimateStatusValue = string;
 type EstimateFamilyCollisionPrompt = {
@@ -109,6 +113,10 @@ const ESTIMATE_QUICK_ACTION_BY_STATUS_FALLBACK: Record<string, "change_order" | 
 };
 const ESTIMATE_SYSTEM_ONLY_STATUSES = new Set<EstimateStatusValue>(["archived"]);
 const ESTIMATE_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 /** Internal estimates workspace: version tree, composer, status lifecycle, and family management. */
 export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }: EstimatesConsoleProps) {
@@ -179,6 +187,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const [creatorFlashCount, setCreatorFlashCount] = useState(0);
   const { setPrintable } = usePrintable();
 
+  // -------------------------------------------------------------------------
+  // Effects
+  // -------------------------------------------------------------------------
+
   useEffect(() => {
     setPrintable(!!selectedEstimateId);
     return () => setPrintable(false);
@@ -195,6 +207,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     el.addEventListener("animationend", cleanup, { once: true });
     return () => el.removeEventListener("animationend", cleanup);
   }, [creatorFlashCount]);
+
+  // -------------------------------------------------------------------------
+  // Derived values
+  // -------------------------------------------------------------------------
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const scopedProjectId = scopedProjectIdProp;
@@ -293,6 +309,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       ? styles.statusDraft
       : statusClasses[selectedEstimate.status] ?? styles.statusArchived;
 
+  // -------------------------------------------------------------------------
+  // Display helpers
+  // -------------------------------------------------------------------------
+
   /** Resolve a status value to its human-readable label. */
   function formatEstimateStatus(status?: string): string {
     if (!status) {
@@ -329,6 +349,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     }
     return "";
   }
+
+  // -------------------------------------------------------------------------
+  // Data loading & form hydration
+  // -------------------------------------------------------------------------
 
   const loadEstimatePolicy = useCallback(async () => {
     try {
@@ -811,6 +835,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     }
   }, [projects, scopedProjectId, selectedProjectId]);
 
+  // -------------------------------------------------------------------------
+  // Line item handlers
+  // -------------------------------------------------------------------------
+
   function addLineItem() {
     if (formErrorMessage === ESTIMATE_MIN_LINE_ITEMS_ERROR) {
       setFormErrorMessage("");
@@ -925,6 +953,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     () => canMutateEstimates && Boolean(selectedProjectId) && lineItems.length > 0,
     [canMutateEstimates, lineItems.length, selectedProjectId],
   );
+
+  // -------------------------------------------------------------------------
+  // Submit & mutation handlers
+  // -------------------------------------------------------------------------
 
   async function submitNewEstimateWithTitle({
     projectId,
@@ -1353,6 +1385,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     }
     void loadStatusEvents({ quiet: true });
   }, [loadStatusEvents, selectedEstimateId, token]);
+
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
 
   return (
     <section className={styles.console}>

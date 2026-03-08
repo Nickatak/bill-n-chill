@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   title: "Get Started",
 };
 
+/** Route page for the "Get Started" onboarding checklist shown to fresh orgs. */
 export default function OnboardingPage() {
   return (
     <PageShell narrow>

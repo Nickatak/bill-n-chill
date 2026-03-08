@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "Customers",
 };
 
+/** Route page for the customers list with quick-add. */
 export default function CustomersPage() {
   return (
     <PageShell>

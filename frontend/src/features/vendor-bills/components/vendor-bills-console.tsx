@@ -46,6 +46,10 @@ import { PaymentRecorder, type AllocationTarget } from "@/features/payments";
 import styles from "./vendor-bills-console.module.css";
 import creatorStyles from "../../../shared/document-creator/creator-foundation.module.css";
 
+// ---------------------------------------------------------------------------
+// Types & constants
+// ---------------------------------------------------------------------------
+
 const VENDOR_BILL_STATUSES_FALLBACK: string[] = [
   "planned",
   "received",
@@ -104,6 +108,10 @@ type BudgetLineGroup = {
 type VendorBillsConsoleProps = {
   scopedProjectId?: number | null;
 };
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 /** Renders the vendor bills dashboard: project picker, bill list, status panel, and bill form. */
 export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null }: VendorBillsConsoleProps) {
@@ -193,6 +201,10 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(true);
   const billFormRef = useRef<HTMLFormElement>(null);
   const [creatorFlashCount, setCreatorFlashCount] = useState(0);
+  // -------------------------------------------------------------------------
+  // Derived values
+  // -------------------------------------------------------------------------
+
   const activeVendors = vendors.filter((vendor) => vendor.is_active);
   const projectNeedle = projectSearch.trim().toLowerCase();
   const filteredProjects = !projectNeedle
@@ -353,6 +365,10 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     formTaxAmountValue +
     formShippingAmountValue
   ).toFixed(2);
+
+  // -------------------------------------------------------------------------
+  // Display helpers
+  // -------------------------------------------------------------------------
 
   // --- Form field delegates ---
   // Each setter routes to either the "new bill" or "edit bill" state based on mode.
@@ -582,6 +598,10 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setSelectedProjectId(String(project.id));
   }
 
+  // -------------------------------------------------------------------------
+  // Data loading & form hydration
+  // -------------------------------------------------------------------------
+
   /** Fetches the policy contract that drives status options, transitions, and labels. */
   async function loadVendorBillPolicy() {
     try {
@@ -796,6 +816,10 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       setBudgetLineGroups([]);
     }
   }
+
+  // -------------------------------------------------------------------------
+  // Submit & mutation handlers
+  // -------------------------------------------------------------------------
 
   /** POSTs a new vendor bill to the API, handling duplicate detection. */
   async function createVendorBill(payloadBody: VendorBillPayload) {
@@ -1117,6 +1141,10 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setIsWorkspaceExpanded(true);
   }
 
+  // -------------------------------------------------------------------------
+  // Effects
+  // -------------------------------------------------------------------------
+
   // Bootstrap: load the policy contract and project/vendor lists once authenticated.
   useEffect(() => {
     if (!token) {
@@ -1251,6 +1279,10 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       })),
     [vendorBills],
   );
+
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
 
   return (
     <section className={styles.console}>
