@@ -48,7 +48,7 @@ authorized users:
 - **RBAC capability gates** — viewer can't create invoices, worker can't invite users
 - **Status transition maps** — can't go from PAID back to DRAFT
 - **Scope guard** — can't bill beyond approved contract value without explicit override
-- **Validation rules** — adjustment lines need reasons, scope lines need budget lines
+- **Validation rules** — adjustment lines need reasons, scope lines need cost codes
 
 These are the enforcement surface that RBAC controls. An authorized user with the right
 capabilities can perform any action within these rules. The rules themselves are not
@@ -60,8 +60,6 @@ required note, for example).
 Everything an authorized user does is captured in append-only records that cannot be
 modified or deleted through the application:
 
-- **FinancialAuditEvent** — every create, status change, and override across all
-  financial artifacts, with actor, timestamp, before/after state, and optional note
 - **InvoiceStatusEvent / EstimateStatusEvent** — lifecycle transitions with full context
 - **ChangeOrderSnapshot / VendorBillSnapshot** — complete entity state at each
   significant transition
@@ -69,7 +67,8 @@ modified or deleted through the application:
   with from/to state
 - **CustomerRecord / LeadContactRecord** — customer data changes
 - **PaymentRecord / PaymentAllocationRecord** — payment lifecycle
-- **InvoiceScopeOverrideEvent** — explicit record when scope guard is bypassed
+- **InvoiceScopeOverrideEvent** *(not yet implemented)* — explicit record when scope
+  guard is bypassed
 
 This layer is the backstop. It does not prevent action — it ensures that every action
 has receipts.
@@ -114,8 +113,6 @@ types), the system has the raw material to support future recovery workflows:
 - **ChangeOrderSnapshot** stores the full CO state at each transition
 - **VendorBillSnapshot** stores the full bill state
 - **PaymentRecord** stores the complete payment state
-- **FinancialAuditEvent.metadata_json** captures contextual data at each event
-
 This means that if an org needs to reconstruct "what did our invoices look like before
 Dave went rogue on Tuesday," the data exists to answer that question. Today this would
 be a manual/support operation. In the future, it could become a self-service "audit
@@ -132,7 +129,8 @@ don't prevent it — we record it.
 ### Scope Guard Override
 
 We allow billing beyond approved scope with `scope_override = true` and a required note.
-The override is recorded in `InvoiceScopeOverrideEvent` with the exact overage amount.
+The override is recorded in `InvoiceScopeOverrideEvent` *(not yet implemented)* with the
+exact overage amount.
 We don't hard-block it — we record the exception and who authorized it.
 
 ### RBAC Without Prevention

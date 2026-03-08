@@ -160,11 +160,9 @@ Customer types name, checks consent, clicks "Approve Estimate" or "Reject Estima
 - `transaction.atomic():`
   - Approve: `estimate.status = APPROVED`, `estimate.save()`
     - `EstimateStatusEvent.record(from=SENT, to=APPROVED, note=...)`
-    - `FinancialAuditEvent.record(type=ESTIMATE_APPROVED, ...)`
     - Auto-activates project if PROSPECT → ACTIVE
   - Reject: `estimate.status = REJECTED`, `estimate.save()`
     - `EstimateStatusEvent.record(from=SENT, to=REJECTED, note=...)`
-    - `FinancialAuditEvent.record(type=ESTIMATE_UPDATED, ...)`
 
 *── signing ceremony artifact ──*
 
@@ -206,15 +204,13 @@ Same ceremony flow. Different document type and decision side effects.
 
 - Approve:
   - `change_order.status = APPROVED`, sets `approved_by`, `approved_at`
-  - **Atomically propagates to budget:** updates `BudgetLine` amounts + `project.contract_value_current`
-  - `FinancialAuditEvent.record(type=CHANGE_ORDER_APPROVED, ...)`
+  - Updates `project.contract_value_current`
 - Reject:
   - `change_order.status = REJECTED`
-  - `FinancialAuditEvent.record(type=CHANGE_ORDER_UPDATED, ...)`
 
 *── signing ceremony artifact ──*
 
-- Content hash fields: family_key, revision_number, reason, amount_delta, terms_text, line_items (description, amount_delta, budget_line, line_type, adjustment_reason)
+- Content hash fields: family_key, revision_number, reason, amount_delta, terms_text, line_items (description, amount_delta, line_type, adjustment_reason)
 - `SigningCeremonyRecord.record(...)`
 
 ---
@@ -238,15 +234,13 @@ Same ceremony flow. Different document type and decision side effects.
 - Approve (`approve`/`pay`):
   - `invoice.status = PAID`, `balance_due = 0`
   - `InvoiceStatusEvent.record(from=SENT, to=PAID, ...)`
-  - `FinancialAuditEvent.record(type=INVOICE_UPDATED, ...)`
 - Dispute (`dispute`/`reject`):
   - Status unchanged — records notation event
   - `InvoiceStatusEvent.record(from=SENT, to=SENT, note=...)`
-  - `FinancialAuditEvent.record(type=INVOICE_UPDATED, status_action=notate, ...)`
 
 *── signing ceremony artifact ──*
 
-- Content hash fields: invoice_number, total, balance_due, tax_percent, terms_text, line_items (description, quantity, unit_price, cost_code, budget_line, unit, line_type)
+- Content hash fields: invoice_number, total, balance_due, tax_percent, terms_text, line_items (description, quantity, unit_price, cost_code, unit, line_type)
 - `SigningCeremonyRecord.record(...)`
 
 ---

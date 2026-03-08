@@ -143,7 +143,6 @@ Per-domain call chain docs live in [`docs/call-chains/`](call-chains/README.md).
   - Capture models should block update/delete at model/queryset level.
   - Prefer append-only `*Record` or `*Snapshot` models in `financial_auditing`.
 - Current examples:
-  - `CustomerIntake` -> `CustomerIntakeRecord`
   - `Customer` -> `CustomerRecord`
   - `Organization` -> `OrganizationRecord`
   - `OrganizationMembership` -> `OrganizationMembershipRecord`
@@ -169,8 +168,6 @@ Per-domain call chain docs live in [`docs/call-chains/`](call-chains/README.md).
   - Immutability is not a hard package-wide rule, but this package is expected to be highly mutation-restrictive by default.
   - Any create/update/delete exposure (including system jobs, scripts, and admin paths) must be explicitly justified, narrowly scoped, and covered by tests.
   - Prefer append-only/event-snapshot patterns over in-place mutation whenever feasible.
-- Example:
-  - `ScopeItem` belongs to `financial_auditing` as canonical cross-artifact line identity, even though it is created/reused from estimate authoring flows.
 - Refactor policy:
   - Favor explicit, domain-named collection packages over oversized single files once a model file carries multiple concerns.
 

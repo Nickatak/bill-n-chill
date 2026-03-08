@@ -46,17 +46,12 @@ Define the core construction and billing entities for the initial bill-n-chill p
 - Mutation posture:
   - `financial_auditing` is not automatically immutable, but mutation exposure should be minimal and deliberate.
   - Prefer append-only/audit-snapshot patterns; any mutable behavior requires explicit justification and coverage.
-- `ScopeItem` is the first explicit canonical-identity model in this split:
-  - It is user-originated via estimate flows but exists to provide stable cross-artifact identity.
-  - It is therefore treated as non-customer-facing financial-auditing infrastructure, not estimate-only workflow data.
-
 ### Lifecycle Capture Pattern
 
 - Policy:
   - User/internal operators can create or edit operational records where workflow requires it.
   - Financially relevant changes are captured as append-only immutable records in `financial_auditing`.
 - Current pairings:
-  - `CustomerIntake` -> `CustomerIntakeRecord`
   - `Customer` -> `CustomerRecord`
   - `Organization` -> `OrganizationRecord`
   - `OrganizationMembership` -> `OrganizationMembershipRecord`
@@ -76,28 +71,24 @@ This section is the canonical glossary for bill-n-chill. For model fields and li
 | --- | --- | --- | --- | --- |
 | Auth Token | Credential used for authenticated API requests after login/register. | DRF `Token` | `POST /api/v1/auth/login/`, `POST /api/v1/auth/register/`, `GET /api/v1/auth/me/` | Sent as `Authorization: Token <token>`. |
 | Tenant | Isolated organization/workspace boundary in the SaaS system. | `Organization`, `OrganizationMembership` | Auth responses include organization context. | A tenant is the company boundary, not an individual user. |
-| Customer Intake | Initial contact intake captured before or alongside project shell creation. | `CustomerIntake` + `CustomerIntakeRecord` | `POST /api/v1/customers/quick-add/` | Intake provenance is immutable capture data. |
 | Duplicate Resolution | Explicit operator decision when intake/vendor duplicate candidates are detected. | Intake/vendor workflows | `POST /api/v1/customers/quick-add/` (`use_existing`, `create_anyway`) | `merge_existing` is not part of current customer quick-add contract. |
 | Customer | Client/owner entity for project relationship and billing context. | `Customer` + `CustomerRecord` | `GET/PATCH /api/v1/customers/{id}/` | One customer can have multiple projects. |
 | Project | Primary container for estimating, change orders, billing, AP, and payments. | `Project` | `GET/PATCH /api/v1/projects/{id}/`, `GET /api/v1/projects/{id}/financial-summary/` | Lifecycle status gates workflow readiness. |
 | Project Profile | Editable baseline project fields used after shell creation. | `Project` | `GET /api/v1/projects/`, `GET/PATCH /api/v1/projects/{id}/` | Includes status and planned dates. |
-| Estimate | Customer-facing scope/price proposal before baseline execution budget. | `Estimate`, `EstimateLineItem` | `GET/POST /api/v1/projects/{project_id}/estimates/`, `GET/PATCH /api/v1/estimates/{id}/` | Lifecycle: `draft`, `sent`, `approved`, `rejected`, `void`, `archived`. |
-| Approved Estimate | Estimate version approved and eligible for budget conversion. | `Estimate(status=approved)` | `PATCH /api/v1/estimates/{id}/`, `POST /api/v1/estimates/{id}/convert-to-budget/` | Conversion can be idempotent when already converted. |
+| Estimate | Customer-facing scope/price proposal for project contract value. | `Estimate`, `EstimateLineItem` | `GET/POST /api/v1/projects/{project_id}/estimates/`, `GET/PATCH /api/v1/estimates/{id}/` | Lifecycle: `draft`, `sent`, `approved`, `rejected`, `void`, `archived`. |
+| Approved Estimate | Estimate version approved; sets project contract value. | `Estimate(status=approved)` | `PATCH /api/v1/estimates/{id}/` | Approval updates project contract value. |
 | Estimate Version | Revision snapshot of an estimate for one project. | `Estimate(version)` | `POST /api/v1/estimates/{id}/clone-version/` | Revisions preserve prior history. |
 | Estimate Status Event | Audit record for estimate status transitions. | `EstimateStatusEvent` | `GET /api/v1/estimates/{id}/status-events/` | Stores from/to status, actor, timestamp, note. |
-| Cost Code | Cost/billing classification used across estimate/budget/invoice/AP flows. | `CostCode` | `GET/POST /api/v1/cost-codes/`, `PATCH /api/v1/cost-codes/{id}/` | Supports CSV import and org-scoped ownership. |
-| Budget | Internal execution baseline derived from approved estimate. | `Budget` + `BudgetLine` | `POST /api/v1/estimates/{id}/convert-to-budget/`, `GET /api/v1/projects/{id}/budgets/` | Baseline snapshot immutable; working lines editable. |
-| Change Order (CO) | Post-baseline contract change request for scoped delta. | `ChangeOrder`, `ChangeOrderLine`, `ChangeOrderSnapshot` | `GET/POST /api/v1/projects/{id}/change-orders/`, `GET/PATCH /api/v1/change-orders/{id}/` | Lifecycle: `draft`, `pending_approval`, `approved`, `rejected`, `void`. |
+| Cost Code | Cost/billing classification used across estimate/invoice/AP flows. | `CostCode` | `GET/POST /api/v1/cost-codes/`, `PATCH /api/v1/cost-codes/{id}/` | Supports CSV import and org-scoped ownership. |
+| Change Order (CO) | Post-contract change request for scoped delta. | `ChangeOrder`, `ChangeOrderLine`, `ChangeOrderSnapshot` | `GET/POST /api/v1/projects/{id}/change-orders/`, `GET/PATCH /api/v1/change-orders/{id}/` | Lifecycle: `draft`, `pending_approval`, `approved`, `rejected`, `void`. |
 | Public Decision Link | Tokenized public customer decision flow for estimate/CO/invoice. | Public token/ref on document models | `/api/v1/public/.../{token}/decision/` | State-gated; writes audit/lifecycle context. |
 | Vendor | Payee identity for subcontractor/supplier billing workflows. | `Vendor` | `GET/POST /api/v1/vendors/`, `GET/PATCH /api/v1/vendors/{id}/` | Duplicate warning + override flow supported. |
 | Vendor Bill | AP invoice from vendor/subcontractor. | `VendorBill`, `VendorBillSnapshot` | `GET/POST /api/v1/projects/{id}/vendor-bills/`, `GET/PATCH /api/v1/vendor-bills/{id}/` | Lifecycle: `planned`, `received`, `approved`, `scheduled`, `paid`, `void`. |
 | Invoice | AR billing document sent to customer. | `Invoice`, `InvoiceLine`, `InvoiceStatusEvent` | `GET/POST /api/v1/projects/{id}/invoices/`, `GET/PATCH /api/v1/invoices/{id}/`, `POST /api/v1/invoices/{id}/send/` | Lifecycle: `draft`, `sent`, `partially_paid`, `paid`, `overdue`, `void`. |
-| Scope Item | Canonical cross-artifact line identity anchor. | `ScopeItem` | Referenced in estimate/budget/invoice payloads | Stabilizes lineage across revisioned artifacts. |
 | Payment | Money movement record (inbound AR or outbound AP). | `Payment`, `PaymentRecord` | `GET/POST /api/v1/projects/{id}/payments/`, `GET/PATCH /api/v1/payments/{id}/` | Lifecycle: `pending`, `settled`, `failed`, `void`. |
 | Payment Allocation | Applied amount from one payment to invoice/vendor bill targets. | `PaymentAllocation`, `PaymentAllocationRecord` | `POST /api/v1/payments/{id}/allocate/` | Direction guard: `inbound->invoice`, `outbound->vendor_bill`. |
 | Accounting Export | Reconciliation export aligned to financial summary math. | Derived from project financial entities | `GET /api/v1/projects/{id}/accounting-export/?export_format=csv|json` | Includes summary rows + traceability records. |
 | Accounting Sync Event | Sync operation log to/from accounting provider. | `AccountingSyncEvent`, `AccountingSyncRecord` | `GET/POST /api/v1/projects/{id}/accounting-sync-events/`, `POST /api/v1/accounting-sync-events/{id}/retry/` | Retry flow: failed->queued with audit capture. |
-| Financial Audit Event | Project-scoped immutable money-impact event index row. | `FinancialAuditEvent` (deprecated index layer) | `GET /api/v1/projects/{id}/audit-events/` | Compatibility timeline/index surface; canonical lane records still live in lane-specific immutable models. |
 | AR / AP Outstanding | Outstanding customer receivable and vendor payable balances. | `Invoice` + inbound allocations, `VendorBill` + outbound allocations | `GET /api/v1/projects/{id}/financial-summary/` | Outstanding totals are clamped at `0` for readability; unapplied credit exposed separately. |
 | Retainage | Withheld payment portion pending milestone/closeout completion. | Open modeling question | TBD | Explicitly unresolved in current v1 model decisions. |
 
@@ -112,7 +103,11 @@ Represents an account/tenant using bill-n-chill.
 Key fields:
 - `id`
 - `display_name`
-- `logo_url`
+- `logo` (ImageField)
+- `phone_number`
+- `website_url`
+- `license_number`
+- `tax_id`
 - `help_email`
 - `billing_address`
 - `default_invoice_due_delta`
@@ -123,7 +118,7 @@ Key fields:
 - `created_by`
 
 Settings split:
-- **Identity fields** (`display_name`, `logo_url`, `billing_address`): owner-only edit.
+- **Identity fields** (`display_name`, `logo`, `billing_address`, `phone_number`, `website_url`, `license_number`, `tax_id`): owner-only edit.
 - **Preset fields** (`help_email`, deltas, T&C fields): owner + PM can edit.
 - Field-level capability gates enforce this split at the API layer.
 
@@ -247,38 +242,13 @@ Policy:
 - Revocable via `DELETE /organization/invites/{id}/` before use.
 - Internal-facing RBAC artifact — no audit record model (invite lifecycle is simple enough to track via `used_at`/`used_by`).
 
-#### CustomerIntake
-
-Lightweight intake record captured before full project/customer setup.
-
-Current implementation note:
-- Quick Add (`POST /customers/quick-add/`) persists immutable intake provenance rows.
-- Intake is stored as immutable record snapshots and does not persist a mutable pre-customer model.
-
-Key fields:
-- `id`
-- `created_by`
-- `status` (intake lifecycle state)
-- `full_name`
-- `phone`
-- `email`
-- `project_address`
-- `source` (`field_manual`, `office_manual`, `import`, `web_form`, `referral`, `other`)
-- `notes`
-- `converted_customer_id` (nullable)
-- `converted_project_id` (nullable)
-
-Policy:
-- Internal-facing intake lifecycle object with model-level status transition guards.
-- Conversion state consistency is enforced at model + DB constraint layers.
-- Canonical immutable lifecycle provenance is captured in `CustomerIntakeRecord`.
-
 #### Customer
 
 Customer/owner for whom work is performed.
 
 Key fields:
 - `id`
+- `organization_id`
 - `created_by`
 - `display_name`
 - `email`
@@ -291,9 +261,9 @@ Policy:
 - API lifecycle contract is archive/unarchive via `is_archived`; hard-delete is intentionally unsupported.
 - Archive transition contract: archiving a customer auto-cancels any remaining `prospect` projects.
 
-#### CustomerIntakeRecord
+#### LeadContactRecord
 
-Immutable audit record for customer-intake lifecycle and conversion captures.
+Immutable audit record for pre-conversion lead/contact intake provenance.
 
 Key fields:
 - `id`
@@ -335,6 +305,7 @@ Container for scope, schedule intent, and all financial workflows.
 
 Key fields:
 - `id`
+- `organization_id`
 - `created_by`
 - `customer_id`
 - `name`
@@ -347,7 +318,7 @@ Key fields:
 
 #### Estimate
 
-Pre-contract or pre-baseline pricing model.
+Pre-contract pricing proposal.
 
 Key fields:
 - `id`
@@ -393,54 +364,13 @@ Policy:
 - Append-only status-history record for estimate lifecycle decisions.
 - Internal-facing operational audit artifact.
 
-#### ScopeItem
-
-Canonical non-customer-facing identity for "same work" line items across lifecycle artifacts.
-
-Why this exists:
-- `EstimateLineItem` and `BudgetLine` are context-specific rows (versioned proposal vs. working budget).
-- We still need one stable identity to reconcile analytics and history across revisions/conversions.
-- `ScopeItem` is that source-of-truth identity key; rows in other models can reference it.
-
-Key fields:
-- `id`
-- `organization_id`
-- `cost_code_id`
-- `name`
-- `normalized_name`
-- `unit`
-
-#### Budget
-
-Working project cost plan derived from approved estimate.
-
-Key fields:
-- `id`
-- `project_id`
-- `status` (`active`, `superseded`)
-- `source_estimate_id`
-- `baseline_snapshot_json`
-
-#### BudgetLine
-
-Budget amount per cost code/category.
-
-Key fields:
-- `id`
-- `budget_id`
-- `cost_code_id`
-- `description`
-- `budget_amount`
-- `committed_amount`
-- `actual_amount`
-
 #### CostCode
 
 Normalized classification for costs and billing lines.
 
 Key fields:
 - `id`
-- `organization_id` (nullable for legacy rows)
+- `organization_id`
 - `created_by`
 - `code`
 - `name`
@@ -448,7 +378,7 @@ Key fields:
 
 #### ChangeOrder
 
-Formal scope/price/time change affecting contract and budget.
+Formal scope/price/time change affecting contract value.
 
 Current scope:
 - Supports both internal authoring/revision workflows and public customer review/decision flows via tokenized public routes.
@@ -487,16 +417,6 @@ Key fields:
 - `created_at`
 
 ### Audit and Snapshot Infrastructure
-
-#### FinancialAuditEvent (Deprecated Index Layer)
-
-`FinancialAuditEvent` currently exists as a project-scoped immutable activity index used by
-legacy financial timeline/reporting reads.
-
-Policy:
-- Not canonical financial truth.
-- Canonical replay/forensics should come from domain-specific immutable capture models.
-- Planned removal after timeline/reporting migration is complete.
 
 #### VendorBillSnapshot
 
@@ -571,20 +491,18 @@ Key fields:
 
 Current policy:
 - One canonical invoice line set is used for both customer-facing and internal-facing views.
-- Invoice lines may reference canonical `ScopeItem` directly for strict cross-artifact lineage.
-- Invoice lines do not require direct FK coupling to `EstimateLineItem` or `BudgetLine`.
+- Invoice lines do not require direct FK coupling to `EstimateLineItem`.
 - Non-scope billing is represented explicitly as adjustment lines with reason metadata.
 
 #### InvoiceLine
 
-Billed line items, optionally tied to cost code and canonical scope identity.
+Billed line items, optionally tied to cost code.
 
 Key fields:
 - `id`
 - `invoice_id`
 - `line_type` (`scope`, `adjustment`)
 - `cost_code_id`
-- `scope_item_id` (optional canonical scope identity)
 - `adjustment_reason` (required when `line_type=adjustment`)
 - `internal_note` (optional internal-only context)
 - `description`
@@ -749,17 +667,15 @@ Policy:
 
 ### Relationship Summary
 
-- `Organization` has many `OrganizationMemberships`, `OrganizationInvites`, `RoleTemplates`, `Vendors`, `CostCodes`, and `ScopeItems`.
+- `Organization` has many `OrganizationMemberships`, `OrganizationInvites`, `RoleTemplates`, `Vendors`, and `CostCodes`.
 - `Organization` has many `OrganizationRecords` and `OrganizationMembershipRecords`.
 - `RoleTemplate` provides capability flags to `OrganizationMembership` (nullable FK).
-- `CustomerIntake` has many `CustomerIntakeRecords`.
 - `Customer` has many `CustomerRecords`.
-- `User` owns/scopes `CustomerIntake`, `Customers`, `Projects`, and financial workflow records via `created_by`.
+- `User` owns/scopes `Customers`, `Projects`, and financial workflow records via `created_by`.
 - `OrganizationMembership` has many `OrganizationMembershipRecords`.
-- `Project` has many `Estimates`, `Budgets`, `ChangeOrders`, `Invoices`, `VendorBills`, `Payments`, and `AccountingSyncEvents`.
+- `Project` has many `Estimates`, `ChangeOrders`, `Invoices`, `VendorBills`, `Payments`, and `AccountingSyncEvents`.
 - `AccountingSyncEvent` has many `AccountingSyncRecords`.
 - `Estimate` has many `EstimateLineItems`.
-- `Budget` has many `BudgetLines`.
 - `Invoice` has many `InvoiceLines`.
 - `Payment` has many `PaymentAllocations`.
 - `Payment` has many `PaymentAllocationRecords`.
@@ -769,13 +685,12 @@ Policy:
 
 1. Capture customer intake (usually from field/office quick add).
 2. Create/reuse customer + optional project shell.
-3. Build estimate and mark approved.
-4. Convert estimate to budget baseline.
-5. Execute work and capture change orders.
-6. Approve change orders and apply contract/budget deltas.
-7. Issue invoices and record customer payments.
-8. Record vendor bills and outbound payments.
-9. Sync finalized transactions to accounting.
+3. Build estimate and mark approved (sets project contract value).
+4. Execute work and capture change orders.
+5. Approve change orders and apply contract value deltas.
+6. Issue invoices and record customer payments.
+7. Record vendor bills and outbound payments.
+8. Sync finalized transactions to accounting.
 
 ### Derived Metrics (Project Financial Summary)
 
@@ -798,7 +713,6 @@ This section is a compact index only. Canonical endpoint behavior lives in `docs
 - `PATCH /api/v1/customers/{id}/`
 - `GET /api/v1/projects/{id}/financial-summary/`
 - `PATCH /api/v1/estimates/{estimate_id}/`
-- `POST /api/v1/estimates/{estimate_id}/convert-to-budget/`
 - `PATCH /api/v1/change-orders/{change_order_id}/`
 - `POST /api/v1/invoices/{id}/send/`
 - `POST /api/v1/projects/{project_id}/payments/`

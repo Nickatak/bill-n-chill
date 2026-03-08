@@ -38,7 +38,7 @@ Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> M
   - `backend/core/urls.py`: route map under `/api/v1/`.
 - Endpoint implementation:
   - `backend/core/views/shared_operations`: auth/org/customers/projects/cost-codes/vendors/report/search surfaces.
-  - `backend/core/views/estimating`: estimate + budget workflows.
+  - `backend/core/views/estimating`: estimate workflows.
   - `backend/core/views/change_orders`: change-order lifecycle and public decision flows.
   - `backend/core/views/accounts_receivable`: invoice workflows and public decision flows.
   - `backend/core/views/accounts_payable`: vendor-bill workflows.
@@ -46,12 +46,12 @@ Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> M
   - `backend/core/views/helpers.py`: capability-based RBAC enforcement (`_capability_gate`, `_resolve_user_capabilities`), organization scope helpers, and write-path utilities.
 - Domain models:
   - `backend/core/models/shared_operations`: org, membership, role template, customer, project, cost code, vendor, sync-event operational rows.
-  - `backend/core/models/estimating`: estimates, lines, budgets, budget lines, estimate status events.
+  - `backend/core/models/estimating`: estimates, estimate lines, estimate status events.
   - `backend/core/models/change_orders`: change orders, change-order lines.
   - `backend/core/models/accounts_receivable`: invoices, invoice lines, invoice status events.
   - `backend/core/models/accounts_payable`: vendor bills and related AP state.
   - `backend/core/models/cash_management`: payments and payment allocations.
-  - `backend/core/models/financial_auditing`: immutable records/snapshots and canonical traceability identity (`ScopeItem`).
+  - `backend/core/models/financial_auditing`: immutable records/snapshots for audit traceability.
 - Policy/contract and support layers:
   - `backend/core/policies`: workflow contract payloads consumed by frontend.
   - `backend/core/serializers`: API validation and response shaping.
@@ -63,12 +63,12 @@ Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> M
 - Route layer:
   - `frontend/src/app/*`: Next.js App Router pages and route-specific content.
 - Feature layer:
-  - `frontend/src/features/*`: workflow-domain UI modules (intake, estimates, change orders, invoices, bills, payments, etc.).
+  - `frontend/src/features/*`: workflow-domain UI modules (customers, estimates, change orders, invoices, bills, payments, etc.).
   - Each feature owns local components, state orchestration, and API interaction hooks/helpers.
 - Shared layer:
   - `frontend/src/shared/shell`: app shell — auth gate, toolbar, navbar, breadcrumbs, page layout wrappers, route metadata helpers. All styles are CSS modules.
   - `frontend/src/shared/components`: cross-feature UI primitives.
-  - `frontend/src/shared/document-composer`: shared authoring patterns for financial docs.
+  - `frontend/src/shared/document-creator`: shared authoring patterns for financial docs.
   - `frontend/src/shared/document-viewer`: shared read/public preview rendering patterns.
 - Session and RBAC:
   - `frontend/src/features/session/*`: token/session management, auth bootstrap checks, and capability-based UI gating (`rbac.ts`: `canDo`, `hasAnyRole`).
@@ -78,9 +78,9 @@ Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> M
 - Auth + org bootstrap:
   - login/register -> token -> `auth/me` -> active org + membership context.
 - Estimate lifecycle:
-  - draft/sent/approved/rejected/void -> approved conversion path to active budget.
+  - draft/sent/approved/rejected/void -> approved estimate sets project contract value.
 - Change-order propagation:
-  - `pending_approval -> approved|rejected` with contract/budget aggregate updates on approved transitions.
+  - `pending_approval -> approved|rejected` with contract value updates on approved transitions.
 - Invoice + payment loop:
   - invoice send/status lifecycle -> inbound/outbound payment recording -> allocation updates balance/status.
 - Public customer decisions:
@@ -120,8 +120,8 @@ Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> M
   - Optimize mobile for short execution tasks.
   - Optimize desktop for high-context editing and analysis.
 - Theme rule:
-  - Dark mode only for MVP v1 (high-contrast, outdoor-legible).
-  - Light mode and theme toggle deferred (see `docs/deferred/DEFERRED_THEME_MODES.md`).
+  - Both light and dark modes supported via theme toggle.
+  - Public-facing pages force light mode; internal pages support both.
 
 ## API Strategy
 

@@ -140,7 +140,6 @@ Expected URLs (key surfaces):
 - Change Orders: `http://localhost:3000/change-orders`
 - Invoices: `http://localhost:3000/invoices`
 - Vendor Bills: `http://localhost:3000/vendor-bills`
-- Payments: `http://localhost:3000/payments`
 - Organization: `http://localhost:3000/ops/organization`
 
 For the full API route map see `docs/api.md`. For the full frontend route map see `frontend/ARCHITECTURE_MAP.md`.
@@ -179,7 +178,6 @@ make db-reset
 Options:
 
 ```bash
-backend/.venv/bin/python backend/manage.py reset_fresh_demo --skip-seed
 backend/.venv/bin/python backend/manage.py reset_fresh_demo --skip-seed
 ```
 

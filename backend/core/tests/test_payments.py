@@ -89,6 +89,7 @@ class PaymentTests(TestCase):
             name=f"Vendor {Vendor.objects.filter(created_by=self.user, organization=self.org).count() + 1}",
             email=f"vendor{Vendor.objects.filter(created_by=self.user).count() + 1}@example.com",
             created_by=self.user,
+            organization=self.org,
         )
         return VendorBill.objects.create(
             project=self.project,

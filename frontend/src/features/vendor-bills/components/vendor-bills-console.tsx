@@ -1010,7 +1010,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setDueDate((current) => current || due);
   }, []);
 
-  // Reload vendor bills and budget lines whenever the selected project changes.
+  // Reload vendor bills whenever the selected project changes.
   useEffect(() => {
     if (!token || !selectedProjectId) {
       return;

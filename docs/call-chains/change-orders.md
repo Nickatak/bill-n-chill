@@ -30,7 +30,6 @@ This traces the load sequence when a project has one approved estimate and zero 
     - `setNewLineItems([emptyLine(1)])`, `setNewLineNextLocalId(2)` — reset create form
     - `setSelectedProjectId(...)`, `setSelectedProjectName(...)`
     - `await Promise.all([`
-      - [`loadBudgetLines(projectId)`](../../frontend/src/features/change-orders/components/change-orders-console.tsx#L791) — sets `budgetLines` (no prefill)
       - [`loadProjectEstimates(projectId)`](../../frontend/src/features/change-orders/components/change-orders-console.tsx#L835) — **sets `selectedViewerEstimateId`**
       - `loadProjectAuditEvents(projectId)`
     - `])`
@@ -39,46 +38,19 @@ This traces the load sequence when a project has one approved estimate and zero 
       - `setEditLineItems([emptyLine(1)])`
       - `setEditLineNextLocalId(2)` — resets **edit** counter only
 
-*── triggered effect (fires because `selectedViewerEstimateId` changed) ──*
-
-- [`useEffect → loadBudgetLines(projectId, sourceEstimateId)`](../../frontend/src/features/change-orders/components/change-orders-console.tsx#L1155)
-  - `await fetch /projects/{id}/budgets/` — async, **races against `fetchProjectChangeOrders`**
-  - [`prefillNewLinesFromBudgetLines(nextLines)`](../../frontend/src/features/change-orders/components/change-orders-console.tsx#L948)
-    - Maps budget lines → `localId: index + 1` → e.g. `[1, 2, 3]`
-    - `setNewLineItems(mapped)`
-    - `setNewLineNextLocalId(mapped.length + 1)` — e.g. `4`
-
 *── user interaction ──*
 
 - User clicks **Add Line Item**
   - [`addLine(setNewLineItems, newLineNextLocalId, setNewLineNextLocalId)`](../../frontend/src/features/change-orders/components/change-orders-console.tsx#L1193)
-    - Reads `newLineNextLocalId` (should be `4` if prefill completed)
-    - Appends `emptyLine(4)` → localIds `[1, 2, 3, 4]` — all unique ✓
+    - Reads `newLineNextLocalId`
+    - Appends `emptyLine(newLineNextLocalId)` — all unique
 
-## The Race Condition (Pre-Fix)
+## The Race Condition (Pre-Fix, Historical)
 
-Before the fix, `nextLineLocalId` was a **single shared counter** used by both the create and edit forms. The race:
-
-```
-Timeline A (budget-prefill effect wins first):
-  1. prefillNewLinesFromBudgetLines → setNextLineLocalId(4)     ← correct
-  2. fetchProjectChangeOrders → hydrateEditForm(undefined)
-     → setNextLineLocalId(2)                                    ← CLOBBERS to 2
-  3. User clicks "Add Line Item" → localId = 2                  ← DUPLICATE
-
-Timeline B (fetchProjectChangeOrders wins first):
-  1. fetchProjectChangeOrders → hydrateEditForm(undefined)
-     → setNextLineLocalId(2)
-  2. prefillNewLinesFromBudgetLines → setNextLineLocalId(4)     ← correct, last write wins
-  3. User clicks "Add Line Item" → localId = 4                  ← OK
-```
-
-Timeline A produced duplicate React keys (`localId: 2` on both a prefilled row and the new row), causing:
+Before the fix, `nextLineLocalId` was a **single shared counter** used by both the create and edit forms. Concurrent async effects (line prefill and CO fetch) could clobber each other's counter values, producing duplicate React keys (`localId: 2` on both a prefilled row and the new row), causing:
 - React console error: `Encountered two children with the same key`
 - Synced/mirrored input fields (React reuses DOM for same-key siblings)
 - Validation errors on wrong rows
-
-**Repro conditions:** Project with approved estimate + zero COs. The `/budgets/` fetch in the effect must resolve before `/change-orders/` returns (both are parallel network requests — order depends on server timing).
 
 ## The Fix
 
@@ -86,7 +58,7 @@ Split the shared counter into two independent counters:
 
 | Counter | Used by | Set by |
 |---------|---------|--------|
-| `newLineNextLocalId` | Create form `addLine` | `prefillNewLinesFromBudgetLines`, `loadProjects` reset, `handleStartNewChangeOrder`, post-create cleanup |
+| `newLineNextLocalId` | Create form `addLine` | `loadProjects` reset, `handleStartNewChangeOrder`, post-create cleanup |
 | `editLineNextLocalId` | Edit form `addLine` | `hydrateEditForm` (both undefined and populated branches) |
 
 `hydrateEditForm(undefined)` now only touches `editLineNextLocalId`, so it can never clobber the create form's counter regardless of fetch resolution order.

@@ -131,7 +131,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const [formSuccessMessage, setFormSuccessMessage] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [actionTone, setActionTone] = useState<"error" | "success" | "info">("info");
-  const [isActivatingBaseline, setIsActivatingBaseline] = useState(false);
+
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -1281,50 +1281,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     }
   }
 
-  /** Set the selected approved estimate as the project's active financial baseline. */
-  async function handleActivateFinancialBaseline() {
-    const estimateId = Number(selectedEstimateId);
-    if (!estimateId || !selectedEstimate) {
-      setActionMessage("Select an approved estimate first.");
-      return;
-    }
-    if (selectedEstimate.status !== "approved") {
-      setActionMessage("Only approved estimates can be activated for financials.");
-      return;
-    }
-
-    setActionMessage("");
-    setIsActivatingBaseline(true);
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/estimates/${estimateId}/convert-to-budget/`, {
-        method: "POST",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
-        body: JSON.stringify({ supersede_active: true }),
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        const activeId = payload.error?.meta?.active_financial_estimate_id;
-        const message = readEstimateApiError(payload, "Active estimate update failed.");
-        setActionMessage(
-          activeId ? `${message} Current active estimate is #${activeId}.` : message,
-        );
-        return;
-      }
-      const conversionStatus = payload.meta?.conversion_status ?? "converted";
-      await loadEstimates({
-        preserveSelection: true,
-        preferredEstimateId: estimateId,
-        quiet: true,
-      });
-      await loadStatusEvents({ estimateId, quiet: true });
-      setActionMessage("");
-    } catch {
-      setActionMessage("Could not reach estimate conversion endpoint.");
-    } finally {
-      setIsActivatingBaseline(false);
-    }
-  }
-
   const loadStatusEvents = useCallback(
     async (options?: { estimateId?: number; quiet?: boolean }) => {
       const estimateId = options?.estimateId ?? Number(selectedEstimateId);
@@ -1670,12 +1626,12 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                     <button
                       type="button"
                       className={styles.financialActivationButton}
-                      onClick={handleActivateFinancialBaseline}
-                      disabled={isActivatingBaseline}
+                      onClick={() => {
+                        setActionMessage("Active estimate activation is not yet available.");
+                        setActionTone("info");
+                      }}
                     >
-                      {isActivatingBaseline
-                        ? "Setting Active Estimate..."
-                        : "Set as Active Estimate"}
+                      Set as Active Estimate
                     </button>
                   </div>
                 ) : null}

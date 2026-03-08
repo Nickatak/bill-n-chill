@@ -63,6 +63,12 @@ class Vendor(models.Model):
 
     class Meta:
         ordering = ["name", "id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(organization__isnull=False) | models.Q(is_canonical=True),
+                name="vendor_org_required_unless_canonical",
+            ),
+        ]
 
     def __str__(self) -> str:
         return self.name

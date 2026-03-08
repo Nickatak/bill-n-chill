@@ -23,7 +23,6 @@ Last reviewed: 2026-03-04
   - [Cost Code Management (EST-01)](#cost-code-management-est-01)
   - [Estimate Authoring and Versioning (EST-02)](#estimate-authoring-and-versioning-est-02)
   - [Estimate Approval Lifecycle (EST-03)](#estimate-approval-lifecycle-est-03)
-  - [Budget Baseline Conversion (BGT-01)](#budget-baseline-conversion-bgt-01)
   - [Change Order Lifecycle (CO-01)](#change-order-lifecycle-co-01)
   - [Change Order Financial Propagation (CO-02)](#change-order-financial-propagation-co-02)
   - [Change Order Decision Snapshots (CO-03)](#change-order-decision-snapshots-co-03)
@@ -40,7 +39,6 @@ Last reviewed: 2026-03-04
   - [Financial Drill-Down Traceability (FIN-02)](#financial-drill-down-traceability-fin-02)
   - [Accounting Export Bridge (ACC-01)](#accounting-export-bridge-acc-01)
   - [QuickBooks Sync Foundation (ACC-02)](#quickbooks-sync-foundation-acc-02)
-  - [Financial Audit Trail (QA-01)](#financial-audit-trail-qa-01)
   - [Project Timeline / Activity Center (QA-02)](#project-timeline--activity-center-qa-02)
 
 ## API Foundations (Meta)
@@ -76,12 +74,10 @@ Source of truth: `backend/core/urls.py`.
 ├── projects/
 │   ├── {project_id}/
 │   ├── {project_id}/financial-summary/
-│   ├── {project_id}/audit-events/
 │   ├── {project_id}/timeline/
 │   ├── {project_id}/accounting-export/
 │   ├── {project_id}/accounting-sync-events/
 │   ├── {project_id}/estimates/
-│   ├── {project_id}/budgets/
 │   ├── {project_id}/change-orders/
 │   ├── {project_id}/invoices/
 │   ├── {project_id}/vendor-bills/
@@ -109,10 +105,7 @@ Source of truth: `backend/core/urls.py`.
 │   └── {estimate_id}/
 │       ├── status-events/
 │       ├── clone-version/
-│       ├── duplicate/
-│       └── convert-to-budget/
-├── budgets/
-│   └── {budget_id}/lines/{line_id}/
+│       └── duplicate/
 ├── change-orders/
 │   └── {change_order_id}/
 │       └── clone-revision/
@@ -260,11 +253,9 @@ All write endpoints are gated by capability checks, not role strings.
   customers:        view, create, edit, disable
   cost_codes:       view, create, edit, disable
   vendors:          view, create, edit, disable
-  budgets:          view, edit
   org_identity:     view, edit
   org_presets:      view, edit
   users:            view, invite, edit_role, disable
-  financial_audit:  view
   accounting_sync:  view, create, retry
   ```
 
@@ -504,36 +495,6 @@ Resolution fields accepted by `POST /api/v1/customers/quick-add/`:
   - Auth required
   - Returns audit trail entries for estimate status changes, including actor, timestamp, and note.
 
-## Budget Baseline Conversion (BGT-01)
-
-- `POST /api/v1/estimates/{estimate_id}/convert-to-budget/`
-  - Auth required
-  - Converts an approved estimate into a project budget.
-  - Validation:
-    - blocked unless estimate status is `approved`
-  - Behavior:
-    - creates immutable baseline snapshot (`baseline_snapshot_json`)
-    - creates editable working `BudgetLine` rows from estimate line items
-    - supersedes previously active budget for the same project
-  - Idempotency:
-    - if estimate was already converted, returns existing budget with `meta.conversion_status = "already_converted"`.
-
-- `GET /api/v1/projects/{project_id}/budgets/`
-  - Auth required
-  - Returns budgets for the selected project, including budget line rows.
-  - Includes CO-02 aggregate fields:
-    - `approved_change_order_total`
-    - `base_working_total`
-    - `current_working_total`
-
-- `PATCH /api/v1/budgets/{budget_id}/lines/{line_id}/`
-  - Auth required
-  - Updates editable working budget line fields:
-    - `description` (optional)
-    - `budget_amount` (optional)
-  - Validation:
-    - budget must be `active`
-
 ## Change Order Lifecycle (CO-01)
 
 Current product posture:
@@ -559,12 +520,10 @@ Current product posture:
     - `reason` (optional)
     - `origin_estimate` (optional; estimate id from same project)
     - `line_items[]` (optional scaffold):
-      - `budget_line` (required when row present; must belong to active budget for project)
       - `description` (optional)
       - `amount_delta` (required)
       - `days_delta` (optional)
   - Validation:
-    - project must have an active budget baseline before change-order creation.
     - if `line_items` are provided, sum of line `amount_delta` must equal change-order `amount_delta`.
 
 - `GET /api/v1/change-orders/{change_order_id}/`
@@ -629,13 +588,10 @@ CO-02 extends existing CO endpoints with propagation behavior.
 - `PATCH /api/v1/change-orders/{change_order_id}/`
   - When change order moves to `approved`:
     - increments `Project.contract_value_current` by CO `amount_delta`
-    - increments active `Budget.approved_change_order_total` by CO `amount_delta`
   - When an approved change order moves out of `approved` (for example `approved -> void`):
-    - reverses the same amounts from project and active budget aggregates
+    - reverses the same amount from project contract value
   - If `amount_delta` is edited while CO is already `approved`:
-    - applies only the delta difference to project and budget aggregates
-  - Validation:
-    - active budget is required for propagation events
+    - applies only the delta difference to project contract value
 
 - Billable amount basis in current v1:
   - billable basis is derived from `Project.contract_value_current`.
@@ -742,7 +698,6 @@ CO-02 extends existing CO endpoints with propagation behavior.
     - `line_items[]` (required)
       - `line_type` (optional; `scope` or `adjustment`, default `scope`)
       - `cost_code` (optional)
-      - `scope_item` (optional; canonical scope identity)
       - `adjustment_reason` (optional string; required when `line_type=adjustment`)
       - `internal_note` (optional string; internal-only context)
       - `description` (required)
@@ -753,8 +708,6 @@ CO-02 extends existing CO endpoints with propagation behavior.
     - at least one line item is required
     - due date must be on/after issue date
     - if `line_type=adjustment`, `adjustment_reason` is required
-    - if both `scope_item` and `cost_code` are provided, their cost-code identity must match
-    - `scope_item` must be accessible in the current active organization scope
   - Behavior:
     - computes line totals, subtotal, tax total, total, and balance due
     - auto-generates `invoice_number` per project (`INV-####`)
@@ -783,7 +736,7 @@ CO-02 extends existing CO endpoints with propagation behavior.
     - `notes_text`
     - `tax_percent`
     - `line_items` (replaces existing lines)
-      - accepts same line schema as create (`line_type`, `scope_item`, adjustment metadata)
+      - accepts same line schema as create (`line_type`, adjustment metadata)
   - Allowed transitions:
     - `draft -> sent | void`
     - `sent -> draft | partially_paid | paid | overdue | void`
@@ -802,9 +755,7 @@ CO-02 extends existing CO endpoints with propagation behavior.
 ### Invoice Lineage Decision
 
 - Invoice lines are billing-time composition rows and may regroup/split partial scope across invoice cycles.
-- `ScopeItem` is the canonical cross-artifact identity anchor used when strict lineage is needed.
-- `EstimateLineItem` and `BudgetLine` are context rows and are not required invoice FKs.
-- Non-estimate/non-scope billing is allowed only as explicit `adjustment` lines with required reason metadata.
+- Non-estimate billing is allowed only as explicit `adjustment` lines with required reason metadata.
 - External/public invoice views should hide internal-only metadata fields (for example `internal_note`).
 
 ## Unapproved Scope Billing Protection (INV-02)
@@ -1153,44 +1104,11 @@ Each bucket contains:
   - Audit behavior:
     - appends immutable `AccountingSyncRecord(event_type=retried, capture_source=manual_ui)` on `failed -> queued`
 
-## Financial Audit Trail (QA-01)
-
-- `GET /api/v1/projects/{project_id}/audit-events/`
-  - Auth required
-  - Returns immutable project-scoped financial index rows (`FinancialAuditEvent`) for current user/project.
-  - Note:
-    - this endpoint is a compatibility timeline/index surface, not the canonical source of truth for every lane.
-    - canonical payment provenance/lifecycle capture is append-only `PaymentRecord`.
-    - canonical accounting-sync lifecycle capture is append-only `AccountingSyncRecord`.
-  - Event coverage includes:
-    - estimate status transitions
-    - estimate-to-budget conversions
-    - change-order updates and approval propagation
-    - invoice lifecycle updates and sends
-    - invoice scope-override approvals
-    - vendor-bill lifecycle updates
-    - payment updates (create/patch/status)
-    - payment allocations
-  - Row fields:
-    - `event_type`
-    - `object_type`
-    - `object_id`
-    - `from_status`
-    - `to_status`
-    - `amount`
-    - `note`
-    - `metadata_json`
-    - `created_by`
-    - `created_at`
-  - Immutability:
-    - rows are append-only and cannot be updated/deleted through API.
-
 ## Project Timeline / Activity Center (QA-02)
 
 - `GET /api/v1/projects/{project_id}/timeline/`
   - Auth required
   - Returns a read-only project timeline merged from:
-    - financial audit events (`FinancialAuditEvent`)
     - workflow estimate status events (`EstimateStatusEvent`)
   - Query params:
     - `category` (optional; default `all`)

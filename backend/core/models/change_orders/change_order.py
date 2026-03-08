@@ -18,7 +18,7 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
     Business workflow:
     - Represents change governance after baseline, not a full estimate restart.
     - Routed through draft -> pending approval -> approved/rejected/void lifecycle.
-    - Approved amount deltas propagate to project contract current and budget CO total.
+    - Approved amount deltas propagate to project contract value.
 
     Current policy:
     - Lifecycle control: `user-managed` with status-transition guards.

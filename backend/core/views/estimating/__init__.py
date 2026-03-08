@@ -1,1 +1,1 @@
-"""Estimating and budget API views."""
+"""Estimating API views."""
