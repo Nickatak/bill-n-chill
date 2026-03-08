@@ -1494,7 +1494,7 @@ export function InvoicesConsole() {
                               onClick={(event) => event.stopPropagation()}
                               onKeyDown={(event) => event.stopPropagation()}
                             >
-                              Public ↗
+                              Customer View ↗
                             </a>
                           ) : null}
                         </div>

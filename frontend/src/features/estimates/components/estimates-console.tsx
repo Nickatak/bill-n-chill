@@ -1481,13 +1481,43 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                     >
                       <div className={styles.familyRow}>
                         <div className={styles.familyMainColumn}>
-                          <button
-                            type="button"
+                          <div
+                            role="button"
+                            tabIndex={0}
                             className={`${styles.familyMain} ${
                               isLatestSelected ? styles.familyMainActive : ""
                             }`}
                             onClick={() => handleSelectFamilyLatest(family.title, latest)}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleSelectFamilyLatest(family.title, latest); } }}
                           >
+                            {(!isViewingHistory && latest.public_ref) || (quickActionKind === "change_order" && selectedProjectId) ? (
+                              <div className={styles.familyPublicBar}>
+                                {quickActionKind === "change_order" && selectedProjectId ? (
+                                  <Link
+                                    href={`/projects/${selectedProjectId}/change-orders?origin_estimate=${latest.id}`}
+                                    className={styles.familyPublicLink}
+                                    aria-label={`${quickActionTitle} (estimate #${latest.id})`}
+                                    title={quickActionTitle}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    To CO&apos;s ↗
+                                  </Link>
+                                ) : null}
+                                {!isViewingHistory && latest.public_ref ? (
+                                  <Link
+                                    href={publicEstimateHref(latest.public_ref)}
+                                    className={`${styles.familyPublicLink} ${styles.familyPublicBarEnd}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    aria-label={`Open customer view for estimate #${latest.id}`}
+                                    title="Open customer view"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    Customer View ↗
+                                  </Link>
+                                ) : null}
+                              </div>
+                            ) : null}
                             <div className={styles.familyMainContent}>
                               <span className={styles.familyTitle}>{family.title}</span>
                               <span className={styles.familyMeta}>
@@ -1516,23 +1546,13 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                                 </span>
                               ) : null}
                             </div>
-                          </button>
-                          {isViewingHistory || (!isViewingHistory && latest.public_ref) || quickActionKind ? (
+                          </div>
+                          {isViewingHistory || quickActionKind === "revision" ? (
                             <div className={styles.familyFooter}>
                               {isViewingHistory ? (
                                 <span className={styles.historyNotice}>
                                   Viewing v{selectedInFamily?.version}
                                 </span>
-                              ) : null}
-                              {quickActionKind === "change_order" && selectedProjectId ? (
-                                <Link
-                                  href={`/projects/${selectedProjectId}/change-orders?origin_estimate=${latest.id}`}
-                                  className={styles.familyActionLink}
-                                  aria-label={`${quickActionTitle} (estimate #${latest.id})`}
-                                  title={quickActionTitle}
-                                >
-                                  To CO&apos;s ↗
-                                </Link>
                               ) : null}
                               {quickActionKind === "revision" ? (
                                 <button
@@ -1542,20 +1562,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                                   title={quickActionTitle}
                                   onClick={() => void handleFamilyCardQuickAction(latest)}
                                 >
-                                  Duplicate
+                                  New Revision
                                 </button>
-                              ) : null}
-                              {!isViewingHistory && latest.public_ref ? (
-                                <Link
-                                  href={publicEstimateHref(latest.public_ref)}
-                                  className={`${styles.familyActionLink} ${styles.familyFooterEnd}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  aria-label={`Open public view for estimate #${latest.id}`}
-                                  title="Open public view"
-                                >
-                                  Public ↗
-                                </Link>
                               ) : null}
                             </div>
                           ) : null}
@@ -1608,10 +1616,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                                         className={styles.historyPublicLink}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        aria-label={`Open public view for estimate #${estimate.id}`}
-                                        title="Open public view"
+                                        aria-label={`Open customer view for estimate #${estimate.id}`}
+                                        title="Open customer view"
                                       >
-                                        Public ↗
+                                        Customer View ↗
                                       </Link>
                                     ) : null}
                                   </div>
