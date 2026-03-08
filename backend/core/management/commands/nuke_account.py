@@ -86,7 +86,6 @@ class Command(BaseCommand):
             ("change order snapshots", f"DELETE FROM core_changeordersnapshot WHERE change_order_id IN {change_order_ids_sub}"),
             ("estimate status events", f"DELETE FROM core_estimatestatusevent WHERE estimate_id IN {estimate_ids_sub}"),
             ("invoice status events", f"DELETE FROM core_invoicestatusevent WHERE invoice_id IN {invoice_ids_sub}"),
-            ("invoice scope override events", f"DELETE FROM core_invoicescopeoverrideevent WHERE invoice_id IN {invoice_ids_sub}"),
             ("customer records", f"DELETE FROM core_customerrecord WHERE customer_id IN (SELECT id FROM core_customer WHERE organization_id = {org_id})"),
             ("organization records", f"DELETE FROM core_organizationrecord WHERE organization_id = {org_id}"),
             ("organization membership records", f"DELETE FROM core_organizationmembershiprecord WHERE organization_id = {org_id}"),
