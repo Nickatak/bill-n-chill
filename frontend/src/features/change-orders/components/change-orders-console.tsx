@@ -1079,6 +1079,7 @@ export function ChangeOrdersConsole({
   }, [
     fetchProjectChangeOrders,
     hydrateEditForm,
+    initialOriginEstimateId,
     loadBudgetLines,
     loadProjectAuditEvents,
     loadProjectEstimates,

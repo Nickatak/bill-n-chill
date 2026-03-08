@@ -10,6 +10,7 @@ Per-domain call chain docs trace the chronological function-call order for each 
 
 - [auth.md](auth.md) — Registration, login, email verification, session verification, RBAC-gated requests
 - [customers.md](customers.md) — Customer list, edit, project creation, quick-add intake
+- [change-orders.md](change-orders.md) — CO page initialization, line item local ID race condition, add-line flow
 - [estimates.md](estimates.md) — Estimate CRUD, status transitions, clone/duplicate, budget conversion, public signing ceremony
 
 ## Format
