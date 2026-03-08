@@ -57,6 +57,10 @@ import {
 import { useClientPagination } from "@/shared/hooks/use-client-pagination";
 import { PaginationControls } from "@/shared/components/pagination-controls";
 
+// ---------------------------------------------------------------------------
+// Types & constants
+// ---------------------------------------------------------------------------
+
 type LineSetter = (
   value:
     | ChangeOrderLineInput[]
@@ -116,6 +120,10 @@ const CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]>
 };
 const CHANGE_ORDER_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 /** Internal change-orders workspace: estimate-linked viewer, dual creators (create + edit), and status lifecycle. */
 export function ChangeOrdersConsole({
   scopedProjectId: scopedProjectIdProp = null,
@@ -172,6 +180,10 @@ export function ChangeOrdersConsole({
   const [editFlashCount, setEditFlashCount] = useState(0);
   const { setPrintable } = usePrintable();
 
+  // -------------------------------------------------------------------------
+  // Effects
+  // -------------------------------------------------------------------------
+
   useEffect(() => {
     setPrintable(!!selectedChangeOrderId);
     return () => setPrintable(false);
@@ -200,6 +212,10 @@ export function ChangeOrdersConsole({
     el.addEventListener("animationend", cleanup, { once: true });
     return () => el.removeEventListener("animationend", cleanup);
   }, [editFlashCount]);
+
+  // -------------------------------------------------------------------------
+  // Derived values
+  // -------------------------------------------------------------------------
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const canMutateChangeOrders = canDo(capabilities, "change_orders", "create");
@@ -416,6 +432,10 @@ export function ChangeOrdersConsole({
       postApproval: formatDecimal(postApprovalTotal),
     };
   })();
+
+  // -------------------------------------------------------------------------
+  // Display helpers
+  // -------------------------------------------------------------------------
 
   /** Resolve a status value to its human-readable label. */
   function statusLabel(status: string): string {
@@ -705,6 +725,10 @@ export function ChangeOrdersConsole({
     }
     return `approved on ${dateLabel}`;
   }
+
+  // -------------------------------------------------------------------------
+  // Data loading & form hydration
+  // -------------------------------------------------------------------------
 
   const hydrateEditForm = useCallback((changeOrder: ChangeOrderRecord | undefined) => {
     if (!changeOrder) {
@@ -1105,6 +1129,10 @@ export function ChangeOrdersConsole({
     token,
   ]);
 
+  // -------------------------------------------------------------------------
+  // Effects (data loading)
+  // -------------------------------------------------------------------------
+
   // Load the change-order workflow policy contract on auth.
   useEffect(() => {
     if (!token) {
@@ -1182,6 +1210,10 @@ export function ChangeOrdersConsole({
     })();
   }, [loadBudgetLines, prefillNewLinesFromBudgetLines, selectedProjectId, selectedViewerEstimateId]);
 
+  // -------------------------------------------------------------------------
+  // Line item handlers
+  // -------------------------------------------------------------------------
+
   /** Convert local line-item state into the API payload shape. */
   function toLinePayload(lines: ChangeOrderLineInput[]) {
     return lines
@@ -1236,6 +1268,10 @@ export function ChangeOrdersConsole({
     }
     setter((current) => current.filter((line) => line.localId !== localId));
   }
+
+  // -------------------------------------------------------------------------
+  // Submit & mutation handlers
+  // -------------------------------------------------------------------------
 
   /** Reset the workspace to a fresh "new change order" draft. */
   function handleStartNewChangeOrder() {
@@ -1537,6 +1573,10 @@ export function ChangeOrdersConsole({
       setFeedback("Could not reach change order detail endpoint.", "error");
     }
   }
+
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
 
   return (
     <section>

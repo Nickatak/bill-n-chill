@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "Projects",
 };
 
+/** Route page for the projects list. */
 export default function ProjectsPage() {
   return (
     <PageShell>

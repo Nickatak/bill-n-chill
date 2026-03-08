@@ -17,6 +17,7 @@ export async function generateMetadata({ searchParams }: InvoicesPageMetadataPro
   return { title: resolveProjectQueryTitle("Invoices", project) };
 }
 
+/** Route page for the invoices list. */
 export default function InvoicesPage() {
   return (
     <PageShell>

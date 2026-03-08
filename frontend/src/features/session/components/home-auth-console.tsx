@@ -61,6 +61,11 @@ function toSessionOrganization(
   };
 }
 
+/**
+ * Login form console. Authenticates credentials against the Django auth endpoint,
+ * persists the session to localStorage, and handles unverified-email edge cases
+ * with an inline resend option.
+ */
 export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
   const [messageTone, setMessageTone] = useState<"neutral" | "error">("neutral");
   const [email, setEmail] = useState("");

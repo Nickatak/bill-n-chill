@@ -12,6 +12,7 @@ export async function generateMetadata({ searchParams }: BillsPageMetadataProps)
   return { title: resolveProjectQueryTitle("Bills", project) };
 }
 
+/** Route page for the vendor bills list. */
 export default function BillsPage() {
   return (
     <PageShell>

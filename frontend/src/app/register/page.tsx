@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: "Register",
 };
 
+/** Route page for new user registration. Accepts an optional `?token=` invite param. */
 export default async function RegisterPage({
   searchParams,
 }: {

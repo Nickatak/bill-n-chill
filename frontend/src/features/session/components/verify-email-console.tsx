@@ -43,6 +43,10 @@ function toSessionOrganization(
   return { id: raw.id, displayName: raw.display_name };
 }
 
+/**
+ * Handles the email verification callback. POSTs the token from the verification
+ * link to the backend, saves the resulting session, and redirects to the dashboard.
+ */
 export function VerifyEmailConsole({ token }: VerifyEmailConsoleProps) {
   const router = useRouter();
   const [status, setStatus] = useState<"verifying" | "success" | "error">("verifying");
