@@ -60,9 +60,13 @@ Source of truth: `backend/core/urls.py`.
 │   ├── login/
 │   ├── register/
 │   ├── me/
+│   ├── verify-email/
+│   ├── resend-verification/
+│   ├── check-invite/{token}/
 │   ├── verify-invite/{token}/
 │   └── accept-invite/
 ├── organization/
+│   ├── logo/
 │   ├── memberships/
 │   │   └── {membership_id}/
 │   └── invites/
@@ -96,10 +100,16 @@ Source of truth: `backend/core/urls.py`.
 │   └── payments/
 ├── public/
 │   ├── estimates/{public_token}/
+│   ├── estimates/{public_token}/otp/
+│   ├── estimates/{public_token}/otp/verify/
 │   ├── estimates/{public_token}/decision/
 │   ├── change-orders/{public_token}/
+│   ├── change-orders/{public_token}/otp/
+│   ├── change-orders/{public_token}/otp/verify/
 │   ├── change-orders/{public_token}/decision/
 │   ├── invoices/{public_token}/
+│   ├── invoices/{public_token}/otp/
+│   ├── invoices/{public_token}/otp/verify/
 │   └── invoices/{public_token}/decision/
 ├── estimates/
 │   └── {estimate_id}/
@@ -759,6 +769,10 @@ CO-02 extends existing CO endpoints with propagation behavior.
 - External/public invoice views should hide internal-only metadata fields (for example `internal_note`).
 
 ## Unapproved Scope Billing Protection (INV-02)
+
+> **Status: Not yet implemented.** This section documents planned design intent.
+> The `_enforce_invoice_scope_guard()` function, `InvoiceScopeOverrideEvent` model,
+> and override payload fields do not exist in the codebase yet.
 
 INV-02 extends invoice billing actions with a scope guard based on approved project billable amount.
 
