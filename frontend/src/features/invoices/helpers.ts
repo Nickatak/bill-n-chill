@@ -161,21 +161,6 @@ export function invoiceStatusEventActionLabel(
   return `${statusLabel(event.from_status)} to ${statusLabel(event.to_status)}`;
 }
 
-/** Pick the most likely next status to pre-select in the status picker for an invoice. */
-export function resolvePreferredStatusSelection(
-  invoice: InvoiceRecord | null,
-  transitions: Record<string, string[]>,
-): string {
-  if (!invoice) {
-    return "draft";
-  }
-  const nextStatuses = [...(transitions[invoice.status] ?? [])];
-  if (invoice.status === "sent" && !nextStatuses.includes("sent")) {
-    nextStatuses.unshift("sent");
-  }
-  return nextStatuses[0] ?? invoice.status;
-}
-
 // ---------------------------------------------------------------------------
 // Error helpers
 // ---------------------------------------------------------------------------

@@ -10,7 +10,6 @@ import {
   projectStatusLabel,
   publicInvoiceHref,
   readInvoiceApiError,
-  resolvePreferredStatusSelection,
 } from "../helpers";
 import type { InvoiceRecord, InvoiceStatusEventRecord } from "../types";
 
@@ -266,37 +265,6 @@ describe("invoiceStatusEventActionLabel", () => {
     expect(
       invoiceStatusEventActionLabel(event({ from_status: "draft", to_status: "sent" }), label),
     ).toBe("Draft to Sent");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// resolvePreferredStatusSelection
-// ---------------------------------------------------------------------------
-
-describe("resolvePreferredStatusSelection", () => {
-  const transitions: Record<string, string[]> = {
-    draft: ["sent", "void"],
-    sent: ["partially_paid", "paid", "void"],
-  };
-
-  it("returns 'draft' for null invoice", () => {
-    expect(resolvePreferredStatusSelection(null, transitions)).toBe("draft");
-  });
-
-  it("returns first available transition", () => {
-    const invoice = { status: "draft" } as InvoiceRecord;
-    expect(resolvePreferredStatusSelection(invoice, transitions)).toBe("sent");
-  });
-
-  it("prepends 'sent' for resend when not in transitions", () => {
-    const narrowTransitions = { sent: ["paid"] };
-    const invoice = { status: "sent" } as InvoiceRecord;
-    expect(resolvePreferredStatusSelection(invoice, narrowTransitions)).toBe("sent");
-  });
-
-  it("returns current status when no transitions available", () => {
-    const invoice = { status: "paid" } as InvoiceRecord;
-    expect(resolvePreferredStatusSelection(invoice, {})).toBe("paid");
   });
 });
 

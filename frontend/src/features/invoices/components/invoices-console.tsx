@@ -23,7 +23,6 @@ import {
   projectStatusLabel,
   publicInvoiceHref,
   readInvoiceApiError,
-  resolvePreferredStatusSelection,
 } from "../helpers";
 import { ProjectListStatusValue, ProjectListViewer } from "@/shared/project-list-viewer";
 import {
@@ -761,13 +760,12 @@ export function InvoicesConsole() {
   // Pre-select the most likely next status when the selected invoice changes.
   useEffect(() => {
     if (!selectedInvoice) {
-      setSelectedStatus("draft");
+      setSelectedStatus("");
       setStatusNote("");
       return;
     }
-    const preferredStatus = resolvePreferredStatusSelection(selectedInvoice, invoiceAllowedStatusTransitions);
     setSelectedStatus((current) =>
-      nextStatusOptions.includes(current) ? current : preferredStatus,
+      nextStatusOptions.includes(current) ? current : "",
     );
     setStatusNote("");
   }, [invoiceAllowedStatusTransitions, nextStatusOptions, selectedInvoice]);
@@ -786,7 +784,7 @@ export function InvoicesConsole() {
     }
     const fallbackInvoice = filteredInvoices[0];
     setSelectedInvoiceId(String(fallbackInvoice.id));
-    setSelectedStatus(resolvePreferredStatusSelection(fallbackInvoice, invoiceAllowedStatusTransitions));
+    setSelectedStatus("");
   }, [filteredInvoices, invoiceAllowedStatusTransitions, selectedInvoiceId]);
 
   // Load status history events whenever the selected invoice changes.
@@ -947,7 +945,7 @@ export function InvoicesConsole() {
   /** Select an invoice from the list and load it into the creator workspace. */
   function handleSelectInvoice(invoice: InvoiceRecord) {
     setSelectedInvoiceId(String(invoice.id));
-    setSelectedStatus(resolvePreferredStatusSelection(invoice, invoiceAllowedStatusTransitions));
+    setSelectedStatus("");
     setIsHistorySectionOpen(false);
     setIsLineItemsSectionOpen(false);
     setShowAllEvents(false);
@@ -1062,7 +1060,7 @@ export function InvoicesConsole() {
         );
         setWorkspaceSourceInvoiceId(updated.id);
         setSelectedInvoiceId(String(updated.id));
-        setSelectedStatus(resolvePreferredStatusSelection(updated, invoiceAllowedStatusTransitions));
+        setSelectedStatus("");
         setWorkspaceContext(`Editing ${updated.invoice_number}`);
         setSuccessStatus(`Saved ${updated.invoice_number} draft.`);
         setCreatorFlashCount((c) => c + 1);
@@ -1097,7 +1095,7 @@ export function InvoicesConsole() {
       const created = payload.data as InvoiceRecord;
       await loadInvoices(projectId);
       setSelectedInvoiceId(String(created.id));
-      setSelectedStatus(created.status);
+      setSelectedStatus("");
       loadInvoiceIntoWorkspace(created);
       setSuccessStatus(`Created ${created.invoice_number} (${statusLabel(created.status)}).`);
       setCreatorFlashCount((c) => c + 1);
@@ -1150,7 +1148,7 @@ export function InvoicesConsole() {
       setInvoices((current) =>
         current.map((invoice) => (invoice.id === updated.id ? updated : invoice)),
       );
-      setSelectedStatus(updated.status);
+      setSelectedStatus("");
       setStatusNote("");
       await loadInvoiceStatusEvents(updated.id);
       const msg = `Updated ${updated.invoice_number} to ${statusLabel(updated.status)}. History updated.`;
@@ -1199,7 +1197,7 @@ export function InvoicesConsole() {
       setInvoices((current) =>
         current.map((invoice) => (invoice.id === updated.id ? updated : invoice)),
       );
-      setSelectedStatus(updated.status);
+      setSelectedStatus("");
       setStatusNote("");
       await loadInvoiceStatusEvents(updated.id);
       const msg = `Added status note on ${updated.invoice_number}. History updated.`;
@@ -1263,7 +1261,7 @@ export function InvoicesConsole() {
       const created = payload.data as InvoiceRecord;
       await loadInvoices(projectId);
       setSelectedInvoiceId(String(created.id));
-      setSelectedStatus(created.status);
+      setSelectedStatus("");
       loadInvoiceIntoWorkspace(created);
       setSuccessStatus(`Duplicated as ${created.invoice_number}.`);
       setCreatorFlashCount((c) => c + 1);
@@ -1578,6 +1576,7 @@ export function InvoicesConsole() {
                                             type="button"
                                             className={`${styles.invoiceViewerActionButton} ${styles.invoiceViewerActionButtonPrimary}`}
                                             onClick={(e) => { e.stopPropagation(); handleUpdateInvoiceStatus(); }}
+                                            disabled={!selectedStatus}
                                           >
                                             Update Status
                                           </button>

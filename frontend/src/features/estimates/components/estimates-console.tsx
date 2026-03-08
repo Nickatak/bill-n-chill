@@ -263,7 +263,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       (selectedEstimate.status === "approved" || selectedEstimate.status === "void"),
   );
   const canSubmitStatusUpdate = selectedEstimate
-    ? !isTerminalEstimateStatus && nextStatusOptions.length > 0
+    ? !isTerminalEstimateStatus && nextStatusOptions.length > 0 && Boolean(selectedStatus)
     : false;
   const canSubmitStatusNote = selectedEstimate
     ? Boolean(statusNote.trim())
@@ -364,7 +364,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         return retained.length ? retained : policy.defaultStatusFilters;
       });
       setSelectedStatus((current) =>
-        policy.statuses.includes(current) ? current : policy.defaultCreateStatus,
+        current && policy.statuses.includes(current) ? current : "",
       );
     } catch {
       // Policy load is best-effort; static fallback remains active.
@@ -513,8 +513,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     const nextEstimateId = String(estimate.id);
     const isSameEstimate = nextEstimateId === selectedEstimateIdRef.current;
     setSelectedEstimateId(nextEstimateId);
-    const nextStatuses = estimateAllowedStatusTransitions[estimate.status] ?? [];
-    setSelectedStatus(nextStatuses[0] ?? estimate.status);
+    setSelectedStatus("");
     if (!isSameEstimate) {
       setStatusEvents([]);
     }
@@ -549,7 +548,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     );
     setSelectedEstimateId("");
     selectedEstimateIdRef.current = "";
-    setSelectedStatus(defaultCreateStatus);
+    setSelectedStatus("");
     setStatusNote("");
     setStatusEvents([]);
     setEstimateTitle("");
@@ -1212,8 +1211,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         }),
       );
       requestAnimationFrame(() => window.scrollTo({ top: scrollY }));
-      const updatedNextStatuses = estimateAllowedStatusTransitions[updated.status] ?? [];
-      setSelectedStatus(updatedNextStatuses[0] ?? updated.status);
+      setSelectedStatus("");
       setStatusNote("");
       await loadStatusEvents({ estimateId: updated.id, quiet: true });
       if (budgetConversionStatus === "converted" || didSupersede || budgetConversionStatus === "already_converted") {
@@ -1260,8 +1258,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         current.map((estimate) => (estimate.id === updated.id ? updated : estimate)),
       );
       requestAnimationFrame(() => window.scrollTo({ top: scrollY }));
-      const updatedNextStatuses = estimateAllowedStatusTransitions[updated.status] ?? [];
-      setSelectedStatus(updatedNextStatuses[0] ?? updated.status);
+      setSelectedStatus("");
       setStatusNote("");
       await loadStatusEvents({ estimateId: updated.id, quiet: true });
       setActionMessage(`Added status note on estimate #${updated.id}. History updated.`);

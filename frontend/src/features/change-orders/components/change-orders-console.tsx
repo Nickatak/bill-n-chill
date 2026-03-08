@@ -151,7 +151,7 @@ export function ChangeOrdersConsole({
   const [editReason, setEditReason] = useState("");
   const [editTermsText, setEditTermsText] = useState("");
   const [editLineItems, setEditLineItems] = useState<ChangeOrderLineInput[]>([emptyLine(1)]);
-  const [quickStatus, setQuickStatus] = useState("pending_approval");
+  const [quickStatus, setQuickStatus] = useState("");
   const [quickStatusNote, setQuickStatusNote] = useState("");
   const [isStatusSectionOpen, setIsStatusSectionOpen] = useState(true);
   const [isHistorySectionOpen, setIsHistorySectionOpen] = useState(false);
@@ -716,7 +716,7 @@ export function ChangeOrdersConsole({
       setEditTermsText("");
       setEditLineItems([emptyLine(1)]);
       setNextLineLocalId(2);
-      setQuickStatus(changeOrderAllowedTransitions.draft?.[0] ?? "pending_approval");
+      setQuickStatus("");
       setQuickStatusNote("");
       return;
     }
@@ -746,12 +746,7 @@ export function ChangeOrdersConsole({
     if (changeOrder.origin_estimate) {
       setSelectedViewerEstimateId(String(changeOrder.origin_estimate));
     }
-    const nextQuickStatuses = changeOrderAllowedTransitions[changeOrder.status] ?? [];
-    if (changeOrder.status === "pending_approval") {
-      setQuickStatus("pending_approval");
-    } else {
-      setQuickStatus(nextQuickStatuses[0] ?? changeOrder.status);
-    }
+    setQuickStatus("");
     setQuickStatusNote("");
     setShowAllEvents(false);
   }, [changeOrderAllowedTransitions, setFeedback]);
@@ -1452,6 +1447,7 @@ export function ChangeOrdersConsole({
       } else {
         setFeedback(`Updated ${coLabel(updated)} to ${statusLabel(updated.status)}. History updated.`, "success");
       }
+      setQuickStatus("");
       setQuickStatusNote("");
     } catch {
       setFeedback("Could not reach change order detail endpoint.", "error");
@@ -1755,7 +1751,7 @@ export function ChangeOrdersConsole({
                                     type="button"
                                     className={`${styles.viewerStatusActionButton} ${styles.viewerStatusActionButtonPrimary}`}
                                     onClick={handleQuickUpdateStatus}
-                                    disabled={!canMutateChangeOrders || !quickStatusOptions.length}
+                                    disabled={!canMutateChangeOrders || !quickStatusOptions.length || !quickStatus}
                                   >
                                     Update CO Status
                                   </button>
