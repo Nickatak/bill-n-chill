@@ -1054,7 +1054,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     const fallbackVendorBill = filteredVendorBills[0];
     setSelectedVendorBillId(String(fallbackVendorBill.id));
     hydrate(fallbackVendorBill);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredVendorBills, selectedVendorBillId]);
 
   // Keep the viewer's next-status picker in sync with the selected bill's allowed transitions.

@@ -82,13 +82,15 @@ export function usePolicyContract<TContract extends PolicyContractBase>(
 
   // Store onLoaded in a ref so inline callbacks don't trigger re-fetches.
   const onLoadedRef = useRef(config.onLoaded);
-  onLoadedRef.current = config.onLoaded;
+  useEffect(() => { onLoadedRef.current = config.onLoaded; });
 
   // Store fallbacks in refs to avoid re-fetch on object identity changes.
   const fallbackStatusesRef = useRef(fallbackStatuses);
-  fallbackStatusesRef.current = fallbackStatuses;
   const fallbackLabelsRef = useRef(fallbackLabels);
-  fallbackLabelsRef.current = fallbackLabels;
+  useEffect(() => {
+    fallbackStatusesRef.current = fallbackStatuses;
+    fallbackLabelsRef.current = fallbackLabels;
+  });
 
   const loadPolicy = useCallback(async () => {
     try {
