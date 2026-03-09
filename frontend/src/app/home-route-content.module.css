@@ -1,0 +1,41 @@
+.onboardingBanner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-xl);
+  padding: 12px 15px;
+  background: var(--accent-lighter);
+}
+
+.bannerText {
+  flex: 1;
+  color: var(--text-primary);
+  font-size: var(--font-base);
+}
+
+.bannerLink {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--accent-border);
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  text-decoration: none;
+  padding: 7px 14px;
+  font-size: var(--font-sm);
+  font-weight: 700;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.bannerLink:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px rgba(59, 130, 246, 0.2);
+}
+
+@media print {
+  .onboardingBanner {
+    display: none;
+  }
+}

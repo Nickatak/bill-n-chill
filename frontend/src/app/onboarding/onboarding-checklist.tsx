@@ -302,7 +302,7 @@ export function OnboardingChecklist() {
           router.push("/");
         }}
       >
-        Go to Dashboard
+        Dismiss Guide
       </button>
       <GuideArrowOverlay />
     </div>
