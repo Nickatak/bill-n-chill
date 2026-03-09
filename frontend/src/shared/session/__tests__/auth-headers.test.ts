@@ -49,7 +49,7 @@ describe("buildAuthHeaders", () => {
   it("adds organization headers when organization is provided", () => {
     const headers = new Headers(
       buildAuthHeaders("abc123", {
-        organization: { id: 5, displayName: "Acme Corp" },
+        organization: { id: 5, displayName: "Acme Corp", onboardingCompleted: true },
       }),
     );
     expect(headers.get("X-Organization-Id")).toBe("5");

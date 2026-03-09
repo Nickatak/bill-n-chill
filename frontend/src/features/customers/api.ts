@@ -1,20 +1,14 @@
 /**
  * Customers feature API layer.
  *
- * Provides base URL resolution and API helpers for customer management
- * and quick-add customer intake.
+ * Re-exports shared base URL helpers and provides API helpers
+ * for customer management and quick-add customer intake.
  */
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { buildAuthHeaders } from "@/shared/session/auth-headers";
+import { normalizeApiBaseUrl } from "@/shared/api/base";
 
-/** Default API base URL, sourced from environment or falling back to localhost. */
-export const defaultApiBaseUrl =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
-
-/** Strip whitespace and trailing slashes so URL concatenation is safe. */
-export function normalizeApiBaseUrl(baseUrl: string): string {
-  return baseUrl.trim().replace(/\/$/, "");
-}
+export { defaultApiBaseUrl, normalizeApiBaseUrl } from "@/shared/api/base";
 
 /**
  * Submit a quick-add customer intake record.

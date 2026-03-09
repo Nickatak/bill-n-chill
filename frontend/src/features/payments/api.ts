@@ -1,20 +1,14 @@
 /**
  * Payments feature API layer.
  *
- * Handles base URL resolution and fetching the payment
- * policy contract that drives workflow rules in the UI.
+ * Re-exports shared base URL helpers and provides the payment
+ * policy contract fetcher that drives workflow rules in the UI.
  */
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { buildAuthHeaders } from "@/shared/session/auth-headers";
+import { normalizeApiBaseUrl } from "@/shared/api/base";
 
-/** Default API base URL, sourced from environment or falling back to localhost. */
-export const defaultApiBaseUrl =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
-
-/** Strip whitespace and trailing slashes so URL concatenation is safe. */
-export function normalizeApiBaseUrl(baseUrl: string): string {
-  return baseUrl.trim().replace(/\/$/, "");
-}
+export { defaultApiBaseUrl, normalizeApiBaseUrl } from "@/shared/api/base";
 
 /**
  * Fetch the payment policy contract from the backend.

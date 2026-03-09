@@ -11,11 +11,11 @@
  */
 "use client";
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useSharedSessionAuth } from "@/features/session/use-shared-session";
+import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import styles from "./workflow-breadcrumbs.module.css";
 
 // ---------------------------------------------------------------------------
@@ -47,7 +47,7 @@ const PROJECTS_HUB_CRUMB: CrumbDef = { href: "/projects", label: "Projects" };
 const BILLING_HUB_CRUMB: CrumbDef = { href: "/invoices", label: "Billing" };
 const META_HUB_CRUMB: CrumbDef = { href: "/ops/organization", label: "Business" };
 
-const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+import { defaultApiBaseUrl } from "@/shared/api/base";
 
 /**
  * Top-level routes that historically accepted `?project=<id>` for

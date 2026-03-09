@@ -6,10 +6,10 @@
  * are the shared coding standard for estimates, budgets, and downstream reporting.
  */
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
-import { canDo } from "@/features/session/rbac";
+import { buildAuthHeaders } from "@/shared/session/auth-headers";
+import { canDo } from "@/shared/session/rbac";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSharedSessionAuth } from "../../session/use-shared-session";
+import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import styles from "./cost-codes-console.module.css";

@@ -6,15 +6,15 @@
  * that routes the user into the new project workspace.
  */
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
-import { canDo } from "@/features/session/rbac";
+import { buildAuthHeaders } from "@/shared/session/auth-headers";
+import { canDo } from "@/shared/session/rbac";
 import { FormEvent, MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import type { ProjectRecord } from "@/features/projects/types";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
-import { useSharedSessionAuth } from "../../session/use-shared-session";
+import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { ApiResponse, CustomerRow } from "../types";
 import { CustomerEditorForm } from "./customer-editor-form";
 import { CustomersFilters } from "./customers-filters";

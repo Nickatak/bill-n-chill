@@ -49,7 +49,7 @@ type HomeRegisterConsoleProps = {
   inviteToken?: string;
 };
 
-const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+import { defaultApiBaseUrl } from "@/shared/api/base";
 
 /**
  * Map the register endpoint's snake_case organization payload to the

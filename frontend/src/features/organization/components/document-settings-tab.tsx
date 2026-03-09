@@ -8,7 +8,7 @@
 
 import { FormEvent, useState } from "react";
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { normalizeApiBaseUrl, defaultApiBaseUrl } from "../api";
 import type {
   ApiResponse,

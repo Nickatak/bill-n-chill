@@ -7,7 +7,7 @@
  * contract, and a "recreate as new" workflow.
  */
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { formatDateDisplay, todayDateInput, futureDateInput } from "@/shared/date-format";
@@ -31,8 +31,8 @@ import {
   defaultBillStatusFilters,
   projectStatusLabel,
 } from "../helpers";
-import { useSharedSessionAuth } from "../../session/use-shared-session";
-import { canDo } from "../../session/rbac";
+import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
+import { canDo } from "@/shared/session/rbac";
 import {
   ApiResponse,
   ProjectRecord,

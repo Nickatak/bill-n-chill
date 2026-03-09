@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { VerifyEmailConsole } from "@/features/session/components/verify-email-console";
+import { VerifyEmailConsole } from "@/shared/session/components/verify-email-console";
 import homeStyles from "../page.module.css";
 
 export const metadata: Metadata = {

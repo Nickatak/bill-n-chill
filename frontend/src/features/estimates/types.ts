@@ -1,4 +1,5 @@
-export type UserData = { token?: string; email?: string };
+import type { UserData, OrganizationPublicContext, CostCode } from "@/shared/types/domain";
+export type { UserData, OrganizationPublicContext, CostCode } from "@/shared/types/domain";
 
 export type ProjectRecord = {
   id: number;
@@ -9,18 +10,6 @@ export type ProjectRecord = {
   customer_email?: string;
   customer_phone?: string;
 };
-
-export type OrganizationPublicContext = {
-  display_name: string;
-  logo_url: string;
-  billing_address: string;
-  help_email: string;
-  invoice_terms_and_conditions: string;
-  estimate_terms_and_conditions: string;
-  change_order_terms_and_conditions: string;
-};
-
-export type CostCode = { id: number; code: string; name: string; is_active: boolean };
 
 export type EstimateRecord = {
   id: number;

@@ -10,7 +10,7 @@
  * Layout: payment list → selected detail card → create/edit workspace.
  */
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { todayDateInput, formatDateDisplay } from "@/shared/date-format";
 
@@ -19,8 +19,8 @@ import {
   fetchPaymentPolicyContract,
   normalizeApiBaseUrl,
 } from "../api";
-import { useSharedSessionAuth } from "../../session/use-shared-session";
-import { canDo } from "../../session/rbac";
+import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
+import { canDo } from "@/shared/session/rbac";
 import type {
   AllocationTarget,
   ApiResponse,

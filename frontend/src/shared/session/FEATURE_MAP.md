@@ -21,7 +21,7 @@ Provide login/registration UX, persisted browser session state (token + role + o
 1. Entry sources:
    - direct route entry: `frontend/src/app/home-route-content.tsx` renders `HomeAuthConsole` in unauthenticated shell
    - direct route entry: `frontend/src/app/register/page.tsx` renders `HomeRegisterConsole`
-   - feature export entry: `frontend/src/features/session/index.ts` exports session components and utilities
+   - feature export entry: `frontend/src/shared/session/index.ts` exports session components and utilities
 2. Parent/Owner:
    route-level auth pages own session console mounting.
 3. Controller/Hook:
@@ -83,7 +83,7 @@ Provide login/registration UX, persisted browser session state (token + role + o
 - Existing anchors:
   - backend tests in `backend/core/tests/test_health_auth.py`
   - backend invite tests in `backend/core/tests/test_invites.py`
-  - frontend tests in `frontend/src/features/session/__tests__/auth-headers.test.ts`
+  - frontend tests in `frontend/src/shared/session/__tests__/auth-headers.test.ts`
 - TODO:
   - add frontend tests for local session persistence and clear-on-expiry behavior
   - add frontend tests for auth-state transitions across route mounts

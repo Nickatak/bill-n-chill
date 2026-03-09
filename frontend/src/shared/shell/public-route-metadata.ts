@@ -38,12 +38,7 @@ type PublicChangeOrderPayload = {
 /** Matches the `--<token>` suffix in a `slug--token` public reference. */
 const PUBLIC_REF_TOKEN_PATTERN = /--([A-Za-z0-9]{8,24})$/;
 
-const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
-
-/** Strip trailing slash so concatenation never produces double slashes. */
-function normalizedApiBaseUrl(): string {
-  return defaultApiBaseUrl.trim().replace(/\/$/, "");
-}
+import { defaultApiBaseUrl, normalizeApiBaseUrl } from "@/shared/api/base";
 
 /**
  * Fetch a public API endpoint and unwrap its `{ data }` envelope.
@@ -52,7 +47,7 @@ function normalizedApiBaseUrl(): string {
  */
 async function loadPublicPayload<T>(path: string): Promise<T | null> {
   try {
-    const response = await fetch(`${normalizedApiBaseUrl()}${path}`, { cache: "no-store" });
+    const response = await fetch(`${normalizeApiBaseUrl(defaultApiBaseUrl)}${path}`, { cache: "no-store" });
     if (!response.ok) {
       return null;
     }

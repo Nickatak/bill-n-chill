@@ -5,6 +5,8 @@
  * simple ok/message shape that route pages pass to their client components.
  */
 
+import { defaultApiBaseUrl, normalizeApiBaseUrl } from "./base";
+
 /** Normalised result passed to client components. */
 export type HealthResult = {
   ok: boolean;
@@ -12,9 +14,7 @@ export type HealthResult = {
 };
 
 export async function fetchHealth(): Promise<HealthResult> {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
-  const url = `${baseUrl.replace(/\/$/, "")}/health/`;
+  const url = `${normalizeApiBaseUrl(defaultApiBaseUrl)}/health/`;
 
   try {
     const response = await fetch(url, { cache: "no-store" });

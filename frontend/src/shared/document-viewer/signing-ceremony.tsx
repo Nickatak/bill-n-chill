@@ -15,8 +15,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./signing-ceremony.module.css";
 
-const API_BASE =
-  (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1").trim().replace(/\/$/, "");
+import { defaultApiBaseUrl, normalizeApiBaseUrl } from "@/shared/api/base";
+
+const API_BASE = normalizeApiBaseUrl(defaultApiBaseUrl);
 
 // ---------------------------------------------------------------------------
 // Types

@@ -6,14 +6,14 @@
  * control and billing tree, and an inline project profile editor.
  */
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { readApiErrorMessage } from "@/shared/api/error";
 import { formatCurrency } from "@/shared/money-format";
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
-import { useSharedSessionAuth } from "../../session/use-shared-session";
+import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import styles from "./projects-console.module.css";
 import { ProjectListStatusValue, ProjectListViewer } from "@/shared/project-list-viewer";

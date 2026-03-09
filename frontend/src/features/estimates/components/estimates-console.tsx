@@ -7,7 +7,7 @@
  * activation, and duplication workflows.
  */
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   defaultApiBaseUrl,
@@ -16,8 +16,8 @@ import {
 } from "../api";
 import { usePolicyContract } from "@/shared/hooks/use-policy-contract";
 import { useStatusFilters } from "@/shared/hooks/use-status-filters";
-import { useSharedSessionAuth } from "../../session/use-shared-session";
-import { canDo } from "../../session/rbac";
+import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
+import { canDo } from "@/shared/session/rbac";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import stampStyles from "@/shared/styles/decision-stamp.module.css";
 import { usePrintable } from "@/shared/shell/printable-context";

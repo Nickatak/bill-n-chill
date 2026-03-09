@@ -6,13 +6,13 @@
  * chronological view of everything that has happened on a project.
  */
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "@/features/projects/api";
 import { ApiResponse, ProjectTimeline } from "@/features/projects/types";
-import { useSharedSessionAuth } from "@/features/session/use-shared-session";
+import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { formatDateTimeDisplay } from "@/shared/date-format";
 import styles from "./project-activity-console.module.css";
 

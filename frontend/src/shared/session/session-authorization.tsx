@@ -27,7 +27,7 @@ import {
 } from "./client-session";
 import { useSharedSessionAuth } from "./use-shared-session";
 
-const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+import { defaultApiBaseUrl } from "@/shared/api/base";
 const AUTH_FAILURE_STATUSES = new Set([401, 403]);
 
 type AuthorizationStatus = "checking" | "authorized" | "unauthorized";

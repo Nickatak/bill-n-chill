@@ -1,7 +1,7 @@
 "use client";
 
 import { DashboardConsole } from "@/features/dashboard";
-import { useSessionAuthorization } from "@/features/session/session-authorization";
+import { useSessionAuthorization } from "@/shared/session/session-authorization";
 import Link from "next/link";
 import shell from "@/shared/shell/page-shell.module.css";
 import { PageCard, PageShell } from "@/shared/shell";

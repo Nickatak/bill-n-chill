@@ -1,4 +1,4 @@
-import type { SessionRole } from "@/features/session/client-session";
+import type { SessionRole } from "@/shared/session/client-session";
 
 export type OrganizationMembershipStatus = "active" | "disabled";
 

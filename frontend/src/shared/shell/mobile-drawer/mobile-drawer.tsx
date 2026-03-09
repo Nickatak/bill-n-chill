@@ -11,9 +11,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { clearClientSession } from "@/features/session/client-session";
-import { isPublicDocumentRoute } from "@/features/session/public-routes";
-import { useSharedSessionAuth } from "@/features/session/use-shared-session";
+import { clearClientSession } from "@/shared/session/client-session";
+import { isPublicDocumentRoute } from "@/shared/session/public-routes";
+import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { isRouteActive, businessMenuRoutes, workflowRoutes } from "../nav-routes";
 import { usePrintable } from "../printable-context";
 import styles from "./mobile-drawer.module.css";

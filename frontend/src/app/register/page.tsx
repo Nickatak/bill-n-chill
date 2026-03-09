@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { HomeRegisterConsole } from "@/features/session/components/home-register-console";
+import { HomeRegisterConsole } from "@/shared/session/components/home-register-console";
 import { fetchHealth } from "@/shared/api/health";
 import homeStyles from "../page.module.css";
 

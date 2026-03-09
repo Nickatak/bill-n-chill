@@ -1,7 +1,5 @@
-export type UserData = {
-  token?: string;
-  email?: string;
-};
+import type { UserData } from "@/shared/types/domain";
+export type { UserData } from "@/shared/types/domain";
 
 export type ProjectRecord = {
   id: number;

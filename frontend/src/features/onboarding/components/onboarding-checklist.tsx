@@ -9,14 +9,14 @@
  * Tab selection persists to localStorage.
  */
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
-import { loadClientSession, saveClientSession } from "@/features/session/client-session";
-import { useSharedSessionAuth } from "@/features/session/use-shared-session";
+import { buildAuthHeaders } from "@/shared/session/auth-headers";
+import { loadClientSession, saveClientSession } from "@/shared/session/client-session";
+import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { GuideArrowOverlay } from "@/shared/onboarding/guide-arrow-overlay";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import styles from "./page.module.css";
+import styles from "./onboarding-checklist.module.css";
 
 type Step = {
   key: string;
@@ -144,7 +144,7 @@ type WorkflowTab = "individual" | "remodeler";
 
 const TAB_KEY = "onboarding:workflow-tab";
 
-const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+import { defaultApiBaseUrl } from "@/shared/api/base";
 
 /** localStorage key set when the user visits the organization settings page. */
 export const ORG_VISITED_KEY = "onboarding:org-visited";

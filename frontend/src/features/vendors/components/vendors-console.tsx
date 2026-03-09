@@ -6,13 +6,13 @@
  * Vendors are canonical records reused across bills, AP workflows, and payment allocation.
  */
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
-import { canDo } from "@/features/session/rbac";
+import { buildAuthHeaders } from "@/shared/session/auth-headers";
+import { canDo } from "@/shared/session/rbac";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { usePagination } from "@/shared/hooks/use-pagination";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
-import { useSharedSessionAuth } from "../../session/use-shared-session";
+import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { ApiResponse, VendorCsvImportResult, VendorPayload, VendorRecord } from "../types";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import segmented from "../../../shared/styles/segmented.module.css";

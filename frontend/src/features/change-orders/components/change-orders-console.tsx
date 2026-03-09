@@ -7,7 +7,7 @@
  * event history, and cost-code-based line-item creators.
  */
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { parseAmount, formatDecimal } from "@/shared/money-format";
@@ -29,8 +29,8 @@ import {
   normalizeApiBaseUrl,
 } from "../api";
 import { usePolicyContract } from "@/shared/hooks/use-policy-contract";
-import { useSharedSessionAuth } from "../../session/use-shared-session";
-import { canDo } from "../../session/rbac";
+import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
+import { canDo } from "@/shared/session/rbac";
 import {
   ApiResponse,
   ChangeOrderLineInput,

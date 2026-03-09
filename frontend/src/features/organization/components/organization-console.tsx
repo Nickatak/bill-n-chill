@@ -15,10 +15,10 @@ import { useEffect, useMemo, useState } from "react";
 
 import shell from "@/shared/shell/page-shell.module.css";
 import { PageShell, PageCard } from "@/shared/shell";
-import { buildAuthHeaders } from "@/features/session/auth-headers";
-import { loadClientSession, saveClientSession } from "@/features/session/client-session";
-import { hasAnyRole, canDo } from "@/features/session/rbac";
-import { useSharedSessionAuth } from "@/features/session/use-shared-session";
+import { buildAuthHeaders } from "@/shared/session/auth-headers";
+import { loadClientSession, saveClientSession } from "@/shared/session/client-session";
+import { hasAnyRole, canDo } from "@/shared/session/rbac";
+import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import type {

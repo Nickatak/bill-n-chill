@@ -9,7 +9,7 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 
-import { useSharedSessionAuth } from "../../session/use-shared-session";
+import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { DuplicateResolutionPanel } from "./duplicate-resolution-panel";
 import { QuickAddForm } from "./quick-add-form";
 import { useQuickAddController } from "../hooks/use-quick-add-controller";

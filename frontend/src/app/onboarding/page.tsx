@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import shell from "@/shared/shell/page-shell.module.css";
 import styles from "./page.module.css";
 import { PageCard, PageShell } from "@/shared/shell";
-import { OnboardingChecklist } from "./onboarding-checklist";
+import { OnboardingChecklist } from "@/features/onboarding";
 
 export const metadata: Metadata = {
   title: "Get Started",

@@ -1,8 +1,8 @@
 "use client";
 
 import type { HealthResult } from "@/shared/api/health";
-import { HomeAuthConsole } from "@/features/session/components/home-auth-console";
-import { useSessionAuthorization } from "@/features/session/session-authorization";
+import { HomeAuthConsole } from "@/shared/session/components/home-auth-console";
+import { useSessionAuthorization } from "@/shared/session/session-authorization";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import homeStyles from "../page.module.css";

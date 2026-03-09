@@ -9,8 +9,8 @@
  */
 "use client";
 
-import { isPublicDocumentRoute } from "@/features/session/public-routes";
-import { useSessionAuthorization } from "@/features/session/session-authorization";
+import { isPublicDocumentRoute } from "@/shared/session/public-routes";
+import { useSessionAuthorization } from "@/shared/session/session-authorization";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { WorkflowNavbar } from "./workflow-navbar";

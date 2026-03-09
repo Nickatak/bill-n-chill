@@ -1,14 +1,5 @@
-export type UserData = {
-  token?: string;
-  email?: string;
-};
-
-export type CostCode = {
-  id: number;
-  code: string;
-  name: string;
-  is_active: boolean;
-};
+import type { UserData, CostCode } from "@/shared/types/domain";
+export type { UserData, CostCode } from "@/shared/types/domain";
 
 export type CsvImportRowResult = {
   row_number: number;

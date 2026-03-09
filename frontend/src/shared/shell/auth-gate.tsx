@@ -7,8 +7,8 @@
  */
 "use client";
 
-import { isPublicAuthRoute } from "@/features/session/public-routes";
-import { useSessionAuthorization } from "@/features/session/session-authorization";
+import { isPublicAuthRoute } from "@/shared/session/public-routes";
+import { useSessionAuthorization } from "@/shared/session/session-authorization";
 import { ReactNode, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 

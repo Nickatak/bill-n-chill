@@ -5,11 +5,11 @@
  * items that need action, and approved change order impact across projects.
  */
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { useSharedSessionAuth } from "@/features/session/use-shared-session";
+import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "@/features/projects/api";
 import {
   ApiResponse,

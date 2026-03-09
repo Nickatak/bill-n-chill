@@ -6,7 +6,7 @@
  * (transitions, notes, history), and a document-creator workspace for creating/editing drafts.
  */
 
-import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -30,8 +30,8 @@ import {
   fetchInvoicePolicyContract,
   normalizeApiBaseUrl,
 } from "../api";
-import { useSharedSessionAuth } from "../../session/use-shared-session";
-import { canDo } from "../../session/rbac";
+import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
+import { canDo } from "@/shared/session/rbac";
 import {
   ApiResponse,
   InvoiceLineInput,

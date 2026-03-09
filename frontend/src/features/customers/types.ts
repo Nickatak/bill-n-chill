@@ -24,11 +24,9 @@ export type ApiResponse = {
 
 // --- Quick-add intake types ---
 
-export type UserData = {
-  token?: string;
-  email?: string;
-  id?: number;
-};
+import type { UserData as BaseUserData } from "@/shared/types/domain";
+
+export type UserData = BaseUserData & { id?: number };
 
 export type CustomerIntakeRecord = {
   id: number;

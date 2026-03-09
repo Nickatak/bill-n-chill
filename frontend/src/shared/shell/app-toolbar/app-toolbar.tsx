@@ -7,10 +7,10 @@
  */
 "use client";
 
-import { isPublicDocumentRoute } from "@/features/session/public-routes";
+import { isPublicDocumentRoute } from "@/shared/session/public-routes";
 import { Fragment, useEffect, useRef } from "react";
-import { clearClientSession } from "@/features/session/client-session";
-import { useSharedSessionAuth } from "@/features/session/use-shared-session";
+import { clearClientSession } from "@/shared/session/client-session";
+import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { isRouteActive, businessMenuRoutes } from "../nav-routes";
