@@ -52,8 +52,12 @@ describe("isPublicDocumentRoute", () => {
 // ---------------------------------------------------------------------------
 
 describe("isPublicAuthRoute", () => {
-  it("returns true for root /", () => {
-    expect(isPublicAuthRoute("/")).toBe(true);
+  it("returns true for /login", () => {
+    expect(isPublicAuthRoute("/login")).toBe(true);
+  });
+
+  it("returns false for root / (protected dashboard)", () => {
+    expect(isPublicAuthRoute("/")).toBe(false);
   });
 
   it("returns true for /register", () => {
