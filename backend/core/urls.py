@@ -46,6 +46,7 @@ from core.views import (
     organization_memberships_view,
     organization_logo_upload_view,
     organization_profile_view,
+    complete_onboarding_view,
     accounting_sync_event_retry_view,
     attention_feed_view,
     change_impact_summary_view,
@@ -86,6 +87,7 @@ urlpatterns = [
     path("auth/check-invite/", check_invite_by_email_view, name="auth-check-invite"),
     path("organization/", organization_profile_view, name="organization-profile"),
     path("organization/logo/", organization_logo_upload_view, name="organization-logo-upload"),
+    path("organization/complete-onboarding/", complete_onboarding_view, name="organization-complete-onboarding"),
     path(
         "organization/invites/",
         organization_invites_view,

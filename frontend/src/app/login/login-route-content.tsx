@@ -1,0 +1,38 @@
+"use client";
+
+import type { HealthResult } from "@/shared/api/health";
+import { HomeAuthConsole } from "@/features/session/components/home-auth-console";
+import { useSessionAuthorization } from "@/features/session/session-authorization";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import homeStyles from "../page.module.css";
+
+type LoginRouteContentProps = {
+  health: HealthResult;
+};
+
+/** Login route content — shows login form, redirects to home if already authenticated. */
+export function LoginRouteContent({ health }: LoginRouteContentProps) {
+  const { isAuthorized } = useSessionAuthorization();
+  const router = useRouter();
+
+  // Redirect authenticated users away from the login page.
+  useEffect(() => {
+    if (isAuthorized) {
+      router.replace("/");
+    }
+  }, [isAuthorized, router]);
+
+  if (isAuthorized) {
+    return null;
+  }
+
+  return (
+    <div className={homeStyles.page}>
+      <main className={homeStyles.main}>
+        <h1 className={homeStyles.title}>Bill n&apos; Chill</h1>
+        <HomeAuthConsole health={health} />
+      </main>
+    </div>
+  );
+}

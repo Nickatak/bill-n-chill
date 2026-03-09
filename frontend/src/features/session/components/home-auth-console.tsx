@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 import type { HealthResult } from "@/shared/api/health";
 import {
-  clearClientSession,
   loadClientSession,
   saveClientSession,
   type SessionOrganization,
@@ -23,6 +23,7 @@ type LoginResponse = {
     organization?: {
       id?: number;
       display_name?: string;
+      onboarding_completed?: boolean;
     };
     capabilities?: Record<string, string[]>;
   };
@@ -49,6 +50,7 @@ function toSessionOrganization(
     | {
         id?: number;
         display_name?: string;
+        onboarding_completed?: boolean;
       }
     | undefined,
 ): SessionOrganization | undefined {
@@ -58,19 +60,19 @@ function toSessionOrganization(
   return {
     id: raw.id,
     displayName: raw.display_name,
+    onboardingCompleted: raw.onboarding_completed ?? false,
   };
 }
 
 /**
  * Login form console. Authenticates credentials against the Django auth endpoint,
- * persists the session to localStorage, and handles unverified-email edge cases
- * with an inline resend option.
+ * persists the session to localStorage, and navigates to the dashboard on success.
  */
 export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
+  const router = useRouter();
   const [messageTone, setMessageTone] = useState<"neutral" | "error">("neutral");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [message, setMessage] = useState("");
   const [emailNotVerified, setEmailNotVerified] = useState(false);
@@ -102,9 +104,8 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
 
   /**
    * Form submission handler for the login form. POSTs credentials to
-   * the Django auth endpoint, persists the session (token, email, role,
-   * org) to localStorage on success, and updates component state to
-   * reflect the outcome.
+   * the Django auth endpoint, persists the session to localStorage on
+   * success, and navigates to the dashboard.
    */
   async function handleLogin(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -148,14 +149,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
         capabilities: payload.data?.capabilities,
       });
 
-      setPassword("");
-      setIsAuthenticated(true);
-      setMessage(
-        `Using shared session for ${nextEmail || "user"} (${nextRole})${
-          nextOrganization ? ` in ${nextOrganization.displayName}` : ""
-        }.`,
-      );
-      setMessageTone("neutral");
+      router.push("/");
     } catch {
       setMessage("Could not reach login endpoint.");
       setMessageTone("error");
@@ -192,92 +186,58 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
     }
   }
 
-  /** Clear the persisted session from localStorage and reset to the login view. */
-  function handleSignOut() {
-    clearClientSession();
-
-    setPassword("");
-    setIsAuthenticated(false);
-    setMessage("Signed out.");
-    setMessageTone("neutral");
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <section className={styles.shell}>
-        <div className={styles.card}>
-          <h2 className={styles.title}>Sign in</h2>
-          <form className={styles.form} onSubmit={handleLogin}>
-            <label>
-              Email
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                autoComplete="email"
-                required
-              />
-            </label>
-            <label>
-              Password
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete="current-password"
-                required
-              />
-            </label>
-            {message && (
-              <p className={`${styles.message} ${messageTone === "error" ? styles.messageError : ""}`}>
-                {message}
-              </p>
-            )}
-            <div className={styles.buttonRow}>
-              <button className={styles.button} type="submit" disabled={isChecking}>
-                {isChecking ? "Checking..." : "Sign in"}
-              </button>
-              {emailNotVerified && (
-                <button
-                  className={styles.buttonSecondary}
-                  type="button"
-                  disabled={isResending}
-                  onClick={handleResendVerification}
-                >
-                  {isResending ? "Sending..." : "Resend verification email"}
-                </button>
-              )}
-            </div>
-            <p className={styles.formHint}>
-              Need an account? <Link href="/register">Create one</Link>.
-            </p>
-          </form>
-          {!health.ok && (
-            <p className={styles.healthBad}>API Health: {health.message}</p>
-          )}
-        </div>
-      </section>
-    );
-  }
-
   return (
     <section className={styles.shell}>
       <div className={styles.card}>
-        <h2 className={styles.title}>Session ready</h2>
-        <p className={styles.text}>Signed in as {email || "user"}. Redirecting to Intake...</p>
-        {message && (
-          <p className={`${styles.message} ${messageTone === "error" ? styles.messageError : ""}`}>
-            {message}
+        <h2 className={styles.title}>Sign in</h2>
+        <form className={styles.form} onSubmit={handleLogin}>
+          <label>
+            Email
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="email"
+              required
+            />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </label>
+          {message && (
+            <p className={`${styles.message} ${messageTone === "error" ? styles.messageError : ""}`}>
+              {message}
+            </p>
+          )}
+          <div className={styles.buttonRow}>
+            <button className={styles.button} type="submit" disabled={isChecking}>
+              {isChecking ? "Checking..." : "Sign in"}
+            </button>
+            {emailNotVerified && (
+              <button
+                className={styles.buttonSecondary}
+                type="button"
+                disabled={isResending}
+                onClick={handleResendVerification}
+              >
+                {isResending ? "Sending..." : "Resend verification email"}
+              </button>
+            )}
+          </div>
+          <p className={styles.formHint}>
+            Need an account? <Link href="/register">Create one</Link>.
           </p>
-        )}
+        </form>
         {!health.ok && (
           <p className={styles.healthBad}>API Health: {health.message}</p>
         )}
-        <div className={styles.buttonRow}>
-          <button className={styles.buttonSecondary} type="button" onClick={handleSignOut}>
-            Sign out
-          </button>
-        </div>
       </div>
     </section>
   );

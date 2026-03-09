@@ -10,9 +10,11 @@
  */
 
 import { buildAuthHeaders } from "@/features/session/auth-headers";
+import { loadClientSession, saveClientSession } from "@/features/session/client-session";
 import { useSharedSessionAuth } from "@/features/session/use-shared-session";
 import { GuideArrowOverlay } from "@/shared/onboarding/guide-arrow-overlay";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import styles from "./page.module.css";
 
@@ -149,6 +151,7 @@ export const ORG_VISITED_KEY = "onboarding:org-visited";
 
 export function OnboardingChecklist() {
   const { token } = useSharedSessionAuth();
+  const router = useRouter();
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [firstProjectId, setFirstProjectId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -277,6 +280,30 @@ export function OnboardingChecklist() {
           );
         })}
       </ol>
+      <button
+        type="button"
+        className={styles.skipButton}
+        onClick={async () => {
+          try {
+            await fetch(`${defaultApiBaseUrl}/organization/complete-onboarding/`, {
+              method: "POST",
+              headers: buildAuthHeaders(token),
+            });
+          } catch {
+            // Best-effort — navigate anyway so the user isn't stuck.
+          }
+          const session = loadClientSession();
+          if (session?.organization) {
+            saveClientSession({
+              ...session,
+              organization: { ...session.organization, onboardingCompleted: true },
+            });
+          }
+          router.push("/");
+        }}
+      >
+        Go to Dashboard
+      </button>
       <GuideArrowOverlay />
     </div>
   );

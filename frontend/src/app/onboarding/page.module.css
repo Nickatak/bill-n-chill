@@ -183,3 +183,24 @@
 .stepLink:hover {
   text-decoration: underline;
 }
+
+/* ── Skip / go to dashboard ─────────────────────────────────── */
+
+.skipButton {
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+  justify-self: start;
+}
+
+.skipButton:hover {
+  background: var(--surface-secondary);
+  border-color: var(--text-secondary);
+}

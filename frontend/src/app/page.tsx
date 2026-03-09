@@ -1,15 +1,10 @@
 import type { Metadata } from "next";
-import { fetchHealth } from "@/shared/api/health";
 import { HomeRouteContent } from "./home-route-content";
 
 export const metadata: Metadata = {
-  title: "Sign In | Bill n Chill",
+  title: "Dashboard | Bill n Chill",
 };
 
-export default async function Home() {
-  const health = await fetchHealth();
-
-  return (
-    <HomeRouteContent health={health} />
-  );
+export default function Home() {
+  return <HomeRouteContent />;
 }

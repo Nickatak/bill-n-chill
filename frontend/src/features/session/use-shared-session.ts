@@ -17,7 +17,7 @@ import {
   type SessionRole,
 } from "./client-session";
 
-const NO_SHARED_SESSION_MESSAGE = "No shared session found. Go to / and login first.";
+const NO_SHARED_SESSION_MESSAGE = "No shared session found. Go to /login and sign in first.";
 
 /** Subscribe to localStorage changes from both same-tab and cross-tab sources. */
 function subscribe(onStoreChange: () => void) {

@@ -70,6 +70,10 @@ class Command(BaseCommand):
         user.save(update_fields=["username", "password"])
         token, _ = Token.objects.get_or_create(user=user)
         membership = _ensure_membership(user)
+        org = membership.organization
+        if not org.onboarding_completed:
+            org.onboarding_completed = True
+            org.save(update_fields=["onboarding_completed"])
         return user, token, membership
 
     def _cost_codes(self, user):

@@ -36,6 +36,7 @@ class Organization(models.Model):
     invoice_terms_and_conditions = models.TextField(blank=True, default="")
     estimate_terms_and_conditions = models.TextField(blank=True, default="")
     change_order_terms_and_conditions = models.TextField(blank=True, default="")
+    onboarding_completed = models.BooleanField(default=False)
     created_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,

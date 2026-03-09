@@ -37,10 +37,10 @@ type VerifyEmailConsoleProps = {
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
 function toSessionOrganization(
-  raw: { id?: number; display_name?: string } | undefined,
+  raw: { id?: number; display_name?: string; onboarding_completed?: boolean } | undefined,
 ): SessionOrganization | undefined {
   if (!raw?.id || !raw.display_name) return undefined;
-  return { id: raw.id, displayName: raw.display_name };
+  return { id: raw.id, displayName: raw.display_name, onboardingCompleted: raw.onboarding_completed ?? false };
 }
 
 /**
@@ -133,7 +133,7 @@ export function VerifyEmailConsole({ token }: VerifyEmailConsoleProps) {
           <p className={styles.warningText}>{errorMessage}</p>
         </div>
         <p className={styles.formHint}>
-          <Link href="/">Back to sign in</Link>
+          <Link href="/login">Back to sign in</Link>
         </p>
       </div>
     </section>

@@ -44,10 +44,10 @@ export function AppToolbar() {
     opsMetaMenuRef.current?.removeAttribute("open");
   }
 
-  /** Clear the session and redirect to the home / login page. */
+  /** Clear the session and redirect to the login page. */
   function logout() {
     clearClientSession();
-    router.push("/");
+    router.push("/login");
     router.refresh();
   }
 

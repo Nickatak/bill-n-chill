@@ -61,6 +61,7 @@ function toSessionOrganization(
     | {
         id?: number;
         display_name?: string;
+        onboarding_completed?: boolean;
       }
     | undefined,
 ): SessionOrganization | undefined {
@@ -70,6 +71,7 @@ function toSessionOrganization(
   return {
     id: raw.id,
     displayName: raw.display_name,
+    onboardingCompleted: raw.onboarding_completed ?? false,
   };
 }
 
@@ -351,7 +353,7 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
                 ? `Wait ${resendCooldown}s`
                 : "Didn\u2019t get it? Resend"}
           </button>
-          <Link href="/" className={styles.formHintLink}>Back to sign in</Link>
+          <Link href="/login" className={styles.formHintLink}>Back to sign in</Link>
         </div>
       </section>
     );
@@ -469,7 +471,7 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
             </button>
           </div>
           <p className={styles.formHint}>
-            Already have an account? <Link href="/">Sign in</Link>.
+            Already have an account? <Link href="/login">Sign in</Link>.
           </p>
         </form>
         {!health.ok && (

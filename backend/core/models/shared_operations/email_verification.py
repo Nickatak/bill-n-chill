@@ -24,8 +24,9 @@ class EmailVerificationToken(models.Model):
     Flow B (invite registration) skips verification — the invite token
     itself proves the email was expected.
 
-    Legacy/seed users have no tokens and are treated as verified via
-    the ``is_user_verified`` classmethod.
+    Verification status is tracked via ``User.is_active``: Flow A users
+    start with ``is_active=False`` and are activated when the token is
+    consumed. Legacy/seed users have ``is_active=True`` by default.
     """
 
     user = models.ForeignKey(
@@ -81,22 +82,6 @@ class EmailVerificationToken(models.Model):
         if token_obj.is_expired:
             return None, "expired"
         return token_obj, None
-
-    @classmethod
-    def is_user_verified(cls, user):
-        """Check whether a user's email has been verified.
-
-        Returns True if:
-        - The user has no verification tokens at all (legacy/seed user), OR
-        - The user has at least one consumed (verified) token.
-
-        Returns False only when the user has tokens but none are consumed
-        (registered via Flow A but hasn't clicked the verification link).
-        """
-        tokens = cls.objects.filter(user=user)
-        if not tokens.exists():
-            return True
-        return tokens.filter(consumed_at__isnull=False).exists()
 
     def __str__(self):
         return f"VerificationToken {self.email} ({self.token[:8]}...)"

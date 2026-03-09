@@ -3,10 +3,14 @@
  *
  * Wraps the app in a React context that tracks auth status. On mount
  * (and when the token changes), it verifies the token against
- * `GET /auth/me/`. The provider optimistically shows "authorized"
- * while verification is in flight, and only reverts to "unauthorized"
- * on a hard 401/403. Transient network errors preserve the authorized
- * UI to avoid flashing the login screen on brief connectivity blips.
+ * `GET /auth/me/`. The provider stays in "checking" until verification
+ * completes — AuthGate renders nothing during this phase, so there is
+ * no flash of protected content before the backend confirms the session.
+ *
+ * Once a token has been verified, subsequent renders with the same token
+ * skip the network call and remain "authorized". If the token is revoked
+ * server-side (401/403), the session is cleared and the user is redirected
+ * to /login via AuthGate.
  */
 "use client";
 
@@ -17,7 +21,6 @@ import {
   clearClientSession,
   loadClientSession,
   saveClientSession,
-  SESSION_STORAGE_KEY,
   type Capabilities,
   type SessionOrganization,
   type SessionRole,
@@ -56,12 +59,6 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
   const [status, setStatus] = useState<AuthorizationStatus>("checking");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const verifiedTokenRef = useRef("");
-  const statusRef = useRef<AuthorizationStatus>(status);
-
-  // Keep statusRef in sync so the token-change effect can read it without triggering re-runs.
-  useEffect(() => {
-    statusRef.current = status;
-  }, [status]);
 
   // Verify the token against the backend whenever it changes.
   useEffect(() => {
@@ -69,8 +66,9 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
 
     /**
      * Call GET /auth/me/ with the candidate token. On 401/403, clear
-     * the session and mark unauthorized. On transient errors, preserve
-     * the current authorized state to avoid login-screen flicker.
+     * the session and mark unauthorized. On transient network errors,
+     * mark unauthorized — if the backend is unreachable the app is
+     * unusable anyway, and masking failures causes confusing state.
      */
     async function verifyToken(candidateToken: string) {
       setIsRefreshing(true);
@@ -88,13 +86,10 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
         if (!response.ok) {
           if (AUTH_FAILURE_STATUSES.has(response.status)) {
             clearClientSession();
-            verifiedTokenRef.current = "";
-            setStatus("unauthorized");
-            setIsRefreshing(false);
-            return;
           }
-          // Preserve authorized UI on transient upstream/CDN failures.
-          setStatus("authorized");
+          verifiedTokenRef.current = "";
+          setStatus("unauthorized");
+          setIsRefreshing(false);
           return;
         }
 
@@ -113,8 +108,8 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
         if (cancelled) {
           return;
         }
-        // Network/transient errors should not force logout.
-        setStatus("authorized");
+        verifiedTokenRef.current = "";
+        setStatus("unauthorized");
       } finally {
         if (!cancelled) {
           setIsRefreshing(false);
@@ -123,27 +118,6 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
     }
 
     if (!token) {
-      // Check if localStorage has a token that hasn't propagated yet.
-      let hasPendingToken = false;
-      if (typeof window !== "undefined") {
-        const rawSnapshot = window.localStorage.getItem(SESSION_STORAGE_KEY);
-        if (rawSnapshot) {
-          try {
-            const parsed = JSON.parse(rawSnapshot) as { token?: string };
-            hasPendingToken = Boolean(parsed?.token);
-          } catch {
-            hasPendingToken = false;
-          }
-        }
-      }
-
-      if (hasPendingToken) {
-        setStatus("checking");
-        return () => {
-          cancelled = true;
-        };
-      }
-
       verifiedTokenRef.current = "";
       setIsRefreshing(false);
       setStatus("unauthorized");
@@ -160,10 +134,8 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
       };
     }
 
-    // Optimistically show authorized while verification is in flight.
-    if (statusRef.current !== "authorized") {
-      setStatus("authorized");
-    }
+    // Stay in "checking" while verification is in flight.
+    setStatus("checking");
     void verifyToken(token);
 
     return () => {

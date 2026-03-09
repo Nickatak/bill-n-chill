@@ -54,7 +54,7 @@ export function WorkflowShell() {
         <div className={styles.spacer} />
         <div className={styles.bar} role="note" aria-label="Authentication hint">
           <div className={styles.inner}>
-            Sign in on <Link href="/">Home</Link> to unlock workflow actions.
+            <Link href="/login">Sign in</Link> to unlock workflow actions.
           </div>
         </div>
       </>

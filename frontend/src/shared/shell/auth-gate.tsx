@@ -1,9 +1,9 @@
 /**
  * Client-side authentication gate that wraps the entire app tree.
  *
- * Renders children immediately for public routes (login, public document
- * views). For protected routes, blocks rendering until the session check
- * completes and redirects unauthenticated users to the home page.
+ * Renders children immediately for public routes (login, register, public
+ * document views). For protected routes, blocks rendering until the session
+ * check completes and redirects unauthenticated users to /login.
  */
 "use client";
 
@@ -22,7 +22,7 @@ type AuthGateProps = {
  * Public routes bypass the gate entirely so tokenized customer links
  * (estimates, invoices, change orders) render without a session.
  * Protected routes show nothing until the session check resolves,
- * then either render children or redirect to home.
+ * then either render children or redirect to /login.
  */
 export function AuthGate({ children }: AuthGateProps) {
   const pathname = usePathname();
@@ -30,13 +30,13 @@ export function AuthGate({ children }: AuthGateProps) {
   const { isAuthorized, isChecking } = useSessionAuthorization();
   const isPublicRoute = isPublicAuthRoute(pathname);
 
-  // Redirect to home when the session check finishes and the user is not authorized.
+  // Redirect to /login when the session check finishes and the user is not authorized.
   // Skipped for public routes and while the check is still in progress.
   useEffect(() => {
     if (isPublicRoute || isChecking || isAuthorized) {
       return;
     }
-    router.replace("/");
+    router.replace("/login");
   }, [isAuthorized, isChecking, isPublicRoute, router]);
 
   if (isPublicRoute) {

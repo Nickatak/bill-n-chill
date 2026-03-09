@@ -31,6 +31,7 @@ def _build_auth_response_payload(user, membership):
         "organization": {
             "id": membership.organization_id,
             "display_name": membership.organization.display_name,
+            "onboarding_completed": membership.organization.onboarding_completed,
         },
         "capabilities": _resolve_user_capabilities(user, membership=membership),
     }
@@ -139,8 +140,8 @@ def login_view(request):
     serializer.is_valid(raise_exception=True)
     user = serializer.validated_data["user"]
 
-    # Email verification gate — legacy/seed users (no tokens) pass through.
-    if not EmailVerificationToken.is_user_verified(user):
+    # Email verification gate — unverified users (is_active=False) cannot log in.
+    if not user.is_active:
         return Response(
             {"error": {"code": "email_not_verified", "message": "Please verify your email before signing in."}},
             status=403,
@@ -251,7 +252,7 @@ def register_view(request):
 
     try:
         with transaction.atomic():
-            user = User.objects.create_user(username=email, email=email, password=password)
+            user = User.objects.create_user(username=email, email=email, password=password, is_active=False)
             _ensure_membership(user)
             token_obj = EmailVerificationToken(user=user, email=email)
             token_obj.save()
@@ -592,6 +593,9 @@ def verify_email_view(request):
     token_obj.save(update_fields=["consumed_at"])
 
     user = token_obj.user
+    user.is_active = True
+    user.save(update_fields=["is_active"])
+
     membership = _ensure_membership(user)
     return Response({"data": _build_auth_response_payload(user, membership)})
 
@@ -634,12 +638,12 @@ def resend_verification_view(request):
     _RESEND_OK = {"data": {"message": "If that email is registered, a verification link has been sent."}}
 
     try:
-        user = User.objects.get(email__iexact=email, is_active=True)
+        user = User.objects.get(email__iexact=email)
     except User.DoesNotExist:
         return Response(_RESEND_OK, status=200)
 
-    # Already verified — no-op.
-    if EmailVerificationToken.is_user_verified(user):
+    # Already verified (is_active=True) — no-op.
+    if user.is_active:
         return Response(_RESEND_OK, status=200)
 
     # Rate limit: most recent token must be >60s old.
@@ -655,10 +659,8 @@ def resend_verification_view(request):
             status=429,
         )
 
-    # Invalidate any previous unconsumed tokens so only the latest link works.
-    EmailVerificationToken.objects.filter(user=user, consumed_at__isnull=True).update(
-        consumed_at=timezone.now()
-    )
+    # Delete any previous unconsumed tokens so only the latest link works.
+    EmailVerificationToken.objects.filter(user=user, consumed_at__isnull=True).delete()
 
     token_obj = EmailVerificationToken(user=user, email=user.email)
     token_obj.save()

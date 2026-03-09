@@ -129,6 +129,22 @@ def organization_profile_view(request):
     )
 
 
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def complete_onboarding_view(request):
+    """Mark the caller's organization onboarding as completed.
+
+    One-way flag — once set to True it stays True. No RBAC gate because
+    any authenticated member completing onboarding benefits the whole org.
+    """
+    membership = _ensure_membership(request.user)
+    org = membership.organization
+    if not org.onboarding_completed:
+        org.onboarding_completed = True
+        org.save(update_fields=["onboarding_completed", "updated_at"])
+    return Response({"data": {"onboarding_completed": True}})
+
+
 LOGO_MAX_SIZE_BYTES = 2 * 1024 * 1024  # 2 MB
 LOGO_ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 

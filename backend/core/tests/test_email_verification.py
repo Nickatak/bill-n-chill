@@ -60,21 +60,6 @@ class EmailVerificationTokenModelTests(TestCase):
         self.assertIsNone(found)
         self.assertEqual(error, "expired")
 
-    def test_is_user_verified_legacy_no_tokens(self):
-        self.assertTrue(EmailVerificationToken.is_user_verified(self.user))
-
-    def test_is_user_verified_has_consumed_token(self):
-        token_obj = EmailVerificationToken(user=self.user, email=self.user.email)
-        token_obj.save()
-        token_obj.consumed_at = timezone.now()
-        token_obj.save(update_fields=["consumed_at"])
-        self.assertTrue(EmailVerificationToken.is_user_verified(self.user))
-
-    def test_is_user_verified_unconsumed_only(self):
-        token_obj = EmailVerificationToken(user=self.user, email=self.user.email)
-        token_obj.save()
-        self.assertFalse(EmailVerificationToken.is_user_verified(self.user))
-
 
 class EmailRecordModelTests(TestCase):
     """Model-level tests for EmailRecord (immutable audit log)."""
@@ -116,6 +101,15 @@ class RegisterFlowAVerificationTests(TestCase):
         payload = response.json()
         self.assertIn("message", payload["data"])
         self.assertNotIn("token", payload["data"])
+
+    def test_register_creates_inactive_user(self):
+        self.client.post(
+            "/api/v1/auth/register/",
+            data={"email": "new@example.com", "password": "secret123"},
+            content_type="application/json",
+        )
+        user = User.objects.get(email="new@example.com")
+        self.assertFalse(user.is_active)
 
     def test_register_creates_verification_token(self):
         self.client.post(
@@ -221,6 +215,7 @@ class VerifyEmailTests(TestCase):
             username="unverified@example.com",
             email="unverified@example.com",
             password="secret123",
+            is_active=False,
         )
         self.token_obj = EmailVerificationToken(user=self.user, email=self.user.email)
         self.token_obj.save()
@@ -238,6 +233,9 @@ class VerifyEmailTests(TestCase):
 
         self.token_obj.refresh_from_db()
         self.assertIsNotNone(self.token_obj.consumed_at)
+
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.is_active)
 
     def test_verify_expired_token(self):
         self.token_obj.expires_at = timezone.now() - timedelta(hours=1)
@@ -284,6 +282,7 @@ class ResendVerificationTests(TestCase):
             username="unverified@example.com",
             email="unverified@example.com",
             password="secret123",
+            is_active=False,
         )
         self.token_obj = EmailVerificationToken(user=self.user, email=self.user.email)
         self.token_obj.save()
@@ -292,14 +291,17 @@ class ResendVerificationTests(TestCase):
             created_at=timezone.now() - timedelta(minutes=5),
         )
 
-    def test_resend_creates_new_token_and_sends_email(self):
+    def test_resend_deletes_old_token_and_creates_new(self):
         response = self.client.post(
             "/api/v1/auth/resend-verification/",
             data={"email": "unverified@example.com"},
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(EmailVerificationToken.objects.filter(user=self.user).count(), 2)
+        # Old unconsumed token deleted, new one created.
+        self.assertEqual(EmailVerificationToken.objects.filter(user=self.user).count(), 1)
+        new_token = EmailVerificationToken.objects.get(user=self.user)
+        self.assertNotEqual(new_token.pk, self.token_obj.pk)
         self.assertEqual(len(mail.outbox), 1)
 
     def test_resend_rate_limited(self):
@@ -325,15 +327,15 @@ class ResendVerificationTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_resend_verified_user_noop(self):
-        self.token_obj.consumed_at = timezone.now()
-        self.token_obj.save(update_fields=["consumed_at"])
+        self.user.is_active = True
+        self.user.save(update_fields=["is_active"])
         response = self.client.post(
             "/api/v1/auth/resend-verification/",
             data={"email": "unverified@example.com"},
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
-        # No new token created.
+        # No new token created, old one untouched.
         self.assertEqual(EmailVerificationToken.objects.filter(user=self.user).count(), 1)
 
     def test_resend_missing_email_returns_400(self):
@@ -344,20 +346,42 @@ class ResendVerificationTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_resend_works_after_previous_resend(self):
+        """Regression: resend should work repeatedly without false 'already verified'."""
+        # First resend (deletes old token, creates new one).
+        self.client.post(
+            "/api/v1/auth/resend-verification/",
+            data={"email": "unverified@example.com"},
+            content_type="application/json",
+        )
+        self.assertEqual(len(mail.outbox), 1)
+
+        # Backdate so rate limit passes.
+        EmailVerificationToken.objects.filter(user=self.user).update(
+            created_at=timezone.now() - timedelta(minutes=5),
+        )
+
+        # Second resend — should still work.
+        response = self.client.post(
+            "/api/v1/auth/resend-verification/",
+            data={"email": "unverified@example.com"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(EmailVerificationToken.objects.filter(user=self.user).count(), 1)
+
 
 class LoginVerificationGateTests(TestCase):
-    """Login blocks unverified users, passes legacy/verified through."""
+    """Login blocks unverified users (is_active=False), passes active users through."""
 
-    def setUp(self):
-        self.user = User.objects.create_user(
+    def test_login_unverified_returns_403(self):
+        User.objects.create_user(
             username="gated@example.com",
             email="gated@example.com",
             password="secret123",
+            is_active=False,
         )
-
-    def test_login_unverified_returns_403(self):
-        token_obj = EmailVerificationToken(user=self.user, email=self.user.email)
-        token_obj.save()
         response = self.client.post(
             "/api/v1/auth/login/",
             data={"email": "gated@example.com", "password": "secret123"},
@@ -367,10 +391,12 @@ class LoginVerificationGateTests(TestCase):
         self.assertEqual(response.json()["error"]["code"], "email_not_verified")
 
     def test_login_verified_returns_200(self):
-        token_obj = EmailVerificationToken(user=self.user, email=self.user.email)
-        token_obj.save()
-        token_obj.consumed_at = timezone.now()
-        token_obj.save(update_fields=["consumed_at"])
+        User.objects.create_user(
+            username="gated@example.com",
+            email="gated@example.com",
+            password="secret123",
+            is_active=True,
+        )
         response = self.client.post(
             "/api/v1/auth/login/",
             data={"email": "gated@example.com", "password": "secret123"},
@@ -379,10 +405,16 @@ class LoginVerificationGateTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("token", response.json()["data"])
 
-    def test_login_legacy_no_tokens_returns_200(self):
+    def test_login_legacy_user_returns_200(self):
+        """Legacy/seed users have is_active=True by default — login works."""
+        User.objects.create_user(
+            username="legacy@example.com",
+            email="legacy@example.com",
+            password="secret123",
+        )
         response = self.client.post(
             "/api/v1/auth/login/",
-            data={"email": "gated@example.com", "password": "secret123"},
+            data={"email": "legacy@example.com", "password": "secret123"},
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)

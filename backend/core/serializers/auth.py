@@ -18,7 +18,7 @@ class LoginSerializer(serializers.Serializer):
 
         # Anti-enumeration: both branches return the same error message so
         # an attacker cannot distinguish "no such account" from "wrong password".
-        user = User.objects.filter(email__iexact=email, is_active=True).first()
+        user = User.objects.filter(email__iexact=email).first()
         if not user:
             raise serializers.ValidationError("Invalid email or password.")
         if not user.check_password(password):

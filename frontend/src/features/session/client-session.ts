@@ -15,6 +15,7 @@ export type SessionRole = "owner" | "pm" | "bookkeeping" | "worker" | "viewer";
 export type SessionOrganization = {
   id: number;
   displayName: string;
+  onboardingCompleted: boolean;
 };
 
 export type Capabilities = Record<string, string[]>;

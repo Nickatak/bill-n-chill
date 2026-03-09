@@ -50,7 +50,7 @@ export function MobileDrawer() {
   function logout() {
     setIsOpen(false);
     clearClientSession();
-    router.push("/");
+    router.push("/login");
     router.refresh();
   }
 
