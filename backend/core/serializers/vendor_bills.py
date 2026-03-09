@@ -89,7 +89,7 @@ class VendorBillWriteSerializer(serializers.Serializer):
     vendor = serializers.IntegerField(required=False)
     bill_number = serializers.CharField(max_length=50, required=False, allow_blank=False)
     status = serializers.ChoiceField(
-        choices=[*VendorBill.Status.choices, ("draft", "Draft (legacy)")],
+        choices=VendorBill.Status.choices,
         required=False,
     )
     received_date = serializers.DateField(required=False, allow_null=True)
@@ -103,9 +103,3 @@ class VendorBillWriteSerializer(serializers.Serializer):
     notes = serializers.CharField(max_length=5000, required=False, allow_blank=True)
     line_items = VendorBillLineInputSerializer(many=True, required=False)
     duplicate_override = serializers.BooleanField(required=False, default=False)
-
-    def validate_status(self, value):
-        # Backward-compatibility for in-flight clients during status rename rollout.
-        if value == "draft":
-            return VendorBill.Status.PLANNED
-        return value

@@ -22,12 +22,12 @@ from core.serializers import ChangeOrderSerializer, ChangeOrderWriteSerializer
 from core.utils.email import send_document_sent_email
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.change_orders.change_orders_helpers import (
-    _model_validation_error_response,
+    _model_validation_error_payload,
     _next_change_order_family_key,
     _serialize_public_change_order,
     _sync_change_order_lines,
     _validate_change_order_lines,
-    _validation_error_response,
+    _validation_error_payload,
 )
 from core.models import SigningCeremonyRecord
 from core.serializers import ChangeOrderSerializer as _ChangeOrderSerializerForHash
@@ -105,11 +105,11 @@ def public_change_order_decision_view(request, public_token: str):
     }
     next_status = decision_to_status.get(decision)
     if not next_status:
-        return _validation_error_response(
+        return Response(*_validation_error_payload(
             message="Invalid public decision for change order.",
             fields={"decision": ["Use 'approve' or 'reject'."]},
             rule="co_public_decision_invalid",
-        )
+        ))
 
     if change_order.status != ChangeOrder.Status.PENDING_APPROVAL:
         return Response(
@@ -293,35 +293,35 @@ def project_change_orders_view(request, project_id: int):
     if "amount_delta" not in data:
         fields["amount_delta"] = ["This field is required."]
     if fields:
-        return _validation_error_response(
+        return Response(*_validation_error_payload(
             message="Missing required fields for change order creation.",
             fields=fields,
             rule="co_create_missing_required_fields",
-        )
+        ))
 
     if "origin_estimate" not in data or data["origin_estimate"] is None:
-        return _validation_error_response(
+        return Response(*_validation_error_payload(
             message="Change orders require an approved origin estimate.",
             fields={"origin_estimate": ["Select an approved estimate from this project."]},
             rule="co_create_origin_estimate_required",
-        )
+        ))
     try:
         origin_estimate = Estimate.objects.get(
             id=data["origin_estimate"],
             project=project,
         )
     except Estimate.DoesNotExist:
-        return _validation_error_response(
+        return Response(*_validation_error_payload(
             message="origin_estimate is invalid for this project.",
             fields={"origin_estimate": ["Use an estimate from this project."]},
             rule="co_origin_estimate_project_scope",
-        )
+        ))
     if origin_estimate.status != Estimate.Status.APPROVED:
-        return _validation_error_response(
+        return Response(*_validation_error_payload(
             message="Change orders require an approved origin estimate.",
             fields={"origin_estimate": ["Only approved estimates can be used as CO origin."]},
             rule="co_origin_estimate_approved_required",
-        )
+        ))
 
     cost_code_map = {}
     line_total_delta = MONEY_ZERO
@@ -331,13 +331,13 @@ def project_change_orders_view(request, project_id: int):
             organization_id=organization.id,
         )
         if line_error:
-            return line_error
+            return Response(*line_error)
         if line_total_delta != Decimal(str(data["amount_delta"])):
-            return _validation_error_response(
+            return Response(*_validation_error_payload(
                 message="Line-item total must match change-order amount delta.",
                 fields={"line_items": ["Sum of line item amount_delta must equal amount_delta."]},
                 rule="co_line_total_must_match_amount_delta",
-            )
+            ))
 
     try:
         with transaction.atomic():
@@ -361,10 +361,10 @@ def project_change_orders_view(request, project_id: int):
                     cost_code_map=cost_code_map,
                 )
     except ValidationError as exc:
-        return _model_validation_error_response(
+        return Response(*_model_validation_error_payload(
             exc=exc,
             message="Change-order line items are invalid for this project/budget context.",
-        )
+        ))
     created = (
         ChangeOrder.objects.filter(id=change_order.id)
         .prefetch_related("line_items", "line_items__cost_code")
@@ -432,21 +432,21 @@ def change_order_detail_view(request, change_order_id: int):
         revision_number__gt=change_order.revision_number,
     ).exists()
     if latest_revision_exists and attempted_content_fields:
-        return _validation_error_response(
+        return Response(*_validation_error_payload(
             message="Only the latest change-order revision can be edited.",
             fields={"change_order": ["Create or edit the latest revision for this family."]},
             rule="co_edit_latest_revision_only",
-        )
+        ))
     if change_order.status != ChangeOrder.Status.DRAFT:
         if attempted_content_fields:
-            return _validation_error_response(
+            return Response(*_validation_error_payload(
                 message="Only draft change orders can edit content fields.",
                 fields={
                     field: ["This field is read-only after draft. Clone a new revision to change content."]
                     for field in attempted_content_fields
                 },
                 rule="co_edit_requires_draft_status",
-            )
+            ))
 
     previous_status = change_order.status
     current_amount_delta = quantize_money(change_order.amount_delta)
@@ -465,11 +465,11 @@ def change_order_detail_view(request, change_order_id: int):
         current_status=previous_status,
         next_status=next_status,
     ):
-        return _validation_error_response(
+        return Response(*_validation_error_payload(
             message=f"Invalid change order status transition: {previous_status} -> {next_status}.",
             fields={"status": ["This transition is not allowed."]},
             rule="co_status_transition_not_allowed",
-        )
+        ))
 
     financial_delta = MONEY_ZERO
     if previous_status != ChangeOrder.Status.APPROVED and next_status == ChangeOrder.Status.APPROVED:
@@ -490,19 +490,19 @@ def change_order_detail_view(request, change_order_id: int):
             organization_id=membership.organization_id,
         )
         if line_error:
-            return line_error
+            return Response(*line_error)
         if line_total_delta != next_amount_delta:
-            return _validation_error_response(
+            return Response(*_validation_error_payload(
                 message="Line-item total must match change-order amount delta.",
                 fields={"line_items": ["Sum of line item amount_delta must equal amount_delta."]},
                 rule="co_line_total_must_match_amount_delta",
-            )
+            ))
     else:
         existing_line_total = change_order.line_items.aggregate(total=Sum("amount_delta")).get("total") or Decimal(
             "0.00"
         )
         if "amount_delta" in data and existing_line_total != Decimal("0.00") and existing_line_total != next_amount_delta:
-            return _validation_error_response(
+            return Response(*_validation_error_payload(
                 message="Existing line items no longer match amount delta.",
                 fields={
                     "amount_delta": [
@@ -510,23 +510,23 @@ def change_order_detail_view(request, change_order_id: int):
                     ]
                 },
                 rule="co_line_total_must_match_amount_delta",
-            )
+            ))
 
     update_fields = ["updated_at"]
     if "origin_estimate" in data:
         if change_order.origin_estimate_id and data["origin_estimate"] != change_order.origin_estimate_id:
-            return _validation_error_response(
+            return Response(*_validation_error_payload(
                 message="origin_estimate cannot be changed after being set.",
                 fields={"origin_estimate": ["Create a new revision to change estimate linkage."]},
                 rule="co_origin_estimate_immutable_once_set",
-            )
+            ))
         if data["origin_estimate"] is None:
             if change_order.origin_estimate_id is not None:
-                return _validation_error_response(
+                return Response(*_validation_error_payload(
                     message="origin_estimate cannot be cleared once set.",
                     fields={"origin_estimate": ["Create a new revision to remove estimate linkage."]},
                     rule="co_origin_estimate_immutable_once_set",
-                )
+                ))
         elif change_order.origin_estimate_id is None:
             try:
                 origin_estimate = Estimate.objects.get(
@@ -534,17 +534,17 @@ def change_order_detail_view(request, change_order_id: int):
                     project=change_order.project,
                 )
             except Estimate.DoesNotExist:
-                return _validation_error_response(
+                return Response(*_validation_error_payload(
                     message="origin_estimate is invalid for this project.",
                     fields={"origin_estimate": ["Use an estimate from this project."]},
                     rule="co_origin_estimate_project_scope",
-                )
+                ))
             if origin_estimate.status != Estimate.Status.APPROVED:
-                return _validation_error_response(
+                return Response(*_validation_error_payload(
                     message="Change orders require an approved origin estimate.",
                     fields={"origin_estimate": ["Only approved estimates can be used as CO origin."]},
                     rule="co_origin_estimate_approved_required",
-                )
+                ))
             change_order.origin_estimate = origin_estimate
             update_fields.append("origin_estimate")
     if "title" in data:
@@ -611,10 +611,10 @@ def change_order_detail_view(request, change_order_id: int):
                     decided_by=request.user,
                 )
     except ValidationError as exc:
-        return _model_validation_error_response(
+        return Response(*_model_validation_error_payload(
             exc=exc,
             message="Change-order line items are invalid for this project/budget context.",
-        )
+        ))
 
     if next_status == ChangeOrder.Status.PENDING_APPROVAL and (
         previous_status != ChangeOrder.Status.PENDING_APPROVAL or is_pending_resend
@@ -673,11 +673,11 @@ def change_order_clone_revision_view(request, change_order_id: int):
         .first()
     )
     if latest and latest.id != change_order.id:
-        return _validation_error_response(
+        return Response(*_validation_error_payload(
             message="Revisions can only be cloned from the latest family version.",
             fields={"change_order": ["Select the latest revision before cloning."]},
             rule="co_clone_requires_latest_revision",
-        )
+        ))
 
     next_revision = (latest.revision_number + 1) if latest else (change_order.revision_number + 1)
     with transaction.atomic():

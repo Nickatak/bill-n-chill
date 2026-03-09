@@ -24,14 +24,7 @@ class Command(BaseCommand):
             if display_name:
                 continue
 
-            lead = (
-                customer.source_leads.order_by("-converted_at", "-created_at").first()
-                if hasattr(customer, "source_leads")
-                else None
-            )
-            if lead and lead.full_name:
-                candidate = lead.full_name.strip()
-            elif customer.email:
+            if customer.email:
                 candidate = customer.email.strip()
             elif customer.phone:
                 candidate = customer.phone.strip()

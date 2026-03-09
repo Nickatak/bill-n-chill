@@ -1,16 +1,8 @@
 """Domain-specific helpers for cost-code views."""
 
-from django.db.models import Q
 from rest_framework.response import Response
 
-from core.models import CostCode
-from core.views.helpers import _ensure_membership
-
-
-def _cost_code_scope_filter(user):
-    """Build a Q filter for cost codes visible to the given user's organization."""
-    membership = _ensure_membership(user)
-    return Q(organization_id=membership.organization_id)
+from core.views.helpers import _cost_code_scope_filter  # noqa: F401 — re-exported for cost_codes.py
 
 
 def _duplicate_code_error_response():

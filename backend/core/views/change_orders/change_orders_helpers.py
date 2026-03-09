@@ -3,8 +3,6 @@
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from rest_framework.response import Response
-
 from core.models import ChangeOrder, ChangeOrderLine, CostCode
 from core.serializers import ChangeOrderSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
@@ -45,7 +43,7 @@ def _validate_change_order_lines(*, line_items, organization_id):
         if not cc_id:
             return (
                 {}, MONEY_ZERO,
-                _validation_error_response(
+                _validation_error_payload(
                     message="Lines must specify a cost code.",
                     fields={"line_items": ["Provide cost_code for each line."]},
                     rule="co_line_requires_cost_code",
@@ -65,7 +63,7 @@ def _validate_change_order_lines(*, line_items, organization_id):
         if len(cost_code_map) != len(cost_code_ids):
             return (
                 {}, MONEY_ZERO,
-                _validation_error_response(
+                _validation_error_payload(
                     message="One or more cost_code values are invalid.",
                     fields={"line_items": ["Use valid cost_code ids."]},
                     rule="co_line_cost_code_invalid",
@@ -93,8 +91,11 @@ def _sync_change_order_lines(*, change_order, line_items, cost_code_map):
         )
 
 
-def _validation_error_response(*, message: str, fields: dict, rule: str | None = None):
-    """Build a standard 400 validation error response with an optional rule code."""
+def _validation_error_payload(*, message: str, fields: dict, rule: str | None = None):
+    """Build a (body, status_code) tuple for a 400 validation error.
+
+    Returns the raw payload and HTTP status so the calling view owns Response construction.
+    """
     error = {
         "code": "validation_error",
         "message": message,
@@ -102,7 +103,7 @@ def _validation_error_response(*, message: str, fields: dict, rule: str | None =
     }
     if rule:
         error["rule"] = rule
-    return Response({"error": error}, status=400)
+    return {"error": error}, 400
 
 
 def _next_change_order_family_key(*, project):
@@ -132,14 +133,17 @@ def _infer_model_validation_rule(*, fields: dict) -> str | None:
     return None
 
 
-def _model_validation_error_response(*, exc: ValidationError, message: str):
-    """Convert a Django model ValidationError into a standard validation error response."""
+def _model_validation_error_payload(*, exc: ValidationError, message: str):
+    """Convert a Django model ValidationError into a (body, status_code) tuple.
+
+    Returns the raw payload and HTTP status so the calling view owns Response construction.
+    """
     fields = {}
     if hasattr(exc, "message_dict"):
         fields = exc.message_dict
     else:
         fields = {"non_field_errors": exc.messages}
-    return _validation_error_response(
+    return _validation_error_payload(
         message=message,
         fields=fields,
         rule=_infer_model_validation_rule(fields=fields),

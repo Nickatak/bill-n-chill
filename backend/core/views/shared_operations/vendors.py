@@ -10,6 +10,7 @@ from core.serializers import VendorSerializer, VendorWriteSerializer
 from core.utils.csv_import import CsvImportError, process_csv_import
 from core.views.helpers import (
     _ensure_membership,
+    _paginate_queryset,
     _parse_request_bool,
     _capability_gate,
 )
@@ -34,7 +35,10 @@ def vendors_list_create_view(request):
                 | Q(phone__icontains=search)
                 | Q(tax_id_last4__icontains=search)
             )
-        return Response({"data": VendorSerializer(rows, many=True).data})
+
+        rows, meta = _paginate_queryset(rows, request.query_params)
+
+        return Response({"data": VendorSerializer(rows, many=True).data, "meta": meta})
 
     permission_error, _ = _capability_gate(request.user, "vendors", "create")
     if permission_error:

@@ -103,6 +103,31 @@ def _serialize_public_project_context(project: Project) -> dict:
     }
 
 
+def _paginate_queryset(queryset, query_params, *, default_page_size: int = 25, max_page_size: int = 100):
+    """Apply page/page_size pagination to a queryset.
+
+    Returns ``(sliced_queryset, meta_dict)`` where *meta_dict* contains
+    ``page``, ``page_size``, ``total_count``, and ``total_pages``.
+    """
+    total_count = queryset.count()
+    try:
+        page_size = max(1, min(max_page_size, int(query_params.get("page_size", default_page_size))))
+    except (ValueError, TypeError):
+        page_size = default_page_size
+    total_pages = max(1, (total_count + page_size - 1) // page_size)
+    try:
+        page = max(1, min(total_pages, int(query_params.get("page", 1))))
+    except (ValueError, TypeError):
+        page = 1
+    offset = (page - 1) * page_size
+    return queryset[offset : offset + page_size], {
+        "page": page,
+        "page_size": page_size,
+        "total_count": total_count,
+        "total_pages": total_pages,
+    }
+
+
 def _parse_request_bool(raw_value, *, default: bool = True) -> bool:
     """Coerce a loosely-typed request value to a boolean."""
     if raw_value is None:
@@ -146,6 +171,12 @@ def _build_public_decision_note(
     if note_value:
         return f"{action_label} via public link by {actor_label}. {note_value}"
     return f"{action_label} via public link by {actor_label}."
+
+
+def _cost_code_scope_filter(user) -> Q:
+    """Build a Q filter for cost codes visible to the given user's organization."""
+    membership = _ensure_membership(user)
+    return Q(organization_id=membership.organization_id)
 
 
 def _vendor_scope_filter(user) -> Q:
