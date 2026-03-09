@@ -3,6 +3,12 @@
 from django.db import migrations, models
 
 
+def backfill_existing_orgs(apps, schema_editor):
+    """Existing orgs predate onboarding — mark them as completed."""
+    Organization = apps.get_model("core", "Organization")
+    Organization.objects.all().update(onboarding_completed=True)
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -15,4 +21,5 @@ class Migration(migrations.Migration):
             name='onboarding_completed',
             field=models.BooleanField(default=False),
         ),
+        migrations.RunPython(backfill_existing_orgs, migrations.RunPython.noop),
     ]
