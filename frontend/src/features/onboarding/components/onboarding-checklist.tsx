@@ -10,6 +10,7 @@
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
+import { defaultApiBaseUrl } from "@/shared/api/base";
 import { loadClientSession, saveClientSession } from "@/shared/session/client-session";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { GuideArrowOverlay } from "@/shared/onboarding/guide-arrow-overlay";
@@ -143,8 +144,6 @@ const REMODELER_STEPS: Step[] = [
 type WorkflowTab = "individual" | "remodeler";
 
 const TAB_KEY = "onboarding:workflow-tab";
-
-import { defaultApiBaseUrl } from "@/shared/api/base";
 
 /** localStorage key set when the user visits the organization settings page. */
 export const ORG_VISITED_KEY = "onboarding:org-visited";
