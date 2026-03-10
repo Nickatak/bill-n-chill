@@ -93,7 +93,7 @@ class OrganizationManagementTests(TestCase):
         self.assertTrue(payload["role_policy"]["can_manage_memberships"])
 
     def test_organization_profile_patch_identity_requires_org_identity_edit(self):
-        # PM cannot edit identity fields (display_name, logo_url, billing_address)
+        # PM cannot edit identity fields (display_name, billing_street_1, etc.)
         patch_by_pm = self.client.patch(
             "/api/v1/organization/",
             data={"display_name": "PM Should Not Edit Identity"},
@@ -145,7 +145,10 @@ class OrganizationManagementTests(TestCase):
             "/api/v1/organization/",
             data={
                 "help_email": "help@example.com",
-                "billing_address": "123 Main St\nAustin, TX 78701",
+                "billing_street_1": "123 Main St",
+                "billing_city": "Austin",
+                "billing_state": "TX",
+                "billing_zip": "78701",
                 "default_invoice_due_delta": 21,
                 "default_estimate_valid_delta": 45,
                 "invoice_terms_and_conditions": "Net 21",
@@ -158,7 +161,11 @@ class OrganizationManagementTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.organization.refresh_from_db()
         self.assertEqual(self.organization.help_email, "help@example.com")
-        self.assertEqual(self.organization.billing_address, "123 Main St\nAustin, TX 78701")
+        self.assertEqual(self.organization.billing_street_1, "123 Main St")
+        self.assertEqual(self.organization.billing_city, "Austin")
+        self.assertEqual(self.organization.billing_state, "TX")
+        self.assertEqual(self.organization.billing_zip, "78701")
+        self.assertEqual(self.organization.formatted_billing_address, "123 Main St\nAustin, TX 78701")
         self.assertEqual(self.organization.default_invoice_due_delta, 21)
         self.assertEqual(self.organization.default_estimate_valid_delta, 45)
         self.assertEqual(self.organization.invoice_terms_and_conditions, "Net 21")

@@ -26,7 +26,11 @@ class Organization(models.Model):
     display_name = models.CharField(max_length=255)
     logo = models.ImageField(upload_to="logos/", blank=True, default="")
     help_email = models.EmailField(blank=True, default="")
-    billing_address = models.TextField(blank=True, default="")
+    billing_street_1 = models.CharField(max_length=255, blank=True, default="")
+    billing_street_2 = models.CharField(max_length=255, blank=True, default="")
+    billing_city = models.CharField(max_length=100, blank=True, default="")
+    billing_state = models.CharField(max_length=50, blank=True, default="")
+    billing_zip = models.CharField(max_length=20, blank=True, default="")
     phone_number = models.CharField(max_length=50, blank=True, default="")
     website_url = models.URLField(blank=True, default="")
     license_number = models.CharField(max_length=100, blank=True, default="")
@@ -48,6 +52,27 @@ class Organization(models.Model):
     class Meta:
         ordering = ["created_at"]
 
+    @property
+    def formatted_billing_address(self) -> str:
+        """Format structured address fields into a multi-line display string."""
+        lines = []
+        if self.billing_street_1:
+            lines.append(self.billing_street_1.strip())
+        if self.billing_street_2:
+            lines.append(self.billing_street_2.strip())
+        city_state_zip = []
+        if self.billing_city:
+            city_state_zip.append(self.billing_city.strip())
+        if self.billing_state:
+            if city_state_zip:
+                city_state_zip[-1] += ","
+            city_state_zip.append(self.billing_state.strip())
+        if self.billing_zip:
+            city_state_zip.append(self.billing_zip.strip())
+        if city_state_zip:
+            lines.append(" ".join(city_state_zip))
+        return "\n".join(lines)
+
     def build_snapshot(self) -> dict:
         """Build an immutable point-in-time snapshot dict for audit records."""
         return {
@@ -56,7 +81,12 @@ class Organization(models.Model):
                 "display_name": self.display_name,
                 "logo_url": self.logo.url if self.logo else "",
                 "help_email": self.help_email,
-                "billing_address": self.billing_address,
+                "billing_address": self.formatted_billing_address,
+                "billing_street_1": self.billing_street_1,
+                "billing_street_2": self.billing_street_2,
+                "billing_city": self.billing_city,
+                "billing_state": self.billing_state,
+                "billing_zip": self.billing_zip,
                 "phone_number": self.phone_number,
                 "website_url": self.website_url,
                 "license_number": self.license_number,

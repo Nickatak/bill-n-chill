@@ -7,7 +7,11 @@ export type OrganizationProfile = {
   display_name: string;
   logo_url: string;
   help_email: string;
-  billing_address: string;
+  billing_street_1: string;
+  billing_street_2: string;
+  billing_city: string;
+  billing_state: string;
+  billing_zip: string;
   phone_number: string;
   website_url: string;
   license_number: string;

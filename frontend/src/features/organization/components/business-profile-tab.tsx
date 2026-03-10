@@ -45,7 +45,11 @@ export function BusinessProfileTab({
   const [websiteUrlDraft, setWebsiteUrlDraft] = useState(profile.website_url ?? "");
   const [licenseNumberDraft, setLicenseNumberDraft] = useState(profile.license_number ?? "");
   const [taxIdDraft, setTaxIdDraft] = useState(profile.tax_id ?? "");
-  const [billingAddressDraft, setBillingAddressDraft] = useState(profile.billing_address ?? "");
+  const [billingStreet1Draft, setBillingStreet1Draft] = useState(profile.billing_street_1 ?? "");
+  const [billingStreet2Draft, setBillingStreet2Draft] = useState(profile.billing_street_2 ?? "");
+  const [billingCityDraft, setBillingCityDraft] = useState(profile.billing_city ?? "");
+  const [billingStateDraft, setBillingStateDraft] = useState(profile.billing_state ?? "");
+  const [billingZipDraft, setBillingZipDraft] = useState(profile.billing_zip ?? "");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [logoUrl, setLogoUrl] = useState(profile.logo_url ?? "");
@@ -57,7 +61,11 @@ export function BusinessProfileTab({
     websiteUrlDraft.trim() !== (profile.website_url || "") ||
     licenseNumberDraft.trim() !== (profile.license_number || "") ||
     taxIdDraft.trim() !== (profile.tax_id || "") ||
-    billingAddressDraft.trim() !== (profile.billing_address || "");
+    billingStreet1Draft.trim() !== (profile.billing_street_1 || "") ||
+    billingStreet2Draft.trim() !== (profile.billing_street_2 || "") ||
+    billingCityDraft.trim() !== (profile.billing_city || "") ||
+    billingStateDraft.trim() !== (profile.billing_state || "") ||
+    billingZipDraft.trim() !== (profile.billing_zip || "");
 
   async function handleLogoUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -107,7 +115,11 @@ export function BusinessProfileTab({
       website_url: websiteUrlDraft.trim(),
       license_number: licenseNumberDraft.trim(),
       tax_id: taxIdDraft.trim(),
-      billing_address: billingAddressDraft.trim(),
+      billing_street_1: billingStreet1Draft.trim(),
+      billing_street_2: billingStreet2Draft.trim(),
+      billing_city: billingCityDraft.trim(),
+      billing_state: billingStateDraft.trim(),
+      billing_zip: billingZipDraft.trim(),
     };
 
     try {
@@ -132,7 +144,11 @@ export function BusinessProfileTab({
         setWebsiteUrlDraft(org.website_url ?? "");
         setLicenseNumberDraft(org.license_number ?? "");
         setTaxIdDraft(org.tax_id ?? "");
-        setBillingAddressDraft(org.billing_address ?? "");
+        setBillingStreet1Draft(org.billing_street_1 ?? "");
+        setBillingStreet2Draft(org.billing_street_2 ?? "");
+        setBillingCityDraft(org.billing_city ?? "");
+        setBillingStateDraft(org.billing_state ?? "");
+        setBillingZipDraft(org.billing_zip ?? "");
         setLogoUrl(org.logo_url ?? "");
         onProfileUpdate(org, data.role_policy ?? undefined);
       }
@@ -147,7 +163,7 @@ export function BusinessProfileTab({
 
   return (
     <form className={styles.profileForm} onSubmit={handleSave}>
-      <label className={styles.field}>
+      <label className={`${styles.field} ${styles.fieldNarrow}`}>
         <span className={styles.fieldLabel}>Company Name</span>
         <input
           value={displayNameDraft}
@@ -187,32 +203,6 @@ export function BusinessProfileTab({
         </div>
       </div>
 
-      <hr className={styles.fieldGroupDivider} />
-
-      <div className={styles.fieldRow}>
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>Phone</span>
-          <input
-            value={phoneNumberDraft}
-            onChange={(e) => setPhoneNumberDraft(e.target.value)}
-            placeholder="(555) 123-4567"
-            disabled={disabled}
-          />
-        </label>
-
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>Website</span>
-          <input
-            value={websiteUrlDraft}
-            onChange={(e) => setWebsiteUrlDraft(e.target.value)}
-            placeholder="https://yourcompany.com"
-            disabled={disabled}
-          />
-        </label>
-      </div>
-
-      <hr className={styles.fieldGroupDivider} />
-
       <div className={styles.fieldRow}>
         <label className={styles.field}>
           <span className={styles.fieldLabel}>Contractor License #</span>
@@ -237,16 +227,79 @@ export function BusinessProfileTab({
 
       <hr className={styles.fieldGroupDivider} />
 
+      <div className={styles.fieldRow}>
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Phone</span>
+          <input
+            value={phoneNumberDraft}
+            onChange={(e) => setPhoneNumberDraft(e.target.value)}
+            placeholder="(555) 123-4567"
+            disabled={disabled}
+          />
+        </label>
+
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Website</span>
+          <input
+            value={websiteUrlDraft}
+            onChange={(e) => setWebsiteUrlDraft(e.target.value)}
+            placeholder="https://yourcompany.com"
+            disabled={disabled}
+          />
+        </label>
+      </div>
+
       <label className={styles.field}>
-        <span className={styles.fieldLabel}>Billing Address</span>
-        <textarea
-          value={billingAddressDraft}
-          onChange={(e) => setBillingAddressDraft(e.target.value)}
-          rows={3}
-          placeholder="Street, city, state, ZIP"
+        <span className={styles.fieldLabel}>Street Address</span>
+        <input
+          value={billingStreet1Draft}
+          onChange={(e) => setBillingStreet1Draft(e.target.value)}
+          placeholder="123 Main St"
           disabled={disabled}
         />
       </label>
+
+      <label className={styles.field}>
+        <span className={styles.fieldLabel}>Street Address Line 2</span>
+        <input
+          value={billingStreet2Draft}
+          onChange={(e) => setBillingStreet2Draft(e.target.value)}
+          placeholder="Suite, unit, building (optional)"
+          disabled={disabled}
+        />
+      </label>
+
+      <div className={styles.fieldRowAddress}>
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>City</span>
+          <input
+            value={billingCityDraft}
+            onChange={(e) => setBillingCityDraft(e.target.value)}
+            placeholder="Springfield"
+            disabled={disabled}
+          />
+        </label>
+
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>State</span>
+          <input
+            value={billingStateDraft}
+            onChange={(e) => setBillingStateDraft(e.target.value)}
+            placeholder="IL"
+            disabled={disabled}
+          />
+        </label>
+
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>ZIP</span>
+          <input
+            value={billingZipDraft}
+            onChange={(e) => setBillingZipDraft(e.target.value)}
+            placeholder="62704"
+            disabled={disabled}
+          />
+        </label>
+      </div>
 
       <div className={styles.profileActions}>
         <button

@@ -258,7 +258,10 @@ class InvoiceTests(TestCase):
     def test_invoice_create_uses_organization_invoice_defaults_when_payload_omits_them(self):
         organization = Organization.objects.create(
             display_name="Invoice Defaults Org",
-            billing_address="100 Main St\nAustin, TX 78701",
+            billing_street_1="100 Main St",
+            billing_city="Austin",
+            billing_state="TX",
+            billing_zip="78701",
             default_invoice_due_delta=45,
             invoice_terms_and_conditions="Net 45. Late fee after due date.",
             created_by=self.user,
@@ -299,7 +302,7 @@ class InvoiceTests(TestCase):
         self.assertEqual(payload["due_date"], expected_due_date)
         self.assertEqual(payload["sender_name"], organization.display_name)
         self.assertEqual(payload["sender_email"], "")
-        self.assertEqual(payload["sender_address"], organization.billing_address)
+        self.assertEqual(payload["sender_address"], organization.formatted_billing_address)
         self.assertEqual(payload["sender_logo_url"], "")
         self.assertEqual(payload["terms_text"], organization.invoice_terms_and_conditions)
         self.assertEqual(payload["footer_text"], "")
@@ -308,7 +311,7 @@ class InvoiceTests(TestCase):
     def test_invoice_create_allows_overriding_organization_invoice_defaults(self):
         organization = Organization.objects.create(
             display_name="Invoice Override Org",
-            billing_address="Org Address",
+            billing_street_1="Org Address",
             default_invoice_due_delta=30,
             invoice_terms_and_conditions="Org terms",
             created_by=self.user,

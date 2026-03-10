@@ -461,7 +461,7 @@ class OrganizationSnapshotTests(TestCase):
         self.org = Organization.objects.create(
             display_name="Snap Org",
             help_email="help@snap.com",
-            billing_address="123 Main St",
+            billing_street_1="123 Main St",
             created_by=self.user,
         )
 

@@ -256,7 +256,7 @@ def project_invoices_view(request, project_id: int):
         default_due_days=default_due_days,
         default_sender_name=(organization.display_name or "").strip(),
         default_sender_email="",
-        default_sender_address=(organization.billing_address or "").strip(),
+        default_sender_address=organization.formatted_billing_address,
         default_sender_logo_url=request.build_absolute_uri(organization.logo.url) if organization.logo else "",
         default_terms_text=(organization.invoice_terms_and_conditions or "").strip(),
         default_footer_text="",

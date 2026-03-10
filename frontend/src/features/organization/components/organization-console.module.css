@@ -103,6 +103,16 @@
   gap: 10px;
 }
 
+.fieldRowAddress {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 10px;
+}
+
+.fieldNarrow {
+  max-width: 65%;
+}
+
 .fieldGroupDivider {
   border: none;
   border-top: 1px solid var(--border);
@@ -434,8 +444,13 @@
 /* ── Responsive ── */
 
 @media (max-width: 700px) {
-  .fieldRow {
+  .fieldRow,
+  .fieldRowAddress {
     grid-template-columns: 1fr;
+  }
+
+  .fieldNarrow {
+    max-width: none;
   }
 
   .memberTable,

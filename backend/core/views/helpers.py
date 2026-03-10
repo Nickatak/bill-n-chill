@@ -81,7 +81,7 @@ def _serialize_public_organization_context(organization: Organization | None, re
     return {
         "display_name": (organization.display_name or "").strip(),
         "logo_url": logo_url,
-        "billing_address": (organization.billing_address or "").strip(),
+        "billing_address": organization.formatted_billing_address,
         "help_email": (organization.help_email or "").strip(),
         "invoice_terms_and_conditions": (organization.invoice_terms_and_conditions or "").strip(),
         "estimate_terms_and_conditions": (organization.estimate_terms_and_conditions or "").strip(),

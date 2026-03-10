@@ -52,7 +52,11 @@ def organization_profile_view(request):
     incoming = serializer.validated_data
 
     # Field-level capability gates: identity vs presets
-    _identity_fields = {"display_name", "billing_address", "phone_number", "website_url", "license_number", "tax_id"}
+    _identity_fields = {
+        "display_name", "billing_street_1", "billing_street_2",
+        "billing_city", "billing_state", "billing_zip",
+        "phone_number", "website_url", "license_number", "tax_id",
+    }
     _preset_fields = {
         "help_email", "default_invoice_due_delta", "default_estimate_valid_delta",
         "invoice_terms_and_conditions", "estimate_terms_and_conditions",
@@ -74,7 +78,11 @@ def organization_profile_view(request):
     _string_fields = {
         "display_name": {"attr": "display_name", "strip": True, "allow_blank": False},
         "help_email": {"attr": "help_email", "strip": True},
-        "billing_address": {"attr": "billing_address", "strip": True},
+        "billing_street_1": {"attr": "billing_street_1", "strip": True},
+        "billing_street_2": {"attr": "billing_street_2", "strip": True},
+        "billing_city": {"attr": "billing_city", "strip": True},
+        "billing_state": {"attr": "billing_state", "strip": True},
+        "billing_zip": {"attr": "billing_zip", "strip": True},
         "phone_number": {"attr": "phone_number", "strip": True},
         "website_url": {"attr": "website_url", "strip": True},
         "license_number": {"attr": "license_number", "strip": True},

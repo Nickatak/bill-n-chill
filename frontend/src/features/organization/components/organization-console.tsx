@@ -11,9 +11,8 @@
  * URL stays at /ops/organization (no sub-routes).
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
-import shell from "@/shared/shell/page-shell.module.css";
 import { PageShell, PageCard } from "@/shared/shell";
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { loadClientSession, saveClientSession } from "@/shared/session/client-session";
@@ -64,18 +63,11 @@ export function OrganizationConsole() {
   const [memberships, setMemberships] = useState<OrganizationMembershipRecord[]>([]);
   const [invites, setInvites] = useState<OrganizationInviteRecord[]>([]);
   const [rolePolicy, setRolePolicy] = useState<OrganizationRolePolicy | null>(null);
-  const [activeMemberCount, setActiveMemberCount] = useState(0);
-
   const canEditProfile = rolePolicy?.can_edit_profile ?? hasAnyRole(role, ["owner", "pm"]);
   const canManageMemberships = rolePolicy?.can_manage_memberships ?? hasAnyRole(role, ["owner"]);
   const canInvite = rolePolicy?.can_invite ?? canDo(capabilities, "users", "invite");
   const editableRoles = rolePolicy?.editable_roles ?? FALLBACK_EDITABLE_ROLES;
   const editableStatuses = rolePolicy?.editable_statuses ?? FALLBACK_EDITABLE_STATUSES;
-
-  const activeMembersDerived = useMemo(
-    () => memberships.filter((m) => m.status === "active").length,
-    [memberships],
-  );
 
   // Mark the onboarding "org visited" step as complete on mount.
   useEffect(() => {
@@ -147,7 +139,7 @@ export function OrganizationConsole() {
         setProfile(nextProfile);
         setMemberships(nextMemberships);
         setRolePolicy(nextRolePolicy);
-        setActiveMemberCount(profileData?.active_member_count ?? nextMemberships.length);
+        // active_member_count available in profileData if needed later
       } catch {
         if (!ignore) {
           setErrorMessage("Could not reach organization endpoints.");
@@ -177,24 +169,6 @@ export function OrganizationConsole() {
 
   return (
     <PageShell narrow>
-      <header className={shell.hero}>
-        <div className={shell.heroTop}>
-          <p className={shell.eyebrow}>Business</p>
-          <h1 className={shell.title}>Organization</h1>
-          <p className={shell.copy}>
-            Company identity, team membership, and document defaults.
-          </p>
-        </div>
-        <div className={shell.heroMetaRow}>
-          <span className={shell.metaPill}>
-            Members: {activeMemberCount || activeMembersDerived}
-          </span>
-          <span className={shell.metaPill}>
-            Role: {rolePolicy?.effective_role ?? role}
-          </span>
-        </div>
-      </header>
-
       {errorMessage ? (
         <PageCard>
           <p className={styles.errorText}>{errorMessage}</p>

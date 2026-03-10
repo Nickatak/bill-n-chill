@@ -20,7 +20,11 @@ class OrganizationProfileSerializer(serializers.ModelSerializer):
             "display_name",
             "logo_url",
             "help_email",
-            "billing_address",
+            "billing_street_1",
+            "billing_street_2",
+            "billing_city",
+            "billing_state",
+            "billing_zip",
             "phone_number",
             "website_url",
             "license_number",
@@ -101,7 +105,11 @@ class OrganizationProfileUpdateSerializer(serializers.Serializer):
 
     display_name = serializers.CharField(max_length=255, required=False, allow_blank=False)
     help_email = serializers.EmailField(required=False, allow_blank=True, default="")
-    billing_address = serializers.CharField(max_length=5000, required=False, allow_blank=True, default="")
+    billing_street_1 = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
+    billing_street_2 = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
+    billing_city = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
+    billing_state = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
+    billing_zip = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
     phone_number = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
     website_url = serializers.URLField(required=False, allow_blank=True, default="")
     license_number = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
