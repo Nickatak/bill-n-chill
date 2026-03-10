@@ -8,6 +8,7 @@
  */
 
 export const SESSION_STORAGE_KEY = "bnc-session-v1";
+export const REAL_SESSION_STORAGE_KEY = "bnc-real-session-v1";
 export const SESSION_CHANGE_EVENT = "bnc-session-change";
 
 export type SessionRole = "owner" | "pm" | "bookkeeping" | "worker" | "viewer";
@@ -41,12 +42,19 @@ function validateCapabilities(raw: unknown): Capabilities | undefined {
   return obj as Capabilities;
 }
 
+export type ImpersonationInfo = {
+  active: boolean;
+  realEmail: string;
+};
+
 export type ClientSession = {
   token: string;
   email: string;
   role?: SessionRole;
   organization?: SessionOrganization;
   capabilities?: Capabilities;
+  isSuperuser?: boolean;
+  impersonation?: ImpersonationInfo;
 };
 
 /** Read the current session from localStorage. Returns null if absent, expired, or malformed. */
@@ -92,5 +100,42 @@ export function clearClientSession(): void {
     return;
   }
   window.localStorage.removeItem(SESSION_STORAGE_KEY);
+  window.localStorage.removeItem(REAL_SESSION_STORAGE_KEY);
   window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
+}
+
+/** Stash the current session and activate an impersonation session. */
+export function startImpersonation(impersonationSession: ClientSession): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const current = window.localStorage.getItem(SESSION_STORAGE_KEY);
+  if (current) {
+    window.localStorage.setItem(REAL_SESSION_STORAGE_KEY, current);
+  }
+  window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(impersonationSession));
+  window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
+}
+
+/** Restore the real session and discard the impersonation session. */
+export function exitImpersonation(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const real = window.localStorage.getItem(REAL_SESSION_STORAGE_KEY);
+  if (real) {
+    window.localStorage.setItem(SESSION_STORAGE_KEY, real);
+    window.localStorage.removeItem(REAL_SESSION_STORAGE_KEY);
+  } else {
+    window.localStorage.removeItem(SESSION_STORAGE_KEY);
+  }
+  window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
+}
+
+/** Check if an impersonation session is currently active. */
+export function isImpersonating(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  return window.localStorage.getItem(REAL_SESSION_STORAGE_KEY) !== null;
 }

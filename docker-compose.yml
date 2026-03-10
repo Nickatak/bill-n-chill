@@ -21,7 +21,7 @@ services:
     working_dir: /app/backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: ${DATABASE_URL:-mysql://${MYSQL_USER:-bnc}:${MYSQL_PASSWORD:-bnc_password}@db:3306/${MYSQL_DATABASE:-bill_n_chill}}
+      DATABASE_URL: mysql://${MYSQL_USER:-bnc}:${MYSQL_PASSWORD:-bnc_password}@db:3306/${MYSQL_DATABASE:-bill_n_chill}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-dev-only-change-me}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}

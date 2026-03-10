@@ -1,0 +1,79 @@
+.container {
+  max-width: 600px;
+  margin: 40px auto;
+  padding: 0 20px;
+}
+
+.heading {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+.userList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.userCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 6px;
+  background: var(--surface-secondary, #f9f9f9);
+}
+
+.userInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.email {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.meta {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+}
+
+.impersonateButton {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 4px;
+  background: var(--surface, #fff);
+  cursor: pointer;
+}
+
+.impersonateButton:hover {
+  background: var(--accent-subtle, #e8f0fe);
+}
+
+.impersonateButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.empty {
+  color: var(--text-secondary, #666);
+  font-size: 14px;
+}
+
+.error {
+  color: var(--error, #c62828);
+  font-size: 14px;
+}
+
+.forbidden {
+  text-align: center;
+  margin-top: 80px;
+  color: var(--text-secondary, #666);
+  font-size: 16px;
+}

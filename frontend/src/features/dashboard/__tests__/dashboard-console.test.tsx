@@ -282,9 +282,12 @@ describe("DashboardConsole", () => {
       token: "",
       email: "",
       authMessage: "No shared session found.",
-      role: "",
+      role: "" as "owner",
       organization: null,
       capabilities: {},
+      isSuperuser: false,
+      isImpersonating: false,
+      impersonation: undefined,
     });
     render(<DashboardConsole />);
 

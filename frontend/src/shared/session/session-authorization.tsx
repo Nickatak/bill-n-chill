@@ -22,6 +22,7 @@ import {
   loadClientSession,
   saveClientSession,
   type Capabilities,
+  type ImpersonationInfo,
   type SessionOrganization,
   type SessionRole,
 } from "./client-session";
@@ -42,6 +43,9 @@ type SessionAuthorizationContextValue = {
   isAuthorized: boolean;
   isChecking: boolean;
   isRefreshing: boolean;
+  isSuperuser: boolean;
+  isImpersonating: boolean;
+  impersonation: ImpersonationInfo | undefined;
 };
 
 const SessionAuthorizationContext = createContext<SessionAuthorizationContextValue | null>(null);
@@ -55,7 +59,8 @@ type SessionAuthorizationProviderProps = {
  * exposes auth state to all descendants via context.
  */
 export function SessionAuthorizationProvider({ children }: SessionAuthorizationProviderProps) {
-  const { token, role, organization, authMessage, capabilities } = useSharedSessionAuth();
+  const { token, role, organization, authMessage, capabilities, isSuperuser, isImpersonating, impersonation } =
+    useSharedSessionAuth();
   const [status, setStatus] = useState<AuthorizationStatus>("checking");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const verifiedTokenRef = useRef("");
@@ -98,7 +103,14 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
         if (freshCapabilities) {
           const current = loadClientSession();
           if (current) {
-            saveClientSession({ ...current, capabilities: freshCapabilities });
+            saveClientSession({
+              ...current,
+              capabilities: freshCapabilities,
+              isSuperuser: mePayload?.data?.user?.is_superuser ?? false,
+              impersonation: mePayload?.data?.impersonation
+                ? { active: true, realEmail: mePayload.data.impersonation.real_email }
+                : undefined,
+            });
           }
         }
 
@@ -154,8 +166,11 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
       isAuthorized: status === "authorized",
       isChecking: status === "checking",
       isRefreshing,
+      isSuperuser,
+      isImpersonating,
+      impersonation,
     }),
-    [authMessage, capabilities, isRefreshing, organization, role, status, token],
+    [authMessage, capabilities, impersonation, isImpersonating, isRefreshing, isSuperuser, organization, role, status, token],
   );
 
   return (

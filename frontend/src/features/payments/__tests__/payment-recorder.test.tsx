@@ -349,6 +349,9 @@ describe("PaymentRecorder", () => {
       role: "viewer",
       organization: null,
       capabilities: { payments: ["view"] },
+      isSuperuser: false,
+      isImpersonating: false,
+      impersonation: undefined,
     });
 
     setupPaymentFetch({ payments: [] });

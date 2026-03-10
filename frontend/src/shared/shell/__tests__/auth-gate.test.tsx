@@ -23,6 +23,9 @@ vi.mock("@/shared/session/session-authorization", () => ({
     organization: null,
     authMessage: "",
     isRefreshing: false,
+    isSuperuser: false,
+    isImpersonating: false,
+    impersonation: undefined,
   })),
 }));
 
@@ -45,6 +48,9 @@ function setAuthState(overrides: Partial<ReturnType<typeof useSessionAuthorizati
     organization: null,
     authMessage: "",
     isRefreshing: false,
+    isSuperuser: false,
+    isImpersonating: false,
+    impersonation: undefined,
     ...overrides,
   });
 }

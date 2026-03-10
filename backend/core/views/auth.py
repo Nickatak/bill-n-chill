@@ -8,7 +8,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import EmailVerificationToken, OrganizationInvite, OrganizationMembership, OrganizationMembershipRecord, PasswordResetToken
+from core.models import EmailVerificationToken, ImpersonationToken, OrganizationInvite, OrganizationMembership, OrganizationMembershipRecord, PasswordResetToken
 from core.serializers import LoginSerializer, RegisterSerializer
 from core.utils.email import send_password_reset_email, send_verification_email
 from core.user_helpers import _ensure_membership, _resolve_user_capabilities
@@ -27,6 +27,7 @@ def _build_auth_response_payload(user, membership):
             "id": user.id,
             "email": user.email,
             "role": membership.role,
+            "is_superuser": user.is_superuser,
         },
         "organization": {
             "id": membership.organization_id,
@@ -337,7 +338,17 @@ def me_view(request):
     """
     user = request.user
     membership = _ensure_membership(user)
-    return Response({"data": _build_auth_response_payload(user, membership)})
+    payload = _build_auth_response_payload(user, membership)
+
+    # When accessed via an impersonation token, include metadata so the
+    # frontend knows to show the impersonation banner.
+    if isinstance(request.auth, ImpersonationToken):
+        payload["impersonation"] = {
+            "active": True,
+            "real_email": request.auth.impersonated_by.email,
+        }
+
+    return Response({"data": payload})
 
 
 @api_view(["GET"])
@@ -869,3 +880,156 @@ def reset_password_view(request):
 
     membership = _ensure_membership(user)
     return Response({"data": _build_auth_response_payload(user, membership)})
+
+
+# ── impersonation ──
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def impersonate_start_view(request):
+    """Start an impersonation session for a target user.
+
+    Superuser-only. Creates an ImpersonationToken that lets the caller
+    make requests as the target user. Returns the same auth payload
+    shape as login so the frontend can swap sessions seamlessly.
+
+    Contract:
+    - `POST`:
+      - `200`: impersonation token + target user auth payload returned.
+      - `400`: user_id missing.
+      - `403`: caller is not a superuser, or target is a superuser.
+      - `404`: target user not found.
+
+    - Preconditions:
+      - caller must be authenticated and ``is_superuser=True``.
+
+    - Object mutations:
+      - `POST`:
+        - Creates: ``ImpersonationToken``.
+
+    - Incoming payload (`POST`) shape:
+      - JSON map: { "user_id": int (required) }
+    """
+    if not request.user.is_superuser:
+        return Response(
+            {"error": {"code": "forbidden", "message": "Superuser access required."}},
+            status=403,
+        )
+
+    user_id = request.data.get("user_id")
+    if not user_id:
+        return Response(
+            {"error": {"code": "validation_error", "message": "user_id is required."}},
+            status=400,
+        )
+
+    try:
+        target_user = User.objects.get(id=user_id, is_active=True)
+    except User.DoesNotExist:
+        return Response(
+            {"error": {"code": "not_found", "message": "User not found."}},
+            status=404,
+        )
+
+    if target_user.is_superuser:
+        return Response(
+            {"error": {"code": "forbidden", "message": "Cannot impersonate another superuser."}},
+            status=403,
+        )
+
+    # Clean up any existing impersonation tokens for this superuser.
+    ImpersonationToken.objects.filter(impersonated_by=request.user).delete()
+
+    imp_token = ImpersonationToken(user=target_user, impersonated_by=request.user)
+    imp_token.save()
+
+    membership = _ensure_membership(target_user)
+    payload = _build_auth_response_payload(target_user, membership)
+    # Override the token with the impersonation token key.
+    payload["token"] = imp_token.key
+    payload["impersonation"] = {
+        "active": True,
+        "real_email": request.user.email,
+    }
+
+    return Response({"data": payload})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def impersonate_exit_view(request):
+    """End the current impersonation session.
+
+    Deletes the impersonation token. The frontend should discard the
+    impersonation token and restore the original superuser session.
+
+    Contract:
+    - `POST`:
+      - `200`: impersonation session ended.
+      - `400`: not currently impersonating.
+
+    - Preconditions:
+      - caller must be authenticated via an impersonation token.
+
+    - Object mutations:
+      - `POST`:
+        - Deletes: the current ``ImpersonationToken``.
+    """
+    if not isinstance(request.auth, ImpersonationToken):
+        return Response(
+            {"error": {"code": "bad_request", "message": "Not currently impersonating."}},
+            status=400,
+        )
+
+    request.auth.delete()
+    return Response({"data": {"message": "Impersonation session ended."}})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def impersonate_users_view(request):
+    """List users available for impersonation.
+
+    Superuser-only. Returns all active non-superuser users with their
+    org context, so the frontend can render a user picker.
+
+    Contract:
+    - `GET`:
+      - `200`: list of impersonatable users returned.
+      - `403`: caller is not a superuser.
+
+    - Preconditions:
+      - caller must be authenticated and ``is_superuser=True``.
+
+    - Object mutations:
+      - `GET`: none.
+    """
+    if not request.user.is_superuser:
+        return Response(
+            {"error": {"code": "forbidden", "message": "Superuser access required."}},
+            status=403,
+        )
+
+    users = (
+        User.objects.filter(is_active=True, is_superuser=False)
+        .select_related()
+        .order_by("email")
+    )
+
+    result = []
+    for user in users:
+        membership = OrganizationMembership.objects.select_related("organization").filter(user=user).first()
+        entry = {
+            "id": user.id,
+            "email": user.email,
+        }
+        if membership:
+            entry["organization"] = {
+                "id": membership.organization_id,
+                "display_name": membership.organization.display_name,
+            }
+            entry["role"] = membership.role
+        result.append(entry)
+
+    return Response({"data": result})

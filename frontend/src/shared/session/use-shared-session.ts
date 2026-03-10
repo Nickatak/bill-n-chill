@@ -12,8 +12,10 @@ import { useMemo, useSyncExternalStore } from "react";
 import {
   SESSION_CHANGE_EVENT,
   SESSION_STORAGE_KEY,
+  REAL_SESSION_STORAGE_KEY,
   type Capabilities,
   type ClientSession,
+  type ImpersonationInfo,
   type SessionRole,
 } from "./client-session";
 
@@ -40,7 +42,10 @@ function getSnapshot() {
   if (typeof window === "undefined") {
     return null;
   }
-  return window.localStorage.getItem(SESSION_STORAGE_KEY);
+  // Combine both keys into one snapshot string so changes to either trigger re-render.
+  const session = window.localStorage.getItem(SESSION_STORAGE_KEY);
+  const real = window.localStorage.getItem(REAL_SESSION_STORAGE_KEY);
+  return JSON.stringify({ session, real });
 }
 
 /** Server-side snapshot — always null since localStorage doesn't exist on the server. */
@@ -53,33 +58,51 @@ function getServerSnapshot() {
  * the parsed token, role, organization, and a human-readable auth message.
  */
 export function useSharedSessionAuth() {
-  const sessionSnapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const combinedSnapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  const session = useMemo<ClientSession | null>(() => {
-    if (!sessionSnapshot) {
-      return null;
+  const { session, isImpersonating } = useMemo<{
+    session: ClientSession | null;
+    isImpersonating: boolean;
+  }>(() => {
+    if (!combinedSnapshot) {
+      return { session: null, isImpersonating: false };
     }
     try {
-      const parsed = JSON.parse(sessionSnapshot) as Partial<ClientSession>;
+      const { session: sessionRaw, real: realRaw } = JSON.parse(combinedSnapshot) as {
+        session: string | null;
+        real: string | null;
+      };
+      const hasRealSession = realRaw !== null;
+      if (!sessionRaw) {
+        return { session: null, isImpersonating: false };
+      }
+      const parsed = JSON.parse(sessionRaw) as Partial<ClientSession>;
       if (!parsed?.token) {
-        return null;
+        return { session: null, isImpersonating: false };
       }
       return {
-        token: parsed.token,
-        email: parsed.email ?? "",
-        role: parsed.role,
-        organization: parsed.organization,
-        capabilities: parsed.capabilities,
+        session: {
+          token: parsed.token,
+          email: parsed.email ?? "",
+          role: parsed.role,
+          organization: parsed.organization,
+          capabilities: parsed.capabilities,
+          isSuperuser: parsed.isSuperuser,
+          impersonation: parsed.impersonation,
+        },
+        isImpersonating: hasRealSession,
       };
     } catch {
-      return null;
+      return { session: null, isImpersonating: false };
     }
-  }, [sessionSnapshot]);
+  }, [combinedSnapshot]);
 
   const token = session?.token ?? "";
   const role: SessionRole = session?.role || "owner";
   const organization = session?.organization ?? null;
   const capabilities: Capabilities | undefined = session?.capabilities;
+  const isSuperuser = session?.isSuperuser ?? false;
+  const impersonation: ImpersonationInfo | undefined = session?.impersonation;
   const orgLabel = organization?.displayName || "";
   const authMessage = session
     ? `Using shared session for ${session.email || "user"} (${role})${orgLabel ? ` in ${orgLabel}` : ""}.`
@@ -87,5 +110,5 @@ export function useSharedSessionAuth() {
 
   const email = session?.email ?? "";
 
-  return { token, email, authMessage, role, organization, capabilities };
+  return { token, email, authMessage, role, organization, capabilities, isSuperuser, isImpersonating, impersonation };
 }

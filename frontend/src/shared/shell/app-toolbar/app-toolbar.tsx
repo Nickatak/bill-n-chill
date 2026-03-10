@@ -32,7 +32,7 @@ import styles from "./app-toolbar.module.css";
 export function AppToolbar() {
   const pathname = usePathname() ?? "";
   const router = useRouter();
-  const { token, organization } = useSharedSessionAuth();
+  const { token, organization, isSuperuser } = useSharedSessionAuth();
   const { isPrintable } = usePrintable();
   const hasSession = Boolean(token);
   const isPublicDocument = isPublicDocumentRoute(pathname);
@@ -117,6 +117,11 @@ export function AppToolbar() {
             })}
           </div>
         </details>
+      ) : null}
+      {hasSession && !isPublicDocument && isSuperuser ? (
+        <Link href="/admin/impersonate" className={styles.button}>
+          Impersonate
+        </Link>
       ) : null}
       {isPublicDocument || (hasSession && isPrintable) ? (
         <button type="button" className={isPublicDocument ? styles.publicButton : styles.button} onClick={printPage}>

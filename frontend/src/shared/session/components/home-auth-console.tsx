@@ -18,6 +18,7 @@ type LoginResponse = {
     user?: {
       email?: string;
       role?: SessionRole;
+      is_superuser?: boolean;
     };
     organization?: {
       id?: number;
@@ -147,6 +148,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
         role: nextRole,
         organization: nextOrganization,
         capabilities: payload.data?.capabilities,
+        isSuperuser: payload.data?.user?.is_superuser ?? false,
       });
 
       router.push("/dashboard");
