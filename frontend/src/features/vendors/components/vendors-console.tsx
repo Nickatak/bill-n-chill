@@ -27,7 +27,13 @@ export function VendorsConsole() {
   const [rows, setRows] = useState<VendorRecord[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const { message: statusMessage, tone: statusTone, setNeutral: setNeutralStatus, setSuccess: setSuccessStatus, setError: setErrorStatus } = useStatusMessage();
+  const {
+    message: statusMessage,
+    tone: statusTone,
+    setNeutral: setNeutralStatus,
+    setSuccess: setSuccessStatus,
+    setError: setErrorStatus,
+  } = useStatusMessage();
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("active");
   const [includeCanonical, setIncludeCanonical] = useState(false);
 
@@ -76,7 +82,15 @@ export function VendorsConsole() {
       return haystack.includes(needle);
     });
   }, [activityFilter, includeCanonical, orderedRows, searchTerm]);
-  const { pageItems: pagedRows, currentPage: currentPageSafe, totalPages, prevPage, nextPage, resetPage, setCurrentPage } = usePagination(filteredRows, 6);
+  const {
+    pageItems: pagedRows,
+    currentPage: currentPageSafe,
+    totalPages,
+    prevPage,
+    nextPage,
+    resetPage,
+    setCurrentPage,
+  } = usePagination(filteredRows, 6);
 
   const selectedVendor = useMemo(
     () => rows.find((row) => String(row.id) === selectedId) ?? null,

@@ -1,0 +1,369 @@
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+
+// ---------------------------------------------------------------------------
+// Mocks
+// ---------------------------------------------------------------------------
+
+const mockFetch = vi.hoisted(() => vi.fn());
+
+vi.mock("@/shared/session/use-shared-session", () => ({
+  useSharedSessionAuth: vi.fn(() => ({
+    token: "test-token",
+    email: "nick@test.com",
+    authMessage: "Using shared session for nick@test.com (owner).",
+    role: "owner",
+    organization: null,
+    capabilities: { vendors: ["view", "create"] },
+  })),
+}));
+
+vi.stubGlobal("fetch", mockFetch);
+
+import { VendorsConsole } from "../components/vendors-console";
+
+// ---------------------------------------------------------------------------
+// Factories
+// ---------------------------------------------------------------------------
+
+function makeVendor(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 1,
+    name: "Acme Supply",
+    vendor_type: "trade",
+    is_canonical: false,
+    email: "acme@example.com",
+    phone: "5551234567",
+    tax_id_last4: "1234",
+    notes: "",
+    is_active: true,
+    created_at: "2026-01-15T10:00:00Z",
+    updated_at: "2026-01-15T10:00:00Z",
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function setupDefaultFetch(overrides: { vendors?: unknown[] } = {}) {
+  mockFetch.mockImplementation((url: string) => {
+    if (url.includes("/vendors/")) {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ data: overrides.vendors ?? [makeVendor()] }),
+      });
+    }
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("VendorsConsole", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("renders header with title and stats", async () => {
+    setupDefaultFetch({
+      vendors: [
+        makeVendor(),
+        makeVendor({ id: 2, name: "Inactive Corp", is_active: false }),
+      ],
+    });
+    render(<VendorsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Vendor Directory")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Total 2")).toBeInTheDocument();
+    expect(screen.getByText("Active 1")).toBeInTheDocument();
+    expect(screen.getByText("Inactive 1")).toBeInTheDocument();
+  });
+
+  it("loads and displays vendors from API", async () => {
+    setupDefaultFetch({
+      vendors: [
+        makeVendor({ id: 1, name: "Acme Supply" }),
+        makeVendor({ id: 2, name: "BuildMart" }),
+      ],
+    });
+    render(<VendorsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Acme Supply/)).toBeInTheDocument();
+      expect(screen.getByText(/BuildMart/)).toBeInTheDocument();
+    });
+  });
+
+  it("shows error on load failure", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      json: () => Promise.resolve({ error: { message: "Forbidden." } }),
+    });
+    render(<VendorsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Forbidden.")).toBeInTheDocument();
+    });
+  });
+
+  it("filters vendors by search term", async () => {
+    setupDefaultFetch({
+      vendors: [
+        makeVendor({ id: 1, name: "Acme Supply" }),
+        makeVendor({ id: 2, name: "BuildMart" }),
+      ],
+    });
+    render(<VendorsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Acme Supply/)).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("Search vendors"), {
+      target: { value: "buildmart" },
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Acme Supply/)).not.toBeInTheDocument();
+      expect(screen.getByText(/BuildMart/)).toBeInTheDocument();
+    });
+  });
+
+  it("filters by activity status (active vs all)", async () => {
+    setupDefaultFetch({
+      vendors: [
+        makeVendor({ id: 1, name: "Active Vendor" }),
+        makeVendor({ id: 2, name: "Inactive Vendor", is_active: false }),
+      ],
+    });
+    render(<VendorsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Active Vendor/)).toBeInTheDocument();
+    });
+
+    // Default is "Active" — inactive should be hidden
+    expect(screen.queryByText(/Inactive Vendor/)).not.toBeInTheDocument();
+
+    // Switch to "All"
+    const allButtons = screen.getAllByRole("button", { name: "All" });
+    const filterButton = allButtons.find(
+      (btn) => btn.closest("[role='group']")?.getAttribute("aria-label") === "Vendor activity filter",
+    )!;
+    fireEvent.click(filterButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Inactive Vendor/)).toBeInTheDocument();
+    });
+  });
+
+  it("selects a vendor and populates the edit form", async () => {
+    setupDefaultFetch();
+    render(<VendorsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Acme Supply/)).toBeInTheDocument();
+    });
+
+    // Click the vendor row
+    fireEvent.click(screen.getByText(/Acme Supply/).closest("tr")!);
+
+    expect(screen.getByText("Edit: Acme Supply")).toBeInTheDocument();
+    expect(screen.getByLabelText("Name")).toHaveValue("Acme Supply");
+    expect(screen.getByLabelText("Email")).toHaveValue("acme@example.com");
+  });
+
+  it("creates a new vendor via POST", async () => {
+    setupDefaultFetch({ vendors: [] });
+    render(<VendorsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("New Vendor")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "New Vendor Co" } });
+
+    mockFetch.mockImplementation((_url: string, opts?: RequestInit) => {
+      if (opts?.method === "POST") {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: makeVendor({ id: 20, name: "New Vendor Co" }),
+            }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Vendor" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Created vendor #20/)).toBeInTheDocument();
+    });
+  });
+
+  it("saves an edited vendor via PATCH", async () => {
+    setupDefaultFetch();
+    render(<VendorsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Acme Supply/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText(/Acme Supply/).closest("tr")!);
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Acme Updated" } });
+
+    mockFetch.mockImplementation((_url: string, opts?: RequestInit) => {
+      if (opts?.method === "PATCH") {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: makeVendor({ name: "Acme Updated" }),
+            }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save Vendor" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Saved vendor #1/)).toBeInTheDocument();
+    });
+  });
+
+  it("handles duplicate detection on create (409)", async () => {
+    setupDefaultFetch({ vendors: [] });
+    render(<VendorsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("New Vendor")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Acme Supply" } });
+
+    // First POST returns 409 with duplicate candidates
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      json: () =>
+        Promise.resolve({
+          error: { code: "duplicate_detected", message: "Potential duplicate." },
+          data: {
+            duplicate_candidates: [makeVendor({ id: 99, name: "Acme Supply" })],
+          },
+        }),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Vendor" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Duplicate candidates")).toBeInTheDocument();
+      expect(screen.getByText(/Acme Supply/)).toBeInTheDocument();
+    });
+
+    // "Create Anyway" resolves with override
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: makeVendor({ id: 50, name: "Acme Supply" }),
+        }),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Anyway" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Created vendor #50/)).toBeInTheDocument();
+    });
+  });
+
+  it("shows canonical vendor as read-only", async () => {
+    setupDefaultFetch({
+      vendors: [makeVendor({ id: 1, name: "System Vendor", is_canonical: true })],
+    });
+    render(<VendorsConsole />);
+
+    await waitFor(() => {
+      // Need to enable canonical filter to see it
+      expect(screen.getByText("Canonical")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Canonical/ }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/System Vendor/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText(/System Vendor/).closest("tr")!);
+
+    expect(screen.getByText("Canonical vendors are read-only and cannot be edited.")).toBeInTheDocument();
+  });
+
+  it("shows pagination when vendors exceed page size", async () => {
+    const vendors = Array.from({ length: 8 }, (_, i) =>
+      makeVendor({ id: i + 1, name: `Vendor ${i + 1}` }),
+    );
+    setupDefaultFetch({ vendors });
+    render(<VendorsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Page 1 of 2/)).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("button", { name: "Prev" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next" })).not.toBeDisabled();
+  });
+
+  it("switches to create mode with + New button", async () => {
+    setupDefaultFetch();
+    render(<VendorsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Acme Supply/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText(/Acme Supply/).closest("tr")!);
+    expect(screen.getByText("Edit: Acme Supply")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("+ New"));
+    expect(screen.getByText("New Vendor")).toBeInTheDocument();
+  });
+
+  it("toggles CSV import section", async () => {
+    setupDefaultFetch();
+    render(<VendorsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("CSV Import")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { expanded: false }));
+
+    expect(screen.getByText(/Headers: name,vendor_type/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Preview" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply" })).toBeInTheDocument();
+  });
+
+  it("shows empty state when no vendors exist", async () => {
+    setupDefaultFetch({ vendors: [] });
+    render(<VendorsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/No vendors yet/)).toBeInTheDocument();
+    });
+  });
+});

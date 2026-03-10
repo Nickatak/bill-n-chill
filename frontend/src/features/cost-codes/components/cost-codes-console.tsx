@@ -25,7 +25,14 @@ export function CostCodesConsole() {
 
   const [rows, setRows] = useState<CostCode[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
-  const { message: statusMessage, tone: statusTone, setNeutral: setNeutralStatus, setSuccess: setSuccessStatus, setError: setErrorStatus, setMessage: setStatusMessage } = useStatusMessage();
+  const {
+    message: statusMessage,
+    tone: statusTone,
+    setNeutral: setNeutralStatus,
+    setSuccess: setSuccessStatus,
+    setError: setErrorStatus,
+    setMessage: setStatusMessage,
+  } = useStatusMessage();
   const [searchTerm, setSearchTerm] = useState("");
   const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("active");
 
