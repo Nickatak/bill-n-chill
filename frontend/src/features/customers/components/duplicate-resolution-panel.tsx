@@ -13,6 +13,7 @@ import Link from "next/link";
 
 import { CustomerIntakePayload, DuplicateCustomerCandidate } from "../types";
 import { DuplicateResolution, SubmitIntent } from "../hooks/quick-add-controller.types";
+import { formatCreatedAt, matchedFields } from "../utils/duplicate-matching";
 import styles from "./quick-add-console.module.css";
 
 type DuplicateResolutionPanelProps = {
@@ -23,49 +24,6 @@ type DuplicateResolutionPanelProps = {
   onSelectDuplicateId: (value: string) => void;
   onResolve: (resolution: DuplicateResolution, targetId?: number) => void;
 };
-
-/** Format a created_at timestamp for display in the candidate card. */
-function formatCreatedAt(value: string) {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-  return parsed.toLocaleString();
-}
-
-/** Normalize a string for case-insensitive field comparison. */
-function normalized(value: string | null | undefined) {
-  return (value ?? "").trim().toLowerCase();
-}
-
-/** Identify which fields match between a candidate and the submitted intake payload. */
-function matchedFields(candidate: DuplicateCustomerCandidate, payload: CustomerIntakePayload | null) {
-  if (!payload) {
-    return [];
-  }
-
-  const matches: string[] = [];
-  if (normalized(payload.phone) && normalized(candidate.phone) === normalized(payload.phone)) {
-    matches.push("phone");
-  }
-  if (normalized(payload.email) && normalized(candidate.email) === normalized(payload.email)) {
-    matches.push("email");
-  }
-  if (
-    normalized(payload.full_name) &&
-    normalized(candidate.display_name) === normalized(payload.full_name)
-  ) {
-    matches.push("name");
-  }
-  if (
-    normalized(payload.project_address) &&
-    normalized(candidate.billing_address) === normalized(payload.project_address)
-  ) {
-    matches.push("address");
-  }
-
-  return matches;
-}
 
 /** Renders duplicate candidate cards with match highlighting and resolution actions. */
 export function DuplicateResolutionPanel({
