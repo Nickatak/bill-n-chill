@@ -7,7 +7,7 @@
 	local-makemigrations local-superuser \
 	local-test local-test-backend local-test-frontend local-clean local-kill-ports \
 	docker-up docker-down docker-logs db-migrate \
-	db-seed db-flush db-reset db-reset-hard db-grant-test-db-perms \
+	db-seed db-reset db-reset-hard db-grant-test-db-perms \
 	docker-prod-up docker-prod-down docker-prod-logs \
 	db-prod-reset db-prod-reset-hard
 
@@ -39,9 +39,8 @@ help:
 	@echo "  make docker-down            Stop dev stack"
 	@echo "  make docker-logs            Stream dev stack logs"
 	@echo "  make db-migrate             Apply Django migrations against dev DB"
-	@echo "  make db-seed                Seed adoption-stage demo accounts into dev DB"
-	@echo "  make db-flush               Flush all app data (no reseed)"
-	@echo "  make db-reset               Destructive app-data reset + demo reseed"
+	@echo "  make db-seed                Seed optional test accounts into dev DB"
+	@echo "  make db-reset               Flush all app data and re-migrate"
 	@echo ""
 	@echo "Dev DB Utilities (.env.local)"
 	@echo "  make db-reset-hard          Drop dev DB volume and recreate DB container"
@@ -51,7 +50,7 @@ help:
 	@echo "  make docker-prod-up         Full cycle: force-recreate all prod containers"
 	@echo "  make docker-prod-down       Stop prod stack"
 	@echo "  make docker-prod-logs       Stream prod stack logs"
-	@echo "  make db-prod-reset          Flush all prod app data (no reseed)"
+	@echo "  make db-prod-reset          Flush all prod app data and re-migrate"
 	@echo "  make db-prod-reset-hard     Drop prod DB volume and recreate DB container"
 	@echo ""
 	@echo "Local Utilities"
@@ -169,11 +168,8 @@ db-seed: local-env-local local-check-db
 db-migrate: local-env-local local-check-db
 	$(BACKEND_MANAGE) migrate
 
-db-flush: local-env-local local-check-db
-	$(BACKEND_MANAGE) reset_fresh_demo --skip-seed
-
 db-reset: local-env-local local-check-db
-	$(BACKEND_MANAGE) reset_fresh_demo
+	$(BACKEND_MANAGE) reset_fresh_demo --skip-seed
 
 db-reset-hard: local-env-local
 	@echo "This will destroy the DB volume and all data. Type 'yes' to confirm:"

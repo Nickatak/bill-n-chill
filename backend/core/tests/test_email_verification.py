@@ -326,17 +326,29 @@ class ResendVerificationTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    def test_resend_verified_user_noop(self):
+    def test_resend_verified_user_gets_password_reset(self):
+        """Verified users get a password reset email instead of verification."""
+        from core.models import EmailRecord, Organization, OrganizationMembership, PasswordResetToken
         self.user.is_active = True
         self.user.save(update_fields=["is_active"])
+        org = Organization.objects.create(display_name="TestOrg", created_by=self.user)
+        OrganizationMembership.objects.create(
+            organization=org, user=self.user, role="owner",
+            status=OrganizationMembership.Status.ACTIVE,
+        )
         response = self.client.post(
             "/api/v1/auth/resend-verification/",
             data={"email": "unverified@example.com"},
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
-        # No new token created, old one untouched.
-        self.assertEqual(EmailVerificationToken.objects.filter(user=self.user).count(), 1)
+        self.assertTrue(PasswordResetToken.objects.filter(user=self.user).exists())
+        self.assertTrue(
+            EmailRecord.objects.filter(
+                recipient_email="unverified@example.com",
+                email_type=EmailRecord.EmailType.PASSWORD_RESET,
+            ).exists()
+        )
 
     def test_resend_missing_email_returns_400(self):
         response = self.client.post(

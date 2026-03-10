@@ -8,9 +8,9 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import EmailVerificationToken, OrganizationInvite, OrganizationMembership, OrganizationMembershipRecord
+from core.models import EmailVerificationToken, OrganizationInvite, OrganizationMembership, OrganizationMembershipRecord, PasswordResetToken
 from core.serializers import LoginSerializer, RegisterSerializer
-from core.utils.email import send_verification_email
+from core.utils.email import send_password_reset_email, send_verification_email
 from core.user_helpers import _ensure_membership, _resolve_user_capabilities
 
 User = get_user_model()
@@ -64,6 +64,40 @@ def _lookup_valid_invite(token_str):
             status=status,
         )
     return invite, None
+
+
+def _send_duplicate_registration_email(user):
+    """Send a contextual email when someone tries to register with an existing email.
+
+    Verified users get a password reset link with a security heads-up.
+    Unverified users get a fresh verification email (respecting rate limits).
+    Best-effort: failures are silently swallowed to preserve anti-enumeration.
+    """
+    from datetime import timedelta
+
+    try:
+        if user.is_active:
+            # Verified user — send password reset with security alert.
+            # Rate limit: most recent reset token must be >60s old.
+            latest = PasswordResetToken.objects.filter(user=user).order_by("-created_at").first()
+            if latest and (timezone.now() - latest.created_at) < timedelta(seconds=60):
+                return
+            PasswordResetToken.objects.filter(user=user, consumed_at__isnull=True).delete()
+            token_obj = PasswordResetToken(user=user, email=user.email)
+            token_obj.save()
+            send_password_reset_email(user, token_obj, is_security_alert=True)
+        else:
+            # Unverified user — re-send verification email.
+            # Rate limit: most recent verification token must be >60s old.
+            latest = EmailVerificationToken.objects.filter(user=user).order_by("-created_at").first()
+            if latest and (timezone.now() - latest.created_at) < timedelta(seconds=60):
+                return
+            EmailVerificationToken.objects.filter(user=user, consumed_at__isnull=True).delete()
+            token_obj = EmailVerificationToken(user=user, email=user.email)
+            token_obj.save()
+            send_verification_email(user, token_obj)
+    except Exception:
+        pass  # Best-effort — never leak information via error responses.
 
 
 # ── views ──
@@ -247,7 +281,10 @@ def register_view(request):
     # Always return the same response to prevent email enumeration.
     _CHECK_EMAIL = {"data": {"message": "Check your email to verify your account."}}
 
-    if User.objects.filter(email__iexact=email).exists():
+    existing_user = User.objects.filter(email__iexact=email).first()
+    if existing_user:
+        # Anti-enumeration: same 200 response, but send a helpful email.
+        _send_duplicate_registration_email(existing_user)
         return Response(_CHECK_EMAIL, status=200)
 
     try:
@@ -642,13 +679,26 @@ def resend_verification_view(request):
     except User.DoesNotExist:
         return Response(_RESEND_OK, status=200)
 
-    # Already verified (is_active=True) — no-op.
+    from datetime import timedelta
+
+    # Already verified — send a password reset email instead.
     if user.is_active:
+        latest_token = (
+            PasswordResetToken.objects.filter(user=user).order_by("-created_at").first()
+        )
+        if latest_token and (timezone.now() - latest_token.created_at) < timedelta(seconds=60):
+            wait_seconds = 60 - int((timezone.now() - latest_token.created_at).total_seconds())
+            return Response(
+                {"error": {"code": "rate_limited", "message": f"Please wait {wait_seconds} seconds before requesting another email."}},
+                status=429,
+            )
+        PasswordResetToken.objects.filter(user=user, consumed_at__isnull=True).delete()
+        token_obj = PasswordResetToken(user=user, email=user.email)
+        token_obj.save()
+        send_password_reset_email(user, token_obj)
         return Response(_RESEND_OK, status=200)
 
     # Rate limit: most recent token must be >60s old.
-    from datetime import timedelta
-
     latest_token = (
         EmailVerificationToken.objects.filter(user=user).order_by("-created_at").first()
     )
@@ -667,3 +717,155 @@ def resend_verification_view(request):
     send_verification_email(user, token_obj)
 
     return Response(_RESEND_OK, status=200)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def forgot_password_view(request):
+    """Request a password reset email. Anti-enumeration: always returns 200.
+
+    Rate-limited: if the most recent reset token was created less than
+    60 seconds ago, returns 429.
+
+    Contract:
+    - `POST`:
+      - `200`: always (anti-enumeration). Email sent if applicable.
+      - `400`: email field missing.
+      - `429`: rate limited (last token <60s old).
+
+    - Preconditions:
+      - none (`AllowAny`).
+
+    - Object mutations:
+      - `POST`:
+        - Creates: new `PasswordResetToken`, `EmailRecord`.
+        - Deletes: previous unconsumed `PasswordResetToken` for the user.
+
+    - Incoming payload (`POST`) shape:
+      - JSON map: { "email": "string (required)" }
+
+    - Test anchors:
+      - `backend/core/tests/test_password_reset.py::ForgotPasswordTests`
+    """
+    email = (request.data.get("email") or "").strip().lower()
+    if not email:
+        return Response(
+            {"error": {"code": "validation_error", "message": "email is required."}},
+            status=400,
+        )
+
+    _FORGOT_OK = {"data": {"message": "If that email is registered, a password reset link has been sent."}}
+
+    try:
+        user = User.objects.get(email__iexact=email)
+    except User.DoesNotExist:
+        return Response(_FORGOT_OK, status=200)
+
+    from datetime import timedelta
+
+    # Unverified users can't reset passwords — send a verification email instead.
+    if not user.is_active:
+        latest_token = (
+            EmailVerificationToken.objects.filter(user=user).order_by("-created_at").first()
+        )
+        if latest_token and (timezone.now() - latest_token.created_at) < timedelta(seconds=60):
+            wait_seconds = 60 - int((timezone.now() - latest_token.created_at).total_seconds())
+            return Response(
+                {"error": {"code": "rate_limited", "message": f"Please wait {wait_seconds} seconds before requesting another email."}},
+                status=429,
+            )
+        EmailVerificationToken.objects.filter(user=user, consumed_at__isnull=True).delete()
+        token_obj = EmailVerificationToken(user=user, email=user.email)
+        token_obj.save()
+        send_verification_email(user, token_obj)
+        return Response(_FORGOT_OK, status=200)
+
+    # Rate limit: most recent token must be >60s old.
+    latest_token = (
+        PasswordResetToken.objects.filter(user=user).order_by("-created_at").first()
+    )
+    if latest_token and (timezone.now() - latest_token.created_at) < timedelta(seconds=60):
+        wait_seconds = 60 - int((timezone.now() - latest_token.created_at).total_seconds())
+        return Response(
+            {"error": {"code": "rate_limited", "message": f"Please wait {wait_seconds} seconds before requesting another email."}},
+            status=429,
+        )
+
+    # Delete any previous unconsumed tokens so only the latest link works.
+    PasswordResetToken.objects.filter(user=user, consumed_at__isnull=True).delete()
+
+    token_obj = PasswordResetToken(user=user, email=user.email)
+    token_obj.save()
+    send_password_reset_email(user, token_obj)
+
+    return Response(_FORGOT_OK, status=200)
+
+
+_RESET_ERROR_MAP = {
+    "not_found": (404, "not_found", "Invalid password reset link."),
+    "consumed": (410, "consumed", "This reset link has already been used."),
+    "expired": (410, "expired", "This reset link has expired. Request a new one."),
+}
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def reset_password_view(request):
+    """Consume a password reset token and set a new password.
+
+    On success, returns an auth payload so the user is automatically
+    logged in after resetting their password.
+
+    Contract:
+    - `POST`:
+      - `200`: password reset, auth payload returned.
+      - `400`: token or new_password field missing, or password too short.
+      - `404`: token not found.
+      - `410`: token expired or already consumed.
+
+    - Preconditions:
+      - none (`AllowAny`).
+
+    - Object mutations:
+      - `POST`:
+        - Edits: `consumed_at` set on reset token, user password updated.
+
+    - Incoming payload (`POST`) shape:
+      - JSON map: { "token": "string (required)", "new_password": "string (required)" }
+
+    - Test anchors:
+      - `backend/core/tests/test_password_reset.py::ResetPasswordTests`
+    """
+    token_str = (request.data.get("token") or "").strip()
+    new_password = (request.data.get("new_password") or "").strip()
+
+    if not token_str:
+        return Response(
+            {"error": {"code": "validation_error", "message": "token is required."}},
+            status=400,
+        )
+    if not new_password:
+        return Response(
+            {"error": {"code": "validation_error", "message": "new_password is required."}},
+            status=400,
+        )
+    if len(new_password) < 8:
+        return Response(
+            {"error": {"code": "validation_error", "message": "Password must be at least 8 characters."}},
+            status=400,
+        )
+
+    token_obj, error_code = PasswordResetToken.lookup_valid(token_str)
+    if error_code:
+        status, code, message = _RESET_ERROR_MAP[error_code]
+        return Response({"error": {"code": code, "message": message}}, status=status)
+
+    token_obj.consumed_at = timezone.now()
+    token_obj.save(update_fields=["consumed_at"])
+
+    user = token_obj.user
+    user.set_password(new_password)
+    user.save(update_fields=["password"])
+
+    membership = _ensure_membership(user)
+    return Response({"data": _build_auth_response_payload(user, membership)})

@@ -216,24 +216,31 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
               {message}
             </p>
           )}
-          <div className={styles.buttonRow}>
-            <button className={styles.button} type="submit" disabled={isChecking}>
-              {isChecking ? "Checking..." : "Sign in"}
-            </button>
-            {emailNotVerified && (
-              <button
-                className={styles.buttonSecondary}
-                type="button"
-                disabled={isResending}
-                onClick={handleResendVerification}
-              >
-                {isResending ? "Sending..." : "Resend verification email"}
+          <div className={styles.formHintRow}>
+            <div className={styles.buttonRow}>
+              <button className={styles.button} type="submit" disabled={isChecking}>
+                {isChecking ? "Checking..." : "Sign in"}
               </button>
-            )}
+              {emailNotVerified && (
+                <button
+                  className={styles.buttonSecondary}
+                  type="button"
+                  disabled={isResending}
+                  onClick={handleResendVerification}
+                >
+                  {isResending ? "Sending..." : "Resend verification email"}
+                </button>
+              )}
+            </div>
+            <div className={styles.formHintStack}>
+              <p className={styles.formHintRight}>
+                <Link href="/reset-password">Forgot password?</Link>
+              </p>
+              <p className={styles.formHintRight}>
+                Need an account? <Link href="/register">Create one</Link>.
+              </p>
+            </div>
           </div>
-          <p className={styles.formHint}>
-            Need an account? <Link href="/register">Create one</Link>.
-          </p>
         </form>
         {!health.ok && (
           <p className={styles.healthBad}>API Health: {health.message}</p>

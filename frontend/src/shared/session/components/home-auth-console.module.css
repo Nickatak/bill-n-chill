@@ -109,6 +109,26 @@
   font-weight: 700;
 }
 
+.formHintRight {
+  composes: formHint;
+  text-align: right;
+}
+
+.formHintRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.formHintStack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2xs);
+}
+
 .formHintLink {
   color: var(--text-primary);
   font-weight: 700;

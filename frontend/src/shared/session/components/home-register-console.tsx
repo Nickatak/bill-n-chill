@@ -353,7 +353,7 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
                 ? `Wait ${resendCooldown}s`
                 : "Didn\u2019t get it? Resend"}
           </button>
-          <Link href="/login" className={styles.formHintLink}>Back to sign in</Link>
+          <Link href="/login" className={styles.formHintLink}>Back to sign in.</Link>
         </div>
       </section>
     );
@@ -404,14 +404,18 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
                 {message}
               </p>
             )}
-            <div className={styles.buttonRow}>
-              <button className={styles.button} type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Accepting..." : "Accept Invite"}
-              </button>
+            <div className={styles.formHintRow}>
+              <div className={styles.buttonRow}>
+                <button className={styles.button} type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Accepting..." : "Accept Invite"}
+                </button>
+              </div>
+              <div className={styles.formHintStack}>
+                <p className={styles.formHintRight}>
+                  Not your account? <Link href="/register">Register a new account</Link>.
+                </p>
+              </div>
             </div>
-            <p className={styles.formHint}>
-              Not your account? <Link href="/register">Register a new account</Link>.
-            </p>
           </form>
         </div>
       </section>
@@ -461,18 +465,22 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
               {message}
             </p>
           )}
-          <div className={styles.buttonRow}>
-            <button className={styles.button} type="submit" disabled={isSubmitting}>
-              {isSubmitting
-                ? "Creating..."
-                : inviteFlow === "flow-b"
-                  ? "Create Account & Join"
-                  : "Create account"}
-            </button>
+          <div className={styles.formHintRow}>
+            <div className={styles.buttonRow}>
+              <button className={styles.button} type="submit" disabled={isSubmitting}>
+                {isSubmitting
+                  ? "Creating..."
+                  : inviteFlow === "flow-b"
+                    ? "Create Account & Join"
+                    : "Create account"}
+              </button>
+            </div>
+            <div className={styles.formHintStack}>
+              <p className={styles.formHintRight}>
+                Already have an account? <Link href="/login">Sign in</Link>.
+              </p>
+            </div>
           </div>
-          <p className={styles.formHint}>
-            Already have an account? <Link href="/login">Sign in</Link>.
-          </p>
         </form>
         {!health.ok && (
           <p className={styles.healthBad}>API Health: {health.message}</p>

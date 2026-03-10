@@ -30,7 +30,6 @@ export function LoginRouteContent({ health }: LoginRouteContentProps) {
   return (
     <div className={homeStyles.page}>
       <main className={homeStyles.main}>
-        <h1 className={homeStyles.title}>Bill n&apos; Chill</h1>
         <HomeAuthConsole health={health} />
       </main>
     </div>

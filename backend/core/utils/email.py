@@ -46,6 +46,56 @@ def send_verification_email(user, token_obj):
     )
 
 
+def send_password_reset_email(user, token_obj, *, is_security_alert=False):
+    """Send password reset link and log to EmailRecord.
+
+    When is_security_alert=True, the email warns the user that someone
+    attempted to register with their email address. This variant is sent
+    from the registration duplicate handler for verified users.
+    """
+    reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token_obj.token}"
+
+    if is_security_alert:
+        subject = "Password reset request — Bill n' Chill"
+        body = (
+            f"Someone tried to create a new account using your email address.\n\n"
+            f"If this was you and you forgot your password, click the link below to reset it:\n\n"
+            f"{reset_url}\n\n"
+            f"This link expires in 1 hour.\n\n"
+            f"If this wasn't you, you can safely ignore this email. Your account is secure."
+        )
+    else:
+        subject = "Reset your password — Bill n' Chill"
+        body = (
+            f"We received a request to reset your password.\n\n"
+            f"Click the link below to choose a new password:\n\n"
+            f"{reset_url}\n\n"
+            f"This link expires in 1 hour.\n\n"
+            f"If you didn't request this, you can safely ignore this email."
+        )
+
+    send_mail(
+        subject=subject,
+        message=body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user.email],
+        fail_silently=False,
+    )
+
+    EmailRecord.record(
+        recipient_email=user.email,
+        email_type=EmailRecord.EmailType.PASSWORD_RESET,
+        subject=subject,
+        body_text=body,
+        sent_by_user=user,
+        metadata={
+            "password_reset_token_id": token_obj.id,
+            "user_id": user.id,
+            "is_security_alert": is_security_alert,
+        },
+    )
+
+
 def send_otp_email(recipient_email, code, document_type_label, document_title):
     """Send a 6-digit OTP code for public document verification.
 

@@ -18,7 +18,6 @@ export default async function RegisterPage({
   return (
     <div className={homeStyles.page}>
       <main className={homeStyles.main}>
-        <h1 className={homeStyles.title}>Bill n&apos; Chill</h1>
         <HomeRegisterConsole health={health} inviteToken={params.token} />
       </main>
     </div>

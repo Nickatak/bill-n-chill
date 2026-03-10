@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import { VerifyEmailConsole } from "@/shared/session/components/verify-email-console";
+import { ResetPasswordConsole } from "@/shared/session/components/reset-password-console";
 import homeStyles from "../page.module.css";
 
 export const metadata: Metadata = {
-  title: "Verify Email",
+  title: "Reset Password | Bill n Chill",
 };
 
-/** Route page that processes an email verification token from the `?token=` query param. */
-export default async function VerifyEmailPage({
+/** Route page that processes a password reset token from the `?token=` query param. */
+export default async function ResetPasswordPage({
   searchParams,
 }: {
   searchParams: Promise<{ token?: string }>;
@@ -17,7 +17,7 @@ export default async function VerifyEmailPage({
   return (
     <div className={homeStyles.page}>
       <main className={homeStyles.main}>
-        <VerifyEmailConsole token={params.token} />
+        <ResetPasswordConsole token={params.token} />
       </main>
     </div>
   );
