@@ -175,6 +175,25 @@ describe("HomeRegisterConsole — Flow A (standard)", () => {
     expect(screen.getByText("Password must be at least 8 characters.")).toBeInTheDocument();
     expect(mockFetch).not.toHaveBeenCalled();
   });
+
+  it("shows error on network failure", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+    render(<HomeRegisterConsole health={HEALTHY} />);
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "nick@test.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "securepass" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Could not reach register endpoint."),
+      ).toBeInTheDocument();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -284,6 +303,59 @@ describe("HomeRegisterConsole — Flow C (existing user invite)", () => {
 
     expect(screen.getByText("Password is required.")).toBeInTheDocument();
   });
+
+  it("shows server error on wrong password", async () => {
+    mockFetch.mockResolvedValueOnce(
+      verifyInviteResponse({ is_existing_user: true }),
+    );
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: () =>
+        Promise.resolve({
+          error: { code: "invalid_credentials", message: "Invalid credentials." },
+        }),
+    });
+
+    render(<HomeRegisterConsole health={HEALTHY} inviteToken="invite-xyz" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Organization Switch")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("Confirm Password"), {
+      target: { value: "wrongpassword" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /accept invite/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Invalid credentials.")).toBeInTheDocument();
+    });
+  });
+
+  it("shows error on network failure", async () => {
+    mockFetch.mockResolvedValueOnce(
+      verifyInviteResponse({ is_existing_user: true }),
+    );
+    mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+    render(<HomeRegisterConsole health={HEALTHY} inviteToken="invite-xyz" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Organization Switch")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("Confirm Password"), {
+      target: { value: "mypassword" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /accept invite/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Could not reach accept-invite endpoint."),
+      ).toBeInTheDocument();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -300,13 +372,13 @@ describe("HomeRegisterConsole — invite errors", () => {
     cleanup();
   });
 
-  it("shows error for expired invite (410)", async () => {
+  it("shows consumed invite error (410)", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 410,
       json: () =>
         Promise.resolve({
-          error: { message: "This invite has already been used." },
+          error: { code: "consumed", message: "This invite has already been used." },
         }),
     });
 
@@ -315,6 +387,40 @@ describe("HomeRegisterConsole — invite errors", () => {
     await waitFor(() => {
       expect(
         screen.getByText("This invite has already been used."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows expired invite error (410)", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 410,
+      json: () =>
+        Promise.resolve({
+          error: {
+            code: "expired",
+            message: "This invite has expired. Ask the org admin to send a new one.",
+          },
+        }),
+    });
+
+    render(<HomeRegisterConsole health={HEALTHY} inviteToken="old-invite" />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("This invite has expired. Ask the org admin to send a new one."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows error on invite verify network failure", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+    render(<HomeRegisterConsole health={HEALTHY} inviteToken="any-token" />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Could not reach the server to verify this invite."),
       ).toBeInTheDocument();
     });
   });

@@ -169,12 +169,17 @@ class OrganizationInviteSerializer(serializers.ModelSerializer):
         return ""
 
 
+INVITABLE_ROLES = [
+    choice for choice in OrganizationMembership.Role.choices if choice[0] != OrganizationMembership.Role.OWNER
+]
+
+
 class OrganizationInviteCreateSerializer(serializers.Serializer):
     """Write serializer for creating an invite."""
 
     email = serializers.EmailField()
     role = serializers.ChoiceField(
-        choices=OrganizationMembership.Role.choices,
+        choices=INVITABLE_ROLES,
         default=OrganizationMembership.Role.VIEWER,
         required=False,
     )

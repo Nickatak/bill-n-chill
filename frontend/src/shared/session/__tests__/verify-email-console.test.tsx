@@ -119,6 +119,50 @@ describe("VerifyEmailConsole", () => {
     });
   });
 
+  it("shows consumed-token message", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      json: () =>
+        Promise.resolve({
+          error: {
+            code: "consumed",
+            message: "This link is no longer active. If you\u2019ve already verified, sign in instead.",
+          },
+        }),
+    });
+
+    render(<VerifyEmailConsole token="used-token" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Verification Failed")).toBeInTheDocument();
+      expect(
+        screen.getByText(/no longer active/),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows expired-token message", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      json: () =>
+        Promise.resolve({
+          error: {
+            code: "expired",
+            message: "This verification link has expired. Request a new one.",
+          },
+        }),
+    });
+
+    render(<VerifyEmailConsole token="old-token" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Verification Failed")).toBeInTheDocument();
+      expect(
+        screen.getByText("This verification link has expired. Request a new one."),
+      ).toBeInTheDocument();
+    });
+  });
+
   it("shows error on network failure", async () => {
     mockFetch.mockRejectedValueOnce(new Error("Network error"));
 

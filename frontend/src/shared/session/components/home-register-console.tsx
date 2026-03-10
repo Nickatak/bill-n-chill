@@ -465,7 +465,7 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               autoComplete="email"
-              readOnly={inviteFlow === "flow-b"}
+              disabled={inviteFlow === "flow-b"}
             />
           </label>
           <label>

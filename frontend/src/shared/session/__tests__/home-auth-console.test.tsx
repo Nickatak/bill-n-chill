@@ -57,16 +57,6 @@ describe("HomeAuthConsole", () => {
     cleanup();
   });
 
-  it("pre-fills email from a stored session", () => {
-    localStorage.setItem(
-      SESSION_STORAGE_KEY,
-      JSON.stringify({ token: "old", email: "nick@test.com" }),
-    );
-
-    render(<HomeAuthConsole health={HEALTHY} />);
-    expect(screen.getByLabelText("Email")).toHaveValue("nick@test.com");
-  });
-
   it("saves session and navigates on successful login", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -175,5 +165,67 @@ describe("HomeAuthConsole", () => {
 
     expect(screen.getByText("Password is required.")).toBeInTheDocument();
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Resend verification
+  // ---------------------------------------------------------------------------
+
+  async function triggerResendButton() {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      json: () =>
+        Promise.resolve({
+          error: { code: "email_not_verified", message: "Not verified." },
+        }),
+    });
+
+    render(<HomeAuthConsole health={HEALTHY} />);
+    fillAndSubmitLogin("nick@test.com", "pass");
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /resend verification/i }),
+      ).toBeInTheDocument();
+    });
+  }
+
+  it("resend verification shows success on 200", async () => {
+    await triggerResendButton();
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+    fireEvent.click(screen.getByRole("button", { name: /resend verification/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Verification email resent. Check your inbox."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("resend verification shows rate limit on 429", async () => {
+    await triggerResendButton();
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 429 });
+
+    fireEvent.click(screen.getByRole("button", { name: /resend verification/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Please wait before requesting another email."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("resend verification shows error on network failure", async () => {
+    await triggerResendButton();
+    mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+    fireEvent.click(screen.getByRole("button", { name: /resend verification/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Could not reach resend endpoint."),
+      ).toBeInTheDocument();
+    });
   });
 });

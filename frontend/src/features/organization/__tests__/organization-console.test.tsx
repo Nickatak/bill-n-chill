@@ -481,19 +481,60 @@ describe("OrganizationConsole > Team Tab", () => {
     expect(screen.getByPlaceholderText("teammate@example.com")).toBeTruthy();
   });
 
-  it("creates invite via POST and shows invite link", async () => {
+  it("invite role dropdown excludes owner", async () => {
     await renderAndSwitchToTeam();
+    const options = screen.getAllByRole("option").map((el) => el.textContent);
+    // Membership role selects include "owner", but the invite dropdown must not.
+    // The invite dropdown is the last <select> — filter to options inside it.
+    const inviteSelect = screen.getByDisplayValue("viewer");
+    const inviteOptions = Array.from(inviteSelect.querySelectorAll("option")).map(
+      (el) => el.value,
+    );
+    expect(inviteOptions).not.toContain("owner");
+    expect(inviteOptions).toEqual(["pm", "bookkeeping", "worker", "viewer"]);
+  });
 
-    const emailInput = screen.getByPlaceholderText("teammate@example.com");
-    fireEvent.change(emailInput, { target: { value: "new@test.com" } });
+  it.each([
+    { role: "pm", email: "pm@invited.com" },
+    { role: "bookkeeping", email: "book@invited.com" },
+    { role: "worker", email: "worker@invited.com" },
+    { role: "viewer", email: "viewer@invited.com" },
+  ])("invite flow for $role role", async ({ role, email }) => {
+    await renderAndSwitchToTeam({ invites: [] });
+    expect(screen.queryByText("Pending Invites")).toBeFalsy();
+
+    // Fill out invite form.
+    fireEvent.change(screen.getByPlaceholderText("teammate@example.com"), {
+      target: { value: email },
+    });
+    const inviteSelect = screen.getByDisplayValue("viewer");
+    fireEvent.change(inviteSelect, { target: { value: role } });
+
+    // Mock POST 201.
+    const createdAt = "2026-03-10T12:00:00Z";
+    const expiresAt = "2026-03-11T12:00:00Z";
+    const inviteToken = `tok_${role}`;
 
     mockFetch.mockImplementation((url: string, init?: RequestInit) => {
       if (init?.method === "POST" && url.includes("/organization/invites/")) {
+        const body = JSON.parse(init.body as string);
+        expect(body.email).toBe(email);
+        expect(body.role).toBe(role);
         return Promise.resolve({
           ok: true,
+          status: 201,
           json: () =>
             Promise.resolve({
-              data: { invite: makeInvite({ email: "new@test.com", token: "xyz789" }) },
+              data: {
+                invite: makeInvite({
+                  id: 200,
+                  email,
+                  role,
+                  token: inviteToken,
+                  expires_at: expiresAt,
+                  created_at: createdAt,
+                }),
+              },
             }),
         });
       }
@@ -502,10 +543,32 @@ describe("OrganizationConsole > Team Tab", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Create Invite" }));
 
-    await waitFor(() => expect(screen.getByText(/xyz789/)).toBeTruthy());
+    // Invite link banner with correct URL.
+    await waitFor(() => {
+      expect(screen.getByText(/Invite Link/)).toBeTruthy();
+    });
+    expect(screen.getByText(`${window.location.origin}/register?token=${inviteToken}`)).toBeTruthy();
+
+    // Pending invite card details.
+    expect(screen.getByText("Pending Invites")).toBeTruthy();
+    expect(screen.getByText(email)).toBeTruthy();
+    expect(screen.getByText(new RegExp(`${role}.*Invited by`))).toBeTruthy();
+
+    // Expiration date (24h from creation).
+    const formattedExpiry = new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(expiresAt));
+    expect(screen.getByText(new RegExp(formattedExpiry))).toBeTruthy();
+
+    // Copy Link button present.
+    expect(screen.getByRole("button", { name: "Copy Link" })).toBeTruthy();
   });
 
-  it("renders pending invites list", async () => {
+  it("renders pending invites list with multiple invites", async () => {
     const invites = [
       makeInvite(),
       makeInvite({ id: 101, email: "another@test.com", role: "pm" }),

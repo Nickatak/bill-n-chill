@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 import type { HealthResult } from "@/shared/api/health";
 import {
-  loadClientSession,
   saveClientSession,
   type SessionOrganization,
   type SessionRole,
@@ -91,16 +90,6 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
     return message ?? "Invalid username/password combination.";
   }
 
-  // Pre-fill the email field from a previously-saved session in localStorage.
-  useEffect(() => {
-    function init() {
-      const session = loadClientSession();
-      if (session?.email) {
-        setEmail(session.email);
-      }
-    }
-    void init();
-  }, []);
 
   /**
    * Form submission handler for the login form. POSTs credentials to

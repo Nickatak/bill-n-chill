@@ -96,6 +96,10 @@ class InviteCRUDTests(InviteTestMixin, TestCase):
         response = self._create_invite(token_obj=viewer_token)
         self.assertEqual(response.status_code, 403)
 
+    def test_owner_role_cannot_be_invited(self):
+        response = self._create_invite(email="wannabe-owner@test.com", role="owner")
+        self.assertEqual(response.status_code, 400)
+
     def test_duplicate_invite_returns_409(self):
         self._create_invite(email="dup@test.com")
         response = self._create_invite(email="dup@test.com")

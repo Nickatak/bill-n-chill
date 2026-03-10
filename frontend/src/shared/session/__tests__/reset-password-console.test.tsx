@@ -75,6 +75,22 @@ describe("ResetPasswordConsole — Forgot form", () => {
       ).toBeInTheDocument();
     });
   });
+
+  it("shows error on network failure", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+    render(<ResetPasswordConsole />);
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "nick@test.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /send reset link/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Could not reach the server."),
+      ).toBeInTheDocument();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -125,6 +141,75 @@ describe("ResetPasswordConsole — Reset form", () => {
 
     expect(screen.getByText("Password must be at least 8 characters.")).toBeInTheDocument();
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("shows error on consumed token", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      json: () =>
+        Promise.resolve({
+          error: { code: "consumed", message: "This reset link has already been used." },
+        }),
+    });
+
+    render(<ResetPasswordConsole token="used-token" />);
+    fireEvent.change(screen.getByLabelText("New password"), {
+      target: { value: "newpassword1" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirm password"), {
+      target: { value: "newpassword1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /reset password/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("This reset link has already been used."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows error on expired token", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      json: () =>
+        Promise.resolve({
+          error: { code: "expired", message: "This reset link has expired. Request a new one." },
+        }),
+    });
+
+    render(<ResetPasswordConsole token="old-token" />);
+    fireEvent.change(screen.getByLabelText("New password"), {
+      target: { value: "newpassword1" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirm password"), {
+      target: { value: "newpassword1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /reset password/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("This reset link has expired. Request a new one."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows error on network failure", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+    render(<ResetPasswordConsole token="reset-abc" />);
+    fireEvent.change(screen.getByLabelText("New password"), {
+      target: { value: "newpassword1" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirm password"), {
+      target: { value: "newpassword1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /reset password/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Could not reach the server."),
+      ).toBeInTheDocument();
+    });
   });
 
   it("saves session and redirects on successful reset", async () => {

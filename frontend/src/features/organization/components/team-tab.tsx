@@ -344,7 +344,7 @@ export function TeamTab({
                 onChange={(e) => setInviteRoleDraft(e.target.value)}
                 disabled={isCreatingInvite}
               >
-                {editableRoles.map((value) => (
+                {editableRoles.filter((r) => r !== "owner").map((value) => (
                   <option key={value} value={value}>{roleLabel(value)}</option>
                 ))}
               </select>

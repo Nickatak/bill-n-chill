@@ -7,52 +7,53 @@ Organized by domain. Check off as you go.
 ## 1. Auth
 
 ### Login
-- [ ] Valid credentials → token issued, redirects to /dashboard
-- [ ] Invalid credentials → "Invalid username/password combination."
-- [ ] Unverified email → "Please verify your email before signing in." + resend button
-- [ ] Empty email → "Email is required."
-- [ ] Empty password → "Password is required."
-- [ ] Pre-fills email from stored session
+- [x] Invalid credentials → "Invalid username/password combination."
+- [x] Unverified email → "Please verify your email before signing in." + resend button
+- [x] Empty email → "Email is required."
+- [x] Empty password → "Password is required."
+- [x] Valid credentials → token issued, redirects to /dashboard
+
 
 ### Register — Flow A (standard)
-- [ ] New email + password → "Check your email" screen
-- [ ] Verification email arrives (check Mailpit locally)
-- [ ] Click verification link → account activated, auto-login, redirects to /dashboard
-- [ ] Duplicate verified email → same "Check your email" response (anti-enumeration), sends password reset email
-- [ ] Duplicate unverified email → same response, re-sends verification (60s rate limit)
-- [ ] Empty email → "Email is required."
-- [ ] Empty password → "Password is required."
-- [ ] Short password (<8) → "Password must be at least 8 characters."
+- [x] New email + password → "Check your email" screen
+- [x] Verification email arrives (check Mailpit locally)
+- [x] Click verification link → account activated, auto-login, redirects to /dashboard
+- [x] Duplicate verified email → same "Check your email" response (anti-enumeration), sends password reset email
+- [x] Duplicate unverified email → same response, re-sends verification (60s rate limit)
+- [x] Empty email → "Email is required."
+- [x] Empty password → "Password is required."
+- [x] Short password (<8) → "Password must be at least 8 characters."
+- [x] Old tokens give a Verification Failed message.
 
 ### Register — Flow B (new user invite)
-- [ ] Navigate to /register?token=XXX → invite verified, banner shows org name + role
-- [ ] Email pre-filled and read-only from invite
-- [ ] Register → account created, membership assigned, redirects to /dashboard (no email verification needed)
-- [ ] Expired invite (>24h) → error message
-- [ ] Already-consumed invite → error message
+- [x] Navigate to /register?token=XXX → invite verified, banner shows org name + role
+- [x] Email pre-filled and read-only from invite
+- [x] Register → account created, membership assigned, redirects to /dashboard (no email verification needed)
+- [x] Expired invite (>24h) → error message
+- [x] Already-consumed invite → error message
 
 ### Register — Flow C (existing user invite)
-- [ ] Existing user visits invite link → "Organization Switch" warning
-- [ ] Confirm password → membership moved to new org, old org access lost
-- [ ] Wrong password → error
+- [x] Existing user visits invite link → "Organization Switch" warning
+- [x] Confirm password → membership moved to new org, old org access lost
+- [x] Wrong password → error
 
 ### Email Verification
-- [ ] Valid token → account activated, auto-login
-- [ ] Consumed token → "no longer active" message
-- [ ] Expired token → "expired" message with resend option
-- [ ] Resend within 60s → rate limited
+- [x] Valid token → account activated, auto-login
+- [x] Consumed token → "no longer active" message
+- [x] Expired token → "expired" message with resend option
+- [x] Resend within 60s → rate limited
 
 ### Password Reset
-- [ ] Request reset for valid email → "Check your email" (always 200)
-- [ ] Request reset for non-existent email → same response (anti-enumeration)
-- [ ] Click reset link → form for new password
-- [ ] Submit matching passwords (8+ chars) → password updated, auto-login
-- [ ] Mismatched passwords → "Passwords do not match."
-- [ ] Short password → "Password must be at least 8 characters."
-- [ ] Empty fields → "Both password fields are required."
-- [ ] Expired token → error
-- [ ] Consumed token → error
-- [ ] Rate limit: 60s between reset requests
+- [x] Request reset for valid email → "Check your email" (always 200)
+- [x] Request reset for non-existent email → same response (anti-enumeration)
+- [x] Click reset link → form for new password
+- [x] Submit matching passwords (8+ chars) → password updated, auto-login
+- [x] Mismatched passwords → "Passwords do not match."
+- [x] Short password → "Password must be at least 8 characters."
+- [x] Empty fields → "Both password fields are required."
+- [x] Expired token → error
+- [x] Consumed token → error
+- [x] Rate limit: 60s between reset requests
 
 ---
 
