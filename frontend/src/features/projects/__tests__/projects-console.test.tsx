@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -358,5 +358,247 @@ describe("ProjectsConsole", () => {
 
     // First matching project is auto-selected — scope control links point to project 1
     expect(screen.getByText("Estimates")).toHaveAttribute("href", "/projects/1/estimates");
+  });
+
+  // ---------------------------------------------------------------------------
+  // Workflow tree links
+  // ---------------------------------------------------------------------------
+
+  it("renders all workflow tree links with correct hrefs for selected project", async () => {
+    setupDefaultFetch();
+    render(<ProjectsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Kitchen Remodel")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Estimates")).toHaveAttribute("href", "/projects/1/estimates");
+    expect(screen.getByText("Change Orders")).toHaveAttribute("href", "/projects/1/change-orders");
+    expect(screen.getByText("Audit Trail")).toHaveAttribute("href", "/projects/1/audit-trail");
+    expect(screen.getByText("Invoices")).toHaveAttribute("href", "/invoices");
+    expect(screen.getByText("Payments In (AR)")).toHaveAttribute("href", "/invoices?project=1");
+    expect(screen.getByText("Bills")).toHaveAttribute("href", "/bills?project=1");
+    expect(screen.getByText("Payments Out (AP)")).toHaveAttribute("href", "/bills?project=1");
+  });
+
+  // ---------------------------------------------------------------------------
+  // Search filtering
+  // ---------------------------------------------------------------------------
+
+  it("search input filters projects by name", async () => {
+    setupDefaultFetch({
+      projects: [
+        makeProject({ id: 1, name: "Kitchen Remodel" }),
+        makeProject({ id: 2, name: "Deck Build", status: "prospect" }),
+      ],
+    });
+    render(<ProjectsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Deck Build/)).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("Search projects"), {
+      target: { value: "Deck" },
+    });
+
+    // "Deck Build" still visible (card + auto-selected overview), "Kitchen Remodel" gone
+    expect(screen.getAllByText(/Deck Build/).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText(/Kitchen Remodel/)).toHaveLength(0);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Status filter toggle
+  // ---------------------------------------------------------------------------
+
+  it("toggling a status filter hides projects with that status", async () => {
+    setupDefaultFetch({
+      projects: [
+        makeProject({ id: 1, name: "Kitchen Remodel", status: "active" }),
+        makeProject({ id: 2, name: "Deck Build", status: "prospect" }),
+      ],
+    });
+    render(<ProjectsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Deck Build/)).toBeInTheDocument();
+    });
+
+    // Default filters: active + prospect. Toggle off "prospect" via the filter button.
+    const filtersContainer = screen.getByText("Project status filter").parentElement!;
+    fireEvent.click(within(filtersContainer).getByRole("button", { name: /prospect/i }));
+
+    // Prospect project hidden, active still visible
+    expect(screen.queryByText(/Deck Build/)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Kitchen Remodel/).length).toBeGreaterThan(0);
+  });
+
+  it("Show all projects reveals projects in all statuses", async () => {
+    setupDefaultFetch({
+      projects: [
+        makeProject({ id: 1, name: "Kitchen Remodel", status: "active" }),
+        makeProject({ id: 2, name: "Old Job", status: "completed" }),
+      ],
+    });
+    render(<ProjectsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Kitchen Remodel/).length).toBeGreaterThan(0);
+    });
+
+    // Default filters exclude "completed" — Old Job not visible
+    expect(screen.queryByText(/Old Job/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /show all projects/i }));
+
+    expect(screen.getByText(/Old Job/)).toBeInTheDocument();
+  });
+
+  it("Reset filters restores default active + prospect filters", async () => {
+    setupDefaultFetch({
+      projects: [
+        makeProject({ id: 1, name: "Kitchen Remodel", status: "active" }),
+        makeProject({ id: 2, name: "Old Job", status: "completed" }),
+      ],
+    });
+    render(<ProjectsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Kitchen Remodel/).length).toBeGreaterThan(0);
+    });
+
+    // Show all first, then reset
+    fireEvent.click(screen.getByRole("button", { name: /show all projects/i }));
+    expect(screen.getByText(/Old Job/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /reset filters/i }));
+    expect(screen.queryByText(/Old Job/)).not.toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Edit form toggle
+  // ---------------------------------------------------------------------------
+
+  it("Close Edit button hides the edit form", async () => {
+    setupDefaultFetch();
+    render(<ProjectsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Edit Project")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Edit Project"));
+    expect(screen.getByLabelText("Project name")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Close Edit"));
+    expect(screen.queryByLabelText("Project name")).not.toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Edit save network failure
+  // ---------------------------------------------------------------------------
+
+  it("shows error on PATCH network failure", async () => {
+    setupDefaultFetch();
+    render(<ProjectsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Kitchen Remodel")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Edit Project"));
+
+    mockFetch.mockImplementation((_url: string, opts?: RequestInit) => {
+      if (opts?.method === "PATCH") {
+        return Promise.reject(new Error("Network error"));
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Could not reach project detail endpoint."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Project selection switch
+  // ---------------------------------------------------------------------------
+
+  it("clicking a different project card updates the overview", async () => {
+    setupDefaultFetch({
+      projects: [
+        makeProject({ id: 1, name: "Kitchen Remodel" }),
+        makeProject({ id: 2, name: "Deck Build", status: "prospect" }),
+      ],
+    });
+    render(<ProjectsConsole />);
+
+    await waitFor(() => {
+      // Project 1 auto-selected — tree links point to project 1
+      expect(screen.getByText("Estimates")).toHaveAttribute("href", "/projects/1/estimates");
+    });
+
+    // Click on Deck Build card (role="button")
+    fireEvent.click(screen.getByText(/Deck Build/));
+
+    await waitFor(() => {
+      expect(screen.getByText("Estimates")).toHaveAttribute("href", "/projects/2/estimates");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Status pills for prospect (different FSM)
+  // ---------------------------------------------------------------------------
+
+  it("shows correct status transition pills for prospect project", async () => {
+    setupDefaultFetch({
+      projects: [makeProject({ status: "prospect" })],
+    });
+    render(<ProjectsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Kitchen Remodel")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Edit Project"));
+
+    // Scope to the edit form to avoid filter button conflicts
+    const editForm = screen.getByLabelText("Project name").closest("form")!;
+
+    // Prospect transitions: prospect (current), active, cancelled
+    expect(screen.getByText("Current: prospect")).toBeInTheDocument();
+    // The pressed pill is prospect (current status); the label wrapping causes
+    // its accessible name to include parent text, so target by pressed state.
+    const pressedPill = within(editForm).getByRole("button", { pressed: true });
+    expect(pressedPill).toHaveTextContent("prospect");
+    expect(within(editForm).getByRole("button", { name: "active" })).toBeInTheDocument();
+    expect(within(editForm).getByRole("button", { name: "cancelled" })).toBeInTheDocument();
+    // on_hold and completed NOT available from prospect
+    expect(within(editForm).queryByRole("button", { name: "on hold" })).not.toBeInTheDocument();
+    expect(within(editForm).queryByRole("button", { name: "completed" })).not.toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Collapse/Expand list
+  // ---------------------------------------------------------------------------
+
+  it("Collapse button hides the project list panel", async () => {
+    setupDefaultFetch({
+      projects: [makeProject()],
+    });
+    render(<ProjectsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Search projects")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse" }));
+
+    expect(screen.queryByLabelText("Search projects")).not.toBeInTheDocument();
+    expect(screen.getByText(/collapsed/i)).toBeInTheDocument();
   });
 });
