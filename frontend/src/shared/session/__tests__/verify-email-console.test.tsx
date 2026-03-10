@@ -99,7 +99,7 @@ describe("VerifyEmailConsole", () => {
     });
 
     // Real setTimeout(2500) — wait for it to fire.
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/"), {
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/dashboard"), {
       timeout: 4000,
     });
   });

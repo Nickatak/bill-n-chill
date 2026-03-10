@@ -21,9 +21,9 @@ export type NavRoute = {
 /** Primary workflow steps shown in the top-level navbar. */
 export const workflowRoutes: NavRoute[] = [
   {
-    href: "/",
+    href: "/dashboard",
     label: "Dashboard",
-    exact: ["/"],
+    exact: ["/dashboard"],
   },
   {
     href: "/customers",

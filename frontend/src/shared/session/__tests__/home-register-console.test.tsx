@@ -140,7 +140,7 @@ describe("HomeRegisterConsole — Flow A (standard)", () => {
     );
 
     render(<HomeRegisterConsole health={HEALTHY} />);
-    expect(mockReplace).toHaveBeenCalledWith("/");
+    expect(mockReplace).toHaveBeenCalledWith("/dashboard");
   });
 });
 
@@ -183,7 +183,7 @@ describe("HomeRegisterConsole — Flow B (new user invite)", () => {
     );
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/");
+      expect(mockPush).toHaveBeenCalledWith("/dashboard");
     });
 
     const stored = JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY)!);
@@ -229,7 +229,7 @@ describe("HomeRegisterConsole — Flow C (existing user invite)", () => {
     fireEvent.click(screen.getByRole("button", { name: /accept invite/i }));
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/");
+      expect(mockPush).toHaveBeenCalledWith("/dashboard");
     });
 
     const stored = JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY)!);

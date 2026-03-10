@@ -56,8 +56,12 @@ describe("isPublicAuthRoute", () => {
     expect(isPublicAuthRoute("/login")).toBe(true);
   });
 
-  it("returns false for root / (protected dashboard)", () => {
-    expect(isPublicAuthRoute("/")).toBe(false);
+  it("returns true for root / (public landing page)", () => {
+    expect(isPublicAuthRoute("/")).toBe(true);
+  });
+
+  it("returns false for /dashboard (protected)", () => {
+    expect(isPublicAuthRoute("/dashboard")).toBe(false);
   });
 
   it("returns true for /register", () => {

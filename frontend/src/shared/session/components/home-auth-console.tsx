@@ -149,7 +149,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
         capabilities: payload.data?.capabilities,
       });
 
-      router.push("/");
+      router.push("/dashboard");
     } catch {
       setMessage("Could not reach login endpoint.");
       setMessageTone("error");

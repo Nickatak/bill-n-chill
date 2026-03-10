@@ -1,0 +1,136 @@
+.page {
+  min-height: calc(100dvh - 48px);
+  display: flex;
+  flex-direction: column;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* ── Content wrapper (centers hero + cards vertically) ────── */
+
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* ── Hero ─────────────────────────────────────────────────── */
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2.5rem 2rem 3.5rem;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.headline {
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  margin: 0 0 1rem;
+}
+
+.subheadline {
+  font-size: 1.15rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin: 0 0 2.5rem;
+  max-width: 540px;
+}
+
+.heroCtas {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+/* ── Buttons ──────────────────────────────────────────────── */
+
+.primaryCta {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.65rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.primaryCta:hover {
+  background: var(--accent-hover);
+}
+
+.secondaryCta {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.65rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-primary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.secondaryCta:hover {
+  background: var(--surface-hover);
+}
+
+/* ── Feature cards ────────────────────────────────────────── */
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.25rem;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 2rem 2rem;
+}
+
+.featureCard {
+  padding: 1.25rem;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.featureTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0 0 0.35rem;
+  color: var(--text-primary);
+}
+
+.featureDesc {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ── Footer ───────────────────────────────────────────────── */
+
+.footer {
+  margin-top: auto;
+  padding: 1.5rem 2rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-light);
+}

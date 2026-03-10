@@ -255,7 +255,7 @@ describe("OnboardingChecklist", () => {
     fireEvent.click(screen.getByText("Dismiss Guide"));
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/");
+      expect(mockPush).toHaveBeenCalledWith("/dashboard");
     });
 
     expect(mockSaveClientSession).toHaveBeenCalledWith(

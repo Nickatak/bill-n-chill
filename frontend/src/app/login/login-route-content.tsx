@@ -11,7 +11,7 @@ type LoginRouteContentProps = {
   health: HealthResult;
 };
 
-/** Login route content — shows login form, redirects to home if already authenticated. */
+/** Login route content — shows login form, redirects to dashboard if already authenticated. */
 export function LoginRouteContent({ health }: LoginRouteContentProps) {
   const { isAuthorized } = useSessionAuthorization();
   const router = useRouter();
@@ -19,7 +19,7 @@ export function LoginRouteContent({ health }: LoginRouteContentProps) {
   // Redirect authenticated users away from the login page.
   useEffect(() => {
     if (isAuthorized) {
-      router.replace("/");
+      router.replace("/dashboard");
     }
   }, [isAuthorized, router]);
 

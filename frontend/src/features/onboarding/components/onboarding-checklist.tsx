@@ -298,7 +298,7 @@ export function OnboardingChecklist() {
               organization: { ...session.organization, onboardingCompleted: true },
             });
           }
-          router.push("/");
+          router.push("/dashboard");
         }}
       >
         Dismiss Guide
