@@ -16,30 +16,34 @@ import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import styles from "./projects-console.module.css";
-import { ProjectListStatusValue, ProjectListViewer } from "@/shared/project-list-viewer";
+import { ProjectListViewer } from "@/shared/project-list-viewer";
 import { ApiResponse, ProjectFinancialSummary, ProjectRecord } from "../types";
-
-type ProjectStatusValue = ProjectListStatusValue;
-const PROJECT_STATUS_VALUES: ProjectStatusValue[] = ["prospect", "active", "on_hold", "completed", "cancelled"];
+import {
+  PROJECT_STATUS_VALUES,
+  PROJECT_STATUS_TRANSITIONS,
+  DEFAULT_PROJECT_STATUS_FILTERS,
+  parseMoneyValue,
+  formatCustomerName,
+  projectStatusLabel,
+  allowedProfileStatuses,
+} from "../utils/project-helpers";
+import type { ProjectStatusValue } from "../utils/project-helpers";
 
 /** Renders the main project dashboard with list, financial map, and profile editor. */
 export function ProjectsConsole() {
   const searchParams = useSearchParams();
-  const projectStatusTransitions: Record<ProjectStatusValue, ProjectStatusValue[]> = {
-    prospect: ["active", "cancelled"],
-    active: ["on_hold", "completed", "cancelled"],
-    on_hold: ["active", "completed", "cancelled"],
-    completed: [],
-    cancelled: [],
-  };
-  const defaultProjectStatusFilters: ProjectStatusValue[] = ["active", "prospect"];
   const { token, authMessage } = useSharedSessionAuth();
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
-  const { message: statusMessage, tone: statusMessageTone, setSuccess: setSuccessStatusMessage, setError: setErrorStatusMessage } = useStatusMessage();
+  const {
+    message: statusMessage,
+    tone: statusMessageTone,
+    setSuccess: setSuccessStatusMessage,
+    setError: setErrorStatusMessage,
+  } = useStatusMessage();
   const [projectSearch, setProjectSearch] = useState("");
   const [projectStatusFilters, setProjectStatusFilters] = useState<ProjectStatusValue[]>(
-    defaultProjectStatusFilters,
+    DEFAULT_PROJECT_STATUS_FILTERS,
   );
   const [isProjectListExpanded, setIsProjectListExpanded] = useState(true);
   const [summary, setSummary] = useState<ProjectFinancialSummary | null>(null);
@@ -80,11 +84,8 @@ export function ProjectsConsole() {
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;
   const isSelectedProjectTerminal =
     selectedProject?.status === "completed" || selectedProject?.status === "cancelled";
-  const allowedNextProjectStatuses = selectedProject
-    ? projectStatusTransitions[selectedProject.status as ProjectStatusValue] ?? []
-    : [];
-  const allowedProfileStatuses = selectedProject
-    ? [selectedProject.status as ProjectStatusValue, ...allowedNextProjectStatuses].filter((value, index, source) => source.indexOf(value) === index)
+  const computedProfileStatuses = selectedProject
+    ? allowedProfileStatuses(selectedProject.status as ProjectStatusValue)
     : [];
   const needle = projectSearch.trim().toLowerCase();
   const filteredProjects = !needle
@@ -121,10 +122,14 @@ export function ProjectsConsole() {
   const contractOriginalDisplay =
     summary?.contract_value_original ?? selectedProject?.contract_value_original ?? "--";
   const acceptedContractDisplay =
-    summary?.accepted_contract_total ?? selectedProject?.accepted_contract_total ?? acceptedEstimateTotal;
+    summary?.accepted_contract_total ??
+    selectedProject?.accepted_contract_total ??
+    acceptedEstimateTotal;
   const arOutstandingDisplay = summary?.ar_outstanding ?? "--";
   const unbilledFromAcceptedDisplay = summary
-    ? formatCurrency(parseMoneyValue(acceptedContractDisplay) - parseMoneyValue(arOutstandingDisplay))
+    ? formatCurrency(
+        parseMoneyValue(acceptedContractDisplay) - parseMoneyValue(arOutstandingDisplay),
+      )
     : "--";
   const apOutstandingDisplay = summary?.ap_outstanding ?? "--";
   const apTotalDisplay = summary?.ap_total ?? "--";
@@ -136,26 +141,10 @@ export function ProjectsConsole() {
   const activeFinancialEstimateDisplay = "--";
   const activeFinancialBudgetDisplay = "--";
   const unspentFromAcceptedDisplay = summary
-    ? formatCurrency(parseMoneyValue(acceptedContractDisplay) - parseMoneyValue(apOutstandingDisplay))
+    ? formatCurrency(
+        parseMoneyValue(acceptedContractDisplay) - parseMoneyValue(apOutstandingDisplay),
+      )
     : "--";
-
-  /** Coerces a string or number to a numeric dollar value, defaulting to 0 for unparseable input. */
-  function parseMoneyValue(value: unknown): number {
-    if (typeof value === "number") {
-      return Number.isFinite(value) ? value : 0;
-    }
-    if (typeof value !== "string") {
-      return 0;
-    }
-    const normalized = value.replace(/[^0-9.-]/g, "");
-    const parsed = Number(normalized);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-
-  /** Returns the display name for a project's customer, falling back to "Customer #id". */
-  function formatCustomerName(project: ProjectRecord): string {
-    return project.customer_display_name || `Customer #${project.customer}`;
-  }
 
   /** Maps a status value like "on_hold" to its corresponding CSS module class. */
   function projectStatusClass(statusValue: string): string {
@@ -164,11 +153,6 @@ export function ProjectsConsole() {
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
       .join("")}`;
     return styles[key] ?? "";
-  }
-
-  /** Converts a snake_case status value to a human-readable label. */
-  function projectStatusLabel(statusValue: string): string {
-    return statusValue.replace("_", " ");
   }
 
   /** Toggles a status value in or out of the active project list filters. */
@@ -208,7 +192,7 @@ export function ProjectsConsole() {
         const preferredProject =
           scopedMatch ??
           scopedItems.find((project) =>
-            defaultProjectStatusFilters.includes(project.status as ProjectStatusValue),
+            DEFAULT_PROJECT_STATUS_FILTERS.includes(project.status as ProjectStatusValue),
           ) ?? scopedItems[0];
         if (scopedMatch) {
           const scopedStatus = scopedMatch.status as ProjectStatusValue;
@@ -472,14 +456,14 @@ export function ProjectsConsole() {
           showSearchAndFilters
           searchValue={projectSearch}
           onSearchChange={setProjectSearch}
-          statusValues={PROJECT_STATUS_VALUES}
+          statusValues={[...PROJECT_STATUS_VALUES]}
           statusFilters={projectStatusFilters}
           statusCounts={projectStatusCounts}
           onToggleStatusFilter={toggleProjectStatusFilter}
           onShowAllStatuses={() =>
             setProjectStatusFilters(["active", "on_hold", "prospect", "completed", "cancelled"])
           }
-          onResetStatuses={() => setProjectStatusFilters(defaultProjectStatusFilters)}
+          onResetStatuses={() => setProjectStatusFilters(DEFAULT_PROJECT_STATUS_FILTERS)}
           projects={statusFilteredProjects.map((project) => ({
             id: project.id,
             name: project.name,
@@ -522,7 +506,7 @@ export function ProjectsConsole() {
                         <span className={styles.projectStatusCurrentLabel}>
                           Current: {projectStatusLabel(selectedProject.status)}
                         </span>
-                        {allowedProfileStatuses.map((statusOption) => {
+                        {computedProfileStatuses.map((statusOption) => {
                           const active = projectStatus === statusOption;
                           return (
                             <button
