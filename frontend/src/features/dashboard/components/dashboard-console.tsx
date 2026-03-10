@@ -93,17 +93,25 @@ export function DashboardConsole() {
             </div>
             <div className={styles.metricCard}>
               <span className={styles.metricLabel}>AR Outstanding</span>
-              <strong className={styles.metricValue}>{formatCurrency(Number(portfolio.ar_total_outstanding))}</strong>
+              <strong className={styles.metricValue}>
+                {formatCurrency(Number(portfolio.ar_total_outstanding))}
+              </strong>
             </div>
             <div className={styles.metricCard}>
               <span className={styles.metricLabel}>AP Outstanding</span>
-              <strong className={styles.metricValue}>{formatCurrency(Number(portfolio.ap_total_outstanding))}</strong>
+              <strong className={styles.metricValue}>
+                {formatCurrency(Number(portfolio.ap_total_outstanding))}
+              </strong>
             </div>
-            <div className={`${styles.metricCard} ${portfolio.overdue_invoice_count > 0 ? styles.metricCardWarning : ""}`}>
+            <div className={`${styles.metricCard} ${
+              portfolio.overdue_invoice_count > 0 ? styles.metricCardWarning : ""
+            }`}>
               <span className={styles.metricLabel}>Overdue Invoices</span>
               <strong className={styles.metricValue}>{portfolio.overdue_invoice_count}</strong>
             </div>
-            <div className={`${styles.metricCard} ${portfolio.overdue_vendor_bill_count > 0 ? styles.metricCardWarning : ""}`}>
+            <div className={`${styles.metricCard} ${
+              portfolio.overdue_vendor_bill_count > 0 ? styles.metricCardWarning : ""
+            }`}>
               <span className={styles.metricLabel}>Overdue Bills</span>
               <strong className={styles.metricValue}>{portfolio.overdue_vendor_bill_count}</strong>
             </div>
@@ -182,7 +190,9 @@ export function DashboardConsole() {
             </div>
             <div className={styles.metricCard}>
               <span className={styles.metricLabel}>Total Contract Growth</span>
-              <strong className={styles.metricValue}>{formatCurrency(Number(changeImpact.approved_change_order_total))}</strong>
+              <strong className={styles.metricValue}>
+                {formatCurrency(Number(changeImpact.approved_change_order_total))}
+              </strong>
             </div>
           </div>
         </section>
