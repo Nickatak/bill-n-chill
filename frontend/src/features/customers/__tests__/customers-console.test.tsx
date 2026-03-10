@@ -345,6 +345,294 @@ describe("CustomersConsole", () => {
     expect(screen.getAllByText("Project name is required.").length).toBeGreaterThanOrEqual(1);
   });
 
+  // ---------------------------------------------------------------------------
+  // Pagination navigation
+  // ---------------------------------------------------------------------------
+
+  it("clicking Next fetches and renders page 2", async () => {
+    // Page 1 response
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/customers/")) {
+        const page = new URL(url, "http://localhost").searchParams.get("page");
+        if (page === "2") {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                data: [{ ...CUSTOMER_ROWS[1], id: 3, display_name: "Page 2 Person" }],
+                meta: { page: 2, total_pages: 3, total_count: 75 },
+              }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: CUSTOMER_ROWS,
+              meta: { page: 1, total_pages: 3, total_count: 75 },
+            }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
+    });
+
+    render(<CustomersConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Page 1 of 3/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Page 2 of 3/)).toBeInTheDocument();
+      expect(screen.getByText("Page 2 Person")).toBeInTheDocument();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Search
+  // ---------------------------------------------------------------------------
+
+  it("search input triggers API call with query param", async () => {
+    setupDefaultFetch();
+    render(<CustomersConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    });
+
+    // Track fetch calls after initial load
+    mockFetch.mockClear();
+    setupDefaultFetch({ customers: [CUSTOMER_ROWS[0]] });
+
+    fireEvent.change(screen.getByPlaceholderText(/search by name/i), {
+      target: { value: "jane" },
+    });
+
+    // Wait for debounce (250ms) and verify fetch was called with search param
+    await waitFor(() => {
+      const customerCall = mockFetch.mock.calls.find(
+        (call: unknown[]) => typeof call[0] === "string" && call[0].includes("/customers/") && call[0].includes("q=jane"),
+      );
+      expect(customerCall).toBeTruthy();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Edit save error paths
+  // ---------------------------------------------------------------------------
+
+  it("shows error on edit save API failure", async () => {
+    setupDefaultFetch();
+    render(<CustomersConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Jane Doe"));
+    expect(screen.getByText("Edit Customer")).toBeInTheDocument();
+
+    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
+      if (opts?.method === "PATCH") {
+        return Promise.resolve({
+          ok: false,
+          json: () =>
+            Promise.resolve({
+              error: { message: "Cannot archive customer with active projects." },
+            }),
+        });
+      }
+      if (url.includes("/customers/") && !url.includes("/projects/")) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: CUSTOMER_ROWS,
+              meta: { page: 1, total_pages: 1, total_count: 2 },
+            }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save Customer" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByText("Cannot archive customer with active projects.").length,
+      ).toBeGreaterThan(0);
+    });
+  });
+
+  it("shows error on edit save network failure", async () => {
+    setupDefaultFetch();
+    render(<CustomersConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Jane Doe"));
+
+    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
+      if (opts?.method === "PATCH") {
+        return Promise.reject(new Error("Network error"));
+      }
+      if (url.includes("/customers/") && !url.includes("/projects/")) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: CUSTOMER_ROWS,
+              meta: { page: 1, total_pages: 1, total_count: 2 },
+            }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save Customer" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByText("Could not reach customer detail endpoint.").length,
+      ).toBeGreaterThan(0);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Project create success + error paths
+  // ---------------------------------------------------------------------------
+
+  it("creates project and navigates to workspace on success", async () => {
+    setupDefaultFetch();
+    render(<CustomersConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /add new project for jane doe/i }),
+    );
+    const dialog = screen.getByRole("dialog", { name: /create project/i });
+
+    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
+      if (opts?.method === "POST") {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: { project: { id: 42, name: "Jane Doe Project", status: "prospect", customer: 1 } },
+            }),
+        });
+      }
+      if (typeof url === "string" && url.includes("/customers/") && !url.includes("/projects/")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            data: CUSTOMER_ROWS,
+            meta: { page: 1, total_pages: 1, total_count: 2 },
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
+    });
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create Project" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Created project #42/)).toBeInTheDocument();
+      expect(mockPush).toHaveBeenCalledWith("/projects?project=42");
+    });
+  });
+
+  it("shows error on project create API failure", async () => {
+    setupDefaultFetch();
+    render(<CustomersConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /add new project for jane doe/i }),
+    );
+    const dialog = screen.getByRole("dialog", { name: /create project/i });
+
+    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
+      if (opts?.method === "POST") {
+        return Promise.resolve({
+          ok: false,
+          json: () =>
+            Promise.resolve({
+              error: { message: "Customer is archived." },
+            }),
+        });
+      }
+      if (typeof url === "string" && url.includes("/customers/") && !url.includes("/projects/")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            data: CUSTOMER_ROWS,
+            meta: { page: 1, total_pages: 1, total_count: 2 },
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
+    });
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create Project" }));
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Customer is archived.").length).toBeGreaterThan(0);
+    });
+  });
+
+  it("shows error on project create network failure", async () => {
+    setupDefaultFetch();
+    render(<CustomersConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /add new project for jane doe/i }),
+    );
+    const dialog = screen.getByRole("dialog", { name: /create project/i });
+
+    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
+      if (opts?.method === "POST") {
+        return Promise.reject(new Error("Network error"));
+      }
+      if (typeof url === "string" && url.includes("/customers/") && !url.includes("/projects/")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            data: CUSTOMER_ROWS,
+            meta: { page: 1, total_pages: 1, total_count: 2 },
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
+    });
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create Project" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByText("Could not reach customer project creation endpoint.").length,
+      ).toBeGreaterThan(0);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Empty-field validation
+  // ---------------------------------------------------------------------------
+
   it("shows error when creating project with empty site address", async () => {
     setupDefaultFetch();
     render(<CustomersConsole />);
