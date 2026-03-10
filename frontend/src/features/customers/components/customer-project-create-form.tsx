@@ -22,6 +22,7 @@ type CustomerProjectCreateFormProps = {
   onProjectStatusChange: (value: ProjectStatusValue) => void;
   onSubmit: FormEventHandler<HTMLFormElement>;
   readOnly?: boolean;
+  formMessage?: string;
 };
 
 /** Project creation form scoped to a single customer, with prospect/active status selector. */
@@ -35,6 +36,7 @@ export function CustomerProjectCreateForm({
   onProjectStatusChange,
   onSubmit,
   readOnly = false,
+  formMessage,
 }: CustomerProjectCreateFormProps) {
   return (
     <form className={styles.editorForm} onSubmit={onSubmit}>
@@ -48,7 +50,6 @@ export function CustomerProjectCreateForm({
         <input
           value={projectName}
           onChange={(event) => onProjectNameChange(event.target.value)}
-          required
         />
       </label>
       <label className={styles.field}>
@@ -56,7 +57,6 @@ export function CustomerProjectCreateForm({
         <input
           value={projectSiteAddress}
           onChange={(event) => onProjectSiteAddressChange(event.target.value)}
-          required
         />
       </label>
       {/* Status selector — only prospect and active are valid for new projects */}
@@ -91,6 +91,7 @@ export function CustomerProjectCreateForm({
         </div>
       </label>
 
+      {formMessage ? <p className={styles.inlineWarning}>{formMessage}</p> : null}
       <div className={styles.actionRow}>
         <button className={styles.primaryButton} type="submit" disabled={readOnly}>
           Create Project

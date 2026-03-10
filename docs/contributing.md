@@ -69,6 +69,21 @@ Known examples of this pattern:
 - Secondary action buttons inside status/action cards
 - Filter action buttons inside filter bars
 
+## Frontend Form Validation
+
+### No Browser `required` — Use Custom Validation Only
+
+Do not use the HTML `required` attribute on form inputs. Browser-native validation tooltips are visually inconsistent with our custom error rendering and cannot be styled or controlled.
+
+**Policy:**
+- All field validation must use custom logic (controller hooks, handler guards, or inline checks).
+- Display errors via styled inline messages (`fieldErrors`, `formMessage`, `inlineWarning`, etc.).
+- If a field is mandatory, validate in the submit handler and show a custom error message — never rely on the browser tooltip.
+
+**Rationale:** Mixing `required` tooltips with custom `fieldErrors` rendering creates a split UX where some fields show browser chrome and others show styled inline text. One pattern, consistently.
+
+**Migration:** Existing forms still have `required` attributes. Remove them when touching a form and add custom validation in the same change. Do not remove `required` without adding a replacement check.
+
 ## RBAC Patterns
 
 ### Backend: Capability Gates

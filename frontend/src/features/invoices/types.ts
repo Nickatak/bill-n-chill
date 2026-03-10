@@ -106,5 +106,6 @@ export type ApiResponse = {
     | {
         organization?: OrganizationInvoiceDefaults;
       };
+  email_sent?: boolean;
   error?: { code?: string; message?: string };
 };

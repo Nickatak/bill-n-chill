@@ -99,6 +99,7 @@ export type ApiResponse = {
     | EstimatePolicyContract
     | EstimateStatusEventRecord[]
     | EstimateRelatedChangeOrderRecord[];
+  email_sent?: boolean;
   meta?: {
     cloned_from?: number;
     duplicated_from?: number;

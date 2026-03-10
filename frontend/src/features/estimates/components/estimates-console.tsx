@@ -1231,7 +1231,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         setActionTone("success");
         return;
       }
-      setActionMessage(`Updated estimate #${updated.id} to ${updated.status.replace(/_/g, " ")}. History updated.`);
+      const emailNote = updated.status === "sent" && payload.email_sent === false ? " No email sent — customer has no email on file." : "";
+      setActionMessage(`Updated estimate #${updated.id} to ${updated.status.replace(/_/g, " ")}. History updated.${emailNote}`);
       setActionTone("success");
     } catch {
       setActionMessage("Could not reach estimate status endpoint.");
@@ -1657,6 +1658,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                           );
                         })}
                       </div>
+                      {selectedStatus === "sent" && !selectedEstimate?.project_context?.customer_email?.trim() ? (
+                        <p className={styles.actionError}>WARNING: This customer has no email on file and will not receive an automated email.</p>
+                      ) : null}
                       {nextStatusOptions.length === 0 ? (
                         <p className={styles.inlineHint}>No next statuses available for this estimate.</p>
                       ) : null}

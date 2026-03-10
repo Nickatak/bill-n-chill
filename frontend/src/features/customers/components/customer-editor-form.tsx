@@ -27,6 +27,7 @@ type CustomerEditorFormProps = {
   hasActiveOrOnHoldProject: boolean;
   onSubmit: FormEventHandler<HTMLFormElement>;
   readOnly?: boolean;
+  formMessage?: string;
 };
 
 /** Editable customer detail form with archive-safety guard for active projects. */
@@ -48,6 +49,7 @@ export function CustomerEditorForm({
   hasActiveOrOnHoldProject,
   onSubmit,
   readOnly = false,
+  formMessage,
 }: CustomerEditorFormProps) {
   // Prevent archiving while the customer still has work in progress
   const archiveToggleBlocked = hasActiveOrOnHoldProject && !isArchived;
@@ -70,7 +72,6 @@ export function CustomerEditorForm({
         <input
           value={displayName}
           onChange={(event) => onDisplayNameChange(event.target.value)}
-          required
           disabled={!selectedId}
         />
       </label>
@@ -130,6 +131,7 @@ export function CustomerEditorForm({
         </p>
       ) : null}
 
+      {formMessage ? <p className={styles.inlineWarning}>{formMessage}</p> : null}
       <div className={styles.actionRow}>
         <button className={styles.primaryButton} type="submit" disabled={!selectedId || readOnly}>
           Save Customer

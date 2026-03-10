@@ -137,9 +137,11 @@ def send_document_sent_email(*, document_type, document_title, public_url, recip
     Called after an estimate, invoice, or change order transitions to sent/pending.
     Skips silently if the customer has no email on file. Email delivery failures
     are logged but never block the status transition.
+
+    Returns True if the email was sent successfully, False otherwise.
     """
     if not (recipient_email or "").strip():
-        return
+        return False
 
     from core.models import OrganizationMembership
 
@@ -170,7 +172,7 @@ def send_document_sent_email(*, document_type, document_title, public_url, recip
         )
     except Exception as exc:
         logger.exception("Failed to send %s email to %s", document_type, recipient_email)
-        return
+        return False
 
     EmailRecord.record(
         recipient_email=recipient_email.strip(),
@@ -184,3 +186,5 @@ def send_document_sent_email(*, document_type, document_title, public_url, recip
             "public_url": public_url,
         },
     )
+
+    return True

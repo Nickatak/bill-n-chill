@@ -1296,6 +1296,7 @@ export function ChangeOrdersConsole({
 
     const isResend =
       selectedViewerChangeOrder.status === quickStatus && quickStatus === "pending_approval";
+
     setFeedback("");
     try {
       const response = await fetch(
@@ -1325,10 +1326,11 @@ export function ChangeOrdersConsole({
         hydrateEditForm(updated);
         await loadProjectAuditEvents(projectId);
       }
+      const emailNote = quickStatus === "pending_approval" && payload.email_sent === false ? " No email sent — customer has no email on file." : "";
       if (isResend) {
-        setFeedback(`Re-sent ${coLabel(updated)} for approval. History updated.`, "success");
+        setFeedback(`Re-sent ${coLabel(updated)} for approval. History updated.${emailNote}`, "success");
       } else {
-        setFeedback(`Updated ${coLabel(updated)} to ${statusLabel(updated.status)}. History updated.`, "success");
+        setFeedback(`Updated ${coLabel(updated)} to ${statusLabel(updated.status)}. History updated.${emailNote}`, "success");
       }
       setQuickStatus("");
       setQuickStatusNote("");
@@ -1616,6 +1618,9 @@ export function ChangeOrdersConsole({
                                       );
                                     })}
                                   </div>
+                                  {quickStatus === "pending_approval" && !selectedViewerChangeOrder.project_context?.customer_email?.trim() ? (
+                                    <p className={creatorStyles.actionError}>WARNING: This customer has no email on file and will not receive an automated email.</p>
+                                  ) : null}
                                 </>
                               ) : null}
                               <label className={creatorStyles.lifecycleField}>

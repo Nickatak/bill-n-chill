@@ -250,6 +250,10 @@ export function CustomersConsole() {
       setStatusMessage("Select a customer first.");
       return;
     }
+    if (!displayName.trim()) {
+      setStatusMessage("Display name is required.");
+      return;
+    }
 
     setStatusMessage("");
 
@@ -292,6 +296,14 @@ export function CustomersConsole() {
     const customerId = createProjectCustomerId;
     if (!customerId) {
       setStatusMessage("Select a customer first.");
+      return;
+    }
+    if (!projectName.trim()) {
+      setStatusMessage("Project name is required.");
+      return;
+    }
+    if (!projectSiteAddress.trim()) {
+      setStatusMessage("Site address is required.");
       return;
     }
 
@@ -434,6 +446,7 @@ export function CustomersConsole() {
               hasActiveOrOnHoldProject={Boolean(editingCustomer.has_active_or_on_hold_project)}
               onSubmit={handleSave}
               readOnly={!canMutateCustomers}
+              formMessage={statusMessage}
             />
           </section>
         </div>
@@ -461,6 +474,7 @@ export function CustomersConsole() {
               onProjectStatusChange={setProjectStatus}
               onSubmit={handleCreateProject}
               readOnly={!canMutateProjects}
+              formMessage={statusMessage}
             />
           </section>
         </div>

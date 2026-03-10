@@ -616,25 +616,25 @@ def change_order_detail_view(request, change_order_id: int):
             message="Change-order line items are invalid for this project/budget context.",
         ))
 
+    email_sent = False
     if next_status == ChangeOrder.Status.PENDING_APPROVAL and (
         previous_status != ChangeOrder.Status.PENDING_APPROVAL or is_pending_resend
     ):
         customer_email = (change_order.project.customer.email or "").strip()
-        if customer_email:
-            send_document_sent_email(
-                document_type="Change Order",
-                document_title=f"CO-{change_order.family_key} v{change_order.revision_number}: {change_order.title}",
-                public_url=f"{settings.FRONTEND_URL}/change-order/{change_order.public_ref}",
-                recipient_email=customer_email,
-                sender_user=request.user,
-            )
+        email_sent = send_document_sent_email(
+            document_type="Change Order",
+            document_title=f"CO-{change_order.family_key} v{change_order.revision_number}: {change_order.title}",
+            public_url=f"{settings.FRONTEND_URL}/change-order/{change_order.public_ref}",
+            recipient_email=customer_email,
+            sender_user=request.user,
+        )
 
     refreshed = (
         ChangeOrder.objects.filter(id=change_order.id)
         .prefetch_related("line_items", "line_items__cost_code")
         .get()
     )
-    return Response({"data": ChangeOrderSerializer(refreshed).data})
+    return Response({"data": ChangeOrderSerializer(refreshed).data, "email_sent": email_sent})
 
 
 @api_view(["POST"])

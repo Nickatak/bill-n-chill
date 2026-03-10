@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -297,5 +297,73 @@ describe("CustomersConsole", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByText("Edit Customer")).not.toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Empty-field validation
+  // ---------------------------------------------------------------------------
+
+  it("shows error when saving customer with empty display name", async () => {
+    setupDefaultFetch();
+    render(<CustomersConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Jane Doe"));
+    expect(screen.getByText("Edit Customer")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Display name"), {
+      target: { value: "" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save Customer" }));
+
+    // Message appears in both the main status area and the editor form
+    expect(screen.getAllByText("Display name is required.").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows error when creating project with empty name", async () => {
+    setupDefaultFetch();
+    render(<CustomersConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /add new project for jane doe/i }),
+    );
+    const dialog = screen.getByRole("dialog", { name: /create project/i });
+
+    // openProjectCreator pre-fills name — clear it to trigger validation
+    fireEvent.change(within(dialog).getByLabelText("Project name"), {
+      target: { value: "" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create Project" }));
+
+    expect(screen.getAllByText("Project name is required.").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows error when creating project with empty site address", async () => {
+    setupDefaultFetch();
+    render(<CustomersConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /add new project for jane doe/i }),
+    );
+    const dialog = screen.getByRole("dialog", { name: /create project/i });
+
+    // Clear site address but keep project name
+    fireEvent.change(within(dialog).getByLabelText("Site address"), {
+      target: { value: "" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create Project" }));
+
+    expect(screen.getAllByText("Site address is required.").length).toBeGreaterThanOrEqual(1);
   });
 });

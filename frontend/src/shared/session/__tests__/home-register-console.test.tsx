@@ -142,6 +142,39 @@ describe("HomeRegisterConsole — Flow A (standard)", () => {
     render(<HomeRegisterConsole health={HEALTHY} />);
     expect(mockReplace).toHaveBeenCalledWith("/dashboard");
   });
+
+  it("shows error when submitting with empty email", () => {
+    render(<HomeRegisterConsole health={HEALTHY} />);
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+    expect(screen.getByText("Email is required.")).toBeInTheDocument();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("shows error when submitting with email but no password", () => {
+    render(<HomeRegisterConsole health={HEALTHY} />);
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "nick@test.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+    expect(screen.getByText("Password is required.")).toBeInTheDocument();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("shows error when password is too short", () => {
+    render(<HomeRegisterConsole health={HEALTHY} />);
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "nick@test.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "short" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+    expect(screen.getByText("Password must be at least 8 characters.")).toBeInTheDocument();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -234,6 +267,22 @@ describe("HomeRegisterConsole — Flow C (existing user invite)", () => {
 
     const stored = JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY)!);
     expect(stored.token).toBe("new-token");
+  });
+
+  it("shows error when submitting with empty password", async () => {
+    mockFetch.mockResolvedValueOnce(
+      verifyInviteResponse({ is_existing_user: true }),
+    );
+
+    render(<HomeRegisterConsole health={HEALTHY} inviteToken="invite-xyz" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Organization Switch")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /accept invite/i }));
+
+    expect(screen.getByText("Password is required.")).toBeInTheDocument();
   });
 });
 

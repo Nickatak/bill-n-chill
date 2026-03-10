@@ -98,12 +98,19 @@ function setupDefaultFetch(overrides: {
   projects?: unknown[];
   estimates?: unknown[];
   costCodes?: unknown[];
+  statusEvents?: unknown[];
 } = {}) {
   mockFetch.mockImplementation((url: string) => {
     if (url.includes("/contracts/estimates")) {
       return Promise.resolve({
         ok: true,
         json: () => Promise.resolve({ data: policyContract }),
+      });
+    }
+    if (url.includes("/status-events")) {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ data: overrides.statusEvents ?? [] }),
       });
     }
     if (url.includes("/projects/") && url.includes("/estimates")) {
@@ -248,5 +255,62 @@ describe("EstimatesConsole", () => {
         expect.anything(),
       );
     });
+  });
+
+  // ---------------------------------------------------------------------------
+  // No-email customer warning
+  // ---------------------------------------------------------------------------
+
+  it("shows no-email warning when Sent is selected and customer has no email", async () => {
+    setupDefaultFetch({
+      estimates: [
+        makeEstimate({
+          id: 42,
+          status: "draft",
+          project_context: {
+            id: 7,
+            name: "Kitchen Remodel",
+            status: "active",
+            customer_display_name: "Jane Smith",
+            customer_email: "",
+          },
+        }),
+      ],
+    });
+    render(<EstimatesConsole scopedProjectId={7} />);
+
+    // Wait for the estimate to auto-select and the "Sent" transition pill to appear
+    const sentButton = await screen.findByRole("button", { name: "Sent" });
+    fireEvent.click(sentButton);
+
+    expect(
+      screen.getByText(/WARNING.*no email on file/),
+    ).toBeInTheDocument();
+  });
+
+  it("does not show no-email warning when Sent is selected and customer has email", async () => {
+    setupDefaultFetch({
+      estimates: [
+        makeEstimate({
+          id: 42,
+          status: "draft",
+          project_context: {
+            id: 7,
+            name: "Kitchen Remodel",
+            status: "active",
+            customer_display_name: "Jane Smith",
+            customer_email: "jane@example.com",
+          },
+        }),
+      ],
+    });
+    render(<EstimatesConsole scopedProjectId={7} />);
+
+    const sentButton = await screen.findByRole("button", { name: "Sent" });
+    fireEvent.click(sentButton);
+
+    expect(
+      screen.queryByText(/WARNING.*no email on file/),
+    ).not.toBeInTheDocument();
   });
 });

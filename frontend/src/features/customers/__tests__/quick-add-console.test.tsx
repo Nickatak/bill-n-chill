@@ -171,14 +171,42 @@ describe("QuickAddConsole", () => {
     expect(screen.getByLabelText("Phone (or email)")).toBeInTheDocument();
   });
 
-  it("shows validation errors on empty submission", async () => {
+  it("shows validation errors on empty submission", () => {
     render(<QuickAddConsole />);
-    // Use fireEvent.submit to bypass native `required` attribute validation
-    fireEvent.submit(document.querySelector("form")!);
+    clickSubmit(/save customer only/i);
 
-    await waitFor(() => {
-      expect(screen.getByText(/fix the required fields/i)).toBeInTheDocument();
+    expect(screen.getByText(/fix the required fields/i)).toBeInTheDocument();
+    expect(screen.getByText("Full name is required.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Provide a valid phone number or email address."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows field error for empty phone when name is provided", () => {
+    render(<QuickAddConsole />);
+    fireEvent.change(screen.getByLabelText("Full name"), {
+      target: { value: "Jane Doe" },
     });
+    clickSubmit(/save customer only/i);
+
+    expect(
+      screen.getByText("Provide a valid phone number or email address."),
+    ).toBeInTheDocument();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("shows project field errors on customer+project submission with empty project fields", () => {
+    render(<QuickAddConsole />);
+    fillCustomerFields("Jane Doe", "5551234567");
+    clickSubmit(/save customer \+ start project/i);
+
+    expect(
+      screen.getByText("Project name is required when creating a project."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Project address is required when creating a project."),
+    ).toBeInTheDocument();
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it("shows success message on customer_only submission", async () => {

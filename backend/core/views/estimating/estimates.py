@@ -643,6 +643,7 @@ def estimate_detail_view(request, estimate_id: int):
             and status_note_requested
         )
     )
+    email_sent = False
     if should_record_status_event:
         EstimateStatusEvent.record(
             estimate=estimate,
@@ -653,14 +654,13 @@ def estimate_detail_view(request, estimate_id: int):
         )
         if estimate.status == Estimate.Status.SENT:
             customer_email = (estimate.project.customer.email or "").strip()
-            if customer_email:
-                send_document_sent_email(
-                    document_type="Estimate",
-                    document_title=f"{estimate.title} (v{estimate.version})",
-                    public_url=f"{settings.FRONTEND_URL}/estimate/{estimate.public_ref}",
-                    recipient_email=customer_email,
-                    sender_user=request.user,
-                )
+            email_sent = send_document_sent_email(
+                document_type="Estimate",
+                document_title=f"{estimate.title} (v{estimate.version})",
+                public_url=f"{settings.FRONTEND_URL}/estimate/{estimate.public_ref}",
+                recipient_email=customer_email,
+                sender_user=request.user,
+            )
         if estimate.status == Estimate.Status.APPROVED:
             _activate_project_from_estimate_approval(
                 estimate=estimate,
@@ -669,7 +669,7 @@ def estimate_detail_view(request, estimate_id: int):
             )
 
     estimate.refresh_from_db()
-    return Response({"data": _serialize_estimate(estimate=estimate)})
+    return Response({"data": _serialize_estimate(estimate=estimate), "email_sent": email_sent})
 
 
 @api_view(["POST"])

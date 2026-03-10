@@ -119,5 +119,6 @@ export type ApiResponse = {
     | ChangeOrderRecord
     | ChangeOrderPolicyContract
     | Array<{ id: number; status: string }>;
+  email_sent?: boolean;
   error?: { code?: string; message?: string; fields?: Record<string, string[]>; rule?: string };
 };

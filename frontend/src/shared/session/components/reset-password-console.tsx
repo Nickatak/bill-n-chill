@@ -70,6 +70,12 @@ function ForgotForm() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!email.trim()) {
+      setMessage("Email is required.");
+      setMessageTone("error");
+      return;
+    }
+
     setIsSubmitting(true);
     setMessage("");
 
@@ -126,7 +132,6 @@ function ForgotForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
-              required
             />
           </label>
           {message && (
@@ -177,6 +182,12 @@ function ResetForm({ token }: { token: string }) {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!newPassword || !confirmPassword) {
+      setMessage("Both password fields are required.");
+      setMessageTone("error");
+      return;
+    }
 
     if (newPassword !== confirmPassword) {
       setMessage("Passwords do not match.");
@@ -239,8 +250,6 @@ function ResetForm({ token }: { token: string }) {
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               autoComplete="new-password"
-              minLength={8}
-              required
             />
           </label>
           <label>
@@ -250,8 +259,6 @@ function ResetForm({ token }: { token: string }) {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               autoComplete="new-password"
-              minLength={8}
-              required
             />
           </label>
           {message && (

@@ -63,7 +63,6 @@ export function QuickAddForm({
           value={fullName}
           onChange={(event) => onFullNameChange(event.target.value)}
           autoComplete="name"
-          required
         />
         {fieldErrors.full_name ? <p className={styles.errorText}>{fieldErrors.full_name}</p> : null}
       </label>

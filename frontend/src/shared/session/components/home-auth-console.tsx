@@ -110,6 +110,17 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
   async function handleLogin(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (!email.trim()) {
+      setMessage("Email is required.");
+      setMessageTone("error");
+      return;
+    }
+    if (!password) {
+      setMessage("Password is required.");
+      setMessageTone("error");
+      return;
+    }
+
     setIsChecking(true);
     setMessage("Signing in...");
     setMessageTone("neutral");
@@ -198,7 +209,6 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               autoComplete="email"
-              required
             />
           </label>
           <label>
@@ -208,7 +218,6 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               autoComplete="current-password"
-              required
             />
           </label>
           {message && (

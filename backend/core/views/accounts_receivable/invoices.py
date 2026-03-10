@@ -582,16 +582,15 @@ def invoice_send_view(request, invoice_id: int):
         )
 
     customer_email = (invoice.customer.email or "").strip()
-    if customer_email:
-        send_document_sent_email(
-            document_type="Invoice",
-            document_title=f"Invoice {invoice.invoice_number}",
-            public_url=f"{settings.FRONTEND_URL}/invoice/{invoice.public_ref}",
-            recipient_email=customer_email,
-            sender_user=request.user,
-        )
+    email_sent = send_document_sent_email(
+        document_type="Invoice",
+        document_title=f"Invoice {invoice.invoice_number}",
+        public_url=f"{settings.FRONTEND_URL}/invoice/{invoice.public_ref}",
+        recipient_email=customer_email,
+        sender_user=request.user,
+    )
 
-    return Response({"data": InvoiceSerializer(invoice).data})
+    return Response({"data": InvoiceSerializer(invoice).data, "email_sent": email_sent})
 
 
 @api_view(["GET"])

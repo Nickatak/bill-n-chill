@@ -206,6 +206,22 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
   async function handleRegister(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (!email.trim()) {
+      setMessage("Email is required.");
+      setMessageTone("error");
+      return;
+    }
+    if (!password) {
+      setMessage("Password is required.");
+      setMessageTone("error");
+      return;
+    }
+    if (password.length < 8) {
+      setMessage("Password must be at least 8 characters.");
+      setMessageTone("error");
+      return;
+    }
+
     setIsSubmitting(true);
     setMessage(inviteFlow === "flow-b" ? "Joining organization..." : "Creating account...");
     setMessageTone("neutral");
@@ -294,6 +310,12 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
   /** Flow C: existing user accepting invite via password confirmation. */
   async function handleAcceptInvite(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!password) {
+      setMessage("Password is required.");
+      setMessageTone("error");
+      return;
+    }
 
     setIsSubmitting(true);
     setMessage("Confirming and switching organization...");
@@ -395,8 +417,6 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 autoComplete="current-password"
-                minLength={8}
-                required
               />
             </label>
             {message && (
@@ -445,7 +465,6 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               autoComplete="email"
-              required
               readOnly={inviteFlow === "flow-b"}
             />
           </label>
@@ -456,8 +475,6 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               autoComplete="new-password"
-              minLength={8}
-              required
             />
           </label>
           {message && (

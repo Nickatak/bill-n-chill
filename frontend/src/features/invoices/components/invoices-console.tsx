@@ -918,7 +918,8 @@ export function InvoicesConsole() {
       setSelectedStatus("");
       setStatusNote("");
       await loadInvoiceStatusEvents(updated.id);
-      const msg = `Updated ${updated.invoice_number} to ${statusLabel(updated.status)}. History updated.`;
+      const emailNote = updated.status === "sent" && payload.email_sent === false ? " No email sent — customer has no email on file." : "";
+      const msg = `Updated ${updated.invoice_number} to ${statusLabel(updated.status)}. History updated.${emailNote}`;
       setSuccessStatus(msg);
       setViewerActionMessage(msg);
       setViewerActionTone("success");
@@ -1323,6 +1324,9 @@ export function InvoicesConsole() {
                                               );
                                             })}
                                           </div>
+                                          {selectedStatus === "sent" && !selectedInvoice?.project_context?.customer_email?.trim() ? (
+                                            <p className={styles.invoiceViewerActionError}>WARNING: This customer has no email on file and will not receive an automated email.</p>
+                                          ) : null}
                                         </>
                                       ) : (
                                         <p className={styles.inlineHint}>No next statuses available.</p>

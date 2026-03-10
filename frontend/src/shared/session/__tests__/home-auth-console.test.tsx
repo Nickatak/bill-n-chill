@@ -153,4 +153,27 @@ describe("HomeAuthConsole", () => {
     );
     expect(screen.getByText(/API Health/)).toBeInTheDocument();
   });
+
+  // ---------------------------------------------------------------------------
+  // Empty-field validation
+  // ---------------------------------------------------------------------------
+
+  it("shows error when submitting with empty email", () => {
+    render(<HomeAuthConsole health={HEALTHY} />);
+    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    expect(screen.getByText("Email is required.")).toBeInTheDocument();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("shows error when submitting with email but no password", () => {
+    render(<HomeAuthConsole health={HEALTHY} />);
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "nick@test.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    expect(screen.getByText("Password is required.")).toBeInTheDocument();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
 });
