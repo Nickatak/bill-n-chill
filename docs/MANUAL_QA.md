@@ -60,45 +60,45 @@ Organized by domain. Check off as you go.
 ## 2. Customers
 
 ### Browse
-- [ ] Customer list loads with pagination (25/page)
-- [ ] Search filters by name/phone/email/address
-- [ ] Activity filter: Active (default) hides archived, All shows everything
-- [ ] Project filter: With Projects / All
-- [ ] Pagination controls work (Previous/Next, page count)
+- [x] Customer list loads with pagination (25/page)
+- [x] Search filters by name/phone/email/address
+- [x] Activity filter: Active (default) hides archived, All shows everything
+- [x] Project filter: With Projects / All
+- [x] Pagination controls work (Previous/Next, page count)
 
 ### Edit (modal)
-- [ ] Click customer name → edit modal opens with pre-filled fields
-- [ ] Change display name → Save → success message, list updates
-- [ ] Empty display name → "Display name is required."
-- [ ] Archive customer → prospect projects auto-cancelled
-- [ ] Cannot archive customer with active/on-hold projects
-- [ ] Close button and backdrop click both close modal
+- [x] Click customer name → edit modal opens with pre-filled fields
+- [x] Change display name → Save → success message, list updates
+- [x] Empty display name → "Display name is required."
+- [x] Archive customer → prospect projects auto-cancelled
+- [x] Cannot archive customer with active/on-hold projects
+- [x] Close button and backdrop click both close modal
 
 ### Create Project (modal)
-- [ ] Click "Add New Project" → project creator opens, pre-filled name + address
-- [ ] Submit → project created, redirects to project workspace
-- [ ] Empty project name → "Project name is required."
-- [ ] Empty site address → "Site address is required."
+- [x] Click "Add New Project" → project creator opens, pre-filled name + address
+- [x] Submit → project created, redirects to project workspace
+- [x] Empty project name → "Project name is required."
+- [x] Empty site address → "Site address is required."
 
 ### Quick Add
-- [ ] Fill name + phone → Save Customer Only → success, form clears
-- [ ] Fill name + phone + project fields → Save Customer + Start Project → success
-- [ ] Empty submission → field-level errors (name, phone)
-- [ ] Customer+project with empty project fields → project-specific errors
-- [ ] Duplicate detected (phone/email match) → resolution panel appears
-- [ ] "Use existing" resolution → reuses customer, creates project
-- [ ] "Create anyway" → creates new customer
+- [x] Fill name + phone → Save Customer Only → success, form clears
+- [x] Fill name + phone + project fields → Save Customer + Start Project → success
+- [x] Empty submission → field-level errors (name, phone)
+- [x] Customer+project with empty project fields → project-specific errors
+- [x] Duplicate detected (phone/email match) → resolution panel appears
+- [x] "Use existing" resolution → reuses customer, creates project
+- [x] "Create anyway" → creates new customer
 
 ---
 
 ## 3. Projects
 
-- [ ] Project list loads, shows all org projects
-- [ ] Click project → navigates to project workspace
-- [ ] Project detail shows contract values (original, current, accepted total)
-- [ ] Status transitions work: prospect → active, active → on_hold → active, active → completed
-- [ ] Invalid transitions blocked
-- [ ] Financial summary endpoint returns correct AR/AP metrics
+- [x] Project list loads, shows all org projects
+- [x] Click project → navigates to project workspace
+- [x] Project detail shows contract values (original, current, accepted total)
+- [x] Status transitions work: prospect → active, active → on_hold → active, active → completed
+- [x] Invalid transitions blocked
+- [x] Financial summary endpoint returns correct AR/AP metrics
 
 ---
 

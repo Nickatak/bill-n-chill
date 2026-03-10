@@ -5,7 +5,7 @@
  * simple ok/message shape that route pages pass to their client components.
  */
 
-import { defaultApiBaseUrl, normalizeApiBaseUrl } from "./base";
+import { serverApiBaseUrl, normalizeApiBaseUrl } from "./base";
 
 /** Normalised result passed to client components. */
 export type HealthResult = {
@@ -14,7 +14,7 @@ export type HealthResult = {
 };
 
 export async function fetchHealth(): Promise<HealthResult> {
-  const url = `${normalizeApiBaseUrl(defaultApiBaseUrl)}/health/`;
+  const url = `${normalizeApiBaseUrl(serverApiBaseUrl)}/health/`;
 
   try {
     const response = await fetch(url, { cache: "no-store" });

@@ -24,7 +24,7 @@ services:
       DATABASE_URL: mysql://${MYSQL_USER:-bnc}:${MYSQL_PASSWORD:-bnc_password}@db:3306/${MYSQL_DATABASE:-bill_n_chill}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-dev-only-change-me}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1},backend
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
     depends_on:
@@ -44,6 +44,7 @@ services:
     restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api/v1}
+      SERVER_API_BASE_URL: http://backend:8000/api/v1
     depends_on:
       - backend
     volumes:
