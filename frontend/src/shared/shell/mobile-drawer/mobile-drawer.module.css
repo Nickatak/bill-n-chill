@@ -3,13 +3,7 @@
 /* ── Root container — hidden on desktop ── */
 
 .root {
-  display: contents;
-}
-
-@media (min-width: 701px) {
-  .root {
-    display: none;
-  }
+  display: none;
 }
 
 /* ── Fixed header bar ── */

@@ -1,0 +1,187 @@
+/* Mobile bottom navigation: fixed tab bar + "More" menu for small viewports. */
+
+.nav {
+  display: none;
+}
+
+.backdrop {
+  display: none;
+}
+
+.moreMenu {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: stretch;
+    border-top: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface-secondary) 96%, transparent);
+    backdrop-filter: blur(6px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    background: color-mix(in srgb, var(--surface) 45%, transparent);
+    backdrop-filter: blur(4px);
+    animation: fadeIn 200ms ease;
+  }
+
+  .moreMenu {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    right: 0;
+    left: 0;
+    z-index: 1001;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    padding: var(--space-sm) 0;
+    animation: slideUp 200ms ease;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+/* ── Tab items ── */
+
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 56px;
+  padding: 6px 2px;
+  text-decoration: none;
+  color: var(--text-secondary);
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 140ms ease, background-color 140ms ease;
+}
+
+.tab:hover {
+  background: var(--surface-secondary);
+}
+
+.tabActive {
+  color: var(--accent);
+}
+
+.label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.moreIcon {
+  font-size: 1.1rem;
+  line-height: 1;
+  letter-spacing: 0.1em;
+}
+
+/* ── More menu content ── */
+
+.moreHeader {
+  padding: var(--space-xs) var(--space-md) var(--space-sm);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-xs);
+}
+
+.orgLabel {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.moreSection {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--space-sm);
+}
+
+.moreDivider {
+  height: 1px;
+  margin: var(--space-xs) var(--space-md);
+  background: var(--border);
+}
+
+.moreLink {
+  display: block;
+  padding: 12px var(--space-sm);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: background 120ms ease;
+}
+
+.moreLink:hover {
+  background: var(--surface-secondary);
+}
+
+.moreLinkActive {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.moreLinkActive:hover {
+  background: var(--accent);
+}
+
+.moreAction {
+  appearance: none;
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px var(--space-sm);
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 120ms ease;
+}
+
+.moreAction:hover {
+  background: var(--surface-secondary);
+}
+
+@media print {
+  .nav {
+    display: none !important;
+  }
+
+  .moreMenu {
+    display: none !important;
+  }
+}

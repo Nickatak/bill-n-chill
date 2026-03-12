@@ -133,7 +133,7 @@ export function VerifyEmailConsole({ token }: VerifyEmailConsoleProps) {
           <p className={styles.warningText}>{errorMessage}</p>
         </div>
         <p className={styles.formHint}>
-          <Link href="/login">Back to sign in.</Link>
+          <Link href="/login">Back to sign in</Link>
         </p>
       </div>
     </section>

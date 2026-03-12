@@ -10,6 +10,8 @@
 export type NavRoute = {
   href: string;
   label: string;
+  /** Abbreviated label for compact contexts (e.g. mobile bottom nav). Falls back to `label`. */
+  shortLabel?: string;
   /** Pathnames that count as an exact active match. */
   exact?: string[];
   /** Pathname prefixes that count as an active match. */
@@ -23,28 +25,35 @@ export const workflowRoutes: NavRoute[] = [
   {
     href: "/dashboard",
     label: "Dashboard",
+    shortLabel: "Dash",
     exact: ["/dashboard"],
   },
   {
     href: "/customers",
     label: "Customers",
+    shortLabel: "Cust",
     exact: ["/customers"],
   },
   {
     href: "/projects",
     label: "Projects",
+    shortLabel: "Proj",
     exact: ["/projects"],
     startsWith: ["/projects/"],
   },
   {
     href: "/invoices",
     label: "Invoices",
+    shortLabel: "Inv",
     exact: ["/invoices"],
   },
   {
-    href: "/bills",
-    label: "Bills",
-    exact: ["/bills"],
+    // Payments promoted to first-class workflow item.
+    // See docs/decisions/product-direction-refinement.md
+    href: "/payments",
+    label: "Payments",
+    shortLabel: "Pay",
+    exact: ["/payments"],
   },
 ];
 
@@ -54,9 +63,10 @@ export const workflowRoutes: NavRoute[] = [
  * the main workflow sequence. The dropdown trigger shows the org name.
  */
 export const businessMenuRoutes: NavRoute[] = [
-  { href: "/ops/organization", label: "Organization", exact: ["/ops/organization"] },
-  { href: "/cost-codes", label: "Cost Codes", exact: ["/cost-codes"], section: "Management" },
-  { href: "/vendors", label: "Vendors", exact: ["/vendors"], section: "Management" },
+  { href: "/bills", label: "Bills", exact: ["/bills"] },
+  { href: "/ops/organization", label: "Organization", exact: ["/ops/organization"], section: "Settings" },
+  { href: "/cost-codes", label: "Cost Codes", exact: ["/cost-codes"], section: "Settings" },
+  { href: "/vendors", label: "Vendors", exact: ["/vendors"], section: "Settings" },
   { href: "/onboarding", label: "Get Started", exact: ["/onboarding"] },
 ];
 

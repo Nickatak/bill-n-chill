@@ -109,9 +109,11 @@ function ForgotForm() {
           <p className={styles.text}>
             If <strong>{email}</strong> is registered, we sent a password reset link.
           </p>
-          <p className={styles.formHintRight}>
-            <Link href="/login">Back to sign in.</Link>
-          </p>
+          <div className={styles.formHintStack} style={{ width: "100%" }}>
+            <p className={styles.formHintRight}>
+              <Link href="/login">Back to sign in</Link>
+            </p>
+          </div>
         </div>
       </section>
     );
@@ -147,7 +149,7 @@ function ForgotForm() {
             </div>
             <div className={styles.formHintStack}>
               <p className={styles.formHintRight}>
-                <Link href="/login">Back to sign in.</Link>
+                <Link href="/login">Back to sign in</Link>
               </p>
             </div>
           </div>
@@ -274,7 +276,7 @@ function ResetForm({ token }: { token: string }) {
             </div>
             <div className={styles.formHintStack}>
               <p className={styles.formHintRight}>
-                <Link href="/login">Back to sign in.</Link>
+                <Link href="/login">Back to sign in</Link>
               </p>
             </div>
           </div>

@@ -237,7 +237,9 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
                 <Link href="/reset-password">Forgot password?</Link>
               </p>
               <p className={styles.formHintRight}>
-                Need an account? <Link href="/register">Create one</Link>.
+                <span className={styles.desktopOnly}>Need an account? </span>
+                <Link href="/register">Create one</Link>
+                <span className={styles.desktopOnly}>.</span>
               </p>
             </div>
           </div>

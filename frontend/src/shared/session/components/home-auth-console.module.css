@@ -212,6 +212,67 @@
   font-size: var(--font-base);
 }
 
+.desktopOnly {
+  display: inline;
+}
+
+@media (max-width: 700px) {
+  .desktopOnly {
+    display: none;
+  }
+
+  .title {
+    text-align: center;
+  }
+
+  .formHintRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .formHintStack {
+    align-items: stretch;
+    gap: var(--space-sm);
+    border-top: 1px solid var(--border);
+    padding-top: var(--space-sm);
+    margin-top: var(--space-xs);
+  }
+
+  .formHintStackFlat {
+    border-top: none;
+    padding-top: 0;
+    margin-top: 0;
+  }
+
+  .formHintRight {
+    text-align: center;
+    margin: 0;
+  }
+
+  .formHintStack .button {
+    width: 100%;
+  }
+
+  .formHintRight a {
+    display: block;
+    min-height: 38px;
+    line-height: 38px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface-secondary);
+    text-decoration: none;
+    font-weight: 700;
+  }
+
+  .buttonRow {
+    width: 100%;
+  }
+
+  .buttonRow .button {
+    width: 100%;
+  }
+}
+
 @media (min-width: 760px) {
   .quickLinks {
     grid-template-columns: repeat(2, minmax(0, 1fr));

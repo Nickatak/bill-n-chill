@@ -363,19 +363,23 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
               {message}
             </p>
           )}
-          <button
-            className={styles.button}
-            type="button"
-            disabled={isResending || resendCooldown > 0}
-            onClick={handleResendVerification}
-          >
-            {isResending
-              ? "Sending..."
-              : resendCooldown > 0
-                ? `Wait ${resendCooldown}s`
-                : "Didn\u2019t get it? Resend"}
-          </button>
-          <Link href="/login" className={styles.formHintLink}>Back to sign in.</Link>
+          <div className={styles.formHintStack} style={{ width: "100%" }}>
+            <button
+              className={styles.button}
+              type="button"
+              disabled={isResending || resendCooldown > 0}
+              onClick={handleResendVerification}
+            >
+              {isResending
+                ? "Sending..."
+                : resendCooldown > 0
+                  ? `Wait ${resendCooldown}s`
+                  : "Didn\u2019t get it? Resend"}
+            </button>
+            <p className={styles.formHintRight}>
+              <Link href="/login">Back to sign in</Link>
+            </p>
+          </div>
         </div>
       </section>
     );
@@ -494,7 +498,9 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
             </div>
             <div className={styles.formHintStack}>
               <p className={styles.formHintRight}>
-                Already have an account? <Link href="/login">Sign in</Link>.
+                <span className={styles.desktopOnly}>Already have an account? </span>
+                <Link href="/login">Sign in</Link>
+                <span className={styles.desktopOnly}>.</span>
               </p>
             </div>
           </div>
