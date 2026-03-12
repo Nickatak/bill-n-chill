@@ -1,29 +1,9 @@
-import type { Metadata } from "next";
-import { InvoicesConsole } from "@/features/invoices";
-import { PageCard, PageShell } from "@/shared/shell";
-import { resolveProjectQueryTitle } from "@/shared/shell/route-metadata";
-
-type InvoicesPageMetadataProps = {
-  searchParams: Promise<{ project?: string }>;
-};
+import { redirect } from "next/navigation";
 
 /**
- * Next.js App Router metadata hook for this route.
- * The hook itself stays in `page.tsx` for framework discovery; title logic is delegated to
- * `route-metadata.ts` helpers to keep route shims thin and consistent.
+ * Legacy /invoices route — redirects to /projects.
+ * Invoices are now project-scoped at /projects/[projectId]/invoices.
  */
-export async function generateMetadata({ searchParams }: InvoicesPageMetadataProps): Promise<Metadata> {
-  const { project } = await searchParams;
-  return { title: resolveProjectQueryTitle("Invoices", project) };
-}
-
-/** Route page for the invoices list. */
-export default function InvoicesPage() {
-  return (
-    <PageShell>
-      <PageCard>
-        <InvoicesConsole />
-      </PageCard>
-    </PageShell>
-  );
+export default function InvoicesRedirect() {
+  redirect("/projects");
 }

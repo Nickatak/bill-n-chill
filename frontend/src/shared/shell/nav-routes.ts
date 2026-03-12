@@ -42,12 +42,6 @@ export const workflowRoutes: NavRoute[] = [
     startsWith: ["/projects/"],
   },
   {
-    href: "/invoices",
-    label: "Invoices",
-    shortLabel: "Inv",
-    exact: ["/invoices"],
-  },
-  {
     // Payments promoted to first-class workflow item.
     // See docs/decisions/product-direction-refinement.md
     href: "/payments",

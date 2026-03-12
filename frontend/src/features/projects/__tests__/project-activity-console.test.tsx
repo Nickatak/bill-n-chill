@@ -50,7 +50,7 @@ function makeTimeline(overrides: Record<string, unknown> = {}) {
         detail: "Amount: $5,000.00",
         object_type: "invoice",
         object_id: 101,
-        ui_route: "/invoices?invoice=101",
+        ui_route: "/projects/1/invoices?invoice=101",
         detail_endpoint: "/api/v1/invoices/101/",
       },
       {
@@ -175,7 +175,7 @@ describe("ProjectActivityConsole", () => {
     });
 
     const openLinks = screen.getAllByText("Open");
-    expect(openLinks[0]).toHaveAttribute("href", "/invoices?invoice=101");
+    expect(openLinks[0]).toHaveAttribute("href", "/projects/1/invoices?invoice=101");
   });
 
   it("reloads timeline when Load Timeline button is clicked", async () => {

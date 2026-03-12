@@ -8,7 +8,6 @@
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { formatDateDisplay, formatDateTimeDisplay, todayDateInput, futureDateInput } from "@/shared/date-format";
 import { parseAmount, formatDecimal } from "@/shared/money-format";
@@ -53,7 +52,6 @@ import {
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import { useClientPagination } from "@/shared/hooks/use-client-pagination";
 import { PaginationControls } from "@/shared/components/pagination-controls";
-import { PaymentRecorder, type AllocationTarget } from "@/features/payments";
 import { usePolicyContract } from "@/shared/hooks/use-policy-contract";
 import { usePrintable } from "@/shared/shell/printable-context";
 import styles from "./invoices-console.module.css";
@@ -211,16 +209,15 @@ function invoiceStatusEventToneClass(event: InvoiceStatusEventRecord): string {
 // ---------------------------------------------------------------------------
 
 /** Primary invoice management console with project selection, invoice viewer, and creator workspace. */
-export function InvoicesConsole() {
+type InvoicesConsoleProps = {
+  scopedProjectId?: number | null;
+};
+
+export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps) {
   const { token, authMessage, role, capabilities } = useSharedSessionAuth();
   const canMutateInvoices = canDo(capabilities, "invoices", "create");
   const canSendInvoices = canDo(capabilities, "invoices", "send");
   const canEditInvoiceWorkspace = canMutateInvoices;
-
-  const searchParams = useSearchParams();
-  const scopedProjectIdParam = searchParams.get("project");
-  const scopedProjectId =
-    scopedProjectIdParam && /^\d+$/.test(scopedProjectIdParam) ? Number(scopedProjectIdParam) : null;
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
 
@@ -234,7 +231,6 @@ export function InvoicesConsole() {
   const [isStatusSectionOpen, setIsStatusSectionOpen] = useState(true);
   const [isHistorySectionOpen, setIsHistorySectionOpen] = useState(false);
   const [isLineItemsSectionOpen, setIsLineItemsSectionOpen] = useState(false);
-  const [activeContentTab, setActiveContentTab] = useState<"invoices" | "payments">("invoices");
   const [viewerActionMessage, setViewerActionMessage] = useState("");
   const [viewerActionTone, setViewerActionTone] = useState<"success" | "error">("success");
   const [showAllEvents, setShowAllEvents] = useState(false);
@@ -1173,16 +1169,6 @@ export function InvoicesConsole() {
   const statusMessageAtToolbar =
     statusTone === "success" && /^Duplicated\b/i.test(statusMessage);
 
-  const invoiceAllocationTargets: AllocationTarget[] = useMemo(
-    () =>
-      invoices.map((inv) => ({
-        id: inv.id,
-        label: inv.invoice_number || `Invoice #${inv.id}`,
-        balanceDue: inv.balance_due,
-      })),
-    [invoices],
-  );
-
   // -------------------------------------------------------------------------
   // Contract breakdown (read-only reference)
   // -------------------------------------------------------------------------
@@ -1349,36 +1335,6 @@ export function InvoicesConsole() {
             statusLabel={projectStatusLabel}
           />
 
-          {selectedProjectId ? (
-            <div className={styles.contentTabBar}>
-              <button
-                type="button"
-                className={`${styles.contentTab} ${activeContentTab === "invoices" ? styles.contentTabActive : ""}`}
-                onClick={() => setActiveContentTab("invoices")}
-              >
-                Invoices
-              </button>
-              <button
-                type="button"
-                className={`${styles.contentTab} ${activeContentTab === "payments" ? styles.contentTabActive : ""}`}
-                onClick={() => setActiveContentTab("payments")}
-              >
-                Payments
-              </button>
-            </div>
-          ) : null}
-
-          {activeContentTab === "payments" && selectedProjectId ? (
-            <PaymentRecorder
-              projectId={Number(selectedProjectId)}
-              direction="inbound"
-              allocationTargets={invoiceAllocationTargets}
-              onPaymentsChanged={() => loadInvoices()}
-            />
-          ) : null}
-
-          {activeContentTab === "invoices" ? (
-          <>
           <section className={`${styles.panel} ${styles.viewerPanel}`}>
               <div className={styles.panelHeader}>
                 <h3>{selectedProject ? `Invoices for: ${selectedProject.name}` : "Invoices"}</h3>
@@ -2024,8 +1980,6 @@ export function InvoicesConsole() {
               ) : null}
 
           </div>
-        </>
-      ) : null}
       </>
       ) : null}
     </section>

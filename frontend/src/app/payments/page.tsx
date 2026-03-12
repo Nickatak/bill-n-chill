@@ -1,16 +1,16 @@
 /**
- * Payments page — placeholder.
+ * Payments page — first-class workflow page for recording and managing payments.
  *
- * Payments is a first-class workflow item for recording money in (from customers)
- * and money out (to vendors/subs). Previously, payment recording was embedded in
- * the Invoices and Bills pages as a secondary feature.
+ * Both inbound (from customers) and outbound (to vendors) payments are visible
+ * here with a direction toggle. Outbound payments also remain co-located on the
+ * Bills page for convenience.
  *
- * See docs/decisions/product-direction-refinement.md for the strategic context
- * behind promoting Payments to its own route.
+ * See docs/decisions/product-direction-refinement.md for strategic context.
  */
 
 import type { Metadata } from "next";
 import { PageShell } from "@/shared/shell";
+import { PaymentsConsole } from "@/features/payments";
 
 export const metadata: Metadata = {
   title: "Payments",
@@ -19,8 +19,7 @@ export const metadata: Metadata = {
 export default function PaymentsPage() {
   return (
     <PageShell>
-      <h1>Payments</h1>
-      <p>Coming soon.</p>
+      <PaymentsConsole />
     </PageShell>
   );
 }

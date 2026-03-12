@@ -198,7 +198,7 @@ def attention_feed_view(request):
                 "detail": f"Status {row.status}, balance due {row.balance_due}",
                 "project_id": row.project_id,
                 "project_name": row.project.name,
-                "ui_route": "/invoices",
+                "ui_route": f"/projects/{row.project_id}/invoices",
                 "detail_endpoint": f"/api/v1/invoices/{row.id}/",
                 "due_date": row.due_date,
             }
@@ -261,11 +261,7 @@ def attention_feed_view(request):
         .order_by("-payment_date", "-id")
     )
     for row in problem_payments:
-        ui_route = (
-            f"/invoices?project={row.project_id}"
-            if row.direction == Payment.Direction.INBOUND
-            else f"/bills?project={row.project_id}"
-        )
+        ui_route = "/payments"
         items.append(
             {
                 "kind": "payment_problem",

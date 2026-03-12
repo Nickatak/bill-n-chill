@@ -5,6 +5,7 @@ export type ProjectRecord = {
   id: number;
   name: string;
   customer_display_name: string;
+  status: string;
 };
 
 export type PaymentDirection = string; // "inbound" | "outbound"

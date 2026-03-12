@@ -44,7 +44,7 @@ type HierarchyRule = {
 
 const CUSTOMERS_HUB_CRUMB: CrumbDef = { href: "/customers", label: "Customers" };
 const PROJECTS_HUB_CRUMB: CrumbDef = { href: "/projects", label: "Projects" };
-const BILLING_HUB_CRUMB: CrumbDef = { href: "/invoices", label: "Billing" };
+const BILLING_HUB_CRUMB: CrumbDef = { href: "/bills", label: "Billing" };
 const META_HUB_CRUMB: CrumbDef = { href: "/ops/organization", label: "Business" };
 
 import { defaultApiBaseUrl } from "@/shared/api/base";
@@ -55,7 +55,6 @@ import { defaultApiBaseUrl } from "@/shared/api/base";
  */
 const legacyProjectScopedPrefixes = [
   "/change-orders",
-  "/invoices",
 ];
 
 /**
@@ -86,8 +85,8 @@ const hierarchyRules: HierarchyRule[] = [
     crumbs: [{ href: "/change-orders", label: "Change Orders" }],
   },
   {
-    when: (pathname) => pathname === "/invoices",
-    crumbs: [BILLING_HUB_CRUMB, { href: "/invoices", label: "Invoices" }],
+    when: (pathname) => /^\/projects\/\d+\/invoices$/.test(pathname),
+    crumbs: [PROJECTS_HUB_CRUMB, { href: "/invoices", label: "Invoices" }],
   },
   {
     when: (pathname) =>
@@ -164,7 +163,7 @@ function isLegacyProjectScopedRoute(pathname: string): boolean {
 
 /** Billing hub routes don't show a project crumb even when project-scoped. */
 function isBillingRoute(pathname: string): boolean {
-  return pathname === "/invoices" || pathname === "/bills";
+  return pathname === "/bills";
 }
 
 /**
@@ -184,7 +183,7 @@ function projectScopedHref(href: string, projectId: string): string {
     return `/projects/${encodeURIComponent(projectId)}/change-orders`;
   }
   if (href === "/invoices") {
-    return `/invoices?project=${encodeURIComponent(projectId)}`;
+    return `/projects/${encodeURIComponent(projectId)}/invoices`;
   }
   if (href === "/bills") {
     return `/bills?project=${encodeURIComponent(projectId)}`;

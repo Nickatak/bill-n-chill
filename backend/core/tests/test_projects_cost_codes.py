@@ -689,15 +689,15 @@ class ProjectFinancialSummaryTests(TestCase):
         self.assertEqual(data["outbound_unapplied_credit"], "300.00")
         self.assertIn("traceability", data)
         self.assertEqual(data["traceability"]["approved_change_orders"]["ui_route"], "/change-orders")
-        self.assertEqual(data["traceability"]["ar_invoices"]["ui_route"], "/invoices")
+        self.assertEqual(data["traceability"]["ar_invoices"]["ui_route"], f"/projects/{self.project.id}/invoices")
         self.assertEqual(
             data["traceability"]["ar_payments"]["ui_route"],
-            f"/financials-auditing?project={self.project.id}",
+            "/payments",
         )
         self.assertEqual(data["traceability"]["ap_vendor_bills"]["ui_route"], "/vendor-bills")
         self.assertEqual(
             data["traceability"]["ap_payments"]["ui_route"],
-            f"/financials-auditing?project={self.project.id}",
+            "/payments",
         )
         self.assertEqual(data["traceability"]["approved_change_orders"]["total"], "2000.00")
         self.assertEqual(data["traceability"]["ar_invoices"]["total"], "1200.00")

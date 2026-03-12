@@ -549,7 +549,6 @@ export function ProjectsConsole() {
               </div>
               <div className={styles.treeBranches}>
                 <div className={styles.branch}>
-                  <span className={styles.branchLabel}>Scope Control</span>
                   <div className={styles.node}>
                     <Link href={`/projects/${selectedProject.id}/estimates`}>Estimates</Link>
                     <span className={styles.nodeEstimateMeta}>
@@ -579,31 +578,10 @@ export function ProjectsConsole() {
                     </span>
                   </div>
                   <div className={styles.node}>
-                    <Link href={`/projects/${selectedProject.id}/audit-trail`}>Audit Trail</Link>
+                    <Link href={`/projects/${selectedProject.id}/invoices`}>Invoices</Link>
                   </div>
-                </div>
-                <div className={styles.branch}>
-                  <div className={styles.branchGroup}>
-                    <span className={styles.branchSubLabel}>Receivables</span>
-                    <div className={styles.node}>
-                      <Link href="/invoices">Invoices</Link>
-                    </div>
-                    <div className={styles.node}>
-                      <Link href={`/invoices?project=${selectedProject.id}`}>
-                        Payments In (AR)
-                      </Link>
-                    </div>
-                  </div>
-                  <div className={styles.branchGroup}>
-                    <span className={styles.branchSubLabel}>Payables</span>
-                    <div className={styles.node}>
-                      <Link href={`/bills?project=${selectedProject.id}`}>Bills</Link>
-                    </div>
-                    <div className={styles.node}>
-                      <Link href={`/bills?project=${selectedProject.id}`}>
-                        Payments Out (AP)
-                      </Link>
-                    </div>
+                  <div className={styles.node}>
+                    <Link href={`/projects/${selectedProject.id}/audit-trail`}>Event History</Link>
                   </div>
                 </div>
               </div>

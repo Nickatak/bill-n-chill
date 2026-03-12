@@ -374,11 +374,8 @@ describe("ProjectsConsole", () => {
 
     expect(screen.getByText("Estimates")).toHaveAttribute("href", "/projects/1/estimates");
     expect(screen.getByText("Change Orders")).toHaveAttribute("href", "/projects/1/change-orders");
-    expect(screen.getByText("Audit Trail")).toHaveAttribute("href", "/projects/1/audit-trail");
-    expect(screen.getByText("Invoices")).toHaveAttribute("href", "/invoices");
-    expect(screen.getByText("Payments In (AR)")).toHaveAttribute("href", "/invoices?project=1");
-    expect(screen.getByText("Bills")).toHaveAttribute("href", "/bills?project=1");
-    expect(screen.getByText("Payments Out (AP)")).toHaveAttribute("href", "/bills?project=1");
+    expect(screen.getByText("Invoices")).toHaveAttribute("href", "/projects/1/invoices");
+    expect(screen.getByText("Event History")).toHaveAttribute("href", "/projects/1/audit-trail");
   });
 
   // ---------------------------------------------------------------------------

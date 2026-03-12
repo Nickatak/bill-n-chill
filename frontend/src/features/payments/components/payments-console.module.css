@@ -1,0 +1,521 @@
+/* Payments console — standalone page for recording and managing payments. */
+
+.console {
+  display: grid;
+  gap: var(--space-md);
+  color: var(--text-primary);
+}
+
+/* ── Auth / read-only notices ──────────────────────── */
+
+.authNotice {
+  composes: noticeWarning from "../../../shared/styles/notices.module.css";
+}
+
+.readOnlyNotice {
+  composes: noticeWarning from "../../../shared/styles/notices.module.css";
+}
+
+/* ── Status banner ─────────────────────────────────── */
+
+.statusBanner {
+  composes: notice from "../../../shared/styles/notices.module.css";
+  margin: 0;
+}
+
+.statusSuccess {
+  composes: noticeSuccess from "../../../shared/styles/notices.module.css";
+}
+
+.statusError {
+  composes: noticeError from "../../../shared/styles/notices.module.css";
+}
+
+/* ── Direction toggle ──────────────────────────────── */
+
+.directionToggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  width: fit-content;
+}
+
+.directionButton {
+  padding: var(--space-sm) var(--space-lg);
+  border: none;
+  background: var(--surface-secondary);
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.directionButton:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+
+.directionButton:hover {
+  background: var(--surface-hover);
+}
+
+.directionButtonActive {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.directionButtonActive:hover {
+  background: var(--accent-hover);
+}
+
+/* ── Payment list panel ────────────────────────────── */
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-secondary);
+  padding: var(--space-md);
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.panelHeader h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+/* ── Status filter pills ───────────────────────────── */
+
+.statusFilters {
+  display: flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.statusFilterPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-secondary);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.statusFilterPillActive {
+  border-color: var(--accent-border);
+  background: var(--accent-light);
+  color: var(--accent-text);
+}
+
+.statusFilterPillInactive:hover {
+  background: var(--surface-hover);
+}
+
+.statusFilterCount {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+/* ── Payment cards ─────────────────────────────────── */
+
+.paymentList {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.paymentCard {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface-secondary);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+
+.paymentCard:last-child {
+  border-bottom: none;
+}
+
+.paymentCard:hover {
+  background: var(--surface-hover);
+}
+
+.paymentCardSelected {
+  background: var(--surface-hover);
+  border-left: 3px solid var(--accent);
+}
+
+.paymentCardRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.paymentCardIdentity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-weight: 600;
+  min-width: 0;
+}
+
+.paymentCardAmount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-size: 0.94rem;
+}
+
+.paymentMetaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-xs);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.paymentMetaLabel {
+  font-weight: 700;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-right: 4px;
+}
+
+/* ── Status badges ─────────────────────────────────── */
+
+.statusPending {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--status-amber-bg);
+  border-color: var(--status-amber-border);
+  color: var(--status-amber-text);
+}
+
+.statusSettled {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--status-green-bg);
+  border-color: var(--status-green-border);
+  color: var(--status-green-text);
+}
+
+.statusVoid {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--status-gray-bg);
+  border-color: var(--status-gray-border);
+  color: var(--status-gray-text);
+}
+
+/* ── Direction badges ──────────────────────────────── */
+
+.directionBadge {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Empty state ───────────────────────────────────── */
+
+.emptyState {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: var(--space-md);
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+/* ── Detail card (selected payment) ────────────────── */
+
+.detailCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-secondary);
+  padding: var(--space-md);
+  display: grid;
+  gap: var(--space-md);
+}
+
+.detailHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.detailTitle {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.detailMetrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-sm);
+}
+
+.metric {
+  display: grid;
+  gap: 2px;
+}
+
+.metricLabel {
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+}
+
+.metricValue {
+  font-weight: 700;
+  font-size: 0.94rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.quickActions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+/* ── Section labels ────────────────────────────────── */
+
+.sectionLabel {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Allocation list ───────────────────────────────── */
+
+.allocationList {
+  display: grid;
+  gap: 0;
+}
+
+.allocationRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+}
+
+.allocationRow:last-child {
+  border-bottom: none;
+}
+
+.allocationTarget {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.allocationAmount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Allocation form ───────────────────────────────── */
+
+.allocationForm {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--space-sm);
+  align-items: end;
+}
+
+/* ── Workspace form (create / edit) ────────────────── */
+
+.workspace {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-secondary);
+  padding: var(--space-md);
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.workspaceTitle {
+  margin: 0;
+  font-size: 0.94rem;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.workspaceBadge {
+  font-size: 0.72rem;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--accent-border);
+  background: var(--accent-light);
+  color: var(--accent-text);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm);
+}
+
+.fieldFull {
+  grid-column: 1 / -1;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+}
+
+.fieldLabel {
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.console input,
+.console select,
+.console textarea {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-primary);
+  padding: var(--space-sm) 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.console textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+/* ── Inline hint ───────────────────────────────────── */
+
+.inlineHint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+/* ── Buttons ───────────────────────────────────────── */
+
+.primaryButton {
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-sm);
+  font-weight: 700;
+  cursor: pointer;
+  width: fit-content;
+}
+
+.primaryButton:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.primaryButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.secondaryButton {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-primary);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.secondaryButton:hover {
+  background: var(--surface-hover);
+}
+
+.secondaryButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* ── Search input ──────────────────────────────────── */
+
+.paymentSearchInput {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Responsive ────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .fieldGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .allocationForm {
+    grid-template-columns: 1fr;
+  }
+
+  .paymentMetaGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .detailMetrics {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .directionToggle {
+    width: 100%;
+  }
+
+  .directionButton {
+    flex: 1;
+    text-align: center;
+  }
+}
+
+@media print {
+  .console {
+    display: none;
+  }
+}

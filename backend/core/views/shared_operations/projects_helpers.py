@@ -178,7 +178,7 @@ def _build_project_financial_summary_data(project: Project, user):
             ],
         },
         "ar_invoices": {
-            "ui_route": "/invoices",
+            "ui_route": f"/projects/{project.id}/invoices",
             "list_endpoint": f"/api/v1/projects/{project.id}/invoices/",
             "total": f"{invoiced_to_date:.2f}",
             "records": [
@@ -193,7 +193,7 @@ def _build_project_financial_summary_data(project: Project, user):
             ],
         },
         "ar_payments": {
-            "ui_route": f"/financials-auditing?project={project.id}",
+            "ui_route": "/payments",
             "list_endpoint": f"/api/v1/projects/{project.id}/payments/",
             "total": f"{paid_to_date:.2f}",
             "records": [
@@ -223,7 +223,7 @@ def _build_project_financial_summary_data(project: Project, user):
             ],
         },
         "ap_payments": {
-            "ui_route": f"/financials-auditing?project={project.id}",
+            "ui_route": "/payments",
             "list_endpoint": f"/api/v1/projects/{project.id}/payments/",
             "total": f"{ap_paid:.2f}",
             "records": [

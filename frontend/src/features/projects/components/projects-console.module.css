@@ -229,7 +229,6 @@
 
 .treeBranches {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-md);
 }
 
@@ -239,27 +238,6 @@
   align-content: start;
   border-left: 3px solid var(--border-accent);
   padding-left: 10px;
-}
-
-.branchLabel {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
-.branchGroup {
-  display: grid;
-  gap: var(--space-sm);
-}
-
-.branchSubLabel {
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--text-secondary);
-  font-weight: 600;
 }
 
 .node {
