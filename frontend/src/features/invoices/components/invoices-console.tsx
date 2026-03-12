@@ -496,10 +496,10 @@ export function InvoicesConsole() {
 
 
   const loadInvoices = useCallback(
-    async (projectIdArg?: number) => {
+    async (projectIdArg?: number): Promise<InvoiceRecord[]> => {
       const resolvedProjectId = projectIdArg ?? Number(selectedProjectId);
       if (!token || !resolvedProjectId) {
-        return;
+        return [];
       }
 
       try {
@@ -510,7 +510,7 @@ export function InvoicesConsole() {
 
         if (!response.ok) {
           setErrorStatus(readInvoiceApiError(payload, "Failed loading invoices."));
-          return;
+          return [];
         }
 
         const rows = (payload.data as InvoiceRecord[]) ?? [];
@@ -523,8 +523,10 @@ export function InvoicesConsole() {
           return rows[0] ? String(rows[0].id) : "";
         });
         setStatusMessage("");
+        return rows;
       } catch {
         setErrorStatus("Could not reach invoice endpoint.");
+        return [];
       }
     },
     [normalizedBaseUrl, selectedProjectId, setErrorStatus, setStatusMessage, token],
@@ -579,6 +581,45 @@ export function InvoicesConsole() {
     [normalizedBaseUrl, token],
   );
 
+  const invoiceToWorkspaceLines = useCallback(
+    (invoice: InvoiceRecord): InvoiceLineInput[] => {
+      const sourceLines = invoice.line_items ?? [];
+      if (!sourceLines.length) {
+        return [emptyLine(1)];
+      }
+      return sourceLines.map((line, index) => ({
+        localId: index + 1,
+        costCode: line.cost_code ? String(line.cost_code) : "",
+        description: line.description || "",
+        quantity: line.quantity || "1",
+        unit: line.unit || "ea",
+        unitPrice: line.unit_price || "0",
+      }));
+    },
+    [],
+  );
+
+  const loadInvoiceIntoWorkspace = useCallback(
+    (invoice: InvoiceRecord) => {
+      const workspaceLines = invoiceToWorkspaceLines(invoice);
+      setIssueDate(invoice.issue_date || todayDateInput());
+      setDueDate(invoice.due_date || futureDateInput());
+      setTaxPercent(invoice.tax_percent || "0");
+      setTermsText(invoice.terms_text || "");
+      setLineItems(workspaceLines);
+      setNextLineId(workspaceLines.length + 1);
+      setWorkspaceSourceInvoiceId(invoice.id);
+      if (invoice.status === "draft") {
+        setEditingDraftInvoiceId(invoice.id);
+        setWorkspaceContext(`Editing ${invoice.invoice_number}`);
+      } else {
+        setEditingDraftInvoiceId(null);
+        setWorkspaceContext(`Viewing ${invoice.invoice_number} (locked)`);
+      }
+    },
+    [invoiceToWorkspaceLines],
+  );
+
   // -------------------------------------------------------------------------
   // Data-loading effects
   // -------------------------------------------------------------------------
@@ -593,7 +634,7 @@ export function InvoicesConsole() {
   }, [loadDependencies, token]);
 
   // Reload invoices and contract breakdown whenever the selected project changes.
-  // Also reset the workspace draft.
+  // Auto-load the first invoice into the workspace so the creator reflects the selection.
   useEffect(() => {
     const projectId = Number(selectedProjectId);
     if (!token || !projectId) {
@@ -602,10 +643,16 @@ export function InvoicesConsole() {
       setContractBreakdown(null);
       return;
     }
-    void loadInvoices(projectId);
+    void (async () => {
+      const rows = await loadInvoices(projectId);
+      if (rows.length > 0) {
+        loadInvoiceIntoWorkspace(rows[0]);
+      } else {
+        resetCreateDraft();
+      }
+    })();
     void loadContractBreakdown(projectId);
-    resetCreateDraft();
-  }, [loadContractBreakdown, loadInvoices, selectedProjectId, token]);
+  }, [loadContractBreakdown, loadInvoiceIntoWorkspace, loadInvoices, selectedProjectId, token]);
 
   // Auto-select the first project that has invoices when the default project is empty.
   useEffect(() => {
@@ -767,45 +814,6 @@ export function InvoicesConsole() {
         : [...current, statusValue],
     );
   }
-
-  const invoiceToWorkspaceLines = useCallback(
-    (invoice: InvoiceRecord): InvoiceLineInput[] => {
-      const sourceLines = invoice.line_items ?? [];
-      if (!sourceLines.length) {
-        return [emptyLine(1)];
-      }
-      return sourceLines.map((line, index) => ({
-        localId: index + 1,
-        costCode: line.cost_code ? String(line.cost_code) : "",
-        description: line.description || "",
-        quantity: line.quantity || "1",
-        unit: line.unit || "ea",
-        unitPrice: line.unit_price || "0",
-      }));
-    },
-    [],
-  );
-
-  const loadInvoiceIntoWorkspace = useCallback(
-    (invoice: InvoiceRecord) => {
-      const workspaceLines = invoiceToWorkspaceLines(invoice);
-      setIssueDate(invoice.issue_date || todayDateInput());
-      setDueDate(invoice.due_date || futureDateInput());
-      setTaxPercent(invoice.tax_percent || "0");
-      setTermsText(invoice.terms_text || "");
-      setLineItems(workspaceLines);
-      setNextLineId(workspaceLines.length + 1);
-      setWorkspaceSourceInvoiceId(invoice.id);
-      if (invoice.status === "draft") {
-        setEditingDraftInvoiceId(invoice.id);
-        setWorkspaceContext(`Editing ${invoice.invoice_number}`);
-      } else {
-        setEditingDraftInvoiceId(null);
-        setWorkspaceContext(`Viewing ${invoice.invoice_number} (locked)`);
-      }
-    },
-    [invoiceToWorkspaceLines],
-  );
 
   /** Switch the active project, triggering invoice reload. */
   function handleSelectProject(project: { id: number }) {
@@ -1426,11 +1434,8 @@ export function InvoicesConsole() {
                         className={`${styles.invoiceCard} ${invoiceCardStatusClass(invoice.status)} ${
                           isSelected ? styles.invoiceCardSelected : ""
                         }`}
-                        onClick={() => {
-                          if (!isSelected) handleSelectInvoice(invoice);
-                        }}
+                        onClick={() => handleSelectInvoice(invoice)}
                         onKeyDown={(event) => {
-                          if (isSelected) return;
                           if (event.key === "Enter" || event.key === " ") {
                             event.preventDefault();
                             handleSelectInvoice(invoice);
