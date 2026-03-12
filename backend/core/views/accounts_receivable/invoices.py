@@ -533,8 +533,21 @@ def invoice_detail_view(request, invoice_id: int):
                 changed_by=request.user,
             )
 
+    email_sent = False
+    if next_status == Invoice.Status.SENT and (
+        previous_status != Invoice.Status.SENT or is_resend
+    ):
+        customer_email = (invoice.customer.email or "").strip()
+        email_sent = send_document_sent_email(
+            document_type="Invoice",
+            document_title=f"Invoice {invoice.invoice_number}",
+            public_url=f"{settings.FRONTEND_URL}/invoice/{invoice.public_ref}",
+            recipient_email=customer_email,
+            sender_user=request.user,
+        )
+
     invoice.refresh_from_db()
-    return Response({"data": InvoiceSerializer(invoice).data})
+    return Response({"data": InvoiceSerializer(invoice).data, "email_sent": email_sent})
 
 
 @api_view(["POST"])

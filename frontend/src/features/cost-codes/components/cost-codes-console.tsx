@@ -12,6 +12,8 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
+import { useClientPagination } from "@/shared/hooks/use-client-pagination";
+import { PaginationControls } from "@/shared/components/pagination-controls";
 import styles from "./cost-codes-console.module.css";
 import { ApiResponse, CostCode, CsvImportResult } from "../types";
 
@@ -64,6 +66,8 @@ export function CostCodesConsole() {
       return haystack.includes(needle);
     });
   }, [orderedRows, searchTerm, visibilityFilter]);
+  const { paginatedItems: pageRows, page, totalPages, totalCount, setPage } =
+    useClientPagination(filteredRows, 25);
   const includeArchived = visibilityFilter === "all";
   const activeRowCount = rows.filter((row) => row.is_active).length;
   const archivedRowCount = rows.length - activeRowCount;
@@ -318,8 +322,8 @@ export function CostCodesConsole() {
             </div>
 
             <div className={styles.list}>
-              {filteredRows.length ? (
-                filteredRows.map((row) => (
+              {pageRows.length ? (
+                pageRows.map((row) => (
                   <button
                     key={row.id}
                     type="button"
@@ -345,6 +349,12 @@ export function CostCodesConsole() {
                 <p className={styles.emptyState}>No codes match this search.</p>
               )}
             </div>
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              totalCount={totalCount}
+              onPageChange={setPage}
+            />
           </section>
 
           <div className={styles.layoutRight}>

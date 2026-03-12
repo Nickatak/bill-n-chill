@@ -195,7 +195,7 @@ describe("EstimatesConsole", () => {
     // After loading deps + selecting project, estimates endpoint should be called
     await waitFor(() => {
       const estimateCalls = mockFetch.mock.calls.filter(
-        ([url]: [string]) => url.includes("/projects/7/estimates"),
+        (call) => String(call[0]).includes("/projects/7/estimates"),
       );
       expect(estimateCalls.length).toBeGreaterThanOrEqual(1);
     }, { timeout: 3000 });

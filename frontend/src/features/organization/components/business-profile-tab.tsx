@@ -42,6 +42,7 @@ export function BusinessProfileTab({
 
   const [displayNameDraft, setDisplayNameDraft] = useState(profile.display_name);
   const [phoneNumberDraft, setPhoneNumberDraft] = useState(profile.phone_number ?? "");
+  const [helpEmailDraft, setHelpEmailDraft] = useState(profile.help_email ?? "");
   const [websiteUrlDraft, setWebsiteUrlDraft] = useState(profile.website_url ?? "");
   const [licenseNumberDraft, setLicenseNumberDraft] = useState(profile.license_number ?? "");
   const [taxIdDraft, setTaxIdDraft] = useState(profile.tax_id ?? "");
@@ -58,6 +59,7 @@ export function BusinessProfileTab({
   const hasChanges =
     displayNameDraft.trim() !== profile.display_name ||
     phoneNumberDraft.trim() !== (profile.phone_number || "") ||
+    helpEmailDraft.trim() !== (profile.help_email || "") ||
     websiteUrlDraft.trim() !== (profile.website_url || "") ||
     licenseNumberDraft.trim() !== (profile.license_number || "") ||
     taxIdDraft.trim() !== (profile.tax_id || "") ||
@@ -112,6 +114,7 @@ export function BusinessProfileTab({
     const payload = {
       display_name: displayNameDraft.trim(),
       phone_number: phoneNumberDraft.trim(),
+      help_email: helpEmailDraft.trim(),
       website_url: websiteUrlDraft.trim(),
       license_number: licenseNumberDraft.trim(),
       tax_id: taxIdDraft.trim(),
@@ -141,6 +144,7 @@ export function BusinessProfileTab({
         const org = data.organization;
         setDisplayNameDraft(org.display_name);
         setPhoneNumberDraft(org.phone_number ?? "");
+        setHelpEmailDraft(org.help_email ?? "");
         setWebsiteUrlDraft(org.website_url ?? "");
         setLicenseNumberDraft(org.license_number ?? "");
         setTaxIdDraft(org.tax_id ?? "");
@@ -248,6 +252,17 @@ export function BusinessProfileTab({
           />
         </label>
       </div>
+
+      <label className={`${styles.field} ${styles.fieldNarrow}`}>
+        <span className={styles.fieldLabel}>Help / Support Email</span>
+        <input
+          value={helpEmailDraft}
+          onChange={(e) => setHelpEmailDraft(e.target.value)}
+          type="email"
+          placeholder="help@yourcompany.com"
+          disabled={disabled}
+        />
+      </label>
 
       <label className={styles.field}>
         <span className={styles.fieldLabel}>Street Address</span>

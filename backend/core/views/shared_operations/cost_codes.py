@@ -10,7 +10,6 @@ from core.serializers import CostCodeSerializer
 from core.utils.csv_import import CsvImportError, process_csv_import
 from core.views.helpers import (
     _ensure_membership,
-    _paginate_queryset,
     _parse_request_bool,
     _capability_gate,
 )
@@ -33,9 +32,7 @@ def cost_codes_list_create_view(request):
     if request.method == "GET":
         rows = CostCode.objects.filter(scope_filter).order_by("code", "name")
 
-        rows, meta = _paginate_queryset(rows, request.query_params)
-
-        return Response({"data": CostCodeSerializer(rows, many=True).data, "meta": meta})
+        return Response({"data": CostCodeSerializer(rows, many=True).data})
 
     permission_error, _ = _capability_gate(request.user, "cost_codes", "create")
     if permission_error:

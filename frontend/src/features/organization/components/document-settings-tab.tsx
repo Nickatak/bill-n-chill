@@ -28,9 +28,9 @@ type DocumentSettingsTabProps = {
 type DocType = "invoice" | "estimate" | "change_order";
 
 const DOC_TYPES: Array<{ value: DocType; label: string }> = [
-  { value: "invoice", label: "Invoices" },
   { value: "estimate", label: "Estimates" },
   { value: "change_order", label: "Change Orders" },
+  { value: "invoice", label: "Invoices" },
 ];
 
 function extractErrorMessage(payload: ApiResponse | null, fallback: string): string {
@@ -48,9 +48,8 @@ export function DocumentSettingsTab({
   onError,
 }: DocumentSettingsTabProps) {
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
-  const [activeDocType, setActiveDocType] = useState<DocType>("invoice");
+  const [activeDocType, setActiveDocType] = useState<DocType>("estimate");
 
-  const [helpEmailDraft, setHelpEmailDraft] = useState(profile.help_email ?? "");
   const [invoiceDueDeltaDraft, setInvoiceDueDeltaDraft] = useState(
     String(profile.default_invoice_due_delta ?? 30),
   );
@@ -69,7 +68,6 @@ export function DocumentSettingsTab({
   const [isSaving, setIsSaving] = useState(false);
 
   const hasChanges =
-    helpEmailDraft.trim() !== (profile.help_email || "") ||
     String(Number(invoiceDueDeltaDraft || "30")) !==
       String(profile.default_invoice_due_delta || 30) ||
     String(Number(estimateValidDeltaDraft || "30")) !==
@@ -95,7 +93,6 @@ export function DocumentSettingsTab({
       : 30;
 
     const payload = {
-      help_email: helpEmailDraft.trim(),
       default_invoice_due_delta: sanitizedDueDelta,
       default_estimate_valid_delta: sanitizedEstimateDelta,
       invoice_terms_and_conditions: invoiceTermsDraft.trim(),
@@ -120,7 +117,6 @@ export function DocumentSettingsTab({
         | undefined;
       if (data?.organization) {
         const org = data.organization;
-        setHelpEmailDraft(org.help_email ?? "");
         setInvoiceDueDeltaDraft(String(org.default_invoice_due_delta ?? 30));
         setEstimateValidDeltaDraft(String(org.default_estimate_valid_delta ?? 30));
         setInvoiceTermsDraft(org.invoice_terms_and_conditions ?? "");
@@ -139,17 +135,6 @@ export function DocumentSettingsTab({
 
   return (
     <form className={styles.profileForm} onSubmit={handleSave}>
-      <label className={styles.field}>
-        <span className={styles.fieldLabel}>Help Email</span>
-        <input
-          value={helpEmailDraft}
-          onChange={(e) => setHelpEmailDraft(e.target.value)}
-          type="email"
-          placeholder="help@example.com"
-          disabled={disabled}
-        />
-      </label>
-
       <div className={styles.docTypeTabs}>
         {DOC_TYPES.map((dt) => (
           <button

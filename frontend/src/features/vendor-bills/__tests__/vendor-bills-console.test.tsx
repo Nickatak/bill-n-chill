@@ -256,7 +256,7 @@ describe("VendorBillsConsole", () => {
 
     await waitFor(() => {
       const billCalls = mockFetch.mock.calls.filter(
-        ([url]: [string]) => url.includes("/projects/7/vendor-bills"),
+        (call) => String(call[0]).includes("/projects/7/vendor-bills"),
       );
       expect(billCalls.length).toBeGreaterThanOrEqual(1);
     }, { timeout: 3000 });

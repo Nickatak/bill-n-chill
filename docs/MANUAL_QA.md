@@ -2,13 +2,24 @@
 
 Organized by domain. Check off as you go.
 
-- Logo broken. (Also, we want this viewer)
-- Invoice email sending isn't working.
-- Public estimate text isn't working.
+- [x] Logo broken. 
+    This was an annoying permissions issue with Caddy (the reverse proxy).  This has been resolved.
+- [x] Invoice email sending isn't working.
+    Added. Verified working.
+- [x] Public estimate text isn't working.
+    This actually IS working - but I think we want to arrange the order of the tabs on the document settings to reflect our workflow from left->right (Estimates, CO's, Invoices).  I also moved the help-email to the business/org settings page.
+- [x] Rough Electrical/Finish Electrical cost codes.
+    So, I did add those, I wasn't crazy.  The problem is that I decided to paginate 25 cost codes at a time, and there was a bug where the pagination display wasn't showing - so it looked like said cost codes didn't exist.
+
+- [] Logo in documentCreator?
+- Auto line loading for the invoice isn't working.
 - Remove line items for bills.
-- Rough Electrical/Finish Electrical cost codes.
+- Probably want original estimate line items on both the editor/public for CO.
 
 
+- Bug: When adding a new customer + project, the new customer is added to the viewer, BUT the new project (for the customer) is not.
+- Bug: I created a new customer + project (with an email instead of a phone number).  When I go to set the status to SENT on an estimate, I get the `WARNING: This customer has no email on file and will not receive an automated email.` message.  This shouldn't happen - since there is an email. Interestingly, it actually sends anyway.  This behavior is also present with re-send.
+- Visual bug:  When a logo is present on the public facing document, we probably want to remove the border/box around it.
 
 
 ---

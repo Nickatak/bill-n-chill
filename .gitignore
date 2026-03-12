@@ -26,6 +26,7 @@ backend/.venv/
 backend/.runtime/
 backend/db.sqlite3
 backend/media/
+media/
 *.sqlite3
 
 # Env files

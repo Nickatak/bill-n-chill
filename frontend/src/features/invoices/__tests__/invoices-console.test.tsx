@@ -251,7 +251,7 @@ describe("InvoicesConsole", () => {
 
     await waitFor(() => {
       const invoiceCalls = mockFetch.mock.calls.filter(
-        ([url]: [string]) => url.includes("/projects/7/invoices"),
+        (call) => String(call[0]).includes("/projects/7/invoices"),
       );
       expect(invoiceCalls.length).toBeGreaterThanOrEqual(1);
     }, { timeout: 3000 });
