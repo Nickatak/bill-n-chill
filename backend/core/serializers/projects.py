@@ -10,6 +10,8 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     customer_display_name = serializers.CharField(source="customer.display_name", read_only=True)
     customer_billing_address = serializers.CharField(source="customer.billing_address", read_only=True)
+    customer_email = serializers.CharField(source="customer.email", read_only=True)
+    customer_phone = serializers.CharField(source="customer.phone", read_only=True)
 
     class Meta:
         model = Project
@@ -18,6 +20,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             "customer",
             "customer_display_name",
             "customer_billing_address",
+            "customer_email",
+            "customer_phone",
             "name",
             "site_address",
             "status",

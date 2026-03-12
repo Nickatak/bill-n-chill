@@ -147,6 +147,12 @@
   background: var(--surface-secondary);
 }
 
+.logoBox:has(.logoImage) {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
 .logoImage {
   width: 100%;
   max-height: 72px;

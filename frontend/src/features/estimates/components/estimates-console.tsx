@@ -1658,7 +1658,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                           );
                         })}
                       </div>
-                      {selectedStatus === "sent" && !selectedEstimate?.project_context?.customer_email?.trim() ? (
+                      {selectedStatus === "sent" && !selectedProject?.customer_email?.trim() ? (
                         <p className={styles.actionError}>WARNING: This customer has no email on file and will not receive an automated email.</p>
                       ) : null}
                       {nextStatusOptions.length === 0 ? (

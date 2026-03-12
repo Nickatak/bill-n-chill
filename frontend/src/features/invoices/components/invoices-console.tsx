@@ -1324,7 +1324,7 @@ export function InvoicesConsole() {
                                               );
                                             })}
                                           </div>
-                                          {selectedStatus === "sent" && !selectedInvoice?.project_context?.customer_email?.trim() ? (
+                                          {selectedStatus === "sent" && !selectedProject?.customer_email?.trim() ? (
                                             <p className={styles.invoiceViewerActionError}>WARNING: This customer has no email on file and will not receive an automated email.</p>
                                           ) : null}
                                         </>

@@ -185,14 +185,14 @@ export function CustomersConsole() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, query, page, normalizedBaseUrl, scopedCustomerId, refreshKey]);
 
-  // Fetch project index once on mount for the per-customer project accordion
+  // Fetch project index for the per-customer project accordion (re-runs on refreshKey so newly created projects appear)
   useEffect(() => {
     if (!token) {
       return;
     }
     void loadProjectsIndex();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, normalizedBaseUrl]);
+  }, [token, normalizedBaseUrl, refreshKey]);
 
   /** Open the edit modal for a customer, closing the project creator if open. */
   function openEditor(id: string) {

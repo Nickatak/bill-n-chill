@@ -147,6 +147,7 @@ export function ChangeOrdersConsole({
   const [newLineNextLocalId, setNewLineNextLocalId] = useState(2);
   const [editLineNextLocalId, setEditLineNextLocalId] = useState(2);
   const [selectedProjectName, setSelectedProjectName] = useState("");
+  const [selectedProjectCustomerEmail, setSelectedProjectCustomerEmail] = useState("");
   const [organizationDefaults, setOrganizationDefaults] =
     useState<OrganizationDocumentDefaults | null>(null);
 
@@ -922,7 +923,7 @@ export function ChangeOrdersConsole({
         setFeedback(readChangeOrderApiError(payload, "Could not load projects."), "error");
         return;
       }
-      const rows = (payload.data as Array<{ id: number; name: string }>) ?? [];
+      const rows = (payload.data as Array<{ id: number; name: string; customer_email?: string }>) ?? [];
       setNewLineItems([emptyLine(1)]);
       setNewLineNextLocalId(2);
       if (rows[0]) {
@@ -936,6 +937,7 @@ export function ChangeOrdersConsole({
             : "";
         setSelectedProjectId(String(nextProject.id));
         setSelectedProjectName(nextProject.name || "");
+        setSelectedProjectCustomerEmail(nextProject.customer_email || "");
         await Promise.all([
           loadProjectEstimates(nextProject.id),
           loadProjectAuditEvents(nextProject.id),
@@ -957,6 +959,7 @@ export function ChangeOrdersConsole({
       } else {
         setSelectedProjectId("");
         setSelectedProjectName("");
+        setSelectedProjectCustomerEmail("");
         setOriginEstimateOriginalTotals({});
         setProjectEstimates([]);
         setProjectAuditEvents([]);
@@ -1618,7 +1621,7 @@ export function ChangeOrdersConsole({
                                       );
                                     })}
                                   </div>
-                                  {quickStatus === "pending_approval" && !selectedViewerChangeOrder.project_context?.customer_email?.trim() ? (
+                                  {quickStatus === "pending_approval" && !selectedProjectCustomerEmail.trim() ? (
                                     <p className={creatorStyles.actionError}>WARNING: This customer has no email on file and will not receive an automated email.</p>
                                   ) : null}
                                 </>
