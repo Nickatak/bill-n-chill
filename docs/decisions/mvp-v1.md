@@ -109,23 +109,11 @@ Goal: strengthen legal enforceability and signer verification for estimate/chang
 - Simple defaults first; advanced controls behind explicit toggles.
 - Both dark mode and light mode are implemented, with a theme toggle. Dark mode provides high-contrast, outdoor-legible tokens; light mode is the default for public-facing pages.
 
-## Mobile and Desktop Strategy (v1)
+## Mobile and Desktop Strategy (v1) — Superseded
 
-- Product posture: mobile-first for in-field speed, desktop-first for complex editing and review.
-- Mobile should optimize short, high-frequency actions (generally under 2 minutes).
-- Desktop should optimize dense data workflows (tables, comparisons, multi-step edits).
+Original strategy moved to `mobile-desktop-strategy-v1.md` (decision log). Superseded by `product-direction-refinement.md` — all flows now target mobile, not just quick lookups.
 
-Primary mobile workflows:
-- Quick Add Customer with optional project shell.
-- Field notes, status updates, and quick approvals.
-- Fast invoice/bill/payment status checks.
-
-Primary desktop workflows:
-- Estimate authoring and revision.
-- Cost-code management.
-- Invoice composition, financial reconciliation, and reporting.
-
-Theme requirements:
+Theme requirements (unchanged):
 - Both dark and light modes are implemented with a user-facing theme toggle.
 - Dark mode provides high-contrast tokens tuned for outdoor/construction-site legibility.
 - Light mode is forced on public-facing pages; internal pages respect the user's toggle.
