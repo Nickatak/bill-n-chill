@@ -296,6 +296,94 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
                     </div>
                   </section>
                 </div>
+                {changeOrder.origin_estimate_context?.line_items?.length ||
+                changeOrder.approved_sibling_change_orders?.length ? (
+                  <div className={styles.breakdownSection}>
+                    <h4 className={frameStyles.panelTitle}>Contract Breakdown</h4>
+
+                    {changeOrder.origin_estimate_context?.line_items?.length ? (
+                      <>
+                        <p className={styles.breakdownLabel}>
+                          Approved Estimate: {changeOrder.origin_estimate_context.title} v
+                          {changeOrder.origin_estimate_context.version}
+                        </p>
+                        <div className={frameStyles.tableWrap}>
+                          <table className={frameStyles.table}>
+                            <thead>
+                              <tr>
+                                <th>Cost Code</th>
+                                <th>Description</th>
+                                <th>Qty</th>
+                                <th>Unit</th>
+                                <th>Unit Cost</th>
+                                <th>Markup %</th>
+                                <th>Line Total</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {changeOrder.origin_estimate_context.line_items.map((line) => (
+                                <tr key={line.id}>
+                                  <td>{line.cost_code_code || "—"}</td>
+                                  <td>{line.description || "—"}</td>
+                                  <td>{line.quantity}</td>
+                                  <td>{line.unit}</td>
+                                  <td>${line.unit_cost}</td>
+                                  <td>{line.markup_percent}%</td>
+                                  <td>${line.line_total}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className={styles.totalRow}>
+                          <span>Estimate Grand Total</span>
+                          <strong>${changeOrder.origin_estimate_context.grand_total}</strong>
+                        </div>
+                      </>
+                    ) : null}
+
+                    {changeOrder.approved_sibling_change_orders?.length ? (
+                      <>
+                        <p className={styles.breakdownLabel}>
+                          Approved Change Orders ({changeOrder.approved_sibling_change_orders.length})
+                        </p>
+                        <div className={frameStyles.tableWrap}>
+                          <table className={frameStyles.table}>
+                            <thead>
+                              <tr>
+                                <th>CO #</th>
+                                <th>Cost Code</th>
+                                <th>Description</th>
+                                <th>Adjustment Reason</th>
+                                <th>Amount Delta</th>
+                                <th>Days Delta</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {changeOrder.approved_sibling_change_orders.flatMap((co) =>
+                                co.line_items.map((line, idx) => (
+                                  <tr key={`${co.id}-${line.id}`}>
+                                    {idx === 0 ? (
+                                      <td rowSpan={co.line_items.length}>
+                                        {co.title} r{co.revision_number}
+                                      </td>
+                                    ) : null}
+                                    <td>{line.cost_code_code || "—"}</td>
+                                    <td>{line.description || "—"}</td>
+                                    <td>{line.adjustment_reason || "—"}</td>
+                                    <td>${formatDecimal(parseAmount(line.amount_delta))}</td>
+                                    <td>{line.days_delta}</td>
+                                  </tr>
+                                )),
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 <div className={frameStyles.terms}>
                   <h4>Terms and Conditions</h4>
                   {termsText

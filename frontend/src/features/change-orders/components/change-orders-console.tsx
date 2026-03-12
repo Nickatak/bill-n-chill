@@ -72,6 +72,18 @@ type ChangeOrdersConsoleProps = {
   initialOriginEstimateId?: number | null;
 };
 
+type OriginEstimateLineItem = {
+  id: number;
+  cost_code_code?: string;
+  cost_code_name?: string;
+  description: string;
+  quantity: string;
+  unit: string;
+  unit_cost: string;
+  markup_percent: string;
+  line_total: string;
+};
+
 type OriginEstimateRecord = {
   id: number;
   title: string;
@@ -80,6 +92,8 @@ type OriginEstimateRecord = {
   approved_by_email: string | null;
   financial_baseline_status?: "none" | "active" | "superseded";
   is_active_financial_baseline?: boolean;
+  grand_total: string;
+  line_items: OriginEstimateLineItem[];
 };
 
 type AuditEventRecord = {
@@ -166,6 +180,7 @@ export function ChangeOrdersConsole({
   const [isStatusSectionOpen, setIsStatusSectionOpen] = useState(true);
   const [isHistorySectionOpen, setIsHistorySectionOpen] = useState(false);
   const [isLineItemsSectionOpen, setIsLineItemsSectionOpen] = useState(true);
+  const [isOriginLineItemsSectionOpen, setIsOriginLineItemsSectionOpen] = useState(false);
   const [showAllEvents, setShowAllEvents] = useState(false);
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const { statusLabels: changeOrderStatusLabels, allowedTransitions: changeOrderAllowedTransitions } =
@@ -266,6 +281,12 @@ export function ChangeOrdersConsole({
     viewerChangeOrders[0] ??
     null;
   const selectedViewerEstimateRecordId = selectedViewerEstimate?.id ?? null;
+  const approvedCOsForSelectedEstimate = useMemo(() => {
+    if (!selectedViewerEstimateRecordId) return [];
+    return viewerChangeOrders.filter((co) =>
+      ["approved", "accepted"].includes(co.status),
+    );
+  }, [viewerChangeOrders, selectedViewerEstimateRecordId]);
   const selectedViewerChangeOrderIdValue = selectedViewerChangeOrder?.id ?? null;
   const selectedViewerChangeOrderLineDelta = selectedViewerChangeOrder
     ? parseAmount(selectedViewerChangeOrder.line_total_delta || selectedViewerChangeOrder.amount_delta)
@@ -754,12 +775,23 @@ export function ChangeOrdersConsole({
           title: string;
           version: number;
           status?: string;
+          grand_total?: string;
+          line_items?: OriginEstimateLineItem[];
           financial_baseline_status?: "none" | "active" | "superseded";
           is_active_financial_baseline?: boolean;
         }>) ?? [];
       const approvedRows = rows.filter((estimate) => estimate.status === "approved");
-      const approvedRowsWithMeta = await Promise.all(
+      const approvedRowsWithMeta: OriginEstimateRecord[] = await Promise.all(
         approvedRows.map(async (estimate) => {
+          const base = {
+            id: estimate.id,
+            title: estimate.title,
+            version: estimate.version,
+            financial_baseline_status: estimate.financial_baseline_status,
+            is_active_financial_baseline: estimate.is_active_financial_baseline,
+            grand_total: estimate.grand_total ?? "0.00",
+            line_items: estimate.line_items ?? [],
+          };
           try {
             const response = await fetch(
               `${normalizedBaseUrl}/estimates/${estimate.id}/status-events/`,
@@ -770,7 +802,7 @@ export function ChangeOrdersConsole({
             const payload: ApiResponse = await response.json();
             if (!response.ok) {
               return {
-                ...estimate,
+                ...base,
                 approved_at: null,
                 approved_by_email: null,
               };
@@ -785,13 +817,13 @@ export function ChangeOrdersConsole({
               .reverse()
               .find((event) => event.to_status === "approved");
             return {
-              ...estimate,
+              ...base,
               approved_at: approvedEvent?.changed_at ?? null,
               approved_by_email: approvedEvent?.changed_by_email ?? null,
             };
           } catch {
             return {
-              ...estimate,
+              ...base,
               approved_at: null,
               approved_by_email: null,
             };
@@ -804,6 +836,11 @@ export function ChangeOrdersConsole({
           ? String(initialOriginEstimateId)
           : "";
       setProjectEstimates(approvedRowsWithMeta);
+      const totalsMap: Record<number, number> = {};
+      for (const est of approvedRowsWithMeta) {
+        totalsMap[est.id] = parseFloat(est.grand_total) || 0;
+      }
+      setOriginEstimateOriginalTotals(totalsMap);
       setSelectedViewerEstimateId((current) => {
         if (preferredEstimateId) {
           return preferredEstimateId;
@@ -1399,6 +1436,117 @@ export function ChangeOrdersConsole({
   }
 
   // -------------------------------------------------------------------------
+  // Contract breakdown (estimate + approved COs) — shared by viewer and both creators
+  // -------------------------------------------------------------------------
+
+  function renderContractBreakdown(opts?: { style?: React.CSSProperties }) {
+    if (!selectedViewerEstimate) return null;
+    const hasEstimateLines = selectedViewerEstimate.line_items.length > 0;
+    const hasApprovedCOs = approvedCOsForSelectedEstimate.length > 0;
+    if (!hasEstimateLines && !hasApprovedCOs) return null;
+
+    return (
+      <div className={styles.viewerSection} style={opts?.style}>
+        <button
+          type="button"
+          className={styles.viewerSectionToggle}
+          onClick={() => setIsOriginLineItemsSectionOpen((v) => !v)}
+          aria-expanded={isOriginLineItemsSectionOpen}
+        >
+          <h4>Contract Breakdown</h4>
+          <span className={styles.viewerSectionArrow}>▼</span>
+        </button>
+        {isOriginLineItemsSectionOpen ? (
+          <div className={styles.viewerSectionContent}>
+            {hasEstimateLines ? (
+              <div className={styles.lineTableWrap}>
+                <table className={styles.lineTable}>
+                  <caption className={styles.lineTableCaption}>
+                    Approved Estimate: {selectedViewerEstimate.title} v{selectedViewerEstimate.version}
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th>Cost code</th>
+                      <th>Description</th>
+                      <th>Qty</th>
+                      <th>Unit</th>
+                      <th>Unit cost</th>
+                      <th>Markup %</th>
+                      <th>Line total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedViewerEstimate.line_items.map((line) => (
+                      <tr key={line.id}>
+                        <td>{line.cost_code_code || "—"}</td>
+                        <td>{line.description || "—"}</td>
+                        <td>{line.quantity}</td>
+                        <td>{line.unit}</td>
+                        <td>${line.unit_cost}</td>
+                        <td>{line.markup_percent}%</td>
+                        <td>${line.line_total}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+            <div className={styles.viewerMetaRow}>
+              <span className={styles.viewerMetaLabel}>Estimate grand total</span>
+              <strong>${selectedViewerEstimate.grand_total}</strong>
+            </div>
+
+            {hasApprovedCOs ? (
+              <div className={styles.lineTableWrap}>
+                <table className={styles.lineTable}>
+                  <caption className={styles.lineTableCaption}>
+                    Approved Change Orders ({approvedCOsForSelectedEstimate.length})
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th>CO #</th>
+                      <th>Cost code</th>
+                      <th>Description</th>
+                      <th>Adjustment reason</th>
+                      <th>Amount delta</th>
+                      <th>Days delta</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {approvedCOsForSelectedEstimate.flatMap((co) =>
+                      co.line_items.map((line, idx) => (
+                        <tr key={`${co.id}-${line.id}`}>
+                          {idx === 0 ? (
+                            <td rowSpan={co.line_items.length}>
+                              {co.title} r{co.revision_number}
+                            </td>
+                          ) : null}
+                          <td>{line.cost_code_code || "—"}</td>
+                          <td>{line.description || "—"}</td>
+                          <td>{line.adjustment_reason || "—"}</td>
+                          <td>${line.amount_delta}</td>
+                          <td>{line.days_delta}</td>
+                        </tr>
+                      )),
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+
+            {hasApprovedCOs ? (
+              <div className={styles.viewerMetaRow}>
+                <span className={styles.viewerMetaLabel}>Net contract total</span>
+                <strong>${currentAcceptedTotal ?? "—"}</strong>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
 
@@ -1774,6 +1922,8 @@ export function ChangeOrdersConsole({
                             </div>
                           ) : null}
                         </div>
+
+                        {renderContractBreakdown()}
                       </>
                     ) : null}
                   </>
@@ -2010,6 +2160,8 @@ export function ChangeOrdersConsole({
                     Add Line Item
                   </button>
                 </div>
+
+                {renderContractBreakdown({ style: { marginTop: "var(--space-md)" } })}
 
                 <div className={changeOrderCreatorStyles.coSheetFooter}>
                   <div className={changeOrderCreatorStyles.coTotalsColumn}>
@@ -2273,6 +2425,8 @@ export function ChangeOrdersConsole({
                     </button>
                   </div>
                 ) : null}
+
+                {renderContractBreakdown({ style: { marginTop: "var(--space-md)" } })}
 
                 <div className={changeOrderCreatorStyles.coSheetFooter}>
                   <div className={changeOrderCreatorStyles.coTotalsColumn}>

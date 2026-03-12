@@ -63,6 +63,7 @@ from core.views.cash_management.payments import (
 from core.views.shared_operations.projects import (
     project_accounting_export_view,
     project_audit_events_view,
+    project_contract_breakdown_view,
     project_detail_view,
     project_financial_summary_view,
     projects_list_view,
@@ -123,6 +124,7 @@ __all__ = [
     "project_timeline_events_view",
     "quick_jump_search_view",
     "project_audit_events_view",
+    "project_contract_breakdown_view",
     "project_accounting_export_view",
     "attention_feed_view",
     "portfolio_snapshot_view",

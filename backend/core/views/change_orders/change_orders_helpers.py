@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from core.models import ChangeOrder, ChangeOrderLine, CostCode
-from core.serializers import ChangeOrderSerializer
+from core.serializers import ChangeOrderSerializer, EstimateLineItemSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
     _resolve_organization_for_public_actor,
@@ -14,18 +14,40 @@ from core.views.helpers import (
 
 
 def _serialize_public_change_order(change_order, request=None) -> dict:
-    """Serialize a change order with project and organization context for public preview."""
+    """Serialize a change order with project and organization context for public preview.
+
+    Includes origin estimate line items and approved sibling change orders for
+    the contract breakdown section on the public document.
+    """
     serialized = ChangeOrderSerializer(change_order).data
     organization = _resolve_organization_for_public_actor(change_order.requested_by)
     serialized["project_context"] = _serialize_public_project_context(change_order.project)
     serialized["organization_context"] = _serialize_public_organization_context(organization, request=request)
     if change_order.origin_estimate_id:
+        estimate = change_order.origin_estimate
         serialized["origin_estimate_context"] = {
-            "id": change_order.origin_estimate_id,
-            "title": change_order.origin_estimate.title,
-            "version": change_order.origin_estimate.version,
-            "public_ref": change_order.origin_estimate.public_ref,
+            "id": estimate.id,
+            "title": estimate.title,
+            "version": estimate.version,
+            "public_ref": estimate.public_ref,
+            "grand_total": str(estimate.grand_total),
+            "line_items": EstimateLineItemSerializer(
+                estimate.line_items.select_related("cost_code").all(), many=True
+            ).data,
         }
+        # Approved/accepted sibling COs on the same origin estimate (excluding this CO).
+        sibling_cos = (
+            ChangeOrder.objects.filter(
+                origin_estimate_id=estimate.id,
+                status__in=["approved", "accepted"],
+            )
+            .exclude(id=change_order.id)
+            .prefetch_related("line_items", "line_items__cost_code")
+            .order_by("created_at", "id")
+        )
+        serialized["approved_sibling_change_orders"] = [
+            ChangeOrderSerializer(co).data for co in sibling_cos
+        ]
     return serialized
 
 

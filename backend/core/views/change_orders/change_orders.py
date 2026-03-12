@@ -56,6 +56,8 @@ def public_change_order_detail_view(request, public_token: str):
             .prefetch_related(
                 "line_items",
                 "line_items__cost_code",
+                "origin_estimate__line_items",
+                "origin_estimate__line_items__cost_code",
             )
             .get(public_token=public_token)
         )

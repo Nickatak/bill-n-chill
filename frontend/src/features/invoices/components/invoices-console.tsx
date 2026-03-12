@@ -67,6 +67,47 @@ import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/pro
 // ---------------------------------------------------------------------------
 
 type ProjectStatusValue = ProjectListStatusValue;
+
+type ContractBreakdownEstimateLine = {
+  id: number;
+  cost_code_code?: string;
+  description: string;
+  quantity: string;
+  unit: string;
+  unit_cost: string;
+  markup_percent: string;
+  line_total: string;
+};
+
+type ContractBreakdownEstimate = {
+  id: number;
+  title: string;
+  version: number;
+  grand_total: string;
+  line_items: ContractBreakdownEstimateLine[];
+};
+
+type ContractBreakdownCO = {
+  id: number;
+  title: string;
+  family_key: string;
+  revision_number: number;
+  amount_delta: string;
+  line_items: Array<{
+    id: number;
+    cost_code_code?: string;
+    description: string;
+    adjustment_reason: string;
+    amount_delta: string;
+    days_delta: number;
+  }>;
+};
+
+type ContractBreakdown = {
+  active_estimate: ContractBreakdownEstimate | null;
+  approved_change_orders: ContractBreakdownCO[];
+};
+
 const INVOICE_STATUSES_FALLBACK = ["draft", "sent", "partially_paid", "paid", "void"];
 
 const INVOICE_STATUS_LABELS_FALLBACK: Record<string, string> = {
@@ -257,6 +298,8 @@ export function InvoicesConsole() {
   const [workspaceContext, setWorkspaceContext] = useState("New invoice draft");
   const invoiceCreatorRef = useRef<HTMLDivElement | null>(null);
   const [creatorFlashCount, setCreatorFlashCount] = useState(0);
+  const [contractBreakdown, setContractBreakdown] = useState<ContractBreakdown | null>(null);
+  const [isContractBreakdownOpen, setIsContractBreakdownOpen] = useState(false);
   const { setPrintable } = usePrintable();
 
   // -------------------------------------------------------------------------
@@ -487,6 +530,29 @@ export function InvoicesConsole() {
     [normalizedBaseUrl, selectedProjectId, setErrorStatus, setStatusMessage, token],
   );
 
+  const loadContractBreakdown = useCallback(
+    async (projectId: number) => {
+      if (!token || !projectId) {
+        setContractBreakdown(null);
+        return;
+      }
+      try {
+        const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/contract-breakdown/`, {
+          headers: buildAuthHeaders(token),
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.data) {
+          setContractBreakdown(null);
+          return;
+        }
+        setContractBreakdown(payload.data as ContractBreakdown);
+      } catch {
+        setContractBreakdown(null);
+      }
+    },
+    [normalizedBaseUrl, token],
+  );
+
   const loadInvoiceStatusEvents = useCallback(
     async (invoiceId: number) => {
       if (!token || !invoiceId) {
@@ -526,18 +592,20 @@ export function InvoicesConsole() {
     void loadDependencies();
   }, [loadDependencies, token]);
 
-  // Reload invoices whenever the selected project changes.
+  // Reload invoices and contract breakdown whenever the selected project changes.
   // Also reset the workspace draft.
   useEffect(() => {
     const projectId = Number(selectedProjectId);
     if (!token || !projectId) {
       setInvoices([]);
       setSelectedInvoiceId("");
+      setContractBreakdown(null);
       return;
     }
     void loadInvoices(projectId);
+    void loadContractBreakdown(projectId);
     resetCreateDraft();
-  }, [loadInvoices, selectedProjectId, token]);
+  }, [loadContractBreakdown, loadInvoices, selectedProjectId, token]);
 
   // Auto-select the first project that has invoices when the default project is empty.
   useEffect(() => {
@@ -1106,6 +1174,124 @@ export function InvoicesConsole() {
       })),
     [invoices],
   );
+
+  // -------------------------------------------------------------------------
+  // Contract breakdown (read-only reference)
+  // -------------------------------------------------------------------------
+
+  function renderContractBreakdown(opts?: { style?: React.CSSProperties }) {
+    if (!contractBreakdown?.active_estimate) return null;
+    const estimate = contractBreakdown.active_estimate;
+    const approvedCOs = contractBreakdown.approved_change_orders;
+    const hasEstimateLines = estimate.line_items.length > 0;
+    const hasApprovedCOs = approvedCOs.length > 0;
+    if (!hasEstimateLines && !hasApprovedCOs) return null;
+
+    return (
+      <div className={styles.invoiceViewerSection} style={opts?.style}>
+        <button
+          type="button"
+          className={styles.invoiceViewerSectionToggle}
+          onClick={() => setIsContractBreakdownOpen((v) => !v)}
+          aria-expanded={isContractBreakdownOpen}
+        >
+          <h4>Contract Breakdown</h4>
+          <span className={styles.invoiceViewerSectionArrow}>▼</span>
+        </button>
+        {isContractBreakdownOpen ? (
+          <div className={styles.invoiceViewerSectionContent}>
+            {hasEstimateLines ? (
+              <div className={styles.invoiceLineTableWrap}>
+                <table className={styles.invoiceLineTable}>
+                  <caption className={styles.invoiceLineTableCaption}>
+                    Approved Estimate: {estimate.title} v{estimate.version}
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th>Cost code</th>
+                      <th>Description</th>
+                      <th>Qty</th>
+                      <th>Unit</th>
+                      <th>Unit cost</th>
+                      <th>Markup %</th>
+                      <th>Line total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {estimate.line_items.map((line) => (
+                      <tr key={line.id}>
+                        <td>{line.cost_code_code || "—"}</td>
+                        <td>{line.description || "—"}</td>
+                        <td>{line.quantity}</td>
+                        <td>{line.unit}</td>
+                        <td>${line.unit_cost}</td>
+                        <td>{line.markup_percent}%</td>
+                        <td>${line.line_total}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+            <div className={styles.invoiceViewerMetaRow}>
+              <span className={styles.invoiceViewerMetaLabel}>Estimate grand total</span>
+              <strong>${estimate.grand_total}</strong>
+            </div>
+
+            {hasApprovedCOs ? (
+              <div className={styles.invoiceLineTableWrap}>
+                <table className={styles.invoiceLineTable}>
+                  <caption className={styles.invoiceLineTableCaption}>
+                    Approved Change Orders ({approvedCOs.length})
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th>CO #</th>
+                      <th>Cost code</th>
+                      <th>Description</th>
+                      <th>Adjustment reason</th>
+                      <th>Amount delta</th>
+                      <th>Days delta</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {approvedCOs.flatMap((co) =>
+                      co.line_items.map((line, idx) => (
+                        <tr key={`${co.id}-${line.id}`}>
+                          {idx === 0 ? (
+                            <td rowSpan={co.line_items.length}>
+                              {co.title} r{co.revision_number}
+                            </td>
+                          ) : null}
+                          <td>{line.cost_code_code || "—"}</td>
+                          <td>{line.description || "—"}</td>
+                          <td>{line.adjustment_reason || "—"}</td>
+                          <td>${formatDecimal(parseAmount(line.amount_delta))}</td>
+                          <td>{line.days_delta}</td>
+                        </tr>
+                      )),
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+
+            {hasApprovedCOs ? (
+              <div className={styles.invoiceViewerMetaRow}>
+                <span className={styles.invoiceViewerMetaLabel}>Net contract total</span>
+                <strong>
+                  ${formatDecimal(
+                    parseAmount(estimate.grand_total) +
+                      approvedCOs.reduce((sum, co) => sum + parseAmount(co.amount_delta), 0),
+                  )}
+                </strong>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   // -------------------------------------------------------------------------
   // Render
@@ -1741,6 +1927,8 @@ export function InvoicesConsole() {
                           </button>
                         </div>
                       ) : null}
+
+                      {renderContractBreakdown({ style: { marginTop: "var(--space-md)" } })}
 
                       {!selectedProjectId ? (
                         <p className={creatorStyles.inlineHint}>Select a project before creating an invoice.</p>

@@ -67,6 +67,7 @@ from core.views import (
     project_detail_view,
     project_accounting_export_view,
     project_audit_events_view,
+    project_contract_breakdown_view,
     project_timeline_events_view,
     project_accounting_sync_events_view,
     project_financial_summary_view,
@@ -137,6 +138,11 @@ urlpatterns = [
         "projects/<int:project_id>/financial-summary/",
         project_financial_summary_view,
         name="project-financial-summary",
+    ),
+    path(
+        "projects/<int:project_id>/contract-breakdown/",
+        project_contract_breakdown_view,
+        name="project-contract-breakdown",
     ),
     path(
         "projects/<int:project_id>/audit-events/",

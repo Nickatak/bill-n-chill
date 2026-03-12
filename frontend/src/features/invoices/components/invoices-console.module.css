@@ -745,6 +745,28 @@
   font-size: 0.86rem;
 }
 
+.invoiceLineTableCaption {
+  caption-side: top;
+  text-align: left;
+  padding: var(--space-sm);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.invoiceViewerMetaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.invoiceViewerMetaLabel {
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
 /* ── Print ────────────────────────────────────────────────────── */
 
 @media print {

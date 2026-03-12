@@ -11,8 +11,10 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import Project
+from core.models import ChangeOrder, Estimate, Project
 from core.serializers import (
+    ChangeOrderSerializer,
+    EstimateLineItemSerializer,
     ProjectFinancialSummarySerializer,
     ProjectProfileSerializer,
     ProjectSerializer,
@@ -283,6 +285,62 @@ def project_accounting_export_view(request, project_id: int):
     )
     response["X-Export-Generated-At"] = generated_at
     return response
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def project_contract_breakdown_view(request, project_id: int):
+    """Return the active financial baseline estimate and approved change orders for a project.
+
+    Returns the most recently approved estimate (the active financial baseline) with its
+    line items, plus all approved/accepted change orders linked to that estimate with their
+    line items. Single response, no additional fetches required.
+    """
+    membership = _ensure_membership(request.user)
+    try:
+        project = Project.objects.get(id=project_id, organization_id=membership.organization_id)
+    except Project.DoesNotExist:
+        return Response(
+            {"error": {"code": "not_found", "message": "Project not found.", "fields": {}}},
+            status=404,
+        )
+
+    # Find the most recently approved estimate (active financial baseline).
+    active_estimate = (
+        Estimate.objects.filter(project=project, status=Estimate.Status.APPROVED)
+        .prefetch_related("line_items", "line_items__cost_code")
+        .order_by("-created_at", "-id")
+        .first()
+    )
+
+    if not active_estimate:
+        return Response({"data": {"active_estimate": None, "approved_change_orders": []}})
+
+    estimate_data = {
+        "id": active_estimate.id,
+        "title": active_estimate.title,
+        "version": active_estimate.version,
+        "grand_total": str(active_estimate.grand_total),
+        "line_items": EstimateLineItemSerializer(
+            active_estimate.line_items.select_related("cost_code").all(), many=True
+        ).data,
+    }
+
+    approved_cos = (
+        ChangeOrder.objects.filter(
+            origin_estimate_id=active_estimate.id,
+            status__in=["approved", "accepted"],
+        )
+        .prefetch_related("line_items", "line_items__cost_code")
+        .order_by("created_at", "id")
+    )
+
+    return Response({
+        "data": {
+            "active_estimate": estimate_data,
+            "approved_change_orders": [ChangeOrderSerializer(co).data for co in approved_cos],
+        }
+    })
 
 
 @api_view(["GET"])

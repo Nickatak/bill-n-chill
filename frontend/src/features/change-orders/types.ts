@@ -67,7 +67,29 @@ export type ChangeOrderRecord = {
     title: string;
     version: number;
     public_ref?: string;
+    grand_total?: string;
+    line_items?: Array<{
+      id: number;
+      cost_code_code?: string;
+      cost_code_name?: string;
+      description: string;
+      quantity: string;
+      unit: string;
+      unit_cost: string;
+      markup_percent: string;
+      line_total: string;
+    }>;
   };
+  approved_sibling_change_orders?: Array<{
+    id: number;
+    title: string;
+    family_key: string;
+    revision_number: number;
+    status: string;
+    amount_delta: string;
+    line_total_delta: string;
+    line_items: ChangeOrderLineRecord[];
+  }>;
 };
 
 export type ChangeOrderPolicyContract = {
