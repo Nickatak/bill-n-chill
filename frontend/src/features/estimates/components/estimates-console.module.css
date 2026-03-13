@@ -607,6 +607,20 @@
   border-color: var(--accent-hover);
 }
 
+.ghostButton {
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--accent);
+  padding: 8px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ghostButton:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
 .summary {
   max-width: 320px;
   margin-left: auto;
@@ -1696,6 +1710,309 @@
 
   .composerPrepPanel {
     width: 100%;
+  }
+}
+
+@media (max-width: 700px) {
+  /* ── Containment: every grid/flex ancestor must allow shrinking ── */
+  .console,
+  .lifecycle,
+  .versionTree,
+  .versionFilters,
+  .familyGroup,
+  .composerPrep,
+  .statusEvents {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .lifecycle {
+    padding: var(--space-sm);
+    border-radius: 10px;
+  }
+
+  .lifecycleHeader h3 {
+    font-size: 1rem;
+  }
+
+  .versionTree {
+    padding: 6px;
+    gap: 6px;
+  }
+
+  /* ── Version filter pills ── */
+  .versionFilterButtons {
+    gap: 6px;
+  }
+
+  .versionFilterButtons .statusPill {
+    padding: 5px 8px;
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+  }
+
+  .versionFilterActions {
+    gap: 6px;
+  }
+
+  .versionFilterActionButton {
+    min-height: 44px;
+    flex: 1 1 0;
+    text-align: center;
+  }
+
+  /* ── Family cards: fully vertical stacked layout ── */
+  .familyGroup {
+    padding: 8px;
+  }
+
+  .familyRow {
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  .familyMainColumn {
+    flex-shrink: 1;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .familyMain {
+    /* Wrap layout: badges + links share the first row, content takes full width below */
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-items: center;
+    min-width: 0;
+    min-height: 0;
+    gap: 6px 8px;
+    padding: 6px 10px 10px;
+  }
+
+  /* Badges sit inline, pushed right */
+  .versionRight {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    order: -1;
+    gap: 6px;
+    margin-left: auto;
+  }
+
+  /* Public links sit inline next to badges */
+  .familyPublicBar {
+    order: -1;
+    width: auto;
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }
+
+  .familyPublicBar::after {
+    display: none;
+  }
+
+  /* Content takes full width, forcing a new row, with top separator */
+  .familyMainContent {
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    align-self: auto;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+  }
+
+  .familyTitle {
+    word-break: break-word;
+  }
+
+  .familyMeta {
+    word-break: break-word;
+    font-size: 0.72rem;
+  }
+
+  .familyFooter {
+    gap: 6px;
+  }
+
+  .familyActionButton,
+  .familyActionLink {
+    min-height: 44px;
+    display: inline-grid;
+    place-items: center;
+  }
+
+  .familyPublicBar {
+    gap: 8px;
+  }
+
+  .familyPublicLink {
+    min-height: 44px;
+    display: inline-grid;
+    place-items: center;
+  }
+
+  /* ── History cards: vertical stack below family card ── */
+  .historyRow {
+    flex-direction: column;
+    gap: 6px;
+    padding-bottom: 0;
+  }
+
+  .historyCardColumn {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .historyCard {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .historyPublicLink {
+    align-self: center;
+    white-space: nowrap;
+    min-height: 44px;
+    display: inline-grid;
+    place-items: center;
+  }
+
+  /* ── Version baseline banner ── */
+  .versionBaselineBanner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .versionBaselineJumpButton {
+    min-height: 44px;
+    width: 100%;
+    text-align: center;
+  }
+
+  .versionBaselineSelected {
+    font-size: 0.68rem;
+  }
+
+  /* ── Status picker / lifecycle ── */
+  .statusPills {
+    gap: 6px;
+  }
+
+  .statusPill {
+    min-height: 44px;
+    padding: 6px 10px;
+    letter-spacing: 0.06em;
+  }
+
+  .statusNote {
+    min-height: 80px;
+    font-size: 1rem;
+  }
+
+  .lifecycleActions {
+    flex-direction: column;
+  }
+
+  .lifecycleActionButton {
+    flex: 1 1 auto;
+    min-height: 44px;
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+
+  .lifecycleLinkAction {
+    min-height: 44px;
+    text-align: center;
+    display: grid;
+    place-items: center;
+  }
+
+  /* ── Financial activation panel ── */
+  .financialActivationButton {
+    min-height: 44px;
+    width: 100%;
+    text-align: center;
+  }
+
+  /* ── Workspace toolbar ── */
+  .workspaceToolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .workspaceToolbarHint {
+    display: none;
+  }
+
+  .workspaceContext {
+    order: 1;
+  }
+
+  .workspaceToolbarActions {
+    display: grid;
+    gap: 8px;
+    order: 0;
+    align-self: stretch;
+    width: 100%;
+  }
+
+  .composerPrepActions {
+    justify-content: stretch;
+  }
+
+  .secondaryButton,
+  .ghostButton {
+    min-height: 44px;
+    width: 100%;
+  }
+
+  /* ── Status events: stacked cards ── */
+  .statusEventsTable {
+    min-width: 0;
+  }
+
+  .statusEventsTable thead {
+    display: none;
+  }
+
+  .statusEventsTable tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-secondary);
+    margin-bottom: 6px;
+  }
+
+  .statusEventsTable tbody tr:nth-child(even) {
+    background: var(--surface-secondary);
+  }
+
+  .statusEventsTable tbody td {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 4px 0;
+    border-top: 0;
+    font-size: 0.82rem;
+  }
+
+  .statusEventsTable tbody td::before {
+    content: attr(data-label);
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-tertiary, var(--text-secondary));
+    opacity: 0.7;
+  }
+
+  /* ── Duplicate dialog ── */
+  .duplicateDialog {
+    max-width: calc(100vw - 32px);
+    min-width: 0;
   }
 }
 

@@ -165,15 +165,19 @@ export function CostCodeCombobox({
     syncMenuPosition();
     setIsOpen(true);
 
+    // When a value is selected, the clear option (or empty-selection) occupies index 0,
+    // so the selected item's index shifts by 1.
+    const leadingOffset = (allowEmptySelection || selectedOption) ? 1 : 0;
+
     if (selectedOption) {
       const selectedInFilteredIndex = filteredOptions.findIndex(
         (option) => option.id === selectedOption.id,
       );
       if (selectedInFilteredIndex >= 0) {
-        setHighlightedIndex(allowEmptySelection ? selectedInFilteredIndex + 1 : selectedInFilteredIndex);
+        setHighlightedIndex(selectedInFilteredIndex + leadingOffset);
         return;
       }
-      setHighlightedIndex(allowEmptySelection ? 0 : 0);
+      setHighlightedIndex(0);
       return;
     }
 
@@ -201,6 +205,8 @@ export function CostCodeCombobox({
   function handleInputChange(nextValue: string) {
     setSearchQuery(nextValue);
     setIsOpen(true);
+    // When typing, the clear option disappears (selectedOption gets cleared below),
+    // so only allowEmptySelection provides a leading slot during active typing.
     if (!nextValue.trim()) {
       setHighlightedIndex(allowEmptySelection ? 0 : -1);
     } else {
@@ -221,9 +227,13 @@ export function CostCodeCombobox({
     }
   }
 
+  /** Whether the dropdown has a leading slot (empty selection or clear option) at index 0. */
+  const hasClearOption = !allowEmptySelection && !!selectedOption;
+  const hasLeadingSlot = allowEmptySelection || hasClearOption;
+
   /** Handle keyboard navigation and selection within the dropdown. */
   function handleInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    const navigableCount = filteredOptions.length + (allowEmptySelection ? 1 : 0);
+    const navigableCount = filteredOptions.length + (hasLeadingSlot ? 1 : 0);
 
     if (event.key === "ArrowDown") {
       event.preventDefault();
@@ -255,11 +265,11 @@ export function CostCodeCombobox({
 
     if (event.key === "Enter" && isOpen) {
       event.preventDefault();
-      if (allowEmptySelection && highlightedIndex === 0) {
+      if (hasLeadingSlot && highlightedIndex === 0) {
         commitSelection(null);
         return;
       }
-      const nextIndex = allowEmptySelection ? highlightedIndex - 1 : highlightedIndex;
+      const nextIndex = hasLeadingSlot ? highlightedIndex - 1 : highlightedIndex;
       if (nextIndex >= 0 && filteredOptions[nextIndex]) {
         commitSelection(filteredOptions[nextIndex]);
       }
@@ -292,10 +302,10 @@ export function CostCodeCombobox({
     if (!isOpen || highlightedIndex < 0) {
       return undefined;
     }
-    if (allowEmptySelection && highlightedIndex === 0) {
-      return `${listboxId}-none`;
+    if (hasLeadingSlot && highlightedIndex === 0) {
+      return allowEmptySelection ? `${listboxId}-none` : `${listboxId}-clear`;
     }
-    const nextIndex = allowEmptySelection ? highlightedIndex - 1 : highlightedIndex;
+    const nextIndex = hasLeadingSlot ? highlightedIndex - 1 : highlightedIndex;
     if (nextIndex < 0 || !filteredOptions[nextIndex]) {
       return undefined;
     }
@@ -370,8 +380,24 @@ export function CostCodeCombobox({
             </button>
           ) : null}
 
+          {!allowEmptySelection && selectedOption ? (
+            <button
+              id={`${listboxId}-clear`}
+              type="button"
+              role="option"
+              aria-selected={false}
+              className={`${styles.option} ${styles.clearOption} ${highlightedIndex === 0 ? styles.optionActive : ""}`}
+              onMouseDown={(event) => event.preventDefault()}
+              onMouseEnter={() => setHighlightedIndex(0)}
+              onClick={() => commitSelection(null)}
+            >
+              <span className={styles.clearOptionLabel}>Clear selection</span>
+            </button>
+          ) : null}
+
           {filteredOptions.map((option, index) => {
-            const optionIndex = allowEmptySelection ? index + 1 : index;
+            const hasClearOption = !allowEmptySelection && selectedOption;
+            const optionIndex = (allowEmptySelection || hasClearOption) ? index + 1 : index;
             const isActive = highlightedIndex === optionIndex;
             return (
               <button

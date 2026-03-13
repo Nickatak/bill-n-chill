@@ -55,6 +55,7 @@ import {
 } from "../helpers";
 import { EstimateSheet, OrganizationDocumentDefaults } from "./estimate-sheet";
 import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
+import { useMediaQuery } from "@/shared/hooks/use-media-query";
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -123,6 +124,7 @@ const ESTIMATE_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
 export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }: EstimatesConsoleProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isMobile = useMediaQuery("(max-width: 700px)");
   const { token, role, capabilities } = useSharedSessionAuth();
   const canMutateEstimates = canDo(capabilities, "estimates", "create");
   const canSendEstimates = canDo(capabilities, "estimates", "send");
@@ -1336,17 +1338,19 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
               ? `Estimates for: ${selectedProject.name}`
               : "Estimates"}
           </h3>
-          <button
-            type="button"
-            className={collapseButtonStyles.collapseButton}
-            onClick={() => setIsViewerExpanded((current) => !current)}
-            aria-expanded={isViewerExpanded}
-          >
-            {isViewerExpanded ? "Collapse" : "Expand"}
-          </button>
+          {!isMobile ? (
+            <button
+              type="button"
+              className={collapseButtonStyles.collapseButton}
+              onClick={() => setIsViewerExpanded((current) => !current)}
+              aria-expanded={isViewerExpanded}
+            >
+              {isViewerExpanded ? "Collapse" : "Expand"}
+            </button>
+          ) : null}
         </div>
 
-        {isViewerExpanded ? (
+        {(isMobile || isViewerExpanded) ? (
           <>
             <div className={styles.versionFilters}>
               <span className={styles.versionFiltersLabel}>Estimate status filter</span>
@@ -1730,14 +1734,14 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                           : statusClasses[event.to_status] ?? "";
                         return (
                           <tr key={event.id}>
-                            <td>
+                            <td data-label="Action">
                               <span className={`${styles.versionStatus} ${toStatusClass}`}>
                                 {formatStatusAction(event)}
                               </span>
                             </td>
-                            <td>{formatEventDate(event.changed_at)}</td>
-                            <td>{event.note || "—"}</td>
-                            <td>
+                            <td data-label="Occurred">{formatEventDate(event.changed_at)}</td>
+                            <td data-label="Note">{event.note || "—"}</td>
+                            <td data-label="Who">
                               {event.changed_by_customer_id ? (
                                 <Link
                                   href={`/customers?customer=${event.changed_by_customer_id}`}
@@ -1784,7 +1788,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
             {selectedEstimate ? (
               <button
                 type="button"
-                className={styles.secondaryButton}
+                className={styles.ghostButton}
                 onClick={() => {
                   setDuplicateTitle(`${selectedEstimate.title || "Estimate"} Copy`);
                   duplicateDialogRef.current?.showModal();

@@ -1,0 +1,222 @@
+/* Mobile line-item card: stacked field layout replacing the desktop line table grid. */
+
+.cardList {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+}
+
+.card {
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  background: var(--surface);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+
+.card:nth-child(even) {
+  background: var(--table-row-alt);
+}
+
+.cardInvalid {
+  border-left: 3px solid var(--tone-error-border);
+}
+
+.cardIndex {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* Two-column field grid for half-span fields */
+.fieldGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.fieldFull {
+  display: grid;
+  gap: 4px;
+}
+
+.fieldHalf {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fieldLabel {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.fieldInput {
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 1rem;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.fieldInput[disabled],
+.fieldInput[readonly] {
+  background: var(--input-readonly-bg);
+  color: var(--input-readonly-text);
+  border-color: var(--input-border);
+  -webkit-text-fill-color: var(--input-readonly-text);
+  cursor: not-allowed;
+}
+
+.fieldSelect {
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 1rem;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.fieldSelect[disabled] {
+  background: var(--input-disabled-bg);
+  color: var(--input-disabled-text);
+  border-color: var(--input-disabled-border);
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.fieldStatic {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  padding: 10px 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.fieldStaticReadOnly {
+  color: var(--input-readonly-text);
+}
+
+.fieldStaticRight {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.fieldAlignRight {
+  text-align: right;
+  align-items: end;
+}
+
+/* Validation error shown inside the card */
+.validationError {
+  font-size: 0.82rem;
+  color: var(--tone-error-text);
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Action bar at card bottom */
+.cardActions {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  min-width: 0;
+}
+
+.moveActions {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.primaryActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  min-width: 0;
+}
+
+.moveButton {
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  background: var(--surface-secondary);
+  color: var(--accent-text);
+  padding: 8px 12px;
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  box-sizing: border-box;
+}
+
+.moveButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.duplicateButton {
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  background: var(--surface-secondary);
+  color: var(--accent-text);
+  padding: 8px 12px;
+  min-height: 44px;
+  width: 100%;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  box-sizing: border-box;
+}
+
+.duplicateButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.removeButton {
+  border: 1px solid var(--tone-error-border);
+  border-radius: var(--radius-md);
+  background: var(--tone-error-bg);
+  color: var(--tone-error-text);
+  padding: 8px 12px;
+  min-height: 44px;
+  width: 100%;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  box-sizing: border-box;
+}
+
+.removeButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

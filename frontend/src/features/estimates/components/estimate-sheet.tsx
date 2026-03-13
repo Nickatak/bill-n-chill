@@ -8,7 +8,10 @@ import { FormEvent } from "react";
 
 import { formatDateDisplay } from "@/shared/date-format";
 import { formatDecimal } from "@/shared/money-format";
+import { useMediaQuery } from "@/shared/hooks/use-media-query";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
+import { MobileLineItemCard } from "@/shared/document-creator/mobile-line-card";
+import mobileCardStyles from "@/shared/document-creator/mobile-line-card.module.css";
 import { CostCode, EstimateLineInput, ProjectRecord } from "../types";
 import { CostCodeCombobox } from "./cost-code-combobox";
 import { DocumentCreator } from "@/shared/document-creator";
@@ -132,6 +135,7 @@ export function EstimateSheet({
   onSortLineItems,
   onSubmit,
 }: EstimateSheetProps) {
+  const isMobile = useMediaQuery("(max-width: 700px)");
   const customerName = (project?.customer_display_name || "Customer name").trim();
   const rawBillingAddress = (project?.customer_billing_address || "").trim();
   const isExistingEstimate = Boolean(estimateId);
@@ -276,7 +280,6 @@ export function EstimateSheet({
                           placeholder="Enter estimate title"
                           disabled={titleReadOnly}
                           aria-disabled={titleReadOnly}
-                          required
                         />
                       )}
                     </label>
@@ -326,194 +329,340 @@ export function EstimateSheet({
         ),
         line_items: () => (
           <>
-            <div className={creatorStyles.lineTable}>
-              <div
-                className={`${creatorStyles.lineHeader} ${readOnly ? creatorStyles.lineHeaderReadOnly : ""} ${
-                  readOnly && !showMarkupColumn ? creatorStyles.lineHeaderNoMarkup : ""
-                }`}
-              >
-                <div className={creatorStyles.lineHeaderCell}>{renderSortableHeader("Qty", "quantity")}</div>
-                <div className={creatorStyles.lineHeaderCell}>
-                  <span>Description</span>
-                </div>
-                <div className={creatorStyles.lineHeaderCell}>{renderSortableHeader("Cost Code", "costCode")}</div>
-                <div className={creatorStyles.lineHeaderCell}>
-                  <span>Unit</span>
-                </div>
-                <div className={creatorStyles.lineHeaderCell}>
-                  {renderSortableHeader("Unit Price", "unitCost")}
-                </div>
-                {showMarkupColumn ? (
-                  <div className={creatorStyles.lineHeaderCell}>
-                    {renderSortableHeader("Markup", "markupPercent")}
-                  </div>
-                ) : null}
-                <div className={creatorStyles.lineHeaderCell}>{renderSortableHeader("Amount", "amount")}</div>
-                {!readOnly ? (
-                  <div className={creatorStyles.lineHeaderCell}>
-                    <span>Actions</span>
-                  </div>
-                ) : null}
+            {isMobile ? (
+              <div className={mobileCardStyles.cardList}>
+                {lineItems.map((line, index) => (
+                  <MobileLineItemCard
+                    key={line.localId}
+                    index={index}
+                    readOnly={readOnly}
+                    isFirst={index === 0}
+                    isLast={index === lineItems.length - 1}
+                    onRemove={readOnly ? undefined : () => onRemoveLineItem(line.localId)}
+                    onMoveUp={readOnly ? undefined : () => onMoveLineItem(line.localId, "up")}
+                    onMoveDown={readOnly ? undefined : () => onMoveLineItem(line.localId, "down")}
+                    onDuplicate={readOnly ? undefined : () => onDuplicateLineItem(line.localId)}
+                    fields={[
+                      {
+                        label: "Description",
+                        key: "description",
+                        span: "full",
+                        render: () =>
+                          showReadOnlyText ? (
+                            <span className={mobileCardStyles.fieldStatic}>{line.description || "No description"}</span>
+                          ) : (
+                            <input
+                              className={mobileCardStyles.fieldInput}
+                              aria-label="Description"
+                              value={line.description}
+                              onChange={(event) => onLineItemChange(line.localId, "description", event.target.value)}
+                              disabled={readOnly}
+                              required
+                            />
+                          ),
+                      },
+                      {
+                        label: "Cost Code",
+                        key: "costCode",
+                        span: "full",
+                        render: () =>
+                          showReadOnlyText ? (
+                            <span className={mobileCardStyles.fieldStatic}>{findCostCodeLabel(line.costCodeId)}</span>
+                          ) : (
+                            <CostCodeCombobox
+                              costCodes={costCodes}
+                              value={line.costCodeId}
+                              onChange={(nextValue) => onLineItemChange(line.localId, "costCodeId", nextValue)}
+                              ariaLabel="Cost code"
+                              disabled={readOnly}
+                              placeholder="Search cost code"
+                            />
+                          ),
+                      },
+                      {
+                        label: "Qty",
+                        key: "quantity",
+                        render: () =>
+                          showReadOnlyText ? (
+                            <span className={mobileCardStyles.fieldStatic}>{line.quantity || "0"}</span>
+                          ) : (
+                            <input
+                              className={mobileCardStyles.fieldInput}
+                              aria-label="Quantity"
+                              value={line.quantity}
+                              onChange={(event) => onLineItemChange(line.localId, "quantity", event.target.value)}
+                              inputMode="decimal"
+                              disabled={readOnly}
+                              required
+                            />
+                          ),
+                      },
+                      {
+                        label: "Unit",
+                        key: "unit",
+                        render: () =>
+                          showReadOnlyText ? (
+                            <span className={mobileCardStyles.fieldStatic}>{line.unit || "ea"}</span>
+                          ) : (
+                            <input
+                              className={mobileCardStyles.fieldInput}
+                              aria-label="Unit"
+                              value={line.unit}
+                              onChange={(event) => onLineItemChange(line.localId, "unit", event.target.value)}
+                              disabled={readOnly}
+                              required
+                            />
+                          ),
+                      },
+                      {
+                        label: "Unit Price",
+                        key: "unitCost",
+                        render: () =>
+                          showReadOnlyText ? (
+                            <span className={mobileCardStyles.fieldStatic}>
+                              ${formatDecimal(Number(line.unitCost || 0) * (1 + Number(line.markupPercent || 0) / 100))}
+                            </span>
+                          ) : (
+                            <input
+                              className={mobileCardStyles.fieldInput}
+                              aria-label="Unit cost"
+                              value={line.unitCost}
+                              onChange={(event) => onLineItemChange(line.localId, "unitCost", event.target.value)}
+                              inputMode="decimal"
+                              disabled={readOnly}
+                              required
+                            />
+                          ),
+                      },
+                      ...(showMarkupColumn
+                        ? [
+                            {
+                              label: "Markup %",
+                              key: "markupPercent",
+                              render: () =>
+                                showReadOnlyText ? (
+                                  <span className={mobileCardStyles.fieldStatic}>{line.markupPercent || "0"}%</span>
+                                ) : (
+                                  <input
+                                    className={mobileCardStyles.fieldInput}
+                                    aria-label="Markup percent"
+                                    value={line.markupPercent}
+                                    onChange={(event) =>
+                                      onLineItemChange(line.localId, "markupPercent", event.target.value)
+                                    }
+                                    inputMode="decimal"
+                                    disabled={readOnly}
+                                    required
+                                  />
+                                ),
+                            } as const,
+                          ]
+                        : []),
+                      {
+                        label: "Amount",
+                        key: "amount",
+                        span: "full",
+                        align: "right",
+                        render: () => (
+                          <span className={`${mobileCardStyles.fieldStatic} ${mobileCardStyles.fieldStaticRight} ${readOnly ? mobileCardStyles.fieldStaticReadOnly : ""}`}>
+                            ${formatDecimal(lineTotals[index] || 0)}
+                          </span>
+                        ),
+                      },
+                    ]}
+                  />
+                ))}
               </div>
-              {lineItems.map((line, index) => (
+            ) : (
+              <div className={creatorStyles.lineTable}>
                 <div
-                  key={line.localId}
-                  className={`${creatorStyles.lineRow} ${readOnly ? creatorStyles.lineRowReadOnly : ""} ${
-                    readOnly && !showMarkupColumn ? creatorStyles.lineRowNoMarkup : ""
+                  className={`${creatorStyles.lineHeader} ${readOnly ? creatorStyles.lineHeaderReadOnly : ""} ${
+                    readOnly && !showMarkupColumn ? creatorStyles.lineHeaderNoMarkup : ""
                   }`}
                 >
-                  <div className={creatorStyles.lineCell}>
-                    {showReadOnlyText ? (
-                      <span className={creatorStyles.staticCellValue}>{line.quantity || "0"}</span>
-                    ) : (
-                      <input
-                        className={creatorStyles.lineInput}
-                        aria-label="Quantity"
-                        value={line.quantity}
-                        onChange={(event) => onLineItemChange(line.localId, "quantity", event.target.value)}
-                        inputMode="decimal"
-                        disabled={readOnly}
-                        aria-disabled={readOnly}
-                        required
-                      />
-                    )}
+                  <div className={creatorStyles.lineHeaderCell}>{renderSortableHeader("Qty", "quantity")}</div>
+                  <div className={creatorStyles.lineHeaderCell}>
+                    <span>Description</span>
                   </div>
-                  <div className={creatorStyles.lineCell}>
-                    {showReadOnlyText ? (
-                      <span className={creatorStyles.staticCellValue}>{line.description || "No description"}</span>
-                    ) : (
-                      <input
-                        className={creatorStyles.lineInput}
-                        aria-label="Description"
-                        value={line.description}
-                        onChange={(event) => onLineItemChange(line.localId, "description", event.target.value)}
-                        disabled={readOnly}
-                        aria-disabled={readOnly}
-                        required
-                      />
-                    )}
+                  <div className={creatorStyles.lineHeaderCell}>{renderSortableHeader("Cost Code", "costCode")}</div>
+                  <div className={creatorStyles.lineHeaderCell}>
+                    <span>Unit</span>
                   </div>
-                  <div className={creatorStyles.lineCell}>
-                    <span className={creatorStyles.printOnly}>{findCostCodeShort(line.costCodeId)}</span>
-                    <span className={creatorStyles.screenOnly}>
-                      {showReadOnlyText ? (
-                        <span className={creatorStyles.staticCellValue}>{findCostCodeLabel(line.costCodeId)}</span>
-                      ) : (
-                        <CostCodeCombobox
-                          costCodes={costCodes}
-                          value={line.costCodeId}
-                          onChange={(nextValue) => onLineItemChange(line.localId, "costCodeId", nextValue)}
-                          ariaLabel="Cost code"
-                          disabled={readOnly}
-                          placeholder="Search cost code"
-                        />
-                      )}
-                    </span>
-                  </div>
-                  <div className={creatorStyles.lineCell}>
-                    {showReadOnlyText ? (
-                      <span className={creatorStyles.staticCellValue}>{line.unit || "ea"}</span>
-                    ) : (
-                      <input
-                        className={creatorStyles.lineInput}
-                        aria-label="Unit"
-                        value={line.unit}
-                        onChange={(event) => onLineItemChange(line.localId, "unit", event.target.value)}
-                        disabled={readOnly}
-                        aria-disabled={readOnly}
-                        required
-                      />
-                    )}
-                  </div>
-                  <div className={creatorStyles.lineCell}>
-                    {showReadOnlyText ? (
-                      <span className={creatorStyles.staticCellValue}>
-                        ${formatDecimal(Number(line.unitCost || 0) * (1 + Number(line.markupPercent || 0) / 100))}
-                      </span>
-                    ) : (
-                      <input
-                        className={creatorStyles.lineInput}
-                        aria-label="Unit cost"
-                        value={line.unitCost}
-                        onChange={(event) => onLineItemChange(line.localId, "unitCost", event.target.value)}
-                        inputMode="decimal"
-                        disabled={readOnly}
-                        aria-disabled={readOnly}
-                        required
-                      />
-                    )}
+                  <div className={creatorStyles.lineHeaderCell}>
+                    {renderSortableHeader("Unit Price", "unitCost")}
                   </div>
                   {showMarkupColumn ? (
-                    <div className={creatorStyles.lineCell}>
-                      {showReadOnlyText ? (
-                        <span className={creatorStyles.staticCellValue}>{line.markupPercent || "0"}%</span>
-                      ) : (
-                        <div className={creatorStyles.percentField}>
-                          <input
-                            className={creatorStyles.lineInput}
-                            aria-label="Markup percent"
-                            value={line.markupPercent}
-                            onChange={(event) =>
-                              onLineItemChange(line.localId, "markupPercent", event.target.value)
-                            }
-                            inputMode="decimal"
-                            disabled={readOnly}
-                            aria-disabled={readOnly}
-                            required
-                          />
-                          <span className={creatorStyles.percentSuffix}>%</span>
-                        </div>
-                      )}
+                    <div className={creatorStyles.lineHeaderCell}>
+                      {renderSortableHeader("Markup", "markupPercent")}
                     </div>
                   ) : null}
-                  <div className={creatorStyles.lineCell}>
-                    <div className={creatorStyles.amountCell}>${formatDecimal(lineTotals[index] || 0)}</div>
-                  </div>
+                  <div className={creatorStyles.lineHeaderCell}>{renderSortableHeader("Amount", "amount")}</div>
                   {!readOnly ? (
-                    <div className={creatorStyles.lineCell}>
-                      <div className={creatorStyles.lineActionsCell}>
-                        <button
-                          type="button"
-                          className={`${creatorStyles.smallButton} ${
-                            readOnly || index === 0 ? creatorStyles.actionDisabled : ""
-                          }`}
-                          onClick={() => onMoveLineItem(line.localId, "up")}
-                          disabled={readOnly || index === 0}
-                        >
-                          Up
-                        </button>
-                        <button
-                          type="button"
-                          className={`${creatorStyles.smallButton} ${
-                            readOnly || index === lineItems.length - 1 ? creatorStyles.actionDisabled : ""
-                          }`}
-                          onClick={() => onMoveLineItem(line.localId, "down")}
-                          disabled={readOnly || index === lineItems.length - 1}
-                        >
-                          Down
-                        </button>
-                        <button
-                          type="button"
-                          className={`${creatorStyles.smallButton} ${readOnly ? creatorStyles.actionDisabled : ""}`}
-                          onClick={() => onDuplicateLineItem(line.localId)}
-                          disabled={readOnly}
-                        >
-                          Duplicate
-                        </button>
-                        <button
-                          type="button"
-                          className={`${creatorStyles.removeButton} ${readOnly ? creatorStyles.actionDisabled : ""}`}
-                          onClick={() => onRemoveLineItem(line.localId)}
-                          disabled={readOnly}
-                        >
-                          Remove
-                        </button>
-                      </div>
+                    <div className={creatorStyles.lineHeaderCell}>
+                      <span>Actions</span>
                     </div>
                   ) : null}
                 </div>
-              ))}
-            </div>
+                {lineItems.map((line, index) => (
+                  <div
+                    key={line.localId}
+                    className={`${creatorStyles.lineRow} ${readOnly ? creatorStyles.lineRowReadOnly : ""} ${
+                      readOnly && !showMarkupColumn ? creatorStyles.lineRowNoMarkup : ""
+                    }`}
+                  >
+                    <div className={creatorStyles.lineCell}>
+                      {showReadOnlyText ? (
+                        <span className={creatorStyles.staticCellValue}>{line.quantity || "0"}</span>
+                      ) : (
+                        <input
+                          className={creatorStyles.lineInput}
+                          aria-label="Quantity"
+                          value={line.quantity}
+                          onChange={(event) => onLineItemChange(line.localId, "quantity", event.target.value)}
+                          inputMode="decimal"
+                          disabled={readOnly}
+                          aria-disabled={readOnly}
+                          required
+                        />
+                      )}
+                    </div>
+                    <div className={creatorStyles.lineCell}>
+                      {showReadOnlyText ? (
+                        <span className={creatorStyles.staticCellValue}>{line.description || "No description"}</span>
+                      ) : (
+                        <input
+                          className={creatorStyles.lineInput}
+                          aria-label="Description"
+                          value={line.description}
+                          onChange={(event) => onLineItemChange(line.localId, "description", event.target.value)}
+                          disabled={readOnly}
+                          aria-disabled={readOnly}
+                          required
+                        />
+                      )}
+                    </div>
+                    <div className={creatorStyles.lineCell}>
+                      <span className={creatorStyles.printOnly}>{findCostCodeShort(line.costCodeId)}</span>
+                      <span className={creatorStyles.screenOnly}>
+                        {showReadOnlyText ? (
+                          <span className={creatorStyles.staticCellValue}>{findCostCodeLabel(line.costCodeId)}</span>
+                        ) : (
+                          <CostCodeCombobox
+                            costCodes={costCodes}
+                            value={line.costCodeId}
+                            onChange={(nextValue) => onLineItemChange(line.localId, "costCodeId", nextValue)}
+                            ariaLabel="Cost code"
+                            disabled={readOnly}
+                            placeholder="Search cost code"
+                          />
+                        )}
+                      </span>
+                    </div>
+                    <div className={creatorStyles.lineCell}>
+                      {showReadOnlyText ? (
+                        <span className={creatorStyles.staticCellValue}>{line.unit || "ea"}</span>
+                      ) : (
+                        <input
+                          className={creatorStyles.lineInput}
+                          aria-label="Unit"
+                          value={line.unit}
+                          onChange={(event) => onLineItemChange(line.localId, "unit", event.target.value)}
+                          disabled={readOnly}
+                          aria-disabled={readOnly}
+                          required
+                        />
+                      )}
+                    </div>
+                    <div className={creatorStyles.lineCell}>
+                      {showReadOnlyText ? (
+                        <span className={creatorStyles.staticCellValue}>
+                          ${formatDecimal(Number(line.unitCost || 0) * (1 + Number(line.markupPercent || 0) / 100))}
+                        </span>
+                      ) : (
+                        <input
+                          className={creatorStyles.lineInput}
+                          aria-label="Unit cost"
+                          value={line.unitCost}
+                          onChange={(event) => onLineItemChange(line.localId, "unitCost", event.target.value)}
+                          inputMode="decimal"
+                          disabled={readOnly}
+                          aria-disabled={readOnly}
+                          required
+                        />
+                      )}
+                    </div>
+                    {showMarkupColumn ? (
+                      <div className={creatorStyles.lineCell}>
+                        {showReadOnlyText ? (
+                          <span className={creatorStyles.staticCellValue}>{line.markupPercent || "0"}%</span>
+                        ) : (
+                          <div className={creatorStyles.percentField}>
+                            <input
+                              className={creatorStyles.lineInput}
+                              aria-label="Markup percent"
+                              value={line.markupPercent}
+                              onChange={(event) =>
+                                onLineItemChange(line.localId, "markupPercent", event.target.value)
+                              }
+                              inputMode="decimal"
+                              disabled={readOnly}
+                              aria-disabled={readOnly}
+                              required
+                            />
+                            <span className={creatorStyles.percentSuffix}>%</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
+                    <div className={creatorStyles.lineCell}>
+                      <div className={creatorStyles.amountCell}>${formatDecimal(lineTotals[index] || 0)}</div>
+                    </div>
+                    {!readOnly ? (
+                      <div className={creatorStyles.lineCell}>
+                        <div className={creatorStyles.lineActionsCell}>
+                          <button
+                            type="button"
+                            className={`${creatorStyles.smallButton} ${
+                              readOnly || index === 0 ? creatorStyles.actionDisabled : ""
+                            }`}
+                            onClick={() => onMoveLineItem(line.localId, "up")}
+                            disabled={readOnly || index === 0}
+                          >
+                            Up
+                          </button>
+                          <button
+                            type="button"
+                            className={`${creatorStyles.smallButton} ${
+                              readOnly || index === lineItems.length - 1 ? creatorStyles.actionDisabled : ""
+                            }`}
+                            onClick={() => onMoveLineItem(line.localId, "down")}
+                            disabled={readOnly || index === lineItems.length - 1}
+                          >
+                            Down
+                          </button>
+                          <button
+                            type="button"
+                            className={`${creatorStyles.smallButton} ${readOnly ? creatorStyles.actionDisabled : ""}`}
+                            onClick={() => onDuplicateLineItem(line.localId)}
+                            disabled={readOnly}
+                          >
+                            Duplicate
+                          </button>
+                          <button
+                            type="button"
+                            className={`${creatorStyles.removeButton} ${readOnly ? creatorStyles.actionDisabled : ""}`}
+                            onClick={() => onRemoveLineItem(line.localId)}
+                            disabled={readOnly}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {!showReadOnlyText ? (
               <div className={creatorStyles.lineActions}>

@@ -101,6 +101,16 @@
   color: var(--text-primary);
 }
 
+.clearOption {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.clearOptionLabel {
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+}
+
 .noResults {
   border-top: 1px solid var(--border);
   padding: 8px 9px;
@@ -120,4 +130,32 @@
 
 .manageCodesLink:hover {
   text-decoration: underline;
+}
+
+@media (max-width: 700px) {
+  .input {
+    min-height: 44px;
+    font-size: 1rem;
+    padding: 10px 12px;
+    padding-right: 32px;
+    background: var(--input-bg);
+    border-style: dashed;
+  }
+
+  .inputWrap .clearButton {
+    display: none;
+  }
+
+  .input {
+    padding-right: 12px;
+  }
+
+  .menu {
+    max-height: 240px;
+  }
+
+  .option {
+    padding: 10px 12px;
+    min-height: 44px;
+  }
 }

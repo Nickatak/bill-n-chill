@@ -1031,13 +1031,137 @@
   }
 }
 
+@media (max-width: 700px) {
+  .sheet {
+    padding: var(--space-lg);
+    border-radius: 14px;
+    gap: var(--space-lg);
+  }
+
+  .sheetSection {
+    gap: var(--space-lg);
+  }
+
+  /* Full-width finalize actions + button */
+  .finalizeActions {
+    max-width: none;
+    margin-left: 0;
+    justify-items: stretch;
+  }
+
+  .logoBox {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .sheetTitle {
+    display: none;
+  }
+
+  .footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-xs) var(--space-sm);
+    text-align: left;
+  }
+
+  .footer span:nth-child(2) {
+    text-align: right;
+  }
+
+  .footer span:last-child {
+    grid-column: 1 / -1;
+    text-align: center;
+  }
+
+  .lineActions {
+    margin-top: 0;
+  }
+
+  .lineActions .secondaryButton {
+    width: 100%;
+  }
+
+  /* Lifecycle panel: tighter padding */
+  .lifecycle {
+    padding: var(--space-md);
+  }
+
+  .lifecycleGrid {
+    gap: var(--space-sm);
+  }
+}
+
 @media (max-width: 640px) {
+  .sheet {
+    padding: var(--space-md);
+    border-radius: 10px;
+  }
+
+  /* Touch targets for all interactive elements */
+  .fieldInput,
+  .fieldSelect {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+
+  .primaryButton,
+  .secondaryButton {
+    min-height: 44px;
+    font-size: 0.9rem;
+    padding: 10px var(--space-md);
+  }
+
+  .primaryButton {
+    width: 100%;
+  }
+
+  .statusPill {
+    min-height: 44px;
+    display: grid;
+    place-items: center;
+  }
+
+  .statusNote {
+    min-height: 96px;
+    font-size: 1rem;
+  }
+
+  .lifecycleField select,
+  .lifecycleField input,
+  .lifecycleField textarea {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+
+  .lifecycleToggleButton {
+    min-height: 44px;
+    padding: 8px var(--space-md);
+  }
+
+  .lifecycleLinkAction {
+    min-height: 44px;
+    display: inline-grid;
+    place-items: center;
+  }
+
   .publicDecisionBanner {
     align-items: flex-start;
   }
 
   .publicDecisionBannerLink {
     width: 100%;
+    min-height: 44px;
+  }
+
+  .summaryTaxInput {
+    min-height: 36px;
+    font-size: 1rem;
+    width: 60px;
+  }
+
+  .termsInput {
+    font-size: 1rem;
   }
 }
 
