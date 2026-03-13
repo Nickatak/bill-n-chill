@@ -23,6 +23,7 @@ type DuplicateResolutionPanelProps = {
   duplicateResolutionIntent: SubmitIntent | null;
   onSelectDuplicateId: (value: string) => void;
   onResolve: (resolution: DuplicateResolution, targetId?: number) => void;
+  onBrowseCustomer?: (searchTerm: string) => void;
 };
 
 /** Renders duplicate candidate cards with match highlighting and resolution actions. */
@@ -33,6 +34,7 @@ export function DuplicateResolutionPanel({
   duplicateResolutionIntent,
   onSelectDuplicateId,
   onResolve,
+  onBrowseCustomer,
 }: DuplicateResolutionPanelProps) {
   if (duplicateCandidates.length === 0) {
     return null;
@@ -150,6 +152,17 @@ export function DuplicateResolutionPanel({
                   }}
                 >
                   Use Customer + Start Project
+                </button>
+              ) : onBrowseCustomer ? (
+                <button
+                  type="button"
+                  className={styles.duplicateViewLink}
+                  onClick={() => {
+                    const term = candidate.phone || candidate.email || candidate.display_name;
+                    onBrowseCustomer(term);
+                  }}
+                >
+                  Find in list &darr;
                 </button>
               ) : (
                 <Link

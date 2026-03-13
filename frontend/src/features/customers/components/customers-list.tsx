@@ -166,6 +166,7 @@ export function CustomersList({
                       )
                     }
                   >
+                    {/* Desktop: per-status pills */}
                     <span className={styles.projectAccordionStatusList}>
                       {summaryStatuses.map((status) => (
                         <span
@@ -178,6 +179,10 @@ export function CustomersList({
                           {projectStatusSummaryLabel(status, projectCountsByStatus[status])}
                         </span>
                       ))}
+                    </span>
+                    {/* Mobile: simple count */}
+                    <span className={styles.mobileProjectSummary}>
+                      {projects.length} project{projects.length === 1 ? "" : "s"}
                     </span>
                     <span className={styles.projectAccordionCaret}>
                       {isExpanded ? "Hide projects" : "Show projects"}
@@ -263,6 +268,10 @@ export function CustomersList({
                             <div className={styles.projectLinks}>
                               {group.projects.map((project) => (
                                 <div key={project.id} className={styles.projectAccordionCard}>
+                                  <span
+                                    className={`${styles.projectCardDot} ${projectStatusClass(project.status)}`}
+                                    title={projectStatusLabel(project.status)}
+                                  />
                                   <Link
                                     href={`/projects?project=${project.id}`}
                                     className={styles.projectAccordionLink}

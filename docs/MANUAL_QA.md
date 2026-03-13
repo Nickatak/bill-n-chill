@@ -3,7 +3,7 @@
 Organized by domain. Check off as you go.
 
 - [x] Logo broken. 
-    This was an annoying permissions issue with Caddy (the reverse proxy).  This has been resolved.
+    This was an annoying permissions issue with Caddy (the reverse proxy) from the old build.  This has been resolved.
 - [x] Invoice email sending isn't working.
     Added. Verified working.
 - [x] Public estimate text isn't working.
@@ -13,13 +13,19 @@ Organized by domain. Check off as you go.
 
 - [] Logo in documentCreator?
 - Auto line loading for the invoice isn't working.
-- Remove line items for bills.
-- Probably want original estimate line items on both the editor/public for CO.
+- [] Remove line items for bills.
+    This is way deeper than it appears.  I made a mistake.  The problem is that I was originally designing for a forensic-financials style of data-accumulation.  The thing is that there is a sharp asymmetry between incoming and outgoing payments for our users.  Like, GC's are primarily interested in _collecting_ their money.  It's great if we provide a way to record and allocate expenditures, but realistically, the "core money loop" of this application actually ends at INCOMING payments. 
 
 
-- Bug: When adding a new customer + project, the new customer is added to the viewer, BUT the new project (for the customer) is not.
-- Bug: I created a new customer + project (with an email instead of a phone number).  When I go to set the status to SENT on an estimate, I get the `WARNING: This customer has no email on file and will not receive an automated email.` message.  This shouldn't happen - since there is an email. Interestingly, it actually sends anyway.  This behavior is also present with re-send.
-- Visual bug:  When a logo is present on the public facing document, we probably want to remove the border/box around it.
+
+
+- [x] Probably want original estimate line items on both the editor/public for CO.
+    Addressed, added a composite "contract summary" lineitems display for both CO's and invoices where it shows all approved estimate lineitems + approved CO lineitems.
+
+
+- [x] Bug: When adding a new customer + project, the new customer is added to the viewer, BUT the new project (for the customer) is not.
+- [x] Bug: I created a new customer + project (with an email instead of a phone number).  When I go to set the status to SENT on an estimate, I get the `WARNING: This customer has no email on file and will not receive an automated email.` message.  This shouldn't happen - since there is an email. Interestingly, it actually sends anyway.  This behavior is also present with re-send.  This issue is persists across all document types.
+- [x] Visual bug:  When a logo is present on the public facing document, we probably want to remove the border/box around it (public-document-frame-module .logoBox)
 
 
 ---

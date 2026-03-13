@@ -219,6 +219,43 @@
   gap: var(--space-xs);
 }
 
+.mobileProjectSummary {
+  display: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.projectCardDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: none;
+}
+
+/* Dot uses the status border-color as its fill for solid visibility */
+.projectCardDot.projectStatusProspect {
+  background: var(--status-blue-border);
+}
+
+.projectCardDot.projectStatusActive {
+  background: var(--status-green-border);
+}
+
+.projectCardDot.projectStatusOnHold {
+  background: var(--status-amber-border);
+}
+
+.projectCardDot.projectStatusCompleted {
+  background: var(--status-gray-border);
+}
+
+.projectCardDot.projectStatusCancelled {
+  background: var(--status-red-border);
+}
+
 .projectAccordionCaret {
   font-size: var(--font-xs);
   color: var(--text-secondary);
@@ -246,16 +283,13 @@
 }
 
 .projectStatusGroupHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
+  display: none;
 }
 
 .projectStatusGroup .projectLinks {
-  margin-left: var(--space-md);
-  padding-left: 10px;
-  border-left: 2px solid color-mix(in srgb, var(--border) 85%, transparent 15%);
+  margin-left: 0;
+  padding-left: 0;
+  border-left: none;
 }
 
 .projectFilterBar {
@@ -682,20 +716,146 @@
   .projectCellHeader {
     flex-wrap: wrap;
   }
+
+  .addProjectButton {
+    width: 100%;
+    text-align: center;
+    min-height: 44px;
+  }
+
+  /* Swap status pills for simple text summary */
+  .projectAccordionStatusList {
+    display: none;
+  }
+
+  .mobileProjectSummary {
+    display: block;
+  }
+
+  /* Hide filter bar and status group headers — flat list on mobile */
+  .projectFilterBar {
+    display: none;
+  }
+
+
+  .projectAccordionToggle {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .projectAccordionCaret {
+    margin-left: auto;
+    min-height: 44px;
+    display: grid;
+    place-items: center;
+  }
 }
 
 @media (max-width: 640px) {
+  .quickAddSection,
+  .browseSection {
+    padding: 10px;
+  }
+
   .filterControls {
     flex-wrap: wrap;
+    width: 100%;
   }
 
   .searchInput {
     min-width: 0;
     width: 100%;
+    min-height: 44px;
+    font-size: 1rem;
+    padding: 10px;
   }
 
   .actionRow {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .gridRow > div {
+    padding: 10px;
+  }
+
+  /* Keep card on one row — truncate project name instead of wrapping */
+  .projectAccordionCard {
+    flex-wrap: nowrap;
+  }
+
+  .projectAccordionLink {
+    overflow: hidden;
+  }
+
+  .projectLinkLabel {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pagination {
+    gap: var(--space-sm);
+  }
+
+  .paginationButton {
+    padding: 10px var(--space-md);
+    min-height: 44px;
+  }
+
+  .paginationInfo {
+    font-size: var(--font-xs);
+    text-align: center;
+  }
+
+  /* ── Modal mobile ── */
+
+  .modalOverlay {
+    padding: var(--space-sm);
+    align-items: flex-start;
+    padding-top: var(--space-lg);
+  }
+
+  .modalCard {
+    width: 100%;
+    padding: var(--space-sm);
+    border-radius: var(--radius-md);
+  }
+
+  .modalClose {
+    top: var(--space-sm);
+    right: var(--space-sm);
+    padding: 8px 12px;
+    min-height: 44px;
+    min-width: 44px;
+    display: grid;
+    place-items: center;
+  }
+
+  .panelTitle {
+    padding-right: 60px;
+  }
+
+  .field input,
+  .field select {
+    padding: 10px;
+    min-height: 44px;
+  }
+
+  .primaryButton {
+    min-height: 44px;
+    width: 100%;
+  }
+
+  .projectStatusSelector {
+    gap: var(--space-xs);
+  }
+
+  .projectStatusSelectorButton {
+    padding: 8px var(--space-md);
+    min-height: 44px;
   }
 }

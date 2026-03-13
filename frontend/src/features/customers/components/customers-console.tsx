@@ -360,7 +360,14 @@ export function CustomersConsole() {
           </button>
         </div>
         {isQuickAddExpanded ? (
-          <QuickAddConsole onCustomerCreated={() => setRefreshKey((k) => k + 1)} />
+          <QuickAddConsole
+            onCustomerCreated={() => setRefreshKey((k) => k + 1)}
+            onBrowseCustomer={(searchTerm) => {
+              setQuery(searchTerm);
+              setPage(1);
+              setActivityFilter("all");
+            }}
+          />
         ) : null}
       </div>
 

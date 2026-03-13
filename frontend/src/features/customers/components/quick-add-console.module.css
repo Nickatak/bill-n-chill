@@ -395,6 +395,12 @@
   display: inline-flex;
   align-items: center;
   font-size: 0.88rem;
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .duplicateResolveButton {
@@ -439,6 +445,10 @@
 }
 
 @media (max-width: 640px) {
+  .introCard {
+    padding: var(--space-sm);
+  }
+
   .formStatus {
     position: sticky;
     top: 8px;
@@ -452,6 +462,33 @@
     padding-right: 6px;
   }
 
+  .field input,
+  .field select,
+  .field textarea {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+
+  .currencyInput {
+    min-height: 44px;
+  }
+
+  .actionPrimary,
+  .actionSecondary {
+    min-height: 48px;
+    font-size: 1rem;
+  }
+
+  .projectStatusPill {
+    min-height: 44px;
+    display: grid;
+    place-items: center;
+  }
+
+  .duplicateTitle {
+    text-align: center;
+  }
+
   .duplicateCardTopRow {
     flex-direction: column;
     align-items: stretch;
@@ -460,5 +497,15 @@
   .duplicateResolveButton {
     width: 100%;
     text-align: center;
+    min-height: 44px;
+  }
+
+  .duplicatePanel {
+    padding: var(--space-sm);
+    order: 10;
+  }
+
+  .optionalDetails {
+    padding: 8px;
   }
 }

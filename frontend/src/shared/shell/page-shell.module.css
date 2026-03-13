@@ -124,6 +124,7 @@
 @media (max-width: 700px) {
   .page {
     padding: var(--space-md);
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
   }
 
   .hero,

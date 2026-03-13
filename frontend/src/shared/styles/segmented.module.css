@@ -29,3 +29,12 @@
   background: var(--accent);
   color: var(--text-on-accent);
 }
+
+@media (max-width: 640px) {
+  .option {
+    min-height: 44px;
+    padding: 6px 14px;
+    display: grid;
+    place-items: center;
+  }
+}
