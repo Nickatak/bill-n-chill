@@ -531,3 +531,102 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 700px) {
+  .treePanel,
+  .metricsPanel {
+    padding: var(--space-md);
+  }
+
+  /* Stack metric label above value instead of side-by-side */
+  .metricRow {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .metricRow strong {
+    font-size: 1.05rem;
+  }
+
+  /* Tree node: stack link + badges vertically */
+  .node {
+    flex-wrap: wrap;
+  }
+
+  .nodeEstimateMeta {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  /* Quick status: stack badge + select vertically */
+  .quickStatusControl {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-sm);
+  }
+
+  .quickStatusChangeLabel {
+    min-width: 0;
+  }
+
+  .quickStatusSelect {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .treePanel,
+  .metricsPanel {
+    padding: 10px;
+    border-radius: 10px;
+  }
+
+  /* Touch targets: edit toggle, tree links, status pills, submit */
+  .projectSettingsToggle {
+    min-height: 44px;
+    padding: 8px var(--space-md);
+  }
+
+  .node {
+    padding: 10px;
+    min-height: 44px;
+  }
+
+  .node a {
+    font-size: 1rem;
+  }
+
+  .estimateCountPill {
+    font-size: 0.72rem;
+    padding: 4px 9px;
+    min-height: 32px;
+    display: inline-grid;
+    place-items: center;
+  }
+
+  .projectStatusPill {
+    min-height: 44px;
+    display: grid;
+    place-items: center;
+  }
+
+  .projectEditSubmit {
+    min-height: 44px;
+    width: 100%;
+  }
+
+  .projectEditForm label > input {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+
+  .quickStatusSelect {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+
+  .baselineCardValue {
+    font-size: 1.05rem;
+  }
+}

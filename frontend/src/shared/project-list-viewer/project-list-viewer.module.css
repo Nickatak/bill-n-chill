@@ -295,14 +295,49 @@
 }
 
 @media (max-width: 700px) {
+  .controlBar {
+    padding: 10px;
+  }
+
   .projectCardGrid {
     grid-template-columns: 1fr;
   }
 
-  .panelHeaderActions,
+  .panelHeaderActions {
+    width: auto;
+    justify-content: flex-end;
+  }
+
   .projectFilterButtons,
   .projectFilterActions {
     width: 100%;
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .searchField input {
+    min-height: 44px;
+    font-size: 1rem;
+    padding: 10px;
+  }
+
+  .projectFilterButton {
+    min-height: 44px;
+    padding: 8px var(--space-md);
+  }
+
+  .projectFilterActionButton {
+    min-height: 44px;
+    padding: 8px var(--space-md);
+  }
+
+  .projectCard {
+    padding: var(--space-sm) 10px;
+    min-height: 44px;
+  }
+
+  .projectCardGrid {
+    max-height: 280px;
   }
 }

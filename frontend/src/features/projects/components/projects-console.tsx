@@ -381,6 +381,11 @@ export function ProjectsConsole() {
     setIsProjectEditOpen(false);
     hydrateForm(selected);
 
+    // On mobile, collapse the project list after selection so the overview is immediately visible.
+    if (window.innerWidth <= 700) {
+      setIsProjectListExpanded(false);
+    }
+
     // Clear stale financial data so it re-loads for the new project.
     setSummary(null);
     setEstimateStatusCounts(null);

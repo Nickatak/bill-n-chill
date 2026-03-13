@@ -43,8 +43,9 @@
   transform: none;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 640px) {
   .collapseButton {
-    display: none;
+    min-height: 44px;
+    padding: 8px var(--space-md);
   }
 }
