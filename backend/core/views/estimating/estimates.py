@@ -27,6 +27,7 @@ from core.views.estimating.estimates_helpers import (
     _serialize_estimates,
 )
 from core.models import SigningCeremonyRecord
+from core.utils.request import get_client_ip
 from core.utils.signing import compute_document_content_hash
 from core.views.helpers import (
     _build_public_decision_note,
@@ -136,12 +137,16 @@ def public_estimate_decision_view(request, public_token: str):
     with transaction.atomic():
         estimate.status = next_status
         estimate.save(update_fields=["status", "updated_at"])
+        client_ip = get_client_ip(request)
+        client_ua = request.META.get("HTTP_USER_AGENT", "")
         EstimateStatusEvent.record(
             estimate=estimate,
             from_status=previous_status,
             to_status=estimate.status,
             note=decision_note,
             changed_by=estimate.created_by,
+            ip_address=client_ip,
+            user_agent=client_ua,
         )
         if estimate.status == Estimate.Status.APPROVED:
             _activate_project_from_estimate_approval(
@@ -160,8 +165,8 @@ def public_estimate_decision_view(request, public_token: str):
             signer_email=ceremony_session.recipient_email if ceremony_session else "",
             email_verified=ceremony_session is not None,
             content_hash=content_hash,
-            ip_address=request.META.get("REMOTE_ADDR"),
-            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            ip_address=client_ip,
+            user_agent=client_ua,
             consent_text_version=consent_version,
             consent_text_snapshot=consent_text,
             note=str(request.data.get("note", "") or "").strip(),

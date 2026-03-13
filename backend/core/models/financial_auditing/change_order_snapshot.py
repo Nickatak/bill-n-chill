@@ -48,6 +48,8 @@ class ChangeOrderSnapshot(ImmutableModelMixin):
         related_name="decided_change_order_snapshots",
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, default="")
 
     class Meta:
         ordering = ["-created_at", "-id"]
@@ -61,6 +63,8 @@ class ChangeOrderSnapshot(ImmutableModelMixin):
         previous_status: str,
         applied_financial_delta,
         decided_by,
+        ip_address=None,
+        user_agent="",
     ):
         """Append an immutable snapshot row for a change-order decision event."""
         snapshot = change_order.build_snapshot()
@@ -74,6 +78,8 @@ class ChangeOrderSnapshot(ImmutableModelMixin):
             decision_status=decision_status,
             snapshot_json=snapshot,
             decided_by=decided_by,
+            ip_address=ip_address,
+            user_agent=user_agent,
         )
 
     def __str__(self) -> str:

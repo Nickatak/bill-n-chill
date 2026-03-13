@@ -49,12 +49,14 @@ class InvoiceStatusEvent(models.Model):
         related_name="invoice_status_events",
     )
     changed_at = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, default="")
 
     class Meta:
         ordering = ["-changed_at", "-id"]
 
     @classmethod
-    def record(cls, *, invoice, from_status, to_status, note, changed_by):
+    def record(cls, *, invoice, from_status, to_status, note, changed_by, ip_address=None, user_agent=""):
         """Append an immutable invoice status transition row."""
         return cls.objects.create(
             invoice=invoice,
@@ -62,6 +64,8 @@ class InvoiceStatusEvent(models.Model):
             to_status=to_status,
             note=note,
             changed_by=changed_by,
+            ip_address=ip_address,
+            user_agent=user_agent,
         )
 
     def __str__(self) -> str:

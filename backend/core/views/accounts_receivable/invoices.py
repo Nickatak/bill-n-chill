@@ -30,6 +30,7 @@ from core.views.accounts_receivable.invoices_helpers import (
     _next_invoice_number,
 )
 from core.models import SigningCeremonyRecord
+from core.utils.request import get_client_ip
 from core.utils.signing import compute_document_content_hash
 from core.views.helpers import (
     _build_public_decision_note,
@@ -143,6 +144,8 @@ def public_invoice_decision_view(request, public_token: str):
     )
 
     consent_text, consent_version = get_ceremony_context()
+    client_ip = get_client_ip(request)
+    client_ua = request.META.get("HTTP_USER_AGENT", "")
     with transaction.atomic():
         previous_status = invoice.status
         if decision_type == "approve":
@@ -165,6 +168,8 @@ def public_invoice_decision_view(request, public_token: str):
                 to_status=invoice.status,
                 note=public_note,
                 changed_by=invoice.created_by,
+                ip_address=client_ip,
+                user_agent=client_ua,
             )
         else:
             InvoiceStatusEvent.record(
@@ -173,6 +178,8 @@ def public_invoice_decision_view(request, public_token: str):
                 to_status=previous_status,
                 note=public_note,
                 changed_by=invoice.created_by,
+                ip_address=client_ip,
+                user_agent=client_ua,
             )
 
         content_hash = compute_document_content_hash("invoice", InvoiceSerializer(invoice).data)
@@ -185,8 +192,8 @@ def public_invoice_decision_view(request, public_token: str):
             signer_email=ceremony_session.recipient_email if ceremony_session else "",
             email_verified=ceremony_session is not None,
             content_hash=content_hash,
-            ip_address=request.META.get("REMOTE_ADDR"),
-            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            ip_address=client_ip,
+            user_agent=client_ua,
             consent_text_version=consent_version,
             consent_text_snapshot=consent_text,
             note=str(request.data.get("note", "") or "").strip(),

@@ -31,6 +31,7 @@ from core.views.change_orders.change_orders_helpers import (
 )
 from core.models import SigningCeremonyRecord
 from core.serializers import ChangeOrderSerializer as _ChangeOrderSerializerForHash
+from core.utils.request import get_client_ip
 from core.utils.signing import compute_document_content_hash
 from core.views.helpers import (
     _build_public_decision_note,
@@ -152,6 +153,8 @@ def public_change_order_decision_view(request, public_token: str):
         update_fields.extend(["approved_by", "approved_at"])
 
     consent_text, consent_version = get_ceremony_context()
+    client_ip = get_client_ip(request)
+    client_ua = request.META.get("HTTP_USER_AGENT", "")
     with transaction.atomic():
         change_order.status = next_status
         change_order.save(update_fields=update_fields)
@@ -165,6 +168,8 @@ def public_change_order_decision_view(request, public_token: str):
             previous_status=previous_status,
             applied_financial_delta=financial_delta,
             decided_by=change_order.requested_by,
+            ip_address=client_ip,
+            user_agent=client_ua,
         )
 
         content_hash = compute_document_content_hash(
@@ -179,8 +184,8 @@ def public_change_order_decision_view(request, public_token: str):
             signer_email=ceremony_session.recipient_email if ceremony_session else "",
             email_verified=ceremony_session is not None,
             content_hash=content_hash,
-            ip_address=request.META.get("REMOTE_ADDR"),
-            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            ip_address=client_ip,
+            user_agent=client_ua,
             consent_text_version=consent_version,
             consent_text_snapshot=consent_text,
             note=str(request.data.get("note", "") or "").strip(),
