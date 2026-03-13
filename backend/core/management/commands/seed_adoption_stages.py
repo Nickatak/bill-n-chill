@@ -402,9 +402,12 @@ class Command(BaseCommand):
 
     def _make_payment(self, user, project, direction, ref, method, status, amount, **kwargs):
         today = date.today()
+        customer = project.customer if direction == Payment.Direction.INBOUND else None
         p, _ = Payment.objects.get_or_create(
-            project=project, direction=direction, reference_number=ref,
+            organization=project.organization, project=project,
+            direction=direction, reference_number=ref,
             defaults={
+                "customer": customer,
                 "method": method,
                 "status": status,
                 "amount": amount,

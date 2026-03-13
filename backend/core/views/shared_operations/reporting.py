@@ -254,14 +254,13 @@ def attention_feed_view(request):
 
     problem_payments = (
         Payment.objects.filter(
-            project__organization_id=membership.organization_id,
+            organization_id=membership.organization_id,
             status=Payment.Status.VOID,
         )
         .select_related("project")
         .order_by("-payment_date", "-id")
     )
     for row in problem_payments:
-        ui_route = "/payments"
         items.append(
             {
                 "kind": "payment_problem",
@@ -269,8 +268,8 @@ def attention_feed_view(request):
                 "label": f"Payment #{row.id} {row.status}",
                 "detail": f"{row.direction} {row.amount} via {row.method}",
                 "project_id": row.project_id,
-                "project_name": row.project.name,
-                "ui_route": ui_route,
+                "project_name": row.project.name if row.project_id else "",
+                "ui_route": "/payments",
                 "detail_endpoint": f"/api/v1/payments/{row.id}/",
                 "due_date": None,
             }
@@ -391,7 +390,7 @@ def quick_jump_search_view(request):
                 }
             )
 
-    payments = Payment.objects.filter(project__organization_id=membership.organization_id).select_related("project")
+    payments = Payment.objects.filter(organization_id=membership.organization_id).select_related("project")
     for row in payments:
         candidate = f"{row.reference_number or ''} {row.id} {row.direction} {row.status}".lower()
         if query_lower in candidate:
@@ -402,8 +401,8 @@ def quick_jump_search_view(request):
                     "label": row.reference_number or f"Payment #{row.id}",
                     "sub_label": f"{row.direction} {row.status} amount {row.amount}",
                     "project_id": row.project_id,
-                    "project_name": row.project.name,
-                    "ui_href": f"/financials-auditing?project={row.project_id}",
+                    "project_name": row.project.name if row.project_id else "",
+                    "ui_href": "/payments",
                     "detail_endpoint": f"/api/v1/payments/{row.id}/",
                 }
             )

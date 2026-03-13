@@ -285,6 +285,7 @@ class AttentionFeedTests(ReportingTestBase):
 
     def test_void_payments_appear_as_low_severity(self):
         Payment.objects.create(
+            organization=self.org,
             project=self.project,
             direction=Payment.Direction.INBOUND,
             method=Payment.Method.CHECK,
@@ -313,6 +314,7 @@ class AttentionFeedTests(ReportingTestBase):
         )
         # Low: void payment
         Payment.objects.create(
+            organization=self.org,
             project=self.project,
             direction=Payment.Direction.INBOUND,
             method=Payment.Method.CHECK,

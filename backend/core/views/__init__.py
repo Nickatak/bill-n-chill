@@ -55,6 +55,7 @@ from core.views.accounts_receivable.invoices import (
     project_invoices_view,
 )
 from core.views.cash_management.payments import (
+    org_payments_view,
     payment_allocate_view,
     payment_contract_view,
     payment_detail_view,
@@ -160,6 +161,7 @@ __all__ = [
     "invoice_send_view",
     "invoice_status_events_view",
     "project_payments_view",
+    "org_payments_view",
     "payment_contract_view",
     "payment_detail_view",
     "payment_allocate_view",

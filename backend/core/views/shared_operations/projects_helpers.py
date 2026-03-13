@@ -102,7 +102,7 @@ def _build_project_financial_summary_data(project: Project, user):
 
     inbound_alloc_rows = list(
         PaymentAllocation.objects.filter(
-            payment__project=project,
+            invoice__project=project,
             payment__status=Payment.Status.SETTLED,
             payment__direction=Payment.Direction.INBOUND,
         )
@@ -122,7 +122,7 @@ def _build_project_financial_summary_data(project: Project, user):
 
     outbound_alloc_rows = list(
         PaymentAllocation.objects.filter(
-            payment__project=project,
+            vendor_bill__project=project,
             payment__status=Payment.Status.SETTLED,
             payment__direction=Payment.Direction.OUTBOUND,
         )

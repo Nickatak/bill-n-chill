@@ -633,6 +633,7 @@ class ProjectFinancialSummaryTests(TestCase):
         )
 
         inbound_payment = Payment.objects.create(
+            organization=self.org,
             project=self.project,
             direction=Payment.Direction.INBOUND,
             method=Payment.Method.ACH,
@@ -642,6 +643,7 @@ class ProjectFinancialSummaryTests(TestCase):
             created_by=self.user,
         )
         outbound_payment = Payment.objects.create(
+            organization=self.org,
             project=self.project,
             direction=Payment.Direction.OUTBOUND,
             method=Payment.Method.CHECK,
@@ -1030,6 +1032,7 @@ class ReportingPackTests(TestCase):
             requested_by=self.user,
         )
         Payment.objects.create(
+            organization=self.org,
             project=self.project,
             direction=Payment.Direction.INBOUND,
             method=Payment.Method.ACH,
@@ -1096,6 +1099,7 @@ class ReportingPackTests(TestCase):
             created_by=self.user,
         )
         payment = Payment.objects.create(
+            organization=self.org,
             project=self.project,
             direction=Payment.Direction.INBOUND,
             method=Payment.Method.ACH,

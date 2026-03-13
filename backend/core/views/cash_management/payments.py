@@ -9,6 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.models import (
+    Customer,
     Invoice,
     Payment,
     PaymentAllocation,
@@ -70,64 +71,123 @@ def payment_contract_view(_request):
 
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
-def project_payments_view(request, project_id: int):
-    """Project payment collection endpoint: `GET` lists payments, `POST` creates a payment.
+def org_payments_view(request):
+    """Org-level payment endpoint: `GET` lists all payments, `POST` creates a payment.
+
+    Payments belong to the organization. Project is optional context.
 
     Contract:
-    - `GET` (user/project-scoped list):
-      - `200`: payment list returned.
-        - Guarantees: no object mutations. `[APP]`
-      - `404`: project not found for this user.
-        - Guarantees: no object mutations. `[APP]`
+    - `GET`: returns all payments for the caller's organization.
     - `POST` (requires role `owner|bookkeeping`):
-      - `201`: payment created and returned.
-        - Guarantees:
-          - newly created payment includes valid direction/method/amount fields. `[APP]`
-          - immutable `PaymentRecord(created)` is appended. `[APP]`
-      - `400`: payload/business validation failed.
-        - Guarantees: no durable partial mutation from failed request path. `[DB+APP]`
-      - `403`: role gate denied for create.
-        - Guarantees: no object mutations. `[APP]`
-      - `404`: project not found for this user.
-        - Guarantees: no object mutations. `[APP]`
-
-    - Preconditions:
-      - caller is authenticated (`IsAuthenticated`).
-      - project must resolve through user scope (`_validate_project_for_user`).
-      - caller role must be `owner|bookkeeping` for `POST`.
-
-    - Object mutations:
-      - `GET`: none.
-      - `POST`:
-        - Creates:
-          - Standard: `Payment`.
-          - Audit: `PaymentRecord`.
-        - Edits: none.
-        - Deletes: none.
-
-    - Incoming payload (`POST`) shape:
-      - `_comment_*` keys in this example are documentation-only (not accepted API fields).
-      - JSON map:
-        {
-          "_comment_required": "direction, method, and amount are required",
-          "direction": "inbound|outbound (required)",
-          "method": "cash|check|ach|wire|credit_card|other (required)",
-          "amount": "decimal (required)",
-          "status": "pending|settled|void (optional, default=settled)",
-          "payment_date": "YYYY-MM-DD (optional, default=today)",
-          "reference_number": "string (optional)",
-          "notes": "string (optional)"
-        }
-
-    - Idempotency and retry semantics:
-      - `GET` is read-only and idempotent.
-      - `POST` is not idempotent.
-
-    - Test anchors:
-      - `backend/core/tests/test_payments.py::test_payment_create_and_project_list`
-      - `backend/core/tests/test_payments.py::test_payment_validates_required_fields_and_positive_amount`
-      - `backend/core/tests/test_payments.py::test_payment_create_rolls_back_when_audit_write_fails`
+      - `201`: payment created. Optional `project` field associates to a project.
+      - `400`: validation failed.
+      - `403`: role gate denied.
     """
+    membership = _ensure_membership(request.user)
+
+    if request.method == "GET":
+        rows = (
+            Payment.objects.filter(organization_id=membership.organization_id)
+            .select_related("customer", "project")
+            .prefetch_related("allocations")
+            .order_by("-payment_date", "-created_at")
+        )
+        return Response({"data": PaymentSerializer(rows, many=True).data})
+
+    permission_error, _ = _capability_gate(request.user, "payments", "create")
+    if permission_error:
+        return Response(permission_error, status=403)
+
+    serializer = PaymentWriteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+
+    fields = {}
+    if "direction" not in data:
+        fields["direction"] = ["This field is required."]
+    if "method" not in data:
+        fields["method"] = ["This field is required."]
+    if "amount" not in data:
+        fields["amount"] = ["This field is required."]
+    if fields:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Missing required fields for payment creation.",
+                    "fields": fields,
+                }
+            },
+            status=400,
+        )
+
+    # Resolve customer (required for inbound, must belong to the same org)
+    customer = None
+    customer_id = data.get("customer")
+    direction = data["direction"]
+    if customer_id:
+        customer = Customer.objects.filter(
+            id=customer_id, organization_id=membership.organization_id,
+        ).first()
+        if not customer:
+            return Response(
+                {"error": {"code": "not_found", "message": "Customer not found.", "fields": {}}},
+                status=404,
+            )
+    elif direction == Payment.Direction.INBOUND:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Customer is required for inbound payments.",
+                    "fields": {"customer": ["This field is required for inbound payments."]},
+                }
+            },
+            status=400,
+        )
+
+    # Resolve optional project (must belong to the same org)
+    project = None
+    project_id = data.get("project")
+    if project_id:
+        project = _validate_project_for_user(project_id, request.user)
+        if not project:
+            return Response(
+                {"error": {"code": "not_found", "message": "Project not found.", "fields": {}}},
+                status=404,
+            )
+
+    with transaction.atomic():
+        payment = Payment.objects.create(
+            organization_id=membership.organization_id,
+            customer=customer,
+            project=project,
+            direction=data["direction"],
+            method=data["method"],
+            status=data.get("status", Payment.Status.SETTLED),
+            amount=data["amount"],
+            payment_date=data.get("payment_date") or timezone.localdate(),
+            reference_number=data.get("reference_number", ""),
+            notes=data.get("notes", ""),
+            created_by=request.user,
+        )
+        PaymentRecord.record(
+            payment=payment,
+            event_type=PaymentRecord.EventType.CREATED,
+            capture_source=PaymentRecord.CaptureSource.MANUAL_UI,
+            recorded_by=request.user,
+            from_status=None,
+            to_status=payment.status,
+            note="Payment created.",
+            metadata={"direction": payment.direction, "method": payment.method},
+        )
+    return Response({"data": PaymentSerializer(payment).data}, status=201)
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def project_payments_view(request, project_id: int):
+    """Project-scoped payment endpoint: `GET` lists project payments, `POST` creates attached to project."""
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -173,6 +233,8 @@ def project_payments_view(request, project_id: int):
 
     with transaction.atomic():
         payment = Payment.objects.create(
+            organization_id=project.organization_id,
+            customer=project.customer if data.get("direction") == Payment.Direction.INBOUND else None,
             project=project,
             direction=data["direction"],
             method=data["method"],
@@ -259,9 +321,9 @@ def payment_detail_view(request, payment_id: int):
     """
     membership = _ensure_membership(request.user)
     try:
-        payment = Payment.objects.select_related("project").prefetch_related("allocations").get(
+        payment = Payment.objects.select_related("customer", "project").prefetch_related("allocations").get(
             id=payment_id,
-            project__organization_id=membership.organization_id,
+            organization_id=membership.organization_id,
         )
     except Payment.DoesNotExist:
         return Response(
@@ -437,9 +499,9 @@ def payment_allocate_view(request, payment_id: int):
     """
     membership = _ensure_membership(request.user)
     try:
-        payment = Payment.objects.select_related("project").prefetch_related("allocations").get(
+        payment = Payment.objects.select_related("customer", "project").prefetch_related("allocations").get(
             id=payment_id,
-            project__organization_id=membership.organization_id,
+            organization_id=membership.organization_id,
         )
     except Payment.DoesNotExist:
         return Response(
@@ -497,11 +559,11 @@ def payment_allocate_view(request, payment_id: int):
         if target_type == PaymentAllocation.TargetType.INVOICE:
             target = Invoice.objects.filter(
                 id=target_id,
-                project=payment.project,
+                project__organization_id=payment.organization_id,
             ).first()
             if not target:
                 fields[f"allocations[{index}].target_id"] = [
-                    "Invoice not found for this user/project."
+                    "Invoice not found in this organization."
                 ]
                 continue
             if target.status == Invoice.Status.VOID:
@@ -518,11 +580,11 @@ def payment_allocate_view(request, payment_id: int):
         else:
             target = VendorBill.objects.filter(
                 id=target_id,
-                project=payment.project,
+                project__organization_id=payment.organization_id,
             ).first()
             if not target:
                 fields[f"allocations[{index}].target_id"] = [
-                    "Vendor bill not found for this user/project."
+                    "Vendor bill not found in this organization."
                 ]
                 continue
             if target.status == VendorBill.Status.VOID:
@@ -639,7 +701,7 @@ def payment_allocate_view(request, payment_id: int):
         )
 
     payment.refresh_from_db()
-    payment = Payment.objects.select_related("project").prefetch_related("allocations").get(id=payment.id)
+    payment = Payment.objects.select_related("customer", "project").prefetch_related("allocations").get(id=payment.id)
     created_rows = [allocation for allocation, _, _, _ in created_allocations]
 
     return Response(

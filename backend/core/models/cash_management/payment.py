@@ -13,12 +13,16 @@ User = get_user_model()
 
 
 class Payment(StatusTransitionMixin, models.Model):
-    """Recorded money movement for a project (AR inbound or AP outbound).
+    """Recorded money movement at the organization level (AR inbound or AP outbound).
 
     Business workflow:
     - Represents a single cash movement entry, independent from specific invoice/bill rows.
+    - `organization` is the owning org (required).
+    - `customer` identifies the sender (required for inbound, null for outbound).
+    - `project` is optional context.
     - `direction` determines valid allocation lane (`inbound` to invoices, `outbound` to vendor bills).
     - Can be partially allocated across multiple targets after settlement.
+    - Allocations can target invoices/bills from any project in the same org.
     - `created_by` captures who created/owns the payment record.
 
     Current policy:
@@ -56,10 +60,24 @@ class Payment(StatusTransitionMixin, models.Model):
         Status.VOID: set(),
     }
 
+    organization = models.ForeignKey(
+        "Organization",
+        on_delete=models.PROTECT,
+        related_name="payments",
+    )
+    customer = models.ForeignKey(
+        "Customer",
+        on_delete=models.PROTECT,
+        related_name="payments",
+        null=True,
+        blank=True,
+    )
     project = models.ForeignKey(
         "Project",
         on_delete=models.PROTECT,
         related_name="payments",
+        null=True,
+        blank=True,
     )
     direction = models.CharField(max_length=16, choices=Direction.choices)
     method = models.CharField(max_length=16, choices=Method.choices)
@@ -114,6 +132,8 @@ class Payment(StatusTransitionMixin, models.Model):
         return {
             "payment": {
                 "id": self.id,
+                "organization_id": self.organization_id,
+                "customer_id": self.customer_id,
                 "project_id": self.project_id,
                 "direction": self.direction,
                 "method": self.method,
@@ -128,7 +148,13 @@ class Payment(StatusTransitionMixin, models.Model):
         }
 
     def __str__(self) -> str:
-        return f"{self.project.name} {self.direction} {self.amount}"
+        if self.customer_id:
+            label = self.customer.display_name
+        elif self.project_id:
+            label = self.project.name
+        else:
+            label = "Unassigned"
+        return f"{label} {self.direction} {self.amount}"
 
 
 class PaymentAllocation(models.Model):

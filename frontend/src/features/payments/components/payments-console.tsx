@@ -1,18 +1,17 @@
 "use client";
 
 /**
- * Primary payments management console — standalone page at /payments.
+ * Inbound payments console — standalone page at /payments.
  *
- * Combines project selection, direction toggle (inbound/outbound), payment list
- * with status filtering, selected payment detail with optional allocation, and a
- * quick-record workspace form.
+ * Form-first layout for quickly recording money received from clients.
+ * Project select is a dropdown inside the form. Payment history for the
+ * selected project lives below as a compact reference list.
  *
- * Replaces the old embedded PaymentRecorder tabs on the Invoices page.
- * Outbound payments also remain co-located on the Bills page.
+ * Outbound payments live on the Bills page (/bills) via PaymentRecorder.
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { todayDateInput, formatDateDisplay } from "@/shared/date-format";
 import {
   defaultApiBaseUrl,
@@ -21,26 +20,20 @@ import {
 } from "../api";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { canDo } from "@/shared/session/rbac";
-import {
-  ProjectListViewer,
-  collapseToggleButtonStyles as collapseButtonStyles,
-} from "@/shared/project-list-viewer";
-import type { ProjectListStatusValue } from "@/shared/project-list-viewer";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import { useClientPagination } from "@/shared/hooks/use-client-pagination";
 import { PaginationControls } from "@/shared/components/pagination-controls";
 import type {
   AllocationTarget,
   ApiResponse,
+  CustomerRecord,
   PaymentAllocateResult,
-  PaymentAllocationTargetType,
   PaymentMethod,
   PaymentPolicyContract,
   PaymentRecord,
   PaymentStatus,
   ProjectRecord,
   InvoiceRecord,
-  VendorBillRecord,
 } from "../types";
 import styles from "./payments-console.module.css";
 
@@ -48,25 +41,20 @@ import styles from "./payments-console.module.css";
 // Constants
 // ---------------------------------------------------------------------------
 
-const PAYMENT_STATUSES_FALLBACK = ["pending", "settled", "void"];
+const DIRECTION = "inbound" as const;
+
 const PAYMENT_STATUS_LABELS_FALLBACK: Record<string, string> = {
   pending: "Pending",
   settled: "Settled",
   void: "Void",
 };
 const PAYMENT_METHODS_FALLBACK = ["ach", "card", "check", "wire", "cash", "other"];
-const PAYMENT_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
+const PAYMENT_ALLOWED_TRANSITIONS_FALLBACK: Record<string, string[]> = {
   pending: ["settled", "void"],
   settled: ["void"],
   void: [],
 };
-const PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK: Record<string, PaymentAllocationTargetType> = {
-  inbound: "invoice",
-  outbound: "vendor_bill",
-};
-
-const DEFAULT_PROJECT_STATUS_FILTERS: ProjectListStatusValue[] = ["active", "prospect"];
-const PROJECT_STATUS_VALUES: ProjectListStatusValue[] = ["prospect", "active", "on_hold", "completed", "cancelled"];
+const PAYMENT_STATUSES_DISPLAY = ["pending", "settled", "void"];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -80,10 +68,6 @@ const STATUS_CLASS_MAP: Record<string, string> = {
 
 function statusBadgeClass(status: string): string {
   return STATUS_CLASS_MAP[status] ?? styles.statusPending;
-}
-
-function projectStatusLabel(statusValue: string): string {
-  return statusValue.replace("_", " ");
 }
 
 // ---------------------------------------------------------------------------
@@ -100,42 +84,50 @@ export function PaymentsConsole() {
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const { message: statusMessage, tone: statusTone, setNeutral, setSuccess, setError, setMessage: setStatusMessage, clear: clearStatus } = useStatusMessage();
 
-  // -- Project state --
+  // -- Customers --
+  const [customers, setCustomers] = useState<CustomerRecord[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [customerMenuOpen, setCustomerMenuOpen] = useState(false);
+  const [customerHighlight, setCustomerHighlight] = useState(-1);
+  const customerInputRef = useRef<HTMLInputElement | null>(null);
+  const customerMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // -- Projects --
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [projectSearch, setProjectSearch] = useState("");
-  const [projectStatusFilters, setProjectStatusFilters] = useState<ProjectListStatusValue[]>(DEFAULT_PROJECT_STATUS_FILTERS);
-  const [isProjectListExpanded, setIsProjectListExpanded] = useState(true);
-
-  // -- Direction --
-  const [direction, setDirection] = useState<"inbound" | "outbound">("inbound");
+  const [projectQuery, setProjectQuery] = useState("");
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  const [projectHighlight, setProjectHighlight] = useState(-1);
+  const projectInputRef = useRef<HTMLInputElement | null>(null);
+  const projectMenuRef = useRef<HTMLDivElement | null>(null);
 
   // -- Policy --
   const [paymentStatusLabels, setPaymentStatusLabels] = useState<Record<string, string>>(PAYMENT_STATUS_LABELS_FALLBACK);
   const [paymentMethods, setPaymentMethods] = useState<string[]>(PAYMENT_METHODS_FALLBACK);
-  const [paymentAllowedTransitions, setPaymentAllowedTransitions] = useState<Record<string, string[]>>(PAYMENT_ALLOWED_STATUS_TRANSITIONS_FALLBACK);
-  const [allocationTargetByDirection, setAllocationTargetByDirection] = useState<Record<string, PaymentAllocationTargetType>>(PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK);
-  const [defaultCreateMethod, setDefaultCreateMethod] = useState<string>("ach");
+  const [paymentAllowedTransitions, setPaymentAllowedTransitions] = useState<Record<string, string[]>>(PAYMENT_ALLOWED_TRANSITIONS_FALLBACK);
+  const [defaultCreateMethod, setDefaultCreateMethod] = useState<string>("check");
 
   // -- Payments --
   const [allPayments, setAllPayments] = useState<PaymentRecord[]>([]);
   const [selectedPaymentId, setSelectedPaymentId] = useState("");
   const [paymentStatusFilters, setPaymentStatusFilters] = useState<string[]>(["pending", "settled"]);
   const [paymentSearch, setPaymentSearch] = useState("");
-  const [isPaymentListExpanded, setIsPaymentListExpanded] = useState(true);
 
-  // -- Allocation targets --
+  // -- Allocation targets (invoices for inbound) --
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
-  const [vendorBills, setVendorBills] = useState<VendorBillRecord[]>([]);
 
-  // -- Workspace --
+  // -- Form --
   const [workspaceMode, setWorkspaceMode] = useState<"create" | "edit">("create");
-  const [formMethod, setFormMethod] = useState<PaymentMethod>("ach");
+  const [formMethod, setFormMethod] = useState<PaymentMethod>("check");
   const [formStatus, setFormStatus] = useState<PaymentStatus>("settled");
-  const [formAmount, setFormAmount] = useState("0.00");
+  const [formAmount, setFormAmount] = useState("");
   const [formPaymentDate, setFormPaymentDate] = useState(todayDateInput());
   const [formReferenceNumber, setFormReferenceNumber] = useState("");
   const [formNotes, setFormNotes] = useState("");
+
+  // -- Allocation (disclosure) --
+  const [showAllocation, setShowAllocation] = useState(false);
   const [allocTargetId, setAllocTargetId] = useState("");
   const [allocAmount, setAllocAmount] = useState("");
 
@@ -143,33 +135,24 @@ export function PaymentsConsole() {
   // Derived
   // -------------------------------------------------------------------------
 
-  const directionLabel = direction === "inbound" ? "Inbound" : "Outbound";
-  const targetLabel = direction === "inbound" ? "Invoice" : "Bill";
-  const allocationTargetType: PaymentAllocationTargetType =
-    allocationTargetByDirection[direction] ?? PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK[direction];
-
-  // Filter payments by direction
-  const directionPayments = useMemo(
-    () => allPayments.filter((p) => p.direction === direction),
-    [allPayments, direction],
+  const inboundPayments = useMemo(
+    () => allPayments.filter((p) => p.direction === DIRECTION),
+    [allPayments],
   );
 
-  // Status totals for filter pills
   const paymentStatusTotals = useMemo(() => {
     const totals = new Map<string, number>();
-    for (const p of directionPayments) {
+    for (const p of inboundPayments) {
       totals.set(p.status, (totals.get(p.status) ?? 0) + 1);
     }
     return totals;
-  }, [directionPayments]);
+  }, [inboundPayments]);
 
-  // Status-filtered payments
   const statusFilteredPayments = useMemo(() => {
     if (!paymentStatusFilters.length) return [];
-    return directionPayments.filter((p) => paymentStatusFilters.includes(p.status));
-  }, [directionPayments, paymentStatusFilters]);
+    return inboundPayments.filter((p) => paymentStatusFilters.includes(p.status));
+  }, [inboundPayments, paymentStatusFilters]);
 
-  // Search-filtered payments
   const paymentNeedle = paymentSearch.trim().toLowerCase();
   const searchedPayments = useMemo(() => {
     if (!paymentNeedle) return statusFilteredPayments;
@@ -182,6 +165,7 @@ export function PaymentsConsole() {
         p.payment_date,
         p.reference_number,
         p.notes,
+        p.customer_name,
         p.project_name,
       ].join(" ").toLowerCase();
       return haystack.includes(paymentNeedle);
@@ -191,8 +175,8 @@ export function PaymentsConsole() {
   const { page: paymentPage, totalPages: paymentTotalPages, totalCount: paymentTotalCount, paginatedItems: paginatedPayments, setPage: setPaymentPage } = useClientPagination(searchedPayments);
 
   const selectedPayment = useMemo(
-    () => directionPayments.find((p) => String(p.id) === selectedPaymentId),
-    [directionPayments, selectedPaymentId],
+    () => inboundPayments.find((p) => String(p.id) === selectedPaymentId),
+    [inboundPayments, selectedPaymentId],
   );
 
   const quickStatusOptions = selectedPayment
@@ -204,45 +188,208 @@ export function PaymentsConsole() {
         .filter((v, i, a) => a.indexOf(v) === i)
     : [];
 
-  // Allocation targets for current direction
   const allocationTargets: AllocationTarget[] = useMemo(() => {
-    if (direction === "inbound") {
-      return invoices.map((inv) => ({
-        id: inv.id,
-        label: inv.invoice_number || `Invoice #${inv.id}`,
-        balanceDue: inv.balance_due,
-      }));
-    }
-    return vendorBills.map((bill) => ({
-      id: bill.id,
-      label: bill.bill_number ? `${bill.bill_number}` : `Bill #${bill.id}`,
-      balanceDue: bill.balance_due,
+    return invoices.map((inv) => ({
+      id: inv.id,
+      label: inv.invoice_number || `Invoice #${inv.id}`,
+      balanceDue: inv.balance_due,
     }));
-  }, [direction, invoices, vendorBills]);
+  }, [invoices]);
 
   const payableTargets = useMemo(
     () => allocationTargets.filter((t) => Number(t.balanceDue) > 0),
     [allocationTargets],
   );
 
-  // Project list filtering
-  const projectNeedle = projectSearch.trim().toLowerCase();
-  const filteredProjects = !projectNeedle
-    ? projects
-    : projects.filter((p) => {
-        const haystack = [String(p.id), p.name, p.customer_display_name, p.status].join(" ").toLowerCase();
-        return haystack.includes(projectNeedle);
-      });
-  const projectStatusCounts = PROJECT_STATUS_VALUES.reduce<Record<ProjectListStatusValue, number>>(
-    (acc, sv) => {
-      acc[sv] = filteredProjects.filter((p) => (p.status as ProjectListStatusValue) === sv).length;
-      return acc;
-    },
-    { prospect: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0 },
-  );
-  const statusFilteredProjects = filteredProjects.filter((p) =>
-    projectStatusFilters.includes(p.status as ProjectListStatusValue),
-  );
+  // -------------------------------------------------------------------------
+  // Customer combobox
+  // -------------------------------------------------------------------------
+
+  const filteredCustomers = useMemo(() => {
+    const needle = customerQuery.trim().toLowerCase();
+    if (!needle) return customers;
+    return customers.filter((c) => c.display_name.toLowerCase().includes(needle));
+  }, [customers, customerQuery]);
+
+  const selectedCustomer = customers.find((c) => String(c.id) === selectedCustomerId) ?? null;
+
+  function openCustomerMenu() {
+    setCustomerQuery(selectedCustomer ? selectedCustomer.display_name : "");
+    setCustomerMenuOpen(true);
+    setCustomerHighlight(-1);
+  }
+
+  function closeCustomerMenu() {
+    setCustomerMenuOpen(false);
+    setCustomerHighlight(-1);
+    if (!selectedCustomer) setCustomerQuery("");
+  }
+
+  function commitCustomer(customer: CustomerRecord | null) {
+    if (customer) {
+      setSelectedCustomerId(String(customer.id));
+      setCustomerQuery(customer.display_name);
+    } else {
+      setSelectedCustomerId("");
+      setCustomerQuery("");
+    }
+    // Clear project when customer changes (project must belong to customer)
+    setSelectedProjectId("");
+    setProjectQuery("");
+    closeCustomerMenu();
+  }
+
+  function handleCustomerInput(value: string) {
+    setCustomerQuery(value);
+    setCustomerMenuOpen(true);
+    setCustomerHighlight(value.trim() ? 0 : -1);
+    if (selectedCustomerId) {
+      setSelectedCustomerId("");
+      setSelectedProjectId("");
+      setProjectQuery("");
+    }
+  }
+
+  function handleCustomerKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    const count = filteredCustomers.length;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (!customerMenuOpen) { openCustomerMenu(); return; }
+      setCustomerHighlight((i) => (i < count - 1 ? i + 1 : i));
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (!customerMenuOpen) { openCustomerMenu(); return; }
+      setCustomerHighlight((i) => (i > 0 ? i - 1 : 0));
+      return;
+    }
+    if (event.key === "Enter" && customerMenuOpen) {
+      event.preventDefault();
+      if (customerHighlight >= 0 && filteredCustomers[customerHighlight]) {
+        commitCustomer(filteredCustomers[customerHighlight]);
+      }
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeCustomerMenu();
+    }
+  }
+
+  // Dismiss customer menu on outside click
+  useEffect(() => {
+    if (!customerMenuOpen) return;
+    function handleMouseDown(e: MouseEvent) {
+      const target = e.target as Node | null;
+      if (
+        customerInputRef.current?.contains(target) ||
+        customerMenuRef.current?.contains(target)
+      ) return;
+      closeCustomerMenu();
+    }
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  });
+
+  // -------------------------------------------------------------------------
+  // Project combobox
+  // -------------------------------------------------------------------------
+
+  function projectDisplayLabel(p: ProjectRecord): string {
+    return `${p.name} — ${p.customer_display_name}`;
+  }
+
+  // Filter projects by selected customer, then by search query
+  const customerProjects = useMemo(() => {
+    if (!selectedCustomerId) return projects;
+    return projects.filter((p) => String(p.customer) === selectedCustomerId);
+  }, [projects, selectedCustomerId]);
+
+  const filteredProjects = useMemo(() => {
+    const needle = projectQuery.trim().toLowerCase();
+    if (!needle) return customerProjects;
+    return customerProjects.filter((p) =>
+      `${p.name} ${p.customer_display_name}`.toLowerCase().includes(needle),
+    );
+  }, [customerProjects, projectQuery]);
+
+  const selectedProject = projects.find((p) => String(p.id) === selectedProjectId) ?? null;
+
+  function openProjectMenu() {
+    setProjectQuery(selectedProject ? projectDisplayLabel(selectedProject) : "");
+    setProjectMenuOpen(true);
+    setProjectHighlight(-1);
+  }
+
+  function closeProjectMenu() {
+    setProjectMenuOpen(false);
+    setProjectHighlight(-1);
+    if (!selectedProject) setProjectQuery("");
+  }
+
+  function commitProject(project: ProjectRecord | null) {
+    if (project) {
+      setSelectedProjectId(String(project.id));
+      setProjectQuery(projectDisplayLabel(project));
+    } else {
+      setSelectedProjectId("");
+      setProjectQuery("");
+    }
+    closeProjectMenu();
+  }
+
+  function handleProjectInput(value: string) {
+    setProjectQuery(value);
+    setProjectMenuOpen(true);
+    // "No project" is always index 0, so first real result is index 1
+    setProjectHighlight(value.trim() ? 1 : 0);
+    if (selectedProjectId) setSelectedProjectId("");
+  }
+
+  function handleProjectKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    // +1 for "No project" option
+    const count = filteredProjects.length + 1;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (!projectMenuOpen) { openProjectMenu(); return; }
+      setProjectHighlight((i) => (i < count - 1 ? i + 1 : i));
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (!projectMenuOpen) { openProjectMenu(); return; }
+      setProjectHighlight((i) => (i > 0 ? i - 1 : 0));
+      return;
+    }
+    if (event.key === "Enter" && projectMenuOpen) {
+      event.preventDefault();
+      if (projectHighlight === 0) { commitProject(null); return; }
+      const idx = projectHighlight - 1;
+      if (idx >= 0 && filteredProjects[idx]) commitProject(filteredProjects[idx]);
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeProjectMenu();
+    }
+  }
+
+  // Dismiss project menu on outside click
+  useEffect(() => {
+    if (!projectMenuOpen) return;
+    function handleMouseDown(e: MouseEvent) {
+      const target = e.target as Node | null;
+      if (
+        projectInputRef.current?.contains(target) ||
+        projectMenuRef.current?.contains(target)
+      ) return;
+      closeProjectMenu();
+    }
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  });
 
   // -------------------------------------------------------------------------
   // Helpers
@@ -255,12 +402,17 @@ export function PaymentsConsole() {
   function resetToCreate() {
     setWorkspaceMode("create");
     setSelectedPaymentId("");
+    setSelectedCustomerId("");
+    setCustomerQuery("");
+    setSelectedProjectId("");
+    setProjectQuery("");
     setFormMethod(defaultCreateMethod);
     setFormStatus("settled");
-    setFormAmount("0.00");
+    setFormAmount("");
     setFormPaymentDate(todayDateInput());
     setFormReferenceNumber("");
     setFormNotes("");
+    setShowAllocation(false);
     setAllocTargetId("");
     setAllocAmount("");
   }
@@ -273,6 +425,7 @@ export function PaymentsConsole() {
     setFormPaymentDate(payment.payment_date);
     setFormReferenceNumber(payment.reference_number);
     setFormNotes(payment.notes);
+    setShowAllocation(false);
     setAllocTargetId("");
     setAllocAmount("");
   }
@@ -282,12 +435,6 @@ export function PaymentsConsole() {
       current.includes(status)
         ? current.filter((s) => s !== status)
         : [...current, status],
-    );
-  }
-
-  function toggleProjectStatusFilter(sv: ProjectListStatusValue) {
-    setProjectStatusFilters((current) =>
-      current.includes(sv) ? current.filter((s) => s !== sv) : [...current, sv],
     );
   }
 
@@ -317,10 +464,6 @@ export function PaymentsConsole() {
       setPaymentStatusLabels({ ...PAYMENT_STATUS_LABELS_FALLBACK, ...(contract.status_labels || {}) });
       setPaymentMethods(contract.methods);
       setPaymentAllowedTransitions(normalizedTransitions);
-      setAllocationTargetByDirection({
-        ...PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK,
-        ...(contract.allocation_target_by_direction || {}),
-      });
       setDefaultCreateMethod(nextDefaultMethod);
       setFormMethod((c) => (contract.methods.includes(c) ? c : nextDefaultMethod));
     } catch {
@@ -328,81 +471,68 @@ export function PaymentsConsole() {
     }
   }, [normalizedBaseUrl, token]);
 
+  const loadCustomers = useCallback(async () => {
+    if (!token) return;
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/customers/`, {
+        headers: buildAuthHeaders(token),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) return;
+      const rows = (payload.data as CustomerRecord[]) ?? [];
+      setCustomers(rows);
+    } catch {
+      // silent
+    }
+  }, [normalizedBaseUrl, token]);
+
   const loadProjects = useCallback(async () => {
     if (!token) return;
-    setNeutral("Loading projects...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/`, {
         headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setError("Failed loading projects.");
-        return;
-      }
+      if (!response.ok) return;
       const rows = (payload.data as ProjectRecord[]) ?? [];
       setProjects(rows);
       setSelectedProjectId((current) => {
         if (current && rows.some((r) => String(r.id) === current)) return current;
         return rows[0] ? String(rows[0].id) : "";
       });
-      setStatusMessage("");
     } catch {
-      setError("Could not reach projects endpoint.");
+      // silent
     }
-  }, [normalizedBaseUrl, setError, setNeutral, setStatusMessage, token]);
+  }, [normalizedBaseUrl, token]);
 
-  const loadPayments = useCallback(async (projectId?: number) => {
-    const resolvedId = projectId ?? Number(selectedProjectId);
-    if (!token || !resolvedId) return;
+  const loadPayments = useCallback(async () => {
+    if (!token) return;
     try {
-      const response = await fetch(`${normalizedBaseUrl}/projects/${resolvedId}/payments/`, {
+      const response = await fetch(`${normalizedBaseUrl}/payments/`, {
         headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setError(payload.error?.message ?? "Could not load payments.");
-        return;
-      }
+      if (!response.ok) return;
       const rows = (payload.data as PaymentRecord[]) ?? [];
       setAllPayments(rows);
-
-      // Auto-select first payment in current direction
-      const dirRows = rows.filter((p) => p.direction === direction);
-      setSelectedPaymentId((current) => {
-        if (current && dirRows.some((p) => String(p.id) === current)) return current;
-        return dirRows[0] ? String(dirRows[0].id) : "";
-      });
-      setStatusMessage("");
     } catch {
-      setError("Could not reach payments endpoint.");
+      // silent
     }
-  }, [direction, normalizedBaseUrl, selectedProjectId, setError, setStatusMessage, token]);
+  }, [normalizedBaseUrl, token]);
 
-  const loadAllocationTargets = useCallback(async (projectId?: number) => {
+  const loadInvoices = useCallback(async (projectId?: number) => {
     const resolvedId = projectId ?? Number(selectedProjectId);
     if (!token || !resolvedId) return;
-
     try {
-      const [invoicesRes, billsRes] = await Promise.all([
-        fetch(`${normalizedBaseUrl}/projects/${resolvedId}/invoices/`, {
-          headers: buildAuthHeaders(token),
-        }),
-        fetch(`${normalizedBaseUrl}/projects/${resolvedId}/vendor-bills/`, {
-          headers: buildAuthHeaders(token),
-        }),
-      ]);
-      const invoicesPayload: ApiResponse = await invoicesRes.json();
-      const billsPayload: ApiResponse = await billsRes.json();
-
-      if (invoicesRes.ok) {
-        setInvoices((invoicesPayload.data as InvoiceRecord[]) ?? []);
-      }
-      if (billsRes.ok) {
-        setVendorBills((billsPayload.data as VendorBillRecord[]) ?? []);
+      const response = await fetch(`${normalizedBaseUrl}/projects/${resolvedId}/invoices/`, {
+        headers: buildAuthHeaders(token),
+      });
+      const payload: ApiResponse = await response.json();
+      if (response.ok) {
+        setInvoices((payload.data as InvoiceRecord[]) ?? []);
       }
     } catch {
-      // Best-effort — allocation is optional.
+      // silent
     }
   }, [normalizedBaseUrl, selectedProjectId, token]);
 
@@ -410,62 +540,27 @@ export function PaymentsConsole() {
   // Effects
   // -------------------------------------------------------------------------
 
-  // Load policy + projects on auth
   useEffect(() => {
     if (!token) return;
     void loadPaymentPolicy();
+    void loadCustomers();
     void loadProjects();
-  }, [loadPaymentPolicy, loadProjects, token]);
+    void loadPayments();
+  }, [loadPaymentPolicy, loadCustomers, loadProjects, loadPayments, token]);
 
-  // Reload payments + allocation targets when project changes
+  // Load invoices (allocation targets) when project selection changes
   useEffect(() => {
     const projectId = Number(selectedProjectId);
     if (!token || !projectId) {
-      setAllPayments([]);
-      setSelectedPaymentId("");
       setInvoices([]);
-      setVendorBills([]);
       return;
     }
-    void loadPayments(projectId);
-    void loadAllocationTargets(projectId);
-  }, [loadAllocationTargets, loadPayments, selectedProjectId, token]);
-
-  // Auto-select first payment when direction changes
-  useEffect(() => {
-    const dirRows = allPayments.filter((p) => p.direction === direction);
-    const stillVisible = dirRows.some((p) => String(p.id) === selectedPaymentId);
-    if (!stillVisible) {
-      const first = dirRows[0];
-      if (first) {
-        setSelectedPaymentId(String(first.id));
-        hydrateFromPayment(first);
-      } else {
-        resetToCreate();
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [direction, allPayments]);
-
-  // Ensure selected project is still visible after filter changes
-  useEffect(() => {
-    if (statusFilteredProjects.length === 0) return;
-    const stillVisible = statusFilteredProjects.some((p) => String(p.id) === selectedProjectId);
-    if (!stillVisible) {
-      setSelectedProjectId(String(statusFilteredProjects[0].id));
-    }
-  }, [selectedProjectId, statusFilteredProjects]);
+    void loadInvoices(projectId);
+  }, [loadInvoices, selectedProjectId, token]);
 
   // -------------------------------------------------------------------------
   // Handlers
   // -------------------------------------------------------------------------
-
-  function handleSelectProject(project: { id: number }) {
-    if (String(project.id) === selectedProjectId) return;
-    setSelectedProjectId(String(project.id));
-    setPaymentSearch("");
-    resetToCreate();
-  }
 
   function handleSelectPayment(payment: PaymentRecord) {
     setSelectedPaymentId(String(payment.id));
@@ -486,24 +581,28 @@ export function PaymentsConsole() {
       setError(`Role ${role} does not have payment create permission.`);
       return;
     }
-    const projectId = Number(selectedProjectId);
-    if (!projectId) {
-      setError("Select a project first.");
+
+    const customerId = Number(selectedCustomerId) || null;
+    if (!customerId) {
+      setError("Customer is required for inbound payments.");
       return;
     }
 
     setNeutral("Recording payment...");
     try {
-      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/payments/`, {
+      const projectId = Number(selectedProjectId) || null;
+      const response = await fetch(`${normalizedBaseUrl}/payments/`, {
         method: "POST",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
-          direction,
+          direction: DIRECTION,
           method: formMethod,
           amount: formAmount,
           payment_date: formPaymentDate,
           reference_number: formReferenceNumber,
           notes: formNotes,
+          customer: customerId,
+          ...(projectId ? { project: projectId } : {}),
         }),
       });
       const payload: ApiResponse = await response.json();
@@ -523,7 +622,7 @@ export function PaymentsConsole() {
             headers: buildAuthHeaders(token, { contentType: "application/json" }),
             body: JSON.stringify({
               allocations: [{
-                target_type: allocationTargetType,
+                target_type: "invoice",
                 target_id: Number(allocTargetId),
                 applied_amount: allocAmount,
               }],
@@ -533,19 +632,19 @@ export function PaymentsConsole() {
           if (allocResponse.ok) {
             const result = allocPayload.data as PaymentAllocateResult;
             created = result.payment;
-            void loadAllocationTargets();
+            void loadInvoices();
           } else {
             setAllPayments((current) => [created, ...current]);
             setSelectedPaymentId(String(created.id));
             hydrateFromPayment(created);
-            setError(`Created payment #${created.id}, but allocation failed: ${allocPayload.error?.message ?? "unknown error"}.`);
+            setError(`Recorded payment #${created.id}, but allocation failed: ${allocPayload.error?.message ?? "unknown error"}.`);
             return;
           }
         } catch {
           setAllPayments((current) => [created, ...current]);
           setSelectedPaymentId(String(created.id));
           hydrateFromPayment(created);
-          setError(`Created payment #${created.id}, but could not reach allocation endpoint.`);
+          setError(`Recorded payment #${created.id}, but could not reach allocation endpoint.`);
           return;
         }
       }
@@ -555,8 +654,8 @@ export function PaymentsConsole() {
       hydrateFromPayment(created);
       setSuccess(
         wantAllocate
-          ? `Created and allocated payment #${created.id}.`
-          : `Created payment #${created.id}.`,
+          ? `Recorded and allocated payment #${created.id}.`
+          : `Recorded payment #${created.id}.`,
       );
     } catch {
       setError("Could not reach payment create endpoint.");
@@ -580,7 +679,7 @@ export function PaymentsConsole() {
         method: "PATCH",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
-          direction,
+          direction: DIRECTION,
           method: formMethod,
           status: formStatus,
           amount: formAmount,
@@ -640,7 +739,7 @@ export function PaymentsConsole() {
     const paymentId = Number(selectedPaymentId);
     const targetId = Number(allocTargetId);
     if (!paymentId || !targetId) {
-      setError("Select a payment and target first.");
+      setError("Select a payment and invoice first.");
       return;
     }
 
@@ -650,7 +749,7 @@ export function PaymentsConsole() {
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
           allocations: [{
-            target_type: allocationTargetType,
+            target_type: "invoice",
             target_id: targetId,
             applied_amount: allocAmount,
           }],
@@ -668,8 +767,8 @@ export function PaymentsConsole() {
       setSelectedPaymentId(String(updatedPayment.id));
       hydrateFromPayment(updatedPayment);
       setAllocAmount("");
-      setSuccess(`Allocated. Unapplied: ${updatedPayment.unapplied_amount}.`);
-      void loadAllocationTargets();
+      setSuccess(`Allocated. Unapplied: $${updatedPayment.unapplied_amount}.`);
+      void loadInvoices();
     } catch {
       setError("Could not reach payment allocation endpoint.");
     }
@@ -678,8 +777,6 @@ export function PaymentsConsole() {
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
-
-  const selectedProject = projects.find((p) => String(p.id) === selectedProjectId) ?? null;
 
   return (
     <section className={styles.console}>
@@ -701,143 +798,277 @@ export function PaymentsConsole() {
             </p>
           ) : null}
 
-          <ProjectListViewer
-            isExpanded={isProjectListExpanded}
-            onToggleExpanded={() => setIsProjectListExpanded((v) => !v)}
-            showSearchAndFilters
-            searchValue={projectSearch}
-            onSearchChange={setProjectSearch}
-            statusValues={PROJECT_STATUS_VALUES}
-            statusFilters={projectStatusFilters}
-            statusCounts={projectStatusCounts}
-            onToggleStatusFilter={toggleProjectStatusFilter}
-            onShowAllStatuses={() => setProjectStatusFilters(["active", "on_hold", "prospect", "completed", "cancelled"])}
-            onResetStatuses={() => setProjectStatusFilters(DEFAULT_PROJECT_STATUS_FILTERS)}
-            projects={statusFilteredProjects}
-            selectedProjectId={selectedProjectId}
-            onSelectProject={handleSelectProject}
-            statusLabel={projectStatusLabel}
-          />
+          {/* ── Record Payment form (leads the page) ── */}
+          {canMutatePayments ? (
+            <form className={styles.recordForm} onSubmit={handleSubmit}>
+              <div className={styles.recordHeader}>
+                <h3 className={styles.recordTitle}>
+                  {workspaceMode === "create" ? "Record Payment" : `Editing Payment #${selectedPaymentId}`}
+                </h3>
+                {workspaceMode === "edit" ? (
+                  <button type="button" className={styles.secondaryButton} onClick={resetToCreate}>
+                    + New
+                  </button>
+                ) : null}
+              </div>
 
-          {/* Direction toggle */}
-          <div className={styles.directionToggle}>
-            <button
-              type="button"
-              className={`${styles.directionButton} ${direction === "inbound" ? styles.directionButtonActive : ""}`}
-              onClick={() => setDirection("inbound")}
-            >
-              Inbound (Received)
-            </button>
-            <button
-              type="button"
-              className={`${styles.directionButton} ${direction === "outbound" ? styles.directionButtonActive : ""}`}
-              onClick={() => setDirection("outbound")}
-            >
-              Outbound (Paid)
-            </button>
-          </div>
-
-          {/* Payment list panel */}
-          <section className={styles.panel}>
-            <div className={styles.panelHeader}>
-              <h3>{selectedProject ? `${directionLabel} Payments: ${selectedProject.name}` : `${directionLabel} Payments`}</h3>
-              <button
-                type="button"
-                className={collapseButtonStyles.collapseButton}
-                onClick={() => setIsPaymentListExpanded((v) => !v)}
-                aria-expanded={isPaymentListExpanded}
-              >
-                {isPaymentListExpanded ? "Collapse" : "Expand"}
-              </button>
-            </div>
-
-            {isPaymentListExpanded ? (
-              <>
-                <input
-                  className={styles.paymentSearchInput}
-                  type="text"
-                  placeholder="Search payments..."
-                  value={paymentSearch}
-                  onChange={(e) => setPaymentSearch(e.target.value)}
-                />
-
-                <div className={styles.statusFilters}>
-                  {PAYMENT_STATUSES_FALLBACK.map((status) => {
-                    const active = paymentStatusFilters.includes(status);
-                    return (
-                      <button
-                        key={status}
-                        type="button"
-                        className={`${styles.statusFilterPill} ${active ? styles.statusFilterPillActive : styles.statusFilterPillInactive}`}
-                        onClick={() => togglePaymentStatusFilter(status)}
-                      >
-                        <span>{statusLabel(status)}</span>
-                        <span className={styles.statusFilterCount}>{paymentStatusTotals.get(status) ?? 0}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className={styles.paymentList}>
-                  {paginatedPayments.length ? (
-                    paginatedPayments.map((payment) => {
-                      const isSelected = String(payment.id) === selectedPaymentId;
-                      return (
-                        <article
-                          key={payment.id}
-                          className={`${styles.paymentCard} ${isSelected ? styles.paymentCardSelected : ""}`}
-                          onClick={() => handleSelectPayment(payment)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              handleSelectPayment(payment);
-                            }
-                          }}
-                          role="button"
-                          tabIndex={0}
-                          aria-pressed={isSelected}
+              <div className={styles.fieldGrid}>
+                <div className={styles.field}>
+                  <span className={styles.fieldLabel}>Customer</span>
+                  <div className={styles.projectCombobox}>
+                    <div className={styles.projectInputWrap}>
+                      <input
+                        ref={customerInputRef}
+                        className={styles.projectInput}
+                        role="combobox"
+                        aria-expanded={customerMenuOpen}
+                        value={customerMenuOpen ? customerQuery : (selectedCustomer ? selectedCustomer.display_name : "")}
+                        placeholder="Type to search customers..."
+                        onFocus={() => openCustomerMenu()}
+                        onChange={(e) => handleCustomerInput(e.target.value)}
+                        onKeyDown={handleCustomerKeyDown}
+                        autoComplete="off"
+                        required
+                      />
+                      {selectedCustomerId ? (
+                        <button
+                          type="button"
+                          className={styles.projectClear}
+                          aria-label="Clear customer selection"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => commitCustomer(null)}
                         >
-                          <div className={styles.paymentCardRow}>
-                            <div className={styles.paymentCardIdentity}>
-                              <span className={statusBadgeClass(payment.status)}>
-                                {statusLabel(payment.status)}
-                              </span>
-                              <span>{payment.method.toUpperCase()}</span>
-                              {payment.reference_number ? (
-                                <span>#{payment.reference_number}</span>
-                              ) : null}
-                            </div>
-                            <span className={styles.paymentCardAmount}>${payment.amount}</span>
-                          </div>
-                          <div className={styles.paymentMetaGrid}>
-                            <span><span className={styles.paymentMetaLabel}>Date</span> {formatDateDisplay(payment.payment_date)}</span>
-                            <span><span className={styles.paymentMetaLabel}>Allocated</span> ${payment.allocated_total}</span>
-                            <span><span className={styles.paymentMetaLabel}>Unapplied</span> ${payment.unapplied_amount}</span>
-                            {payment.notes ? (
-                              <span><span className={styles.paymentMetaLabel}>Notes</span> {payment.notes}</span>
-                            ) : null}
-                          </div>
-                        </article>
-                      );
-                    })
-                  ) : (
-                    <p className={styles.emptyState}>
-                      {directionPayments.length
-                        ? paymentNeedle
-                          ? "No payments match your search."
-                          : "No payments match the selected status filters."
-                        : `No ${directionLabel.toLowerCase()} payments yet for this project.`}
-                    </p>
-                  )}
+                          ×
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className={styles.projectClear}
+                          aria-label="Open customer options"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => { customerInputRef.current?.focus(); openCustomerMenu(); }}
+                        >
+                          ▾
+                        </button>
+                      )}
+                    </div>
+                    {customerMenuOpen ? (
+                      <div ref={customerMenuRef} className={styles.projectMenu} role="listbox">
+                        {filteredCustomers.map((c, i) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            role="option"
+                            aria-selected={String(c.id) === selectedCustomerId}
+                            className={`${styles.projectOption} ${customerHighlight === i ? styles.projectOptionActive : ""}`}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onMouseEnter={() => setCustomerHighlight(i)}
+                            onClick={() => commitCustomer(c)}
+                          >
+                            {c.display_name}
+                          </button>
+                        ))}
+                        {filteredCustomers.length === 0 && customerQuery.trim() ? (
+                          <div className={styles.projectNoResults}>No matching customers.</div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
-                <PaginationControls page={paymentPage} totalPages={paymentTotalPages} totalCount={paymentTotalCount} onPageChange={setPaymentPage} />
-              </>
-            ) : (
-              <p className={styles.inlineHint}>Payment list collapsed.</p>
-            )}
-          </section>
 
-          {/* Selected payment detail card */}
+                <div className={styles.field}>
+                  <span className={styles.fieldLabel}>Project (optional)</span>
+                  <div className={styles.projectCombobox}>
+                    <div className={styles.projectInputWrap}>
+                      <input
+                        ref={projectInputRef}
+                        className={styles.projectInput}
+                        role="combobox"
+                        aria-expanded={projectMenuOpen}
+                        value={projectMenuOpen ? projectQuery : (selectedProject ? projectDisplayLabel(selectedProject) : "")}
+                        placeholder="Type to search projects..."
+                        onFocus={() => openProjectMenu()}
+                        onChange={(e) => handleProjectInput(e.target.value)}
+                        onKeyDown={handleProjectKeyDown}
+                        autoComplete="off"
+                      />
+                      {selectedProjectId ? (
+                        <button
+                          type="button"
+                          className={styles.projectClear}
+                          aria-label="Clear project selection"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => commitProject(null)}
+                        >
+                          ×
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className={styles.projectClear}
+                          aria-label="Open project options"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => { projectInputRef.current?.focus(); openProjectMenu(); }}
+                        >
+                          ▾
+                        </button>
+                      )}
+                    </div>
+                    {projectMenuOpen ? (
+                      <div ref={projectMenuRef} className={styles.projectMenu} role="listbox">
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={!selectedProjectId}
+                          className={`${styles.projectOption} ${projectHighlight === 0 ? styles.projectOptionActive : ""}`}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onMouseEnter={() => setProjectHighlight(0)}
+                          onClick={() => commitProject(null)}
+                        >
+                          No project
+                        </button>
+                        {filteredProjects.map((p, i) => {
+                          const idx = i + 1;
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              role="option"
+                              aria-selected={String(p.id) === selectedProjectId}
+                              className={`${styles.projectOption} ${projectHighlight === idx ? styles.projectOptionActive : ""}`}
+                              onMouseDown={(e) => e.preventDefault()}
+                              onMouseEnter={() => setProjectHighlight(idx)}
+                              onClick={() => commitProject(p)}
+                            >
+                              <span className={styles.projectOptionName}>{p.name}</span>
+                              <span className={styles.projectOptionCustomer}>{p.customer_display_name}</span>
+                            </button>
+                          );
+                        })}
+                        {filteredProjects.length === 0 && projectQuery.trim() ? (
+                          <div className={styles.projectNoResults}>No matching projects.</div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className={styles.field}>
+                  <span className={styles.fieldLabel}>Amount</span>
+                  <input
+                    value={formAmount}
+                    onChange={(e) => setFormAmount(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+
+                <div className={`${styles.field} ${styles.fieldFull}`}>
+                  <span className={styles.fieldLabel}>Method</span>
+                  <div className={styles.methodPills}>
+                    {paymentMethods.map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        className={`${styles.methodPill} ${v === formMethod ? styles.methodPillActive : ""}`}
+                        aria-pressed={v === formMethod}
+                        onClick={() => setFormMethod(v as PaymentMethod)}
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className={styles.field}>
+                  <span className={styles.fieldLabel}>Date</span>
+                  <input type="date" value={formPaymentDate} onChange={(e) => setFormPaymentDate(e.target.value)} required />
+                </div>
+
+                <div className={styles.field}>
+                  <span className={styles.fieldLabel}>Reference #</span>
+                  <input value={formReferenceNumber} onChange={(e) => setFormReferenceNumber(e.target.value)} placeholder="Check #, confirmation, etc." />
+                </div>
+
+                {workspaceMode === "edit" ? (
+                  <div className={styles.field}>
+                    <span className={styles.fieldLabel}>Status</span>
+                    <select value={formStatus} onChange={(e) => setFormStatus(e.target.value as PaymentStatus)}>
+                      {selectedPaymentAllowedStatuses.map((v) => (
+                        <option key={v} value={v}>{statusLabel(v)}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+
+                <div className={`${styles.field} ${styles.fieldFull}`}>
+                  <span className={styles.fieldLabel}>Notes</span>
+                  <textarea value={formNotes} onChange={(e) => setFormNotes(e.target.value)} rows={2} placeholder="Optional" />
+                </div>
+              </div>
+
+              {/* Allocation disclosure — create mode only */}
+              {workspaceMode === "create" && payableTargets.length > 0 ? (
+                <div className={styles.allocationDisclosure}>
+                  <button
+                    type="button"
+                    className={styles.disclosureToggle}
+                    onClick={() => setShowAllocation((v) => !v)}
+                    aria-expanded={showAllocation}
+                  >
+                    {showAllocation ? "▾" : "▸"} Allocate to invoice
+                  </button>
+                  {showAllocation ? (
+                    <div className={styles.allocationFields}>
+                      <div className={styles.field}>
+                        <span className={styles.fieldLabel}>Invoice</span>
+                        <select value={allocTargetId} onChange={(e) => setAllocTargetId(e.target.value)}>
+                          <option value="">None</option>
+                          {payableTargets.map((target) => (
+                            <option key={target.id} value={target.id}>
+                              {target.label} (due ${target.balanceDue})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      {allocTargetId ? (
+                        <div className={styles.field}>
+                          <span className={styles.fieldLabel}>Amount</span>
+                          <input value={allocAmount} onChange={(e) => setAllocAmount(e.target.value)} placeholder="0.00" />
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div className={styles.formActions}>
+                <button
+                  type="submit"
+                  className={styles.primaryButton}
+                  disabled={
+                    workspaceMode === "create"
+                      ? !canCreatePayments
+                      : !selectedPaymentId || !canEditPayments
+                  }
+                >
+                  {workspaceMode === "create"
+                    ? allocTargetId && allocAmount
+                      ? "Record & Allocate"
+                      : "Record Payment"
+                    : "Save Changes"}
+                </button>
+                {workspaceMode === "edit" ? (
+                  <button type="button" className={styles.secondaryButton} onClick={resetToCreate}>
+                    Cancel
+                  </button>
+                ) : null}
+              </div>
+            </form>
+          ) : null}
+
+          {/* ── Selected payment detail ── */}
           {selectedPayment ? (
             <div className={styles.detailCard}>
               <div className={styles.detailHeader}>
@@ -845,7 +1076,6 @@ export function PaymentsConsole() {
                 <span className={statusBadgeClass(selectedPayment.status)}>
                   {statusLabel(selectedPayment.status)}
                 </span>
-                <span className={styles.directionBadge}>{directionLabel}</span>
               </div>
 
               <div className={styles.detailMetrics}>
@@ -901,7 +1131,7 @@ export function PaymentsConsole() {
                     {selectedPayment.allocations.map((alloc) => (
                       <div key={alloc.id} className={styles.allocationRow}>
                         <span className={styles.allocationTarget}>
-                          {alloc.target_type === "invoice" ? "Invoice" : "Bill"} #{alloc.target_id}
+                          Invoice #{alloc.target_id}
                         </span>
                         <span className={styles.allocationAmount}>${alloc.applied_amount}</span>
                       </div>
@@ -910,18 +1140,18 @@ export function PaymentsConsole() {
                 </>
               ) : null}
 
-              {/* Allocate form (settled payments with targets) */}
+              {/* Allocate form (settled payments with outstanding invoices) */}
               {selectedPayment.status === "settled" &&
                payableTargets.length > 0 &&
                canAllocatePayments &&
                Number(selectedPayment.unapplied_amount) > 0 ? (
                 <>
-                  <span className={styles.sectionLabel}>Allocate to {targetLabel}</span>
+                  <span className={styles.sectionLabel}>Allocate to Invoice</span>
                   <form className={styles.allocationForm} onSubmit={handleAllocate}>
                     <div className={styles.field}>
-                      <span className={styles.fieldLabel}>Target</span>
+                      <span className={styles.fieldLabel}>Invoice</span>
                       <select value={allocTargetId} onChange={(e) => setAllocTargetId(e.target.value)} required>
-                        <option value="">Select {targetLabel.toLowerCase()}</option>
+                        <option value="">Select invoice</option>
                         {payableTargets.map((target) => (
                           <option key={target.id} value={target.id}>
                             {target.label} (due ${target.balanceDue})
@@ -951,114 +1181,95 @@ export function PaymentsConsole() {
             </div>
           ) : null}
 
-          {/* Workspace form (create / edit) */}
-          {canMutatePayments ? (
-            <form className={styles.workspace} onSubmit={handleSubmit}>
-              <h3 className={styles.workspaceTitle}>
-                {workspaceMode === "create" ? "Record Payment" : `Editing Payment #${selectedPaymentId}`}
-                <span className={styles.workspaceBadge}>
-                  {workspaceMode === "create" ? "New" : "Edit"}
+          {/* ── Payment history (compact, below form) ── */}
+          <section className={styles.historyPanel}>
+            <div className={styles.historyHeader}>
+              <h3 className={styles.historyTitle}>Payment History</h3>
+                <span className={styles.historyCount}>
+                  {inboundPayments.length} payment{inboundPayments.length !== 1 ? "s" : ""}
                 </span>
-              </h3>
+              </div>
 
-              <div className={styles.fieldGrid}>
-                <div className={styles.field}>
-                  <span className={styles.fieldLabel}>Method</span>
-                  <select value={formMethod} onChange={(e) => setFormMethod(e.target.value as PaymentMethod)}>
-                    {paymentMethods.map((v) => (
-                      <option key={v} value={v}>{v}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className={styles.field}>
-                  <span className={styles.fieldLabel}>Amount</span>
-                  <input value={formAmount} onChange={(e) => setFormAmount(e.target.value)} inputMode="decimal" required />
-                </div>
-
-                <div className={styles.field}>
-                  <span className={styles.fieldLabel}>Payment Date</span>
-                  <input type="date" value={formPaymentDate} onChange={(e) => setFormPaymentDate(e.target.value)} required />
-                </div>
-
-                <div className={styles.field}>
-                  <span className={styles.fieldLabel}>Reference #</span>
-                  <input value={formReferenceNumber} onChange={(e) => setFormReferenceNumber(e.target.value)} />
-                </div>
-
-                {workspaceMode === "edit" ? (
-                  <div className={styles.field}>
-                    <span className={styles.fieldLabel}>Status</span>
-                    <select value={formStatus} onChange={(e) => setFormStatus(e.target.value as PaymentStatus)}>
-                      {selectedPaymentAllowedStatuses.map((v) => (
-                        <option key={v} value={v}>{statusLabel(v)}</option>
-                      ))}
-                    </select>
-                  </div>
-                ) : null}
-
-                <div className={`${styles.field} ${styles.fieldFull}`}>
-                  <span className={styles.fieldLabel}>Notes</span>
-                  <textarea value={formNotes} onChange={(e) => setFormNotes(e.target.value)} rows={2} />
+              <div className={styles.historyControls}>
+                <input
+                  className={styles.historySearch}
+                  type="text"
+                  placeholder="Search..."
+                  value={paymentSearch}
+                  onChange={(e) => setPaymentSearch(e.target.value)}
+                />
+                <div className={styles.statusFilters}>
+                  {PAYMENT_STATUSES_DISPLAY.map((status) => {
+                    const active = paymentStatusFilters.includes(status);
+                    return (
+                      <button
+                        key={status}
+                        type="button"
+                        className={`${styles.statusFilterPill} ${active ? styles.statusFilterPillActive : styles.statusFilterPillInactive}`}
+                        onClick={() => togglePaymentStatusFilter(status)}
+                      >
+                        <span>{statusLabel(status)}</span>
+                        <span className={styles.statusFilterCount}>{paymentStatusTotals.get(status) ?? 0}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Inline allocation on create */}
-              {workspaceMode === "create" && payableTargets.length > 0 ? (
-                <>
-                  <p className={styles.inlineHint}>
-                    Optionally allocate this payment to a {targetLabel.toLowerCase()} on creation.
+              <div className={styles.paymentList}>
+                {paginatedPayments.length ? (
+                  paginatedPayments.map((payment) => {
+                    const isSelected = String(payment.id) === selectedPaymentId;
+                    return (
+                      <article
+                        key={payment.id}
+                        className={`${styles.paymentCard} ${isSelected ? styles.paymentCardSelected : ""}`}
+                        onClick={() => handleSelectPayment(payment)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleSelectPayment(payment);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={isSelected}
+                      >
+                        <div className={styles.paymentCardRow}>
+                          <div className={styles.paymentCardIdentity}>
+                            <span className={statusBadgeClass(payment.status)}>
+                              {statusLabel(payment.status)}
+                            </span>
+                            {payment.customer_name ? (
+                              <span>{payment.customer_name}</span>
+                            ) : null}
+                            <span>{payment.method.toUpperCase()}</span>
+                            {payment.reference_number ? (
+                              <span>#{payment.reference_number}</span>
+                            ) : null}
+                          </div>
+                          <span className={styles.paymentCardAmount}>${payment.amount}</span>
+                        </div>
+                        <div className={styles.paymentMetaGrid}>
+                          <span><span className={styles.paymentMetaLabel}>Date</span> {formatDateDisplay(payment.payment_date)}</span>
+                          <span><span className={styles.paymentMetaLabel}>Allocated</span> ${payment.allocated_total}</span>
+                          <span><span className={styles.paymentMetaLabel}>Unapplied</span> ${payment.unapplied_amount}</span>
+                        </div>
+                      </article>
+                    );
+                  })
+                ) : (
+                  <p className={styles.emptyState}>
+                    {inboundPayments.length
+                      ? paymentNeedle
+                        ? "No payments match your search."
+                        : "No payments match the selected filters."
+                      : "No inbound payments yet for this project."}
                   </p>
-                  <div className={styles.fieldGrid}>
-                    <div className={styles.field}>
-                      <span className={styles.fieldLabel}>{targetLabel}</span>
-                      <select value={allocTargetId} onChange={(e) => setAllocTargetId(e.target.value)}>
-                        <option value="">None</option>
-                        {payableTargets.map((target) => (
-                          <option key={target.id} value={target.id}>
-                            {target.label} (due ${target.balanceDue})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {allocTargetId ? (
-                      <div className={styles.field}>
-                        <span className={styles.fieldLabel}>Allocation Amount</span>
-                        <input value={allocAmount} onChange={(e) => setAllocAmount(e.target.value)} placeholder="0.00" />
-                      </div>
-                    ) : null}
-                  </div>
-                </>
-              ) : null}
-
-              <div style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap" }}>
-                <button
-                  type="submit"
-                  className={styles.primaryButton}
-                  disabled={
-                    workspaceMode === "create"
-                      ? !selectedProjectId || !canCreatePayments
-                      : !selectedPaymentId || !canEditPayments
-                  }
-                >
-                  {workspaceMode === "create"
-                    ? allocTargetId && allocAmount
-                      ? "Record & Allocate"
-                      : "Record Payment"
-                    : "Save Changes"}
-                </button>
-                {workspaceMode === "edit" ? (
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={resetToCreate}
-                  >
-                    + Record New Payment
-                  </button>
-                ) : null}
+                )}
               </div>
-            </form>
-          ) : null}
+              <PaginationControls page={paymentPage} totalPages={paymentTotalPages} totalCount={paymentTotalCount} onPageChange={setPaymentPage} />
+          </section>
         </>
       ) : null}
     </section>

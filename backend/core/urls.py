@@ -55,6 +55,7 @@ from core.views import (
     accounting_sync_event_retry_view,
     attention_feed_view,
     change_impact_summary_view,
+    org_payments_view,
     payment_detail_view,
     payment_allocate_view,
     payment_contract_view,
@@ -312,6 +313,7 @@ urlpatterns = [
         vendor_bill_detail_view,
         name="vendor-bill-detail",
     ),
+    path("payments/", org_payments_view, name="org-payments"),
     path("payments/<int:payment_id>/", payment_detail_view, name="payment-detail"),
     path("payments/<int:payment_id>/allocate/", payment_allocate_view, name="payment-allocate"),
     path(

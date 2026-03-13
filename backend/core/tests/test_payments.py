@@ -191,6 +191,7 @@ class PaymentTests(TestCase):
     def test_payment_list_scoped_by_project_and_user(self):
         self._create_payment()
         Payment.objects.create(
+            organization=self.other_org,
             project=self.other_project,
             direction=Payment.Direction.OUTBOUND,
             method=Payment.Method.CHECK,

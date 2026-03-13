@@ -34,7 +34,8 @@ class PaymentAllocationSerializer(serializers.ModelSerializer):
 class PaymentSerializer(serializers.ModelSerializer):
     """Read-only payment with nested allocations and computed totals."""
 
-    project_name = serializers.CharField(source="project.name", read_only=True)
+    customer_name = serializers.SerializerMethodField()
+    project_name = serializers.SerializerMethodField()
     allocations = PaymentAllocationSerializer(many=True, read_only=True)
     allocated_total = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     unapplied_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
@@ -43,6 +44,9 @@ class PaymentSerializer(serializers.ModelSerializer):
         model = Payment
         fields = [
             "id",
+            "organization",
+            "customer",
+            "customer_name",
             "project",
             "project_name",
             "direction",
@@ -60,6 +64,9 @@ class PaymentSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
+            "organization",
+            "customer",
+            "customer_name",
             "project",
             "project_name",
             "created_at",
@@ -69,10 +76,20 @@ class PaymentSerializer(serializers.ModelSerializer):
             "allocations",
         ]
 
+    def get_customer_name(self, obj: Payment) -> str:
+        """Return customer display name or empty string."""
+        return obj.customer.display_name if obj.customer_id else ""
+
+    def get_project_name(self, obj: Payment) -> str:
+        """Return project name or empty string for unassigned payments."""
+        return obj.project.name if obj.project_id else ""
+
 
 class PaymentWriteSerializer(serializers.Serializer):
     """Write serializer for creating or updating a payment."""
 
+    customer = serializers.IntegerField(required=False, allow_null=True)
+    project = serializers.IntegerField(required=False, allow_null=True)
     direction = serializers.ChoiceField(choices=Payment.Direction.choices, required=False)
     method = serializers.ChoiceField(choices=Payment.Method.choices, required=False)
     status = serializers.ChoiceField(choices=Payment.Status.choices, required=False)

@@ -3,6 +3,7 @@ export type { UserData } from "@/shared/types/domain";
 
 export type ProjectRecord = {
   id: number;
+  customer: number;
   name: string;
   customer_display_name: string;
   status: string;
@@ -31,9 +32,17 @@ export type PaymentAllocationRecord = {
   created_at: string;
 };
 
+export type CustomerRecord = {
+  id: number;
+  display_name: string;
+};
+
 export type PaymentRecord = {
   id: number;
-  project: number;
+  organization: number;
+  customer: number | null;
+  customer_name: string;
+  project: number | null;
   project_name: string;
   direction: PaymentDirection;
   method: PaymentMethod;
@@ -87,6 +96,7 @@ export type PaymentPolicyContract = {
 export type ApiResponse = {
   data?:
     | UserData
+    | CustomerRecord[]
     | ProjectRecord[]
     | PaymentRecord[]
     | PaymentRecord
