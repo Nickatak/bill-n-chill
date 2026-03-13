@@ -24,17 +24,12 @@
 
 .statusMessage {
   margin: 0;
-  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent 18%);
+  border: 1px solid var(--status-green-border);
   border-radius: var(--radius-lg);
   padding: 10px var(--space-md);
   font-size: var(--font-base);
-  color: color-mix(in srgb, var(--text-secondary) 92%, var(--text-primary) 8%);
-  background:
-    linear-gradient(
-      140deg,
-      color-mix(in srgb, var(--surface) 92%, var(--border) 8%) 0%,
-      color-mix(in srgb, var(--surface) 97%, var(--accent-light) 3%) 100%
-    );
+  color: var(--status-green-text);
+  background: var(--status-green-bg);
 }
 
 /* ── Quick Add collapsible section ── */

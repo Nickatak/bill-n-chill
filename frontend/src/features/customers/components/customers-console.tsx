@@ -280,7 +280,7 @@ export function CustomersConsole() {
       setRows((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
       hydrate(updated);
       setIsEditorOpen(false);
-      setStatusMessage(`Saved customer #${updated.id}.`);
+      setStatusMessage(`Saved ${updated.display_name || "customer"}.`);
     } catch {
       setStatusMessage("Could not reach customer detail endpoint.");
     }
@@ -453,7 +453,6 @@ export function CustomersConsole() {
               hasActiveOrOnHoldProject={Boolean(editingCustomer.has_active_or_on_hold_project)}
               onSubmit={handleSave}
               readOnly={!canMutateCustomers}
-              formMessage={statusMessage}
             />
           </section>
         </div>
