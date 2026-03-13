@@ -212,13 +212,13 @@ describe("OrganizationConsole", () => {
     expect(screen.getByText("PM User")).toBeTruthy();
   });
 
-  it("switches to Document Settings tab and renders help email", async () => {
+  it("switches to Document Settings tab and renders estimate fields by default", async () => {
     setupDefaultFetch();
     render(<OrganizationConsole />);
     await waitFor(() => expect(screen.getByText("Company Name")).toBeTruthy());
 
     fireEvent.click(screen.getByText("Document Settings"));
-    expect(screen.getByText("Help Email")).toBeTruthy();
+    expect(screen.getByText("Estimate Valid Days")).toBeTruthy();
   });
 
   // -- Error states --
@@ -618,17 +618,16 @@ describe("OrganizationConsole > Document Settings", () => {
     fireEvent.click(screen.getByText("Document Settings"));
   }
 
-  it("renders help email and invoice doc type by default", async () => {
+  it("renders estimate doc type sub-tab by default", async () => {
     await renderAndSwitchToDocuments();
-    expect(screen.getByDisplayValue("help@test.com")).toBeTruthy();
-    expect(screen.getByText("Default Due Days")).toBeTruthy();
+    expect(screen.getByText("Estimate Valid Days")).toBeTruthy();
     expect(screen.getByDisplayValue("30")).toBeTruthy();
   });
 
-  it("switches to estimate doc type sub-tab", async () => {
+  it("switches to invoice doc type sub-tab", async () => {
     await renderAndSwitchToDocuments();
-    fireEvent.click(screen.getByText("Estimates"));
-    expect(screen.getByText("Estimate Valid Days")).toBeTruthy();
+    fireEvent.click(screen.getByText("Invoices"));
+    expect(screen.getByText("Default Due Days")).toBeTruthy();
   });
 
   it("switches to change order doc type sub-tab", async () => {
@@ -646,19 +645,19 @@ describe("OrganizationConsole > Document Settings", () => {
   it("sends PATCH on save with document settings payload", async () => {
     await renderAndSwitchToDocuments();
 
-    const helpEmailInput = screen.getByDisplayValue("help@test.com");
-    fireEvent.change(helpEmailInput, { target: { value: "support@test.com" } });
+    const validDaysInput = screen.getByDisplayValue("30");
+    fireEvent.change(validDaysInput, { target: { value: "45" } });
 
     mockFetch.mockImplementation((url: string, init?: RequestInit) => {
       if (init?.method === "PATCH" && url.includes("/organization/")) {
         const body = JSON.parse(init.body as string);
-        expect(body.help_email).toBe("support@test.com");
+        expect(body.default_estimate_valid_delta).toBe(45);
         expect(body.default_invoice_due_delta).toBe(30);
         return Promise.resolve({
           ok: true,
           json: () =>
             Promise.resolve({
-              data: { organization: makeProfile({ help_email: "support@test.com" }) },
+              data: { organization: makeProfile({ default_estimate_valid_delta: 45 }) },
             }),
         });
       }
@@ -666,7 +665,7 @@ describe("OrganizationConsole > Document Settings", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(screen.getByDisplayValue("support@test.com")).toBeTruthy());
+    await waitFor(() => expect(screen.getByDisplayValue("45")).toBeTruthy());
   });
 
   it("shows read-only hint when canEdit is false", async () => {
@@ -678,6 +677,6 @@ describe("OrganizationConsole > Document Settings", () => {
 
   it("renders T&Cs textarea with profile values", async () => {
     await renderAndSwitchToDocuments();
-    expect(screen.getByDisplayValue("Net 30")).toBeTruthy();
+    expect(screen.getByDisplayValue("Valid 30 days")).toBeTruthy();
   });
 });

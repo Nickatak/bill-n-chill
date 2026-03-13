@@ -290,6 +290,7 @@ describe("EstimatesConsole", () => {
 
   it("does not show no-email warning when Sent is selected and customer has email", async () => {
     setupDefaultFetch({
+      projects: [makeProject({ customer_email: "jane@example.com" })],
       estimates: [
         makeEstimate({
           id: 42,
