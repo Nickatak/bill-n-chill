@@ -38,6 +38,18 @@ type PublicDocumentTableRow = {
   cells: ReactNode[];
 };
 
+/** Per-column mobile card layout hint. One entry per column index. */
+type MobileColumnHint = {
+  /** Visual order within the card grid (lower = earlier). */
+  order: number;
+  /** "full" spans the full card width, "half" shares a row. Default "half". */
+  span?: "full" | "half";
+  /** Right-align this field's value. Default "left". */
+  align?: "left" | "right";
+  /** Hide this column on mobile. Default false. */
+  hidden?: boolean;
+};
+
 type PublicDocumentFrameProps = {
   headerLeft: ReactNode;
   headerRight: ReactNode;
@@ -48,6 +60,8 @@ type PublicDocumentFrameProps = {
   afterTable?: ReactNode;
   afterLineSection?: ReactNode;
   footer?: ReactNode;
+  /** Optional per-column mobile layout hints (order, span, alignment). */
+  mobileColumnLayout?: MobileColumnHint[];
 };
 
 // ---------------------------------------------------------------------------
@@ -110,6 +124,7 @@ export function PublicDocumentFrame({
   afterTable,
   afterLineSection,
   footer,
+  mobileColumnLayout,
 }: PublicDocumentFrameProps) {
   return (
     <section className={styles.card}>
@@ -133,9 +148,21 @@ export function PublicDocumentFrame({
               {rows.length ? (
                 rows.map((row) => (
                   <tr key={row.key}>
-                    {row.cells.map((cell, index) => (
-                      <td key={`${row.key}-${index}`}>{cell}</td>
-                    ))}
+                    {row.cells.map((cell, index) => {
+                      const hint = mobileColumnLayout?.[index];
+                      return (
+                        <td
+                          key={`${row.key}-${index}`}
+                          data-label={columns[index]}
+                          data-span={hint?.span || "half"}
+                          data-align={hint?.align || "left"}
+                          data-hidden={hint?.hidden ? "true" : undefined}
+                          style={hint ? { order: hint.order } : undefined}
+                        >
+                          {cell}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))
               ) : (
@@ -157,4 +184,5 @@ export function PublicDocumentFrame({
   );
 }
 
+export type { MobileColumnHint };
 export { styles as publicDocumentFrameStyles };

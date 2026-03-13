@@ -261,18 +261,36 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
               </>
             }
             lineTitle="Line Items"
-            columns={["Qty", "Description", "Cost Code", "Unit", "Unit Price", "Amount"]}
-            rows={(invoice.line_items ?? []).map((line) => ({
-              key: line.id,
-              cells: [
-                line.quantity,
-                line.description || "No description",
-                line.cost_code ? String(line.cost_code) : "N/A",
-                line.unit || "ea",
-                `$${formatDecimal(parseAmount(line.unit_price))}`,
-                `$${formatDecimal(parseAmount(line.line_total))}`,
-              ],
-            }))}
+            columns={["Qty", "Description", "Cost Code", "Unit", "Unit Price", "Total"]}
+            mobileColumnLayout={[
+              { order: 2, span: "half", hidden: true },  // Qty (folded into Amount)
+              { order: 0, span: "full" },                 // Description
+              { order: 1, span: "full" },                 // Cost Code
+              { order: 3, span: "half", hidden: true },   // Unit (folded into Amount)
+              { order: 4, span: "half", hidden: true },   // Unit Price (folded into Amount)
+              { order: 2, span: "full", align: "right" }, // Amount (shows breakdown)
+            ]}
+            rows={(invoice.line_items ?? []).map((line) => {
+              const qty = Number(line.quantity || 0);
+              const unitPrice = parseAmount(line.unit_price);
+              const unit = line.unit || "ea";
+              return {
+                key: line.id,
+                cells: [
+                  line.quantity,
+                  line.description || "No description",
+                  line.cost_code ? String(line.cost_code) : "N/A",
+                  unit,
+                  `$${formatDecimal(unitPrice)}`,
+                  <>
+                    <span className={frameStyles.mobileBreakdown}>
+                      {qty.toFixed(2)} {unit} × ${formatDecimal(unitPrice)}
+                    </span>
+                    <span>${formatDecimal(parseAmount(line.line_total))}</span>
+                  </>,
+                ],
+              };
+            })}
             afterTable={
               <div className={styles.summaryWrap}>
                 <div className={frameStyles.summaryBox}>

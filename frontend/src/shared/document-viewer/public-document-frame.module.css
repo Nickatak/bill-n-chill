@@ -411,6 +411,10 @@
   text-align: right;
 }
 
+.mobileBreakdown {
+  display: none;
+}
+
 .printFooter {
   display: none;
 }
@@ -465,6 +469,125 @@
   .partySecondary,
   .table td {
     font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 700px) {
+  .identityTitle {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+
+  .identityEyebrow {
+    display: none;
+  }
+
+  /* Line-items table → stacked cards */
+  .table {
+    min-width: 0;
+  }
+
+  .table thead {
+    display: none;
+  }
+
+  .table tbody {
+    counter-reset: line-item;
+  }
+
+  .table tbody tr {
+    counter-increment: line-item;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    margin-bottom: 8px;
+  }
+
+  .table tbody tr::before {
+    content: "Item " counter(line-item);
+    grid-column: 1 / -1;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    order: -1;
+  }
+
+  .table tbody tr:nth-child(even) {
+    background: var(--surface-secondary);
+  }
+
+  .table tbody td {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 4px 0;
+    border-bottom: 0;
+    font-size: 0.9rem;
+  }
+
+  .table tbody td::before {
+    content: attr(data-label);
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--pub-accent-heading);
+    opacity: 0.7;
+  }
+
+  /* Full-span columns stretch across both grid columns */
+  .table tbody td[data-span="full"] {
+    grid-column: 1 / -1;
+  }
+
+  /* Breakdown text (e.g. "2.00 ea × $50.00") shown above the total on mobile */
+  .mobileBreakdown {
+    display: inline;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    font-weight: 400;
+  }
+
+  /* Hidden columns on mobile */
+  .table tbody td[data-hidden="true"] {
+    display: none;
+  }
+
+  /* Right-aligned fields */
+  .table tbody td[data-align="right"] {
+    text-align: right;
+    align-items: flex-end;
+    font-weight: 600;
+  }
+
+  .tableWrap {
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+  }
+
+  /* Summary box full-width */
+  .summaryBox {
+    width: 100%;
+  }
+
+  /* Footer stacks */
+  .footerRow {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .footerRow span:nth-child(3) {
+    grid-column: 1 / -1;
+    text-align: center;
+    word-break: break-all;
+    font-size: 0.75rem;
   }
 }
 

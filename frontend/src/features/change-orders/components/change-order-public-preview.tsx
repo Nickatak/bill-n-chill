@@ -268,6 +268,12 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
             }
             lineTitle="Line Items"
             columns={["Cost Code", "Description", "Amount Delta", "Days Delta"]}
+            mobileColumnLayout={[
+              { order: 1, span: "full" },   // Cost Code
+              { order: 0, span: "full" },   // Description
+              { order: 2, span: "half" },   // Amount Delta
+              { order: 3, span: "half" },   // Days Delta
+            ]}
             rows={(changeOrder.line_items ?? []).map((line) => ({
               key: line.id,
               cells: [

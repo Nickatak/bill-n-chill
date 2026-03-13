@@ -278,21 +278,39 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
               </>
             }
             lineTitle="Line Items"
-            columns={["Qty", "Desc", "Cost Code", "Unit", "Unit Price", "Amount"]}
-            rows={lineItems.map((line, index) => ({
-              key: line.localId,
-              cells: [
-                Number(line.quantity || 0).toFixed(2),
-                line.description || "No description",
-                <>
-                  <span className={creatorStyles.printOnly}>{findCostCodeShort(line.costCodeId)}</span>
-                  <span className={creatorStyles.screenOnly}>{findCostCodeLabel(line.costCodeId)}</span>
-                </>,
-                line.unit || "ea",
-                `$${Number(line.unitCost || 0).toFixed(2)}`,
-                `$${formatDecimal(lineTotals[index] ?? 0)}`,
-              ],
-            }))}
+            columns={["Qty", "Desc", "Cost Code", "Unit", "Unit Price", "Total"]}
+            mobileColumnLayout={[
+              { order: 2, span: "half", hidden: true },  // Qty (folded into Amount)
+              { order: 0, span: "full" },                 // Desc
+              { order: 1, span: "full" },                 // Cost Code
+              { order: 3, span: "half", hidden: true },   // Unit (folded into Amount)
+              { order: 4, span: "half", hidden: true },   // Unit Price (folded into Amount)
+              { order: 2, span: "full", align: "right" }, // Amount (shows breakdown)
+            ]}
+            rows={lineItems.map((line, index) => {
+              const qty = Number(line.quantity || 0);
+              const unitPrice = Number(line.unitCost || 0);
+              const unit = line.unit || "ea";
+              return {
+                key: line.localId,
+                cells: [
+                  qty.toFixed(2),
+                  line.description || "No description",
+                  <>
+                    <span className={creatorStyles.printOnly}>{findCostCodeShort(line.costCodeId)}</span>
+                    <span className={creatorStyles.screenOnly}>{findCostCodeLabel(line.costCodeId)}</span>
+                  </>,
+                  unit,
+                  `$${unitPrice.toFixed(2)}`,
+                  <>
+                    <span className={frameStyles.mobileBreakdown}>
+                      {qty.toFixed(2)} {unit} × ${unitPrice.toFixed(2)}
+                    </span>
+                    <span>${formatDecimal(lineTotals[index] ?? 0)}</span>
+                  </>,
+                ],
+              };
+            })}
             afterTable={
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <div className={frameStyles.summaryBox}>
