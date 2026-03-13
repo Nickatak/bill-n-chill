@@ -300,25 +300,43 @@
   color: var(--text-primary);
 }
 
-.projectAccordionLink {
+.projectAccordionCard {
   border: 1px solid color-mix(in srgb, var(--border) 85%, transparent 15%);
   border-radius: 10px;
   padding: 7px 9px;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   gap: var(--space-sm);
   background: var(--surface-secondary);
-  text-decoration: none;
 }
 
-.projectAccordionLink:hover {
+.projectAccordionCard:hover {
   border-color: color-mix(in srgb, var(--text-primary) 30%, var(--border) 70%);
+}
+
+.projectAccordionLink {
+  flex: 1;
+  min-width: 0;
+  text-decoration: none;
 }
 
 .projectLinkLabel {
   color: var(--text-primary);
   font-size: 0.84rem;
+}
+
+.projectQuickLink {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.projectQuickLink:hover {
+  text-decoration: underline;
 }
 
 .addProjectButton {

@@ -262,15 +262,23 @@ export function CustomersList({
                             </header>
                             <div className={styles.projectLinks}>
                               {group.projects.map((project) => (
-                                <Link
-                                  key={project.id}
-                                  href={`/projects?project=${project.id}`}
-                                  className={styles.projectAccordionLink}
-                                >
-                                  <span className={styles.projectLinkLabel}>
-                                    #{project.id} {project.name}
-                                  </span>
-                                </Link>
+                                <div key={project.id} className={styles.projectAccordionCard}>
+                                  <Link
+                                    href={`/projects?project=${project.id}`}
+                                    className={styles.projectAccordionLink}
+                                  >
+                                    <span className={styles.projectLinkLabel}>
+                                      #{project.id} {project.name}
+                                    </span>
+                                  </Link>
+                                  <Link
+                                    href={`/payments?customer=${row.id}&project=${project.id}`}
+                                    className={styles.projectQuickLink}
+                                    title="Record a payment for this project"
+                                  >
+                                    Enter Payment
+                                  </Link>
+                                </div>
                               ))}
                             </div>
                           </section>

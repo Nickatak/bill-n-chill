@@ -36,7 +36,7 @@
 .recordForm {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: var(--surface-secondary);
+  background: var(--surface);
   padding: var(--space-md);
   display: grid;
   gap: var(--space-sm);
@@ -84,7 +84,7 @@
 .console textarea {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--surface);
+  background: var(--surface-secondary);
   color: var(--text-primary);
   padding: var(--space-sm) 10px;
   font-size: 0.88rem;
@@ -110,7 +110,7 @@
   width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--surface);
+  background: var(--surface-secondary);
   color: var(--text-primary);
   padding: var(--space-sm) 10px;
   padding-right: 28px;
@@ -210,7 +210,7 @@
   letter-spacing: 0.1em;
   font-weight: 600;
   cursor: pointer;
-  background: var(--surface);
+  background: var(--surface-secondary);
   color: var(--text-secondary);
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
@@ -272,7 +272,7 @@
 .detailCard {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: var(--surface-secondary);
+  background: var(--surface);
   padding: var(--space-md);
   display: grid;
   gap: var(--space-md);
@@ -377,7 +377,7 @@
 .historyPanel {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: var(--surface-secondary);
+  background: var(--surface);
   padding: var(--space-md);
   display: grid;
   gap: var(--space-sm);
@@ -585,7 +585,7 @@
 .secondaryButton {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--surface);
+  background: var(--surface-secondary);
   color: var(--text-primary);
   padding: var(--space-sm) var(--space-md);
   font-size: var(--font-sm);

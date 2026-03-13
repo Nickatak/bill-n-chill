@@ -40,6 +40,7 @@ class Payment(StatusTransitionMixin, models.Model):
         CARD = "card", "Card"
         CHECK = "check", "Check"
         WIRE = "wire", "Wire"
+        ZELLE = "zelle", "Zelle"
         CASH = "cash", "Cash"
         OTHER = "other", "Other"
 

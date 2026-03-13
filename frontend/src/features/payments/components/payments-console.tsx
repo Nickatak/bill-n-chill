@@ -12,6 +12,7 @@
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { todayDateInput, formatDateDisplay } from "@/shared/date-format";
 import {
   defaultApiBaseUrl,
@@ -48,7 +49,7 @@ const PAYMENT_STATUS_LABELS_FALLBACK: Record<string, string> = {
   settled: "Settled",
   void: "Void",
 };
-const PAYMENT_METHODS_FALLBACK = ["ach", "card", "check", "wire", "cash", "other"];
+const PAYMENT_METHODS_FALLBACK = ["ach", "card", "check", "wire", "zelle", "cash", "other"];
 const PAYMENT_ALLOWED_TRANSITIONS_FALLBACK: Record<string, string[]> = {
   pending: ["settled", "void"],
   settled: ["void"],
@@ -84,9 +85,16 @@ export function PaymentsConsole() {
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const { message: statusMessage, tone: statusTone, setNeutral, setSuccess, setError, setMessage: setStatusMessage, clear: clearStatus } = useStatusMessage();
 
+  // -- URL params (deep-link from other pages) --
+  const searchParams = useSearchParams();
+  const urlCustomerId = searchParams.get("customer");
+  const urlProjectId = searchParams.get("project");
+  const scopedCustomerId = urlCustomerId && /^\d+$/.test(urlCustomerId) ? urlCustomerId : null;
+  const scopedProjectId = urlProjectId && /^\d+$/.test(urlProjectId) ? urlProjectId : null;
+
   // -- Customers --
   const [customers, setCustomers] = useState<CustomerRecord[]>([]);
-  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState(scopedCustomerId ?? "");
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerMenuOpen, setCustomerMenuOpen] = useState(false);
   const [customerHighlight, setCustomerHighlight] = useState(-1);
@@ -95,7 +103,7 @@ export function PaymentsConsole() {
 
   // -- Projects --
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState(scopedProjectId ?? "");
   const [projectQuery, setProjectQuery] = useState("");
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [projectHighlight, setProjectHighlight] = useState(-1);
@@ -496,9 +504,10 @@ export function PaymentsConsole() {
       if (!response.ok) return;
       const rows = (payload.data as ProjectRecord[]) ?? [];
       setProjects(rows);
+      // Validate scoped project ID still exists; don't auto-select (project is optional)
       setSelectedProjectId((current) => {
         if (current && rows.some((r) => String(r.id) === current)) return current;
-        return rows[0] ? String(rows[0].id) : "";
+        return "";
       });
     } catch {
       // silent
@@ -547,6 +556,19 @@ export function PaymentsConsole() {
     void loadProjects();
     void loadPayments();
   }, [loadPaymentPolicy, loadCustomers, loadProjects, loadPayments, token]);
+
+  // Hydrate combobox display text when data arrives for URL-scoped selections
+  useEffect(() => {
+    if (!selectedCustomerId || customerQuery) return;
+    const match = customers.find((c) => String(c.id) === selectedCustomerId);
+    if (match) setCustomerQuery(match.display_name);
+  }, [customers, selectedCustomerId, customerQuery]);
+
+  useEffect(() => {
+    if (!selectedProjectId || projectQuery) return;
+    const match = projects.find((p) => String(p.id) === selectedProjectId);
+    if (match) setProjectQuery(projectDisplayLabel(match));
+  }, [projects, selectedProjectId, projectQuery]);
 
   // Load invoices (allocation targets) when project selection changes
   useEffect(() => {
