@@ -244,7 +244,6 @@ export function ChangeOrdersConsole({
     changeOrders.find((row) => String(row.id) === selectedChangeOrderId) ?? null;
   const selectedViewerEstimate =
     projectEstimates.find((estimate) => String(estimate.id) === selectedViewerEstimateId) ?? null;
-  const selectedViewerEstimateBaselineStatus = financialBaselineStatus(selectedViewerEstimate);
   const sortChangeOrdersForViewer = useCallback((rows: ChangeOrderRecord[]) => {
     return [...rows].sort((left, right) => {
       const leftCreatedAt = Date.parse(left.created_at);
@@ -282,11 +281,10 @@ export function ChangeOrdersConsole({
     null;
   const selectedViewerEstimateRecordId = selectedViewerEstimate?.id ?? null;
   const approvedCOsForSelectedEstimate = useMemo(() => {
-    if (!selectedViewerEstimateRecordId) return [];
     return viewerChangeOrders.filter((co) =>
       ["approved", "accepted"].includes(co.status),
     );
-  }, [viewerChangeOrders, selectedViewerEstimateRecordId]);
+  }, [viewerChangeOrders]);
   const selectedViewerChangeOrderIdValue = selectedViewerChangeOrder?.id ?? null;
   const selectedViewerChangeOrderLineDelta = selectedViewerChangeOrder
     ? parseAmount(selectedViewerChangeOrder.line_total_delta || selectedViewerChangeOrder.amount_delta)
