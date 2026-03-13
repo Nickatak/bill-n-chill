@@ -533,15 +533,15 @@ def generate_backend_index():
     lines = [
         "# Backend Structural Index",
         "",
-        f"_Auto-generated from `{REPO_ROOT}/backend/core/`. Do not edit manually._",
-        f"_Regenerate: `python generate_index.py`_",
+        "_Auto-generated from `backend/core/`. Do not edit manually._",
+        "_Regenerate: `python scripts/generate_ai_index.py`_",
         "",
     ]
 
     # TOC
     lines.append("## Sections")
     for section in sections:
-        anchor = section.lower().replace(" ", "-").replace("—", "").replace("  ", "-").strip("-")
+        anchor = section.lower().replace("—", "").replace(" ", "-").replace("--", "-").strip("-")
         lines.append(f"- [{section}](#{anchor})")
     lines.append("")
 
@@ -601,15 +601,15 @@ def generate_frontend_index():
     lines = [
         "# Frontend Structural Index",
         "",
-        f"_Auto-generated from `{REPO_ROOT}/frontend/src/`. Do not edit manually._",
-        f"_Regenerate: `python generate_index.py`_",
+        "_Auto-generated from `frontend/src/`. Do not edit manually._",
+        "_Regenerate: `python scripts/generate_ai_index.py`_",
         "",
     ]
 
     # TOC
     lines.append("## Sections")
     for section in sections:
-        anchor = section.lower().replace(" ", "-").replace("—", "").replace("  ", "-").strip("-")
+        anchor = section.lower().replace("—", "").replace(" ", "-").replace("--", "-").strip("-")
         lines.append(f"- [{section}](#{anchor})")
     lines.append("")
 

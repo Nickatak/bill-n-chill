@@ -1,34 +1,34 @@
 # Frontend Structural Index
 
-_Auto-generated from `/home/nick/bill_n_chill/frontend/src/`. Do not edit manually._
-_Regenerate: `python generate_index.py`_
+_Auto-generated from `frontend/src/`. Do not edit manually._
+_Regenerate: `python scripts/generate_ai_index.py`_
 
 ## Sections
 - [App Routes](#app-routes)
-- [Features — Change Orders](#features--change-orders)
-- [Features — Cost Codes](#features--cost-codes)
-- [Features — Customers](#features--customers)
-- [Features — Dashboard](#features--dashboard)
-- [Features — Estimates](#features--estimates)
-- [Features — Financials Auditing](#features--financials-auditing)
-- [Features — Invoices](#features--invoices)
-- [Features — Onboarding](#features--onboarding)
-- [Features — Organization](#features--organization)
-- [Features — Payments](#features--payments)
-- [Features — Projects](#features--projects)
-- [Features — Vendor Bills](#features--vendor-bills)
-- [Features — Vendors](#features--vendors)
-- [Shared — Api](#shared--api)
-- [Shared — Components](#shared--components)
-- [Shared — Utilities](#shared--utilities)
-- [Shared — Document Creator](#shared--document-creator)
-- [Shared — Document Viewer](#shared--document-viewer)
-- [Shared — Hooks](#shared--hooks)
-- [Shared — Onboarding](#shared--onboarding)
-- [Shared — Project List Viewer](#shared--project-list-viewer)
-- [Shared — Session](#shared--session)
-- [Shared — Shell](#shared--shell)
-- [Shared — Types](#shared--types)
+- [Features — Change Orders](#features-change-orders)
+- [Features — Cost Codes](#features-cost-codes)
+- [Features — Customers](#features-customers)
+- [Features — Dashboard](#features-dashboard)
+- [Features — Estimates](#features-estimates)
+- [Features — Financials Auditing](#features-financials-auditing)
+- [Features — Invoices](#features-invoices)
+- [Features — Onboarding](#features-onboarding)
+- [Features — Organization](#features-organization)
+- [Features — Payments](#features-payments)
+- [Features — Projects](#features-projects)
+- [Features — Vendor Bills](#features-vendor-bills)
+- [Features — Vendors](#features-vendors)
+- [Shared — Api](#shared-api)
+- [Shared — Components](#shared-components)
+- [Shared — Utilities](#shared-utilities)
+- [Shared — Document Creator](#shared-document-creator)
+- [Shared — Document Viewer](#shared-document-viewer)
+- [Shared — Hooks](#shared-hooks)
+- [Shared — Onboarding](#shared-onboarding)
+- [Shared — Project List Viewer](#shared-project-list-viewer)
+- [Shared — Session](#shared-session)
+- [Shared — Shell](#shared-shell)
+- [Shared — Types](#shared-types)
 
 ## App Routes
 
@@ -317,6 +317,7 @@ _Estimate document creator sheet used for both creating and editing estimates._
 **Depends on:**
 - `@/shared/document-creator/creator-foundation.module.css`
 - `@/shared/financial-baseline`
+- `@/shared/hooks/use-media-query`
 - `@/shared/hooks/use-policy-contract`
 - `@/shared/hooks/use-status-filters`
 - `@/shared/money-format`

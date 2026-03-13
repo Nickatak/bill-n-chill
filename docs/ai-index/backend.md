@@ -1,30 +1,30 @@
 # Backend Structural Index
 
-_Auto-generated from `/home/nick/bill_n_chill/backend/core/`. Do not edit manually._
-_Regenerate: `python generate_index.py`_
+_Auto-generated from `backend/core/`. Do not edit manually._
+_Regenerate: `python scripts/generate_ai_index.py`_
 
 ## Sections
 - [Core](#core)
 - [Management Commands](#management-commands)
-- [Models — Accounts Payable](#models--accounts-payable)
-- [Models — Accounts Receivable](#models--accounts-receivable)
-- [Models — Cash Management](#models--cash-management)
-- [Models — Change Orders](#models--change-orders)
-- [Models — Estimating](#models--estimating)
-- [Models — Financial Auditing](#models--financial-auditing)
-- [Models — Core](#models--core)
-- [Models — Shared Operations](#models--shared-operations)
+- [Models — Accounts Payable](#models-accounts-payable)
+- [Models — Accounts Receivable](#models-accounts-receivable)
+- [Models — Cash Management](#models-cash-management)
+- [Models — Change Orders](#models-change-orders)
+- [Models — Estimating](#models-estimating)
+- [Models — Financial Auditing](#models-financial-auditing)
+- [Models — Core](#models-core)
+- [Models — Shared Operations](#models-shared-operations)
 - [Policies](#policies)
 - [Serializers](#serializers)
 - [Tests](#tests)
 - [Utils](#utils)
-- [Views — Accounts Payable](#views--accounts-payable)
-- [Views — Accounts Receivable](#views--accounts-receivable)
-- [Views — Shared](#views--shared)
-- [Views — Cash Management](#views--cash-management)
-- [Views — Change Orders](#views--change-orders)
-- [Views — Estimating](#views--estimating)
-- [Views — Shared Operations](#views--shared-operations)
+- [Views — Accounts Payable](#views-accounts-payable)
+- [Views — Accounts Receivable](#views-accounts-receivable)
+- [Views — Shared](#views-shared)
+- [Views — Cash Management](#views-cash-management)
+- [Views — Change Orders](#views-change-orders)
+- [Views — Estimating](#views-estimating)
+- [Views — Shared Operations](#views-shared-operations)
 
 ## Models — Shared Operations
 
