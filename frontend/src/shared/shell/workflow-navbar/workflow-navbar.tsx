@@ -74,26 +74,26 @@ export function WorkflowNavbar() {
               </Link>
             );
           })}
-          {isDebugMode ? (
-            <details ref={devMenuRef} className={styles.devMenu}>
-              <summary className={`${styles.link} ${styles.devTrigger} ${hasActiveDevRoute ? styles.devTriggerActive : ""}`}>
-                Dev <span className={styles.devChevron}>&#9662;</span>
-              </summary>
-              <div className={styles.devMenuList} role="menu" aria-label="Dev pages">
-                {allDebugRoutes.map((route) => (
-                  <Link
-                    key={route.href}
-                    href={route.href}
-                    className={`${styles.devMenuItem} ${isRouteActive(pathname, route) ? styles.devMenuItemActive : ""}`}
-                    role="menuitem"
-                  >
-                    {route.label}
-                  </Link>
-                ))}
-              </div>
-            </details>
-          ) : null}
         </div>
+        {isDebugMode ? (
+          <details ref={devMenuRef} className={styles.devMenu}>
+            <summary className={`${styles.link} ${styles.devTrigger} ${hasActiveDevRoute ? styles.devTriggerActive : ""}`}>
+              Dev <span className={styles.devChevron}>&#9662;</span>
+            </summary>
+            <div className={styles.devMenuList} role="menu" aria-label="Dev pages">
+              {allDebugRoutes.map((route) => (
+                <Link
+                  key={route.href}
+                  href={route.href}
+                  className={`${styles.devMenuItem} ${isRouteActive(pathname, route) ? styles.devMenuItemActive : ""}`}
+                  role="menuitem"
+                >
+                  {route.label}
+                </Link>
+              ))}
+            </div>
+          </details>
+        ) : null}
       </div>
     </nav>
   );
