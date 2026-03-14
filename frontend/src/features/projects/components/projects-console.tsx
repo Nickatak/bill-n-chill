@@ -12,6 +12,7 @@ import { formatCurrency } from "@/shared/money-format";
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { isDebugMode } from "@/shared/shell/nav-routes";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
@@ -623,9 +624,11 @@ export function ProjectsConsole() {
                 </Link>
               </nav>
 
-              <Link href={`/projects/${selectedProject.id}/audit-trail`} className={styles.eventHistoryLink}>
-                Event History
-              </Link>
+              {isDebugMode ? (
+                <Link href={`/projects/${selectedProject.id}/audit-trail`} className={styles.eventHistoryLink}>
+                  Event History
+                </Link>
+              ) : null}
             </div>
             <div className={styles.metricsPanel}>
               <section className={styles.metricSection}>

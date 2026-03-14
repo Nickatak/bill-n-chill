@@ -364,7 +364,7 @@ describe("ProjectsConsole", () => {
   // Workflow tree links
   // ---------------------------------------------------------------------------
 
-  it("renders all workflow tree links with correct hrefs for selected project", async () => {
+  it("renders all workflow pipeline links with correct hrefs for selected project", async () => {
     setupDefaultFetch();
     render(<ProjectsConsole />);
 
@@ -376,7 +376,7 @@ describe("ProjectsConsole", () => {
     expect(screen.getByRole("link", { name: /Change Orders/ })).toHaveAttribute("href", "/projects/1/change-orders");
     expect(screen.getByRole("link", { name: /Invoices/ })).toHaveAttribute("href", "/projects/1/invoices");
     expect(screen.getByRole("link", { name: /Payments/ })).toHaveAttribute("href", "/payments");
-    expect(screen.getByRole("link", { name: /Event History/ })).toHaveAttribute("href", "/projects/1/audit-trail");
+    // Event History is debug-only (NEXT_PUBLIC_DEBUG=true)
   });
 
   // ---------------------------------------------------------------------------

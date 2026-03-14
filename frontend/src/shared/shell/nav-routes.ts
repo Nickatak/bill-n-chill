@@ -20,14 +20,11 @@ export type NavRoute = {
   section?: string;
 };
 
+/** True when the frontend is running with NEXT_PUBLIC_DEBUG=true. */
+export const isDebugMode = process.env.NEXT_PUBLIC_DEBUG === "true";
+
 /** Primary workflow steps shown in the top-level navbar. */
 export const workflowRoutes: NavRoute[] = [
-  {
-    href: "/dashboard",
-    label: "Dashboard",
-    shortLabel: "Dash",
-    exact: ["/dashboard"],
-  },
   {
     href: "/customers",
     label: "Customers",
@@ -42,8 +39,6 @@ export const workflowRoutes: NavRoute[] = [
     startsWith: ["/projects/"],
   },
   {
-    // Payments promoted to first-class workflow item.
-    // See docs/decisions/product-direction-refinement.md
     href: "/payments",
     label: "Payments",
     shortLabel: "Pay",
@@ -57,11 +52,25 @@ export const workflowRoutes: NavRoute[] = [
  * the main workflow sequence. The dropdown trigger shows the org name.
  */
 export const businessMenuRoutes: NavRoute[] = [
-  { href: "/bills", label: "Bills", exact: ["/bills"] },
   { href: "/ops/organization", label: "Organization", exact: ["/ops/organization"], section: "Settings" },
   { href: "/cost-codes", label: "Cost Codes", exact: ["/cost-codes"], section: "Settings" },
   { href: "/vendors", label: "Vendors", exact: ["/vendors"], section: "Settings" },
   { href: "/onboarding", label: "Get Started", exact: ["/onboarding"] },
+];
+
+/** Dev-only workflow routes, shown in the navbar when NEXT_PUBLIC_DEBUG=true. */
+export const debugWorkflowRoutes: NavRoute[] = [
+  {
+    href: "/dashboard",
+    label: "Dashboard",
+    shortLabel: "Dash",
+    exact: ["/dashboard"],
+  },
+];
+
+/** Dev-only business menu routes, shown in the org dropdown when NEXT_PUBLIC_DEBUG=true. */
+export const debugBusinessMenuRoutes: NavRoute[] = [
+  { href: "/bills", label: "Bills", exact: ["/bills"] },
 ];
 
 /**

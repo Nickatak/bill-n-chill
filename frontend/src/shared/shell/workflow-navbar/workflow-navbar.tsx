@@ -7,7 +7,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { isRouteActive, workflowRoutes } from "../nav-routes";
+import { isRouteActive, workflowRoutes, debugWorkflowRoutes, isDebugMode } from "../nav-routes";
 import styles from "./workflow-navbar.module.css";
 
 /** Map workflow route hrefs to onboarding target names for guide arrows. */
@@ -26,12 +26,13 @@ const ONBOARDING_TARGETS: Record<string, string> = {
  */
 export function WorkflowNavbar() {
   const pathname = usePathname() ?? "";
+  const routes = isDebugMode ? [...debugWorkflowRoutes, ...workflowRoutes] : workflowRoutes;
 
   return (
     <nav className={styles.nav} aria-label="MVP workflow order">
       <div className={styles.inner}>
         <div className={styles.scroll}>
-          {workflowRoutes.map((route) => {
+          {routes.map((route) => {
             const isActive = isRouteActive(pathname, route);
             const onboardingTarget = ONBOARDING_TARGETS[route.href];
             return (
