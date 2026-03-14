@@ -151,7 +151,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
         isSuperuser: payload.data?.user?.is_superuser ?? false,
       });
 
-      router.push("/dashboard");
+      router.push("/customers");
     } catch {
       setMessage("Could not reach login endpoint.");
       setMessageTone("error");

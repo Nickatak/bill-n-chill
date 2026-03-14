@@ -73,7 +73,11 @@
 }
 
 .spacer {
-  min-height: 36px;
+  min-height: 64px;
+}
+
+.hintSpacer {
+  min-height: 49px;
 }
 
 @media (max-width: 700px) {

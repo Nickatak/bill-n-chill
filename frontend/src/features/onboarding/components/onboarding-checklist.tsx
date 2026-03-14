@@ -300,7 +300,7 @@ export function OnboardingChecklist() {
               organization: { ...session.organization, onboardingCompleted: true },
             });
           }
-          router.push("/dashboard");
+          router.push("/customers");
         }}
       >
         Dismiss Guide

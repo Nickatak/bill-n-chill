@@ -86,7 +86,7 @@ export function VerifyEmailConsole({ token }: VerifyEmailConsoleProps) {
           });
 
           setStatus("success");
-          setTimeout(() => { if (!ignore) router.push("/dashboard"); }, 2500);
+          setTimeout(() => { if (!ignore) router.push("/customers"); }, 2500);
           return;
         }
 

@@ -44,7 +44,7 @@ export function LandingPage() {
 
   useEffect(() => {
     if (isAuthorized) {
-      router.replace("/dashboard");
+      router.replace("/customers");
     }
   }, [isAuthorized, router]);
 

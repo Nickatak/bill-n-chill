@@ -226,7 +226,7 @@ function ResetForm({ token }: { token: string }) {
         });
 
         setDone(true);
-        setTimeout(() => router.push("/dashboard"), 2000);
+        setTimeout(() => router.push("/customers"), 2000);
         return;
       }
 

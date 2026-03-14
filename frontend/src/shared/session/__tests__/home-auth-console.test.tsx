@@ -75,7 +75,7 @@ describe("HomeAuthConsole", () => {
     fillAndSubmitLogin("nick@test.com", "password123");
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/dashboard");
+      expect(mockPush).toHaveBeenCalledWith("/customers");
     });
 
     const stored = JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY)!);

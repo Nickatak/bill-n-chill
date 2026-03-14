@@ -96,7 +96,7 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
     if (inviteToken) return;
     const session = loadClientSession();
     if (session?.token) {
-      router.replace("/dashboard");
+      router.replace("/customers");
     }
   }, [inviteToken, router]);
 
@@ -199,7 +199,7 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
 
     setMessage("Success! Redirecting...");
     setMessageTone("neutral");
-    router.push("/dashboard");
+    router.push("/customers");
   }
 
   /** Flow A (standard) and Flow B (new user with invite). */

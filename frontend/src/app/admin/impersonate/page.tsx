@@ -100,7 +100,7 @@ export default function ImpersonatePage() {
         });
 
         // Full reload so all state reinitializes.
-        window.location.href = "/dashboard";
+        window.location.href = "/customers";
       } catch {
         setError("Could not reach the server.");
         setStartingId(null);

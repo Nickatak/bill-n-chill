@@ -35,7 +35,7 @@ export function ImpersonationBanner() {
 
     exitImpersonation();
     // Force a full page reload so all state reinitializes with the real session.
-    window.location.href = "/dashboard";
+    window.location.href = "/customers";
   }, [exiting, token]);
 
   if (!impersonating) {

@@ -66,7 +66,7 @@ export function MobileDrawer() {
         <header className={styles.header}>
           <div className={styles.headerActions}>
             {hasSession ? (
-              <Link href="/dashboard" className={styles.headerButton}>
+              <Link href="/customers" className={styles.headerButton}>
                 Home
               </Link>
             ) : null}

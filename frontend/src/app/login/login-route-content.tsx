@@ -19,7 +19,7 @@ export function LoginRouteContent({ health }: LoginRouteContentProps) {
   // Redirect authenticated users away from the login page.
   useEffect(() => {
     if (isAuthorized) {
-      router.replace("/dashboard");
+      router.replace("/customers");
     }
   }, [isAuthorized, router]);
 

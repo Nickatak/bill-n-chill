@@ -39,7 +39,7 @@ export function WorkflowShell() {
   if (isChecking && !isAuthorized) {
     return (
       <>
-        <div className={styles.spacer} />
+        <div className={styles.hintSpacer} />
         <div className={styles.bar} role="status" aria-live="polite">
           <div className={styles.inner}>Checking session...</div>
         </div>
@@ -51,7 +51,7 @@ export function WorkflowShell() {
   if (!isAuthorized) {
     return (
       <>
-        <div className={styles.spacer} />
+        <div className={styles.hintSpacer} />
         <div className={styles.bar} role="note" aria-label="Authentication hint">
           <div className={styles.inner}>
             <span className={styles.hintText}>

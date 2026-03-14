@@ -140,7 +140,7 @@ describe("HomeRegisterConsole — Flow A (standard)", () => {
     );
 
     render(<HomeRegisterConsole health={HEALTHY} />);
-    expect(mockReplace).toHaveBeenCalledWith("/dashboard");
+    expect(mockReplace).toHaveBeenCalledWith("/customers");
   });
 
   it("shows error when submitting with empty email", () => {
@@ -235,7 +235,7 @@ describe("HomeRegisterConsole — Flow B (new user invite)", () => {
     );
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/dashboard");
+      expect(mockPush).toHaveBeenCalledWith("/customers");
     });
 
     const stored = JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY)!);
@@ -281,7 +281,7 @@ describe("HomeRegisterConsole — Flow C (existing user invite)", () => {
     fireEvent.click(screen.getByRole("button", { name: /accept invite/i }));
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/dashboard");
+      expect(mockPush).toHaveBeenCalledWith("/customers");
     });
 
     const stored = JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY)!);
