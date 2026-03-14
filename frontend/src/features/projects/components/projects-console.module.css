@@ -227,51 +227,84 @@
   border-color: var(--status-red-border);
 }
 
-.treeBranches {
-  display: grid;
-  gap: var(--space-md);
+/* ── Workflow pipeline ──────────────────────────────────── */
+
+.pipeline {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
 }
 
-.branch {
-  display: grid;
-  gap: var(--space-sm);
-  align-content: start;
-  border-left: 3px solid var(--border-accent);
-  padding-left: 10px;
+.pipelineStage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: var(--space-md) var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+  cursor: pointer;
 }
 
-.node {
+.pipelineStage:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.pipelineIcon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.pipelineLabel {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.pipelineCounts {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: var(--space-sm) 10px;
-  background: var(--surface);
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
-.node a {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--accent);
-  font-weight: 600;
-  text-decoration: none;
+.pipelineArrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  color: var(--text-secondary);
+  opacity: 0.5;
 }
 
-.node a:hover {
-  text-decoration: underline;
-}
-
-.nodeEstimateMeta {
+.eventHistoryLink {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  flex-shrink: 0;
-  white-space: nowrap;
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.eventHistoryLink:hover {
+  color: var(--accent);
+  text-decoration: underline;
 }
 
 .estimateCountPill {
@@ -297,15 +330,6 @@
 .estimateCountApproved {
   background: var(--status-green-bg);
   color: var(--status-green-text);
-}
-
-.nodeCount {
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-  padding: 2px var(--space-sm);
-  border-radius: var(--radius-pill);
-  background: var(--surface-hover);
-  color: var(--text-secondary);
 }
 
 .metricsPanel {
@@ -488,8 +512,33 @@
     grid-template-columns: 1fr;
   }
 
-  .treeBranches {
-    grid-template-columns: 1fr;
+  .pipeline {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .pipelineStage {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: var(--space-sm) 10px;
+    border-radius: 10px;
+  }
+
+  .pipelineIcon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .pipelineLabel {
+    flex: 1;
+    text-align: left;
+    min-width: 0;
+  }
+
+  .pipelineArrow {
+    width: auto;
+    height: 20px;
+    transform: rotate(90deg);
   }
 }
 
@@ -507,16 +556,6 @@
 
   .metricRow strong {
     font-size: 1.05rem;
-  }
-
-  /* Tree node: stack link + badges vertically */
-  .node {
-    flex-wrap: wrap;
-  }
-
-  .nodeEstimateMeta {
-    width: 100%;
-    justify-content: flex-start;
   }
 
   /* Quick status: stack badge + select vertically */
@@ -543,19 +582,18 @@
     border-radius: 10px;
   }
 
-  /* Touch targets: edit toggle, tree links, status pills, submit */
+  /* Touch targets */
   .projectSettingsToggle {
     min-height: 44px;
     padding: 8px var(--space-md);
   }
 
-  .node {
-    padding: 10px;
+  .pipelineStage {
     min-height: 44px;
   }
 
-  .node a {
-    font-size: 1rem;
+  .pipelineLabel {
+    font-size: 0.84rem;
   }
 
   .estimateCountPill {
@@ -586,5 +624,4 @@
     min-height: 44px;
     font-size: 1rem;
   }
-
 }

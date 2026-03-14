@@ -178,9 +178,9 @@ describe("ProjectsConsole", () => {
       expect(screen.getByText("Kitchen Remodel")).toBeInTheDocument();
     });
 
-    // Scope control links are rendered with the project id
-    expect(screen.getByText("Estimates")).toHaveAttribute("href", "/projects/1/estimates");
-    expect(screen.getByText("Change Orders")).toHaveAttribute("href", "/projects/1/change-orders");
+    // Pipeline stage links are rendered with the project id
+    expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/1/estimates");
+    expect(screen.getByRole("link", { name: /Change Orders/ })).toHaveAttribute("href", "/projects/1/change-orders");
   });
 
   it("displays financial summary metrics section headers", async () => {
@@ -356,8 +356,8 @@ describe("ProjectsConsole", () => {
     // "Kitchen Remodel" appears in both the card and the overview title
     expect(screen.getAllByText(/Kitchen Remodel/).length).toBeGreaterThanOrEqual(2);
 
-    // First matching project is auto-selected — scope control links point to project 1
-    expect(screen.getByText("Estimates")).toHaveAttribute("href", "/projects/1/estimates");
+    // First matching project is auto-selected — pipeline links point to project 1
+    expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/1/estimates");
   });
 
   // ---------------------------------------------------------------------------
@@ -372,10 +372,11 @@ describe("ProjectsConsole", () => {
       expect(screen.getByText("Kitchen Remodel")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Estimates")).toHaveAttribute("href", "/projects/1/estimates");
-    expect(screen.getByText("Change Orders")).toHaveAttribute("href", "/projects/1/change-orders");
-    expect(screen.getByText("Invoices")).toHaveAttribute("href", "/projects/1/invoices");
-    expect(screen.getByText("Event History")).toHaveAttribute("href", "/projects/1/audit-trail");
+    expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/1/estimates");
+    expect(screen.getByRole("link", { name: /Change Orders/ })).toHaveAttribute("href", "/projects/1/change-orders");
+    expect(screen.getByRole("link", { name: /Invoices/ })).toHaveAttribute("href", "/projects/1/invoices");
+    expect(screen.getByRole("link", { name: /Payments/ })).toHaveAttribute("href", "/payments");
+    expect(screen.getByRole("link", { name: /Event History/ })).toHaveAttribute("href", "/projects/1/audit-trail");
   });
 
   // ---------------------------------------------------------------------------
@@ -535,15 +536,15 @@ describe("ProjectsConsole", () => {
     render(<ProjectsConsole />);
 
     await waitFor(() => {
-      // Project 1 auto-selected — tree links point to project 1
-      expect(screen.getByText("Estimates")).toHaveAttribute("href", "/projects/1/estimates");
+      // Project 1 auto-selected — pipeline links point to project 1
+      expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/1/estimates");
     });
 
     // Click on Deck Build card (role="button")
     fireEvent.click(screen.getByText(/Deck Build/));
 
     await waitFor(() => {
-      expect(screen.getByText("Estimates")).toHaveAttribute("href", "/projects/2/estimates");
+      expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/2/estimates");
     });
   });
 

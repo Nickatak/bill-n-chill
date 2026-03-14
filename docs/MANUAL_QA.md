@@ -11,12 +11,14 @@ Organized by domain. Check off as you go.
 - [x] Rough Electrical/Finish Electrical cost codes.
     So, I did add those, I wasn't crazy.  The problem is that I decided to paginate 25 cost codes at a time, and there was a bug where the pagination display wasn't showing - so it looked like said cost codes didn't exist.
 
-- [] Logo in documentCreator?
-- Auto line loading for the invoice isn't working.
-- [] Remove line items for bills.
+- [x] Logo in documentCreator?
+    Fixed - it works.
+- [x] Auto line loading for the invoice isn't working.
+    Addressed - we went with a static "contract breakdown" reference where you can copy the lines with a + sign on each line item.
+- [x] Remove line items for bills.
     This is way deeper than it appears.  I made a mistake.  The problem is that I was originally designing for a forensic-financials style of data-accumulation.  The thing is that there is a sharp asymmetry between incoming and outgoing payments for our users.  Like, GC's are primarily interested in _collecting_ their money.  It's great if we provide a way to record and allocate expenditures, but realistically, the "core money loop" of this application actually ends at INCOMING payments. 
-
-
+- [x] Individual audit stamping for documents 
+    The public documents were drawing from the default T&C at render time.  We've stamped a copy on the actual document itself, same with the logo.  This prevents any post-changing/scammy behavior.
 
 
 - [x] Probably want original estimate line items on both the editor/public for CO.

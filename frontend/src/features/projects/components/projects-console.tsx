@@ -542,44 +542,90 @@ export function ProjectsConsole() {
                   </form>
                 ) : null}
               </div>
-              <div className={styles.treeBranches}>
-                <div className={styles.branch}>
-                  <div className={styles.node}>
-                    <Link href={`/projects/${selectedProject.id}/estimates`}>Estimates</Link>
-                    <span className={styles.nodeEstimateMeta}>
-                      <span className={`${styles.estimateCountPill} ${styles.estimateCountDraft}`}>
-                        D{estimateStatusCounts ? estimateStatusCounts.draft : "--"}
-                      </span>
-                      <span className={`${styles.estimateCountPill} ${styles.estimateCountSent}`}>
-                        S{estimateStatusCounts ? estimateStatusCounts.sent : "--"}
-                      </span>
-                      <span className={`${styles.estimateCountPill} ${styles.estimateCountApproved}`}>
-                        A{estimateStatusCounts ? estimateStatusCounts.approved : "--"}
-                      </span>
+              <nav className={styles.pipeline} aria-label="Project workflow">
+                <Link href={`/projects/${selectedProject.id}/estimates`} className={styles.pipelineStage}>
+                  <svg className={styles.pipelineIcon} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                  </svg>
+                  <span className={styles.pipelineLabel}>Estimates</span>
+                  <span className={styles.pipelineCounts}>
+                    <span className={`${styles.estimateCountPill} ${styles.estimateCountDraft}`}>
+                      D{estimateStatusCounts ? estimateStatusCounts.draft : "--"}
                     </span>
-                  </div>
-                  <div className={styles.node}>
-                    <Link href={`/projects/${selectedProject.id}/change-orders`}>Change Orders</Link>
-                    <span className={styles.nodeEstimateMeta}>
-                      <span className={`${styles.estimateCountPill} ${styles.estimateCountDraft}`}>
-                        D{changeOrderStatusCounts ? changeOrderStatusCounts.draft : "--"}
-                      </span>
-                      <span className={`${styles.estimateCountPill} ${styles.estimateCountSent}`}>
-                        S{changeOrderStatusCounts ? changeOrderStatusCounts.sent : "--"}
-                      </span>
-                      <span className={`${styles.estimateCountPill} ${styles.estimateCountApproved}`}>
-                        A{changeOrderStatusCounts ? changeOrderStatusCounts.accepted : "--"}
-                      </span>
+                    <span className={`${styles.estimateCountPill} ${styles.estimateCountSent}`}>
+                      S{estimateStatusCounts ? estimateStatusCounts.sent : "--"}
                     </span>
-                  </div>
-                  <div className={styles.node}>
-                    <Link href={`/projects/${selectedProject.id}/invoices`}>Invoices</Link>
-                  </div>
-                  <div className={styles.node}>
-                    <Link href={`/projects/${selectedProject.id}/audit-trail`}>Event History</Link>
-                  </div>
-                </div>
-              </div>
+                    <span className={`${styles.estimateCountPill} ${styles.estimateCountApproved}`}>
+                      A{estimateStatusCounts ? estimateStatusCounts.approved : "--"}
+                    </span>
+                  </span>
+                </Link>
+
+                <span className={styles.pipelineArrow} aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <polyline points="12 5 19 12 12 19" />
+                  </svg>
+                </span>
+
+                <Link href={`/projects/${selectedProject.id}/change-orders`} className={styles.pipelineStage}>
+                  <svg className={styles.pipelineIcon} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="17 1 21 5 17 9" />
+                    <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                    <polyline points="7 23 3 19 7 15" />
+                    <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                  </svg>
+                  <span className={styles.pipelineLabel}>Change Orders</span>
+                  <span className={styles.pipelineCounts}>
+                    <span className={`${styles.estimateCountPill} ${styles.estimateCountDraft}`}>
+                      D{changeOrderStatusCounts ? changeOrderStatusCounts.draft : "--"}
+                    </span>
+                    <span className={`${styles.estimateCountPill} ${styles.estimateCountSent}`}>
+                      S{changeOrderStatusCounts ? changeOrderStatusCounts.sent : "--"}
+                    </span>
+                    <span className={`${styles.estimateCountPill} ${styles.estimateCountApproved}`}>
+                      A{changeOrderStatusCounts ? changeOrderStatusCounts.accepted : "--"}
+                    </span>
+                  </span>
+                </Link>
+
+                <span className={styles.pipelineArrow} aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <polyline points="12 5 19 12 12 19" />
+                  </svg>
+                </span>
+
+                <Link href={`/projects/${selectedProject.id}/invoices`} className={styles.pipelineStage}>
+                  <svg className={styles.pipelineIcon} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                  </svg>
+                  <span className={styles.pipelineLabel}>Invoices</span>
+                </Link>
+
+                <span className={styles.pipelineArrow} aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <polyline points="12 5 19 12 12 19" />
+                  </svg>
+                </span>
+
+                <Link href="/payments" className={styles.pipelineStage}>
+                  <svg className={styles.pipelineIcon} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <line x1="12" y1="1" x2="12" y2="23" />
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                  <span className={styles.pipelineLabel}>Payments</span>
+                </Link>
+              </nav>
+
+              <Link href={`/projects/${selectedProject.id}/audit-trail`} className={styles.eventHistoryLink}>
+                Event History
+              </Link>
             </div>
             <div className={styles.metricsPanel}>
               <section className={styles.metricSection}>
