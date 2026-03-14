@@ -346,6 +346,10 @@ def project_change_orders_view(request, project_id: int):
                 rule="co_line_total_must_match_amount_delta",
             ))
 
+    sender_logo_url = ""
+    if organization.logo:
+        sender_logo_url = request.build_absolute_uri(organization.logo.url)
+
     try:
         with transaction.atomic():
             change_order = ChangeOrder.objects.create(
@@ -358,6 +362,9 @@ def project_change_orders_view(request, project_id: int):
                 days_delta=data.get("days_delta", 0),
                 reason=reason_text,
                 terms_text=terms_text,
+                sender_name=(organization.display_name or "").strip(),
+                sender_address=organization.formatted_billing_address,
+                sender_logo_url=sender_logo_url,
                 origin_estimate=origin_estimate,
                 requested_by=request.user,
             )
@@ -573,6 +580,37 @@ def change_order_detail_view(request, change_order_id: int):
         change_order.status = data["status"]
         update_fields.append("status")
 
+    # Freeze org identity and T&C onto the document when leaving draft, so
+    # public pages never fall back to live (potentially changed) org defaults.
+    if (
+        previous_status == ChangeOrder.Status.DRAFT
+        and change_order.status != ChangeOrder.Status.DRAFT
+    ):
+        organization = membership.organization
+        if not (change_order.terms_text or "").strip():
+            org_terms = (organization.change_order_terms_and_conditions or "").strip()
+            if org_terms:
+                change_order.terms_text = org_terms
+                if "terms_text" not in update_fields:
+                    update_fields.append("terms_text")
+        if not (change_order.sender_name or "").strip():
+            org_name = (organization.display_name or "").strip()
+            if org_name:
+                change_order.sender_name = org_name
+                if "sender_name" not in update_fields:
+                    update_fields.append("sender_name")
+        if not (change_order.sender_address or "").strip():
+            org_address = organization.formatted_billing_address
+            if org_address:
+                change_order.sender_address = org_address
+                if "sender_address" not in update_fields:
+                    update_fields.append("sender_address")
+        if not (change_order.sender_logo_url or "").strip():
+            if organization.logo:
+                change_order.sender_logo_url = request.build_absolute_uri(organization.logo.url)
+                if "sender_logo_url" not in update_fields:
+                    update_fields.append("sender_logo_url")
+
     if status_changing and previous_status != next_status and next_status == ChangeOrder.Status.APPROVED:
         change_order.approved_by = request.user
         change_order.approved_at = timezone.now()
@@ -687,6 +725,11 @@ def change_order_clone_revision_view(request, change_order_id: int):
         ))
 
     next_revision = (latest.revision_number + 1) if latest else (change_order.revision_number + 1)
+    organization = membership.organization
+    sender_logo_url = ""
+    if organization.logo:
+        sender_logo_url = request.build_absolute_uri(organization.logo.url)
+
     with transaction.atomic():
         clone = ChangeOrder.objects.create(
             project=change_order.project,
@@ -698,6 +741,9 @@ def change_order_clone_revision_view(request, change_order_id: int):
             days_delta=change_order.days_delta,
             reason=change_order.reason,
             terms_text=change_order.terms_text,
+            sender_name=(organization.display_name or "").strip(),
+            sender_address=organization.formatted_billing_address,
+            sender_logo_url=sender_logo_url,
             origin_estimate=change_order.origin_estimate,
             previous_change_order=change_order,
             requested_by=request.user,

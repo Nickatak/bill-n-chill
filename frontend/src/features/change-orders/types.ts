@@ -38,6 +38,9 @@ export type ChangeOrderRecord = {
   days_delta: number;
   reason: string;
   terms_text: string;
+  sender_name: string;
+  sender_address: string;
+  sender_logo_url: string;
   origin_estimate: number | null;
   origin_estimate_version?: number | null;
   previous_change_order: number | null;

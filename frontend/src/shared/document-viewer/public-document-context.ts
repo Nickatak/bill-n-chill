@@ -83,25 +83,43 @@ export function toAddressLines(value?: string | null): string[] {
 // Resolvers
 // ---------------------------------------------------------------------------
 
+/** Document-level sender identity frozen at send time. */
+type DocumentSenderOverrides = {
+  sender_name?: string | null;
+  sender_address?: string | null;
+  sender_logo_url?: string | null;
+};
+
 /**
  * Resolve organization context into a display-ready sender shape.
  *
- * Uses display_name as the canonical company/sender identity.
+ * When a document carries its own frozen sender fields (stamped at send time),
+ * those take precedence over the live organization context. This prevents
+ * retroactive identity changes from altering previously-sent documents.
  */
 export function resolvePublicSender(
   organizationContext?: PublicOrganizationContext | null,
+  documentSender?: DocumentSenderOverrides | null,
 ): PublicViewerSender {
-  const companyName = normalizeValue(organizationContext?.display_name) || "Your Company";
+  const companyName =
+    normalizeValue(documentSender?.sender_name)
+    || normalizeValue(organizationContext?.display_name)
+    || "Your Company";
   const senderName = companyName;
-  const senderAddress = normalizeValue(organizationContext?.billing_address);
+  const senderAddress =
+    normalizeValue(documentSender?.sender_address)
+    || normalizeValue(organizationContext?.billing_address);
   const helpEmail = normalizeValue(organizationContext?.help_email);
+  const logoUrl =
+    normalizeValue(documentSender?.sender_logo_url)
+    || normalizeValue(organizationContext?.logo_url);
 
   return {
     companyName,
     senderName,
     senderAddress,
     senderAddressLines: toAddressLines(senderAddress),
-    logoUrl: normalizeValue(organizationContext?.logo_url),
+    logoUrl,
     helpEmail,
   };
 }

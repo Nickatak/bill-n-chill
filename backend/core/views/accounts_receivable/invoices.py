@@ -484,6 +484,38 @@ def invoice_detail_view(request, invoice_id: int):
         if ingress.has_terms_text:
             invoice.terms_text = (ingress.terms_text or "").strip()
             update_fields.append("terms_text")
+
+        # Freeze org identity and T&C onto the document when leaving draft, so
+        # public pages never fall back to live (potentially changed) org defaults.
+        if (
+            previous_status == Invoice.Status.DRAFT
+            and next_status != Invoice.Status.DRAFT
+        ):
+            organization = membership.organization
+            if not (invoice.terms_text or "").strip():
+                org_terms = (organization.invoice_terms_and_conditions or "").strip()
+                if org_terms:
+                    invoice.terms_text = org_terms
+                    if "terms_text" not in update_fields:
+                        update_fields.append("terms_text")
+            if not (invoice.sender_name or "").strip():
+                org_name = (organization.display_name or "").strip()
+                if org_name:
+                    invoice.sender_name = org_name
+                    if "sender_name" not in update_fields:
+                        update_fields.append("sender_name")
+            if not (invoice.sender_address or "").strip():
+                org_address = organization.formatted_billing_address
+                if org_address:
+                    invoice.sender_address = org_address
+                    if "sender_address" not in update_fields:
+                        update_fields.append("sender_address")
+            if not (invoice.sender_logo_url or "").strip():
+                if organization.logo:
+                    invoice.sender_logo_url = request.build_absolute_uri(organization.logo.url)
+                    if "sender_logo_url" not in update_fields:
+                        update_fields.append("sender_logo_url")
+
         if ingress.has_footer_text:
             invoice.footer_text = (ingress.footer_text or "").strip()
             update_fields.append("footer_text")
@@ -592,7 +624,32 @@ def invoice_send_view(request, invoice_id: int):
     with transaction.atomic():
         previous_status = invoice.status
         invoice.status = Invoice.Status.SENT
-        invoice.save(update_fields=["status", "updated_at"])
+
+        # Freeze org identity and T&C onto the document when leaving draft.
+        update_fields = ["status", "updated_at"]
+        if previous_status == Invoice.Status.DRAFT:
+            organization = membership.organization
+            if not (invoice.terms_text or "").strip():
+                org_terms = (organization.invoice_terms_and_conditions or "").strip()
+                if org_terms:
+                    invoice.terms_text = org_terms
+                    update_fields.append("terms_text")
+            if not (invoice.sender_name or "").strip():
+                org_name = (organization.display_name or "").strip()
+                if org_name:
+                    invoice.sender_name = org_name
+                    update_fields.append("sender_name")
+            if not (invoice.sender_address or "").strip():
+                org_address = organization.formatted_billing_address
+                if org_address:
+                    invoice.sender_address = org_address
+                    update_fields.append("sender_address")
+            if not (invoice.sender_logo_url or "").strip():
+                if organization.logo:
+                    invoice.sender_logo_url = request.build_absolute_uri(organization.logo.url)
+                    update_fields.append("sender_logo_url")
+
+        invoice.save(update_fields=update_fields)
         InvoiceStatusEvent.record(
             invoice=invoice,
             from_status=previous_status,

@@ -75,6 +75,9 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
     days_delta = models.IntegerField(default=0)
     reason = models.TextField(blank=True)
     terms_text = models.TextField(blank=True, default="")
+    sender_name = models.CharField(max_length=255, blank=True, default="")
+    sender_address = models.TextField(blank=True, default="")
+    sender_logo_url = models.URLField(blank=True, default="")
     origin_estimate = models.ForeignKey(
         "Estimate",
         on_delete=models.PROTECT,
@@ -257,6 +260,9 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
                 "days_delta": self.days_delta,
                 "reason": self.reason,
                 "terms_text": self.terms_text,
+                "sender_name": self.sender_name,
+                "sender_address": self.sender_address,
+                "sender_logo_url": self.sender_logo_url,
                 "origin_estimate_id": self.origin_estimate_id,
                 "origin_estimate_version": origin_estimate_version,
                 "previous_change_order_id": self.previous_change_order_id,

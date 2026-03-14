@@ -400,6 +400,9 @@ def project_estimates_view(request, project_id: int):
         title=data.get("title", ""),
     )
     terms_text = (organization.estimate_terms_and_conditions or "").strip()
+    sender_logo_url = ""
+    if organization.logo:
+        sender_logo_url = request.build_absolute_uri(organization.logo.url)
 
     estimate = Estimate.objects.create(
         project=project,
@@ -409,6 +412,9 @@ def project_estimates_view(request, project_id: int):
         title=data.get("title", ""),
         valid_through=resolved_valid_through,
         terms_text=terms_text,
+        sender_name=(organization.display_name or "").strip(),
+        sender_address=organization.formatted_billing_address,
+        sender_logo_url=sender_logo_url,
         tax_percent=data.get("tax_percent", Decimal("0")),
     )
 
@@ -585,6 +591,35 @@ def estimate_detail_view(request, estimate_id: int):
     if "tax_percent" in data:
         estimate.tax_percent = data["tax_percent"]
         update_fields.append("tax_percent")
+
+    # Freeze org identity and T&C onto the document when leaving draft, so
+    # public pages never fall back to live (potentially changed) org defaults.
+    if (
+        previous_status == Estimate.Status.DRAFT
+        and estimate.status != Estimate.Status.DRAFT
+    ):
+        membership = _ensure_membership(request.user)
+        organization = membership.organization
+        if not (estimate.terms_text or "").strip():
+            org_terms = (organization.estimate_terms_and_conditions or "").strip()
+            if org_terms:
+                estimate.terms_text = org_terms
+                update_fields.append("terms_text")
+        if not (estimate.sender_name or "").strip():
+            org_name = (organization.display_name or "").strip()
+            if org_name:
+                estimate.sender_name = org_name
+                update_fields.append("sender_name")
+        if not (estimate.sender_address or "").strip():
+            org_address = organization.formatted_billing_address
+            if org_address:
+                estimate.sender_address = org_address
+                update_fields.append("sender_address")
+        if not (estimate.sender_logo_url or "").strip():
+            if organization.logo:
+                estimate.sender_logo_url = request.build_absolute_uri(organization.logo.url)
+                update_fields.append("sender_logo_url")
+
     estimate.save(update_fields=update_fields)
 
     if "line_items" in data:
@@ -718,6 +753,12 @@ def estimate_clone_version_view(request, estimate_id: int):
         title=estimate.title,
     )
 
+    membership = _ensure_membership(request.user)
+    organization = membership.organization
+    sender_logo_url = ""
+    if organization.logo:
+        sender_logo_url = request.build_absolute_uri(organization.logo.url)
+
     cloned = Estimate.objects.create(
         project=estimate.project,
         created_by=request.user,
@@ -726,6 +767,9 @@ def estimate_clone_version_view(request, estimate_id: int):
         title=estimate.title,
         valid_through=estimate.valid_through,
         terms_text=estimate.terms_text,
+        sender_name=(organization.display_name or "").strip(),
+        sender_address=organization.formatted_billing_address,
+        sender_logo_url=sender_logo_url,
         tax_percent=estimate.tax_percent,
     )
 
@@ -832,6 +876,12 @@ def estimate_duplicate_view(request, estimate_id: int):
         title=target_title,
     )
 
+    membership = _ensure_membership(request.user)
+    organization = membership.organization
+    sender_logo_url = ""
+    if organization.logo:
+        sender_logo_url = request.build_absolute_uri(organization.logo.url)
+
     duplicated = Estimate.objects.create(
         project=target_project,
         created_by=request.user,
@@ -840,6 +890,9 @@ def estimate_duplicate_view(request, estimate_id: int):
         title=target_title,
         valid_through=estimate.valid_through,
         terms_text=estimate.terms_text,
+        sender_name=(organization.display_name or "").strip(),
+        sender_address=organization.formatted_billing_address,
+        sender_logo_url=sender_logo_url,
         tax_percent=estimate.tax_percent,
     )
 

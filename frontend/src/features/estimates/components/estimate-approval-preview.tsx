@@ -66,16 +66,18 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
   const estimateDate = formatDateInputFromIso(estimate?.created_at);
   const validThrough = estimate?.valid_through ?? "";
   const sender = useMemo(
-    () => resolvePublicSender(estimate?.organization_context),
-    [estimate?.organization_context],
+    () => resolvePublicSender(estimate?.organization_context, estimate),
+    [estimate?.organization_context, estimate?.sender_name, estimate?.sender_address, estimate?.sender_logo_url],
   );
   const recipient = useMemo(
     () => resolvePublicRecipient(estimate?.project_context),
     [estimate?.project_context],
   );
   const termsText = useMemo(() => {
+    const documentTerms = (estimate?.terms_text || "").trim();
+    if (documentTerms) return documentTerms;
     const organizationTerms = resolveDefaultTerms(estimate?.organization_context, "estimate");
-    return organizationTerms || (estimate?.terms_text || "").trim() || "No terms specified.";
+    return organizationTerms || "No terms specified.";
   }, [estimate?.organization_context, estimate?.terms_text]);
 
   const lineTotals = useMemo(

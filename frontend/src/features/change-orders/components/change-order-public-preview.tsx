@@ -81,17 +81,19 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
   const canDecide = changeOrder?.status === "pending_approval";
   const hasDecision = changeOrder?.status === "approved" || changeOrder?.status === "rejected";
   const sender = useMemo(
-    () => resolvePublicSender(changeOrder?.organization_context),
-    [changeOrder?.organization_context],
+    () => resolvePublicSender(changeOrder?.organization_context, changeOrder),
+    [changeOrder?.organization_context, changeOrder?.sender_name, changeOrder?.sender_address, changeOrder?.sender_logo_url],
   );
   const recipient = useMemo(
     () => resolvePublicRecipient(changeOrder?.project_context),
     [changeOrder?.project_context],
   );
   const termsText = useMemo(() => {
-    const organizationTerms = resolveDefaultTerms(changeOrder?.organization_context, "estimate");
+    const documentTerms = (changeOrder?.terms_text || "").trim();
+    if (documentTerms) return documentTerms;
+    const organizationTerms = resolveDefaultTerms(changeOrder?.organization_context, "change_order");
     return organizationTerms || "No terms specified.";
-  }, [changeOrder?.organization_context]);
+  }, [changeOrder?.organization_context, changeOrder?.terms_text]);
   const reasonFallback = useMemo(() => {
     const organizationReason = resolveDefaultTerms(changeOrder?.organization_context, "change_order");
     return organizationReason || "No reason provided.";

@@ -72,19 +72,8 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const sender = useMemo(
-    () =>
-      resolvePublicSender({
-        ...invoice?.organization_context,
-        display_name:
-          invoice?.sender_name || invoice?.organization_context?.display_name,
-        logo_url:
-          invoice?.sender_logo_url || invoice?.organization_context?.logo_url,
-      }),
-    [
-      invoice?.organization_context,
-      invoice?.sender_name,
-      invoice?.sender_logo_url,
-    ],
+    () => resolvePublicSender(invoice?.organization_context, invoice),
+    [invoice?.organization_context, invoice?.sender_name, invoice?.sender_address, invoice?.sender_logo_url],
   );
   const recipient = useMemo(
     () =>
@@ -96,8 +85,10 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
     [invoice?.customer_display_name, invoice?.project_context],
   );
   const termsText = useMemo(() => {
+    const documentTerms = (invoice?.terms_text || "").trim();
+    if (documentTerms) return documentTerms;
     const organizationTerms = resolveDefaultTerms(invoice?.organization_context, "invoice");
-    return organizationTerms || (invoice?.terms_text || "").trim() || "No terms specified.";
+    return organizationTerms || "No terms specified.";
   }, [invoice?.organization_context, invoice?.terms_text]);
   const canDecide =
     invoice?.status === "sent" || invoice?.status === "partially_paid";

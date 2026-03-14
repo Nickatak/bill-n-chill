@@ -19,6 +19,9 @@ export type EstimateRecord = {
   title: string;
   valid_through: string | null;
   terms_text: string;
+  sender_name: string;
+  sender_address: string;
+  sender_logo_url: string;
   subtotal: string;
   tax_percent: string;
   grand_total: string;
