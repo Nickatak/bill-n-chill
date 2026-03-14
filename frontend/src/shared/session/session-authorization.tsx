@@ -130,6 +130,15 @@ export function SessionAuthorizationProvider({ children }: SessionAuthorizationP
     }
 
     if (!token) {
+      // During SSR hydration, useSyncExternalStore may briefly return the
+      // server snapshot (null) before switching to the client snapshot.
+      // Check localStorage directly to avoid a false "unauthorized" redirect
+      // when a real session exists but hasn't hydrated yet.
+      if (loadClientSession()?.token) {
+        return () => {
+          cancelled = true;
+        };
+      }
       verifiedTokenRef.current = "";
       setIsRefreshing(false);
       setStatus("unauthorized");
