@@ -86,8 +86,8 @@ describe("workflowRoutes", () => {
     }
   });
 
-  it("Dashboard is the first route", () => {
-    expect(workflowRoutes[0].label).toBe("Dashboard");
+  it("Customers is the first route", () => {
+    expect(workflowRoutes[0].label).toBe("Customers");
   });
 });
 
