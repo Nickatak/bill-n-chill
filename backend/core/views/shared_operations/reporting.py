@@ -10,12 +10,16 @@ from rest_framework.response import Response
 
 from core.models import (
     ChangeOrder,
+    ChangeOrderSnapshot,
     Estimate,
     EstimateStatusEvent,
     Invoice,
+    InvoiceStatusEvent,
     Payment,
+    PaymentRecord,
     Project,
     VendorBill,
+    VendorBillSnapshot,
 )
 from core.serializers import (
     AttentionFeedSerializer,
@@ -427,7 +431,12 @@ def quick_jump_search_view(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def project_timeline_events_view(request, project_id: int):
-    """Return merged project timeline events by category (`all|financial|workflow`)."""
+    """Return merged project timeline events by category (`all|financial|workflow`).
+
+    Queries all project-scoped audit models:
+    - Workflow: EstimateStatusEvent, InvoiceStatusEvent, ChangeOrderSnapshot
+    - Financial: PaymentRecord, VendorBillSnapshot
+    """
     membership = _ensure_membership(request.user)
     try:
         project = Project.objects.get(id=project_id, organization_id=membership.organization_id)
@@ -451,29 +460,101 @@ def project_timeline_events_view(request, project_id: int):
         )
 
     items = []
+
+    # --- Workflow events ---
     if category in {"all", "workflow"}:
-        workflow_rows = (
-            EstimateStatusEvent.objects.filter(
-                estimate__project=project,
-            )
+        for row in (
+            EstimateStatusEvent.objects.filter(estimate__project=project)
             .select_related("estimate")
             .order_by("-changed_at", "-id")
-        )
-        for row in workflow_rows:
-            items.append(
-                {
-                    "timeline_id": f"workflow-estimate-{row.id}",
-                    "category": "workflow",
-                    "event_type": "estimate_status_event",
-                    "occurred_at": row.changed_at,
-                    "label": f"estimate {row.from_status or 'new'} -> {row.to_status}",
-                    "detail": row.note or "",
-                    "object_type": "estimate",
-                    "object_id": row.estimate_id,
-                    "ui_route": f"/projects/{project.id}/estimates?estimate={row.estimate_id}",
-                    "detail_endpoint": f"/api/v1/estimates/{row.estimate_id}/status-events/",
-                }
-            )
+        ):
+            items.append({
+                "timeline_id": f"estimate-event-{row.id}",
+                "category": "workflow",
+                "event_type": "estimate_status",
+                "occurred_at": row.changed_at,
+                "label": f"Estimate {row.from_status or 'new'} → {row.to_status}",
+                "detail": row.note or "",
+                "object_type": "estimate",
+                "object_id": row.estimate_id,
+                "ui_route": f"/projects/{project.id}/estimates?estimate={row.estimate_id}",
+            })
+
+        for row in (
+            InvoiceStatusEvent.objects.filter(invoice__project=project)
+            .select_related("invoice")
+            .order_by("-changed_at", "-id")
+        ):
+            items.append({
+                "timeline_id": f"invoice-event-{row.id}",
+                "category": "workflow",
+                "event_type": "invoice_status",
+                "occurred_at": row.changed_at,
+                "label": f"Invoice {row.from_status or 'new'} → {row.to_status}",
+                "detail": row.note or "",
+                "object_type": "invoice",
+                "object_id": row.invoice_id,
+                "ui_route": f"/projects/{project.id}/invoices?invoice={row.invoice_id}",
+            })
+
+        for row in (
+            ChangeOrderSnapshot.objects.filter(change_order__project=project)
+            .select_related("change_order")
+            .order_by("-created_at", "-id")
+        ):
+            co = row.change_order
+            items.append({
+                "timeline_id": f"co-snapshot-{row.id}",
+                "category": "workflow",
+                "event_type": "change_order_decision",
+                "occurred_at": row.created_at,
+                "label": f"CO {co.family_key} v{co.revision_number} {row.decision_status}",
+                "detail": "",
+                "object_type": "change_order",
+                "object_id": co.id,
+                "ui_route": f"/projects/{project.id}/change-orders?co={co.id}",
+            })
+
+    # --- Financial events ---
+    if category in {"all", "financial"}:
+        for row in (
+            PaymentRecord.objects.filter(payment__project=project)
+            .select_related("payment")
+            .order_by("-created_at", "-id")
+        ):
+            pmt = row.payment
+            label_parts = [f"Payment #{pmt.id} {row.event_type}"]
+            if row.from_status and row.to_status:
+                label_parts.append(f"({row.from_status} → {row.to_status})")
+            items.append({
+                "timeline_id": f"payment-record-{row.id}",
+                "category": "financial",
+                "event_type": "payment_record",
+                "occurred_at": row.created_at,
+                "label": " ".join(label_parts),
+                "detail": row.note or "",
+                "object_type": "payment",
+                "object_id": pmt.id,
+                "ui_route": "/payments",
+            })
+
+        for row in (
+            VendorBillSnapshot.objects.filter(vendor_bill__project=project)
+            .select_related("vendor_bill")
+            .order_by("-created_at", "-id")
+        ):
+            vb = row.vendor_bill
+            items.append({
+                "timeline_id": f"vb-snapshot-{row.id}",
+                "category": "financial",
+                "event_type": "vendor_bill_status",
+                "occurred_at": row.created_at,
+                "label": f"Vendor Bill #{vb.id} {row.capture_status}",
+                "detail": "",
+                "object_type": "vendor_bill",
+                "object_id": vb.id,
+                "ui_route": "/bills",
+            })
 
     sorted_items = sorted(items, key=lambda row: row["occurred_at"], reverse=True)
     payload = {

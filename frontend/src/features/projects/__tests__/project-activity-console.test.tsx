@@ -42,28 +42,26 @@ function makeTimeline(overrides: Record<string, unknown> = {}) {
     item_count: 2,
     items: [
       {
-        timeline_id: "evt-1",
-        category: "financial",
-        event_type: "invoice_created",
+        timeline_id: "estimate-event-1",
+        category: "workflow",
+        event_type: "estimate_status",
         occurred_at: "2026-03-01T10:00:00Z",
-        label: "Invoice #101 created",
-        detail: "Amount: $5,000.00",
-        object_type: "invoice",
-        object_id: 101,
-        ui_route: "/projects/1/invoices?invoice=101",
-        detail_endpoint: "/api/v1/invoices/101/",
+        label: "Estimate draft → sent",
+        detail: "",
+        object_type: "estimate",
+        object_id: 10,
+        ui_route: "/projects/1/estimates?estimate=10",
       },
       {
-        timeline_id: "evt-2",
-        category: "workflow",
-        event_type: "status_changed",
+        timeline_id: "payment-record-1",
+        category: "financial",
+        event_type: "payment_record",
         occurred_at: "2026-02-15T08:00:00Z",
-        label: "Project status changed to active",
-        detail: "",
-        object_type: "project",
-        object_id: 1,
-        ui_route: "/projects?project=1",
-        detail_endpoint: "/api/v1/projects/1/",
+        label: "Payment #5 created",
+        detail: "Initial deposit received",
+        object_type: "payment",
+        object_id: 5,
+        ui_route: "/payments",
       },
     ],
     ...overrides,
@@ -83,17 +81,7 @@ describe("ProjectActivityConsole", () => {
     cleanup();
   });
 
-  it("renders intro text with the project id", () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ data: makeTimeline() }),
-    });
-    render(<ProjectActivityConsole projectId={42} />);
-
-    expect(screen.getByText(/project #42/i)).toBeInTheDocument();
-  });
-
-  it("loads and displays timeline items on mount", async () => {
+  it("auto-loads and displays timeline items on mount", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ data: makeTimeline() }),
@@ -101,30 +89,17 @@ describe("ProjectActivityConsole", () => {
     render(<ProjectActivityConsole projectId={1} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Invoice #101 created")).toBeInTheDocument();
-      expect(screen.getByText("Project status changed to active")).toBeInTheDocument();
+      expect(screen.getByText("Estimate draft → sent")).toBeInTheDocument();
+      expect(screen.getByText("Payment #5 created")).toBeInTheDocument();
     });
   });
 
-  it("shows item count in status message after load", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ data: makeTimeline({ item_count: 2 }) }),
-    });
-    render(<ProjectActivityConsole projectId={1} />);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Loaded 2 timeline event/)).toBeInTheDocument();
-    });
-  });
-
-  it("shows loading status while fetching", async () => {
-    // Never resolve — just confirm the loading state appears
+  it("shows loading state while fetching", async () => {
     mockFetch.mockReturnValue(new Promise(() => {}));
     render(<ProjectActivityConsole projectId={1} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Loading project timeline...")).toBeInTheDocument();
+      expect(screen.getByText(/Loading timeline/)).toBeInTheDocument();
     });
   });
 
@@ -145,7 +120,7 @@ describe("ProjectActivityConsole", () => {
     render(<ProjectActivityConsole projectId={1} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Could not reach project timeline endpoint.")).toBeInTheDocument();
+      expect(screen.getByText("Could not reach the server.")).toBeInTheDocument();
     });
   });
 
@@ -157,9 +132,7 @@ describe("ProjectActivityConsole", () => {
     render(<ProjectActivityConsole projectId={1} />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText("No timeline events matched this filter."),
-      ).toBeInTheDocument();
+      expect(screen.getByText("No events found for this filter.")).toBeInTheDocument();
     });
   });
 
@@ -171,14 +144,14 @@ describe("ProjectActivityConsole", () => {
     render(<ProjectActivityConsole projectId={1} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Invoice #101 created")).toBeInTheDocument();
+      expect(screen.getByText("Estimate draft → sent")).toBeInTheDocument();
     });
 
-    const openLinks = screen.getAllByText("Open");
-    expect(openLinks[0]).toHaveAttribute("href", "/projects/1/invoices?invoice=101");
+    const viewLinks = screen.getAllByText("View →");
+    expect(viewLinks[0]).toHaveAttribute("href", "/projects/1/estimates?estimate=10");
   });
 
-  it("reloads timeline when Load Timeline button is clicked", async () => {
+  it("renders event type badges", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ data: makeTimeline() }),
@@ -186,36 +159,66 @@ describe("ProjectActivityConsole", () => {
     render(<ProjectActivityConsole projectId={1} />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Loaded 2 timeline event/)).toBeInTheDocument();
+      expect(screen.getByText("Estimate")).toBeInTheDocument();
+      expect(screen.getByText("Payment")).toBeInTheDocument();
+    });
+  });
+
+  it("renders category filter pills", () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: makeTimeline() }),
+    });
+    render(<ProjectActivityConsole projectId={1} />);
+
+    expect(screen.getByRole("button", { name: "All" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Workflow" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Financial" })).toBeInTheDocument();
+  });
+
+  it("reloads timeline when category pill is clicked", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: makeTimeline() }),
+    });
+    render(<ProjectActivityConsole projectId={1} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Estimate draft → sent")).toBeInTheDocument();
     });
 
-    // Reset and click again
+    // Switch to financial category
     mockFetch.mockResolvedValue({
       ok: true,
       json: () =>
         Promise.resolve({
-          data: makeTimeline({ item_count: 5, items: [...makeTimeline().items] }),
+          data: makeTimeline({
+            category: "financial",
+            item_count: 1,
+            items: [makeTimeline().items[1]],
+          }),
         }),
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Load Timeline" }));
+    fireEvent.click(screen.getByRole("button", { name: "Financial" }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Loaded \d+ timeline event/)).toBeInTheDocument();
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining("category=financial"),
+        expect.any(Object),
+      );
     });
   });
 
-  it("renders category filter dropdown with all options", () => {
+  it("shows detail text when present", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ data: makeTimeline() }),
     });
     render(<ProjectActivityConsole projectId={1} />);
 
-    const select = screen.getByRole("combobox");
-    expect(select).toBeInTheDocument();
-
-    const options = screen.getAllByRole("option");
-    expect(options.map((opt) => opt.textContent)).toEqual(["all", "financial", "workflow"]);
+    await waitFor(() => {
+      expect(screen.getByText("Initial deposit received")).toBeInTheDocument();
+    });
   });
 });

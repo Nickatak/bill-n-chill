@@ -1,119 +1,141 @@
 "use client";
 
 /**
- * Displays a filterable timeline of financial audit and workflow events for a
- * single project. Used on the project activity page to give users a unified
- * chronological view of everything that has happened on a project.
+ * Filterable timeline of audit and workflow events for a single project.
+ * Queries the unified project timeline endpoint which merges estimate,
+ * invoice, change order, payment, and vendor bill audit records.
  */
 
-import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "@/features/projects/api";
-import { ApiResponse, ProjectTimeline } from "@/features/projects/types";
+import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { formatDateTimeDisplay } from "@/shared/date-format";
+import type { ApiResponse, ProjectTimeline, ProjectTimelineItem } from "@/features/projects/types";
 import styles from "./project-activity-console.module.css";
 
 type ProjectActivityConsoleProps = {
   projectId: number;
 };
 
-/** Renders a filterable timeline of audit and workflow events for one project. */
+type TimelineCategory = "all" | "financial" | "workflow";
+
+const CATEGORY_OPTIONS: { value: TimelineCategory; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "workflow", label: "Workflow" },
+  { value: "financial", label: "Financial" },
+];
+
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  estimate_status: "Estimate",
+  invoice_status: "Invoice",
+  change_order_decision: "Change Order",
+  payment_record: "Payment",
+  vendor_bill_status: "Vendor Bill",
+};
+
+function eventTypeBadgeClass(eventType: string): string {
+  switch (eventType) {
+    case "estimate_status":
+      return styles.badgeEstimate;
+    case "invoice_status":
+      return styles.badgeInvoice;
+    case "change_order_decision":
+      return styles.badgeCo;
+    case "payment_record":
+      return styles.badgePayment;
+    case "vendor_bill_status":
+      return styles.badgeVendorBill;
+    default:
+      return styles.badgeDefault;
+  }
+}
+
 export function ProjectActivityConsole({ projectId }: ProjectActivityConsoleProps) {
-  const { token, authMessage } = useSharedSessionAuth();
-  const [statusMessage, setStatusMessage] = useState("");
-  const [category, setCategory] = useState<"all" | "financial" | "workflow">("all");
+  const { token } = useSharedSessionAuth();
+  const [category, setCategory] = useState<TimelineCategory>("all");
   const [timeline, setTimeline] = useState<ProjectTimeline | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
 
-  /** Fetches timeline events from the API, optionally filtered by category. */
-  async function loadTimeline(nextCategory: "all" | "financial" | "workflow") {
-    if (!token) {
-      return;
-    }
-    setStatusMessage("Loading project timeline...");
+  async function loadTimeline(cat: TimelineCategory) {
+    if (!token) return;
+    setLoading(true);
+    setError("");
     try {
       const response = await fetch(
-        `${normalizedBaseUrl}/projects/${projectId}/timeline/?category=${nextCategory}`,
-        {
-          headers: buildAuthHeaders(token),
-        },
+        `${normalizedBaseUrl}/projects/${projectId}/timeline/?category=${cat}`,
+        { headers: buildAuthHeaders(token) },
       );
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setStatusMessage(payload.error?.message ?? "Could not load project timeline.");
+        setError(payload.error?.message ?? "Could not load timeline.");
         return;
       }
-      const data = payload.data as ProjectTimeline;
-      setTimeline(data);
-      setStatusMessage(`Loaded ${data.item_count} timeline event(s).`);
+      setTimeline(payload.data as ProjectTimeline);
     } catch {
-      setStatusMessage("Could not reach project timeline endpoint.");
+      setError("Could not reach the server.");
+    } finally {
+      setLoading(false);
     }
   }
 
-  // Load timeline on mount and when the project changes.
   useEffect(() => {
-    if (!token) {
-      return;
+    if (token) {
+      void loadTimeline(category);
     }
-    void loadTimeline(category);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, projectId]);
+  }, [token, projectId, category]);
+
+  function renderItem(item: ProjectTimelineItem) {
+    const badgeLabel = EVENT_TYPE_LABELS[item.event_type] ?? item.event_type;
+    return (
+      <li key={item.timeline_id} className={styles.item}>
+        <div className={styles.itemHeader}>
+          <span className={`${styles.badge} ${eventTypeBadgeClass(item.event_type)}`}>
+            {badgeLabel}
+          </span>
+          <span className={styles.timestamp}>{formatDateTimeDisplay(item.occurred_at)}</span>
+        </div>
+        <p className={styles.itemLabel}>{item.label}</p>
+        {item.detail ? <p className={styles.itemDetail}>{item.detail}</p> : null}
+        <Link className={styles.itemLink} href={item.ui_route}>
+          View →
+        </Link>
+      </li>
+    );
+  }
 
   return (
-    <section className={styles.console}>
-      <p className={styles.authMessage}>{authMessage}</p>
-      <p className={styles.intro}>
-        Timeline combines finance audit rows and workflow status events for project #{projectId}.
-      </p>
-      <label className={styles.filterField}>
-        <span>Category</span>
-        <select
-          value={category}
-          onChange={(event) => setCategory(event.target.value as "all" | "financial" | "workflow")}
-        >
-          <option value="all">all</option>
-          <option value="financial">financial</option>
-          <option value="workflow">workflow</option>
-        </select>
-      </label>
-      <p className={styles.actions}>
-        <button type="button" onClick={() => loadTimeline(category)} disabled={!token}>
-          Load Timeline
-        </button>
-      </p>
-      {timeline ? (
-        <div className={styles.timelineCard}>
-          <p className={styles.timelineSummary}>
-            Project: {timeline.project_name} | Category: {timeline.category} | Items:{" "}
-            {timeline.item_count}
-          </p>
-          {timeline.items.length > 0 ? (
-            <ul className={styles.timelineList}>
-              {timeline.items.map((item) => (
-                <li key={item.timeline_id} className={styles.timelineItem}>
-                  <div className={styles.timelineTopRow}>
-                    <span className={styles.categoryBadge}>{item.category}</span>
-                    <span>{formatDateTimeDisplay(item.occurred_at, item.occurred_at)}</span>
-                  </div>
-                  <p className={styles.timelineLabel}>{item.label}</p>
-                  {item.detail ? <p className={styles.timelineDetail}>{item.detail}</p> : null}
-                  <Link className={styles.openLink} href={item.ui_route}>
-                    Open
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className={styles.emptyState}>No timeline events matched this filter.</p>
-          )}
-        </div>
+    <div className={styles.console}>
+      <div className={styles.filterBar}>
+        {CATEGORY_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            className={`${styles.pill} ${category === opt.value ? styles.pillActive : ""}`}
+            onClick={() => setCategory(opt.value)}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <p className={styles.statusMessage}>Loading timeline…</p>
+      ) : error ? (
+        <p className={styles.errorMessage}>{error}</p>
+      ) : timeline && timeline.items.length === 0 ? (
+        <p className={styles.emptyState}>No events found for this filter.</p>
+      ) : timeline ? (
+        <ul className={styles.list}>
+          {timeline.items.map(renderItem)}
+        </ul>
       ) : null}
-      {statusMessage ? <p className={styles.statusMessage}>{statusMessage}</p> : null}
-    </section>
+    </div>
   );
 }

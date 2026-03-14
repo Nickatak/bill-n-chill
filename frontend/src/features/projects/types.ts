@@ -159,7 +159,6 @@ export type ProjectTimelineItem = {
   object_type: string;
   object_id: number;
   ui_route: string;
-  detail_endpoint: string;
 };
 
 export type ProjectTimeline = {

@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
-import { ProjectActivityConsole } from "@/features/projects/components/project-activity-console";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import shell from "@/shared/shell/page-shell.module.css";
 import { PageCard, PageShell } from "@/shared/shell";
 import { isNumericRouteId, resolveProjectParamTitle } from "@/shared/shell/route-metadata";
+import { ProjectActivityConsole } from "@/features/projects/components/project-activity-console";
 
 type ProjectAuditTrailPageProps = {
   params: Promise<{ projectId: string }>;
@@ -23,24 +21,6 @@ export default async function ProjectAuditTrailPage({ params }: ProjectAuditTrai
 
   return (
     <PageShell>
-      <header className={shell.hero}>
-        <div className={shell.heroTop}>
-          <p className={shell.eyebrow}>Projects</p>
-          <h1 className={shell.title}>Audit Trail</h1>
-          <p className={shell.copy}>
-            Read-only audit trail combining workflow transitions and finance-linked
-            audit events for a single project.
-          </p>
-        </div>
-        <div className={shell.linkRow}>
-          <Link className={shell.linkButton} href={`/projects?project=${projectId}`}>
-            Back to Project Hub
-          </Link>
-          <Link className={shell.linkButton} href={`/projects/${projectId}/invoices`}>
-            Next: Invoices
-          </Link>
-        </div>
-      </header>
       <PageCard>
         <ProjectActivityConsole projectId={Number(projectId)} />
       </PageCard>

@@ -193,7 +193,6 @@ class ProjectTimelineItemSerializer(serializers.Serializer):
     object_type = serializers.CharField()
     object_id = serializers.IntegerField()
     ui_route = serializers.CharField()
-    detail_endpoint = serializers.CharField()
 
 
 class ProjectTimelineSerializer(serializers.Serializer):
