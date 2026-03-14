@@ -63,6 +63,78 @@
 }
 
 
+/* -- Dev dropdown -- */
+
+.devMenu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.devMenu summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.devMenu summary::-webkit-details-marker {
+  display: none;
+}
+
+.devTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-style: dashed;
+}
+
+.devTriggerActive {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border-style: dashed;
+}
+
+.devChevron {
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+
+.devMenuList {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 1200;
+  min-width: 150px;
+  display: grid;
+  gap: 4px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: var(--space-sm);
+}
+
+.devMenuItem {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) 10px;
+  font-size: var(--font-sm);
+  color: var(--text-primary);
+  background: var(--surface);
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease;
+}
+
+.devMenuItem:hover {
+  border-color: var(--text-muted);
+  background: var(--surface-secondary);
+}
+
+.devMenuItemActive {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
 @media (max-width: 700px) {
   .nav {
     display: none;

@@ -13,7 +13,7 @@ import { clearClientSession } from "@/shared/session/client-session";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { isRouteActive, businessMenuRoutes, debugBusinessMenuRoutes, isDebugMode } from "../nav-routes";
+import { isRouteActive, businessMenuRoutes } from "../nav-routes";
 import { usePrintable } from "../printable-context";
 import lightTheme from "@/shared/styles/light-theme.module.css";
 import styles from "./app-toolbar.module.css";
@@ -36,8 +36,7 @@ export function AppToolbar() {
   const { isPrintable } = usePrintable();
   const hasSession = Boolean(token);
   const isPublicDocument = isPublicDocumentRoute(pathname);
-  const allBusinessRoutes = isDebugMode ? [...businessMenuRoutes, ...debugBusinessMenuRoutes] : businessMenuRoutes;
-  const hasActiveBusinessMenu = allBusinessRoutes.some((route) => isRouteActive(pathname, route));
+  const hasActiveBusinessMenu = businessMenuRoutes.some((route) => isRouteActive(pathname, route));
   const opsMetaMenuRef = useRef<HTMLDetailsElement>(null);
 
   /** Close all open `<details>` menus. */
@@ -116,22 +115,6 @@ export function AppToolbar() {
                 </Fragment>
               );
             })}
-            {isDebugMode ? (
-              <>
-                <span className={styles.menuSectionLabel}>Dev</span>
-                {debugBusinessMenuRoutes.map((route) => (
-                  <Link
-                    key={route.href}
-                    href={route.href}
-                    className={`${styles.menuItem} ${isRouteActive(pathname, route) ? styles.menuItemActive : ""}`}
-                    role="menuitem"
-                    onClick={closeMenus}
-                  >
-                    {route.label}
-                  </Link>
-                ))}
-              </>
-            ) : null}
           </div>
         </details>
       ) : null}
