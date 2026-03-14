@@ -88,7 +88,7 @@ local-stop-docker-backend: local-env-local
 	@$(DEV_COMPOSE) stop backend >/dev/null 2>&1 || true
 
 local-run-frontend: local-stop-docker-frontend
-	env NEXT_PUBLIC_DEBUG=$${NEXT_PUBLIC_DEBUG:-true} npm run dev --prefix frontend
+	set -a && . ./.env && set +a && npm run dev --prefix frontend
 
 local-run-backend: local-stop-docker-backend local-check-db
 	$(BACKEND_MANAGE) runserver
