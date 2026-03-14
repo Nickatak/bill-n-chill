@@ -1,9 +1,9 @@
 /**
- * Payments page — first-class workflow page for recording and managing payments.
+ * Accounting page — org-wide ledger for reconciliation and payment management.
  *
  * Both inbound (from customers) and outbound (to vendors) payments are visible
- * here with a direction toggle. Outbound payments also remain co-located on the
- * Bills page for convenience.
+ * here with a direction toggle. Day-to-day payment recording lives on the
+ * project page; this is the bookkeeper's reconciliation view.
  *
  * See docs/decisions/product-direction-refinement.md for strategic context.
  */
@@ -13,10 +13,10 @@ import { PageShell } from "@/shared/shell";
 import { PaymentsConsole } from "@/features/payments";
 
 export const metadata: Metadata = {
-  title: "Payments",
+  title: "Accounting",
 };
 
-export default function PaymentsPage() {
+export default function AccountingPage() {
   return (
     <PageShell>
       <PaymentsConsole />

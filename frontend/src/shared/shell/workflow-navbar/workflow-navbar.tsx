@@ -21,7 +21,7 @@ import styles from "./workflow-navbar.module.css";
 const ONBOARDING_TARGETS: Record<string, string> = {
   "/customers": "customers",
   "/projects": "projects",
-  "/payments": "payments",
+  "/accounting": "accounting",
   "/bills": "bills",
 };
 

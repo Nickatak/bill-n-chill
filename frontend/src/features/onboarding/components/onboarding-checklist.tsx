@@ -81,8 +81,8 @@ const INDIVIDUAL_STEPS: Step[] = [
     label: "Record a payment",
     description: "When your customer pays, log it here. Payments track against projects so you always know what\u2019s outstanding.",
     tip: "Record payments from the Payments page — select a project and log the payment.",
-    href: "/payments",
-    linkLabel: "Payments",
+    href: "/accounting",
+    linkLabel: "Accounting",
   },
 ];
 
@@ -138,8 +138,8 @@ const REMODELER_STEPS: Step[] = [
     label: "Record payments",
     description: "Log money in and out. Payments track against projects so you always know what\u2019s settled.",
     tip: "Record payments from the Payments page — both inbound and outbound.",
-    href: "/payments",
-    linkLabel: "Payments",
+    href: "/accounting",
+    linkLabel: "Accounting",
   },
 ];
 

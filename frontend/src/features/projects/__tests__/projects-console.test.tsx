@@ -375,7 +375,7 @@ describe("ProjectsConsole", () => {
     expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/1/estimates");
     expect(screen.getByRole("link", { name: /Change Orders/ })).toHaveAttribute("href", "/projects/1/change-orders");
     expect(screen.getByRole("link", { name: /Invoices/ })).toHaveAttribute("href", "/projects/1/invoices");
-    expect(screen.getByRole("link", { name: /Payments/ })).toHaveAttribute("href", "/payments");
+    expect(screen.getByRole("link", { name: /Accounting/ })).toHaveAttribute("href", "/accounting");
     // Event History is debug-only (NEXT_PUBLIC_DEBUG=true)
   });
 

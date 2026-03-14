@@ -49,9 +49,9 @@ describe("isRouteActive", () => {
     const route: NavRoute = {
       href: "/bills",
       label: "Bills",
-      exact: ["/bills", "/payments"],
+      exact: ["/bills", "/accounting"],
     };
-    expect(isRouteActive("/payments", route)).toBe(true);
+    expect(isRouteActive("/accounting", route)).toBe(true);
   });
 
   it("prefers exact match over prefix match", () => {
@@ -65,7 +65,7 @@ describe("isRouteActive", () => {
   });
 
   it("returns false for root path on non-root route", () => {
-    const route: NavRoute = { href: "/payments", label: "Payments", exact: ["/payments"] };
+    const route: NavRoute = { href: "/accounting", label: "Accounting", exact: ["/accounting"] };
     expect(isRouteActive("/", route)).toBe(false);
   });
 });

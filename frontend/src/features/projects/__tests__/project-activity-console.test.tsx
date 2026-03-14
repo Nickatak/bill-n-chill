@@ -61,7 +61,7 @@ function makeTimeline(overrides: Record<string, unknown> = {}) {
         detail: "Initial deposit received",
         object_type: "payment",
         object_id: 5,
-        ui_route: "/payments",
+        ui_route: "/accounting",
       },
     ],
     ...overrides,

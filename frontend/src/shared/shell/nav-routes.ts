@@ -39,10 +39,10 @@ export const workflowRoutes: NavRoute[] = [
     startsWith: ["/projects/"],
   },
   {
-    href: "/payments",
-    label: "Payments",
-    shortLabel: "Pay",
-    exact: ["/payments"],
+    href: "/accounting",
+    label: "Accounting",
+    shortLabel: "Acct",
+    exact: ["/accounting"],
   },
 ];
 
