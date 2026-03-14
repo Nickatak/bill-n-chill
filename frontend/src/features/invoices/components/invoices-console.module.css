@@ -819,6 +819,23 @@
   color: var(--accent-text);
 }
 
+.contractDuplicateButton.duplicateFlash {
+  animation: duplicateFlash 500ms ease-out;
+}
+
+@keyframes duplicateFlash {
+  0% {
+    background: var(--status-success-bg, #22c55e);
+    color: #fff;
+    transform: scale(1.15);
+  }
+  100% {
+    background: var(--surface-secondary);
+    color: var(--accent-text);
+    transform: scale(1);
+  }
+}
+
 /* ── Print ────────────────────────────────────────────────────── */
 
 @media print {

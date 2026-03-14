@@ -1018,10 +1018,20 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
   // Contract breakdown (read-only reference)
   // -------------------------------------------------------------------------
 
-  function duplicateContractLineToInvoice(fields: Omit<InvoiceLineInput, "localId">) {
+  const [flashingButtons, setFlashingButtons] = useState<Set<string>>(new Set());
+
+  function duplicateContractLineToInvoice(lineKey: string, fields: Omit<InvoiceLineInput, "localId">) {
     const id = nextLineId;
     setLineItems((current) => [...current, { localId: id, ...fields }]);
     setNextLineId((value) => value + 1);
+    setFlashingButtons((prev) => new Set(prev).add(lineKey));
+    setTimeout(() => {
+      setFlashingButtons((prev) => {
+        const next = new Set(prev);
+        next.delete(lineKey);
+        return next;
+      });
+    }, 500);
   }
 
   function renderContractBreakdown(opts?: { style?: React.CSSProperties }) {
@@ -1056,10 +1066,10 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                           {canDuplicate ? (
                             <button
                               type="button"
-                              className={styles.contractDuplicateButton}
+                              className={`${styles.contractDuplicateButton}${flashingButtons.has(`est-${line.id}`) ? ` ${styles.duplicateFlash}` : ""}`}
                               title="Add to invoice"
                               onClick={() =>
-                                duplicateContractLineToInvoice({
+                                duplicateContractLineToInvoice(`est-${line.id}`, {
                                   costCode: line.cost_code_code || "",
                                   description: line.description,
                                   quantity: line.quantity,
@@ -1130,10 +1140,10 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                           {canDuplicate ? (
                             <button
                               type="button"
-                              className={styles.contractDuplicateButton}
+                              className={`${styles.contractDuplicateButton}${flashingButtons.has(`co-${co.id}-${line.id}`) ? ` ${styles.duplicateFlash}` : ""}`}
                               title="Add to invoice"
                               onClick={() =>
-                                duplicateContractLineToInvoice({
+                                duplicateContractLineToInvoice(`co-${co.id}-${line.id}`, {
                                   costCode: line.cost_code_code || "",
                                   description: line.description,
                                   quantity: "1",
