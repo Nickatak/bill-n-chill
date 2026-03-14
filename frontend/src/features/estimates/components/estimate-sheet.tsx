@@ -248,8 +248,14 @@ export function EstimateSheet({
               </div>
             </div>
             <div className={creatorStyles.headerRight}>
-              <div className={creatorStyles.logoBox}>
-                {senderLogoUrl ? "Logo" : "No logo set"}
+              <div className={`${creatorStyles.logoBox} ${senderLogoUrl ? creatorStyles.logoBoxHasImage : ""}`}>
+                {senderLogoUrl ? (
+                  <img
+                    className={creatorStyles.logoImage}
+                    src={senderLogoUrl}
+                    alt={`${senderName || "Company"} logo`}
+                  />
+                ) : "No logo set"}
               </div>
               {titlePresentation === "header" ? (
                 <div className={creatorStyles.sheetTitleValue}>{estimateTitle || "Untitled"}</div>

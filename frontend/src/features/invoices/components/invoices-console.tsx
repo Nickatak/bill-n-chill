@@ -1583,8 +1583,14 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                           </div>
                         </div>
                         <div className={creatorStyles.headerRight}>
-                          <div className={creatorStyles.logoBox}>
-                            {senderLogoUrl ? "Logo" : "No logo set"}
+                          <div className={`${creatorStyles.logoBox} ${senderLogoUrl ? creatorStyles.logoBoxHasImage : ""}`}>
+                            {senderLogoUrl ? (
+                              <img
+                                className={creatorStyles.logoImage}
+                                src={senderLogoUrl}
+                                alt={`${senderDisplayName || "Company"} logo`}
+                              />
+                            ) : "No logo set"}
                           </div>
                           <div className={creatorStyles.sheetTitle}>Invoice</div>
                         </div>

@@ -2024,8 +2024,14 @@ export function ChangeOrdersConsole({
                     )}
                   </div>
                   <div className={creatorStyles.headerRight}>
-                    <div className={creatorStyles.logoBox}>
-                      {senderLogoUrl ? "Logo" : "No logo set"}
+                    <div className={`${creatorStyles.logoBox} ${senderLogoUrl ? creatorStyles.logoBoxHasImage : ""}`}>
+                      {senderLogoUrl ? (
+                        <img
+                          className={creatorStyles.logoImage}
+                          src={senderLogoUrl}
+                          alt={`${senderName || "Company"} logo`}
+                        />
+                      ) : "No logo set"}
                     </div>
                     <div className={creatorStyles.sheetTitle}>Change Order</div>
                     <div className={`${creatorStyles.sheetTitleValue} ${creatorStyles.printOnly}`}>
@@ -2357,8 +2363,14 @@ export function ChangeOrdersConsole({
                     )}
                   </div>
                   <div className={creatorStyles.headerRight}>
-                    <div className={creatorStyles.logoBox}>
-                      {senderLogoUrl ? "Logo" : "No logo set"}
+                    <div className={`${creatorStyles.logoBox} ${senderLogoUrl ? creatorStyles.logoBoxHasImage : ""}`}>
+                      {senderLogoUrl ? (
+                        <img
+                          className={creatorStyles.logoImage}
+                          src={senderLogoUrl}
+                          alt={`${senderName || "Company"} logo`}
+                        />
+                      ) : "No logo set"}
                     </div>
                     <div className={`${creatorStyles.sheetTitle} ${creatorStyles.screenOnly}`}>Change Order Revision</div>
                     <div className={`${creatorStyles.sheetTitle} ${creatorStyles.printOnly}`}>Change Order</div>
