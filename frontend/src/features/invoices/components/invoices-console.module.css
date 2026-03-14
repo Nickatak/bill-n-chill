@@ -761,40 +761,11 @@
   letter-spacing: 0.07em;
 }
 
-/* ── Contract breakdown cards ─────────────────────────────────── */
+/* ── Contract breakdown ───────────────────────────────────────── */
 
 .contractBreakdown {
   display: grid;
   gap: var(--space-sm);
-}
-
-.contractGroupLabel {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-
-.contractLineTotal {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  font-size: 1rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-primary);
-}
-
-.contractLineBreakdown {
-  font-size: 0.76rem;
-  font-weight: 400;
-  color: var(--text-secondary);
-}
-
-.contractCardHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
 }
 
 .contractDuplicateButton {

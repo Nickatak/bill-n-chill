@@ -60,6 +60,7 @@ import { MobileLineItemCard } from "@/shared/document-creator/mobile-line-card";
 import mobileCardStyles from "@/shared/document-creator/mobile-line-card.module.css";
 import invoiceCreatorStyles from "@/shared/document-creator/invoice-creator.module.css";
 import stampStyles from "@/shared/styles/decision-stamp.module.css";
+import { ReadOnlyLineTable, readOnlyLineTableStyles as roTableStyles } from "@/shared/document-viewer/read-only-line-table";
 import { CostCodeCombobox } from "@/features/estimates/components/cost-code-combobox";
 import type { CostCode } from "../types";
 
@@ -1034,6 +1035,19 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     }, 500);
   }
 
+  function renderDuplicateButton(lineKey: string, fields: Omit<InvoiceLineInput, "localId">) {
+    return (
+      <button
+        type="button"
+        className={`${styles.contractDuplicateButton}${flashingButtons.has(lineKey) ? ` ${styles.duplicateFlash}` : ""}`}
+        title="Add to invoice"
+        onClick={() => duplicateContractLineToInvoice(lineKey, fields)}
+      >
+        +
+      </button>
+    );
+  }
+
   function renderContractBreakdown(opts?: { style?: React.CSSProperties }) {
     if (!contractBreakdown?.active_estimate) return null;
     const estimate = contractBreakdown.active_estimate;
@@ -1043,155 +1057,115 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     if (!hasEstimateLines && !hasApprovedCOs) return null;
     const canDuplicate = !workspaceIsLocked;
 
+    const estimateColumns = ["Cost code", "Description", "Qty", "Unit", "Unit cost", "Markup %", "Line total"];
+    const estimateMobileLayout: { order: number; span: "full" | "half"; align?: "left" | "right"; hidden?: boolean }[] = [
+      { order: 0, span: "full" },
+      { order: 1, span: "full" },
+      { order: 2, span: "half", hidden: true },
+      { order: 3, span: "half", hidden: true },
+      { order: 4, span: "half", hidden: true },
+      { order: 5, span: "half" },
+      { order: 6, span: "full", align: "right" },
+    ];
+    const coColumns = ["CO #", "Cost code", "Description", "Days delta", "Amount delta"];
+    const coMobileLayout: { order: number; span: "full" | "half"; align?: "left" | "right"; hidden?: boolean }[] = [
+      { order: 0, span: "full" },
+      { order: 1, span: "half" },
+      { order: 2, span: "full" },
+      { order: 3, span: "half" },
+      { order: 4, span: "half", align: "right" },
+    ];
+
+    if (canDuplicate) {
+      estimateColumns.push("");
+      estimateMobileLayout.push({ order: 7, span: "half", hidden: true });
+      coColumns.push("");
+      coMobileLayout.push({ order: 5, span: "half", hidden: true });
+    }
+
     return (
       <div className={styles.contractBreakdown} style={opts?.style}>
         <h4 className={styles.invoiceViewerSectionHeading}>Contract Breakdown</h4>
 
-            {/* Approved estimate lines */}
-            {hasEstimateLines ? (
-              <>
-                <span className={styles.contractGroupLabel}>
-                  Approved Estimate: {estimate.title} v{estimate.version}
-                </span>
-                <div className={mobileCardStyles.cardList}>
-                  {estimate.line_items.map((line, index) => {
-                    const qty = parseAmount(line.quantity);
-                    const markedUpUnitPrice = qty !== 0
-                      ? formatDecimal(parseAmount(line.line_total) / qty)
-                      : line.unit_cost;
-                    return (
-                      <div key={line.id} className={mobileCardStyles.card}>
-                        <div className={styles.contractCardHeader}>
-                          <span className={mobileCardStyles.cardIndex}>Item {index + 1}</span>
-                          {canDuplicate ? (
-                            <button
-                              type="button"
-                              className={`${styles.contractDuplicateButton}${flashingButtons.has(`est-${line.id}`) ? ` ${styles.duplicateFlash}` : ""}`}
-                              title="Add to invoice"
-                              onClick={() =>
-                                duplicateContractLineToInvoice(`est-${line.id}`, {
-                                  costCode: line.cost_code_code || "",
-                                  description: line.description,
-                                  quantity: line.quantity,
-                                  unit: line.unit,
-                                  unitPrice: markedUpUnitPrice,
-                                })
-                              }
-                            >
-                              +
-                            </button>
-                          ) : null}
-                        </div>
-                        <div className={mobileCardStyles.fieldFull}>
-                          <span className={mobileCardStyles.fieldLabel}>Description</span>
-                          <span className={mobileCardStyles.fieldStatic}>{line.description || "—"}</span>
-                        </div>
-                        {line.cost_code_code ? (
-                          <div className={mobileCardStyles.fieldFull}>
-                            <span className={mobileCardStyles.fieldLabel}>Cost Code</span>
-                            <span className={mobileCardStyles.fieldStatic}>{line.cost_code_code}</span>
-                          </div>
-                        ) : null}
-                        <div className={mobileCardStyles.fieldGrid}>
-                          <div className={mobileCardStyles.fieldHalf}>
-                            <span className={mobileCardStyles.fieldLabel}>Qty</span>
-                            <span className={mobileCardStyles.fieldStatic}>{line.quantity}</span>
-                          </div>
-                          <div className={mobileCardStyles.fieldHalf}>
-                            <span className={mobileCardStyles.fieldLabel}>Unit</span>
-                            <span className={mobileCardStyles.fieldStatic}>{line.unit}</span>
-                          </div>
-                        </div>
-                        <div className={`${mobileCardStyles.fieldFull} ${mobileCardStyles.fieldAlignRight}`}>
-                          <span className={mobileCardStyles.fieldLabel}>Line Total</span>
-                          <span className={styles.contractLineTotal}>
-                            <span className={styles.contractLineBreakdown}>
-                              {line.quantity} {line.unit} × ${line.unit_cost}
-                              {parseAmount(line.markup_percent) !== 0 ? ` + ${line.markup_percent}%` : ""}
-                            </span>
-                            <span>${line.line_total}</span>
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            ) : null}
-            <div className={styles.invoiceViewerMetaRow}>
-              <span className={styles.invoiceViewerMetaLabel}>Estimate grand total</span>
-              <strong>${estimate.grand_total}</strong>
-            </div>
+        {hasEstimateLines ? (
+          <ReadOnlyLineTable
+            caption={`Approved Estimate: ${estimate.title} v${estimate.version}`}
+            columns={estimateColumns}
+            rows={estimate.line_items.map((line) => {
+              const qty = parseAmount(line.quantity);
+              const markedUpUnitPrice = qty !== 0
+                ? formatDecimal(parseAmount(line.line_total) / qty)
+                : line.unit_cost;
+              const unit = line.unit || "ea";
+              const costCodeLabel = line.cost_code_code || "—";
+              const cells: React.ReactNode[] = [
+                costCodeLabel,
+                line.description || "—",
+                Number(line.quantity).toFixed(2),
+                unit,
+                `$${Number(line.unit_cost).toFixed(2)}`,
+                `${line.markup_percent}%`,
+                <>
+                  <span className={roTableStyles.mobileBreakdown}>
+                    {Number(line.quantity).toFixed(2)} {unit} × ${Number(line.unit_cost).toFixed(2)}
+                    {parseAmount(line.markup_percent) !== 0 ? ` + ${line.markup_percent}%` : ""}
+                  </span>
+                  <span>${line.line_total}</span>
+                </>,
+              ];
+              if (canDuplicate) {
+                cells.push(
+                  renderDuplicateButton(`est-${line.id}`, {
+                    costCode: line.cost_code_code || "",
+                    description: line.description,
+                    quantity: line.quantity,
+                    unit: line.unit,
+                    unitPrice: markedUpUnitPrice,
+                  }),
+                );
+              }
+              return { key: line.id, cells };
+            })}
+            mobileColumnLayout={estimateMobileLayout}
+            afterTable={
+              <div className={styles.invoiceViewerMetaRow}>
+                <span className={styles.invoiceViewerMetaLabel}>Estimate grand total</span>
+                <strong>${estimate.grand_total}</strong>
+              </div>
+            }
+          />
+        ) : null}
 
-            {/* Approved change order lines */}
-            {hasApprovedCOs ? (
-              <>
-                <span className={styles.contractGroupLabel}>
-                  Approved Change Orders ({approvedCOs.length})
-                </span>
-                <div className={mobileCardStyles.cardList}>
-                  {approvedCOs.flatMap((co) =>
-                    co.line_items.map((line, idx) => (
-                      <div key={`${co.id}-${line.id}`} className={mobileCardStyles.card}>
-                        <div className={styles.contractCardHeader}>
-                          <span className={mobileCardStyles.cardIndex}>
-                            {co.title}{co.line_items.length > 1 ? ` · Item ${idx + 1}` : ""}
-                          </span>
-                          {canDuplicate ? (
-                            <button
-                              type="button"
-                              className={`${styles.contractDuplicateButton}${flashingButtons.has(`co-${co.id}-${line.id}`) ? ` ${styles.duplicateFlash}` : ""}`}
-                              title="Add to invoice"
-                              onClick={() =>
-                                duplicateContractLineToInvoice(`co-${co.id}-${line.id}`, {
-                                  costCode: line.cost_code_code || "",
-                                  description: line.description,
-                                  quantity: "1",
-                                  unit: "",
-                                  unitPrice: formatDecimal(parseAmount(line.amount_delta)),
-                                })
-                              }
-                            >
-                              +
-                            </button>
-                          ) : null}
-                        </div>
-                        <div className={mobileCardStyles.fieldFull}>
-                          <span className={mobileCardStyles.fieldLabel}>Description</span>
-                          <span className={mobileCardStyles.fieldStatic}>{line.description || "—"}</span>
-                        </div>
-                        {line.cost_code_code ? (
-                          <div className={mobileCardStyles.fieldFull}>
-                            <span className={mobileCardStyles.fieldLabel}>Cost Code</span>
-                            <span className={mobileCardStyles.fieldStatic}>{line.cost_code_code}</span>
-                          </div>
-                        ) : null}
-                        {line.adjustment_reason ? (
-                          <div className={mobileCardStyles.fieldFull}>
-                            <span className={mobileCardStyles.fieldLabel}>Adjustment Reason</span>
-                            <span className={mobileCardStyles.fieldStatic}>{line.adjustment_reason}</span>
-                          </div>
-                        ) : null}
-                        <div className={mobileCardStyles.fieldGrid}>
-                          <div className={mobileCardStyles.fieldHalf}>
-                            <span className={mobileCardStyles.fieldLabel}>Days Delta</span>
-                            <span className={mobileCardStyles.fieldStatic}>{line.days_delta}</span>
-                          </div>
-                          <div className={`${mobileCardStyles.fieldHalf} ${mobileCardStyles.fieldAlignRight}`}>
-                            <span className={mobileCardStyles.fieldLabel}>Amount Delta</span>
-                            <span className={`${mobileCardStyles.fieldStatic} ${mobileCardStyles.fieldStaticRight}`}>
-                              ${formatDecimal(parseAmount(line.amount_delta))}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )),
-                  )}
-                </div>
-              </>
-            ) : null}
-
-            {hasApprovedCOs ? (
+        {hasApprovedCOs ? (
+          <ReadOnlyLineTable
+            caption={`Approved Change Orders (${approvedCOs.length})`}
+            columns={coColumns}
+            rows={approvedCOs.flatMap((co) =>
+              co.line_items.map((line) => {
+                const costCodeLabel = line.cost_code_code || "—";
+                const cells: React.ReactNode[] = [
+                  co.title,
+                  costCodeLabel,
+                  line.description || "—",
+                  `${line.days_delta} days`,
+                  `$${line.amount_delta}`,
+                ];
+                if (canDuplicate) {
+                  cells.push(
+                    renderDuplicateButton(`co-${co.id}-${line.id}`, {
+                      costCode: line.cost_code_code || "",
+                      description: line.description,
+                      quantity: "1",
+                      unit: "",
+                      unitPrice: formatDecimal(parseAmount(line.amount_delta)),
+                    }),
+                  );
+                }
+                return { key: `${co.id}-${line.id}`, cells };
+              }),
+            )}
+            mobileColumnLayout={coMobileLayout}
+            afterTable={
               <div className={styles.invoiceViewerMetaRow}>
                 <span className={styles.invoiceViewerMetaLabel}>Net contract total</span>
                 <strong>
@@ -1201,7 +1175,9 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                   )}
                 </strong>
               </div>
-            ) : null}
+            }
+          />
+        ) : null}
       </div>
     );
   }

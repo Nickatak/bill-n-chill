@@ -44,8 +44,12 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--table-header-text);
-  background: var(--table-header-bg);
+  background: var(--surface);
   white-space: nowrap;
+}
+
+.table tbody tr {
+  background: var(--surface-secondary);
 }
 
 .table td {
