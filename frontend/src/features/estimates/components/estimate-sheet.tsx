@@ -23,6 +23,7 @@ import {
   createEstimateDocumentAdapter,
   EstimateFormState,
 } from "../document-adapter";
+import type { LineValidationResult } from "../helpers";
 
 type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amount";
 
@@ -52,6 +53,7 @@ type EstimateSheetProps = {
   readOnly: boolean;
   formErrorMessage?: string;
   formSuccessMessage?: string;
+  lineValidation?: LineValidationResult;
   readOnlyPresentation?: "inputs" | "text";
   showMarkupColumn?: boolean;
   titlePresentation?: "field" | "header";
@@ -119,6 +121,7 @@ export function EstimateSheet({
   readOnly,
   formErrorMessage = "",
   formSuccessMessage = "",
+  lineValidation,
   readOnlyPresentation = "inputs",
   showMarkupColumn = true,
   titlePresentation = "field",
@@ -320,18 +323,15 @@ export function EstimateSheet({
                 </div>
               </div>
             </div>
-            {costCodes.length === 0 ? (
-              <p className={creatorStyles.inlineHint}>
-                Cost codes are required for line items. Create them on the Cost Codes page.
-              </p>
-            ) : null}
           </>
         ),
         line_items: () => (
           <>
             {isMobile ? (
               <div className={mobileCardStyles.cardList}>
-                {lineItems.map((line, index) => (
+                {lineItems.map((line, index) => {
+                  const rowIssues = lineValidation?.issuesByLocalId.get(line.localId) ?? [];
+                  return (
                   <MobileLineItemCard
                     key={line.localId}
                     index={index}
@@ -342,6 +342,7 @@ export function EstimateSheet({
                     onMoveUp={readOnly ? undefined : () => onMoveLineItem(line.localId, "up")}
                     onMoveDown={readOnly ? undefined : () => onMoveLineItem(line.localId, "down")}
                     onDuplicate={readOnly ? undefined : () => onDuplicateLineItem(line.localId)}
+                    validationError={rowIssues.length ? `Row ${index + 1}: ${rowIssues.join(" ")}` : undefined}
                     fields={[
                       {
                         label: "Description",
@@ -471,7 +472,8 @@ export function EstimateSheet({
                       },
                     ]}
                   />
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className={creatorStyles.lineTable}>
@@ -503,12 +505,14 @@ export function EstimateSheet({
                     </div>
                   ) : null}
                 </div>
-                {lineItems.map((line, index) => (
+                {lineItems.map((line, index) => {
+                  const rowIssues = lineValidation?.issuesByLocalId.get(line.localId) ?? [];
+                  return (
                   <div
                     key={line.localId}
                     className={`${creatorStyles.lineRow} ${readOnly ? creatorStyles.lineRowReadOnly : ""} ${
                       readOnly && !showMarkupColumn ? creatorStyles.lineRowNoMarkup : ""
-                    }`}
+                    } ${rowIssues.length ? creatorStyles.lineRowInvalid : ""}`}
                   >
                     <div className={creatorStyles.lineCell}>
                       {showReadOnlyText ? (
@@ -660,7 +664,8 @@ export function EstimateSheet({
                       </div>
                     ) : null}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 

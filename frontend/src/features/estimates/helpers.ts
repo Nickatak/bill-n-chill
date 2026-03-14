@@ -97,8 +97,7 @@ export function normalizeEstimatePolicy(
  * Priority cascade (first visible match wins):
  *  1. `preferredId` — explicitly requested (e.g. just-created or preserving selection)
  *  2. `scopedId`    — deep-linked from URL or cross-page navigation
- *  3. Active financial baseline
- *  4. First visible estimate in the list
+ *  3. First visible estimate in the list
  *
  * "Visible" means the estimate's status is included in the current filter set.
  */
@@ -122,10 +121,47 @@ export function resolveAutoSelectEstimate(
     if (match && isVisible(match)) return match;
   }
 
-  const activeBaseline = rows.find((e) => e.is_active_financial_baseline && isVisible(e));
-  if (activeBaseline) return activeBaseline;
-
   return rows.find(isVisible) ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Line-item validation
+// ---------------------------------------------------------------------------
+
+export type LineValidationIssue = {
+  localId: number;
+  rowNumber: number;
+  message: string;
+};
+
+export type LineValidationResult = {
+  issues: LineValidationIssue[];
+  issuesByLocalId: Map<number, string[]>;
+};
+
+/** Validate estimate line items for completeness (cost code required). */
+export function validateEstimateLineItems(lines: EstimateLineInput[]): LineValidationResult {
+  const issues: LineValidationIssue[] = [];
+  const issuesByLocalId = new Map<number, string[]>();
+  lines.forEach((line, index) => {
+    const rowNumber = index + 1;
+    const rowIssues: string[] = [];
+
+    if (!line.costCodeId.trim()) {
+      rowIssues.push("Select a cost code.");
+    }
+
+    if (!rowIssues.length) {
+      return;
+    }
+
+    issuesByLocalId.set(line.localId, rowIssues);
+    for (const message of rowIssues) {
+      issues.push({ localId: line.localId, rowNumber, message });
+    }
+  });
+
+  return { issues, issuesByLocalId };
 }
 
 // ---------------------------------------------------------------------------
@@ -238,15 +274,6 @@ export function estimateStatusLabel(status?: string): string {
   const normalized = (status || "").trim();
   return STATUS_LABELS[normalized] || normalized || "Unknown";
 }
-
-// ---------------------------------------------------------------------------
-// Financial baseline helpers (re-exported from shared)
-// ---------------------------------------------------------------------------
-
-export {
-  financialBaselineStatus as estimateFinancialBaselineStatus,
-  formatFinancialBaselineStatus,
-} from "@/shared/financial-baseline";
 
 // ---------------------------------------------------------------------------
 // Status event helpers

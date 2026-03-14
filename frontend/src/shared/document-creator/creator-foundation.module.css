@@ -486,6 +486,18 @@
   background: var(--table-row-alt);
 }
 
+.lineRowInvalid {
+  border-left: 3px solid var(--tone-error-border);
+}
+
+.lineIssue {
+  margin: 0;
+  grid-column: 1 / -1;
+  font-size: 0.82rem;
+  color: var(--tone-error-text);
+  padding: 2px 0 0;
+}
+
 .lineCell {
   position: relative;
   min-width: 0;

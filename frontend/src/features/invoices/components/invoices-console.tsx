@@ -2,7 +2,8 @@
 
 /**
  * Primary invoice management console.
- * Combines project selection, invoice list with status filtering, status lifecycle management
+ * Project-scoped: receives a project ID from the URL and shows invoices for that project.
+ * Combines invoice list with status filtering, status lifecycle management
  * (transitions, notes, history), and a document-creator workspace for creating/editing drafts.
  */
 
@@ -18,12 +19,10 @@ import {
   invoiceStatusEventActionLabel,
   invoiceStatusLabel,
   nextInvoiceNumberPreview,
-  projectStatusLabel,
   publicInvoiceHref,
   readInvoiceApiError,
 } from "../helpers";
 import { useStatusFilters } from "@/shared/hooks/use-status-filters";
-import { ProjectListStatusValue, ProjectListViewer } from "@/shared/project-list-viewer";
 import {
   defaultApiBaseUrl,
   fetchInvoicePolicyContract,
@@ -49,6 +48,7 @@ import {
   InvoiceFormState,
   toInvoiceStatusPolicy,
 } from "../document-adapter";
+import { useMediaQuery } from "@/shared/hooks/use-media-query";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import { useClientPagination } from "@/shared/hooks/use-client-pagination";
 import { PaginationControls } from "@/shared/components/pagination-controls";
@@ -56,15 +56,16 @@ import { usePolicyContract } from "@/shared/hooks/use-policy-contract";
 import { usePrintable } from "@/shared/shell/printable-context";
 import styles from "./invoices-console.module.css";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
+import { MobileLineItemCard } from "@/shared/document-creator/mobile-line-card";
+import mobileCardStyles from "@/shared/document-creator/mobile-line-card.module.css";
 import invoiceCreatorStyles from "@/shared/document-creator/invoice-creator.module.css";
 import stampStyles from "@/shared/styles/decision-stamp.module.css";
-import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
+import { CostCodeCombobox } from "@/features/estimates/components/cost-code-combobox";
+import type { CostCode } from "../types";
 
 // ---------------------------------------------------------------------------
 // Types & constants
 // ---------------------------------------------------------------------------
-
-type ProjectStatusValue = ProjectListStatusValue;
 
 type ContractBreakdownEstimateLine = {
   id: number;
@@ -127,8 +128,6 @@ const INVOICE_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
 const INVOICE_DEFAULT_STATUS_FILTERS_FALLBACK = ["draft", "sent", "partially_paid"];
 const INVOICE_TERMINAL_STATUSES_FALLBACK = ["paid", "partially_paid", "void"];
 const INVOICE_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
-const DEFAULT_PROJECT_STATUS_FILTERS: ProjectStatusValue[] = ["active", "prospect"];
-const PROJECT_STATUS_VALUES: ProjectStatusValue[] = ["prospect", "active", "on_hold", "completed", "cancelled"];
 // ---------------------------------------------------------------------------
 // Display helpers
 // ---------------------------------------------------------------------------
@@ -208,12 +207,13 @@ function invoiceStatusEventToneClass(event: InvoiceStatusEventRecord): string {
 // Component
 // ---------------------------------------------------------------------------
 
-/** Primary invoice management console with project selection, invoice viewer, and creator workspace. */
+/** Primary invoice management console — project-scoped via URL param. */
 type InvoicesConsoleProps = {
-  scopedProjectId?: number | null;
+  scopedProjectId: number;
 };
 
-export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps) {
+export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
+  const isMobile = useMediaQuery("(max-width: 700px)");
   const { token, authMessage, role, capabilities } = useSharedSessionAuth();
   const canMutateInvoices = canDo(capabilities, "invoices", "create");
   const canSendInvoices = canDo(capabilities, "invoices", "send");
@@ -222,23 +222,13 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
 
   const { message: statusMessage, tone: statusTone, setNeutral: setNeutralStatus, setSuccess: setSuccessStatus, setError: setErrorStatus, setMessage: setStatusMessage, clear: clearStatus } = useStatusMessage();
-  const [projectSearch, setProjectSearch] = useState("");
-  const [projectStatusFilters, setProjectStatusFilters] = useState<ProjectStatusValue[]>(
-    DEFAULT_PROJECT_STATUS_FILTERS,
-  );
-  const [isProjectListExpanded, setIsProjectListExpanded] = useState(true);
-  const [isInvoiceViewerExpanded, setIsInvoiceViewerExpanded] = useState(true);
-  const [isStatusSectionOpen, setIsStatusSectionOpen] = useState(true);
-  const [isHistorySectionOpen, setIsHistorySectionOpen] = useState(false);
-  const [isLineItemsSectionOpen, setIsLineItemsSectionOpen] = useState(false);
   const [viewerActionMessage, setViewerActionMessage] = useState("");
   const [viewerActionTone, setViewerActionTone] = useState<"success" | "error">("success");
   const [showAllEvents, setShowAllEvents] = useState(false);
   const [invoiceSearch, setInvoiceSearch] = useState("");
-  const [hasAutoSelectedProjectWithInvoices, setHasAutoSelectedProjectWithInvoices] = useState(false);
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const selectedProjectId = String(scopedProjectId);
 
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
   const [selectedInvoiceStatusEvents, setSelectedInvoiceStatusEvents] = useState<
@@ -295,7 +285,7 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
   const invoiceCreatorRef = useRef<HTMLDivElement | null>(null);
   const [creatorFlashCount, setCreatorFlashCount] = useState(0);
   const [contractBreakdown, setContractBreakdown] = useState<ContractBreakdown | null>(null);
-  const [isContractBreakdownOpen, setIsContractBreakdownOpen] = useState(false);
+  const [costCodes, setCostCodes] = useState<CostCode[]>([]);
   const { setPrintable } = usePrintable();
 
   // -------------------------------------------------------------------------
@@ -330,33 +320,6 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
   const workspaceSourceInvoice = useMemo(
     () => invoices.find((invoice) => invoice.id === workspaceSourceInvoiceId) ?? null,
     [invoices, workspaceSourceInvoiceId],
-  );
-  const projectNeedle = projectSearch.trim().toLowerCase();
-  const filteredProjects = !projectNeedle
-    ? projects
-    : projects.filter((project) => {
-        const haystack = [String(project.id), project.name, project.customer_display_name, project.status]
-          .join(" ")
-          .toLowerCase();
-        return haystack.includes(projectNeedle);
-      });
-  const projectStatusCounts = PROJECT_STATUS_VALUES.reduce<Record<ProjectStatusValue, number>>(
-    (acc, statusValue) => {
-      acc[statusValue] = filteredProjects.filter(
-        (project) => (project.status as ProjectStatusValue) === statusValue,
-      ).length;
-      return acc;
-    },
-    {
-      prospect: 0,
-      active: 0,
-      on_hold: 0,
-      completed: 0,
-      cancelled: 0,
-    },
-  );
-  const statusFilteredProjects = filteredProjects.filter((project) =>
-    projectStatusFilters.includes(project.status as ProjectStatusValue),
   );
   const filteredInvoices = useMemo(() => {
     if (!invoiceStatusFilters.length) {
@@ -440,11 +403,12 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
         return;
       }
 
-      setNeutralStatus("Loading projects...");
+      setNeutralStatus("Loading...");
       try {
-        const [projectsRes, orgRes] = await Promise.all([
+        const [projectsRes, orgRes, costCodesRes] = await Promise.all([
           fetch(`${normalizedBaseUrl}/projects/`, { headers: buildAuthHeaders(token) }),
           fetch(`${normalizedBaseUrl}/organization/`, { headers: buildAuthHeaders(token) }),
+          fetch(`${normalizedBaseUrl}/cost-codes/`, { headers: buildAuthHeaders(token) }),
         ]);
         const projectsPayload: ApiResponse = await projectsRes.json();
         const orgPayload: ApiResponse = await orgRes.json();
@@ -454,31 +418,23 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
           return;
         }
 
+        if (costCodesRes.ok) {
+          const costCodesPayload: ApiResponse = await costCodesRes.json();
+          const costCodeRows = ((costCodesPayload.data as CostCode[]) ?? []).filter((c) => c.is_active);
+          setCostCodes(costCodeRows);
+        }
+
         const projectRows = (projectsPayload.data as ProjectRecord[]) ?? [];
         const organizationData = (
           orgPayload.data as { organization?: OrganizationInvoiceDefaults } | undefined
         )?.organization;
 
         setProjects(projectRows);
-        setHasAutoSelectedProjectWithInvoices(false);
         if (orgRes.ok && organizationData) {
           setOrganizationInvoiceDefaults(organizationData);
           setDueDate(dueDateFromIssueDate(issueDate, organizationData.default_invoice_due_delta || 30));
           setTermsText((current) => current || organizationData.invoice_terms_and_conditions || "");
         }
-
-        setSelectedProjectId((current) => {
-          if (current && projectRows.some((row) => String(row.id) === current)) {
-            return current;
-          }
-          if (scopedProjectId) {
-            const scoped = projectRows.find((row) => row.id === scopedProjectId);
-            if (scoped) {
-              return String(scoped.id);
-            }
-          }
-          return projectRows[0] ? String(projectRows[0].id) : "";
-        });
 
         if (!options?.keepStatusOnSuccess) {
           setStatusMessage("");
@@ -487,19 +443,18 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
         setErrorStatus("Could not reach dependency endpoints.");
       }
     },
-    [issueDate, normalizedBaseUrl, scopedProjectId, setErrorStatus, setNeutralStatus, setStatusMessage, token],
+    [issueDate, normalizedBaseUrl, setErrorStatus, setNeutralStatus, setStatusMessage, token],
   );
 
 
   const loadInvoices = useCallback(
-    async (projectIdArg?: number): Promise<InvoiceRecord[]> => {
-      const resolvedProjectId = projectIdArg ?? Number(selectedProjectId);
-      if (!token || !resolvedProjectId) {
+    async (): Promise<InvoiceRecord[]> => {
+      if (!token || !scopedProjectId) {
         return [];
       }
 
       try {
-        const response = await fetch(`${normalizedBaseUrl}/projects/${resolvedProjectId}/invoices/`, {
+        const response = await fetch(`${normalizedBaseUrl}/projects/${scopedProjectId}/invoices/`, {
           headers: buildAuthHeaders(token),
         });
         const payload: ApiResponse = await response.json();
@@ -525,7 +480,7 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
         return [];
       }
     },
-    [normalizedBaseUrl, selectedProjectId, setErrorStatus, setStatusMessage, token],
+    [normalizedBaseUrl, scopedProjectId, setErrorStatus, setStatusMessage, token],
   );
 
   const loadContractBreakdown = useCallback(
@@ -629,103 +584,25 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
     void loadDependencies();
   }, [loadDependencies, token]);
 
-  // Reload invoices and contract breakdown whenever the selected project changes.
+  // Load invoices and contract breakdown for the scoped project.
   // Auto-load the first invoice into the workspace so the creator reflects the selection.
   useEffect(() => {
-    const projectId = Number(selectedProjectId);
-    if (!token || !projectId) {
+    if (!token || !scopedProjectId) {
       setInvoices([]);
       setSelectedInvoiceId("");
       setContractBreakdown(null);
       return;
     }
     void (async () => {
-      const rows = await loadInvoices(projectId);
+      const rows = await loadInvoices();
       if (rows.length > 0) {
         loadInvoiceIntoWorkspace(rows[0]);
       } else {
         resetCreateDraft();
       }
     })();
-    void loadContractBreakdown(projectId);
-  }, [loadContractBreakdown, loadInvoiceIntoWorkspace, loadInvoices, selectedProjectId, token]);
-
-  // Auto-select the first project that has invoices when the default project is empty.
-  useEffect(() => {
-    if (!token || scopedProjectId || hasAutoSelectedProjectWithInvoices) {
-      return;
-    }
-    if (!selectedProjectId || invoices.length > 0) {
-      return;
-    }
-    if (statusFilteredProjects.length <= 1) {
-      return;
-    }
-
-    const selectedProjectIdNumber = Number(selectedProjectId);
-    if (!selectedProjectIdNumber) {
-      return;
-    }
-
-    let cancelled = false;
-    setHasAutoSelectedProjectWithInvoices(true);
-
-    async function selectFirstProjectWithInvoices() {
-      for (const project of statusFilteredProjects) {
-        if (project.id === selectedProjectIdNumber) {
-          continue;
-        }
-        try {
-          const response = await fetch(`${normalizedBaseUrl}/projects/${project.id}/invoices/`, {
-            headers: buildAuthHeaders(token),
-          });
-          const payload: ApiResponse = await response.json();
-          if (!response.ok) {
-            continue;
-          }
-          const rows = (payload.data as InvoiceRecord[]) ?? [];
-          if (!rows.length) {
-            continue;
-          }
-          if (cancelled) {
-            return;
-          }
-          setSelectedProjectId(String(project.id));
-          return;
-        } catch {
-          // Best effort fallback; continue probing.
-        }
-      }
-    }
-
-    void selectFirstProjectWithInvoices();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    hasAutoSelectedProjectWithInvoices,
-    invoices.length,
-    normalizedBaseUrl,
-    scopedProjectId,
-    selectedProjectId,
-    statusFilteredProjects,
-    token,
-  ]);
-
-  // Ensure selected project is still visible after filter changes; fall back to first match.
-  useEffect(() => {
-    if (statusFilteredProjects.length === 0) {
-      return;
-    }
-    const selectedStillVisible = statusFilteredProjects.some(
-      (project) => String(project.id) === selectedProjectId,
-    );
-    if (selectedStillVisible) {
-      return;
-    }
-    const fallbackProject = statusFilteredProjects[0];
-    setSelectedProjectId(String(fallbackProject.id));
-  }, [selectedProjectId, statusFilteredProjects]);
+    void loadContractBreakdown(scopedProjectId);
+  }, [loadContractBreakdown, loadInvoiceIntoWorkspace, loadInvoices, scopedProjectId, token]);
 
   // Pre-select the most likely next status when the selected invoice changes.
   useEffect(() => {
@@ -802,30 +679,10 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
     );
   }
 
-  /** Toggle a project status value in the project list filter. */
-  function toggleProjectStatusFilter(statusValue: ProjectStatusValue) {
-    setProjectStatusFilters((current) =>
-      current.includes(statusValue)
-        ? current.filter((status) => status !== statusValue)
-        : [...current, statusValue],
-    );
-  }
-
-  /** Switch the active project, triggering invoice reload. */
-  function handleSelectProject(project: { id: number }) {
-    if (String(project.id) === selectedProjectId) {
-      return;
-    }
-    setSelectedProjectId(String(project.id));
-    setInvoiceSearch("");
-  }
-
   /** Select an invoice from the list and load it into the creator workspace. */
   function handleSelectInvoice(invoice: InvoiceRecord) {
     setSelectedInvoiceId(String(invoice.id));
     setSelectedStatus("");
-    setIsHistorySectionOpen(false);
-    setIsLineItemsSectionOpen(false);
     setShowAllEvents(false);
     setViewerActionMessage("");
     loadInvoiceIntoWorkspace(invoice);
@@ -910,16 +767,10 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
       }
     }
 
-    const projectId = Number(selectedProjectId);
-    if (!projectId) {
-      setErrorStatus("Select a project first.");
-      return;
-    }
-
     setNeutralStatus("Creating invoice...");
     try {
       const createPayload = invoiceCreatorAdapter.toCreatePayload(invoiceDraftFormState);
-      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/invoices/`, {
+      const response = await fetch(`${normalizedBaseUrl}/projects/${scopedProjectId}/invoices/`, {
         method: "POST",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify(createPayload),
@@ -932,7 +783,7 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
       }
 
       const created = payload.data as InvoiceRecord;
-      await loadInvoices(projectId);
+      await loadInvoices();
       setSelectedInvoiceId(String(created.id));
       setSelectedStatus("");
       loadInvoiceIntoWorkspace(created);
@@ -1058,12 +909,6 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
       setErrorStatus("Select an invoice first.");
       return;
     }
-    const projectId = Number(selectedProjectId);
-    if (!projectId) {
-      setErrorStatus("Select a project first.");
-      return;
-    }
-
     const nextDraftLines = invoiceToWorkspaceLines(selectedInvoice);
     const nextIssueDate = todayDateInput();
     const nextDueDate = dueDateFromIssueDate(
@@ -1088,7 +933,7 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
         lineItems: nextDraftLines,
       };
       const createPayload = invoiceCreatorAdapter.toCreatePayload(duplicateFormState);
-      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/invoices/`, {
+      const response = await fetch(`${normalizedBaseUrl}/projects/${scopedProjectId}/invoices/`, {
         method: "POST",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify(createPayload),
@@ -1099,7 +944,7 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
         return;
       }
       const created = payload.data as InvoiceRecord;
-      await loadInvoices(projectId);
+      await loadInvoices();
       setSelectedInvoiceId(String(created.id));
       setSelectedStatus("");
       loadInvoiceIntoWorkspace(created);
@@ -1173,6 +1018,12 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
   // Contract breakdown (read-only reference)
   // -------------------------------------------------------------------------
 
+  function duplicateContractLineToInvoice(fields: Omit<InvoiceLineInput, "localId">) {
+    const id = nextLineId;
+    setLineItems((current) => [...current, { localId: id, ...fields }]);
+    setNextLineId((value) => value + 1);
+  }
+
   function renderContractBreakdown(opts?: { style?: React.CSSProperties }) {
     if (!contractBreakdown?.active_estimate) return null;
     const estimate = contractBreakdown.active_estimate;
@@ -1180,94 +1031,154 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
     const hasEstimateLines = estimate.line_items.length > 0;
     const hasApprovedCOs = approvedCOs.length > 0;
     if (!hasEstimateLines && !hasApprovedCOs) return null;
+    const canDuplicate = !workspaceIsLocked;
 
     return (
-      <div className={styles.invoiceViewerSection} style={opts?.style}>
-        <button
-          type="button"
-          className={styles.invoiceViewerSectionToggle}
-          onClick={() => setIsContractBreakdownOpen((v) => !v)}
-          aria-expanded={isContractBreakdownOpen}
-        >
-          <h4>Contract Breakdown</h4>
-          <span className={styles.invoiceViewerSectionArrow}>▼</span>
-        </button>
-        {isContractBreakdownOpen ? (
-          <div className={styles.invoiceViewerSectionContent}>
+      <div className={styles.contractBreakdown} style={opts?.style}>
+        <h4 className={styles.invoiceViewerSectionHeading}>Contract Breakdown</h4>
+
+            {/* Approved estimate lines */}
             {hasEstimateLines ? (
-              <div className={styles.invoiceLineTableWrap}>
-                <table className={styles.invoiceLineTable}>
-                  <caption className={styles.invoiceLineTableCaption}>
-                    Approved Estimate: {estimate.title} v{estimate.version}
-                  </caption>
-                  <thead>
-                    <tr>
-                      <th>Cost code</th>
-                      <th>Description</th>
-                      <th>Qty</th>
-                      <th>Unit</th>
-                      <th>Unit cost</th>
-                      <th>Markup %</th>
-                      <th>Line total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {estimate.line_items.map((line) => (
-                      <tr key={line.id}>
-                        <td>{line.cost_code_code || "—"}</td>
-                        <td>{line.description || "—"}</td>
-                        <td>{line.quantity}</td>
-                        <td>{line.unit}</td>
-                        <td>${line.unit_cost}</td>
-                        <td>{line.markup_percent}%</td>
-                        <td>${line.line_total}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <span className={styles.contractGroupLabel}>
+                  Approved Estimate: {estimate.title} v{estimate.version}
+                </span>
+                <div className={mobileCardStyles.cardList}>
+                  {estimate.line_items.map((line, index) => {
+                    const qty = parseAmount(line.quantity);
+                    const markedUpUnitPrice = qty !== 0
+                      ? formatDecimal(parseAmount(line.line_total) / qty)
+                      : line.unit_cost;
+                    return (
+                      <div key={line.id} className={mobileCardStyles.card}>
+                        <div className={styles.contractCardHeader}>
+                          <span className={mobileCardStyles.cardIndex}>Item {index + 1}</span>
+                          {canDuplicate ? (
+                            <button
+                              type="button"
+                              className={styles.contractDuplicateButton}
+                              title="Add to invoice"
+                              onClick={() =>
+                                duplicateContractLineToInvoice({
+                                  costCode: line.cost_code_code || "",
+                                  description: line.description,
+                                  quantity: line.quantity,
+                                  unit: line.unit,
+                                  unitPrice: markedUpUnitPrice,
+                                })
+                              }
+                            >
+                              +
+                            </button>
+                          ) : null}
+                        </div>
+                        <div className={mobileCardStyles.fieldFull}>
+                          <span className={mobileCardStyles.fieldLabel}>Description</span>
+                          <span className={mobileCardStyles.fieldStatic}>{line.description || "—"}</span>
+                        </div>
+                        {line.cost_code_code ? (
+                          <div className={mobileCardStyles.fieldFull}>
+                            <span className={mobileCardStyles.fieldLabel}>Cost Code</span>
+                            <span className={mobileCardStyles.fieldStatic}>{line.cost_code_code}</span>
+                          </div>
+                        ) : null}
+                        <div className={mobileCardStyles.fieldGrid}>
+                          <div className={mobileCardStyles.fieldHalf}>
+                            <span className={mobileCardStyles.fieldLabel}>Qty</span>
+                            <span className={mobileCardStyles.fieldStatic}>{line.quantity}</span>
+                          </div>
+                          <div className={mobileCardStyles.fieldHalf}>
+                            <span className={mobileCardStyles.fieldLabel}>Unit</span>
+                            <span className={mobileCardStyles.fieldStatic}>{line.unit}</span>
+                          </div>
+                        </div>
+                        <div className={`${mobileCardStyles.fieldFull} ${mobileCardStyles.fieldAlignRight}`}>
+                          <span className={mobileCardStyles.fieldLabel}>Line Total</span>
+                          <span className={styles.contractLineTotal}>
+                            <span className={styles.contractLineBreakdown}>
+                              {line.quantity} {line.unit} × ${line.unit_cost}
+                              {parseAmount(line.markup_percent) !== 0 ? ` + ${line.markup_percent}%` : ""}
+                            </span>
+                            <span>${line.line_total}</span>
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             ) : null}
             <div className={styles.invoiceViewerMetaRow}>
               <span className={styles.invoiceViewerMetaLabel}>Estimate grand total</span>
               <strong>${estimate.grand_total}</strong>
             </div>
 
+            {/* Approved change order lines */}
             {hasApprovedCOs ? (
-              <div className={styles.invoiceLineTableWrap}>
-                <table className={styles.invoiceLineTable}>
-                  <caption className={styles.invoiceLineTableCaption}>
-                    Approved Change Orders ({approvedCOs.length})
-                  </caption>
-                  <thead>
-                    <tr>
-                      <th>CO #</th>
-                      <th>Cost code</th>
-                      <th>Description</th>
-                      <th>Adjustment reason</th>
-                      <th>Amount delta</th>
-                      <th>Days delta</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {approvedCOs.flatMap((co) =>
-                      co.line_items.map((line, idx) => (
-                        <tr key={`${co.id}-${line.id}`}>
-                          {idx === 0 ? (
-                            <td rowSpan={co.line_items.length}>
-                              {co.title} r{co.revision_number}
-                            </td>
+              <>
+                <span className={styles.contractGroupLabel}>
+                  Approved Change Orders ({approvedCOs.length})
+                </span>
+                <div className={mobileCardStyles.cardList}>
+                  {approvedCOs.flatMap((co) =>
+                    co.line_items.map((line, idx) => (
+                      <div key={`${co.id}-${line.id}`} className={mobileCardStyles.card}>
+                        <div className={styles.contractCardHeader}>
+                          <span className={mobileCardStyles.cardIndex}>
+                            {co.title}{co.line_items.length > 1 ? ` · Item ${idx + 1}` : ""}
+                          </span>
+                          {canDuplicate ? (
+                            <button
+                              type="button"
+                              className={styles.contractDuplicateButton}
+                              title="Add to invoice"
+                              onClick={() =>
+                                duplicateContractLineToInvoice({
+                                  costCode: line.cost_code_code || "",
+                                  description: line.description,
+                                  quantity: "1",
+                                  unit: "",
+                                  unitPrice: formatDecimal(parseAmount(line.amount_delta)),
+                                })
+                              }
+                            >
+                              +
+                            </button>
                           ) : null}
-                          <td>{line.cost_code_code || "—"}</td>
-                          <td>{line.description || "—"}</td>
-                          <td>{line.adjustment_reason || "—"}</td>
-                          <td>${formatDecimal(parseAmount(line.amount_delta))}</td>
-                          <td>{line.days_delta}</td>
-                        </tr>
-                      )),
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                        </div>
+                        <div className={mobileCardStyles.fieldFull}>
+                          <span className={mobileCardStyles.fieldLabel}>Description</span>
+                          <span className={mobileCardStyles.fieldStatic}>{line.description || "—"}</span>
+                        </div>
+                        {line.cost_code_code ? (
+                          <div className={mobileCardStyles.fieldFull}>
+                            <span className={mobileCardStyles.fieldLabel}>Cost Code</span>
+                            <span className={mobileCardStyles.fieldStatic}>{line.cost_code_code}</span>
+                          </div>
+                        ) : null}
+                        {line.adjustment_reason ? (
+                          <div className={mobileCardStyles.fieldFull}>
+                            <span className={mobileCardStyles.fieldLabel}>Adjustment Reason</span>
+                            <span className={mobileCardStyles.fieldStatic}>{line.adjustment_reason}</span>
+                          </div>
+                        ) : null}
+                        <div className={mobileCardStyles.fieldGrid}>
+                          <div className={mobileCardStyles.fieldHalf}>
+                            <span className={mobileCardStyles.fieldLabel}>Days Delta</span>
+                            <span className={mobileCardStyles.fieldStatic}>{line.days_delta}</span>
+                          </div>
+                          <div className={`${mobileCardStyles.fieldHalf} ${mobileCardStyles.fieldAlignRight}`}>
+                            <span className={mobileCardStyles.fieldLabel}>Amount Delta</span>
+                            <span className={`${mobileCardStyles.fieldStatic} ${mobileCardStyles.fieldStaticRight}`}>
+                              ${formatDecimal(parseAmount(line.amount_delta))}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )),
+                  )}
+                </div>
+              </>
             ) : null}
 
             {hasApprovedCOs ? (
@@ -1281,8 +1192,6 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
                 </strong>
               </div>
             ) : null}
-          </div>
-        ) : null}
       </div>
     );
   }
@@ -1315,41 +1224,10 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
             <p className={styles.readOnlyNotice}>Role `{role}` can view invoices but cannot create, update, or send.</p>
           ) : null}
 
-          <ProjectListViewer
-            isExpanded={isProjectListExpanded}
-            onToggleExpanded={() => setIsProjectListExpanded((current) => !current)}
-            showSearchAndFilters
-            searchValue={projectSearch}
-            onSearchChange={setProjectSearch}
-            statusValues={PROJECT_STATUS_VALUES}
-            statusFilters={projectStatusFilters}
-            statusCounts={projectStatusCounts}
-            onToggleStatusFilter={toggleProjectStatusFilter}
-            onShowAllStatuses={() =>
-              setProjectStatusFilters(["active", "on_hold", "prospect", "completed", "cancelled"])
-            }
-            onResetStatuses={() => setProjectStatusFilters(DEFAULT_PROJECT_STATUS_FILTERS)}
-            projects={statusFilteredProjects}
-            selectedProjectId={selectedProjectId}
-            onSelectProject={handleSelectProject}
-            statusLabel={projectStatusLabel}
-          />
-
           <section className={`${styles.panel} ${styles.viewerPanel}`}>
               <div className={styles.panelHeader}>
                 <h3>{selectedProject ? `Invoices for: ${selectedProject.name}` : "Invoices"}</h3>
-                <button
-                  type="button"
-                  className={collapseButtonStyles.collapseButton}
-                  onClick={() => setIsInvoiceViewerExpanded((current) => !current)}
-                  aria-expanded={isInvoiceViewerExpanded}
-                >
-                  {isInvoiceViewerExpanded ? "Collapse" : "Expand"}
-                </button>
               </div>
-
-              {isInvoiceViewerExpanded ? (
-                <>
 
               <input
                 className={styles.invoiceSearchInput}
@@ -1408,18 +1286,6 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
                               {statusLabel(invoice.status)}
                             </span>
                           </div>
-                          {invoice.public_ref ? (
-                            <a
-                              href={publicInvoiceHref(invoice.public_ref)}
-                              className={styles.invoiceCardPublicLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(event) => event.stopPropagation()}
-                              onKeyDown={(event) => event.stopPropagation()}
-                            >
-                              Customer View ↗
-                            </a>
-                          ) : null}
                         </div>
                         <div className={styles.invoiceMetaGrid}>
                           <span><span className={styles.invoiceMetaLabel}>Total</span> ${invoice.total}</span>
@@ -1427,21 +1293,26 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
                           <span><span className={styles.invoiceMetaLabel}>Issued</span> {formatDateDisplay(invoice.issue_date)}</span>
                           <span><span className={styles.invoiceMetaLabel}>Due</span> {formatDateDisplay(invoice.due_date)}</span>
                         </div>
+                        {invoice.public_ref ? (
+                          <div className={styles.invoiceLinkBar}>
+                            <a
+                              href={publicInvoiceHref(invoice.public_ref)}
+                              className={styles.invoiceLinkBarLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(event) => event.stopPropagation()}
+                              onKeyDown={(event) => event.stopPropagation()}
+                            >
+                              Customer View →
+                            </a>
+                          </div>
+                        ) : null}
 
                         {isSelected && selectedInvoice ? (
                           <div className={styles.invoiceExpandedSections}>
                             {/* Status & Actions */}
                             <div className={styles.invoiceViewerSection}>
-                              <button
-                                type="button"
-                                className={styles.invoiceViewerSectionToggle}
-                                onClick={(e) => { e.stopPropagation(); setIsStatusSectionOpen((v) => !v); }}
-                                aria-expanded={isStatusSectionOpen}
-                              >
-                                <h4>Status &amp; Actions</h4>
-                                <span className={styles.invoiceViewerSectionArrow}>▼</span>
-                              </button>
-                              {isStatusSectionOpen ? (
+                              <h4 className={styles.invoiceViewerSectionHeading}>Status &amp; Actions</h4>
                                 <div className={styles.invoiceViewerSectionContent}>
                                   <p className={styles.inlineHint}>{invoiceNextActionHint(selectedInvoice.status)}</p>
                                   {canMutateInvoices ? (
@@ -1521,21 +1392,11 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
                                     <p className={styles.inlineHint}>Status actions are read-only for your role.</p>
                                   )}
                                 </div>
-                              ) : null}
                             </div>
 
                             {/* History */}
                             <div className={styles.invoiceViewerSection}>
-                              <button
-                                type="button"
-                                className={styles.invoiceViewerSectionToggle}
-                                onClick={(e) => { e.stopPropagation(); setIsHistorySectionOpen((v) => !v); }}
-                                aria-expanded={isHistorySectionOpen}
-                              >
-                                <h4>History ({selectedInvoiceStatusEvents.length})</h4>
-                                <span className={styles.invoiceViewerSectionArrow}>▼</span>
-                              </button>
-                              {isHistorySectionOpen ? (
+                              <h4 className={styles.invoiceViewerSectionHeading}>History ({selectedInvoiceStatusEvents.length})</h4>
                                 <div className={styles.invoiceViewerSectionContent}>
                                   {selectedInvoiceStatusEvents.length > 0 ? (
                                     <>
@@ -1586,21 +1447,11 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
                                     </p>
                                   )}
                                 </div>
-                              ) : null}
                             </div>
 
                             {/* Line Items */}
                             <div className={styles.invoiceViewerSection}>
-                              <button
-                                type="button"
-                                className={styles.invoiceViewerSectionToggle}
-                                onClick={(e) => { e.stopPropagation(); setIsLineItemsSectionOpen((v) => !v); }}
-                                aria-expanded={isLineItemsSectionOpen}
-                              >
-                                <h4>Line Items ({invoice.line_items?.length ?? 0})</h4>
-                                <span className={styles.invoiceViewerSectionArrow}>▼</span>
-                              </button>
-                              {isLineItemsSectionOpen ? (
+                              <h4 className={styles.invoiceViewerSectionHeading}>Line Items ({invoice.line_items?.length ?? 0})</h4>
                                 <div className={styles.invoiceViewerSectionContent}>
                                   {(invoice.line_items?.length ?? 0) > 0 ? (
                                     <div className={styles.invoiceLineTableWrap}>
@@ -1631,7 +1482,6 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
                                     <p className={styles.inlineHint}>No line items.</p>
                                   )}
                                 </div>
-                              ) : null}
                             </div>
                           </div>
                         ) : null}
@@ -1649,11 +1499,6 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
                 )}
               </div>
               <PaginationControls page={invoicePage} totalPages={invoiceTotalPages} totalCount={invoiceTotalCount} onPageChange={setInvoicePage} />
-
-                </>
-              ) : (
-                <p className={styles.inlineHint}>Invoice viewer collapsed. Expand to review status history and send actions.</p>
-              )}
             </section>
 
           <div className={styles.workspace}>
@@ -1728,12 +1573,12 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
                           <div className={creatorStyles.toBlock}>
                             <span className={creatorStyles.blockLabel}>To</span>
                             <p className={creatorStyles.blockText}>
-                              {selectedProject?.customer_display_name || "Select project"}
+                              {selectedProject?.customer_display_name}
                             </p>
                             <p className={creatorStyles.blockMuted}>
                               {selectedProject
                                 ? `#${selectedProject.id} ${selectedProject.name}`
-                                : "Choose a project from the project list"}
+                                : ""}
                             </p>
                           </div>
                         </div>
@@ -1796,86 +1641,193 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
                       <div className={invoiceCreatorStyles.invoiceLineSectionIntro}>
                         <h3>Line Items</h3>
                       </div>
-                      <div className={creatorStyles.lineTable}>
-                        <div className={invoiceCreatorStyles.invoiceLineHeader}>
-                          <span>Cost Code</span>
-                          <span>Description</span>
-                          <span>Qty</span>
-                          <span>Unit</span>
-                          <span>Unit price</span>
-                          <span>Amount</span>
-                          <span>{workspaceIsLocked ? "" : "Actions"}</span>
+                      {isMobile ? (
+                        <div className={mobileCardStyles.cardList}>
+                          {lineItems.map((line, index) => {
+                            const lineAmount = parseAmount(line.quantity) * parseAmount(line.unitPrice);
+                            return (
+                              <MobileLineItemCard
+                                key={line.localId}
+                                index={index}
+                                readOnly={workspaceIsLocked}
+                                isFirst={index === 0}
+                                isLast={index === lineItems.length - 1}
+                                onRemove={workspaceIsLocked ? undefined : () => removeLineItem(line.localId)}
+                                fields={[
+                                  {
+                                    label: "Description",
+                                    key: "description",
+                                    span: "full",
+                                    render: () => (
+                                      <input
+                                        className={mobileCardStyles.fieldInput}
+                                        value={line.description}
+                                        onChange={(event) => updateLineItem(line.localId, "description", event.target.value)}
+                                        required
+                                        disabled={workspaceIsLocked}
+                                      />
+                                    ),
+                                  },
+                                  {
+                                    label: "Cost Code",
+                                    key: "costCode",
+                                    span: "full",
+                                    render: () => (
+                                      <CostCodeCombobox
+                                        costCodes={costCodes}
+                                        value={line.costCode}
+                                        onChange={(nextValue) => updateLineItem(line.localId, "costCode", nextValue)}
+                                        ariaLabel="Cost code"
+                                        disabled={workspaceIsLocked}
+                                        allowEmptySelection
+                                        emptySelectionLabel="No cost code (optional)"
+                                        placeholder="Search cost code"
+                                      />
+                                    ),
+                                  },
+                                  {
+                                    label: "Qty",
+                                    key: "quantity",
+                                    render: () => (
+                                      <input
+                                        className={mobileCardStyles.fieldInput}
+                                        value={line.quantity}
+                                        onChange={(event) => updateLineItem(line.localId, "quantity", event.target.value)}
+                                        inputMode="decimal"
+                                        required
+                                        disabled={workspaceIsLocked}
+                                      />
+                                    ),
+                                  },
+                                  {
+                                    label: "Unit",
+                                    key: "unit",
+                                    render: () => (
+                                      <input
+                                        className={mobileCardStyles.fieldInput}
+                                        value={line.unit}
+                                        onChange={(event) => updateLineItem(line.localId, "unit", event.target.value)}
+                                        required
+                                        disabled={workspaceIsLocked}
+                                      />
+                                    ),
+                                  },
+                                  {
+                                    label: "Unit Price",
+                                    key: "unitPrice",
+                                    render: () => (
+                                      <input
+                                        className={mobileCardStyles.fieldInput}
+                                        value={line.unitPrice}
+                                        onChange={(event) => updateLineItem(line.localId, "unitPrice", event.target.value)}
+                                        inputMode="decimal"
+                                        required
+                                        disabled={workspaceIsLocked}
+                                      />
+                                    ),
+                                  },
+                                  {
+                                    label: "Amount",
+                                    key: "amount",
+                                    render: () => (
+                                      <span className={mobileCardStyles.fieldStatic}>
+                                        ${formatDecimal(lineAmount)}
+                                      </span>
+                                    ),
+                                  },
+                                ]}
+                              />
+                            );
+                          })}
                         </div>
-                        {lineItems.map((line, index) => {
-                          const lineAmount = parseAmount(line.quantity) * parseAmount(line.unitPrice);
-                          return (
-                            <div
-                              key={line.localId}
-                              className={`${invoiceCreatorStyles.invoiceLineRow} ${index % 2 === 1 ? invoiceCreatorStyles.invoiceLineRowAlt : ""}`}
-                            >
-                              <input
-                                className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                                value={line.costCode}
-                                onChange={(event) =>
-                                  updateLineItem(line.localId, "costCode", event.target.value)
-                                }
-                                placeholder="Optional"
-                                disabled={workspaceIsLocked}
-                              />
-                              <input
-                                className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                                value={line.description}
-                                onChange={(event) =>
-                                  updateLineItem(line.localId, "description", event.target.value)
-                                }
-                                required
-                                disabled={workspaceIsLocked}
-                              />
-                              <input
-                                className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                                value={line.quantity}
-                                onChange={(event) =>
-                                  updateLineItem(line.localId, "quantity", event.target.value)
-                                }
-                                inputMode="decimal"
-                                required
-                                disabled={workspaceIsLocked}
-                              />
-                              <input
-                                className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                                value={line.unit}
-                                onChange={(event) => updateLineItem(line.localId, "unit", event.target.value)}
-                                required
-                                disabled={workspaceIsLocked}
-                              />
-                              <input
-                                className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                                value={line.unitPrice}
-                                onChange={(event) =>
-                                  updateLineItem(line.localId, "unitPrice", event.target.value)
-                                }
-                                inputMode="decimal"
-                                required
-                                disabled={workspaceIsLocked}
-                              />
-                              <span className={`${creatorStyles.amountCell} ${invoiceCreatorStyles.invoiceReadAmount}`}>
-                                ${formatDecimal(lineAmount)}
-                              </span>
-                              <div className={invoiceCreatorStyles.invoiceLineActionsCell}>
-                                {!workspaceIsLocked ? (
-                                  <button
-                                    type="button"
-                                    className={creatorStyles.smallButton}
-                                    onClick={() => removeLineItem(line.localId)}
-                                  >
-                                    Remove
-                                  </button>
-                                ) : null}
+                      ) : (
+                        <div className={creatorStyles.lineTable}>
+                          <div className={invoiceCreatorStyles.invoiceLineHeader}>
+                            <span>Cost Code</span>
+                            <span>Description</span>
+                            <span>Qty</span>
+                            <span>Unit</span>
+                            <span>Unit price</span>
+                            <span>Amount</span>
+                            <span>{workspaceIsLocked ? "" : "Actions"}</span>
+                          </div>
+                          {lineItems.map((line, index) => {
+                            const lineAmount = parseAmount(line.quantity) * parseAmount(line.unitPrice);
+                            return (
+                              <div
+                                key={line.localId}
+                                className={`${invoiceCreatorStyles.invoiceLineRow} ${index % 2 === 1 ? invoiceCreatorStyles.invoiceLineRowAlt : ""}`}
+                              >
+                                <span className={creatorStyles.printOnly}>
+                                  {costCodes.find((c) => String(c.id) === line.costCode)?.code || "—"}
+                                </span>
+                                <span className={creatorStyles.screenOnly}>
+                                  <CostCodeCombobox
+                                    costCodes={costCodes}
+                                    value={line.costCode}
+                                    onChange={(nextValue) => updateLineItem(line.localId, "costCode", nextValue)}
+                                    ariaLabel="Cost code"
+                                    disabled={workspaceIsLocked}
+                                    allowEmptySelection
+                                    emptySelectionLabel="No cost code (optional)"
+                                    placeholder="Search cost code"
+                                  />
+                                </span>
+                                <input
+                                  className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
+                                  value={line.description}
+                                  onChange={(event) =>
+                                    updateLineItem(line.localId, "description", event.target.value)
+                                  }
+                                  required
+                                  disabled={workspaceIsLocked}
+                                />
+                                <input
+                                  className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
+                                  value={line.quantity}
+                                  onChange={(event) =>
+                                    updateLineItem(line.localId, "quantity", event.target.value)
+                                  }
+                                  inputMode="decimal"
+                                  required
+                                  disabled={workspaceIsLocked}
+                                />
+                                <input
+                                  className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
+                                  value={line.unit}
+                                  onChange={(event) => updateLineItem(line.localId, "unit", event.target.value)}
+                                  required
+                                  disabled={workspaceIsLocked}
+                                />
+                                <input
+                                  className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
+                                  value={line.unitPrice}
+                                  onChange={(event) =>
+                                    updateLineItem(line.localId, "unitPrice", event.target.value)
+                                  }
+                                  inputMode="decimal"
+                                  required
+                                  disabled={workspaceIsLocked}
+                                />
+                                <span className={`${creatorStyles.amountCell} ${invoiceCreatorStyles.invoiceReadAmount}`}>
+                                  ${formatDecimal(lineAmount)}
+                                </span>
+                                <div className={invoiceCreatorStyles.invoiceLineActionsCell}>
+                                  {!workspaceIsLocked ? (
+                                    <button
+                                      type="button"
+                                      className={creatorStyles.smallButton}
+                                      onClick={() => removeLineItem(line.localId)}
+                                    >
+                                      Remove
+                                    </button>
+                                  ) : null}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                            );
+                          })}
+                        </div>
+                      )}
 
                       {!workspaceIsLocked ? (
                         <div className={invoiceCreatorStyles.invoiceLineActions}>
@@ -1890,10 +1842,6 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
                       ) : null}
 
                       {renderContractBreakdown({ style: { marginTop: "var(--space-md)" } })}
-
-                      {!selectedProjectId ? (
-                        <p className={creatorStyles.inlineHint}>Select a project before creating an invoice.</p>
-                      ) : null}
 
                       <div className={invoiceCreatorStyles.invoiceSheetFooter}>
                         <div className={invoiceCreatorStyles.invoiceTotalsColumn}>
@@ -1936,7 +1884,6 @@ export function InvoicesConsole({ scopedProjectId = null }: InvoicesConsoleProps
                                 <button
                                   type="submit"
                                   className={`${creatorStyles.primaryButton} ${invoiceCreatorStyles.invoiceCreatePrimary}`}
-                                  disabled={!editingDraftInvoiceId && !selectedProjectId}
                                 >
                                   {editingDraftInvoiceId ? "Save Draft" : "Create Invoice"}
                                 </button>

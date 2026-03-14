@@ -18,6 +18,7 @@ export type ChangeOrderLineRecord = {
   cost_code_code: string | null;
   cost_code_name: string | null;
   description: string;
+  /** Retained for API compat — no longer surfaced in the UI. */
   adjustment_reason: string;
   amount_delta: string;
   days_delta: number;
@@ -122,6 +123,7 @@ export type ChangeOrderLineInput = {
   localId: number;
   costCodeId: string;
   description: string;
+  /** Retained for API compat — no longer surfaced in the UI. */
   adjustmentReason: string;
   amountDelta: string;
   daysDelta: string;

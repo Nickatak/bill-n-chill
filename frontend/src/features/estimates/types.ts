@@ -23,8 +23,6 @@ export type EstimateRecord = {
   tax_percent: string;
   grand_total: string;
   public_ref?: string;
-  financial_baseline_status?: "none" | "active" | "superseded";
-  is_active_financial_baseline?: boolean;
   created_at: string;
   updated_at: string;
   line_items?: EstimateLineItemRecord[];
@@ -110,7 +108,6 @@ export type ApiResponse = {
     message?: string;
     fields?: Record<string, string[]>;
     meta?: {
-      active_financial_estimate_id?: number | null;
       latest_estimate_id?: number | null;
       latest_version?: number | null;
       latest_status?: string | null;

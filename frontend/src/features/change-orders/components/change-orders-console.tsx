@@ -12,10 +12,6 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import Link from "next/link";
 import { parseAmount, formatDecimal } from "@/shared/money-format";
 import {
-  financialBaselineStatus,
-  formatFinancialBaselineStatus,
-} from "@/shared/financial-baseline";
-import {
   coLabel,
   defaultChangeOrderTitle,
   emptyLine,
@@ -54,8 +50,13 @@ import {
   ChangeOrderFormState,
   toChangeOrderStatusPolicy,
 } from "../document-adapter";
+import { useMediaQuery } from "@/shared/hooks/use-media-query";
 import { useClientPagination } from "@/shared/hooks/use-client-pagination";
 import { PaginationControls } from "@/shared/components/pagination-controls";
+import { MobileLineItemCard } from "@/shared/document-creator/mobile-line-card";
+import mobileCardStyles from "@/shared/document-creator/mobile-line-card.module.css";
+import { CostCodeCombobox } from "@/features/estimates/components/cost-code-combobox";
+import { ReadOnlyLineTable, readOnlyLineTableStyles as roTableStyles } from "@/shared/document-viewer/read-only-line-table";
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -90,8 +91,6 @@ type OriginEstimateRecord = {
   version: number;
   approved_at: string | null;
   approved_by_email: string | null;
-  financial_baseline_status?: "none" | "active" | "superseded";
-  is_active_financial_baseline?: boolean;
   grand_total: string;
   line_items: OriginEstimateLineItem[];
 };
@@ -143,6 +142,7 @@ export function ChangeOrdersConsole({
   scopedProjectId: scopedProjectIdProp = null,
   initialOriginEstimateId: initialOriginEstimateIdProp = null,
 }: ChangeOrdersConsoleProps) {
+  const isMobile = useMediaQuery("(max-width: 700px)");
   const { token, role, capabilities } = useSharedSessionAuth();
   const [actionMessage, setActionMessage] = useState("");
   const [actionTone, setActionTone] = useState<"error" | "success" | "info">("info");
@@ -337,8 +337,7 @@ export function ChangeOrdersConsole({
   const isCreateSubmitDisabled =
     !canMutateChangeOrders ||
     !selectedProjectId ||
-    !selectedViewerEstimateId ||
-    newLineValidation.issues.length > 0;
+    !selectedViewerEstimateId;
   const isSelectedChangeOrderDraft = selectedChangeOrder?.status === "draft";
   const isSelectedChangeOrderEditable =
     canMutateChangeOrders &&
@@ -358,9 +357,7 @@ export function ChangeOrdersConsole({
     : isSelectedChangeOrderEditable
       ? styles.editStatusDraft
       : editStatusBadgeClass(selectedChangeOrder.status);
-  const isEditSubmitDisabled =
-    !isSelectedChangeOrderEditable ||
-    editLineValidation.issues.length > 0;
+  const isEditSubmitDisabled = !isSelectedChangeOrderEditable;
   const currentAcceptedTotal = selectedViewerEstimate
     ? currentApprovedBudgetTotalForEstimate(selectedViewerEstimate.id)
     : null;
@@ -775,8 +772,6 @@ export function ChangeOrdersConsole({
           status?: string;
           grand_total?: string;
           line_items?: OriginEstimateLineItem[];
-          financial_baseline_status?: "none" | "active" | "superseded";
-          is_active_financial_baseline?: boolean;
         }>) ?? [];
       const approvedRows = rows.filter((estimate) => estimate.status === "approved");
       const approvedRowsWithMeta: OriginEstimateRecord[] = await Promise.all(
@@ -785,8 +780,6 @@ export function ChangeOrdersConsole({
             id: estimate.id,
             title: estimate.title,
             version: estimate.version,
-            financial_baseline_status: estimate.financial_baseline_status,
-            is_active_financial_baseline: estimate.is_active_financial_baseline,
             grand_total: estimate.grand_total ?? "0.00",
             line_items: estimate.line_items ?? [],
           };
@@ -1087,8 +1080,8 @@ export function ChangeOrdersConsole({
         cost_code: Number(line.costCodeId),
         description: line.description,
         adjustment_reason: line.adjustmentReason,
-        amount_delta: line.amountDelta,
-        days_delta: Number(line.daysDelta),
+        amount_delta: line.amountDelta.trim() || "0",
+        days_delta: Number(line.daysDelta.trim() || "0"),
       }));
   }
 
@@ -1130,6 +1123,24 @@ export function ChangeOrdersConsole({
     setter((current) => current.filter((line) => line.localId !== localId));
   }
 
+  /** Swap a line item up or down within the given line-item set. */
+  function moveLine(
+    setter: LineSetter,
+    localId: number,
+    direction: "up" | "down",
+  ) {
+    setter((current) => {
+      const index = current.findIndex((line) => line.localId === localId);
+      if (index === -1) return current;
+      const targetIndex = direction === "up" ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= current.length) return current;
+      const next = [...current];
+      const [item] = next.splice(index, 1);
+      next.splice(targetIndex, 0, item);
+      return next;
+    });
+  }
+
   // -------------------------------------------------------------------------
   // Submit & mutation handlers
   // -------------------------------------------------------------------------
@@ -1157,6 +1168,12 @@ export function ChangeOrdersConsole({
     const projectId = Number(selectedProjectId);
     if (!projectId) {
       setFeedback("Select a project first.", "error");
+      return;
+    }
+
+    const hasMissingCostCode = newLineItems.some((line) => !line.costCodeId.trim());
+    if (hasMissingCostCode) {
+      setFeedback("Every line item must have a cost code.", "error");
       return;
     }
 
@@ -1268,6 +1285,12 @@ export function ChangeOrdersConsole({
     }
     if (!selectedChangeOrder) {
       setFeedback("Selected change order could not be resolved.", "error");
+      return;
+    }
+
+    const hasMissingCostCode = editLineItems.some((line) => !line.costCodeId.trim());
+    if (hasMissingCostCode) {
+      setFeedback("Every line item must have a cost code.", "error");
       return;
     }
 
@@ -1457,86 +1480,83 @@ export function ChangeOrdersConsole({
         {isOriginLineItemsSectionOpen ? (
           <div className={styles.viewerSectionContent}>
             {hasEstimateLines ? (
-              <div className={styles.lineTableWrap}>
-                <table className={styles.lineTable}>
-                  <caption className={styles.lineTableCaption}>
-                    Approved Estimate: {selectedViewerEstimate.title} v{selectedViewerEstimate.version}
-                  </caption>
-                  <thead>
-                    <tr>
-                      <th>Cost code</th>
-                      <th>Description</th>
-                      <th>Qty</th>
-                      <th>Unit</th>
-                      <th>Unit cost</th>
-                      <th>Markup %</th>
-                      <th>Line total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedViewerEstimate.line_items.map((line) => (
-                      <tr key={line.id}>
-                        <td>{line.cost_code_code || "—"}</td>
-                        <td>{line.description || "—"}</td>
-                        <td>{line.quantity}</td>
-                        <td>{line.unit}</td>
-                        <td>${line.unit_cost}</td>
-                        <td>{line.markup_percent}%</td>
-                        <td>${line.line_total}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
-            <div className={styles.viewerMetaRow}>
-              <span className={styles.viewerMetaLabel}>Estimate grand total</span>
-              <strong>${selectedViewerEstimate.grand_total}</strong>
-            </div>
-
-            {hasApprovedCOs ? (
-              <div className={styles.lineTableWrap}>
-                <table className={styles.lineTable}>
-                  <caption className={styles.lineTableCaption}>
-                    Approved Change Orders ({approvedCOsForSelectedEstimate.length})
-                  </caption>
-                  <thead>
-                    <tr>
-                      <th>CO #</th>
-                      <th>Cost code</th>
-                      <th>Description</th>
-                      <th>Adjustment reason</th>
-                      <th>Amount delta</th>
-                      <th>Days delta</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {approvedCOsForSelectedEstimate.flatMap((co) =>
-                      co.line_items.map((line, idx) => (
-                        <tr key={`${co.id}-${line.id}`}>
-                          {idx === 0 ? (
-                            <td rowSpan={co.line_items.length}>
-                              {co.title} r{co.revision_number}
-                            </td>
-                          ) : null}
-                          <td>{line.cost_code_code || "—"}</td>
-                          <td>{line.description || "—"}</td>
-                          <td>{line.adjustment_reason || "—"}</td>
-                          <td>${line.amount_delta}</td>
-                          <td>{line.days_delta}</td>
-                        </tr>
-                      )),
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <ReadOnlyLineTable
+                caption={`Approved Estimate: ${selectedViewerEstimate.title} v${selectedViewerEstimate.version}`}
+                columns={["Cost code", "Description", "Qty", "Unit", "Unit cost", "Markup %", "Line total"]}
+                rows={selectedViewerEstimate.line_items.map((line) => {
+                  const qty = Number(line.quantity || 0);
+                  const unitCost = Number(line.unit_cost || 0);
+                  const unit = line.unit || "ea";
+                  const costCodeLabel = [line.cost_code_code, line.cost_code_name].filter(Boolean).join(" — ") || "—";
+                  return {
+                    key: line.id,
+                    cells: [
+                      costCodeLabel,
+                      line.description || "—",
+                      qty.toFixed(2),
+                      unit,
+                      `$${unitCost.toFixed(2)}`,
+                      `${line.markup_percent}%`,
+                      <>
+                        <span className={roTableStyles.mobileBreakdown}>
+                          {qty.toFixed(2)} {unit} × ${unitCost.toFixed(2)}
+                        </span>
+                        <span>${line.line_total}</span>
+                      </>,
+                    ],
+                  };
+                })}
+                mobileColumnLayout={[
+                  { order: 0, span: "full" },
+                  { order: 1, span: "full" },
+                  { order: 2, span: "half", hidden: true },
+                  { order: 3, span: "half", hidden: true },
+                  { order: 4, span: "half", hidden: true },
+                  { order: 5, span: "half" },
+                  { order: 6, span: "full", align: "right" },
+                ]}
+                afterTable={
+                  <div className={styles.viewerMetaRow}>
+                    <span className={styles.viewerMetaLabel}>Estimate grand total</span>
+                    <strong>${selectedViewerEstimate.grand_total}</strong>
+                  </div>
+                }
+              />
             ) : null}
 
             {hasApprovedCOs ? (
-              <div className={styles.viewerMetaRow}>
-                <span className={styles.viewerMetaLabel}>Net contract total</span>
-                <strong>${currentAcceptedTotal ?? "—"}</strong>
-              </div>
+              <ReadOnlyLineTable
+                caption={`Approved Change Orders (${approvedCOsForSelectedEstimate.length})`}
+                columns={["CO #", "Cost code", "Description", "Days delta", "Amount delta"]}
+                rows={approvedCOsForSelectedEstimate.flatMap((co) =>
+                  co.line_items.map((line) => {
+                    const costCodeLabel = [line.cost_code_code, line.cost_code_name].filter(Boolean).join(" — ") || "—";
+                    return {
+                      key: `${co.id}-${line.id}`,
+                      cells: [
+                        `${co.title} r${co.revision_number}`,
+                        costCodeLabel,
+                        line.description || "—",
+                        `${line.days_delta} days`,
+                        `$${line.amount_delta}`,
+                      ],
+                    };
+                  }),
+                )}
+                mobileColumnLayout={[
+                  { order: 0, span: "full" },
+                  { order: 1, span: "half" },
+                  { order: 2, span: "full" },
+                  { order: 3, span: "half" },
+                  { order: 4, span: "half", align: "right" },
+                ]}
+                afterTable={
+                  <div className={styles.viewerMetaRow}>
+                    <span className={styles.viewerMetaLabel}>Net contract total</span>
+                    <strong>${currentAcceptedTotal ?? "—"}</strong>
+                  </div>
+                }
+              />
             ) : null}
           </div>
         ) : null}
@@ -1571,21 +1591,23 @@ export function ChangeOrdersConsole({
         <div className={styles.viewerHeader}>
           <div className={styles.viewerHeaderRow}>
             <h3>{selectedProjectName ? `Change Orders for: ${selectedProjectName}` : "Change Orders"}</h3>
-            <button
-              type="button"
-              className={collapseButtonStyles.collapseButton}
-              style={{ background: "var(--surface)" }}
-              onClick={() => setIsViewerExpanded((current) => !current)}
-              aria-expanded={isViewerExpanded}
-            >
-              {isViewerExpanded ? "Collapse" : "Expand"}
-            </button>
+            {!isMobile ? (
+              <button
+                type="button"
+                className={collapseButtonStyles.collapseButton}
+                style={{ background: "var(--surface)" }}
+                onClick={() => setIsViewerExpanded((current) => !current)}
+                aria-expanded={isViewerExpanded}
+              >
+                {isViewerExpanded ? "Collapse" : "Expand"}
+              </button>
+            ) : null}
           </div>
           <p>
             Select an estimate to view its change orders.
           </p>
         </div>
-        {isViewerExpanded ? (projectEstimates.length > 0 ? (
+        {(isMobile || isViewerExpanded) ? (projectEstimates.length > 0 ? (
           <div className={styles.viewerGrid}>
             <div className={styles.viewerRail}>
               <div className={styles.viewerRailHeader}>
@@ -1593,7 +1615,6 @@ export function ChangeOrdersConsole({
               </div>
               {projectEstimates.map((estimate) => {
                 const active = String(estimate.id) === selectedViewerEstimateId;
-                const baselineStatus = financialBaselineStatus(estimate);
                 const relatedCount = changeOrders.filter(
                   (changeOrder) => changeOrder.origin_estimate === estimate.id,
                 ).length;
@@ -1601,7 +1622,7 @@ export function ChangeOrdersConsole({
                   <div key={estimate.id} className={styles.viewerRailEntry}>
                     <button
                       type="button"
-                      className={`${styles.viewerRailItem} ${active ? styles.viewerRailItemActive : ""} ${baselineStatus === "active" ? styles.viewerRailItemActiveBaseline : ""}`}
+                      className={`${styles.viewerRailItem} ${active ? styles.viewerRailItemActive : ""}`}
                       onClick={() => {
                         const nextEstimateId = String(estimate.id);
                         setSelectedViewerEstimateId(nextEstimateId);
@@ -1628,17 +1649,6 @@ export function ChangeOrdersConsole({
                           Estimate #{estimate.id} · {relatedCount} COs
                         </span>
                       </span>
-                      {baselineStatus !== "none" ? (
-                        <span
-                          className={`${changeOrderCreatorStyles.viewerBaselineBadge} ${
-                            baselineStatus === "active"
-                              ? changeOrderCreatorStyles.viewerBaselineBadgeActive
-                              : changeOrderCreatorStyles.viewerBaselineBadgeSuperseded
-                          }`}
-                        >
-                          {formatFinancialBaselineStatus(baselineStatus)}
-                        </span>
-                      ) : null}
                       <span className={styles.viewerRailSubtext}>
                         {approvalMeta(estimate)}
                       </span>
@@ -1655,15 +1665,16 @@ export function ChangeOrdersConsole({
                           CO Delta ${approvedRollingDeltaForEstimate(estimate.id)}
                         </span>
                       </span>
+                      {selectedProjectId ? (
+                        <Link
+                          href={`/projects/${selectedProjectId}/estimates?estimate=${estimate.id}`}
+                          className={styles.viewerCardLinkBar}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          View Estimate →
+                        </Link>
+                      ) : null}
                     </button>
-                    {selectedProjectId ? (
-                      <Link
-                        href={`/projects/${selectedProjectId}/estimates?estimate=${estimate.id}`}
-                        className={styles.viewerCardLink}
-                      >
-                        Open Original Estimate ↗
-                      </Link>
-                    ) : null}
                   </div>
                 );
               })}
@@ -1688,25 +1699,12 @@ export function ChangeOrdersConsole({
                             onClick={() => hydrateEditForm(changeOrder)}
                             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); hydrateEditForm(changeOrder); } }}
                           >
-                            {changeOrder.public_ref ? (
-                              <div className={styles.viewerCardPublicBar}>
-                                <Link
-                                  href={publicChangeOrderHref(changeOrder.public_ref)}
-                                  className={styles.viewerCardPublicLink}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  aria-label={`Open customer view for ${coLabel(changeOrder)}`}
-                                  title="Open customer view"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  Customer View ↗
-                                </Link>
-                              </div>
-                            ) : null}
                             <span className={styles.viewerRailTitle}>
-                              {changeOrder.title || "Untitled"} · {coLabel(changeOrder)}
+                              <span className={styles.viewerRailTitleText}>
+                                {changeOrder.title || "Untitled"} · {coLabel(changeOrder)}
+                              </span>
+                              <span className={styles.viewerHistoryStatusText}>{statusLabel(changeOrder.status)}</span>
                             </span>
-                            <span className={styles.viewerHistoryStatusText}>{statusLabel(changeOrder.status)}</span>
                             <span
                               className={`${styles.viewerHistoryMetaText} ${styles.viewerHistoryLineDelta} ${
                                 ["approved", "accepted"].includes(changeOrder.status)
@@ -1724,6 +1722,19 @@ export function ChangeOrdersConsole({
                             ) : (
                               <span className={styles.viewerHistoryMetaText}>No status events yet.</span>
                             )}
+                            {changeOrder.public_ref ? (
+                              <Link
+                                href={publicChangeOrderHref(changeOrder.public_ref)}
+                                className={styles.viewerCardLinkBar}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`Open customer view for ${coLabel(changeOrder)}`}
+                                title="Open customer view"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                Customer View →
+                              </Link>
+                            ) : null}
                           </div>
                         );
                       })}
@@ -1892,11 +1903,11 @@ export function ChangeOrdersConsole({
                                       <tbody>
                                         {selectedViewerChangeOrder.line_items.map((line) => (
                                           <tr key={line.id}>
-                                            <td>{line.cost_code_code || "—"}</td>
-                                            <td>{line.description || "—"}</td>
-                                            <td>{line.adjustment_reason || "—"}</td>
-                                            <td>${line.amount_delta}</td>
-                                            <td>{line.days_delta}</td>
+                                            <td data-label="Cost code">{line.cost_code_code || "—"}</td>
+                                            <td data-label="Description">{line.description || "—"}</td>
+                                            <td data-label="Reason">{line.adjustment_reason || "—"}</td>
+                                            <td data-label="CO delta ($)">${line.amount_delta}</td>
+                                            <td data-label="Days delta">{line.days_delta}</td>
                                           </tr>
                                         ))}
                                       </tbody>
@@ -2020,7 +2031,7 @@ export function ChangeOrdersConsole({
                     <div className={`${creatorStyles.sheetTitleValue} ${creatorStyles.printOnly}`}>
                       {newTitle || "Untitled"}
                     </div>
-                    <div className={creatorStyles.blockMuted}>Project #{selectedProjectId || "—"}</div>
+                    <div className={`${creatorStyles.blockMuted} ${creatorStyles.printOnly}`}>Project #{selectedProjectId || "—"}</div>
                     {selectedViewerEstimate ? (
                       <div className={`${creatorStyles.blockMuted} ${creatorStyles.printOnly}`}>
                         Estimate: {selectedViewerEstimate.title || `#${selectedViewerEstimate.id}`} v{selectedViewerEstimate.version}
@@ -2056,99 +2067,185 @@ export function ChangeOrdersConsole({
 
                 <div className={changeOrderCreatorStyles.coLineSectionIntro}>
                   <h3>Line Items</h3>
-                  <p>
-                    Each line captures a cost and/or schedule adjustment with a cost code for categorization.
-                  </p>
                 </div>
 
-                <div className={creatorStyles.lineTable}>
-                  <div className={changeOrderCreatorStyles.coLineHeader}>
-                    <span>Cost code</span>
-                    <span>Description</span>
-                    <span>Adjustment reason</span>
-                    <span>CO delta ($)</span>
-                    <span>Schedule delta (days)</span>
-                    <span>Actions</span>
+                {isMobile ? (
+                  <div className={mobileCardStyles.cardList}>
+                    {newLineItems.map((line, index) => {
+                      const rowIssues = newLineValidation.issuesByLocalId.get(line.localId) ?? [];
+                      return (
+                        <MobileLineItemCard
+                          key={line.localId}
+                          index={index}
+                          isFirst={index === 0}
+                          isLast={index === newLineItems.length - 1}
+                          onRemove={() => removeLine(setNewLineItems, newLineItems, line.localId)}
+                          onMoveUp={() => moveLine(setNewLineItems, line.localId, "up")}
+                          onMoveDown={() => moveLine(setNewLineItems, line.localId, "down")}
+                          validationError={rowIssues.length ? `Row ${index + 1}: ${rowIssues.join(" ")}` : undefined}
+                          fields={[
+                            {
+                              label: "Cost Code",
+                              key: "costCode",
+                              span: "full",
+                              render: () => (
+                                <CostCodeCombobox
+                                  costCodes={costCodes}
+                                  value={line.costCodeId}
+                                  onChange={(nextValue) =>
+                                    updateLine(setNewLineItems, line.localId, { costCodeId: nextValue })
+                                  }
+                                  ariaLabel="Cost code"
+                                  placeholder="Search cost code"
+                                />
+                              ),
+                            },
+                            {
+                              label: "Description",
+                              key: "description",
+                              span: "full",
+                              render: () => (
+                                <input
+                                  className={mobileCardStyles.fieldInput}
+                                  value={line.description}
+                                  placeholder="Optional CO scope note"
+                                  onChange={(event) =>
+                                    updateLine(setNewLineItems, line.localId, { description: event.target.value })
+                                  }
+                                />
+                              ),
+                            },
+                            {
+                              label: "CO Delta ($)",
+                              key: "amountDelta",
+                              render: () => (
+                                <input
+                                  className={mobileCardStyles.fieldInput}
+                                  value={line.amountDelta}
+                                  placeholder="0.00 (USD)"
+                                  onChange={(event) =>
+                                    updateLine(setNewLineItems, line.localId, { amountDelta: event.target.value })
+                                  }
+                                  inputMode="decimal"
+                                />
+                              ),
+                            },
+                            {
+                              label: "Schedule (days)",
+                              key: "daysDelta",
+                              render: () => (
+                                <input
+                                  className={mobileCardStyles.fieldInput}
+                                  value={line.daysDelta}
+                                  placeholder="0 days"
+                                  onChange={(event) =>
+                                    updateLine(setNewLineItems, line.localId, { daysDelta: event.target.value })
+                                  }
+                                  inputMode="numeric"
+                                />
+                              ),
+                            },
+                          ]}
+                        />
+                      );
+                    })}
                   </div>
-                  {newLineItems.map((line, index) => {
-                    const rowIssues = newLineValidation.issuesByLocalId.get(line.localId) ?? [];
-                    return (
-                      <div key={line.localId} className={changeOrderCreatorStyles.coLineRowGroup}>
-                        <div
-                          className={`${changeOrderCreatorStyles.coLineRow} ${index % 2 === 1 ? changeOrderCreatorStyles.coLineRowAlt : ""} ${
-                            rowIssues.length ? changeOrderCreatorStyles.coLineRowInvalid : ""
-                          }`}
-                        >
-                          <div>
-                            <span className={creatorStyles.printOnly}>
-                              {costCodes.find((c) => String(c.id) === line.costCodeId)?.code || "—"}
-                            </span>
-                            <select
-                              className={`${creatorStyles.lineSelect} ${creatorStyles.screenOnly}`}
-                              value={line.costCodeId}
-                              onChange={(event) =>
-                                updateLine(setNewLineItems, line.localId, { costCodeId: event.target.value })
-                              }
-                            >
-                              <option value="">Select cost code</option>
-                              {costCodes.map((cc) => (
-                                <option key={cc.id} value={cc.id}>
-                                  {cc.code} - {cc.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <input
-                            className={creatorStyles.lineInput}
-                            value={line.description}
-                            placeholder="Optional CO scope note"
-                            onChange={(event) =>
-                              updateLine(setNewLineItems, line.localId, { description: event.target.value })
-                            }
-                          />
-                          <input
-                            className={creatorStyles.lineInput}
-                            value={line.adjustmentReason}
-                            placeholder="Optional reason"
-                            onChange={(event) =>
-                              updateLine(setNewLineItems, line.localId, { adjustmentReason: event.target.value })
-                            }
-                          />
-                          <input
-                            className={creatorStyles.lineInput}
-                            value={line.amountDelta}
-                            placeholder="0.00 (USD)"
-                            onChange={(event) =>
-                              updateLine(setNewLineItems, line.localId, { amountDelta: event.target.value })
-                            }
-                            inputMode="decimal"
-                          />
-                          <input
-                            className={creatorStyles.lineInput}
-                            value={line.daysDelta}
-                            placeholder="0 days"
-                            onChange={(event) =>
-                              updateLine(setNewLineItems, line.localId, { daysDelta: event.target.value })
-                            }
-                            inputMode="numeric"
-                          />
-                          <button
-                            type="button"
-                            className={creatorStyles.smallButton}
-                            onClick={() => removeLine(setNewLineItems, newLineItems, line.localId)}
+                ) : (
+                  <div className={creatorStyles.lineTable}>
+                    <div className={changeOrderCreatorStyles.coLineHeader}>
+                      <span>Cost code</span>
+                      <span>Description</span>
+                      <span>CO delta ($)</span>
+                      <span>Schedule delta (days)</span>
+                      <span>Actions</span>
+                    </div>
+                    {newLineItems.map((line, index) => {
+                      const rowIssues = newLineValidation.issuesByLocalId.get(line.localId) ?? [];
+                      return (
+                        <div key={line.localId} className={changeOrderCreatorStyles.coLineRowGroup}>
+                          <div
+                            className={`${changeOrderCreatorStyles.coLineRow} ${index % 2 === 1 ? changeOrderCreatorStyles.coLineRowAlt : ""} ${
+                              rowIssues.length ? changeOrderCreatorStyles.coLineRowInvalid : ""
+                            }`}
                           >
-                            Remove
-                          </button>
+                            <div>
+                              <span className={creatorStyles.printOnly}>
+                                {costCodes.find((c) => String(c.id) === line.costCodeId)?.code || "—"}
+                              </span>
+                              <span className={creatorStyles.screenOnly}>
+                                <CostCodeCombobox
+                                  costCodes={costCodes}
+                                  value={line.costCodeId}
+                                  onChange={(nextValue) =>
+                                    updateLine(setNewLineItems, line.localId, { costCodeId: nextValue })
+                                  }
+                                  ariaLabel="Cost code"
+                                  placeholder="Search cost code"
+                                />
+                              </span>
+                            </div>
+                            <input
+                              className={creatorStyles.lineInput}
+                              value={line.description}
+                              placeholder="Optional CO scope note"
+                              onChange={(event) =>
+                                updateLine(setNewLineItems, line.localId, { description: event.target.value })
+                              }
+                            />
+                            <input
+                              className={creatorStyles.lineInput}
+                              value={line.amountDelta}
+                              placeholder="0.00 (USD)"
+                              onChange={(event) =>
+                                updateLine(setNewLineItems, line.localId, { amountDelta: event.target.value })
+                              }
+                              inputMode="decimal"
+                            />
+                            <input
+                              className={creatorStyles.lineInput}
+                              value={line.daysDelta}
+                              placeholder="0 days"
+                              onChange={(event) =>
+                                updateLine(setNewLineItems, line.localId, { daysDelta: event.target.value })
+                              }
+                              inputMode="numeric"
+                            />
+                            <div className={changeOrderCreatorStyles.coLineRowActions}>
+                              <button
+                                type="button"
+                                className={`${creatorStyles.smallButton} ${index === 0 ? creatorStyles.actionDisabled : ""}`}
+                                onClick={() => moveLine(setNewLineItems, line.localId, "up")}
+                                disabled={index === 0}
+                              >
+                                Up
+                              </button>
+                              <button
+                                type="button"
+                                className={`${creatorStyles.smallButton} ${index === newLineItems.length - 1 ? creatorStyles.actionDisabled : ""}`}
+                                onClick={() => moveLine(setNewLineItems, line.localId, "down")}
+                                disabled={index === newLineItems.length - 1}
+                              >
+                                Down
+                              </button>
+                              <button
+                                type="button"
+                                className={creatorStyles.smallButton}
+                                onClick={() => removeLine(setNewLineItems, newLineItems, line.localId)}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                          {rowIssues.length ? (
+                            <p className={changeOrderCreatorStyles.coLineIssue}>
+                              Row {index + 1}: {rowIssues.join(" ")}
+                            </p>
+                          ) : null}
                         </div>
-                        {rowIssues.length ? (
-                          <p className={changeOrderCreatorStyles.coLineIssue}>
-                            Row {index + 1}: {rowIssues.join(" ")}
-                          </p>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
                 <div className={changeOrderCreatorStyles.coLineActions}>
                   <button
                     type="button"
@@ -2190,11 +2287,6 @@ export function ChangeOrdersConsole({
                         <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint}`}>
                           Select an approved origin estimate from the history selector before creating a change
                           order.
-                        </p>
-                      ) : null}
-                      {selectedViewerEstimateId && newLineValidation.issues.length ? (
-                        <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint} ${changeOrderCreatorStyles.coFooterErrorHint}`}>
-                          Line-level issues are highlighted inline. Fix them before creating this draft.
                         </p>
                       ) : null}
                       {actionMessage && actionTone === "error" ? (
@@ -2312,106 +2404,196 @@ export function ChangeOrdersConsole({
 
                 <div className={changeOrderCreatorStyles.coLineSectionIntro}>
                   <h3>Line Items</h3>
-                  <p>
-                    Each line captures a cost and/or schedule adjustment with a cost code for categorization.
-                  </p>
                 </div>
 
-                <div className={creatorStyles.lineTable}>
-                  <div className={changeOrderCreatorStyles.coLineHeader}>
-                    <span>Cost code</span>
-                    <span>Description</span>
-                    <span>Adjustment reason</span>
-                    <span>CO delta ($)</span>
-                    <span>Schedule delta (days)</span>
-                    <span>{isSelectedChangeOrderEditable ? "Actions" : ""}</span>
+                {isMobile ? (
+                  <div className={mobileCardStyles.cardList}>
+                    {editLineItems.map((line, index) => {
+                      const rowIssues = editLineValidation.issuesByLocalId.get(line.localId) ?? [];
+                      return (
+                        <MobileLineItemCard
+                          key={line.localId}
+                          index={index}
+                          readOnly={!isSelectedChangeOrderEditable}
+                          isFirst={index === 0}
+                          isLast={index === editLineItems.length - 1}
+                          onRemove={isSelectedChangeOrderEditable ? () => removeLine(setEditLineItems, editLineItems, line.localId) : undefined}
+                          onMoveUp={isSelectedChangeOrderEditable ? () => moveLine(setEditLineItems, line.localId, "up") : undefined}
+                          onMoveDown={isSelectedChangeOrderEditable ? () => moveLine(setEditLineItems, line.localId, "down") : undefined}
+                          validationError={rowIssues.length ? `Row ${index + 1}: ${rowIssues.join(" ")}` : undefined}
+                          fields={[
+                            {
+                              label: "Cost Code",
+                              key: "costCode",
+                              span: "full",
+                              render: () => (
+                                <CostCodeCombobox
+                                  costCodes={costCodes}
+                                  value={line.costCodeId}
+                                  onChange={(nextValue) =>
+                                    updateLine(setEditLineItems, line.localId, { costCodeId: nextValue })
+                                  }
+                                  ariaLabel="Cost code"
+                                  disabled={!isSelectedChangeOrderEditable}
+                                  placeholder="Search cost code"
+                                />
+                              ),
+                            },
+                            {
+                              label: "Description",
+                              key: "description",
+                              span: "full",
+                              render: () => (
+                                <input
+                                  className={mobileCardStyles.fieldInput}
+                                  value={line.description}
+                                  placeholder="Optional CO scope note"
+                                  onChange={(event) =>
+                                    updateLine(setEditLineItems, line.localId, { description: event.target.value })
+                                  }
+                                  disabled={!isSelectedChangeOrderEditable}
+                                />
+                              ),
+                            },
+                            {
+                              label: "CO Delta ($)",
+                              key: "amountDelta",
+                              render: () => (
+                                <input
+                                  className={mobileCardStyles.fieldInput}
+                                  value={line.amountDelta}
+                                  placeholder="0.00 (USD)"
+                                  onChange={(event) =>
+                                    updateLine(setEditLineItems, line.localId, { amountDelta: event.target.value })
+                                  }
+                                  inputMode="decimal"
+                                  disabled={!isSelectedChangeOrderEditable}
+                                />
+                              ),
+                            },
+                            {
+                              label: "Schedule (days)",
+                              key: "daysDelta",
+                              render: () => (
+                                <input
+                                  className={mobileCardStyles.fieldInput}
+                                  value={line.daysDelta}
+                                  placeholder="0 days"
+                                  onChange={(event) =>
+                                    updateLine(setEditLineItems, line.localId, { daysDelta: event.target.value })
+                                  }
+                                  inputMode="numeric"
+                                  disabled={!isSelectedChangeOrderEditable}
+                                />
+                              ),
+                            },
+                          ]}
+                        />
+                      );
+                    })}
                   </div>
-                  {editLineItems.map((line, index) => {
-                    const rowIssues = editLineValidation.issuesByLocalId.get(line.localId) ?? [];
-                    return (
-                      <div key={line.localId} className={changeOrderCreatorStyles.coLineRowGroup}>
-                        <div
-                          className={`${changeOrderCreatorStyles.coLineRow} ${index % 2 === 1 ? changeOrderCreatorStyles.coLineRowAlt : ""} ${
-                            rowIssues.length ? changeOrderCreatorStyles.coLineRowInvalid : ""
-                          }`}
-                        >
-                          <div>
-                            <span className={creatorStyles.printOnly}>
-                              {costCodes.find((c) => String(c.id) === line.costCodeId)?.code || "—"}
-                            </span>
-                            <select
-                              className={`${creatorStyles.lineSelect} ${changeOrderCreatorStyles.lockableControl} ${creatorStyles.screenOnly}`}
-                              value={line.costCodeId}
+                ) : (
+                  <div className={creatorStyles.lineTable}>
+                    <div className={changeOrderCreatorStyles.coLineHeader}>
+                      <span>Cost code</span>
+                      <span>Description</span>
+                      <span>CO delta ($)</span>
+                      <span>Schedule delta (days)</span>
+                      <span>{isSelectedChangeOrderEditable ? "Actions" : ""}</span>
+                    </div>
+                    {editLineItems.map((line, index) => {
+                      const rowIssues = editLineValidation.issuesByLocalId.get(line.localId) ?? [];
+                      return (
+                        <div key={line.localId} className={changeOrderCreatorStyles.coLineRowGroup}>
+                          <div
+                            className={`${changeOrderCreatorStyles.coLineRow} ${index % 2 === 1 ? changeOrderCreatorStyles.coLineRowAlt : ""} ${
+                              rowIssues.length ? changeOrderCreatorStyles.coLineRowInvalid : ""
+                            }`}
+                          >
+                            <div>
+                              <span className={creatorStyles.printOnly}>
+                                {costCodes.find((c) => String(c.id) === line.costCodeId)?.code || "—"}
+                              </span>
+                              <span className={creatorStyles.screenOnly}>
+                                <CostCodeCombobox
+                                  costCodes={costCodes}
+                                  value={line.costCodeId}
+                                  onChange={(nextValue) =>
+                                    updateLine(setEditLineItems, line.localId, { costCodeId: nextValue })
+                                  }
+                                  ariaLabel="Cost code"
+                                  disabled={!isSelectedChangeOrderEditable}
+                                  placeholder="Search cost code"
+                                />
+                              </span>
+                            </div>
+                            <input
+                              className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
+                              value={line.description}
+                              placeholder="Optional CO scope note"
                               onChange={(event) =>
-                                updateLine(setEditLineItems, line.localId, { costCodeId: event.target.value })
+                                updateLine(setEditLineItems, line.localId, { description: event.target.value })
                               }
                               disabled={!isSelectedChangeOrderEditable}
-                            >
-                              <option value="">Select cost code</option>
-                              {costCodes.map((cc) => (
-                                <option key={cc.id} value={cc.id}>
-                                  {cc.code} - {cc.name}
-                                </option>
-                              ))}
-                            </select>
+                            />
+                            <input
+                              className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
+                              value={line.amountDelta}
+                              placeholder="0.00 (USD)"
+                              onChange={(event) =>
+                                updateLine(setEditLineItems, line.localId, { amountDelta: event.target.value })
+                              }
+                              inputMode="decimal"
+                              disabled={!isSelectedChangeOrderEditable}
+                            />
+                            <input
+                              className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
+                              value={line.daysDelta}
+                              placeholder="0 days"
+                              onChange={(event) =>
+                                updateLine(setEditLineItems, line.localId, { daysDelta: event.target.value })
+                              }
+                              inputMode="numeric"
+                              disabled={!isSelectedChangeOrderEditable}
+                            />
+                            {isSelectedChangeOrderEditable ? (
+                              <div className={changeOrderCreatorStyles.coLineRowActions}>
+                                <button
+                                  type="button"
+                                  className={`${creatorStyles.smallButton} ${index === 0 ? creatorStyles.actionDisabled : ""}`}
+                                  onClick={() => moveLine(setEditLineItems, line.localId, "up")}
+                                  disabled={index === 0}
+                                >
+                                  Up
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`${creatorStyles.smallButton} ${index === editLineItems.length - 1 ? creatorStyles.actionDisabled : ""}`}
+                                  onClick={() => moveLine(setEditLineItems, line.localId, "down")}
+                                  disabled={index === editLineItems.length - 1}
+                                >
+                                  Down
+                                </button>
+                                <button
+                                  type="button"
+                                  className={creatorStyles.smallButton}
+                                  onClick={() => removeLine(setEditLineItems, editLineItems, line.localId)}
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            ) : null}
                           </div>
-                          <input
-                            className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
-                            value={line.description}
-                            placeholder="Optional CO scope note"
-                            onChange={(event) =>
-                              updateLine(setEditLineItems, line.localId, { description: event.target.value })
-                            }
-                            disabled={!isSelectedChangeOrderEditable}
-                          />
-                          <input
-                            className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
-                            value={line.adjustmentReason}
-                            placeholder="Optional reason"
-                            onChange={(event) =>
-                              updateLine(setEditLineItems, line.localId, { adjustmentReason: event.target.value })
-                            }
-                            disabled={!isSelectedChangeOrderEditable}
-                          />
-                          <input
-                            className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
-                            value={line.amountDelta}
-                            placeholder="0.00 (USD)"
-                            onChange={(event) =>
-                              updateLine(setEditLineItems, line.localId, { amountDelta: event.target.value })
-                            }
-                            inputMode="decimal"
-                            disabled={!isSelectedChangeOrderEditable}
-                          />
-                          <input
-                            className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
-                            value={line.daysDelta}
-                            placeholder="0 days"
-                            onChange={(event) =>
-                              updateLine(setEditLineItems, line.localId, { daysDelta: event.target.value })
-                            }
-                            inputMode="numeric"
-                            disabled={!isSelectedChangeOrderEditable}
-                          />
-                          {isSelectedChangeOrderEditable ? (
-                            <button
-                              type="button"
-                              className={creatorStyles.smallButton}
-                              onClick={() => removeLine(setEditLineItems, editLineItems, line.localId)}
-                            >
-                              Remove
-                            </button>
+                          {rowIssues.length ? (
+                            <p className={changeOrderCreatorStyles.coLineIssue}>
+                              Row {index + 1}: {rowIssues.join(" ")}
+                            </p>
                           ) : null}
                         </div>
-                        {rowIssues.length ? (
-                          <p className={changeOrderCreatorStyles.coLineIssue}>
-                            Row {index + 1}: {rowIssues.join(" ")}
-                          </p>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
                 {isSelectedChangeOrderEditable ? (
                   <div className={changeOrderCreatorStyles.coLineActions}>
                     <button
@@ -2451,11 +2633,6 @@ export function ChangeOrdersConsole({
                       </div>
                     </div>
                     <div className={changeOrderCreatorStyles.coSheetFooterActions}>
-                      {isSelectedChangeOrderEditable && editLineValidation.issues.length ? (
-                        <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint} ${changeOrderCreatorStyles.coFooterErrorHint}`}>
-                          Line-level issues are highlighted inline. Fix them before saving this revision.
-                        </p>
-                      ) : null}
                       {selectedChangeOrder && !selectedChangeOrder.is_latest_revision ? (
                         <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint} ${changeOrderCreatorStyles.coFooterErrorHint}`}>
                           This revision is historical and read-only. Save/update actions are available on the latest revision only.

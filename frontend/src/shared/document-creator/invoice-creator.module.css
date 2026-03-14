@@ -37,7 +37,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-md);
-  background: var(--surface-secondary);
+  background: var(--surface);
   display: grid;
   gap: 10px;
 }

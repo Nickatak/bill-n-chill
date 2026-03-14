@@ -290,11 +290,11 @@ def project_accounting_export_view(request, project_id: int):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def project_contract_breakdown_view(request, project_id: int):
-    """Return the active financial baseline estimate and approved change orders for a project.
+    """Return the most recently approved estimate and approved change orders for a project.
 
-    Returns the most recently approved estimate (the active financial baseline) with its
-    line items, plus all approved/accepted change orders linked to that estimate with their
-    line items. Single response, no additional fetches required.
+    Returns the most recently approved estimate with its line items, plus all
+    approved/accepted change orders linked to that estimate with their line items.
+    Single response, no additional fetches required.
     """
     membership = _ensure_membership(request.user)
     try:
@@ -305,7 +305,7 @@ def project_contract_breakdown_view(request, project_id: int):
             status=404,
         )
 
-    # Find the most recently approved estimate (active financial baseline).
+    # Find the most recently approved estimate.
     active_estimate = (
         Estimate.objects.filter(project=project, status=Estimate.Status.APPROVED)
         .prefetch_related("line_items", "line_items__cost_code")
@@ -328,7 +328,7 @@ def project_contract_breakdown_view(request, project_id: int):
 
     approved_cos = (
         ChangeOrder.objects.filter(
-            origin_estimate_id=active_estimate.id,
+            project=project,
             status__in=["approved", "accepted"],
         )
         .prefetch_related("line_items", "line_items__cost_code")

@@ -11,16 +11,13 @@
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-lg);
   padding: var(--space-md);
-  background: var(--surface);
+  background: var(--surface-secondary);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   min-width: 0;
 }
 
-.card:nth-child(even) {
-  background: var(--table-row-alt);
-}
 
 .cardInvalid {
   border-left: 3px solid var(--tone-error-border);

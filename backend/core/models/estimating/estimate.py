@@ -17,7 +17,7 @@ class Estimate(StatusTransitionMixin, models.Model):
     Business workflow:
     - Pre-baseline commercial entity discussed with the customer.
     - Revised by version/status lifecycle until customer approval.
-    - Approved estimate becomes the active financial baseline for the project.
+    - First approved estimate seeds project contract values (original + current).
 
     Current policy:
     - Plain English: this is the proposal the customer reviews/approves.

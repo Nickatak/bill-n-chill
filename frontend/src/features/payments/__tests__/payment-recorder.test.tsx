@@ -367,7 +367,7 @@ describe("PaymentRecorder", () => {
     renderRecorder();
 
     await waitFor(() => {
-      expect(screen.getByText(/Optionally allocate this payment/)).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "None" })).toBeInTheDocument();
     });
   });
 

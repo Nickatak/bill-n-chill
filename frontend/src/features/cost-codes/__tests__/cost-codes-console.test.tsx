@@ -258,7 +258,6 @@ describe("CostCodesConsole", () => {
     // Click to expand
     fireEvent.click(screen.getByRole("button", { expanded: false }));
 
-    expect(screen.getByText(/Headers: code,name/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Preview" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Apply" })).toBeInTheDocument();
   });

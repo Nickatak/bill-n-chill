@@ -21,7 +21,6 @@ import { CustomersFilters } from "./customers-filters";
 import { CustomersList } from "./customers-list";
 import { CustomerProjectCreateForm } from "./customer-project-create-form";
 import { QuickAddConsole } from "./quick-add-console";
-import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
 import styles from "./customers-console.module.css";
 
 type ActivityFilter = "all" | "active";
@@ -47,8 +46,7 @@ export function CustomersConsole() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [isQuickAddExpanded, setIsQuickAddExpanded] = useState(true);
-  const [query, setQuery] = useState("");
+const [query, setQuery] = useState("");
   const [rows, setRows] = useState<CustomerRow[]>([]);
   const [projectsByCustomer, setProjectsByCustomer] = useState<Record<number, ProjectRecord[]>>({});
   const [editingId, setEditingId] = useState("");
@@ -346,29 +344,19 @@ export function CustomersConsole() {
 
   return (
     <section className={styles.section}>
-      {/* Quick Add — collapsible intake form */}
+      {/* Quick Add intake form */}
       <div className={styles.quickAddSection}>
         <div className={styles.quickAddHeader}>
           <h3 className={styles.quickAddTitle}>Quick Add Customer</h3>
-          <button
-            type="button"
-            className={collapseButtonStyles.collapseButton}
-            onClick={() => setIsQuickAddExpanded((v) => !v)}
-            aria-expanded={isQuickAddExpanded}
-          >
-            {isQuickAddExpanded ? "Collapse" : "Expand"}
-          </button>
         </div>
-        {isQuickAddExpanded ? (
-          <QuickAddConsole
-            onCustomerCreated={() => setRefreshKey((k) => k + 1)}
-            onBrowseCustomer={(searchTerm) => {
-              setQuery(searchTerm);
-              setPage(1);
-              setActivityFilter("all");
-            }}
-          />
-        ) : null}
+        <QuickAddConsole
+          onCustomerCreated={() => setRefreshKey((k) => k + 1)}
+          onBrowseCustomer={(searchTerm) => {
+            setQuery(searchTerm);
+            setPage(1);
+            setActivityFilter("all");
+          }}
+        />
       </div>
 
       {/* Browse — search, filters, customer list, pagination */}

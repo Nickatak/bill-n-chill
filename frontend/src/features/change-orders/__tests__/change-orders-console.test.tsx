@@ -103,8 +103,6 @@ function makeEstimate(overrides: Record<string, unknown> = {}) {
     title: "Foundation Work",
     version: 1,
     status: "approved",
-    financial_baseline_status: "active",
-    is_active_financial_baseline: true,
     ...overrides,
   };
 }

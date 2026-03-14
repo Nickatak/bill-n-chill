@@ -22,10 +22,10 @@
 }
 
 .inputDisabled {
-  background: var(--input-readonly-bg);
-  color: var(--input-readonly-text);
-  border-color: var(--input-border);
-  cursor: default;
+  background: var(--input-disabled-bg);
+  color: var(--input-disabled-text);
+  border-color: var(--input-disabled-border);
+  cursor: not-allowed;
 }
 
 .menu {

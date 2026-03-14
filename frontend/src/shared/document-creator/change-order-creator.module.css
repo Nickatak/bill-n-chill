@@ -56,31 +56,6 @@
   grid-column: 1 / -1;
 }
 
-.viewerBaselineBadge {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  border-radius: var(--radius-pill);
-  border: 1px solid transparent;
-  padding: 2px var(--space-sm);
-  font-size: 0.64rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-weight: 700;
-}
-
-.viewerBaselineBadgeActive {
-  background: var(--status-green-bg);
-  border-color: var(--status-green-border);
-  color: var(--status-green-text);
-}
-
-.viewerBaselineBadgeSuperseded {
-  background: var(--status-gray-bg);
-  border-color: var(--status-gray-border);
-  color: var(--status-gray-text);
-}
-
 .coLineSectionIntro {
   display: grid;
   gap: 6px;
@@ -106,7 +81,7 @@
 
 .coLineHeader {
   display: grid;
-  grid-template-columns: 0.85fr 1.2fr 1.2fr 1.45fr 1fr 0.9fr 0.9fr 0.7fr;
+  grid-template-columns: 1.2fr 1.5fr 0.8fr 0.8fr 0.7fr;
   gap: var(--space-sm);
   align-items: stretch;
   padding: 10px;
@@ -120,11 +95,17 @@
 
 .coLineRow {
   display: grid;
-  grid-template-columns: 0.85fr 1.2fr 1.2fr 1.45fr 1fr 0.9fr 0.9fr 0.7fr;
+  grid-template-columns: 1.2fr 1.5fr 0.8fr 0.8fr 0.7fr;
   gap: var(--space-sm);
   align-items: stretch;
   padding: 9px 10px;
   background: var(--surface);
+}
+
+.coLineRowActions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
 }
 
 .coLineHeader > span,
@@ -313,7 +294,7 @@
   }
 
   .coLineHeader {
-    grid-template-columns: 0.7fr 1fr 1.2fr 0.9fr 0.7fr 0.6fr;
+    grid-template-columns: 1fr 1.5fr 0.8fr 0.8fr;
     min-width: 0;
     background: #f3f4f6;
     color: #000000;
@@ -325,7 +306,7 @@
   }
 
   .coLineRow {
-    grid-template-columns: 0.7fr 1fr 1.2fr 0.9fr 0.7fr 0.6fr;
+    grid-template-columns: 1fr 1.5fr 0.8fr 0.8fr;
     min-width: 0;
     break-inside: avoid;
     color: #000000;
@@ -334,11 +315,9 @@
     padding: 6px 8px;
   }
 
-  /* Hide adjustment reason (2nd) and actions (8th) columns */
-  .coLineHeader > span:nth-child(2),
-  .coLineRow > *:nth-child(2),
-  .coLineHeader > span:nth-child(8),
-  .coLineRow > *:nth-child(8) {
+  /* Hide actions column in print */
+  .coLineHeader > span:nth-child(5),
+  .coLineRow > *:nth-child(5) {
     display: none;
   }
 

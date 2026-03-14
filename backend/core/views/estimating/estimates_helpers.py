@@ -74,7 +74,7 @@ def _serialize_estimate(*, estimate):
 
 
 def _serialize_estimates(*, estimates, project):
-    """Serialize multiple estimates sharing the same project."""
+    """Serialize multiple estimates."""
     return EstimateSerializer(estimates, many=True).data
 
 

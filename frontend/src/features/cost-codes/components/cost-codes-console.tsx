@@ -256,9 +256,6 @@ export function CostCodesConsole() {
       <div className={styles.headerRow}>
         <div className={styles.headerCopy}>
           <h2 className={styles.headerTitle}>Cost Codes</h2>
-          <p className={styles.headerSubtitle}>
-            Manage coding standards for estimates, budgets, and downstream reporting.
-          </p>
         </div>
         <div className={styles.headerStats}>
           <span className={styles.headerStatPill}>Total {rows.length}</span>
@@ -431,9 +428,6 @@ export function CostCodesConsole() {
               </button>
               {importExpanded ? (
                 <>
-                  <p className={styles.importHint}>
-                    Headers: code,name. Existing codes update names; new codes are created as active.
-                  </p>
                   <label className={styles.field}>
                     CSV text
                     <textarea

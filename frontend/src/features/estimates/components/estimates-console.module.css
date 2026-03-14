@@ -1100,75 +1100,6 @@
   background: var(--surface-secondary);
 }
 
-.versionBaselineBanner {
-  border: 1px solid var(--status-green-border);
-  border-radius: 10px;
-  background: var(--tone-success-bg);
-  padding: 9px 11px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.versionBaselineCopy {
-  display: grid;
-  gap: 2px;
-}
-
-.versionBaselineLabel {
-  font-size: 0.66rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--status-green-text);
-  font-weight: 700;
-}
-
-.versionBaselineValue {
-  font-size: var(--font-sm);
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.versionBaselineActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.versionBaselineSelected {
-  font-size: 0.74rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--status-green-text);
-}
-
-.versionBaselineJumpButton {
-  border: 1px solid var(--status-green-border);
-  border-radius: var(--radius-md);
-  background: var(--tone-success-bg);
-  color: var(--status-green-text);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 5px 9px;
-  cursor: pointer;
-}
-
-.versionBaselineJumpButton:hover,
-.versionBaselineJumpButton:focus-visible {
-  background: var(--tone-success-bg);
-  border-color: var(--status-green-text);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--status-green-border) 25%, transparent);
-  outline: none;
-}
-
-.versionBaselineEmpty {
-  margin: 0;
-}
 
 .versionFilters {
   display: grid;
@@ -1249,12 +1180,9 @@
 
 .familyMain {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
+  flex-direction: column;
+  gap: 4px;
   min-width: 240px;
-  min-height: 86px;
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px 14px;
@@ -1263,27 +1191,19 @@
   cursor: pointer;
 }
 
-.familyPublicBar {
+.familyLinkBar {
   position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
-  width: 100%;
-  padding-bottom: 8px;
-  margin-bottom: -10px;
+  width: calc(100% + 28px);
+  margin-left: -14px;
+  padding: 8px 14px 0;
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
 }
 
-.familyPublicBar::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: -14px;
-  right: -14px;
-  height: 1px;
-  background: var(--border);
-}
-
-.familyPublicBarEnd {
+.familyLinkBarEnd {
   margin-left: auto;
 }
 
@@ -1306,10 +1226,7 @@
 .familyMainContent {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  align-self: stretch;
-  min-height: 100%;
-  gap: 6px;
+  gap: 4px;
 }
 
 .familyMainActive {
@@ -1319,10 +1236,17 @@
   background: var(--accent-lighter);
 }
 
+.familyTitleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
 .familyTitle {
+  flex: 1;
+  min-width: 0;
   font-weight: 600;
   color: var(--text-primary);
-  display: block;
 }
 
 .familyMeta {
@@ -1539,14 +1463,6 @@
   color: var(--text-secondary);
 }
 
-.versionRight {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: space-between;
-  align-self: stretch;
-  gap: 8px;
-}
 
 .versionStatus {
   font-size: 0.7rem;
@@ -1557,34 +1473,6 @@
   font-weight: 600;
 }
 
-.financialBaselineBadge {
-  font-size: 0.62rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  padding: 3px 7px;
-  border-radius: var(--radius-pill);
-  font-weight: 700;
-}
-
-.financialBaselineActive {
-  background: var(--status-green-bg);
-  color: var(--status-green-text);
-}
-
-.financialBaselineSuperseded {
-  background: var(--status-gray-bg);
-  color: var(--status-gray-text);
-}
-
-.financialBaselineNone {
-  background: transparent;
-  color: inherit;
-}
-
-.historyFinancialBaselineBadge {
-  margin-top: 4px;
-  align-self: flex-start;
-}
 
 .statusDraft {
   composes: draft from '../../../shared/styles/status.module.css';
@@ -1618,47 +1506,6 @@
   color: var(--text-secondary);
 }
 
-.financialActivationPanel {
-  border: 1px solid var(--status-green-border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  background: var(--tone-success-bg);
-  color: var(--text-primary);
-  display: grid;
-  gap: 8px;
-}
-
-.financialActivationHint {
-  margin: 0;
-  font-size: var(--font-base);
-  color: var(--text-primary);
-}
-
-.financialActivationLabel {
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--status-green-text);
-  font-weight: 700;
-}
-
-.financialActivationButton {
-  justify-self: start;
-  border: 1px solid var(--status-green-solid);
-  border-radius: var(--radius-md);
-  background: var(--status-green-solid);
-  color: var(--status-green-solid-text);
-  font-size: 0.78rem;
-  letter-spacing: 0.04em;
-  font-weight: 700;
-  padding: 7px 10px;
-  cursor: pointer;
-}
-
-.financialActivationButton:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-}
 
 .versionAmount {
   font-size: 0.85rem;
@@ -1778,46 +1625,20 @@
   }
 
   .familyMain {
-    /* Wrap layout: badges + links share the first row, content takes full width below */
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    align-items: center;
     min-width: 0;
-    min-height: 0;
-    gap: 6px 8px;
+    gap: 4px;
     padding: 6px 10px 10px;
   }
 
-  /* Badges sit inline, pushed right */
-  .versionRight {
-    flex-direction: row;
-    align-items: center;
-    justify-content: flex-start;
-    order: -1;
-    gap: 6px;
-    margin-left: auto;
-  }
-
   /* Public links sit inline next to badges */
-  .familyPublicBar {
-    order: -1;
-    width: auto;
-    padding-bottom: 0;
-    margin-bottom: 0;
+  .familyLinkBar {
+    width: calc(100% + 20px);
+    margin-left: -10px;
+    padding: 8px 10px 0;
   }
 
-  .familyPublicBar::after {
-    display: none;
-  }
-
-  /* Content takes full width, forcing a new row, with top separator */
   .familyMainContent {
-    width: 100%;
     min-width: 0;
-    min-height: 0;
-    align-self: auto;
-    border-top: 1px solid var(--border);
-    padding-top: 8px;
   }
 
   .familyTitle {
@@ -1840,7 +1661,7 @@
     place-items: center;
   }
 
-  .familyPublicBar {
+  .familyLinkBar {
     gap: 8px;
   }
 
@@ -1876,23 +1697,6 @@
     place-items: center;
   }
 
-  /* ── Version baseline banner ── */
-  .versionBaselineBanner {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-
-  .versionBaselineJumpButton {
-    min-height: 44px;
-    width: 100%;
-    text-align: center;
-  }
-
-  .versionBaselineSelected {
-    font-size: 0.68rem;
-  }
-
   /* ── Status picker / lifecycle ── */
   .statusPills {
     gap: 6px;
@@ -1926,13 +1730,6 @@
     text-align: center;
     display: grid;
     place-items: center;
-  }
-
-  /* ── Financial activation panel ── */
-  .financialActivationButton {
-    min-height: 44px;
-    width: 100%;
-    text-align: center;
   }
 
   /* ── Workspace toolbar ── */

@@ -214,6 +214,7 @@
   gap: 6px;
   align-content: start;
   cursor: pointer;
+  overflow: hidden;
   transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
 }
 
@@ -229,15 +230,20 @@
   background: var(--accent-lighter);
 }
 
-.viewerRailItemActiveBaseline {
-  border-color: var(--status-green-border);
-  box-shadow: inset 3px 0 0 var(--status-green-solid);
-}
-
 .viewerRailTitle {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.25;
+  word-break: break-word;
+  min-width: 0;
+}
+
+.viewerRailTitleText {
+  flex: 1;
+  min-width: 0;
 }
 
 .viewerRailVersion {
@@ -251,31 +257,6 @@
   font-size: 0.8rem;
   color: var(--text-secondary);
   line-height: 1.35;
-}
-
-.viewerBaselineBadge {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  border-radius: var(--radius-pill);
-  border: 1px solid transparent;
-  padding: 2px 8px;
-  font-size: 0.64rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-weight: 700;
-}
-
-.viewerBaselineBadgeActive {
-  background: var(--status-green-bg);
-  border-color: var(--status-green-border);
-  color: var(--status-green-text);
-}
-
-.viewerBaselineBadgeSuperseded {
-  background: var(--surface-inset);
-  border-color: var(--border);
-  color: var(--text-secondary);
 }
 
 .viewerRailMetrics {
@@ -297,11 +278,13 @@
   color: var(--status-amber-text);
 }
 
-.viewerCardLink {
+.viewerCardLinkBar {
   display: inline-flex;
   align-items: center;
-  justify-self: end;
-  gap: 4px;
+  width: fit-content;
+  padding: 8px 0 0;
+  margin-top: 6px;
+  border-top: none;
   color: var(--accent-text);
   text-decoration: none;
   font-size: 0.66rem;
@@ -310,11 +293,10 @@
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
-  transition: color 0.15s ease;
 }
 
-.viewerCardLink:hover,
-.viewerCardLink:focus-visible {
+.viewerCardLinkBar:hover,
+.viewerCardLinkBar:focus-visible {
   color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -361,28 +343,6 @@
   color: var(--text-secondary);
 }
 
-.viewerBaselineHint {
-  margin: 0;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  padding: 7px 9px;
-  font-size: 0.8rem;
-  line-height: 1.35;
-  font-weight: 600;
-}
-
-.viewerBaselineHintActive {
-  background: var(--tone-success-bg);
-  border-color: var(--status-green-border);
-  color: var(--status-green-text);
-}
-
-.viewerBaselineHintWarning {
-  background: var(--tone-warning-bg);
-  border-color: var(--status-amber-border);
-  color: var(--status-amber-text);
-}
-
 .viewerHistoryRail {
   padding: var(--space-sm);
   border: 1px solid var(--border);
@@ -390,41 +350,6 @@
   background: var(--surface-secondary);
 }
 
-.viewerCardPublicBar {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  width: 100%;
-  padding-bottom: 8px;
-  margin-bottom: -2px;
-}
-
-.viewerCardPublicBar::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: -10px;
-  right: -10px;
-  height: 1px;
-  background: var(--border);
-}
-
-.viewerCardPublicLink {
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--accent-text);
-  text-decoration: none;
-  line-height: 1;
-}
-
-.viewerCardPublicLink:hover,
-.viewerCardPublicLink:focus-visible {
-  text-decoration: underline;
-  outline: none;
-}
 
 .viewerHistoryItem {
   border-color: var(--border);
@@ -458,6 +383,7 @@
 }
 
 .viewerHistoryStatusText {
+  margin-left: auto;
   font-size: var(--font-xs);
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -665,9 +591,14 @@
 .lineTableCaption {
   caption-side: top;
   text-align: left;
-  padding: var(--space-sm);
-  font-size: 0.8rem;
-  color: var(--text-secondary);
+  padding: var(--space-sm) var(--space-sm) var(--space-xs);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  background: var(--surface-secondary);
+  border-bottom: 2px solid var(--border);
 }
 
 .lineTable th {
@@ -878,7 +809,19 @@
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 700px) {
+  /* ── Containment: every grid/flex ancestor must allow shrinking ── */
+  .consoleTop,
+  .viewer,
+  .viewerGrid,
+  .viewerRail,
+  .viewerDetail,
+  .quickStatusPanel,
+  .viewerEventPanel {
+    min-width: 0;
+    overflow: hidden;
+  }
+
   .consoleTop {
     padding: var(--space-md);
   }
@@ -887,6 +830,7 @@
     font-size: 1rem;
   }
 
+  /* ── Form toolbar: stacked column ── */
   .formToolbar {
     flex-direction: column;
     align-items: stretch;
@@ -908,8 +852,14 @@
 
   .primaryCreateButton {
     width: 100%;
+    min-height: 44px;
   }
 
+  .cloneRevisionButton {
+    min-height: 44px;
+  }
+
+  /* ── Viewer ── */
   .viewer {
     padding: 11px;
   }
@@ -919,16 +869,117 @@
     flex-direction: column;
   }
 
+  .viewerGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .viewerRailItem {
+    min-height: 44px;
+  }
+
+  .viewerCardLinkBar {
+    min-height: 44px;
+    display: inline-grid;
+    place-items: center start;
+  }
+
   .viewerHistoryMetaText {
     font-size: 0.74rem;
     line-height: 1.35;
+    word-break: break-word;
   }
 
+  /* ── Status pills / actions: touch targets ── */
+  .quickStatusButton {
+    min-height: 44px;
+    padding: 6px 10px;
+  }
+
+  .viewerStatusActionButton {
+    min-height: 44px;
+    width: 100%;
+    text-align: center;
+  }
+
+  .viewerStatusActionRow {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  /* ── Line table in viewer: stacked cards ── */
+  .lineTable {
+    min-width: 0;
+  }
+
+  .lineTable thead {
+    display: none;
+  }
+
+  .lineTable tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    margin-bottom: 6px;
+  }
+
+  .lineTable tbody tr:nth-child(even) {
+    background: var(--surface-secondary);
+  }
+
+  .lineTable tbody td {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 4px 0;
+    border-top: 0;
+    font-size: 0.82rem;
+  }
+
+  .lineTable tbody td::before {
+    content: attr(data-label);
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+    opacity: 0.7;
+  }
+
+  .lineTableWrap {
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+  }
+
+  /* ── Event list ── */
   .viewerEventMeta,
   .viewerEventNote {
     font-size: var(--font-xs);
   }
+
+  /* ── Collapsible section buttons ── */
+  .viewerSectionToggle {
+    min-height: 44px;
+    background: var(--accent-light);
+    border-radius: var(--radius-md);
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  .showAllToggle {
+    min-height: 44px;
+  }
+
+  .budgetToggle {
+    min-height: 44px;
+  }
 }
+
+@media (max-width: 640px) {
 
 /* ── Print ────────────────────────────────────────────────────── */
 
@@ -941,8 +992,7 @@
   .viewerHint,
   .viewerRail,
   .viewerHistoryRail,
-  .viewerCardPublicBar,
-  .viewerCardLink,
+  .viewerCardLinkBar,
   .quickStatusPanel,
   .quickStatusPills,
   .viewerStatusActionRow,

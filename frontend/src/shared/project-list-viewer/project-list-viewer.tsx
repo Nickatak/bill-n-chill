@@ -1,5 +1,5 @@
 /**
- * Collapsible project list panel with search, status filters, and card grid.
+ * Project list panel with search, status filters, and card grid.
  *
  * Used as a sidebar/panel component on pages that need project selection
  * (e.g. projects, invoices, bills). The parent page owns all data-fetching
@@ -10,7 +10,6 @@
 "use client";
 
 import styles from "./project-list-viewer.module.css";
-import collapseButtonStyles from "./collapse-toggle-button.module.css";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -27,10 +26,7 @@ export type ProjectListEntry = {
 
 type ProjectListViewerProps = {
   title?: string;
-  isExpanded: boolean;
-  onToggleExpanded: () => void;
   expandedHint?: string;
-  collapsedHint?: string;
   showSearchAndFilters: boolean;
   contextHint?: string;
   searchValue: string;
@@ -53,18 +49,14 @@ type ProjectListViewerProps = {
 // ---------------------------------------------------------------------------
 
 /**
- * Render a collapsible project list with search, status filters, and card grid.
+ * Render a project list with search, status filters, and card grid.
  *
- * When collapsed, a hint message is shown instead of the full list. When
- * expanded, the panel displays a search input, status filter toggle buttons
+ * The panel displays a search input, status filter toggle buttons
  * with per-status counts, and a scrollable grid of project cards.
  */
 export function ProjectListViewer({
   title = "Project List",
-  isExpanded,
-  onToggleExpanded,
   expandedHint = "",
-  collapsedHint = "Project list collapsed. Expand to search, filter, or select a project.",
   showSearchAndFilters,
   contextHint = "",
   searchValue,
@@ -118,20 +110,8 @@ export function ProjectListViewer({
       <div className={styles.projectSelector}>
         <div className={styles.panelHeader}>
           <h3>{title}</h3>
-          <div className={styles.panelHeaderActions}>
-            <button
-              type="button"
-              className={collapseButtonStyles.collapseButton}
-              onClick={onToggleExpanded}
-              aria-expanded={isExpanded}
-            >
-              {isExpanded ? "Collapse" : "Expand"}
-            </button>
-          </div>
         </div>
 
-        {isExpanded ? (
-          <>
             {expandedHint ? <p className={styles.inlineHint}>{expandedHint}</p> : null}
             {showSearchAndFilters ? (
               <>
@@ -228,10 +208,6 @@ export function ProjectListViewer({
                 <span className={styles.projectEmptyMessage}>{emptyMessage}</span>
               )}
             </div>
-          </>
-        ) : (
-          <p className={styles.inlineHint}>{collapsedHint}</p>
-        )}
       </div>
     </section>
   );

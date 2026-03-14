@@ -1,0 +1,187 @@
+/* ── ReadOnlyLineTable ─────────────────────────────────────────
+ * Polished read-only line-items table used for reference data
+ * (contract breakdowns, approved estimate lines, approved CO lines).
+ * Works in both light and dark internal themes via standard tokens.
+ * ───────────────────────────────────────────────────────────── */
+
+.section {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.caption {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+
+.tableWrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 9px var(--space-md);
+  border-bottom: 1px solid var(--border);
+}
+
+.table th {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--table-header-text);
+  background: var(--table-header-bg);
+  white-space: nowrap;
+}
+
+.table td {
+  font-size: 0.84rem;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Hidden on desktop, shown inside mobile card layout */
+.mobileBreakdown {
+  display: none;
+}
+
+.emptyHint {
+  margin: 0;
+  padding: var(--space-md);
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+}
+
+/* ── Mobile card layout ──────────────────────────────────── */
+
+@media (max-width: 700px) {
+  .table {
+    min-width: 0;
+  }
+
+  .table thead {
+    display: none;
+  }
+
+  .table tbody {
+    counter-reset: line-item;
+  }
+
+  .table tbody tr {
+    counter-increment: line-item;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-secondary);
+  }
+
+  .table tbody tr::before {
+    content: "Item " counter(line-item);
+    grid-column: 1 / -1;
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    order: -1;
+  }
+
+  .table tbody td {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 3px 0;
+    border-bottom: 0;
+    font-size: 0.84rem;
+  }
+
+  .table tbody td::before {
+    content: attr(data-label);
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent-text);
+    opacity: 0.7;
+  }
+
+  .table tbody td[data-span="full"] {
+    grid-column: 1 / -1;
+  }
+
+  .table tbody td[data-hidden="true"] {
+    display: none;
+  }
+
+  .table tbody td[data-align="right"] {
+    text-align: right;
+    align-items: flex-end;
+    font-weight: 600;
+  }
+
+  /* Breakdown hint (e.g. "2.00 ea × $50.00") shown above the total on mobile */
+  .mobileBreakdown {
+    display: inline;
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    font-weight: 400;
+  }
+
+  .tableWrap {
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+  }
+}
+
+/* ── Print ─────────────────────────────────────────────── */
+
+@media print {
+  .tableWrap {
+    border-radius: 0;
+    border-color: #9ca3af;
+  }
+
+  .table {
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  .table th,
+  .table td {
+    white-space: normal;
+    word-break: break-word;
+    padding: var(--space-sm) 6px;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .table th {
+    background: #f3f4f6;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .caption {
+    color: #1e40af;
+    -webkit-text-fill-color: #1e40af;
+  }
+}

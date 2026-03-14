@@ -715,9 +715,6 @@ export function PaymentRecorder({
         {/* Inline allocation on create */}
         {workspaceMode === "create" && payableTargets.length > 0 ? (
           <>
-            <p className={styles.inlineHint}>
-              Optionally allocate this payment to a {targetLabel.toLowerCase()} on creation.
-            </p>
             <div className={styles.fieldGrid}>
               <div className={styles.field}>
                 <span className={styles.fieldLabel}>{targetLabel}</span>

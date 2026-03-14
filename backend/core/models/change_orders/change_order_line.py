@@ -7,7 +7,9 @@ class ChangeOrderLine(models.Model):
     """Line-level change-order delta.
 
     Each line captures a cost and/or schedule adjustment with a cost code
-    for categorization and an optional adjustment reason.
+    for categorization. The ``description`` field serves as the free-text
+    scope note; ``adjustment_reason`` is retained for API/data compatibility
+    but is no longer surfaced in the UI.
     """
 
     change_order = models.ForeignKey(

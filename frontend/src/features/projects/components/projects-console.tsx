@@ -45,7 +45,6 @@ export function ProjectsConsole() {
   const [projectStatusFilters, setProjectStatusFilters] = useState<ProjectStatusValue[]>(
     DEFAULT_PROJECT_STATUS_FILTERS,
   );
-  const [isProjectListExpanded, setIsProjectListExpanded] = useState(true);
   const [summary, setSummary] = useState<ProjectFinancialSummary | null>(null);
   const [estimateStatusCounts, setEstimateStatusCounts] = useState<{
     draft: number;
@@ -138,8 +137,6 @@ export function ProjectsConsole() {
   const paidDisplay = summary?.paid_to_date ?? "--";
   const inboundCreditDisplay = summary?.inbound_unapplied_credit ?? "--";
   const outboundCreditDisplay = summary?.outbound_unapplied_credit ?? "--";
-  const activeFinancialEstimateDisplay = "--";
-  const activeFinancialBudgetDisplay = "--";
   const unspentFromAcceptedDisplay = summary
     ? formatCurrency(
         parseMoneyValue(acceptedContractDisplay) - parseMoneyValue(apOutstandingDisplay),
@@ -381,11 +378,6 @@ export function ProjectsConsole() {
     setIsProjectEditOpen(false);
     hydrateForm(selected);
 
-    // On mobile, collapse the project list after selection so the overview is immediately visible.
-    if (window.innerWidth <= 700) {
-      setIsProjectListExpanded(false);
-    }
-
     // Clear stale financial data so it re-loads for the new project.
     setSummary(null);
     setEstimateStatusCounts(null);
@@ -455,8 +447,6 @@ export function ProjectsConsole() {
       {projects.length > 0 ? (
         <ProjectListViewer
           title="Choose a project below"
-          isExpanded={isProjectListExpanded}
-          onToggleExpanded={() => setIsProjectListExpanded((current) => !current)}
           expandedHint="Select a project to open its map, financial snapshot, and downstream actions."
           showSearchAndFilters
           searchValue={projectSearch}
@@ -592,11 +582,6 @@ export function ProjectsConsole() {
               </div>
             </div>
             <div className={styles.metricsPanel}>
-              <div className={`${styles.baselineCard} ${styles.baselineInactive}`}>
-                <span className={styles.baselineCardLabel}>Project Baseline</span>
-                <strong className={styles.baselineCardValue}>{activeFinancialEstimateDisplay}</strong>
-                <span className={styles.baselineCardMeta}>{activeFinancialBudgetDisplay}</span>
-              </div>
               <section className={styles.metricSection}>
                 <h4 className={styles.metricSectionTitle}>Estimates / Approvals</h4>
                 <div className={styles.metricRow}>

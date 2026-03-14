@@ -114,7 +114,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const [projectStatusFilters, setProjectStatusFilters] = useState<ProjectStatusValue[]>(
     DEFAULT_PROJECT_STATUS_FILTERS,
   );
-  const [isProjectListExpanded, setIsProjectListExpanded] = useState(true);
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [vendors, setVendors] = useState<VendorRecord[]>([]);
@@ -1100,8 +1099,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     <section className={styles.console}>
       {projects.length > 0 ? (
         <ProjectListViewer
-          isExpanded={isProjectListExpanded}
-          onToggleExpanded={() => setIsProjectListExpanded((current) => !current)}
           showSearchAndFilters={!isProjectScoped}
           contextHint={
             selectedProject

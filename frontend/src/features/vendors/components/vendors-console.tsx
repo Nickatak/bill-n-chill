@@ -335,9 +335,6 @@ export function VendorsConsole() {
       <header className={styles.headerRow}>
         <div className={styles.headerCopy}>
           <h2 className={styles.headerTitle}>Vendor Directory</h2>
-          <p className={styles.headerSubtitle}>
-            Manage canonical vendor records reused across bills, AP workflows, and payment allocation.
-          </p>
         </div>
         <div className={styles.headerStats}>
           <span className={styles.headerStatPill}>Total {rows.length}</span>
@@ -527,9 +524,6 @@ export function VendorsConsole() {
                   </button>
                 ) : null}
               </div>
-              {selectedVendorIsCanonical ? (
-                <p className={styles.panelIntro}>Canonical vendors are read-only and cannot be edited.</p>
-              ) : null}
               <label className={styles.field}>
                 <span>Name</span>
                 <input
@@ -636,9 +630,6 @@ export function VendorsConsole() {
               </button>
               {importExpanded ? (
                 <>
-                  <p className={styles.importHint}>
-                    Headers: name,vendor_type,email,phone,tax_id_last4,notes. Existing names update; new names are created as active.
-                  </p>
                   <label className={styles.field}>
                     <span>CSV text</span>
                     <textarea

@@ -6,7 +6,6 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 // ---------------------------------------------------------------------------
 
 const mockFetch = vi.hoisted(() => vi.fn());
-const mockSearchParams = vi.hoisted(() => new URLSearchParams());
 
 vi.mock("@/shared/session/use-shared-session", () => ({
   useSharedSessionAuth: vi.fn(() => ({
@@ -32,7 +31,7 @@ vi.mock("@/shared/shell/printable-context", () => ({
 
 vi.mock("next/navigation", () => ({
   useRouter: vi.fn(() => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() })),
-  useSearchParams: vi.fn(() => mockSearchParams),
+  useSearchParams: vi.fn(() => new URLSearchParams()),
 }));
 
 vi.mock("next/link", () => ({
@@ -40,13 +39,6 @@ vi.mock("next/link", () => ({
     const { href, ...rest } = props;
     return <a href={String(href ?? "")} {...rest}>{children as React.ReactNode}</a>;
   },
-}));
-
-vi.mock("@/shared/project-list-viewer", () => ({
-  ProjectListViewer: (props: Record<string, unknown>) => (
-    <div data-testid="project-list-viewer">{String(props.selectedProjectId ?? "")}</div>
-  ),
-  collapseToggleButtonStyles: { collapseButton: "collapseButton" },
 }));
 
 vi.mock("@/features/payments", () => ({
@@ -68,6 +60,21 @@ vi.mock("@/shared/document-creator", () => ({
 }));
 
 vi.stubGlobal("fetch", mockFetch);
+
+// jsdom doesn't implement matchMedia
+Object.defineProperty(window, "matchMedia", {
+  writable: true,
+  value: vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+});
 
 // jsdom doesn't implement HTMLDialogElement methods
 HTMLDialogElement.prototype.showModal = HTMLDialogElement.prototype.showModal || vi.fn();
@@ -175,7 +182,6 @@ function setupDefaultFetch(overrides: {
 describe("InvoicesConsole", () => {
   beforeEach(() => {
     mockFetch.mockReset();
-    mockSearchParams.delete("project");
   });
 
   afterEach(() => {
@@ -184,7 +190,7 @@ describe("InvoicesConsole", () => {
 
   it("renders and fetches policy contract on mount", async () => {
     setupDefaultFetch();
-    render(<InvoicesConsole />);
+    render(<InvoicesConsole scopedProjectId={7} />);
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
@@ -196,7 +202,7 @@ describe("InvoicesConsole", () => {
 
   it("fetches project list on mount", async () => {
     setupDefaultFetch();
-    render(<InvoicesConsole />);
+    render(<InvoicesConsole scopedProjectId={7} />);
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
@@ -211,7 +217,7 @@ describe("InvoicesConsole", () => {
     (canDo as ReturnType<typeof vi.fn>).mockReturnValue(false);
 
     setupDefaultFetch();
-    render(<InvoicesConsole />);
+    render(<InvoicesConsole scopedProjectId={7} />);
 
     await waitFor(() =>
       expect(screen.getByText(/can view invoices but cannot create/i)).toBeTruthy(),
@@ -225,7 +231,7 @@ describe("InvoicesConsole", () => {
 
   it("renders status filter section", async () => {
     setupDefaultFetch();
-    render(<InvoicesConsole />);
+    render(<InvoicesConsole scopedProjectId={7} />);
 
     // The status filter section renders pill buttons for each status from the contract.
     // After the contract loads, "Draft" should appear as a filter pill.
@@ -234,20 +240,18 @@ describe("InvoicesConsole", () => {
     );
   });
 
-  it("shows invoice search input after project selection", async () => {
+  it("shows invoice search input", async () => {
     setupDefaultFetch();
-    render(<InvoicesConsole />);
+    render(<InvoicesConsole scopedProjectId={7} />);
 
-    // The search input appears once a project is selected (auto-selected from project list).
     await waitFor(() =>
       expect(screen.getByPlaceholderText("Search invoices...")).toBeTruthy(),
     );
   });
 
-  it("fetches invoices when project is selected", async () => {
-    mockSearchParams.set("project", "7");
+  it("fetches invoices for the scoped project on mount", async () => {
     setupDefaultFetch();
-    render(<InvoicesConsole />);
+    render(<InvoicesConsole scopedProjectId={7} />);
 
     await waitFor(() => {
       const invoiceCalls = mockFetch.mock.calls.filter(

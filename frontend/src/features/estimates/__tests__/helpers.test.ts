@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   emptyLine,
-  estimateFinancialBaselineStatus,
   estimateStatusLabel,
-  formatFinancialBaselineStatus,
   formatStatusAction,
   isNotatedStatusEvent,
   mapEstimateLineItemsToInputs,
@@ -189,15 +187,6 @@ describe("resolveAutoSelectEstimate", () => {
     expect(result?.id).toBe(3);
   });
 
-  it("prefers active financial baseline over first visible", () => {
-    const rows = [
-      estimate({ id: 1, status: "draft" }),
-      estimate({ id: 2, status: "approved", is_active_financial_baseline: true }),
-    ];
-    const result = resolveAutoSelectEstimate(rows, filters, {});
-    expect(result?.id).toBe(2);
-  });
-
   it("falls back to first visible estimate", () => {
     const rows = [
       estimate({ id: 1, status: "archived" }),
@@ -214,16 +203,16 @@ describe("resolveAutoSelectEstimate", () => {
     expect(result).toBeNull();
   });
 
-  it("respects priority order: preferred > scoped > baseline > first", () => {
+  it("respects priority order: preferred > scoped > first", () => {
     const rows = [
       estimate({ id: 1, status: "draft" }),
-      estimate({ id: 2, status: "approved", is_active_financial_baseline: true }),
+      estimate({ id: 2, status: "approved" }),
       estimate({ id: 3, status: "sent" }),
     ];
     expect(resolveAutoSelectEstimate(rows, filters, { preferredId: 3, scopedId: 2 })?.id).toBe(3);
     expect(resolveAutoSelectEstimate(rows, filters, { preferredId: 99, scopedId: 3 })?.id).toBe(3);
-    expect(resolveAutoSelectEstimate(rows, filters, { preferredId: 99, scopedId: 99 })?.id).toBe(2);
-    expect(resolveAutoSelectEstimate(rows, filters, {})?.id).toBe(2);
+    expect(resolveAutoSelectEstimate(rows, filters, { preferredId: 99, scopedId: 99 })?.id).toBe(1);
+    expect(resolveAutoSelectEstimate(rows, filters, {})?.id).toBe(1);
   });
 });
 
@@ -536,75 +525,6 @@ describe("estimateStatusLabel", () => {
 
   it("trims whitespace before lookup", () => {
     expect(estimateStatusLabel("  sent  ")).toBe("Sent");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// estimateFinancialBaselineStatus
-// ---------------------------------------------------------------------------
-
-describe("estimateFinancialBaselineStatus", () => {
-  it("returns 'none' for null", () => {
-    expect(estimateFinancialBaselineStatus(null)).toBe("none");
-  });
-
-  it("returns 'none' for undefined", () => {
-    expect(estimateFinancialBaselineStatus(undefined)).toBe("none");
-  });
-
-  it("returns 'active' when is_active_financial_baseline is true", () => {
-    const estimate = { is_active_financial_baseline: true } as unknown as EstimateRecord;
-    expect(estimateFinancialBaselineStatus(estimate)).toBe("active");
-  });
-
-  it("returns 'active' from financial_baseline_status field", () => {
-    const estimate = {
-      is_active_financial_baseline: false,
-      financial_baseline_status: "active",
-    } as unknown as EstimateRecord;
-    expect(estimateFinancialBaselineStatus(estimate)).toBe("active");
-  });
-
-  it("returns 'superseded' from financial_baseline_status field", () => {
-    const estimate = {
-      is_active_financial_baseline: false,
-      financial_baseline_status: "superseded",
-    } as unknown as EstimateRecord;
-    expect(estimateFinancialBaselineStatus(estimate)).toBe("superseded");
-  });
-
-  it("returns 'none' when no baseline flags are set", () => {
-    const estimate = {
-      is_active_financial_baseline: false,
-      financial_baseline_status: undefined,
-    } as unknown as EstimateRecord;
-    expect(estimateFinancialBaselineStatus(estimate)).toBe("none");
-  });
-
-  it("prioritizes is_active_financial_baseline over financial_baseline_status", () => {
-    const estimate = {
-      is_active_financial_baseline: true,
-      financial_baseline_status: "superseded",
-    } as unknown as EstimateRecord;
-    expect(estimateFinancialBaselineStatus(estimate)).toBe("active");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// formatFinancialBaselineStatus
-// ---------------------------------------------------------------------------
-
-describe("formatFinancialBaselineStatus", () => {
-  it("returns 'Active Estimate' for active", () => {
-    expect(formatFinancialBaselineStatus("active")).toBe("Active Estimate");
-  });
-
-  it("returns 'Superseded Estimate' for superseded", () => {
-    expect(formatFinancialBaselineStatus("superseded")).toBe("Superseded Estimate");
-  });
-
-  it("returns empty string for none", () => {
-    expect(formatFinancialBaselineStatus("none")).toBe("");
   });
 });
 

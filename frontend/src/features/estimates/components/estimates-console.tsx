@@ -3,8 +3,8 @@
 /**
  * Estimates console -- the primary internal workspace for managing estimates
  * within a project. Provides version-tree browsing, family-grouped estimate
- * history, draft creation/editing, status transitions, financial-baseline
- * activation, and duplication workflows.
+ * history, draft creation/editing, status transitions, and duplication
+ * workflows.
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
@@ -31,7 +31,6 @@ import {
   addDaysToDateInput,
 } from "@/shared/date-format";
 import { formatDecimal } from "@/shared/money-format";
-import { type FinancialBaselineStatusValue } from "@/shared/financial-baseline";
 import {
   ApiResponse,
   CostCode,
@@ -43,8 +42,6 @@ import {
 } from "../types";
 import {
   emptyLine,
-  estimateFinancialBaselineStatus,
-  formatFinancialBaselineStatus,
   formatStatusAction,
   isNotatedStatusEvent,
   mapEstimateLineItemsToInputs,
@@ -52,6 +49,7 @@ import {
   readEstimateApiError,
   resolveAutoSelectEstimate,
   resolveEstimateValidationDeltaDays,
+  validateEstimateLineItems,
 } from "../helpers";
 import { EstimateSheet, OrganizationDocumentDefaults } from "./estimate-sheet";
 import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
@@ -208,7 +206,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const duplicateDialogRef = useRef<HTMLDialogElement | null>(null);
   const [duplicateTitle, setDuplicateTitle] = useState("");
   const [isViewerExpanded, setIsViewerExpanded] = useState(true);
-  const [hideSuperseded, setHideSuperseded] = useState(true);
   const [defaultEstimateStatusFilters, setDefaultEstimateStatusFilters] = useState<string[]>(
     ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK,
   );
@@ -264,8 +261,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;
   const selectedEstimate =
     estimates.find((estimate) => String(estimate.id) === selectedEstimateId) ?? null;
-  const activeFinancialEstimate =
-    estimates.find((estimate) => estimate.is_active_financial_baseline) ?? null;
   const isEditingDraft = Boolean(selectedEstimate && selectedEstimate.status === "draft");
   const isReadOnly = !canMutateEstimates || Boolean(selectedEstimate && selectedEstimate.status !== "draft");
   const statusClasses: Record<string, string> = {
@@ -275,11 +270,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     rejected: styles.statusRejected,
     void: styles.statusArchived,
     archived: styles.statusArchived,
-  };
-  const financialBaselineClasses: Record<FinancialBaselineStatusValue, string> = {
-    none: styles.financialBaselineNone,
-    active: styles.financialBaselineActive,
-    superseded: styles.financialBaselineSuperseded,
   };
   const statusOptions: Array<{ value: EstimateStatusValue; label: string }> = estimateStatuses.map(
     (statusValue) => ({
@@ -325,12 +315,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const canSubmitStatusNote = selectedEstimate
     ? Boolean(statusNote.trim())
     : false;
-  const selectedFinancialBaselineStatus = estimateFinancialBaselineStatus(selectedEstimate);
-  const canActivateSelectedFinancialBaseline = Boolean(
-    selectedEstimate &&
-      selectedEstimate.status === "approved" &&
-      selectedFinancialBaselineStatus !== "active",
-  );
   const workspaceContext = selectedEstimate
     ? `${selectedEstimate.title || "Untitled"} · #${selectedEstimate.id} v${selectedEstimate.version}`
     : "New estimate draft";
@@ -383,7 +367,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   function quickActionTitleForStatus(status: string): string {
     const kind = quickActionKindForStatus(status);
     if (kind === "change_order") {
-      return "Open linked change orders for this estimate";
+      return "View change orders for this estimate";
     }
     if (kind === "revision") {
       return "Duplicate this estimate as a new revision";
@@ -456,6 +440,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     [lineItems],
   );
 
+  const lineValidation = useMemo(() => validateEstimateLineItems(lineItems), [lineItems]);
   const subtotal = lineTotals.reduce((sum, value) => sum + value, 0);
   const taxRate = toNumber(taxPercent);
   const taxAmount = subtotal * (taxRate / 100);
@@ -504,12 +489,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       if (!latest?.status) {
         return false;
       }
-      if (hideSuperseded && latest.financial_baseline_status === "superseded") {
-        return false;
-      }
       return estimateStatusFilters.includes(latest.status as EstimateStatusValue);
     });
-  }, [estimateFamilies, estimateStatusFilters, hideSuperseded]);
+  }, [estimateFamilies, estimateStatusFilters]);
 
   function publicEstimateHref(publicRef?: string): string {
     if (!publicRef) {
@@ -564,7 +546,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
 
   const clearSelectedEstimateState = useCallback(() => {
-    const defaultCostCodeId = costCodes[0] ? String(costCodes[0].id) : "";
     const nextEstimateDate = todayDateInput();
     const nextValidThrough = addDaysToDateInput(
       nextEstimateDate,
@@ -580,7 +561,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setConfirmedFamilyTitleKey("");
     setTermsText(organizationDefaults?.estimate_terms_and_conditions || "");
     setTaxPercent("0");
-    setLineItems([emptyLine(1, defaultCostCodeId)]);
+    setLineItems([emptyLine(1)]);
     setLineSortKey(null);
     setLineSortDirection("asc");
     setNextLineId(2);
@@ -702,14 +683,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         setSelectedProjectId("");
       }
 
-      if (codeRows[0]) {
-        const defaultCostCodeId = String(codeRows[0].id);
-        setLineItems((current) =>
-          current.map((line) =>
-            line.costCodeId ? line : { ...line, costCodeId: defaultCostCodeId },
-          ),
-        );
-      }
+      // Cost codes loaded — lines without a cost code stay blank (user must pick).
 
     } catch {
       setActionMessage("Could not reach project and cost-code endpoints.");
@@ -825,8 +799,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     if (formErrorMessage === ESTIMATE_MIN_LINE_ITEMS_ERROR) {
       setFormErrorMessage("");
     }
-    const defaultCostCodeId = costCodes[0] ? String(costCodes[0].id) : "";
-    setLineItems((current) => [...current, emptyLine(nextLineId, defaultCostCodeId)]);
+    setLineItems((current) => [...current, emptyLine(nextLineId)]);
     setNextLineId((value) => value + 1);
   }
 
@@ -1213,14 +1186,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       }
       const updated = payload.data as EstimateRecord;
       const scrollY = window.scrollY;
-      const conversionStatus = payload.meta?.conversion_status;
-      const didSupersede = conversionStatus === "superseded_and_converted";
       setEstimates((current) =>
         current.map((estimate) => {
           if (estimate.id === updated.id) return updated;
-          if (didSupersede && estimate.is_active_financial_baseline) {
-            return { ...estimate, is_active_financial_baseline: false, financial_baseline_status: "superseded" as const };
-          }
           return estimate;
         }),
       );
@@ -1228,11 +1196,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setSelectedStatus("");
       setStatusNote("");
       await loadStatusEvents({ estimateId: updated.id, quiet: true });
-      if (conversionStatus === "converted" || didSupersede || conversionStatus === "already_converted") {
-        setActionMessage("Estimate approved and set as the active estimate. History updated.");
-        setActionTone("success");
-        return;
-      }
       const emailNote = updated.status === "sent" && payload.email_sent === false ? " No email sent — customer has no email on file." : "";
       setActionMessage(`Updated estimate #${updated.id} to ${updated.status.replace(/_/g, " ")}. History updated.${emailNote}`);
       setActionTone("success");
@@ -1388,50 +1351,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                 >
                   Reset Filters
                 </button>
-                <button
-                  type="button"
-                  className={`${styles.versionFilterActionButton} ${!hideSuperseded ? styles.versionFilterActionButtonActive : ""}`}
-                  aria-pressed={!hideSuperseded}
-                  onClick={() => setHideSuperseded((current) => !current)}
-                >
-                  {hideSuperseded ? "Show Superseded" : "Hide Superseded"}
-                </button>
               </div>
             </div>
 
             <div className={styles.versionTree}>
-              {activeFinancialEstimate ? (
-                <div className={styles.versionBaselineBanner}>
-                  <div className={styles.versionBaselineCopy}>
-                    <span className={styles.versionBaselineLabel}>Active Estimate</span>
-                    <span className={styles.versionBaselineValue}>
-                      Estimate #{activeFinancialEstimate.id} · v{activeFinancialEstimate.version} ·{" "}
-                      {activeFinancialEstimate.title || "Untitled"}
-                    </span>
-                  </div>
-                  <div className={styles.versionBaselineActions}>
-                    {String(activeFinancialEstimate.id) === selectedEstimateId ? (
-                      <span className={styles.versionBaselineSelected}>Viewing active estimate</span>
-                    ) : (
-                      <button
-                        type="button"
-                        className={styles.versionBaselineJumpButton}
-                        onClick={() => {
-                          handleSelectEstimate(activeFinancialEstimate);
-                          const title = (activeFinancialEstimate.title || "").trim() || "Untitled";
-                          requestAnimationFrame(() => {
-                            document
-                              .querySelector(`[data-family-title="${CSS.escape(title)}"]`)
-                              ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                          });
-                        }}
-                      >
-                        Jump to Active Estimate
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ) : null}
               {visibleEstimateFamilies.length > 0 ? (
                 visibleEstimateFamilies.map((family) => {
                   const latest = family.items[family.items.length - 1];
@@ -1447,7 +1370,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                   const quickActionKind = quickActionKindForStatus(latest.status);
                   const quickActionTitle = quickActionTitleForStatus(latest.status);
                   const latestTotal = formatDecimal(toNumber(latest.grand_total || "0"));
-                  const latestFinancialBaselineStatus = estimateFinancialBaselineStatus(latest);
                   return (
                     <div
                       key={family.title}
@@ -1467,36 +1389,17 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                             onClick={() => handleSelectFamilyLatest(family.title, latest)}
                             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleSelectFamilyLatest(family.title, latest); } }}
                           >
-                            {(!isViewingHistory && latest.public_ref) || (quickActionKind === "change_order" && selectedProjectId) ? (
-                              <div className={styles.familyPublicBar}>
-                                {quickActionKind === "change_order" && selectedProjectId ? (
-                                  <Link
-                                    href={`/projects/${selectedProjectId}/change-orders?origin_estimate=${latest.id}`}
-                                    className={styles.familyPublicLink}
-                                    aria-label={`${quickActionTitle} (estimate #${latest.id})`}
-                                    title={quickActionTitle}
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    To CO&apos;s ↗
-                                  </Link>
-                                ) : null}
-                                {!isViewingHistory && latest.public_ref ? (
-                                  <Link
-                                    href={publicEstimateHref(latest.public_ref)}
-                                    className={`${styles.familyPublicLink} ${styles.familyPublicBarEnd}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    aria-label={`Open customer view for estimate #${latest.id}`}
-                                    title="Open customer view"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    Customer View ↗
-                                  </Link>
-                                ) : null}
-                              </div>
-                            ) : null}
                             <div className={styles.familyMainContent}>
-                              <span className={styles.familyTitle}>{family.title}</span>
+                              <span className={styles.familyTitleRow}>
+                                <span className={styles.familyTitle}>{family.title}</span>
+                                <span
+                                  className={`${styles.versionStatus} ${
+                                    statusClasses[latest.status] ?? ""
+                                  }`}
+                                >
+                                  {formatEstimateStatus(latest.status)}
+                                </span>
+                              </span>
                               <span className={styles.familyMeta}>
                                 ${latestTotal} · Estimate #{latest.id} · {history.length} history{" "}
                                 {history.length === 1 ? "entry" : "entries"}
@@ -1505,24 +1408,34 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                                 Last action: {formatEstimateLastActionDate(latest)}
                               </span>
                             </div>
-                            <div className={styles.versionRight}>
-                              <span
-                                className={`${styles.versionStatus} ${
-                                  statusClasses[latest.status] ?? ""
-                                }`}
-                              >
-                                {formatEstimateStatus(latest.status)}
-                              </span>
-                              {latestFinancialBaselineStatus !== "none" ? (
-                                <span
-                                  className={`${styles.financialBaselineBadge} ${
-                                    financialBaselineClasses[latestFinancialBaselineStatus]
-                                  }`}
-                                >
-                                  {formatFinancialBaselineStatus(latestFinancialBaselineStatus)}
-                                </span>
-                              ) : null}
-                            </div>
+                            {(!isViewingHistory && latest.public_ref) || (quickActionKind === "change_order" && selectedProjectId) ? (
+                              <div className={styles.familyLinkBar}>
+                                {quickActionKind === "change_order" && selectedProjectId ? (
+                                  <Link
+                                    href={`/projects/${selectedProjectId}/change-orders?origin_estimate=${latest.id}`}
+                                    className={styles.familyPublicLink}
+                                    aria-label={`${quickActionTitle} (estimate #${latest.id})`}
+                                    title={quickActionTitle}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    View Change Orders →
+                                  </Link>
+                                ) : null}
+                                {!isViewingHistory && latest.public_ref ? (
+                                  <Link
+                                    href={publicEstimateHref(latest.public_ref)}
+                                    className={`${styles.familyPublicLink} ${styles.familyLinkBarEnd}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    aria-label={`Open customer view for estimate #${latest.id}`}
+                                    title="Open customer view"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    Customer View →
+                                  </Link>
+                                ) : null}
+                              </div>
+                            ) : null}
                           </div>
                           {isViewingHistory || quickActionKind === "revision" ? (
                             <div className={styles.familyFooter}>
@@ -1550,8 +1463,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                             {history.map((estimate) => {
                                 const total = formatDecimal(toNumber(estimate.grand_total || "0"));
                                 const isSelected = String(estimate.id) === selectedEstimateId;
-                                const financialBaselineStatus =
-                                  estimateFinancialBaselineStatus(estimate);
                                 return (
                                   <div key={estimate.id} className={styles.historyCardColumn}>
                                     <button
@@ -1573,15 +1484,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                                           {formatEstimateStatus(estimate.status)}
                                         </span>
                                       </span>
-                                      {financialBaselineStatus !== "none" ? (
-                                        <span
-                                          className={`${styles.financialBaselineBadge} ${
-                                            financialBaselineClasses[financialBaselineStatus]
-                                          } ${styles.historyFinancialBaselineBadge}`}
-                                        >
-                                          {formatFinancialBaselineStatus(financialBaselineStatus)}
-                                        </span>
-                                      ) : null}
                                       <span className={styles.historyAmount}>${total}</span>
                                       <span className={styles.historyDate}>
                                         {formatEstimateLastActionDate(estimate)}
@@ -1596,7 +1498,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
                                         aria-label={`Open customer view for estimate #${estimate.id}`}
                                         title="Open customer view"
                                       >
-                                        Customer View ↗
+                                        Customer View →
                                       </Link>
                                     ) : null}
                                   </div>
@@ -1617,29 +1519,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
             {selectedEstimateId ? (
               <>
-                {canActivateSelectedFinancialBaseline ? (
-                  <div className={styles.financialActivationPanel}>
-                    <span className={styles.financialActivationLabel}>Active Estimate</span>
-                    <p className={styles.financialActivationHint}>
-                      {selectedFinancialBaselineStatus === "superseded"
-                        ? "This estimate was previously active and is now superseded."
-                        : "This approved estimate is not currently the active estimate for this project."}{" "}
-                      {activeFinancialEstimate
-                        ? `Current active estimate: #${activeFinancialEstimate.id} v${activeFinancialEstimate.version}.`
-                        : "No active estimate is currently set."}
-                    </p>
-                    <button
-                      type="button"
-                      className={styles.financialActivationButton}
-                      onClick={() => {
-                        setActionMessage("Active estimate activation is not yet available.");
-                        setActionTone("info");
-                      }}
-                    >
-                      Set as Active Estimate
-                    </button>
-                  </div>
-                ) : null}
                 <div className={styles.lifecycleGrid}>
                   {!isTerminalEstimateStatus ? (
                     <div className={styles.statusPicker}>
@@ -1901,6 +1780,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
           readOnly={isReadOnly}
           formErrorMessage={formErrorMessage}
           formSuccessMessage={formSuccessMessage}
+          lineValidation={lineValidation}
           lineSortKey={lineSortKey}
           lineSortDirection={lineSortDirection}
           onTitleChange={handleEstimateTitleChange}

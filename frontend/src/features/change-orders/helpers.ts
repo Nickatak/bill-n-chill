@@ -44,11 +44,11 @@ export function validateLineItems(lines: ChangeOrderLineInput[]): LineValidation
       rowIssues.push("Select a cost code.");
     }
 
-    if (!isFiniteNumericInput(line.amountDelta)) {
+    if (line.amountDelta.trim() && !isFiniteNumericInput(line.amountDelta)) {
       rowIssues.push("Amount delta must be a number.");
     }
 
-    if (!isFiniteNumericInput(line.daysDelta) || !Number.isInteger(Number(line.daysDelta))) {
+    if (line.daysDelta.trim() && (!isFiniteNumericInput(line.daysDelta) || !Number.isInteger(Number(line.daysDelta)))) {
       rowIssues.push("Days delta must be a whole number.");
     }
 
@@ -83,8 +83,8 @@ export function emptyLine(localId: number): ChangeOrderLineInput {
     costCodeId: "",
     description: "",
     adjustmentReason: "",
-    amountDelta: "0.00",
-    daysDelta: "0",
+    amountDelta: "",
+    daysDelta: "",
   };
 }
 

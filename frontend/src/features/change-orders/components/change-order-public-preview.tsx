@@ -254,7 +254,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
                           className={`${frameStyles.metaLink} ${creatorStyles.screenOnly}`}
                           href={publicEstimateHref(changeOrder.origin_estimate_context.public_ref)}
                         >
-                          View Related Estimate
+                          View Estimate
                         </a>
                       ) : null}
                       <span className={creatorStyles.printOnly}>

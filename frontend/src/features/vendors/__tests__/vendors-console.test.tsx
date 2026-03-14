@@ -310,7 +310,9 @@ describe("VendorsConsole", () => {
 
     fireEvent.click(screen.getByText(/System Vendor/).closest("tr")!);
 
-    expect(screen.getByText("Canonical vendors are read-only and cannot be edited.")).toBeInTheDocument();
+    // Canonical vendor fields should be disabled/read-only
+    const nameInput = screen.getByLabelText("Name") as HTMLInputElement;
+    expect(nameInput.disabled).toBe(true);
   });
 
   it("shows pagination when vendors exceed page size", async () => {
@@ -353,7 +355,6 @@ describe("VendorsConsole", () => {
 
     fireEvent.click(screen.getByRole("button", { expanded: false }));
 
-    expect(screen.getByText(/Headers: name,vendor_type/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Preview" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Apply" })).toBeInTheDocument();
   });
