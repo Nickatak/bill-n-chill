@@ -128,8 +128,8 @@ describe("emptyLine", () => {
     expect(result.costCodeId).toBe("");
     expect(result.description).toBe("");
     expect(result.adjustmentReason).toBe("");
-    expect(result.amountDelta).toBe("0.00");
-    expect(result.daysDelta).toBe("0");
+    expect(result.amountDelta).toBe("");
+    expect(result.daysDelta).toBe("");
   });
 });
 

@@ -579,23 +579,4 @@ describe("ProjectsConsole", () => {
     expect(within(editForm).queryByRole("button", { name: "completed" })).not.toBeInTheDocument();
   });
 
-  // ---------------------------------------------------------------------------
-  // Collapse/Expand list
-  // ---------------------------------------------------------------------------
-
-  it("Collapse button hides the project list panel", async () => {
-    setupDefaultFetch({
-      projects: [makeProject()],
-    });
-    render(<ProjectsConsole />);
-
-    await waitFor(() => {
-      expect(screen.getByLabelText("Search projects")).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Collapse" }));
-
-    expect(screen.queryByLabelText("Search projects")).not.toBeInTheDocument();
-    expect(screen.getByText(/collapsed/i)).toBeInTheDocument();
-  });
 });

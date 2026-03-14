@@ -204,7 +204,7 @@ describe("CustomersConsole", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save Customer" }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Saved customer #1/)).toBeInTheDocument();
+      expect(screen.getByText(/Saved Jane Doe-Smith/)).toBeInTheDocument();
     });
   });
 

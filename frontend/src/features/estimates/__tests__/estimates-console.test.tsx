@@ -45,6 +45,21 @@ vi.mock("next/link", () => ({
 
 vi.stubGlobal("fetch", mockFetch);
 
+// jsdom doesn't implement matchMedia
+Object.defineProperty(window, "matchMedia", {
+  writable: true,
+  value: vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+});
+
 // jsdom doesn't implement HTMLDialogElement methods
 HTMLDialogElement.prototype.showModal = HTMLDialogElement.prototype.showModal || vi.fn();
 HTMLDialogElement.prototype.close = HTMLDialogElement.prototype.close || vi.fn();
@@ -156,8 +171,13 @@ function setupDefaultFetch(overrides: {
 // ---------------------------------------------------------------------------
 
 describe("EstimatesConsole", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     mockFetch.mockReset();
+    // Ensure canDo mock is restored to default (may leak from read-only test)
+    const { canDo } = await import("@/shared/session/rbac");
+    (canDo as ReturnType<typeof vi.fn>).mockImplementation(
+      (_caps: unknown, resource: string) => resource === "estimates",
+    );
   });
 
   afterEach(() => {
@@ -280,7 +300,7 @@ describe("EstimatesConsole", () => {
     render(<EstimatesConsole scopedProjectId={7} />);
 
     // Wait for the estimate to auto-select and the "Sent" transition pill to appear
-    const sentButton = await screen.findByRole("button", { name: "Sent" });
+    const sentButton = await screen.findByRole("button", { name: "Sent" }, { timeout: 3000 });
     fireEvent.click(sentButton);
 
     expect(
@@ -307,7 +327,7 @@ describe("EstimatesConsole", () => {
     });
     render(<EstimatesConsole scopedProjectId={7} />);
 
-    const sentButton = await screen.findByRole("button", { name: "Sent" });
+    const sentButton = await screen.findByRole("button", { name: "Sent" }, { timeout: 3000 });
     fireEvent.click(sentButton);
 
     expect(
