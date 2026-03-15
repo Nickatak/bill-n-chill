@@ -24,36 +24,6 @@
   align-content: start;
 }
 
-.invoiceMetaLayout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 420px);
-  gap: var(--space-lg);
-  align-items: start;
-}
-
-.invoiceDetailCard {
-  grid-column: 2;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-md);
-  background: var(--surface);
-  display: grid;
-  gap: 10px;
-}
-
-.invoiceMetaCardLabel {
-  font-size: 1rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--accent-text);
-  font-weight: 700;
-}
-
-.invoiceMetaStrong {
-  font-weight: 700;
-  color: var(--accent-text);
-}
-
 .invoiceNumberContext {
   display: inline-flex;
   align-items: center;
@@ -84,24 +54,6 @@
   background: var(--status-blue-bg);
   border-color: var(--status-blue-border);
   color: var(--status-blue-text);
-}
-
-.invoiceNumberIndicatorEditing {
-  background: var(--status-gray-bg);
-  border-color: var(--status-gray-border);
-  color: var(--status-gray-text);
-}
-
-.invoiceNumberIndicatorLocked {
-  background: var(--status-red-bg);
-  border-color: var(--status-red-border);
-  color: var(--status-red-text);
-}
-
-.invoiceLogoImage {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
 }
 
 .invoiceLineSectionIntro {
@@ -240,16 +192,6 @@
   color: var(--input-readonly-text);
 }
 
-@media (max-width: 980px) {
-  .invoiceMetaLayout {
-    grid-template-columns: 1fr;
-  }
-
-  .invoiceDetailCard {
-    grid-column: 1;
-  }
-}
-
 @media (max-width: 700px) {
   .invoiceCreatorSheet {
     padding: var(--space-lg);
@@ -277,10 +219,6 @@
     padding: var(--space-md);
     border-radius: 10px;
   }
-
-  .invoiceDetailCard {
-    padding: var(--space-sm);
-  }
 }
 
 /* ── Print ────────────────────────────────────────────────────── */
@@ -301,21 +239,6 @@
     padding: 0;
     box-shadow: none;
     background: var(--surface);
-  }
-
-  .invoiceDetailCard {
-    border-color: #9ca3af;
-    border-radius: 0;
-    background: transparent;
-  }
-
-  /* Restore 2-column meta layout (980px responsive breakpoint collapses it) */
-  .invoiceMetaLayout {
-    grid-template-columns: minmax(0, 1fr) minmax(200px, 340px);
-  }
-
-  .invoiceDetailCard {
-    grid-column: 2;
   }
 
   /* Hide Type (1st child) and Actions (8th child) columns */

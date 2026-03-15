@@ -1,42 +1,3 @@
-.consoleTop {
-  display: grid;
-  gap: 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-lg);
-  margin-bottom: var(--space-md);
-  background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 12%, transparent), transparent 42%),
-    var(--surface-secondary);
-}
-
-.consoleIntro {
-  display: grid;
-  gap: 6px;
-}
-
-.consoleEyebrow {
-  margin: 0;
-  font-size: 0.68rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  font-weight: 700;
-  color: var(--accent);
-}
-
-.consoleHeading {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: var(--font-lg);
-}
-
-.consoleCopy {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--font-base);
-  max-width: 68ch;
-}
-
 .primaryCreateButton {
   border: 1px solid var(--accent-hover);
   border-radius: 10px;
@@ -64,12 +25,6 @@
   flex-shrink: 0;
 }
 
-.toolbarFeedbackMessage {
-  margin: 0;
-  width: 100%;
-  text-align: right;
-}
-
 .formContext {
   display: grid;
   gap: 2px;
@@ -91,12 +46,6 @@
   flex-wrap: wrap;
 }
 
-.formContextHint {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--font-sm);
-}
-
 .editStatusBadge {
   display: inline-flex;
   align-items: center;
@@ -113,22 +62,6 @@
 
 .editStatusDraft {
   composes: draft from '../../../shared/styles/status.module.css';
-}
-
-.editStatusPendingApproval {
-  composes: pendingApproval from '../../../shared/styles/status.module.css';
-}
-
-.editStatusApproved {
-  composes: approved from '../../../shared/styles/status.module.css';
-}
-
-.editStatusRejected {
-  composes: rejected from '../../../shared/styles/status.module.css';
-}
-
-.editStatusVoid {
-  composes: void from '../../../shared/styles/status.module.css';
 }
 
 .roleReadOnlyNote {
@@ -191,12 +124,6 @@
   text-transform: uppercase;
   font-weight: 700;
   color: var(--accent-text);
-}
-
-.viewerRailSubheading {
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-  line-height: 1.35;
 }
 
 .viewerRailItem {
@@ -352,31 +279,6 @@
   width: 100%;
 }
 
-.viewerHistoryDraft {
-  border-color: var(--status-blue-border);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--status-blue-bg) 50%, transparent), var(--surface));
-}
-
-.viewerHistoryPendingApproval {
-  border-color: var(--status-amber-border);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--status-amber-bg) 52%, transparent), var(--surface));
-}
-
-.viewerHistoryApproved {
-  border-color: var(--status-green-border);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--status-green-bg) 56%, transparent), var(--surface));
-}
-
-.viewerHistoryRejected {
-  border-color: var(--status-red-border);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--status-red-bg) 56%, transparent), var(--surface));
-}
-
-.viewerHistoryVoid {
-  border-color: var(--status-gray-border);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--status-gray-bg) 56%, transparent), var(--surface));
-}
-
 .viewerHistoryStatusText {
   margin-left: auto;
   font-size: var(--font-xs);
@@ -416,12 +318,6 @@
   box-shadow:
     0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent),
     inset 4px 0 0 var(--accent);
-}
-
-.quickStatusPanel {
-  margin-top: 2px;
-  display: grid;
-  gap: var(--space-sm);
 }
 
 .viewerStatusActionRow {
@@ -553,24 +449,6 @@
   cursor: default;
 }
 
-.reconcilePill {
-  margin: 4px 0 0;
-  font-size: 0.78rem;
-  border-radius: var(--radius-pill);
-  padding: 4px 9px;
-  width: fit-content;
-}
-
-.reconcileGood {
-  background: var(--status-green-bg);
-  color: var(--status-green-text);
-}
-
-.reconcileBad {
-  background: var(--status-red-bg);
-  color: var(--status-red-text);
-}
-
 .lineTableWrap {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -581,19 +459,6 @@
   width: 100%;
   border-collapse: collapse;
   min-width: 580px;
-}
-
-.lineTableCaption {
-  caption-side: top;
-  text-align: left;
-  padding: var(--space-sm) var(--space-sm) var(--space-xs);
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-primary);
-  background: var(--surface-secondary);
-  border-bottom: 2px solid var(--border);
 }
 
 .lineTable th {
@@ -611,11 +476,6 @@
   border-top: 1px solid var(--table-border);
   color: var(--text-primary);
   font-size: 0.86rem;
-}
-
-.viewerEventPanel {
-  display: grid;
-  gap: 6px;
 }
 
 .viewerEventList {
@@ -654,11 +514,6 @@
 .statusEventCreated {
   background: var(--accent-light);
   color: var(--accent-hover);
-}
-
-.statusEventResent {
-  background: var(--status-amber-bg);
-  color: var(--status-amber-text);
 }
 
 .statusEventSent {
@@ -779,27 +634,6 @@
   text-decoration: underline;
 }
 
-.budgetToggle {
-  appearance: none;
-  -webkit-appearance: none;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-secondary);
-  padding: 3px 8px;
-  font-size: 0.68rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  font-weight: 700;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: border-color 120ms ease;
-}
-
-.budgetToggle:hover {
-  border-color: var(--accent);
-  color: var(--accent-text);
-}
-
 @media (min-width: 980px) {
   .viewerGrid {
     grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
@@ -808,13 +642,10 @@
 
 @media (max-width: 700px) {
   /* ── Containment: every grid/flex ancestor must allow shrinking ── */
-  .consoleTop,
   .viewer,
   .viewerGrid,
   .viewerRail,
-  .viewerDetail,
-  .quickStatusPanel,
-  .viewerEventPanel {
+  .viewerDetail {
     min-width: 0;
     overflow: hidden;
   }
@@ -836,14 +667,6 @@
     width: 100%;
   }
 
-  .consoleTop {
-    padding: var(--space-md);
-  }
-
-  .consoleHeading {
-    font-size: 1rem;
-  }
-
   /* ── Form toolbar: stacked column ── */
   .formToolbar {
     flex-direction: column;
@@ -858,10 +681,6 @@
   .formToolbarActions .primaryCreateButton,
   .formToolbarActions .cloneRevisionButton {
     width: 100%;
-  }
-
-  .toolbarFeedbackMessage {
-    text-align: left;
   }
 
   .primaryCreateButton {
@@ -982,10 +801,6 @@
   .showAllToggle {
     min-height: 44px;
   }
-
-  .budgetToggle {
-    min-height: 44px;
-  }
 }
 
 @media (max-width: 640px) {
@@ -993,7 +808,6 @@
 /* ── Print ────────────────────────────────────────────────────── */
 
 @media print {
-  .consoleTop,
   .formToolbar,
   .formToolbarActions,
   .roleReadOnlyNote,
@@ -1002,15 +816,11 @@
   .viewerRail,
   .viewerHistoryRail,
   .viewerCardLinkBar,
-  .quickStatusPanel,
   .quickStatusPills,
   .viewerStatusActionRow,
-  .viewerEventPanel,
   .viewerEventList,
   .cloneRevisionButton,
-  .reconcilePill,
   .showAllToggle,
-  .budgetToggle,
   .primaryCreateButton {
     display: none !important;
   }

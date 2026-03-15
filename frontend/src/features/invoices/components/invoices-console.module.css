@@ -43,37 +43,6 @@
   align-content: start;
 }
 
-/* ── Content Tab Bar ── */
-
-.contentTabBar {
-  display: flex;
-  gap: 0;
-  border-bottom: 2px solid var(--border);
-}
-
-.contentTab {
-  flex: 1;
-  padding: var(--space-md) var(--space-md);
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.contentTab:hover {
-  color: var(--text-primary);
-}
-
-.contentTabActive {
-  color: var(--accent-text);
-  border-bottom-color: var(--accent);
-}
-
 .panelHeader {
   display: flex;
   align-items: center;
@@ -84,12 +53,6 @@
 .panelHeader h3 {
   margin: 0;
   font-size: 1rem;
-}
-
-.panelHeaderActions {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-sm);
 }
 
 .inlineHint {
@@ -327,12 +290,6 @@
   grid-row: 1 / span 2;
 }
 
-.workspaceToolbarHint {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--font-sm);
-}
-
 .toolbarPrimaryButton {
   border: 1px solid var(--accent-hover);
   border-radius: 10px;
@@ -442,11 +399,6 @@
   composes: void from '../../../shared/styles/status.module.css';
 }
 
-.projectEmptyCell {
-  text-align: center;
-  color: var(--text-secondary);
-}
-
 .emptyState {
   border: 1px dashed var(--border);
   border-radius: 10px;
@@ -457,7 +409,6 @@
 }
 
 @media (max-width: 640px) {
-  .panelHeaderActions,
   .statusFilters,
   .workspaceToolbarActions {
     display: grid;
@@ -492,10 +443,6 @@
   .toolbarSecondaryButton {
     min-height: 44px;
     width: 100%;
-  }
-
-  .workspaceToolbarHint {
-    text-align: left;
   }
 
   .invoiceMetaGrid {
@@ -734,45 +681,6 @@
   text-decoration: underline;
 }
 
-/* Line items preview table */
-
-.invoiceLineTableWrap {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: auto;
-}
-
-.invoiceLineTable {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 420px;
-}
-
-.invoiceLineTable th {
-  text-align: left;
-  font-size: 0.69rem;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--table-header-text);
-  background: var(--table-header-bg);
-  padding: var(--space-sm);
-}
-
-.invoiceLineTable td {
-  padding: var(--space-sm);
-  border-top: 1px solid var(--table-border);
-  color: var(--text-primary);
-  font-size: 0.86rem;
-}
-
-.invoiceLineTableCaption {
-  caption-side: top;
-  text-align: left;
-  padding: var(--space-sm);
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-
 .invoiceViewerMetaRow {
   display: flex;
   justify-content: space-between;
@@ -896,7 +804,6 @@
   .invoiceShowAllToggle,
   .statusFilters,
   .invoiceSearchInput,
-  .panelHeaderActions,
   .toolbarPrimaryButton,
   .toolbarSecondaryButton,
   .invoiceViewerActionSuccess,

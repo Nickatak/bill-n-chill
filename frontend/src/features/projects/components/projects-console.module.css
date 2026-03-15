@@ -21,66 +21,9 @@
   composes: noticeError from "../../../shared/styles/notices.module.css";
 }
 
-.projectStatus {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  padding: 4px 10px;
-  border-radius: var(--radius-pill);
-  font-weight: 600;
-}
-
-.projectStatusProspect {
-  background: var(--status-blue-solid);
-  color: var(--status-blue-solid-text);
-}
-
-.projectStatusActive {
-  background: var(--status-green-solid);
-  color: var(--status-green-solid-text);
-}
-
-.projectStatusOnHold {
-  background: var(--status-amber-solid);
-  color: var(--status-amber-solid-text);
-}
-
-.projectStatusCompleted {
-  background: var(--status-gray-solid);
-  color: var(--status-gray-solid-text);
-}
-
-.projectStatusCancelled {
-  background: var(--status-red-solid);
-  color: var(--status-red-solid-text);
-}
-
 .overview {
   display: grid;
   gap: var(--space-md);
-}
-
-.overviewHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-md);
-  flex-wrap: wrap;
-}
-
-.overviewHeader h3 {
-  margin: 0 0 4px;
-}
-
-.overviewHeader p {
-  margin: 0;
-  color: var(--text-secondary);
-}
-
-.overviewActions {
-  display: flex;
-  gap: var(--space-sm);
-  flex-wrap: wrap;
 }
 
 .overviewGrid {
@@ -153,78 +96,6 @@
 
 .projectSettingsToggle:active {
   transform: translateY(0);
-}
-
-.quickStatusRow {
-  margin-top: 10px;
-  display: grid;
-  gap: var(--space-sm);
-}
-
-.quickStatusLabel {
-  font-size: 0.7rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
-.quickStatusControl {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-lg);
-  flex-wrap: wrap;
-}
-
-.quickStatusBadge {
-  font-size: 0.7rem;
-  letter-spacing: 0.12em;
-  padding: 5px var(--space-md);
-}
-
-.quickStatusChangeLabel {
-  display: grid;
-  gap: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.64rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  min-width: 190px;
-}
-
-.quickStatusSelect {
-  min-width: 190px;
-  border: 1px solid var(--border-accent);
-  border-radius: var(--radius-md);
-  padding: 7px 10px;
-  background: var(--surface);
-  color: var(--text-primary);
-  text-transform: none;
-  letter-spacing: normal;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.quickStatusSelectProspect {
-  border-color: var(--status-blue-border);
-}
-
-.quickStatusSelectActive {
-  border-color: var(--status-green-border);
-}
-
-.quickStatusSelectOnHold {
-  border-color: var(--status-amber-border);
-}
-
-.quickStatusSelectCompleted {
-  border-color: var(--status-gray-border);
-}
-
-.quickStatusSelectCancelled {
-  border-color: var(--status-red-border);
 }
 
 /* ── Workflow pipeline ──────────────────────────────────── */
@@ -326,22 +197,6 @@
   gap: 10px;
 }
 
-.metricSection {
-  display: grid;
-  gap: 6px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
-}
-
-.metricSectionTitle {
-  margin: 0;
-  font-size: var(--font-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.11em;
-  color: var(--text-secondary);
-  font-weight: 700;
-}
-
 .metricRow {
   display: flex;
   justify-content: space-between;
@@ -352,27 +207,6 @@
 
 .metricRow strong {
   font-variant-numeric: tabular-nums;
-}
-
-.metricRowSecondary {
-  color: var(--text-secondary);
-  font-size: var(--font-sm);
-  border-top: 1px solid var(--border);
-  padding-top: 8px;
-  margin-top: 4px;
-}
-
-.metricsDivider {
-  width: 100%;
-  border: 0;
-  border-top: 1px solid var(--border);
-  margin: 2px 0;
-}
-
-.metricHint {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
 }
 
 .projectEditForm {
@@ -551,22 +385,6 @@
   .metricRow strong {
     font-size: 1.05rem;
   }
-
-  /* Quick status: stack badge + select vertically */
-  .quickStatusControl {
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-sm);
-  }
-
-  .quickStatusChangeLabel {
-    min-width: 0;
-  }
-
-  .quickStatusSelect {
-    min-width: 0;
-    width: 100%;
-  }
 }
 
 @media (max-width: 640px) {
@@ -614,11 +432,6 @@
     min-height: 44px;
     font-size: 1rem;
   }
-
-  .quickStatusSelect {
-    min-height: 44px;
-    font-size: 1rem;
-  }
 }
 
 /* -- Payment recorder section -- */
@@ -631,13 +444,4 @@
   align-self: start;
   min-width: 0;
   overflow: hidden;
-}
-
-.sectionHeading {
-  font-size: 0.85rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-secondary);
-  margin: 0 0 var(--space-md) 0;
 }
