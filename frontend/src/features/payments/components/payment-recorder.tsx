@@ -677,9 +677,11 @@ export function PaymentRecorder({
       <form className={`${styles.workspace} ${createOnly ? styles.workspaceEmbedded : ""}`} onSubmit={handleSubmit}>
         <h3 className={styles.workspaceTitle}>
           {workspaceMode === "create" ? "Record Payment" : `Editing Payment #${selectedPaymentId}`}
-          <span className={styles.workspaceBadge}>
-            {workspaceMode === "create" ? "New" : "Edit"}
-          </span>
+          {!createOnly && (
+            <span className={styles.workspaceBadge}>
+              {workspaceMode === "create" ? "New" : "Edit"}
+            </span>
+          )}
         </h3>
 
         <div className={styles.fieldGrid}>
