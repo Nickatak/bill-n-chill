@@ -387,6 +387,24 @@
   font-weight: 600;
 }
 
+.lineSectionIntro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin-bottom: calc(-1 * var(--space-md));
+}
+
+.lineSectionIntro h3 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--accent);
+}
+
 .lineTable {
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-lg);

@@ -1977,7 +1977,7 @@ export function ChangeOrdersConsole({
           >
             {selectedChangeOrder ? "Create New Change Order" : "Reset"}
           </button>
-          {selectedViewerChangeOrder?.is_latest_revision ? (
+          {selectedChangeOrder && selectedViewerChangeOrder?.is_latest_revision ? (
             <button
               type="button"
               className={styles.cloneRevisionButton}

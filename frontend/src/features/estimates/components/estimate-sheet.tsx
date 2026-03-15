@@ -333,6 +333,9 @@ export function EstimateSheet({
         ),
         line_items: () => (
           <>
+            <div className={creatorStyles.lineSectionIntro}>
+              <h3>Line Items</h3>
+            </div>
             {isMobile ? (
               <div className={mobileCardStyles.cardList}>
                 {lineItems.map((line, index) => {

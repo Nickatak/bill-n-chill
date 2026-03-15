@@ -711,7 +711,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
   /** Clear the workspace and start a new invoice draft. */
   function handleStartNewInvoiceDraft() {
     resetCreateDraft();
-    setSuccessStatus("Started a new invoice draft.");
     setCreatorFlashCount((c) => c + 1);
   }
 
