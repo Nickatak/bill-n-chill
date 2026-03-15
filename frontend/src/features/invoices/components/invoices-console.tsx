@@ -1171,7 +1171,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                 if (canDuplicate) {
                   cells.push(
                     renderDuplicateButton(`co-${co.id}-${line.id}`, {
-                      costCode: line.cost_code_id ? String(line.cost_code_id) : "",
+                      costCode: String(costCodes.find((c) => c.code === line.cost_code_code)?.id ?? ""),
                       description: line.description,
                       quantity: "1",
                       unit: "",
