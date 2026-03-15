@@ -312,7 +312,7 @@ export function EstimateSheet({
                     />
                   )}
                 </div>
-                <div className={`${creatorStyles.metaLine} ${creatorStyles.metaLineLast}`}>
+                <div className={creatorStyles.metaLine}>
                   <span>Valid through</span>
                   {showReadOnlyText ? (
                     <span className={creatorStyles.staticMetaValue}>{formatDateDisplay(validThrough, "Not set")}</span>

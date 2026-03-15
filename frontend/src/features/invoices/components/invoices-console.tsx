@@ -1587,9 +1587,8 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                         </div>
                       </div>
 
-                      <div className={invoiceCreatorStyles.invoiceMetaLayout}>
-                        <div className={invoiceCreatorStyles.invoiceDetailCard}>
-                          <span className={invoiceCreatorStyles.invoiceMetaCardLabel}>Invoice Details</span>
+                        <div className={creatorStyles.metaBlock}>
+                          <div className={creatorStyles.metaTitle}>Invoice Details</div>
                           <div className={creatorStyles.metaLine}>
                             <span>Invoice #</span>
                             <div className={invoiceCreatorStyles.invoiceNumberContext}>
@@ -1633,7 +1632,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                             />
                           </label>
                         </div>
-                      </div>
 
                       <div className={invoiceCreatorStyles.invoiceLineSectionIntro}>
                         <h3>Line Items</h3>

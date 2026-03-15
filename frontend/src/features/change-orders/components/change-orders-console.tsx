@@ -2044,7 +2044,8 @@ export function ChangeOrdersConsole({
                   </div>
                 </div>
 
-                <div className={creatorStyles.partyGrid}>
+                <div className={creatorStyles.metaBlock}>
+                  <div className={creatorStyles.metaTitle}>Change Order Details</div>
                   <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField} ${creatorStyles.screenOnly}`}>
                     <span className={changeOrderCreatorStyles.coMetaLabel}>Title</span>
                     <input
@@ -2388,7 +2389,8 @@ export function ChangeOrdersConsole({
                   </div>
                 </div>
 
-                <div className={creatorStyles.partyGrid}>
+                <div className={creatorStyles.metaBlock}>
+                  <div className={creatorStyles.metaTitle}>Change Order Details</div>
                   <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField} ${creatorStyles.screenOnly}`}>
                     <span className={changeOrderCreatorStyles.coMetaLabel}>Title</span>
                     <input
