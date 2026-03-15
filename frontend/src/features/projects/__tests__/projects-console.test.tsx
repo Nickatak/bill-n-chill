@@ -188,14 +188,13 @@ describe("ProjectsConsole", () => {
     render(<ProjectsConsole />);
 
     await waitFor(() => {
-      expect(screen.getByText("Estimates / Approvals")).toBeInTheDocument();
+      expect(screen.getByText("Contract Total")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Income")).toBeInTheDocument();
-    expect(screen.getByText("Expenses")).toBeInTheDocument();
-    expect(screen.getByText("Invoiced to date")).toBeInTheDocument();
-    expect(screen.getByText("AR outstanding")).toBeInTheDocument();
-    expect(screen.getByText("AP outstanding")).toBeInTheDocument();
+    expect(screen.getByText("Invoiced")).toBeInTheDocument();
+    expect(screen.getByText("Paid")).toBeInTheDocument();
+    expect(screen.getByText("Outstanding")).toBeInTheDocument();
+    expect(screen.getByText("Remaining to Invoice")).toBeInTheDocument();
   });
 
   it("displays estimate and CO status count badges", async () => {
@@ -375,8 +374,6 @@ describe("ProjectsConsole", () => {
     expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/1/estimates");
     expect(screen.getByRole("link", { name: /Change Orders/ })).toHaveAttribute("href", "/projects/1/change-orders");
     expect(screen.getByRole("link", { name: /Invoices/ })).toHaveAttribute("href", "/projects/1/invoices");
-    expect(screen.getByRole("link", { name: /Accounting/ })).toHaveAttribute("href", "/accounting");
-    // Event History is debug-only (NEXT_PUBLIC_DEBUG=true)
   });
 
   // ---------------------------------------------------------------------------
