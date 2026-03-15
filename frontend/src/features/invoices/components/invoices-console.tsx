@@ -21,6 +21,7 @@ import {
   nextInvoiceNumberPreview,
   publicInvoiceHref,
   readInvoiceApiError,
+  validateInvoiceLineItems,
 } from "../helpers";
 import { useStatusFilters } from "@/shared/hooks/use-status-filters";
 import {
@@ -279,6 +280,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
   const [taxPercent, setTaxPercent] = useState("0");
   const [termsText, setTermsText] = useState("");
   const [lineItems, setLineItems] = useState<InvoiceLineInput[]>([emptyLine(1)]);
+  const lineValidation = useMemo(() => validateInvoiceLineItems(lineItems), [lineItems]);
   const [nextLineId, setNextLineId] = useState(2);
   const [workspaceSourceInvoiceId, setWorkspaceSourceInvoiceId] = useState<number | null>(null);
   const [editingDraftInvoiceId, setEditingDraftInvoiceId] = useState<number | null>(null);
@@ -723,6 +725,11 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     }
     if (workspaceIsLocked) {
       setErrorStatus("This invoice workspace is read-only. Start a new draft or duplicate to edit.");
+      return;
+    }
+
+    if (lineValidation.issues.length > 0) {
+      setErrorStatus("Every line item must have a cost code.");
       return;
     }
 
@@ -1664,6 +1671,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                         <div className={mobileCardStyles.cardList}>
                           {lineItems.map((line, index) => {
                             const lineAmount = parseAmount(line.quantity) * parseAmount(line.unitPrice);
+                            const rowIssues = lineValidation.issuesByLocalId.get(line.localId) ?? [];
                             return (
                               <MobileLineItemCard
                                 key={line.localId}
@@ -1672,6 +1680,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                                 isFirst={index === 0}
                                 isLast={index === lineItems.length - 1}
                                 onRemove={() => removeLineItem(line.localId)}
+                                validationError={rowIssues.length ? `Row ${index + 1}: ${rowIssues.join(" ")}` : undefined}
                                 fields={[
                                   {
                                     label: "Description",
@@ -1682,7 +1691,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                                         className={mobileCardStyles.fieldInput}
                                         value={line.description}
                                         onChange={(event) => updateLineItem(line.localId, "description", event.target.value)}
-                                        required
                                       />
                                     ),
                                   },
@@ -1711,7 +1719,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                                         value={line.quantity}
                                         onChange={(event) => updateLineItem(line.localId, "quantity", event.target.value)}
                                         inputMode="decimal"
-                                        required
                                       />
                                     ),
                                   },
@@ -1723,7 +1730,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                                         className={mobileCardStyles.fieldInput}
                                         value={line.unit}
                                         onChange={(event) => updateLineItem(line.localId, "unit", event.target.value)}
-                                        required
                                       />
                                     ),
                                   },
@@ -1736,7 +1742,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                                         value={line.unitPrice}
                                         onChange={(event) => updateLineItem(line.localId, "unitPrice", event.target.value)}
                                         inputMode="decimal"
-                                        required
                                       />
                                     ),
                                   },
@@ -1767,10 +1772,11 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                           </div>
                           {lineItems.map((line, index) => {
                             const lineAmount = parseAmount(line.quantity) * parseAmount(line.unitPrice);
+                            const rowIssues = lineValidation.issuesByLocalId.get(line.localId) ?? [];
                             return (
                               <div
                                 key={line.localId}
-                                className={`${invoiceCreatorStyles.invoiceLineRow} ${index % 2 === 1 ? invoiceCreatorStyles.invoiceLineRowAlt : ""}`}
+                                className={`${invoiceCreatorStyles.invoiceLineRow} ${index % 2 === 1 ? invoiceCreatorStyles.invoiceLineRowAlt : ""} ${rowIssues.length ? creatorStyles.lineRowInvalid : ""}`}
                               >
                                 <div>
                                   <span className={creatorStyles.printOnly}>
@@ -1794,7 +1800,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                                   onChange={(event) =>
                                     updateLineItem(line.localId, "description", event.target.value)
                                   }
-                                  required
                                 />
                                 <input
                                   className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
@@ -1803,13 +1808,11 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                                     updateLineItem(line.localId, "quantity", event.target.value)
                                   }
                                   inputMode="decimal"
-                                  required
                                 />
                                 <input
                                   className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
                                   value={line.unit}
                                   onChange={(event) => updateLineItem(line.localId, "unit", event.target.value)}
-                                  required
                                 />
                                 <input
                                   className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
@@ -1818,7 +1821,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                                     updateLineItem(line.localId, "unitPrice", event.target.value)
                                   }
                                   inputMode="decimal"
-                                  required
                                 />
                                 <span className={`${creatorStyles.amountCell} ${invoiceCreatorStyles.invoiceReadAmount}`}>
                                   ${formatDecimal(lineAmount)}
@@ -1832,6 +1834,11 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                                     Remove
                                   </button>
                                 </div>
+                                {rowIssues.length ? (
+                                  <p className={creatorStyles.lineIssue}>
+                                    Row {index + 1}: {rowIssues.join(" ")}
+                                  </p>
+                                ) : null}
                               </div>
                             );
                           })}

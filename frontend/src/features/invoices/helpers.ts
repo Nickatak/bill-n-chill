@@ -178,3 +178,43 @@ export function readInvoiceApiError(
 export function projectStatusLabel(statusValue: string): string {
   return statusValue.replace("_", " ");
 }
+
+// ---------------------------------------------------------------------------
+// Line item validation
+// ---------------------------------------------------------------------------
+
+export type InvoiceLineValidationIssue = {
+  localId: number;
+  rowNumber: number;
+  message: string;
+};
+
+export type InvoiceLineValidationResult = {
+  issues: InvoiceLineValidationIssue[];
+  issuesByLocalId: Map<number, string[]>;
+};
+
+/** Validate invoice line items for completeness (cost code required). */
+export function validateInvoiceLineItems(lines: InvoiceLineInput[]): InvoiceLineValidationResult {
+  const issues: InvoiceLineValidationIssue[] = [];
+  const issuesByLocalId = new Map<number, string[]>();
+  lines.forEach((line, index) => {
+    const rowNumber = index + 1;
+    const rowIssues: string[] = [];
+
+    if (!line.costCode.trim()) {
+      rowIssues.push("Select a cost code.");
+    }
+
+    if (!rowIssues.length) {
+      return;
+    }
+
+    issuesByLocalId.set(line.localId, rowIssues);
+    for (const message of rowIssues) {
+      issues.push({ localId: line.localId, rowNumber, message });
+    }
+  });
+
+  return { issues, issuesByLocalId };
+}
