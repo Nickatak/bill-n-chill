@@ -71,6 +71,7 @@ import type { CostCode } from "../types";
 
 type ContractBreakdownEstimateLine = {
   id: number;
+  cost_code?: number | null;
   cost_code_code?: string;
   description: string;
   quantity: string;
