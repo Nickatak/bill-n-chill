@@ -480,6 +480,14 @@
     order: 1;
   }
 
+  .contractDuplicateButton {
+    width: auto;
+    min-width: 60px;
+    height: 44px;
+    min-height: 44px;
+    font-size: 1.4rem;
+  }
+
   .toolbarPrimaryButton,
   .toolbarSecondaryButton {
     min-height: 44px;
@@ -842,7 +850,7 @@
   padding: 0;
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-md);
-  background: var(--surface-secondary);
+  background: var(--surface);
   color: var(--accent-text);
   font-size: 1.1rem;
   font-weight: 700;
@@ -867,7 +875,7 @@
     transform: scale(1.15);
   }
   100% {
-    background: var(--surface-secondary);
+    background: var(--surface);
     color: var(--accent-text);
     transform: scale(1);
   }

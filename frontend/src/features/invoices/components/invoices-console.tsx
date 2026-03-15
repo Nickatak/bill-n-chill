@@ -1071,23 +1071,25 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       { order: 2, span: "half", hidden: true },
       { order: 3, span: "half", hidden: true },
       { order: 4, span: "half", hidden: true },
-      { order: 5, span: "half" },
-      { order: 6, span: "full", align: "right" },
+      { order: 5, span: "full" },
+      { order: 7, span: "full", align: "right" },
     ];
     const coColumns = ["CO #", "Cost code", "Description", "Days delta", "Amount delta"];
     const coMobileLayout: { order: number; span: "full" | "half"; align?: "left" | "right"; hidden?: boolean }[] = [
       { order: 0, span: "full" },
       { order: 1, span: "half" },
       { order: 2, span: "full" },
-      { order: 3, span: "half" },
-      { order: 4, span: "half", align: "right" },
+      { order: 3, span: "full", align: "right" },
+      { order: 5, span: "full", align: "right" },
     ];
 
     if (canDuplicate) {
       estimateColumns.push("");
-      estimateMobileLayout.push({ order: 7, span: "half", hidden: true });
+      estimateMobileLayout[6] = { order: 7, span: "half", align: "right" };
+      estimateMobileLayout.push({ order: 6, span: "half" });
       coColumns.push("");
-      coMobileLayout.push({ order: 5, span: "half", hidden: true });
+      coMobileLayout[4] = { order: 5, span: "half", align: "right" };
+      coMobileLayout.push({ order: 4, span: "half" });
     }
 
     return (
@@ -1131,7 +1133,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
               if (canDuplicate) {
                 cells.push(
                   renderDuplicateButton(`est-${line.id}`, {
-                    costCode: line.cost_code_code || "",
+                    costCode: line.cost_code ? String(line.cost_code) : "",
                     description: line.description,
                     quantity: line.quantity,
                     unit: line.unit,
@@ -1168,7 +1170,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                 if (canDuplicate) {
                   cells.push(
                     renderDuplicateButton(`co-${co.id}-${line.id}`, {
-                      costCode: line.cost_code_code || "",
+                      costCode: line.cost_code_id ? String(line.cost_code_id) : "",
                       description: line.description,
                       quantity: "1",
                       unit: "",
