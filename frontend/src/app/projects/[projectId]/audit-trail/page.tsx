@@ -1,3 +1,7 @@
+// TODO: Audit trail is hidden from the UI for now (no nav link points here).
+// This will resurface as an administration/compliance feature. The route,
+// component, and backend endpoints are fully functional — just not exposed.
+
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { PageCard, PageShell } from "@/shared/shell";

@@ -43,7 +43,7 @@ const PAYMENT_STATUS_LABELS_FALLBACK: Record<string, string> = {
   settled: "Settled",
   void: "Void",
 };
-const PAYMENT_METHODS_FALLBACK = ["ach", "card", "check", "wire", "cash", "other"];
+const PAYMENT_METHODS_FALLBACK = ["check", "zelle", "ach", "cash", "wire", "card", "other"];
 const PAYMENT_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
   pending: ["settled", "void"],
   settled: ["void"],
@@ -63,6 +63,10 @@ export type PaymentRecorderProps = {
   direction: "inbound" | "outbound";
   allocationTargets: AllocationTarget[];
   onPaymentsChanged?: () => void;
+  /** Hide the heading and description copy (e.g. when embedded in a parent with its own header). */
+  hideHeader?: boolean;
+  /** Show only the create form — hide the payment list and detail card (e.g. on project page). */
+  createOnly?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -88,6 +92,8 @@ export function PaymentRecorder({
   direction,
   allocationTargets,
   onPaymentsChanged,
+  hideHeader = false,
+  createOnly = false,
 }: PaymentRecorderProps) {
   const { token, role, capabilities } = useSharedSessionAuth();
   const [statusMessage, setStatusMessage] = useState("");
@@ -174,6 +180,7 @@ export function PaymentRecorder({
   }
 
   function hydrateFromPayment(payment: PaymentRecord) {
+    if (createOnly) return;
     setWorkspaceMode("edit");
     setFormMethod(payment.method);
     setFormStatus(payment.status);
@@ -253,6 +260,7 @@ export function PaymentRecorder({
   }
 
   function handleSelectPayment(payment: PaymentRecord) {
+    if (createOnly) return;
     setSelectedPaymentId(String(payment.id));
     hydrateFromPayment(payment);
   }
@@ -481,12 +489,16 @@ export function PaymentRecorder({
 
   return (
     <section className={styles.recorder}>
-      <h2 className={styles.heading}>{directionLabel} Payments</h2>
-      <p className={styles.copy}>
-        {direction === "inbound"
-          ? "Record payments received from customers and allocate them to invoices."
-          : "Record payments made to vendors and allocate them to bills."}
-      </p>
+      {!hideHeader && (
+        <>
+          <h2 className={styles.heading}>{directionLabel} Payments</h2>
+          <p className={styles.copy}>
+            {direction === "inbound"
+              ? "Record payments received from customers and allocate them to invoices."
+              : "Record payments made to vendors and allocate them to bills."}
+          </p>
+        </>
+      )}
 
       {!canCreatePayments && !canEditPayments ? (
         <p className={styles.readOnlyNotice}>
@@ -504,7 +516,7 @@ export function PaymentRecorder({
 
       {/* ── Payment list ──────────────────────────────────── */}
 
-      {payments.length > 0 ? (
+      {!createOnly && (payments.length > 0 ? (
         <>
           <div className={styles.paymentList}>
             {payments.map((payment) => {
@@ -544,11 +556,11 @@ export function PaymentRecorder({
         <p className={styles.emptyState}>
           No {directionLabel.toLowerCase()} payments yet for this project.
         </p>
-      )}
+      ))}
 
       {/* ── Selected payment detail card ──────────────────── */}
 
-      {selectedPayment ? (
+      {!createOnly && selectedPayment ? (
         <div className={styles.detailCard}>
           <div className={styles.detailHeader}>
             <h3 className={styles.detailTitle}>Payment #{selectedPayment.id}</h3>
@@ -662,7 +674,7 @@ export function PaymentRecorder({
 
       {/* ── Workspace form (create / edit) ────────────────── */}
 
-      <form className={styles.workspace} onSubmit={handleSubmit}>
+      <form className={`${styles.workspace} ${createOnly ? styles.workspaceEmbedded : ""}`} onSubmit={handleSubmit}>
         <h3 className={styles.workspaceTitle}>
           {workspaceMode === "create" ? "Record Payment" : `Editing Payment #${selectedPaymentId}`}
           <span className={styles.workspaceBadge}>
@@ -728,10 +740,38 @@ export function PaymentRecorder({
                 </select>
               </div>
               {allocTargetId ? (
-                <div className={styles.field}>
-                  <span className={styles.fieldLabel}>Allocation Amount</span>
-                  <input value={allocAmount} onChange={(e) => setAllocAmount(e.target.value)} placeholder="0.00" />
-                </div>
+                <>
+                  <div className={styles.quickAmountRow}>
+                    {(() => {
+                      const target = payableTargets.find((t) => String(t.id) === allocTargetId);
+                      if (!target) return null;
+                      const full = target.balanceDue;
+                      const half = (Number(full) / 2).toFixed(2);
+                      return (
+                        <>
+                          <button
+                            type="button"
+                            className={styles.quickAmountButton}
+                            onClick={() => { setFormAmount(full); setAllocAmount(full); }}
+                          >
+                            Full (${full})
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.quickAmountButton}
+                            onClick={() => { setFormAmount(half); setAllocAmount(half); }}
+                          >
+                            50% (${half})
+                          </button>
+                        </>
+                      );
+                    })()}
+                  </div>
+                  <div className={styles.field}>
+                    <span className={styles.fieldLabel}>Allocation Amount</span>
+                    <input value={allocAmount} onChange={(e) => setAllocAmount(e.target.value)} placeholder="0.00" />
+                  </div>
+                </>
               ) : null}
             </div>
           </>

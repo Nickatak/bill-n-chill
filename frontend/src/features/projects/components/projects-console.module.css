@@ -290,22 +290,6 @@
   opacity: 0.5;
 }
 
-.eventHistoryLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.76rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  text-decoration: none;
-}
-
-.eventHistoryLink:hover {
-  color: var(--accent);
-  text-decoration: underline;
-}
 
 .estimateCountPill {
   font-size: 0.66rem;
@@ -333,6 +317,7 @@
 }
 
 .metricsPanel {
+  grid-column: 1 / -1;
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: var(--space-lg);
@@ -544,7 +529,8 @@
 
 @media (max-width: 700px) {
   .treePanel,
-  .metricsPanel {
+  .metricsPanel,
+  .paymentRecorderSection {
     padding: var(--space-md);
   }
 
@@ -577,7 +563,8 @@
 
 @media (max-width: 640px) {
   .treePanel,
-  .metricsPanel {
+  .metricsPanel,
+  .paymentRecorderSection {
     padding: 10px;
     border-radius: 10px;
   }
@@ -624,4 +611,25 @@
     min-height: 44px;
     font-size: 1rem;
   }
+}
+
+/* -- Payment recorder section -- */
+
+.paymentRecorderSection {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: var(--space-lg);
+  background: var(--surface-secondary);
+  align-self: start;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sectionHeading {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-md) 0;
 }

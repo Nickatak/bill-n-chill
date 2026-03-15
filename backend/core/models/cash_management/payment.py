@@ -36,12 +36,12 @@ class Payment(StatusTransitionMixin, models.Model):
         OUTBOUND = "outbound", "Outbound"
 
     class Method(models.TextChoices):
-        ACH = "ach", "ACH"
-        CARD = "card", "Card"
         CHECK = "check", "Check"
-        WIRE = "wire", "Wire"
         ZELLE = "zelle", "Zelle"
+        ACH = "ach", "ACH"
         CASH = "cash", "Cash"
+        WIRE = "wire", "Wire"
+        CARD = "card", "Card"
         OTHER = "other", "Other"
 
     class Status(models.TextChoices):

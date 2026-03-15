@@ -12,11 +12,11 @@ import { formatCurrency } from "@/shared/money-format";
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { isDebugMode } from "@/shared/shell/nav-routes";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import styles from "./projects-console.module.css";
+import { PaymentRecorder, type AllocationTarget } from "@/features/payments";
 import { ProjectListViewer } from "@/shared/project-list-viewer";
 import { ApiResponse, ProjectFinancialSummary, ProjectRecord } from "../types";
 import {
@@ -59,6 +59,7 @@ export function ProjectsConsole() {
   } | null>(null);
   const [acceptedEstimateTotal, setAcceptedEstimateTotal] = useState("--");
   const [acceptedChangeOrderDeltaTotal, setAcceptedChangeOrderDeltaTotal] = useState("--");
+  const [invoiceAllocationTargets, setInvoiceAllocationTargets] = useState<AllocationTarget[]>([]);
   const [isProjectEditOpen, setIsProjectEditOpen] = useState(false);
   const projectEditFormRef = useRef<HTMLFormElement | null>(null);
 
@@ -301,6 +302,37 @@ export function ProjectsConsole() {
     }
   }
 
+  /** Loads invoices for the selected project and maps them to allocation targets. */
+  async function loadInvoiceAllocationTargets(projectId: number) {
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/invoices/`, {
+        headers: buildAuthHeaders(token),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setInvoiceAllocationTargets([]);
+        return;
+      }
+      const rows = (payload.data as Array<{
+        id: number;
+        invoice_number?: string;
+        balance_due?: string;
+        status?: string;
+      }>) ?? [];
+      setInvoiceAllocationTargets(
+        rows
+          .filter((inv) => inv.status !== "void" && inv.status !== "draft" && Number(inv.balance_due || 0) > 0)
+          .map((inv) => ({
+            id: inv.id,
+            label: inv.invoice_number ? `Invoice ${inv.invoice_number}` : `Invoice #${inv.id}`,
+            balanceDue: inv.balance_due ?? "0.00",
+          })),
+      );
+    } catch {
+      setInvoiceAllocationTargets([]);
+    }
+  }
+
   // Fetch the full project list whenever auth or URL scope changes.
   useEffect(() => {
     if (!token) {
@@ -322,6 +354,7 @@ export function ProjectsConsole() {
     void loadFinancialSummary();
     void loadEstimateStatusCounts(projectId);
     void loadChangeOrderStatusCounts(projectId);
+    void loadInvoiceAllocationTargets(projectId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProjectId, token]);
 
@@ -608,28 +641,25 @@ export function ProjectsConsole() {
                   <span className={styles.pipelineLabel}>Invoices</span>
                 </Link>
 
-                <span className={styles.pipelineArrow} aria-hidden="true">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                    <polyline points="12 5 19 12 12 19" />
-                  </svg>
-                </span>
-
-                <Link href="/accounting" className={styles.pipelineStage}>
-                  <svg className={styles.pipelineIcon} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <line x1="12" y1="1" x2="12" y2="23" />
-                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                  </svg>
-                  <span className={styles.pipelineLabel}>Accounting</span>
-                </Link>
               </nav>
 
-              {isDebugMode ? (
-                <Link href={`/projects/${selectedProject.id}/audit-trail`} className={styles.eventHistoryLink}>
-                  Event History
-                </Link>
-              ) : null}
             </div>
+
+            {/* Inbound payment recorder — rough placement for iteration */}
+            <div className={styles.paymentRecorderSection}>
+              <PaymentRecorder
+                projectId={selectedProject.id}
+                direction="inbound"
+                allocationTargets={invoiceAllocationTargets}
+                hideHeader
+                createOnly
+                onPaymentsChanged={() => {
+                  void loadFinancialSummary();
+                  void loadInvoiceAllocationTargets(selectedProject.id);
+                }}
+              />
+            </div>
+
             <div className={styles.metricsPanel}>
               <section className={styles.metricSection}>
                 <h4 className={styles.metricSectionTitle}>Estimates / Approvals</h4>
@@ -694,6 +724,7 @@ export function ProjectsConsole() {
               </section>
             </div>
           </div>
+
         </section>
       ) : null}
 

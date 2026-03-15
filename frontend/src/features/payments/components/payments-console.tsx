@@ -49,7 +49,7 @@ const PAYMENT_STATUS_LABELS_FALLBACK: Record<string, string> = {
   settled: "Settled",
   void: "Void",
 };
-const PAYMENT_METHODS_FALLBACK = ["ach", "card", "check", "wire", "zelle", "cash", "other"];
+const PAYMENT_METHODS_FALLBACK = ["check", "zelle", "ach", "cash", "wire", "card", "other"];
 const PAYMENT_ALLOWED_TRANSITIONS_FALLBACK: Record<string, string[]> = {
   pending: ["settled", "void"],
   settled: ["void"],
