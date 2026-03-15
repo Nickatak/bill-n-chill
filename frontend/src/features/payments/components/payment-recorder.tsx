@@ -120,7 +120,7 @@ export function PaymentRecorder({
   const [workspaceMode, setWorkspaceMode] = useState<"create" | "edit">("create");
 
   // Form fields (shared between create and edit)
-  const [formMethod, setFormMethod] = useState<PaymentMethod>("ach");
+  const [formMethod, setFormMethod] = useState<PaymentMethod>("check");
   const [formStatus, setFormStatus] = useState<PaymentStatus>("settled");
   const [formAmount, setFormAmount] = useState("0.00");
   const [formPaymentDate, setFormPaymentDate] = useState(todayDateInput());
