@@ -413,7 +413,7 @@ def payment_detail_view(request, payment_id: int):
             previous_status,
             payment.status,
         } & {Payment.Status.SETTLED}:
-            _recalculate_payment_allocation_targets(payment)
+            _recalculate_payment_allocation_targets(payment, changed_by=request.user)
         if len(update_fields) > 1:
             PaymentRecord.record(
                 payment=payment,
@@ -654,7 +654,7 @@ def payment_allocate_view(request, payment_id: int):
         touched_vendor_bill_ids = [vendor_bill.id for _, _, vendor_bill in resolved_targets if vendor_bill]
 
         for invoice in Invoice.objects.filter(id__in=touched_invoice_ids):
-            _set_invoice_balance_from_allocations(invoice)
+            _set_invoice_balance_from_allocations(invoice, changed_by=request.user)
 
         for vendor_bill in VendorBill.objects.filter(id__in=touched_vendor_bill_ids):
             _set_vendor_bill_balance_from_allocations(vendor_bill)

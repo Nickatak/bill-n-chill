@@ -2,10 +2,14 @@
 
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
 from django.db.models import Sum
 
 from core.models import Invoice, Payment, PaymentAllocation, VendorBill
+from core.models.financial_auditing.invoice_status_event import InvoiceStatusEvent
 from core.utils.money import MONEY_ZERO, quantize_money
+
+User = get_user_model()
 
 
 def _settled_allocated_total(payment: Payment) -> Decimal:
@@ -27,8 +31,11 @@ def _all_allocated_total(payment: Payment) -> Decimal:
     )
 
 
-def _set_invoice_balance_from_allocations(invoice: Invoice):
+def _set_invoice_balance_from_allocations(invoice: Invoice, *, changed_by: "User"):
     """Recompute an invoice's balance_due and status from its settled payment allocations."""
+    previous_status = invoice.status
+    previous_balance = invoice.balance_due
+
     applied_total = (
         PaymentAllocation.objects.filter(
             invoice=invoice,
@@ -62,6 +69,24 @@ def _set_invoice_balance_from_allocations(invoice: Invoice):
         invoice.save(update_fields=list(dict.fromkeys(update_fields)))
     finally:
         invoice._skip_transition_validation = False
+
+    # Record audit event when the status actually changed.
+    if invoice.status != previous_status:
+        balance_restored = next_balance - previous_balance
+        if balance_restored > MONEY_ZERO:
+            note = f"Payment voided — ${balance_restored:,.2f} balance restored."
+        elif invoice.status == Invoice.Status.PAID:
+            note = "Payment settled — invoice fully paid."
+        else:
+            note = "Payment applied — invoice partially paid."
+
+        InvoiceStatusEvent.record(
+            invoice=invoice,
+            from_status=previous_status,
+            to_status=invoice.status,
+            note=note,
+            changed_by=changed_by,
+        )
 
 
 def _set_vendor_bill_balance_from_allocations(vendor_bill: VendorBill):
@@ -97,7 +122,7 @@ def _set_vendor_bill_balance_from_allocations(vendor_bill: VendorBill):
         vendor_bill._skip_transition_validation = False
 
 
-def _recalculate_payment_allocation_targets(payment: Payment):
+def _recalculate_payment_allocation_targets(payment: Payment, *, changed_by: "User"):
     """Refresh balance_due on all invoices and vendor bills linked to a payment."""
     invoice_ids = set(
         PaymentAllocation.objects.filter(payment=payment, invoice_id__isnull=False).values_list(
@@ -111,7 +136,7 @@ def _recalculate_payment_allocation_targets(payment: Payment):
     )
 
     for invoice in Invoice.objects.filter(id__in=invoice_ids):
-        _set_invoice_balance_from_allocations(invoice)
+        _set_invoice_balance_from_allocations(invoice, changed_by=changed_by)
 
     for vendor_bill in VendorBill.objects.filter(id__in=vendor_bill_ids):
         _set_vendor_bill_balance_from_allocations(vendor_bill)
