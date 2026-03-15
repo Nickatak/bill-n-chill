@@ -163,7 +163,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 6px var(--space-sm);
-  background: var(--surface-secondary);
+  background: var(--surface);
   color: var(--text-primary);
   font-size: 0.84rem;
   font-variant-numeric: tabular-nums;

@@ -11,7 +11,7 @@
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-lg);
   padding: var(--space-md);
-  background: var(--surface-secondary);
+  background: var(--surface);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 10px;
@@ -158,7 +158,7 @@
 .moveButton {
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-md);
-  background: var(--surface-secondary);
+  background: var(--surface);
   color: var(--accent-text);
   padding: 8px 12px;
   min-height: 44px;
@@ -179,7 +179,7 @@
 .duplicateButton {
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-md);
-  background: var(--surface-secondary);
+  background: var(--surface);
   color: var(--accent-text);
   padding: 8px 12px;
   min-height: 44px;

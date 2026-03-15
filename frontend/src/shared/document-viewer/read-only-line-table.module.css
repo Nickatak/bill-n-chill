@@ -97,7 +97,7 @@
     padding: 10px 12px;
     border: 1px solid var(--border);
     border-radius: 10px;
-    background: var(--surface);
+    background: var(--surface-secondary);
     margin-bottom: 6px;
   }
 

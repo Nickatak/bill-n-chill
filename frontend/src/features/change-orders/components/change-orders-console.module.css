@@ -718,7 +718,7 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: var(--space-sm);
-  background: var(--surface-secondary);
+  background: var(--surface);
 }
 
 .viewerSectionToggle {

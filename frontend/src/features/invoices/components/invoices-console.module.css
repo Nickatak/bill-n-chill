@@ -789,7 +789,7 @@
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: var(--space-sm);
-  background: var(--surface-secondary);
+  background: var(--surface);
 }
 
 .contractBreakdownToggle {
@@ -829,7 +829,7 @@
 }
 
 .lockedLineTableWrap {
-  background: var(--surface-secondary);
+  background: var(--surface);
   border-radius: 10px;
   padding: var(--space-sm);
 }
