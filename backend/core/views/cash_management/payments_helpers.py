@@ -55,7 +55,13 @@ def _set_invoice_balance_from_allocations(invoice: Invoice):
             invoice.status = Invoice.Status.SENT
             update_fields.append("status")
 
-    invoice.save(update_fields=list(dict.fromkeys(update_fields)))
+    # System-driven status reversals (e.g. paid → sent after payment void)
+    # bypass the model's transition validation since these are not user-initiated.
+    invoice._skip_transition_validation = True
+    try:
+        invoice.save(update_fields=list(dict.fromkeys(update_fields)))
+    finally:
+        invoice._skip_transition_validation = False
 
 
 def _set_vendor_bill_balance_from_allocations(vendor_bill: VendorBill):
@@ -83,7 +89,12 @@ def _set_vendor_bill_balance_from_allocations(vendor_bill: VendorBill):
             vendor_bill.status = VendorBill.Status.SCHEDULED
             update_fields.append("status")
 
-    vendor_bill.save(update_fields=list(dict.fromkeys(update_fields)))
+    # System-driven status reversals bypass transition validation.
+    vendor_bill._skip_transition_validation = True
+    try:
+        vendor_bill.save(update_fields=list(dict.fromkeys(update_fields)))
+    finally:
+        vendor_bill._skip_transition_validation = False
 
 
 def _recalculate_payment_allocation_targets(payment: Payment):

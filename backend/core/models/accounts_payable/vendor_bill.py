@@ -106,7 +106,8 @@ class VendorBill(StatusTransitionMixin, models.Model):
         if self.status == self.Status.SCHEDULED and self.scheduled_for is None:
             errors.setdefault("scheduled_for", []).append("Provide a scheduled payment date.")
 
-        self.validate_status_transition(errors)
+        if not getattr(self, "_skip_transition_validation", False):
+            self.validate_status_transition(errors)
 
         if errors:
             raise ValidationError(errors)

@@ -138,7 +138,8 @@ class Invoice(StatusTransitionMixin, models.Model):
                 "Invoice customer must match the project customer."
             )
 
-        self.validate_status_transition(errors)
+        if not getattr(self, "_skip_transition_validation", False):
+            self.validate_status_transition(errors)
 
         if errors:
             raise ValidationError(errors)

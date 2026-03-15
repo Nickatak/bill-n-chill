@@ -139,7 +139,7 @@ class PaymentTests(TestCase):
         )
         self.assertEqual(payload["default_create_status"], Payment.Status.SETTLED)
         self.assertEqual(payload["default_create_direction"], Payment.Direction.INBOUND)
-        self.assertEqual(payload["default_create_method"], Payment.Method.ACH)
+        self.assertEqual(payload["default_create_method"], Payment.Method.CHECK)
         self.assertEqual(payload["allowed_status_transitions"], expected_transitions)
         self.assertEqual(payload["terminal_statuses"], expected_terminal_statuses)
         self.assertEqual(
@@ -514,4 +514,136 @@ class PaymentTests(TestCase):
         )
         self.assertEqual(invalid_amount.status_code, 400)
         self.assertIn("amount", invalid_amount.json())
+
+    # ── Payment void reversal: system-driven status transitions ──
+
+    def test_void_payment_reopens_fully_paid_invoice(self):
+        """Voiding a payment that fully paid an invoice should revert the invoice to sent."""
+        payment_id = self._create_payment(status="settled", amount="500.00", direction="inbound")
+        invoice = self._create_invoice(total="500.00")
+
+        # Allocate full amount → invoice becomes paid
+        alloc = self.client.post(
+            f"/api/v1/payments/{payment_id}/allocate/",
+            data={
+                "allocations": [
+                    {"target_type": "invoice", "target_id": invoice.id, "applied_amount": "500.00"}
+                ]
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(alloc.status_code, 201)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, Invoice.Status.PAID)
+        self.assertEqual(str(invoice.balance_due), "0.00")
+
+        # Void the payment → invoice should revert to sent with full balance restored
+        void_resp = self.client.patch(
+            f"/api/v1/payments/{payment_id}/",
+            data={"status": "void"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(void_resp.status_code, 200)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, Invoice.Status.SENT)
+        self.assertEqual(str(invoice.balance_due), "500.00")
+
+    def test_void_one_of_two_payments_reverts_paid_invoice_to_partially_paid(self):
+        """Voiding one of two payments on a fully paid invoice should revert to partially_paid."""
+        payment_a_id = self._create_payment(status="settled", amount="300.00", direction="inbound")
+        payment_b_id = self._create_payment(status="settled", amount="200.00", direction="inbound")
+        invoice = self._create_invoice(total="500.00")
+
+        # Allocate both payments → invoice becomes paid
+        alloc_a = self.client.post(
+            f"/api/v1/payments/{payment_a_id}/allocate/",
+            data={
+                "allocations": [
+                    {"target_type": "invoice", "target_id": invoice.id, "applied_amount": "300.00"}
+                ]
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(alloc_a.status_code, 201)
+
+        alloc_b = self.client.post(
+            f"/api/v1/payments/{payment_b_id}/allocate/",
+            data={
+                "allocations": [
+                    {"target_type": "invoice", "target_id": invoice.id, "applied_amount": "200.00"}
+                ]
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(alloc_b.status_code, 201)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, Invoice.Status.PAID)
+        self.assertEqual(str(invoice.balance_due), "0.00")
+
+        # Void payment A → invoice should revert to partially_paid (B still settled)
+        void_resp = self.client.patch(
+            f"/api/v1/payments/{payment_a_id}/",
+            data={"status": "void"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(void_resp.status_code, 200)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, Invoice.Status.PARTIALLY_PAID)
+        self.assertEqual(str(invoice.balance_due), "300.00")
+
+    def test_void_payment_reopens_fully_paid_vendor_bill(self):
+        """Voiding a payment that fully paid a vendor bill should revert the bill to scheduled."""
+        payment_id = self._create_payment(status="settled", amount="1000.00", direction="outbound")
+        bill = self._create_vendor_bill(total="1000.00", status="scheduled")
+
+        # Allocate full amount → bill becomes paid
+        alloc = self.client.post(
+            f"/api/v1/payments/{payment_id}/allocate/",
+            data={
+                "allocations": [
+                    {"target_type": "vendor_bill", "target_id": bill.id, "applied_amount": "1000.00"}
+                ]
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(alloc.status_code, 201)
+        bill.refresh_from_db()
+        self.assertEqual(bill.status, VendorBill.Status.PAID)
+        self.assertEqual(str(bill.balance_due), "0.00")
+
+        # Void the payment → bill should revert to scheduled with full balance restored
+        void_resp = self.client.patch(
+            f"/api/v1/payments/{payment_id}/",
+            data={"status": "void"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(void_resp.status_code, 200)
+        bill.refresh_from_db()
+        self.assertEqual(bill.status, VendorBill.Status.SCHEDULED)
+        self.assertEqual(str(bill.balance_due), "1000.00")
+
+    def test_user_cannot_manually_transition_paid_invoice_to_sent(self):
+        """The paid → sent transition should only be allowed by the system, not by user API calls."""
+        invoice = self._create_invoice(total="500.00", status="sent")
+        # Manually set to paid via the model (simulating a completed payment flow)
+        invoice.status = Invoice.Status.PAID
+        invoice.balance_due = 0
+        invoice.save(update_fields=["status", "balance_due", "updated_at"])
+
+        # User tries to manually revert via the invoice detail API
+        resp = self.client.patch(
+            f"/api/v1/invoices/{invoice.id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("transition", resp.json()["error"]["message"].lower())
 
