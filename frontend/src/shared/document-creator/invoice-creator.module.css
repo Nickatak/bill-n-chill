@@ -111,10 +111,16 @@
   justify-content: space-between;
   gap: var(--space-sm);
   flex-wrap: wrap;
+  margin: var(--space-md) 0 var(--space-sm);
 }
 
 .invoiceLineSectionIntro h3 {
   margin: 0;
+  font-size: 1rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--accent);
 }
 
 .invoiceLineHeader {
