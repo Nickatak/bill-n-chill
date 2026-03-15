@@ -928,7 +928,7 @@
   }
 
   .lineTable tbody tr:nth-child(even) {
-    background: var(--surface-secondary);
+    background: var(--surface);
   }
 
   .lineTable tbody td {

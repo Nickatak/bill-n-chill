@@ -506,7 +506,7 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: var(--space-sm);
-  background: var(--surface);
+  background: var(--surface-secondary);
 }
 
 .invoiceViewerSectionHeading {
@@ -766,6 +766,48 @@
 .contractBreakdown {
   display: grid;
   gap: var(--space-sm);
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: var(--space-sm);
+  background: var(--surface-secondary);
+}
+
+.contractBreakdownToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: var(--accent-light);
+  border-radius: var(--radius-md);
+  padding: var(--space-xs) var(--space-sm);
+  min-height: 44px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.contractBreakdownToggle h4 {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
+.contractBreakdownArrow {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  transition: transform 140ms ease;
+}
+
+.contractBreakdownToggle[aria-expanded="true"] .contractBreakdownArrow {
+  transform: rotate(180deg);
 }
 
 .contractDuplicateButton {

@@ -16,6 +16,8 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--accent-text);
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .tableWrap {
@@ -93,8 +95,10 @@
     grid-template-columns: 1fr 1fr;
     gap: 4px 10px;
     padding: 10px 12px;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface-secondary);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    margin-bottom: 6px;
   }
 
   .table tbody tr::before {
@@ -115,6 +119,10 @@
     padding: 3px 0;
     border-bottom: 0;
     font-size: 0.84rem;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-break: break-word;
   }
 
   .table tbody td::before {
@@ -153,6 +161,7 @@
     border: 0;
     border-radius: 0;
     overflow: visible;
+    background: transparent;
   }
 }
 

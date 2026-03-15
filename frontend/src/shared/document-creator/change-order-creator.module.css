@@ -59,13 +59,16 @@
 .coLineSectionIntro {
   display: grid;
   gap: 6px;
-  margin: 2px 0 0;
+  margin: var(--space-md) 0 var(--space-sm);
 }
 
 .coLineSectionIntro h3 {
   margin: 0;
-  font-size: 0.92rem;
-  color: var(--text-primary);
+  font-size: 1rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--accent);
 }
 
 .coLineSectionIntro p {

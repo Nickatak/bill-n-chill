@@ -1019,6 +1019,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
   // Contract breakdown (read-only reference)
   // -------------------------------------------------------------------------
 
+  const [isContractBreakdownOpen, setIsContractBreakdownOpen] = useState(false);
   const [flashingButtons, setFlashingButtons] = useState<Set<string>>(new Set());
 
   function duplicateContractLineToInvoice(lineKey: string, fields: Omit<InvoiceLineInput, "localId">) {
@@ -1085,9 +1086,17 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
 
     return (
       <div className={styles.contractBreakdown} style={opts?.style}>
-        <h4 className={styles.invoiceViewerSectionHeading}>Contract Breakdown</h4>
+        <button
+          type="button"
+          className={styles.contractBreakdownToggle}
+          onClick={() => setIsContractBreakdownOpen((v) => !v)}
+          aria-expanded={isContractBreakdownOpen}
+        >
+          <h4>Contract Breakdown</h4>
+          <span className={styles.contractBreakdownArrow}>▼</span>
+        </button>
 
-        {hasEstimateLines ? (
+        {isContractBreakdownOpen && hasEstimateLines ? (
           <ReadOnlyLineTable
             caption={`Approved Estimate: ${estimate.title} v${estimate.version}`}
             columns={estimateColumns}
@@ -1136,7 +1145,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
           />
         ) : null}
 
-        {hasApprovedCOs ? (
+        {isContractBreakdownOpen && hasApprovedCOs ? (
           <ReadOnlyLineTable
             caption={`Approved Change Orders (${approvedCOs.length})`}
             columns={coColumns}
@@ -1439,34 +1448,27 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                             <div className={styles.invoiceViewerSection}>
                               <h4 className={styles.invoiceViewerSectionHeading}>Line Items ({invoice.line_items?.length ?? 0})</h4>
                                 <div className={styles.invoiceViewerSectionContent}>
-                                  {(invoice.line_items?.length ?? 0) > 0 ? (
-                                    <div className={styles.invoiceLineTableWrap}>
-                                      <table className={styles.invoiceLineTable}>
-                                        <thead>
-                                          <tr>
-                                            <th>Description</th>
-                                            <th>Qty</th>
-                                            <th>Unit</th>
-                                            <th>Unit Price</th>
-                                            <th>Line Total</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {invoice.line_items!.map((line) => (
-                                            <tr key={line.id}>
-                                              <td>{line.description || "—"}</td>
-                                              <td>{line.quantity}</td>
-                                              <td>{line.unit}</td>
-                                              <td>${line.unit_price}</td>
-                                              <td>${line.line_total}</td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  ) : (
-                                    <p className={styles.inlineHint}>No line items.</p>
-                                  )}
+                                  <ReadOnlyLineTable
+                                    columns={["Description", "Qty", "Unit", "Unit Price", "Line Total"]}
+                                    rows={(invoice.line_items ?? []).map((line) => ({
+                                      key: line.id,
+                                      cells: [
+                                        line.description || "—",
+                                        line.quantity,
+                                        line.unit,
+                                        `$${line.unit_price}`,
+                                        `$${line.line_total}`,
+                                      ],
+                                    }))}
+                                    emptyMessage="No line items."
+                                    mobileColumnLayout={[
+                                      { order: 0, span: "full" },
+                                      { order: 1, span: "half" },
+                                      { order: 2, span: "half" },
+                                      { order: 3, span: "half" },
+                                      { order: 4, span: "half", align: "right" },
+                                    ]}
+                                  />
                                 </div>
                             </div>
                           </div>

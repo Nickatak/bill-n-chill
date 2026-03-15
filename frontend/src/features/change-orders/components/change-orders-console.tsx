@@ -1931,8 +1931,6 @@ export function ChangeOrdersConsole({
                             </div>
                           ) : null}
                         </div>
-
-                        {renderContractBreakdown()}
                       </>
                     ) : null}
                   </>

@@ -244,6 +244,39 @@
   }
 }
 
+@media (max-width: 700px) {
+  .invoiceCreatorSheet {
+    padding: var(--space-lg);
+    border-radius: 14px;
+  }
+
+  .invoiceNumberInput {
+    width: 100%;
+    text-align: left;
+  }
+
+  .invoiceNumberContext {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .invoiceLineHeader,
+  .invoiceLineRow {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .invoiceCreatorSheet {
+    padding: var(--space-md);
+    border-radius: 10px;
+  }
+
+  .invoiceDetailCard {
+    padding: var(--space-sm);
+  }
+}
+
 /* ── Print ────────────────────────────────────────────────────── */
 
 @media print {
