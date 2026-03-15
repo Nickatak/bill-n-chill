@@ -122,27 +122,16 @@ export function ProjectsConsole() {
   );
   const contractOriginalDisplay =
     summary?.contract_value_original ?? selectedProject?.contract_value_original ?? "--";
-  const acceptedContractDisplay =
+  const acceptedContractRaw =
     summary?.accepted_contract_total ??
     selectedProject?.accepted_contract_total ??
     acceptedEstimateTotal;
-  const arOutstandingDisplay = summary?.ar_outstanding ?? "--";
-  const unbilledFromAcceptedDisplay = summary
-    ? formatCurrency(
-        parseMoneyValue(acceptedContractDisplay) - parseMoneyValue(arOutstandingDisplay),
-      )
-    : "--";
-  const apOutstandingDisplay = summary?.ap_outstanding ?? "--";
-  const apTotalDisplay = summary?.ap_total ?? "--";
-  const apPaidDisplay = summary?.ap_paid ?? "--";
-  const invoicedDisplay = summary?.invoiced_to_date ?? "--";
-  const paidDisplay = summary?.paid_to_date ?? "--";
-  const inboundCreditDisplay = summary?.inbound_unapplied_credit ?? "--";
-  const outboundCreditDisplay = summary?.outbound_unapplied_credit ?? "--";
-  const unspentFromAcceptedDisplay = summary
-    ? formatCurrency(
-        parseMoneyValue(acceptedContractDisplay) - parseMoneyValue(apOutstandingDisplay),
-      )
+  const acceptedContractDisplay = summary ? formatCurrency(parseMoneyValue(acceptedContractRaw)) : "--";
+  const invoicedDisplay = summary ? formatCurrency(parseMoneyValue(summary.invoiced_to_date)) : "--";
+  const paidDisplay = summary ? formatCurrency(parseMoneyValue(summary.paid_to_date)) : "--";
+  const arOutstandingDisplay = summary ? formatCurrency(parseMoneyValue(summary.ar_outstanding)) : "--";
+  const remainingToInvoiceDisplay = summary
+    ? formatCurrency(parseMoneyValue(acceptedContractRaw) - parseMoneyValue(summary.invoiced_to_date))
     : "--";
 
   /** Maps a status value like "on_hold" to its corresponding CSS module class. */
@@ -661,67 +650,26 @@ export function ProjectsConsole() {
             </div>
 
             <div className={styles.metricsPanel}>
-              <section className={styles.metricSection}>
-                <h4 className={styles.metricSectionTitle}>Estimates / Approvals</h4>
-                <div className={styles.metricRow}>
-                  <span>Eyeball / Initial Estimate</span>
-                  <strong>{contractOriginalDisplay}</strong>
-                </div>
-                <div className={styles.metricRow}>
-                  <span>Accepted Contract Total</span>
-                  <strong>{acceptedContractDisplay}</strong>
-                </div>
-                <div className={styles.metricRow}>
-                  <span>Accepted CO Delta</span>
-                  <strong>{acceptedChangeOrderDeltaTotal}</strong>
-                </div>
-              </section>
-              <section className={styles.metricSection}>
-                <h4 className={styles.metricSectionTitle}>Income</h4>
-                <div className={styles.metricRow}>
-                  <span>Invoiced to date</span>
-                  <strong>{invoicedDisplay}</strong>
-                </div>
-                <div className={styles.metricRow}>
-                  <span>Inbound payments to date</span>
-                  <strong>{paidDisplay}</strong>
-                </div>
-                <div className={styles.metricRow}>
-                  <span>Inbound credit</span>
-                  <strong>{inboundCreditDisplay}</strong>
-                </div>
-                <div className={styles.metricRow}>
-                  <span>AR outstanding</span>
-                  <strong>{arOutstandingDisplay}</strong>
-                </div>
-                <div className={styles.metricRow}>
-                  <span>Not Yet Billed</span>
-                  <strong>{unbilledFromAcceptedDisplay}</strong>
-                </div>
-              </section>
-              <section className={styles.metricSection}>
-                <h4 className={styles.metricSectionTitle}>Expenses</h4>
-                <div className={styles.metricRow}>
-                  <span>Bills to date</span>
-                  <strong>{apTotalDisplay}</strong>
-                </div>
-                <div className={styles.metricRow}>
-                  <span>Payments out to date</span>
-                  <strong>{apPaidDisplay}</strong>
-                </div>
-                <div className={styles.metricRow}>
-                  <span>Outbound credit</span>
-                  <strong>{outboundCreditDisplay}</strong>
-                </div>
-                <div className={styles.metricRow}>
-                  <span>AP outstanding</span>
-                  <strong>{apOutstandingDisplay}</strong>
-                </div>
-                <div className={styles.metricRow}>
-                  <span>Not Yet Expensed</span>
-                  <strong>{unspentFromAcceptedDisplay}</strong>
-                </div>
-              </section>
+              <div className={styles.metricRow}>
+                <span>Contract Total</span>
+                <strong>{acceptedContractDisplay}</strong>
+              </div>
+              <div className={styles.metricRow}>
+                <span>Invoiced</span>
+                <strong>{invoicedDisplay}</strong>
+              </div>
+              <div className={styles.metricRow}>
+                <span>Paid</span>
+                <strong>{paidDisplay}</strong>
+              </div>
+              <div className={styles.metricRow}>
+                <span>Outstanding</span>
+                <strong>{arOutstandingDisplay}</strong>
+              </div>
+              <div className={styles.metricRow}>
+                <span>Remaining to Invoice</span>
+                <strong>{remainingToInvoiceDisplay}</strong>
+              </div>
             </div>
           </div>
 

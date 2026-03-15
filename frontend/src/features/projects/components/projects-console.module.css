@@ -354,6 +354,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+.metricRowSecondary {
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
 .metricsDivider {
   width: 100%;
   border: 0;
