@@ -38,19 +38,14 @@
 }
 
 .primaryCreateButton {
-  border: 1px solid var(--accent);
+  border: 1px solid var(--accent-hover);
   border-radius: 10px;
-  background: var(--accent);
+  background: var(--accent-hover);
   color: var(--text-on-accent);
   padding: 8px 14px;
   font-size: var(--font-sm);
   font-weight: 700;
   cursor: pointer;
-}
-
-.primaryCreateButton:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
 }
 
 .formToolbar {
@@ -822,6 +817,23 @@
   .viewerEventPanel {
     min-width: 0;
     overflow: hidden;
+  }
+
+  .formToolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-sm);
+  }
+
+  .formContext {
+    order: 1;
+  }
+
+  .formToolbarActions {
+    order: 0;
+    display: grid;
+    gap: 8px;
+    width: 100%;
   }
 
   .consoleTop {

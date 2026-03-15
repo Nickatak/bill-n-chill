@@ -1661,13 +1661,13 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
             </p>
           </div>
           <div className={`${styles.lifecycleActions} ${styles.composerPrepActions} ${styles.workspaceToolbarActions}`}>
-            <button type="button" className={styles.secondaryButton} onClick={startNewEstimate}>
+            <button type="button" className={styles.toolbarPrimaryButton} onClick={startNewEstimate}>
               {selectedEstimate ? "Create New Estimate" : "Reset"}
             </button>
             {selectedEstimate ? (
               <button
                 type="button"
-                className={styles.ghostButton}
+                className={styles.toolbarSecondaryButton}
                 onClick={() => {
                   setDuplicateTitle(`${selectedEstimate.title || "Estimate"} Copy`);
                   duplicateDialogRef.current?.showModal();

@@ -1503,7 +1503,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                   <div className={styles.workspaceToolbarActions}>
                     <button
                       type="button"
-                      className={styles.toolbarActionButton}
+                      className={styles.toolbarPrimaryButton}
                       onClick={handleStartNewInvoiceDraft}
                     >
                       {workspaceSourceInvoice ? "Create New Invoice" : "Reset"}
@@ -1511,7 +1511,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                     {workspaceSourceInvoice ? (
                       <button
                         type="button"
-                        className={styles.toolbarActionButton}
+                        className={styles.toolbarSecondaryButton}
                         onClick={handleDuplicateInvoiceIntoDraft}
                       >
                         Duplicate as New Invoice
@@ -1521,9 +1521,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                   {statusMessageAtToolbar ? (
                     <p className={creatorStyles.actionSuccess}>{statusMessage}</p>
                   ) : null}
-                  <p className={styles.workspaceToolbarHint}>
-                    Invoices do not use revision families. Duplicate always creates a new invoice #.
-                  </p>
                 </div>
               ) : null}
               <div ref={invoiceCreatorRef}>

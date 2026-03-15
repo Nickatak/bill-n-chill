@@ -333,19 +333,26 @@
   font-size: var(--font-sm);
 }
 
-.toolbarActionButton {
+.toolbarPrimaryButton {
+  border: 1px solid var(--accent-hover);
+  border-radius: 10px;
+  background: var(--accent-hover);
+  color: var(--text-on-accent);
+  padding: 8px 14px;
+  font-size: var(--font-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.toolbarSecondaryButton {
   border: 1px solid var(--accent);
   border-radius: 10px;
   background: var(--accent);
   color: var(--text-on-accent);
   padding: 8px 14px;
-  font-weight: 600;
+  font-size: var(--font-sm);
+  font-weight: 700;
   cursor: pointer;
-}
-
-.toolbarActionButton:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
 }
 
 .statusActorLink {
@@ -466,6 +473,17 @@
     grid-column: 1;
     grid-row: auto;
     justify-content: stretch;
+    order: 0;
+  }
+
+  .workspaceContext {
+    order: 1;
+  }
+
+  .toolbarPrimaryButton,
+  .toolbarSecondaryButton {
+    min-height: 44px;
+    width: 100%;
   }
 
   .workspaceToolbarHint {
@@ -871,7 +889,8 @@
   .statusFilters,
   .invoiceSearchInput,
   .panelHeaderActions,
-  .toolbarActionButton,
+  .toolbarPrimaryButton,
+  .toolbarSecondaryButton,
   .invoiceViewerActionSuccess,
   .invoiceViewerActionError {
     display: none !important;
