@@ -138,6 +138,7 @@
   min-width: 1040px;
 }
 
+
 .invoiceLineRow {
   display: grid;
   grid-template-columns: 100px minmax(220px, 1.1fr) 78px minmax(220px, 1.5fr) 84px 120px 120px 88px;

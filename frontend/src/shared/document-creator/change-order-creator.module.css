@@ -96,6 +96,10 @@
   font-weight: 700;
 }
 
+.coLineHeaderLocked {
+  grid-template-columns: 1.2fr 1.5fr 0.8fr 0.8fr;
+}
+
 .coLineRow {
   display: grid;
   grid-template-columns: 1.2fr 1.5fr 0.8fr 0.8fr 0.7fr;
@@ -103,6 +107,10 @@
   align-items: stretch;
   padding: 9px 10px;
   background: var(--surface);
+}
+
+.coLineRowLocked {
+  grid-template-columns: 1.2fr 1.5fr 0.8fr 0.8fr;
 }
 
 .coLineRowActions {

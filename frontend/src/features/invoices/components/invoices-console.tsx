@@ -1635,7 +1635,36 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                       <div className={invoiceCreatorStyles.invoiceLineSectionIntro}>
                         <h3>Line Items</h3>
                       </div>
-                      {isMobile ? (
+                      {workspaceIsLocked ? (
+                        <div className={styles.lockedLineTableWrap}>
+                        <ReadOnlyLineTable
+                          columns={["Cost Code", "Description", "Qty", "Unit", "Unit Price", "Amount"]}
+                          rows={lineItems.map((line) => {
+                            const lineAmount = parseAmount(line.quantity) * parseAmount(line.unitPrice);
+                            return {
+                              key: line.localId,
+                              cells: [
+                                costCodes.find((c) => String(c.id) === line.costCode)?.code || "—",
+                                line.description || "—",
+                                line.quantity,
+                                line.unit,
+                                `$${line.unitPrice}`,
+                                `$${formatDecimal(lineAmount)}`,
+                              ],
+                            };
+                          })}
+                          emptyMessage="No line items."
+                          mobileColumnLayout={[
+                            { order: 0, span: "full" },
+                            { order: 1, span: "full" },
+                            { order: 2, span: "half" },
+                            { order: 3, span: "half" },
+                            { order: 4, span: "half" },
+                            { order: 5, span: "half", align: "right" },
+                          ]}
+                        />
+                        </div>
+                      ) : isMobile ? (
                         <div className={mobileCardStyles.cardList}>
                           {lineItems.map((line, index) => {
                             const lineAmount = parseAmount(line.quantity) * parseAmount(line.unitPrice);
@@ -1643,10 +1672,10 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                               <MobileLineItemCard
                                 key={line.localId}
                                 index={index}
-                                readOnly={workspaceIsLocked}
+                                readOnly={false}
                                 isFirst={index === 0}
                                 isLast={index === lineItems.length - 1}
-                                onRemove={workspaceIsLocked ? undefined : () => removeLineItem(line.localId)}
+                                onRemove={() => removeLineItem(line.localId)}
                                 fields={[
                                   {
                                     label: "Description",
@@ -1658,7 +1687,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                                         value={line.description}
                                         onChange={(event) => updateLineItem(line.localId, "description", event.target.value)}
                                         required
-                                        disabled={workspaceIsLocked}
                                       />
                                     ),
                                   },
@@ -1672,7 +1700,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                                         value={line.costCode}
                                         onChange={(nextValue) => updateLineItem(line.localId, "costCode", nextValue)}
                                         ariaLabel="Cost code"
-                                        disabled={workspaceIsLocked}
                                         allowEmptySelection
                                         emptySelectionLabel="No cost code (optional)"
                                         placeholder="Search cost code"
@@ -1689,7 +1716,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                                         onChange={(event) => updateLineItem(line.localId, "quantity", event.target.value)}
                                         inputMode="decimal"
                                         required
-                                        disabled={workspaceIsLocked}
                                       />
                                     ),
                                   },
@@ -1702,7 +1728,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                                         value={line.unit}
                                         onChange={(event) => updateLineItem(line.localId, "unit", event.target.value)}
                                         required
-                                        disabled={workspaceIsLocked}
                                       />
                                     ),
                                   },
@@ -1716,7 +1741,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                                         onChange={(event) => updateLineItem(line.localId, "unitPrice", event.target.value)}
                                         inputMode="decimal"
                                         required
-                                        disabled={workspaceIsLocked}
                                       />
                                     ),
                                   },
@@ -1743,7 +1767,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                             <span>Unit</span>
                             <span>Unit price</span>
                             <span>Amount</span>
-                            <span>{workspaceIsLocked ? "" : "Actions"}</span>
+                            <span>Actions</span>
                           </div>
                           {lineItems.map((line, index) => {
                             const lineAmount = parseAmount(line.quantity) * parseAmount(line.unitPrice);
@@ -1752,21 +1776,22 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                                 key={line.localId}
                                 className={`${invoiceCreatorStyles.invoiceLineRow} ${index % 2 === 1 ? invoiceCreatorStyles.invoiceLineRowAlt : ""}`}
                               >
-                                <span className={creatorStyles.printOnly}>
-                                  {costCodes.find((c) => String(c.id) === line.costCode)?.code || "—"}
-                                </span>
-                                <span className={creatorStyles.screenOnly}>
-                                  <CostCodeCombobox
-                                    costCodes={costCodes}
-                                    value={line.costCode}
-                                    onChange={(nextValue) => updateLineItem(line.localId, "costCode", nextValue)}
-                                    ariaLabel="Cost code"
-                                    disabled={workspaceIsLocked}
-                                    allowEmptySelection
-                                    emptySelectionLabel="No cost code (optional)"
-                                    placeholder="Search cost code"
-                                  />
-                                </span>
+                                <div>
+                                  <span className={creatorStyles.printOnly}>
+                                    {costCodes.find((c) => String(c.id) === line.costCode)?.code || "—"}
+                                  </span>
+                                  <span className={creatorStyles.screenOnly}>
+                                    <CostCodeCombobox
+                                      costCodes={costCodes}
+                                      value={line.costCode}
+                                      onChange={(nextValue) => updateLineItem(line.localId, "costCode", nextValue)}
+                                      ariaLabel="Cost code"
+                                      allowEmptySelection
+                                      emptySelectionLabel="No cost code (optional)"
+                                      placeholder="Search cost code"
+                                    />
+                                  </span>
+                                </div>
                                 <input
                                   className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
                                   value={line.description}
@@ -1774,7 +1799,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                                     updateLineItem(line.localId, "description", event.target.value)
                                   }
                                   required
-                                  disabled={workspaceIsLocked}
                                 />
                                 <input
                                   className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
@@ -1784,14 +1808,12 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                                   }
                                   inputMode="decimal"
                                   required
-                                  disabled={workspaceIsLocked}
                                 />
                                 <input
                                   className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
                                   value={line.unit}
                                   onChange={(event) => updateLineItem(line.localId, "unit", event.target.value)}
                                   required
-                                  disabled={workspaceIsLocked}
                                 />
                                 <input
                                   className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
@@ -1801,21 +1823,18 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                                   }
                                   inputMode="decimal"
                                   required
-                                  disabled={workspaceIsLocked}
                                 />
                                 <span className={`${creatorStyles.amountCell} ${invoiceCreatorStyles.invoiceReadAmount}`}>
                                   ${formatDecimal(lineAmount)}
                                 </span>
                                 <div className={invoiceCreatorStyles.invoiceLineActionsCell}>
-                                  {!workspaceIsLocked ? (
-                                    <button
-                                      type="button"
-                                      className={creatorStyles.smallButton}
-                                      onClick={() => removeLineItem(line.localId)}
-                                    >
-                                      Remove
-                                    </button>
-                                  ) : null}
+                                  <button
+                                    type="button"
+                                    className={creatorStyles.smallButton}
+                                    onClick={() => removeLineItem(line.localId)}
+                                  >
+                                    Remove
+                                  </button>
                                 </div>
                               </div>
                             );

@@ -810,6 +810,12 @@
   transform: rotate(180deg);
 }
 
+.lockedLineTableWrap {
+  background: var(--surface-secondary);
+  border-radius: 10px;
+  padding: var(--space-sm);
+}
+
 .contractDuplicateButton {
   display: inline-grid;
   place-items: center;

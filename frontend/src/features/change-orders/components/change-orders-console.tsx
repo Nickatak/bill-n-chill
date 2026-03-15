@@ -2504,19 +2504,19 @@ export function ChangeOrdersConsole({
                   </div>
                 ) : (
                   <div className={creatorStyles.lineTable}>
-                    <div className={changeOrderCreatorStyles.coLineHeader}>
+                    <div className={`${changeOrderCreatorStyles.coLineHeader} ${!isSelectedChangeOrderEditable ? changeOrderCreatorStyles.coLineHeaderLocked : ""}`}>
                       <span>Cost code</span>
                       <span>Description</span>
                       <span>CO delta ($)</span>
                       <span>Schedule delta (days)</span>
-                      <span>{isSelectedChangeOrderEditable ? "Actions" : ""}</span>
+                      {isSelectedChangeOrderEditable ? <span>Actions</span> : null}
                     </div>
                     {editLineItems.map((line, index) => {
                       const rowIssues = editLineValidation.issuesByLocalId.get(line.localId) ?? [];
                       return (
                         <div key={line.localId} className={changeOrderCreatorStyles.coLineRowGroup}>
                           <div
-                            className={`${changeOrderCreatorStyles.coLineRow} ${index % 2 === 1 ? changeOrderCreatorStyles.coLineRowAlt : ""} ${
+                            className={`${changeOrderCreatorStyles.coLineRow} ${!isSelectedChangeOrderEditable ? changeOrderCreatorStyles.coLineRowLocked : ""} ${index % 2 === 1 ? changeOrderCreatorStyles.coLineRowAlt : ""} ${
                               rowIssues.length ? changeOrderCreatorStyles.coLineRowInvalid : ""
                             }`}
                           >

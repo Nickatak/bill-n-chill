@@ -734,8 +734,10 @@
   appearance: none;
   -webkit-appearance: none;
   border: 0;
-  background: transparent;
-  padding: 0;
+  background: var(--accent-light);
+  border-radius: var(--radius-md);
+  padding: var(--space-xs) var(--space-sm);
+  min-height: 44px;
   cursor: pointer;
   width: 100%;
   text-align: left;
@@ -963,12 +965,7 @@
   }
 
   /* ── Collapsible section buttons ── */
-  .viewerSectionToggle {
-    min-height: 44px;
-    background: var(--accent-light);
-    border-radius: var(--radius-md);
-    padding: var(--space-xs) var(--space-sm);
-  }
+
 
   .showAllToggle {
     min-height: 44px;
