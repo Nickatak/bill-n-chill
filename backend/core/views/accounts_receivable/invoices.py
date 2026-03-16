@@ -1,7 +1,5 @@
 """Accounts receivable invoice endpoints and state transitions."""
 
-from decimal import Decimal
-
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
@@ -9,9 +7,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from django.db.models import Sum
-
-from core.models import Invoice, InvoiceStatusEvent, Payment, PaymentAllocation
+from core.models import Invoice, InvoiceStatusEvent, SigningCeremonyRecord
 from core.policies import get_invoice_policy_contract
 from core.serializers import (
     InvoiceSerializer,
@@ -19,7 +15,8 @@ from core.serializers import (
     InvoiceWriteSerializer,
 )
 from core.utils.email import send_document_sent_email
-from core.utils.money import quantize_money
+from core.utils.request import get_client_ip
+from core.utils.signing import compute_document_content_hash
 from core.views.accounts_receivable.invoice_ingress import (
     build_invoice_create_ingress,
     build_invoice_patch_ingress,
@@ -27,18 +24,16 @@ from core.views.accounts_receivable.invoice_ingress import (
 from core.views.accounts_receivable.invoices_helpers import (
     _activate_project_from_invoice_creation,
     _apply_invoice_lines_and_totals,
-    _calculate_invoice_line_totals,
+    _handle_invoice_document_save,
+    _handle_invoice_status_note,
+    _handle_invoice_status_transition,
     _invoice_line_apply_error_response,
     _next_invoice_number,
 )
-from core.models import SigningCeremonyRecord
-from core.utils.request import get_client_ip
-from core.utils.signing import compute_document_content_hash
 from core.views.helpers import (
     _build_public_decision_note,
     _capability_gate,
     _ensure_membership,
-    _resolve_cost_codes_for_user,
     _resolve_organization_for_public_actor,
     _serialize_public_organization_context,
     _serialize_public_project_context,
@@ -373,235 +368,26 @@ def invoice_detail_view(request, invoice_id: int):
     serializer = InvoiceWriteSerializer(data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
     ingress = build_invoice_patch_ingress(serializer.validated_data)
-    status_note = ingress.status_note
 
-    status_changing = ingress.has_status
-    status_note_requested = ingress.has_status_note and bool(status_note.strip())
+    # --- Concern dispatch ---
     previous_status = invoice.status
-    next_status = ingress.status if ingress.has_status else invoice.status
+    next_status = ingress.status if ingress.has_status else previous_status
+    is_actual_transition = ingress.has_status and previous_status != next_status
     is_resend = (
-        status_changing
+        ingress.has_status
         and previous_status == Invoice.Status.SENT
         and next_status == Invoice.Status.SENT
     )
-    same_status_note_request = (
-        status_changing
-        and previous_status == next_status
-        and status_note_requested
-    )
-    if status_changing and not (is_resend or same_status_note_request) and not Invoice.is_transition_allowed(
-        current_status=invoice.status,
-        next_status=next_status,
-    ):
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": f"Invalid invoice status transition: {invoice.status} -> {next_status}.",
-                    "fields": {"status": ["This transition is not allowed."]},
-                }
-            },
-            status=400,
+    note_text = ingress.status_note.strip() if ingress.has_status_note else ""
+
+    if is_actual_transition or is_resend:
+        return _handle_invoice_status_transition(
+            request, invoice, ingress, membership,
+            previous_status, next_status, is_resend,
         )
-
-    next_issue_date = ingress.issue_date if ingress.has_issue_date else invoice.issue_date
-    next_due_date = ingress.due_date if ingress.has_due_date else invoice.due_date
-    if next_due_date < next_issue_date:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "due_date cannot be before issue_date.",
-                    "fields": {"due_date": ["Due date must be on or after issue date."]},
-                }
-            },
-            status=400,
-        )
-
-    totals_changing = ingress.has_line_items or ingress.has_tax_percent
-    template_changing = any(
-        [
-            ingress.has_sender_name,
-            ingress.has_sender_email,
-            ingress.has_sender_address,
-            ingress.has_sender_logo_url,
-            ingress.has_terms_text,
-            ingress.has_footer_text,
-            ingress.has_notes_text,
-        ]
-    )
-
-    if ingress.has_line_items:
-        line_items = ingress.line_items
-        if not line_items:
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_error",
-                        "message": "At least one invoice line item is required.",
-                        "fields": {"line_items": ["At least one line item is required."]},
-                    }
-                },
-                status=400,
-            )
-        _, missing_cost_codes = _resolve_cost_codes_for_user(request.user, line_items)
-        if missing_cost_codes:
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_error",
-                        "message": "One or more cost codes are invalid for this user.",
-                        "fields": {"cost_code": missing_cost_codes},
-                    }
-                },
-                status=400,
-            )
-
-    with transaction.atomic():
-        update_fields = ["updated_at"]
-        if ingress.has_issue_date:
-            invoice.issue_date = ingress.issue_date
-            update_fields.append("issue_date")
-        if ingress.has_due_date:
-            invoice.due_date = ingress.due_date
-            update_fields.append("due_date")
-        if ingress.has_status:
-            invoice.status = ingress.status
-            update_fields.append("status")
-        if ingress.has_tax_percent:
-            invoice.tax_percent = ingress.tax_percent
-            update_fields.append("tax_percent")
-        if ingress.has_sender_name:
-            invoice.sender_name = (ingress.sender_name or "").strip()
-            update_fields.append("sender_name")
-        if ingress.has_sender_email:
-            invoice.sender_email = (ingress.sender_email or "").strip()
-            update_fields.append("sender_email")
-        if ingress.has_sender_address:
-            invoice.sender_address = (ingress.sender_address or "").strip()
-            update_fields.append("sender_address")
-        if ingress.has_sender_logo_url:
-            invoice.sender_logo_url = (ingress.sender_logo_url or "").strip()
-            update_fields.append("sender_logo_url")
-        if ingress.has_terms_text:
-            invoice.terms_text = (ingress.terms_text or "").strip()
-            update_fields.append("terms_text")
-
-        # Freeze org identity and T&C onto the document when leaving draft, so
-        # public pages never fall back to live (potentially changed) org defaults.
-        if (
-            previous_status == Invoice.Status.DRAFT
-            and next_status != Invoice.Status.DRAFT
-        ):
-            organization = membership.organization
-            if not (invoice.terms_text or "").strip():
-                org_terms = (organization.invoice_terms_and_conditions or "").strip()
-                if org_terms:
-                    invoice.terms_text = org_terms
-                    if "terms_text" not in update_fields:
-                        update_fields.append("terms_text")
-            if not (invoice.sender_name or "").strip():
-                org_name = (organization.display_name or "").strip()
-                if org_name:
-                    invoice.sender_name = org_name
-                    if "sender_name" not in update_fields:
-                        update_fields.append("sender_name")
-            if not (invoice.sender_address or "").strip():
-                org_address = organization.formatted_billing_address
-                if org_address:
-                    invoice.sender_address = org_address
-                    if "sender_address" not in update_fields:
-                        update_fields.append("sender_address")
-            if not (invoice.sender_logo_url or "").strip():
-                if organization.logo:
-                    invoice.sender_logo_url = request.build_absolute_uri(organization.logo.url)
-                    if "sender_logo_url" not in update_fields:
-                        update_fields.append("sender_logo_url")
-
-        if ingress.has_footer_text:
-            invoice.footer_text = (ingress.footer_text or "").strip()
-            update_fields.append("footer_text")
-        if ingress.has_notes_text:
-            invoice.notes_text = (ingress.notes_text or "").strip()
-            update_fields.append("notes_text")
-        if len(update_fields) > 1:
-            invoice.save(update_fields=update_fields)
-
-        if ingress.has_line_items:
-            apply_error = _apply_invoice_lines_and_totals(
-                invoice=invoice,
-                line_items_data=ingress.line_items,
-                tax_percent=ingress.tax_percent if ingress.has_tax_percent else invoice.tax_percent,
-                user=request.user,
-            )
-            if apply_error:
-                transaction.set_rollback(True)
-                payload, status_code = _invoice_line_apply_error_response(apply_error)
-                return Response(payload, status=status_code)
-        elif ingress.has_tax_percent:
-            existing_lines = [
-                {
-                    "cost_code": line.cost_code_id,
-                    "description": line.description,
-                    "quantity": line.quantity,
-                    "unit": line.unit,
-                    "unit_price": line.unit_price,
-                }
-                for line in invoice.line_items.all()
-            ]
-            _apply_invoice_lines_and_totals(
-                invoice=invoice,
-                line_items_data=existing_lines,
-                tax_percent=invoice.tax_percent,
-                user=request.user,
-            )
-        elif status_changing:
-            # Recompute balance_due from settled allocations without overriding
-            # the status the user just set (the full helper is payment-driven and
-            # would clobber the explicit status choice).
-            applied_total = (
-                PaymentAllocation.objects.filter(
-                    invoice=invoice,
-                    payment__status=Payment.Status.SETTLED,
-                ).aggregate(total=Sum("applied_amount")).get("total")
-                or Decimal("0")
-            )
-            invoice.balance_due = max(
-                quantize_money(Decimal(str(invoice.total)) - applied_total),
-                Decimal("0"),
-            )
-            if invoice.status == Invoice.Status.PAID:
-                invoice.balance_due = Decimal("0")
-            invoice.save(update_fields=["balance_due", "updated_at"])
-
-        should_record_status_event = previous_status != next_status or is_resend or status_note_requested
-        if should_record_status_event:
-            status_event_note = status_note.strip()
-            if not status_event_note:
-                status_event_note = "Invoice re-sent." if is_resend else "Invoice status updated."
-            InvoiceStatusEvent.record(
-                invoice=invoice,
-                from_status=previous_status,
-                to_status=next_status,
-                note=status_event_note,
-                changed_by=request.user,
-            )
-
-    email_sent = False
-    if next_status == Invoice.Status.SENT and (
-        previous_status != Invoice.Status.SENT or is_resend
-    ):
-        customer_email = (invoice.customer.email or "").strip()
-        email_sent = send_document_sent_email(
-            document_type="Invoice",
-            document_title=f"Invoice {invoice.invoice_number}",
-            public_url=f"{settings.FRONTEND_URL}/invoice/{invoice.public_ref}",
-            recipient_email=customer_email,
-            sender_user=request.user,
-        )
-
-    invoice.refresh_from_db()
-    return Response({"data": InvoiceSerializer(invoice).data, "email_sent": email_sent})
+    if note_text:
+        return _handle_invoice_status_note(request, invoice, ingress)
+    return _handle_invoice_document_save(request, invoice, ingress)
 
 
 @api_view(["POST"])

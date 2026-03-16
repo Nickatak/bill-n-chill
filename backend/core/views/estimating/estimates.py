@@ -10,7 +10,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import Estimate, EstimateStatusEvent
+from core.models import Estimate, EstimateStatusEvent, SigningCeremonyRecord
 from core.policies import get_estimate_policy_contract
 from core.serializers import (
     EstimateDuplicateSerializer,
@@ -18,17 +18,20 @@ from core.serializers import (
     EstimateStatusEventSerializer,
     EstimateWriteSerializer,
 )
+from core.utils.email import send_document_sent_email
+from core.utils.request import get_client_ip
+from core.utils.signing import compute_document_content_hash
 from core.views.estimating.estimates_helpers import (
     _activate_project_from_estimate_approval,
     _apply_estimate_lines_and_totals,
     _archive_estimate_family,
+    _handle_estimate_document_save,
+    _handle_estimate_status_note,
+    _handle_estimate_status_transition,
     _next_estimate_family_version,
     _serialize_estimate,
     _serialize_estimates,
 )
-from core.models import SigningCeremonyRecord
-from core.utils.request import get_client_ip
-from core.utils.signing import compute_document_content_hash
 from core.views.helpers import (
     _build_public_decision_note,
     _capability_gate,
@@ -39,7 +42,6 @@ from core.views.helpers import (
     _validate_estimate_for_user,
     _validate_project_for_user,
 )
-from core.utils.email import send_document_sent_email
 from core.views.public_signing_helpers import get_ceremony_context, validate_ceremony_on_decision
 
 
@@ -545,179 +547,26 @@ def estimate_detail_view(request, estimate_id: int):
             },
             status=400,
         )
-    status_note = (data.get("status_note", "") or "").strip()
-    status_note_requested = status_note != ""
-    status_changing = "status" in data
+    # --- Concern dispatch ---
+    previous_status = estimate.status
     next_status = data.get("status", estimate.status)
-    is_sent_resend = (
+    status_changing = "status" in data
+    is_actual_transition = status_changing and previous_status != next_status
+    is_resend = (
         status_changing
-        and estimate.status == Estimate.Status.SENT
+        and previous_status == Estimate.Status.SENT
         and next_status == Estimate.Status.SENT
     )
-    same_status_note_request = status_changing and next_status == estimate.status and status_note_requested
+    status_note = (data.get("status_note", "") or "").strip()
 
-    if status_changing and not (is_sent_resend or same_status_note_request) and not Estimate.is_transition_allowed(
-        current_status=estimate.status,
-        next_status=next_status,
-    ):
-        if estimate.status == Estimate.Status.DRAFT and next_status in {
-            Estimate.Status.APPROVED,
-            Estimate.Status.REJECTED,
-        }:
-            message = "Estimate must be sent before it can be approved or rejected."
-        else:
-            message = f"Invalid estimate status transition: {estimate.status} -> {next_status}."
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": message,
-                    "fields": {"status": ["This transition is not allowed."]},
-                }
-            },
-            status=400,
+    if is_actual_transition or is_resend:
+        return _handle_estimate_status_transition(
+            request, estimate, data,
+            previous_status, next_status, is_resend,
         )
-
-    previous_status = estimate.status
-    update_fields = ["updated_at"]
-    if "title" in data:
-        estimate.title = data["title"]
-        update_fields.append("title")
-    if "valid_through" in data:
-        estimate.valid_through = data["valid_through"]
-        update_fields.append("valid_through")
-    if "status" in data:
-        estimate.status = data["status"]
-        update_fields.append("status")
-    if "tax_percent" in data:
-        estimate.tax_percent = data["tax_percent"]
-        update_fields.append("tax_percent")
-
-    # Freeze org identity and T&C onto the document when leaving draft, so
-    # public pages never fall back to live (potentially changed) org defaults.
-    if (
-        previous_status == Estimate.Status.DRAFT
-        and estimate.status != Estimate.Status.DRAFT
-    ):
-        membership = _ensure_membership(request.user)
-        organization = membership.organization
-        if not (estimate.terms_text or "").strip():
-            org_terms = (organization.estimate_terms_and_conditions or "").strip()
-            if org_terms:
-                estimate.terms_text = org_terms
-                update_fields.append("terms_text")
-        if not (estimate.sender_name or "").strip():
-            org_name = (organization.display_name or "").strip()
-            if org_name:
-                estimate.sender_name = org_name
-                update_fields.append("sender_name")
-        if not (estimate.sender_address or "").strip():
-            org_address = organization.formatted_billing_address
-            if org_address:
-                estimate.sender_address = org_address
-                update_fields.append("sender_address")
-        if not (estimate.sender_logo_url or "").strip():
-            if organization.logo:
-                estimate.sender_logo_url = request.build_absolute_uri(organization.logo.url)
-                update_fields.append("sender_logo_url")
-
-    if "line_items" in data:
-        line_items = data["line_items"]
-        if not line_items:
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_error",
-                        "message": "At least one line item is required.",
-                        "fields": {"line_items": ["At least one line item is required."]},
-                    }
-                },
-                status=400,
-            )
-
-    should_record_status_event = status_changing and (
-        previous_status != estimate.status
-        or (previous_status == Estimate.Status.SENT and estimate.status == Estimate.Status.SENT)
-    )
-    should_record_status_event = (
-        should_record_status_event
-        or (
-            previous_status == estimate.status
-            and status_note_requested
-        )
-    )
-    email_sent = False
-
-    with transaction.atomic():
-        estimate.save(update_fields=update_fields)
-
-        if "line_items" in data:
-            apply_error = _apply_estimate_lines_and_totals(
-                estimate=estimate,
-                line_items_data=line_items,
-                tax_percent=data.get("tax_percent", estimate.tax_percent),
-                user=request.user,
-            )
-            if apply_error:
-                transaction.set_rollback(True)
-                return Response(
-                    {
-                        "error": {
-                            "code": "validation_error",
-                            "message": "One or more cost codes are invalid for this user.",
-                            "fields": {"cost_code": apply_error["missing_cost_codes"]},
-                        }
-                    },
-                    status=400,
-                )
-        elif "tax_percent" in data:
-            # Recalculate totals with existing lines when tax is updated.
-            existing_lines = [
-                {
-                    "cost_code": line.cost_code_id,
-                    "description": line.description,
-                    "quantity": line.quantity,
-                    "unit": line.unit,
-                    "unit_cost": line.unit_cost,
-                    "markup_percent": line.markup_percent,
-                }
-                for line in estimate.line_items.all()
-            ]
-            _apply_estimate_lines_and_totals(
-                estimate=estimate,
-                line_items_data=existing_lines,
-                tax_percent=estimate.tax_percent,
-                user=request.user,
-            )
-
-        if should_record_status_event:
-            EstimateStatusEvent.record(
-                estimate=estimate,
-                from_status=previous_status,
-                to_status=estimate.status,
-                note=status_note,
-                changed_by=request.user,
-            )
-            if estimate.status == Estimate.Status.APPROVED:
-                _activate_project_from_estimate_approval(
-                    estimate=estimate,
-                    actor=request.user,
-                    note=f"Project moved to active after approval of estimate #{estimate.id}.",
-                )
-
-    # Email is sent outside the transaction — fire-and-forget side effect.
-    if should_record_status_event and estimate.status == Estimate.Status.SENT:
-        customer_email = (estimate.project.customer.email or "").strip()
-        email_sent = send_document_sent_email(
-            document_type="Estimate",
-            document_title=f"{estimate.title} (v{estimate.version})",
-            public_url=f"{settings.FRONTEND_URL}/estimate/{estimate.public_ref}",
-            recipient_email=customer_email,
-            sender_user=request.user,
-        )
-
-    estimate.refresh_from_db()
-    return Response({"data": _serialize_estimate(estimate=estimate), "email_sent": email_sent})
+    if status_note:
+        return _handle_estimate_status_note(request, estimate, data)
+    return _handle_estimate_document_save(request, estimate, data)
 
 
 @api_view(["POST"])
