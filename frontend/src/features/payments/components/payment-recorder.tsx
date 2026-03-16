@@ -110,7 +110,7 @@ export function PaymentRecorder({
   const [allocationTargetByDirection, setAllocationTargetByDirection] = useState<
     Record<string, PaymentAllocationTargetType>
   >(PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK);
-  const [defaultCreateMethod, setDefaultCreateMethod] = useState<string>("ach");
+  const [defaultCreateMethod, setDefaultCreateMethod] = useState<string>(PAYMENT_METHODS_FALLBACK[0]);
 
   // Payment list
   const [payments, setPayments] = useState<PaymentRecord[]>([]);

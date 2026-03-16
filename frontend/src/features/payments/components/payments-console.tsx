@@ -11,7 +11,7 @@
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCombobox } from "@/shared/hooks/use-combobox";
 import { todayDateInput, formatDateDisplay } from "@/shared/date-format";
@@ -163,7 +163,7 @@ export function PaymentsConsole() {
   const [paymentStatusLabels, setPaymentStatusLabels] = useState<Record<string, string>>(PAYMENT_STATUS_LABELS_FALLBACK);
   const [paymentMethods, setPaymentMethods] = useState<string[]>(PAYMENT_METHODS_FALLBACK);
   const [paymentAllowedTransitions, setPaymentAllowedTransitions] = useState<Record<string, string[]>>(PAYMENT_ALLOWED_TRANSITIONS_FALLBACK);
-  const [defaultCreateMethod, setDefaultCreateMethod] = useState<string>("check");
+  const [defaultCreateMethod, setDefaultCreateMethod] = useState<string>(PAYMENT_METHODS_FALLBACK[0]);
 
   // -- Payments --
   const [allPayments, setAllPayments] = useState<PaymentRecord[]>([]);
