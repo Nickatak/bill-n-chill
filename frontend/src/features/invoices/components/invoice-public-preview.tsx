@@ -6,7 +6,8 @@
  * including sender/recipient context, line items, totals, terms, and a test payment section.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
 import { PublicDocumentViewerShell } from "@/shared/document-viewer/public-document-viewer-shell";
 import {
   PublicDocumentFrame,
@@ -24,7 +25,6 @@ import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { ApiResponse, InvoiceRecord } from "../types";
 import { usePrintContext } from "@/shared/hooks/use-print-context";
 import { SigningCeremony, type CeremonyPayload } from "@/shared/document-viewer/signing-ceremony";
-import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import stampStyles from "@/shared/styles/decision-stamp.module.css";
 import styles from "./invoice-public-preview.module.css";
 
@@ -54,21 +54,8 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
   const [decisionMessage, setDecisionMessage] = useState("");
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [decisionReceiptName, setDecisionReceiptName] = useState("");
-  const decisionSectionRef = useRef<HTMLDivElement | null>(null);
-  const [decisionFlashCount, setDecisionFlashCount] = useState(0);
+  const { ref: decisionSectionRef, flash: flashDecision } = useCreatorFlash();
   const { printTimestamp } = usePrintContext();
-
-  useEffect(() => {
-    if (decisionFlashCount === 0) return;
-    const el = decisionSectionRef.current;
-    if (!el) return;
-    el.classList.remove(creatorStyles.sheetFlash);
-    void el.offsetWidth;
-    el.classList.add(creatorStyles.sheetFlash);
-    const cleanup = () => el.classList.remove(creatorStyles.sheetFlash);
-    el.addEventListener("animationend", cleanup, { once: true });
-    return () => el.removeEventListener("animationend", cleanup);
-  }, [decisionFlashCount]);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const sender = useMemo(
@@ -155,7 +142,7 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
 
       setDecisionReceiptName(ceremony.signer_name);
       setDecisionMessage("");
-      setDecisionFlashCount((c) => c + 1);
+      flashDecision();
     } catch {
       setDecisionMessage("Could not reach invoice decision endpoint.");
     } finally {

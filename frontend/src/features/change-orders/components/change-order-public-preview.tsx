@@ -6,7 +6,8 @@
  * provides approve/reject controls for change orders in "pending_approval" status.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
 import Image from "next/image";
 import { parseAmount, formatDecimal } from "@/shared/money-format";
 import { PublicDocumentViewerShell } from "@/shared/document-viewer/public-document-viewer-shell";
@@ -61,21 +62,8 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
   const [decisionMessage, setDecisionMessage] = useState("");
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [decisionReceiptName, setDecisionReceiptName] = useState("");
-  const decisionSectionRef = useRef<HTMLDivElement | null>(null);
-  const [decisionFlashCount, setDecisionFlashCount] = useState(0);
+  const { ref: decisionSectionRef, flash: flashDecision } = useCreatorFlash();
   const { printTimestamp } = usePrintContext();
-
-  useEffect(() => {
-    if (decisionFlashCount === 0) return;
-    const el = decisionSectionRef.current;
-    if (!el) return;
-    el.classList.remove(creatorStyles.sheetFlash);
-    void el.offsetWidth;
-    el.classList.add(creatorStyles.sheetFlash);
-    const cleanup = () => el.classList.remove(creatorStyles.sheetFlash);
-    el.addEventListener("animationend", cleanup, { once: true });
-    return () => el.removeEventListener("animationend", cleanup);
-  }, [decisionFlashCount]);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const canDecide = changeOrder?.status === "pending_approval";
@@ -160,7 +148,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
 
       setDecisionReceiptName(ceremony.signer_name);
       setDecisionMessage("");
-      setDecisionFlashCount((c) => c + 1);
+      flashDecision();
     } catch {
       setDecisionMessage("Could not reach change-order decision endpoint.");
     } finally {

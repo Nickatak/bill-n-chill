@@ -8,7 +8,8 @@
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
 import Link from "next/link";
 import { parseAmount, formatDecimal } from "@/shared/money-format";
 import {
@@ -156,10 +157,8 @@ export function ChangeOrdersConsole({
       baseUrl: normalizedBaseUrl,
       token,
     });
-  const createCreatorRef = useRef<HTMLDivElement | null>(null);
-  const editCreatorRef = useRef<HTMLDivElement | null>(null);
-  const [createFlashCount, setCreateFlashCount] = useState(0);
-  const [editFlashCount, setEditFlashCount] = useState(0);
+  const { ref: createCreatorRef, flash: flashCreate } = useCreatorFlash();
+  const { ref: editCreatorRef, flash: flashEdit } = useCreatorFlash();
   const { setPrintable } = usePrintable();
 
   // -------------------------------------------------------------------------
@@ -170,30 +169,6 @@ export function ChangeOrdersConsole({
     setPrintable(!!selectedChangeOrderId);
     return () => setPrintable(false);
   }, [selectedChangeOrderId, setPrintable]);
-
-  useEffect(() => {
-    if (createFlashCount === 0) return;
-    const el = createCreatorRef.current;
-    if (!el) return;
-    el.classList.remove(creatorStyles.sheetFlash);
-    void el.offsetWidth;
-    el.classList.add(creatorStyles.sheetFlash);
-    const cleanup = () => el.classList.remove(creatorStyles.sheetFlash);
-    el.addEventListener("animationend", cleanup, { once: true });
-    return () => el.removeEventListener("animationend", cleanup);
-  }, [createFlashCount]);
-
-  useEffect(() => {
-    if (editFlashCount === 0) return;
-    const el = editCreatorRef.current;
-    if (!el) return;
-    el.classList.remove(creatorStyles.sheetFlash);
-    void el.offsetWidth;
-    el.classList.add(creatorStyles.sheetFlash);
-    const cleanup = () => el.classList.remove(creatorStyles.sheetFlash);
-    el.addEventListener("animationend", cleanup, { once: true });
-    return () => el.removeEventListener("animationend", cleanup);
-  }, [editFlashCount]);
 
   // -------------------------------------------------------------------------
   // Derived values
@@ -923,7 +898,7 @@ export function ChangeOrdersConsole({
     setNewLineItems([emptyLine(1)]);
     setNewLineNextLocalId(2);
     setFeedback("Ready for a new change order draft.", "info");
-    setCreateFlashCount((c) => c + 1);
+    flashCreate();
   }
 
   /** Handle form submission for creating a new change order draft. */
@@ -989,7 +964,7 @@ export function ChangeOrdersConsole({
       setNewTitle(defaultChangeOrderTitle(selectedProjectName));
       setNewReason("");
       setNewTermsText(defaultChangeOrderTerms);
-      setCreateFlashCount((c) => c + 1);
+      flashCreate();
     } catch {
       setFeedback("Could not reach change order create endpoint.", "error");
     }
@@ -1033,7 +1008,7 @@ export function ChangeOrdersConsole({
         await loadProjectAuditEvents(projectId);
       }
       setFeedback(`Duplicated as ${coLabel(created)}.`, "success");
-      setEditFlashCount((c) => c + 1);
+      flashEdit();
     } catch {
       setFeedback("Could not reach clone revision endpoint.", "error");
     }
@@ -1228,6 +1203,11 @@ export function ChangeOrdersConsole({
   // Contract breakdown (estimate + approved COs) — shared by viewer and both creators
   // -------------------------------------------------------------------------
 
+  /* Contract Breakdown — intentionally not extracted to a shared component.
+     CO version is read-only; invoice version has per-row duplicate buttons,
+     different cost code label formats, and markup display. Extracting would
+     create a ~12-prop wrapper with render callbacks that moves no complexity.
+     See invoices-console.tsx for the same decision. */
   function renderContractBreakdown(opts?: { style?: React.CSSProperties }) {
     if (!selectedViewerEstimate) return null;
     const hasEstimateLines = selectedViewerEstimate.line_items.length > 0;
@@ -1592,7 +1572,10 @@ export function ChangeOrdersConsole({
                           ) : null}
                         </div>
 
-                        {/* History section */}
+                        {/* History section — intentionally not extracted to a shared component.
+                           CO uses AuditEventRecord with created_at; invoices use InvoiceStatusEvent
+                           with changed_at. Different actor rendering, action label functions, and
+                           CSS classes. See invoices-console.tsx for the same decision. */}
                         <div className={styles.viewerSection}>
                           <button
                             type="button"

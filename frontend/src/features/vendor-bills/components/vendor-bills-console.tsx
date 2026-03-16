@@ -8,7 +8,8 @@
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
 import { useSearchParams } from "next/navigation";
 import { formatDateDisplay, todayDateInput, futureDateInput } from "@/shared/date-format";
 import { readApiErrorMessage } from "@/shared/api/error";
@@ -217,8 +218,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   // Workspace visibility + flash animation
   const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(true);
-  const billFormRef = useRef<HTMLFormElement>(null);
-  const [creatorFlashCount, setCreatorFlashCount] = useState(0);
+  const { ref: billFormRef, flash: flashCreator } = useCreatorFlash<HTMLFormElement>();
   // -------------------------------------------------------------------------
   // Derived values
   // -------------------------------------------------------------------------
@@ -772,7 +772,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     if (!selected) return;
 
     hydrate(selected);
-    setCreatorFlashCount((c) => c + 1);
+    flashCreator();
   }
 
   /** Resets the form to create-mode with default values for a new bill. */
@@ -800,7 +800,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       setNewVendorId(String(activeVendors[0].id));
     }
     setStatusMessage("New vendor bill create mode.");
-    setCreatorFlashCount((c) => c + 1);
+    flashCreator();
   }
 
   /** PATCHes the currently selected vendor bill with the edit form values. */
@@ -977,7 +977,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setDuplicateCandidates([]);
     setCreateErrorMessage("Enter a new bill number, then create the recreated planned bill.");
     setStatusMessage(`Copied bill #${selected.id} into create form.`);
-    setCreatorFlashCount((c) => c + 1);
+    flashCreator();
     setIsWorkspaceExpanded(true);
   }
 
@@ -1066,18 +1066,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
 
 
-  // Flash animation for the workspace form when switching bills or creating new.
-  useEffect(() => {
-    if (creatorFlashCount === 0) return;
-    const el = billFormRef.current;
-    if (!el) return;
-    el.classList.remove(creatorStyles.sheetFlash);
-    void el.offsetWidth;
-    el.classList.add(creatorStyles.sheetFlash);
-    const cleanup = () => el.classList.remove(creatorStyles.sheetFlash);
-    el.addEventListener("animationend", cleanup, { once: true });
-    return () => el.removeEventListener("animationend", cleanup);
-  }, [creatorFlashCount]);
+
 
   const billAllocationTargets: AllocationTarget[] = useMemo(
     () =>

@@ -8,7 +8,8 @@
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
 import Link from "next/link";
 import { formatDateDisplay, formatDateTimeDisplay, todayDateInput, futureDateInput } from "@/shared/date-format";
 import { parseAmount, formatDecimal } from "@/shared/money-format";
@@ -286,8 +287,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
   const [workspaceSourceInvoiceId, setWorkspaceSourceInvoiceId] = useState<number | null>(null);
   const [editingDraftInvoiceId, setEditingDraftInvoiceId] = useState<number | null>(null);
   const [workspaceContext, setWorkspaceContext] = useState("New invoice draft");
-  const invoiceCreatorRef = useRef<HTMLDivElement | null>(null);
-  const [creatorFlashCount, setCreatorFlashCount] = useState(0);
+  const { ref: invoiceCreatorRef, flash: flashCreator } = useCreatorFlash();
   const [contractBreakdown, setContractBreakdown] = useState<ContractBreakdown | null>(null);
   const [costCodes, setCostCodes] = useState<CostCode[]>([]);
   const { setPrintable } = usePrintable();
@@ -301,17 +301,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     return () => setPrintable(false);
   }, [invoices.length, setPrintable]);
 
-  useEffect(() => {
-    if (creatorFlashCount === 0) return;
-    const el = invoiceCreatorRef.current;
-    if (!el) return;
-    el.classList.remove(creatorStyles.sheetFlash);
-    void el.offsetWidth;
-    el.classList.add(creatorStyles.sheetFlash);
-    const cleanup = () => el.classList.remove(creatorStyles.sheetFlash);
-    el.addEventListener("animationend", cleanup, { once: true });
-    return () => el.removeEventListener("animationend", cleanup);
-  }, [creatorFlashCount]);
+
 
   // -------------------------------------------------------------------------
   // Derived values
@@ -714,7 +704,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
   /** Clear the workspace and start a new invoice draft. */
   function handleStartNewInvoiceDraft() {
     resetCreateDraft();
-    setCreatorFlashCount((c) => c + 1);
+    flashCreator();
   }
 
   /** Create a new invoice or save an existing draft, depending on workspace context. */
@@ -767,7 +757,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
         setSelectedStatus("");
         setWorkspaceContext(`Editing ${updated.invoice_number}`);
         setSuccessStatus(`Saved ${updated.invoice_number} draft.`);
-        setCreatorFlashCount((c) => c + 1);
+        flashCreator();
         return;
       } catch {
         setErrorStatus("Could not reach invoice update endpoint.");
@@ -796,7 +786,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       setSelectedStatus("");
       loadInvoiceIntoWorkspace(created);
       setSuccessStatus(`Created ${created.invoice_number} (${statusLabel(created.status)}).`);
-      setCreatorFlashCount((c) => c + 1);
+      flashCreator();
     } catch {
       setErrorStatus("Could not reach invoice create endpoint.");
     }
@@ -957,7 +947,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       setSelectedStatus("");
       loadInvoiceIntoWorkspace(created);
       setSuccessStatus(`Duplicated as ${created.invoice_number}.`);
-      setCreatorFlashCount((c) => c + 1);
+      flashCreator();
     } catch {
       setErrorStatus("Could not reach invoice create endpoint.");
     }
@@ -1056,6 +1046,10 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     );
   }
 
+  /* Contract Breakdown — intentionally not extracted to a shared component.
+     Invoice version has per-row duplicate buttons and markup display;
+     CO version is read-only with different cost code labels. Extracting
+     would create a prop-heavy wrapper with render callbacks. */
   function renderContractBreakdown(opts?: { style?: React.CSSProperties }) {
     if (!contractBreakdown?.active_estimate) return null;
     const estimate = contractBreakdown.active_estimate;
@@ -1403,7 +1397,9 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                                 </div>
                             </div>
 
-                            {/* History */}
+                            {/* History — intentionally not extracted to a shared component.
+                               Different event shapes, actor rendering, and action label functions
+                               across CO and invoice consoles. See change-orders-console.tsx. */}
                             <div className={styles.invoiceViewerSection}>
                               <h4 className={styles.invoiceViewerSectionHeading}>History ({selectedInvoiceStatusEvents.length})</h4>
                                 <div className={styles.invoiceViewerSectionContent}>

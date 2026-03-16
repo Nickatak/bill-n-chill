@@ -9,6 +9,7 @@
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
 import {
   defaultApiBaseUrl,
   fetchEstimatePolicyContract,
@@ -222,8 +223,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const estimateStatusFiltersRef = useRef<EstimateStatusValue[]>(
     ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK,
   );
-  const estimateComposerRef = useRef<HTMLDivElement | null>(null);
-  const [creatorFlashCount, setCreatorFlashCount] = useState(0);
+  const { ref: estimateComposerRef, flash: flashCreator } = useCreatorFlash();
   const { setPrintable } = usePrintable();
 
   // -------------------------------------------------------------------------
@@ -234,18 +234,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setPrintable(!!selectedEstimateId);
     return () => setPrintable(false);
   }, [selectedEstimateId, setPrintable]);
-
-  useEffect(() => {
-    if (creatorFlashCount === 0) return;
-    const el = estimateComposerRef.current;
-    if (!el) return;
-    el.classList.remove(creatorStyles.sheetFlash);
-    void el.offsetWidth;
-    el.classList.add(creatorStyles.sheetFlash);
-    const cleanup = () => el.classList.remove(creatorStyles.sheetFlash);
-    el.addEventListener("animationend", cleanup, { once: true });
-    return () => el.removeEventListener("animationend", cleanup);
-  }, [creatorFlashCount]);
 
   // -------------------------------------------------------------------------
   // Derived values
@@ -575,7 +563,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setActionMessage("");
     setFormErrorMessage("");
     setFormSuccessMessage("");
-    setCreatorFlashCount((c) => c + 1);
+    flashCreator();
   }
 
   /** Select the latest version of a family and toggle its history expansion. */
@@ -976,7 +964,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         loadEstimateIntoForm(created);
       setFamilyCollisionPrompt(null);
       setConfirmedFamilyTitleKey("");
-      setCreatorFlashCount((c) => c + 1);
+      flashCreator();
     } catch {
       setFormErrorMessage("Could not reach estimate create endpoint.");
     } finally {
@@ -1055,7 +1043,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         loadEstimateIntoForm(updated);
         setFormErrorMessage("");
         setFormSuccessMessage(`Saved draft estimate #${updated.id}.`);
-        setCreatorFlashCount((c) => c + 1);
+        flashCreator();
       } catch {
         setFormErrorMessage("Could not reach estimate update endpoint.");
       } finally {
@@ -1152,7 +1140,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setStatusEvents([]);
       setActionMessage(`Duplicated as ${duplicated.title || "Untitled"} v${duplicated.version}.`);
       setActionTone("success");
-      setCreatorFlashCount((c) => c + 1);
+      flashCreator();
     } catch {
       setActionMessage("Could not reach duplicate endpoint.");
     }

@@ -6,7 +6,8 @@
  * provides approve/reject controls for estimates in "sent" status.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
 import {
   PublicDocumentFrame,
   publicDocumentFrameStyles as frameStyles,
@@ -44,21 +45,8 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
   const [decisionMessage, setDecisionMessage] = useState("");
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [decisionReceiptName, setDecisionReceiptName] = useState("");
-  const decisionSectionRef = useRef<HTMLDivElement | null>(null);
-  const [decisionFlashCount, setDecisionFlashCount] = useState(0);
+  const { ref: decisionSectionRef, flash: flashDecision } = useCreatorFlash();
   const { printTimestamp } = usePrintContext();
-
-  useEffect(() => {
-    if (decisionFlashCount === 0) return;
-    const el = decisionSectionRef.current;
-    if (!el) return;
-    el.classList.remove(creatorStyles.sheetFlash);
-    void el.offsetWidth;
-    el.classList.add(creatorStyles.sheetFlash);
-    const cleanup = () => el.classList.remove(creatorStyles.sheetFlash);
-    el.addEventListener("animationend", cleanup, { once: true });
-    return () => el.removeEventListener("animationend", cleanup);
-  }, [decisionFlashCount]);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const lineItems = useMemo(() => mapPublicEstimateLineItems(estimate), [estimate]);
@@ -159,7 +147,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
       setEstimate(nextEstimate);
       setDecisionReceiptName(ceremony.signer_name);
       setDecisionMessage("");
-      setDecisionFlashCount((c) => c + 1);
+      flashDecision();
     } catch {
       setDecisionMessage("Could not reach estimate decision endpoint.");
     } finally {
