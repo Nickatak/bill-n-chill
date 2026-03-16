@@ -604,7 +604,7 @@
 
 /* ── Responsive ────────────────────────────────────── */
 
-@media (max-width: 640px) {
+@media (max-width: 700px) {
   .fieldGrid {
     grid-template-columns: 1fr;
   }
@@ -617,17 +617,19 @@
     grid-template-columns: 1fr;
   }
 
+  .historyControls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 640px) {
   .paymentMetaGrid {
     grid-template-columns: 1fr 1fr;
   }
 
   .detailMetrics {
     grid-template-columns: 1fr 1fr;
-  }
-
-  .historyControls {
-    flex-direction: column;
-    align-items: stretch;
   }
 }
 

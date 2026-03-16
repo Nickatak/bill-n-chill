@@ -510,7 +510,7 @@
   }
 }
 
-@media (max-width: 740px) {
+@media (max-width: 700px) {
   .headerRow {
     padding: var(--space-md);
   }

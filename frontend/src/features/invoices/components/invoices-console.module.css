@@ -408,7 +408,7 @@
   align-self: start;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 700px) {
   .statusFilters,
   .workspaceToolbarActions {
     display: grid;
@@ -431,20 +431,6 @@
     order: 1;
   }
 
-  .contractDuplicateButton {
-    width: auto;
-    min-width: 60px;
-    height: 44px;
-    min-height: 44px;
-    font-size: 1.4rem;
-  }
-
-  .toolbarPrimaryButton,
-  .toolbarSecondaryButton {
-    min-height: 44px;
-    width: 100%;
-  }
-
   .invoiceMetaGrid {
     grid-template-columns: 1fr;
   }
@@ -460,6 +446,22 @@
 
   .invoiceQuickStatusPills {
     gap: 4px;
+  }
+}
+
+@media (max-width: 640px) {
+  .contractDuplicateButton {
+    width: auto;
+    min-width: 60px;
+    height: 44px;
+    min-height: 44px;
+    font-size: 1.4rem;
+  }
+
+  .toolbarPrimaryButton,
+  .toolbarSecondaryButton {
+    min-height: 44px;
+    width: 100%;
   }
 }
 

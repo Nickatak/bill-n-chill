@@ -433,7 +433,7 @@
   background: var(--surface);
 }
 
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   .formGrid,
   .optionalBody {
     grid-template-columns: 1fr;

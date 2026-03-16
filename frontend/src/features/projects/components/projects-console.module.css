@@ -334,7 +334,7 @@
   filter: none;
 }
 
-@media (max-width: 980px) {
+@media (max-width: 900px) {
   .overviewGrid {
     grid-template-columns: 1fr;
   }

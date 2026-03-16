@@ -234,7 +234,7 @@
   opacity: 0.85;
 }
 
-@media (max-width: 980px) {
+@media (max-width: 900px) {
   .coTotalsColumn {
     width: 100%;
   }
