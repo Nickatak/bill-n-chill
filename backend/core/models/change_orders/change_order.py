@@ -69,6 +69,7 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
         max_length=32,
         choices=Status.choices,
         default=Status.DRAFT,
+        db_index=True,
     )
     public_token = models.CharField(max_length=24, unique=True, null=True, blank=True)
     amount_delta = models.DecimalField(max_digits=12, decimal_places=2, default=0)

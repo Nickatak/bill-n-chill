@@ -70,6 +70,7 @@ class Project(StatusTransitionMixin, models.Model):
         max_length=32,
         choices=Status.choices,
         default=Status.PROSPECT,
+        db_index=True,
     )
     contract_value_original = models.DecimalField(
         max_digits=12,

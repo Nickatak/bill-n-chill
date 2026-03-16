@@ -75,7 +75,7 @@ class OrganizationRecord(ImmutableModelMixin):
         metadata: dict | None = None,
     ):
         """Append an immutable audit row for an organization mutation."""
-        cls.objects.create(
+        return cls.objects.create(
             organization=organization,
             event_type=event_type,
             capture_source=capture_source,

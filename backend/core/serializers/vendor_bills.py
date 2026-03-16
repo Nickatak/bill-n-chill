@@ -80,7 +80,6 @@ class VendorBillLineInputSerializer(serializers.Serializer):
     quantity = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=1)
     unit = serializers.CharField(max_length=30, required=False, default="ea")
     unit_price = serializers.DecimalField(max_digits=12, decimal_places=2)
-    line_total = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
 
 
 class VendorBillWriteSerializer(serializers.Serializer):

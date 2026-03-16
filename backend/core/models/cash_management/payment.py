@@ -86,6 +86,7 @@ class Payment(StatusTransitionMixin, models.Model):
         max_length=16,
         choices=Status.choices,
         default=Status.SETTLED,
+        db_index=True,
     )
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     payment_date = models.DateField()

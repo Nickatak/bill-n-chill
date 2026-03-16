@@ -58,7 +58,7 @@ class EstimateStatusEvent(models.Model):
     @classmethod
     def record(cls, *, estimate, from_status, to_status, note, changed_by, ip_address=None, user_agent=""):
         """Append an immutable estimate status transition row."""
-        cls.objects.create(
+        return cls.objects.create(
             estimate=estimate,
             from_status=from_status,
             to_status=to_status,

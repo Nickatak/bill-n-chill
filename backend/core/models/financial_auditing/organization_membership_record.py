@@ -129,7 +129,7 @@ class OrganizationMembershipRecord(ImmutableModelMixin):
         metadata: dict | None = None,
     ):
         """Append an immutable audit row for a membership mutation."""
-        cls.objects.create(
+        return cls.objects.create(
             organization=membership.organization,
             organization_membership=membership,
             membership_user=membership.user,

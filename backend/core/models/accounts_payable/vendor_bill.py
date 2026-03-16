@@ -58,6 +58,7 @@ class VendorBill(StatusTransitionMixin, models.Model):
         max_length=32,
         choices=Status.choices,
         default=Status.PLANNED,
+        db_index=True,
     )
     received_date = models.DateField(
         null=True,

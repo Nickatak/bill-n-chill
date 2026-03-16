@@ -65,6 +65,7 @@ class Invoice(StatusTransitionMixin, models.Model):
         max_length=32,
         choices=Status.choices,
         default=Status.DRAFT,
+        db_index=True,
     )
     issue_date = models.DateField()
     due_date = models.DateField()

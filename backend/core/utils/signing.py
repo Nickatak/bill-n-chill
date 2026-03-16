@@ -39,8 +39,8 @@ CEREMONY_CONSENT_TEXT_VERSION = compute_consent_text_version(CEREMONY_CONSENT_TE
 # the document content the signer reviewed.
 
 _ESTIMATE_LINE_FIELDS = ("description", "quantity", "unit_cost", "markup_percent", "cost_code", "unit")
-_CHANGE_ORDER_LINE_FIELDS = ("description", "amount_delta", "budget_line", "line_type", "adjustment_reason")
-_INVOICE_LINE_FIELDS = ("description", "quantity", "unit_price", "cost_code", "budget_line", "unit", "line_type")
+_CHANGE_ORDER_LINE_FIELDS = ("description", "amount_delta", "days_delta", "cost_code", "adjustment_reason")
+_INVOICE_LINE_FIELDS = ("description", "quantity", "unit_price", "cost_code", "unit")
 
 
 def _extract_line_items(serialized_data: dict, fields: tuple[str, ...]) -> list[dict]:

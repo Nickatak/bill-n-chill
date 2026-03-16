@@ -18,7 +18,7 @@ from core.serializers import (
     CustomerSerializer,
     ProjectSerializer,
 )
-from core.views.helpers import _capability_gate, _ensure_membership, _paginate_queryset
+from core.views.helpers import _capability_gate, _ensure_membership, _paginate_queryset, _parse_request_bool
 from core.views.shared_operations.customers_helpers import (
     _build_customer_duplicate_candidate,
     _build_intake_payload,
@@ -333,7 +333,7 @@ def quick_add_customer_intake_view(request):
     create_project_raw = request.data.get("create_project", False)
     project_name = str(request.data.get("project_name") or "").strip()
     project_status = str(request.data.get("project_status") or Project.Status.PROSPECT).strip()
-    create_project = str(create_project_raw).strip().lower() in {"true", "1", "yes", "on"}
+    create_project = _parse_request_bool(create_project_raw, default=False)
 
     serializer = CustomerIntakeQuickAddSerializer(
         data=raw_payload,

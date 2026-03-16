@@ -74,6 +74,7 @@ class Estimate(StatusTransitionMixin, models.Model):
         max_length=32,
         choices=Status.choices,
         default=Status.DRAFT,
+        db_index=True,
     )
     title = models.CharField(max_length=255, blank=True)
     valid_through = models.DateField(null=True, blank=True)
