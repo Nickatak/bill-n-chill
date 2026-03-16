@@ -1512,6 +1512,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
               )}
             </div>
 
+            {/* Status & Actions — intentionally not extracted to a shared component.
+                See invoices-console.tsx for rationale. */}
             {selectedEstimateId ? (
               <>
                 <div className={styles.lifecycleGrid}>

@@ -11,8 +11,9 @@
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
-import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useCombobox } from "@/shared/hooks/use-combobox";
 import { todayDateInput, formatDateDisplay } from "@/shared/date-format";
 import {
   defaultApiBaseUrl,
@@ -95,20 +96,68 @@ export function PaymentsConsole() {
   // -- Customers --
   const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState(scopedCustomerId ?? "");
-  const [customerQuery, setCustomerQuery] = useState("");
-  const [customerMenuOpen, setCustomerMenuOpen] = useState(false);
-  const [customerHighlight, setCustomerHighlight] = useState(-1);
-  const customerInputRef = useRef<HTMLInputElement | null>(null);
-  const customerMenuRef = useRef<HTMLDivElement | null>(null);
+  const selectedCustomer = customers.find((c) => String(c.id) === selectedCustomerId) ?? null;
 
   // -- Projects --
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState(scopedProjectId ?? "");
-  const [projectQuery, setProjectQuery] = useState("");
-  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
-  const [projectHighlight, setProjectHighlight] = useState(-1);
-  const projectInputRef = useRef<HTMLInputElement | null>(null);
-  const projectMenuRef = useRef<HTMLDivElement | null>(null);
+  const selectedProject = projects.find((p) => String(p.id) === selectedProjectId) ?? null;
+
+  function projectDisplayLabel(p: ProjectRecord): string {
+    return `${p.name} — ${p.customer_display_name}`;
+  }
+
+  // Filter projects by selected customer, then let the hook filter by query
+  const customerProjects = useMemo(() => {
+    if (!selectedCustomerId) return projects;
+    return projects.filter((p) => String(p.customer) === selectedCustomerId);
+  }, [projects, selectedCustomerId]);
+
+  // Commit handlers live outside the hooks so they can reference each other's
+  // setQuery without circular initialization issues.
+  const commitCustomerRef = { current: (_c: CustomerRecord | null) => {} };
+  const commitProjectRef = { current: (_p: ProjectRecord | null) => {} };
+
+  const customerCombobox = useCombobox<CustomerRecord>({
+    items: customers,
+    getLabel: (c) => c.display_name,
+    onCommit: (c) => commitCustomerRef.current(c),
+  });
+
+  const projectCombobox = useCombobox<ProjectRecord>({
+    items: customerProjects,
+    getLabel: (p) => `${p.name} ${p.customer_display_name}`,
+    onCommit: (p) => commitProjectRef.current(p),
+    syntheticPrefixCount: 1, // "No project" option
+  });
+
+  commitCustomerRef.current = (customer) => {
+    if (customer) {
+      setSelectedCustomerId(String(customer.id));
+      customerCombobox.setQuery(customer.display_name);
+    } else {
+      setSelectedCustomerId("");
+      customerCombobox.setQuery("");
+    }
+    // Clear project when customer changes (project must belong to customer)
+    setSelectedProjectId("");
+    projectCombobox.setQuery("");
+    customerCombobox.close(!!customer);
+  };
+
+  commitProjectRef.current = (project) => {
+    if (project) {
+      setSelectedProjectId(String(project.id));
+      projectCombobox.setQuery(projectDisplayLabel(project));
+    } else {
+      setSelectedProjectId("");
+      projectCombobox.setQuery("");
+    }
+    projectCombobox.close(!!project);
+  };
+
+  function commitCustomer(customer: CustomerRecord | null) { commitCustomerRef.current(customer); }
+  function commitProject(project: ProjectRecord | null) { commitProjectRef.current(project); }
 
   // -- Policy --
   const [paymentStatusLabels, setPaymentStatusLabels] = useState<Record<string, string>>(PAYMENT_STATUS_LABELS_FALLBACK);
@@ -210,196 +259,6 @@ export function PaymentsConsole() {
   );
 
   // -------------------------------------------------------------------------
-  // Customer combobox
-  // -------------------------------------------------------------------------
-
-  const filteredCustomers = useMemo(() => {
-    const needle = customerQuery.trim().toLowerCase();
-    if (!needle) return customers;
-    return customers.filter((c) => c.display_name.toLowerCase().includes(needle));
-  }, [customers, customerQuery]);
-
-  const selectedCustomer = customers.find((c) => String(c.id) === selectedCustomerId) ?? null;
-
-  function openCustomerMenu() {
-    setCustomerQuery(selectedCustomer ? selectedCustomer.display_name : "");
-    setCustomerMenuOpen(true);
-    setCustomerHighlight(-1);
-  }
-
-  function closeCustomerMenu() {
-    setCustomerMenuOpen(false);
-    setCustomerHighlight(-1);
-    if (!selectedCustomer) setCustomerQuery("");
-  }
-
-  function commitCustomer(customer: CustomerRecord | null) {
-    if (customer) {
-      setSelectedCustomerId(String(customer.id));
-      setCustomerQuery(customer.display_name);
-    } else {
-      setSelectedCustomerId("");
-      setCustomerQuery("");
-    }
-    // Clear project when customer changes (project must belong to customer)
-    setSelectedProjectId("");
-    setProjectQuery("");
-    closeCustomerMenu();
-  }
-
-  function handleCustomerInput(value: string) {
-    setCustomerQuery(value);
-    setCustomerMenuOpen(true);
-    setCustomerHighlight(value.trim() ? 0 : -1);
-    if (selectedCustomerId) {
-      setSelectedCustomerId("");
-      setSelectedProjectId("");
-      setProjectQuery("");
-    }
-  }
-
-  function handleCustomerKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    const count = filteredCustomers.length;
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      if (!customerMenuOpen) { openCustomerMenu(); return; }
-      setCustomerHighlight((i) => (i < count - 1 ? i + 1 : i));
-      return;
-    }
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      if (!customerMenuOpen) { openCustomerMenu(); return; }
-      setCustomerHighlight((i) => (i > 0 ? i - 1 : 0));
-      return;
-    }
-    if (event.key === "Enter" && customerMenuOpen) {
-      event.preventDefault();
-      if (customerHighlight >= 0 && filteredCustomers[customerHighlight]) {
-        commitCustomer(filteredCustomers[customerHighlight]);
-      }
-      return;
-    }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      closeCustomerMenu();
-    }
-  }
-
-  // Dismiss customer menu on outside click
-  useEffect(() => {
-    if (!customerMenuOpen) return;
-    function handleMouseDown(e: MouseEvent) {
-      const target = e.target as Node | null;
-      if (
-        customerInputRef.current?.contains(target) ||
-        customerMenuRef.current?.contains(target)
-      ) return;
-      closeCustomerMenu();
-    }
-    document.addEventListener("mousedown", handleMouseDown);
-    return () => document.removeEventListener("mousedown", handleMouseDown);
-  }, [customerMenuOpen]);
-
-  // -------------------------------------------------------------------------
-  // Project combobox
-  // -------------------------------------------------------------------------
-
-  function projectDisplayLabel(p: ProjectRecord): string {
-    return `${p.name} — ${p.customer_display_name}`;
-  }
-
-  // Filter projects by selected customer, then by search query
-  const customerProjects = useMemo(() => {
-    if (!selectedCustomerId) return projects;
-    return projects.filter((p) => String(p.customer) === selectedCustomerId);
-  }, [projects, selectedCustomerId]);
-
-  const filteredProjects = useMemo(() => {
-    const needle = projectQuery.trim().toLowerCase();
-    if (!needle) return customerProjects;
-    return customerProjects.filter((p) =>
-      `${p.name} ${p.customer_display_name}`.toLowerCase().includes(needle),
-    );
-  }, [customerProjects, projectQuery]);
-
-  const selectedProject = projects.find((p) => String(p.id) === selectedProjectId) ?? null;
-
-  function openProjectMenu() {
-    setProjectQuery(selectedProject ? projectDisplayLabel(selectedProject) : "");
-    setProjectMenuOpen(true);
-    setProjectHighlight(-1);
-  }
-
-  function closeProjectMenu() {
-    setProjectMenuOpen(false);
-    setProjectHighlight(-1);
-    if (!selectedProject) setProjectQuery("");
-  }
-
-  function commitProject(project: ProjectRecord | null) {
-    if (project) {
-      setSelectedProjectId(String(project.id));
-      setProjectQuery(projectDisplayLabel(project));
-    } else {
-      setSelectedProjectId("");
-      setProjectQuery("");
-    }
-    closeProjectMenu();
-  }
-
-  function handleProjectInput(value: string) {
-    setProjectQuery(value);
-    setProjectMenuOpen(true);
-    // "No project" is always index 0, so first real result is index 1
-    setProjectHighlight(value.trim() ? 1 : 0);
-    if (selectedProjectId) setSelectedProjectId("");
-  }
-
-  function handleProjectKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    // +1 for "No project" option
-    const count = filteredProjects.length + 1;
-
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      if (!projectMenuOpen) { openProjectMenu(); return; }
-      setProjectHighlight((i) => (i < count - 1 ? i + 1 : i));
-      return;
-    }
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      if (!projectMenuOpen) { openProjectMenu(); return; }
-      setProjectHighlight((i) => (i > 0 ? i - 1 : 0));
-      return;
-    }
-    if (event.key === "Enter" && projectMenuOpen) {
-      event.preventDefault();
-      if (projectHighlight === 0) { commitProject(null); return; }
-      const idx = projectHighlight - 1;
-      if (idx >= 0 && filteredProjects[idx]) commitProject(filteredProjects[idx]);
-      return;
-    }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      closeProjectMenu();
-    }
-  }
-
-  // Dismiss project menu on outside click
-  useEffect(() => {
-    if (!projectMenuOpen) return;
-    function handleMouseDown(e: MouseEvent) {
-      const target = e.target as Node | null;
-      if (
-        projectInputRef.current?.contains(target) ||
-        projectMenuRef.current?.contains(target)
-      ) return;
-      closeProjectMenu();
-    }
-    document.addEventListener("mousedown", handleMouseDown);
-    return () => document.removeEventListener("mousedown", handleMouseDown);
-  }, [projectMenuOpen]);
-
-  // -------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------
 
@@ -411,9 +270,9 @@ export function PaymentsConsole() {
     setWorkspaceMode("create");
     setSelectedPaymentId("");
     setSelectedCustomerId("");
-    setCustomerQuery("");
+    customerCombobox.setQuery("");
     setSelectedProjectId("");
-    setProjectQuery("");
+    projectCombobox.setQuery("");
     setFormMethod(defaultCreateMethod);
     setFormStatus("settled");
     setFormAmount("");
@@ -559,16 +418,16 @@ export function PaymentsConsole() {
 
   // Hydrate combobox display text when data arrives for URL-scoped selections
   useEffect(() => {
-    if (!selectedCustomerId || customerQuery) return;
+    if (!selectedCustomerId || customerCombobox.query) return;
     const match = customers.find((c) => String(c.id) === selectedCustomerId);
-    if (match) setCustomerQuery(match.display_name);
-  }, [customers, selectedCustomerId, customerQuery]);
+    if (match) customerCombobox.setQuery(match.display_name);
+  }, [customers, selectedCustomerId, customerCombobox.query]);
 
   useEffect(() => {
-    if (!selectedProjectId || projectQuery) return;
+    if (!selectedProjectId || projectCombobox.query) return;
     const match = projects.find((p) => String(p.id) === selectedProjectId);
-    if (match) setProjectQuery(projectDisplayLabel(match));
-  }, [projects, selectedProjectId, projectQuery]);
+    if (match) projectCombobox.setQuery(projectDisplayLabel(match));
+  }, [projects, selectedProjectId, projectCombobox.query]);
 
   // Load invoices (allocation targets) when project selection changes
   useEffect(() => {
@@ -840,15 +699,22 @@ export function PaymentsConsole() {
                   <div className={styles.projectCombobox}>
                     <div className={styles.projectInputWrap}>
                       <input
-                        ref={customerInputRef}
+                        ref={customerCombobox.inputRef}
                         className={styles.projectInput}
                         role="combobox"
-                        aria-expanded={customerMenuOpen}
-                        value={customerMenuOpen ? customerQuery : (selectedCustomer ? selectedCustomer.display_name : "")}
+                        aria-expanded={customerCombobox.isOpen}
+                        value={customerCombobox.isOpen ? customerCombobox.query : (selectedCustomer ? selectedCustomer.display_name : "")}
                         placeholder="Type to search customers..."
-                        onFocus={() => openCustomerMenu()}
-                        onChange={(e) => handleCustomerInput(e.target.value)}
-                        onKeyDown={handleCustomerKeyDown}
+                        onFocus={() => customerCombobox.open(selectedCustomer ? selectedCustomer.display_name : "")}
+                        onChange={(e) => {
+                          customerCombobox.handleInput(e.target.value);
+                          if (selectedCustomerId) {
+                            setSelectedCustomerId("");
+                            setSelectedProjectId("");
+                            projectCombobox.setQuery("");
+                          }
+                        }}
+                        onKeyDown={customerCombobox.handleKeyDown}
                         autoComplete="off"
                         required
                       />
@@ -858,7 +724,7 @@ export function PaymentsConsole() {
                           className={styles.projectClear}
                           aria-label="Clear customer selection"
                           onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => commitCustomer(null)}
+                          onClick={() => customerCombobox.onCommit(null)}
                         >
                           ×
                         </button>
@@ -868,29 +734,29 @@ export function PaymentsConsole() {
                           className={styles.projectClear}
                           aria-label="Open customer options"
                           onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => { customerInputRef.current?.focus(); openCustomerMenu(); }}
+                          onClick={() => { customerCombobox.inputRef.current?.focus(); customerCombobox.open(""); }}
                         >
                           ▾
                         </button>
                       )}
                     </div>
-                    {customerMenuOpen ? (
-                      <div ref={customerMenuRef} className={styles.projectMenu} role="listbox">
-                        {filteredCustomers.map((c, i) => (
+                    {customerCombobox.isOpen ? (
+                      <div ref={customerCombobox.menuRef} className={styles.projectMenu} role="listbox">
+                        {customerCombobox.filteredItems.map((c, i) => (
                           <button
                             key={c.id}
                             type="button"
                             role="option"
                             aria-selected={String(c.id) === selectedCustomerId}
-                            className={`${styles.projectOption} ${customerHighlight === i ? styles.projectOptionActive : ""}`}
+                            className={`${styles.projectOption} ${customerCombobox.highlightIndex === i ? styles.projectOptionActive : ""}`}
                             onMouseDown={(e) => e.preventDefault()}
-                            onMouseEnter={() => setCustomerHighlight(i)}
-                            onClick={() => commitCustomer(c)}
+                            onMouseEnter={() => customerCombobox.setHighlightIndex(i)}
+                            onClick={() => customerCombobox.onCommit(c)}
                           >
                             {c.display_name}
                           </button>
                         ))}
-                        {filteredCustomers.length === 0 && customerQuery.trim() ? (
+                        {customerCombobox.filteredItems.length === 0 && customerCombobox.query.trim() ? (
                           <div className={styles.projectNoResults}>No matching customers.</div>
                         ) : null}
                       </div>
@@ -903,15 +769,18 @@ export function PaymentsConsole() {
                   <div className={styles.projectCombobox}>
                     <div className={styles.projectInputWrap}>
                       <input
-                        ref={projectInputRef}
+                        ref={projectCombobox.inputRef}
                         className={styles.projectInput}
                         role="combobox"
-                        aria-expanded={projectMenuOpen}
-                        value={projectMenuOpen ? projectQuery : (selectedProject ? projectDisplayLabel(selectedProject) : "")}
+                        aria-expanded={projectCombobox.isOpen}
+                        value={projectCombobox.isOpen ? projectCombobox.query : (selectedProject ? projectDisplayLabel(selectedProject) : "")}
                         placeholder="Type to search projects..."
-                        onFocus={() => openProjectMenu()}
-                        onChange={(e) => handleProjectInput(e.target.value)}
-                        onKeyDown={handleProjectKeyDown}
+                        onFocus={() => projectCombobox.open(selectedProject ? projectDisplayLabel(selectedProject) : "")}
+                        onChange={(e) => {
+                          projectCombobox.handleInput(e.target.value);
+                          if (selectedProjectId) setSelectedProjectId("");
+                        }}
+                        onKeyDown={projectCombobox.handleKeyDown}
                         autoComplete="off"
                       />
                       {selectedProjectId ? (
@@ -930,26 +799,26 @@ export function PaymentsConsole() {
                           className={styles.projectClear}
                           aria-label="Open project options"
                           onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => { projectInputRef.current?.focus(); openProjectMenu(); }}
+                          onClick={() => { projectCombobox.inputRef.current?.focus(); projectCombobox.open(""); }}
                         >
                           ▾
                         </button>
                       )}
                     </div>
-                    {projectMenuOpen ? (
-                      <div ref={projectMenuRef} className={styles.projectMenu} role="listbox">
+                    {projectCombobox.isOpen ? (
+                      <div ref={projectCombobox.menuRef} className={styles.projectMenu} role="listbox">
                         <button
                           type="button"
                           role="option"
                           aria-selected={!selectedProjectId}
-                          className={`${styles.projectOption} ${projectHighlight === 0 ? styles.projectOptionActive : ""}`}
+                          className={`${styles.projectOption} ${projectCombobox.highlightIndex === 0 ? styles.projectOptionActive : ""}`}
                           onMouseDown={(e) => e.preventDefault()}
-                          onMouseEnter={() => setProjectHighlight(0)}
+                          onMouseEnter={() => projectCombobox.setHighlightIndex(0)}
                           onClick={() => commitProject(null)}
                         >
                           No project
                         </button>
-                        {filteredProjects.map((p, i) => {
+                        {projectCombobox.filteredItems.map((p, i) => {
                           const idx = i + 1;
                           return (
                             <button
@@ -957,9 +826,9 @@ export function PaymentsConsole() {
                               type="button"
                               role="option"
                               aria-selected={String(p.id) === selectedProjectId}
-                              className={`${styles.projectOption} ${projectHighlight === idx ? styles.projectOptionActive : ""}`}
+                              className={`${styles.projectOption} ${projectCombobox.highlightIndex === idx ? styles.projectOptionActive : ""}`}
                               onMouseDown={(e) => e.preventDefault()}
-                              onMouseEnter={() => setProjectHighlight(idx)}
+                              onMouseEnter={() => projectCombobox.setHighlightIndex(idx)}
                               onClick={() => commitProject(p)}
                             >
                               <span className={styles.projectOptionName}>{p.name}</span>
@@ -967,7 +836,7 @@ export function PaymentsConsole() {
                             </button>
                           );
                         })}
-                        {filteredProjects.length === 0 && projectQuery.trim() ? (
+                        {projectCombobox.filteredItems.length === 0 && projectCombobox.query.trim() ? (
                           <div className={styles.projectNoResults}>No matching projects.</div>
                         ) : null}
                       </div>

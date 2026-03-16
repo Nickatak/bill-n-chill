@@ -1314,7 +1314,12 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
 
                         {isSelected && selectedInvoice ? (
                           <div className={styles.invoiceExpandedSections}>
-                            {/* Status & Actions */}
+                            {/* Status & Actions — intentionally not extracted to a shared component.
+                               The pill/note/button pattern is similar across EST/CO/INV but each
+                               console owns its own state, labels, tone classes, and layout variants
+                               (e.g. CO wraps in a collapsible). Extracting would just create a
+                               ~12-prop wrapper that moves no complexity. CSS consolidation is the
+                               real win here, not component extraction. */}
                             <div className={styles.invoiceViewerSection}>
                               <h4 className={styles.invoiceViewerSectionHeading}>Status &amp; Actions</h4>
                                 <div className={styles.invoiceViewerSectionContent}>

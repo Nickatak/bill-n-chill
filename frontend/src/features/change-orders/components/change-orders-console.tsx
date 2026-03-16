@@ -1741,7 +1741,8 @@ export function ChangeOrdersConsole({
                     <PaginationControls page={coPage} totalPages={coTotalPages} totalCount={coTotalCount} onPageChange={setCoPage} />
                     {selectedViewerChangeOrder ? (
                       <>
-                        {/* Status & Actions section */}
+                        {/* Status & Actions — intentionally not extracted to a shared component.
+                           See invoices-console.tsx for rationale. */}
                         <div className={styles.viewerSection}>
                           <button
                             type="button"
