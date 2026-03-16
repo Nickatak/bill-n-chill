@@ -485,6 +485,66 @@
   background: var(--surface);
 }
 
+/* ── Paid Action Forms (Record Payment / Mark Paid) ────────── */
+
+.paidActionForm {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.paidActionTitle {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-xs) 0;
+}
+
+.paidActionHint {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-sm) 0;
+}
+
+.paidActionFields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: flex-end;
+}
+
+.paidActionField {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 120px;
+  flex: 1;
+  font-size: 0.82rem;
+}
+
+.paidActionField span {
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.paidActionFieldWide {
+  flex: 2;
+  min-width: 200px;
+}
+
+.paidActionButtons {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
 .statusFilterButtons {
   display: flex;
   flex-wrap: wrap;

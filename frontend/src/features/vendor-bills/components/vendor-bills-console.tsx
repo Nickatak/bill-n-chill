@@ -77,6 +77,16 @@ const VENDOR_BILL_STATUS_LABELS_FALLBACK: Record<string, string> = {
   paid: "Paid",
   void: "Void",
 };
+const PAYMENT_METHODS = [
+  { value: "check", label: "Check" },
+  { value: "ach", label: "ACH" },
+  { value: "wire", label: "Wire" },
+  { value: "zelle", label: "Zelle" },
+  { value: "card", label: "Card" },
+  { value: "cash", label: "Cash" },
+  { value: "other", label: "Other" },
+];
+
 type ProjectStatusValue = ProjectListStatusValue;
 const DEFAULT_PROJECT_STATUS_FILTERS: ProjectStatusValue[] = ["active", "prospect"];
 const PROJECT_STATUS_VALUES: ProjectStatusValue[] = ["prospect", "active", "on_hold", "completed", "cancelled"];
@@ -214,6 +224,17 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const [receiptNotes, setReceiptNotes] = useState("");
   const [receiptMessage, setReceiptMessage] = useState("");
   const [receiptMessageTone, setReceiptMessageTone] = useState<"success" | "error">("success");
+
+  // Payment action state (Record Payment / Mark Paid on status → paid)
+  const [paidAction, setPaidAction] = useState<"" | "record_payment" | "mark_paid">("");
+  const [rpAmount, setRpAmount] = useState("");
+  const [rpMethod, setRpMethod] = useState("check");
+  const [rpDate, setRpDate] = useState(todayDateInput());
+  const [rpReference, setRpReference] = useState("");
+  const [rpNote, setRpNote] = useState("");
+  const [markPaidNote, setMarkPaidNote] = useState("");
+  const [paidActionError, setPaidActionError] = useState("");
+  const [paidActionBusy, setPaidActionBusy] = useState(false);
 
   // Accordion section state for inline viewer expansion
   const [isStatusSectionOpen, setIsStatusSectionOpen] = useState(true);
@@ -1020,6 +1041,126 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     await handleQuickVendorBillStatus(viewerNextStatus);
   }
 
+  /** Opens the Record Payment inline form, pre-filling amount from balance_due. */
+  function handleOpenRecordPayment() {
+    if (!selectedVendorBill) return;
+    setRpAmount(selectedVendorBill.balance_due);
+    setRpMethod("check");
+    setRpDate(todayDateInput());
+    setRpReference("");
+    setRpNote("");
+    setPaidActionError("");
+    setPaidAction("record_payment");
+  }
+
+  /** Opens the Mark Paid inline form. */
+  function handleOpenMarkPaid() {
+    setMarkPaidNote("");
+    setPaidActionError("");
+    setPaidAction("mark_paid");
+  }
+
+  /** Creates an outbound payment, allocates it to the selected bill, then refreshes. */
+  async function handleRecordPayment() {
+    if (!selectedVendorBill || !selectedProjectId) return;
+    const amount = Number(rpAmount);
+    if (!amount || amount <= 0) {
+      setPaidActionError("Enter a payment amount greater than zero.");
+      return;
+    }
+    setPaidActionBusy(true);
+    setPaidActionError("");
+    try {
+      // Step 1: Create outbound payment
+      const createRes = await fetch(
+        `${normalizedBaseUrl}/projects/${selectedProjectId}/payments/`,
+        {
+          method: "POST",
+          headers: buildAuthHeaders(token, { contentType: "application/json" }),
+          body: JSON.stringify({
+            direction: "outbound",
+            method: rpMethod,
+            amount: rpAmount,
+            payment_date: rpDate || todayDateInput(),
+            reference_number: rpReference,
+            notes: rpNote,
+          }),
+        },
+      );
+      const createPayload = await createRes.json();
+      if (!createRes.ok) {
+        setPaidActionError(readApiErrorMessage(createPayload, "Failed to create payment."));
+        return;
+      }
+      const payment = createPayload.data;
+
+      // Step 2: Allocate payment to this vendor bill
+      const allocateRes = await fetch(
+        `${normalizedBaseUrl}/payments/${payment.id}/allocate/`,
+        {
+          method: "POST",
+          headers: buildAuthHeaders(token, { contentType: "application/json" }),
+          body: JSON.stringify({
+            allocations: [{
+              target_type: "vendor_bill",
+              target_id: selectedVendorBill.id,
+              applied_amount: rpAmount,
+            }],
+          }),
+        },
+      );
+      const allocatePayload = await allocateRes.json();
+      if (!allocateRes.ok) {
+        setPaidActionError(readApiErrorMessage(allocatePayload, "Payment created but allocation failed."));
+        return;
+      }
+
+      // Refresh bill list to pick up updated balance_due and status
+      await loadVendorBills();
+      setPaidAction("");
+      setViewerNextStatus("");
+      setStatusMessage(`Payment of $${rpAmount} recorded and allocated to bill #${selectedVendorBill.id}.`);
+    } catch {
+      setPaidActionError("Network error recording payment.");
+    } finally {
+      setPaidActionBusy(false);
+    }
+  }
+
+  /** Marks the selected bill as paid with a required note (no payment record). */
+  async function handleMarkPaid() {
+    if (!selectedVendorBill) return;
+    const note = markPaidNote.trim();
+    if (!note) {
+      setPaidActionError("A note is required when marking a bill as paid without a payment record.");
+      return;
+    }
+    setPaidActionBusy(true);
+    setPaidActionError("");
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/vendor-bills/${selectedVendorBill.id}/`, {
+        method: "PATCH",
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        body: JSON.stringify({ status: "paid", mark_paid_note: note }),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setPaidActionError(readApiErrorMessage(payload, "Failed to mark bill as paid."));
+        return;
+      }
+      const updated = payload.data as VendorBillRecord;
+      setVendorBills((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      hydrate(updated);
+      setPaidAction("");
+      setViewerNextStatus("");
+      setStatusMessage(`Bill #${updated.id} marked as paid.`);
+    } catch {
+      setPaidActionError("Network error marking bill as paid.");
+    } finally {
+      setPaidActionBusy(false);
+    }
+  }
+
   /** Copies the selected bill's details into the create form for a "recreate" workflow. */
   function handleRecreateAsNewDraftTemplate() {
     if (!selectedVendorBillId) {
@@ -1142,6 +1283,12 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
     setViewerNextStatus("");
   }, [allowedStatusTransitions, selectedVendorBill]);
+
+  // Reset paid action forms when next-status changes away from "paid" or bill changes.
+  useEffect(() => {
+    setPaidAction("");
+    setPaidActionError("");
+  }, [viewerNextStatus, selectedVendorBillId]);
 
 
 
@@ -1448,16 +1595,139 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                                   ) : (
                                     <p className={styles.viewerHint}>No next statuses available for this bill.</p>
                                   )}
-                                  <div className={styles.viewerStatusActions}>
-                                    <button
-                                      type="button"
-                                      className={creatorStyles.primaryButton}
-                                      onClick={() => void handleUpdateVendorBillStatus()}
-                                      disabled={!selectedVendorBillId || !viewerNextStatus || !canMutateVendorBills}
-                                    >
-                                      Update Status
-                                    </button>
-                                  </div>
+                                  {viewerNextStatus === "paid" ? (
+                                    <>
+                                      <div className={styles.viewerStatusActions}>
+                                        <button
+                                          type="button"
+                                          className={creatorStyles.primaryButton}
+                                          onClick={handleOpenRecordPayment}
+                                          disabled={!selectedVendorBillId || !canMutateVendorBills || paidActionBusy}
+                                        >
+                                          Record Payment
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className={creatorStyles.secondaryButton}
+                                          onClick={handleOpenMarkPaid}
+                                          disabled={!selectedVendorBillId || !canMutateVendorBills || paidActionBusy}
+                                        >
+                                          Mark Paid
+                                        </button>
+                                      </div>
+                                      {paidAction === "record_payment" ? (
+                                        <div className={styles.paidActionForm}>
+                                          <h5 className={styles.paidActionTitle}>Record Outbound Payment</h5>
+                                          <div className={styles.paidActionFields}>
+                                            <label className={styles.paidActionField}>
+                                              <span>Amount *</span>
+                                              <input
+                                                type="number"
+                                                step="0.01"
+                                                min="0.01"
+                                                value={rpAmount}
+                                                onChange={(e) => setRpAmount(e.target.value)}
+                                                required
+                                              />
+                                            </label>
+                                            <label className={styles.paidActionField}>
+                                              <span>Method</span>
+                                              <select value={rpMethod} onChange={(e) => setRpMethod(e.target.value)}>
+                                                {PAYMENT_METHODS.map((m) => (
+                                                  <option key={m.value} value={m.value}>{m.label}</option>
+                                                ))}
+                                              </select>
+                                            </label>
+                                            <label className={styles.paidActionField}>
+                                              <span>Date</span>
+                                              <input type="date" value={rpDate} onChange={(e) => setRpDate(e.target.value)} />
+                                            </label>
+                                            <label className={styles.paidActionField}>
+                                              <span>Reference #</span>
+                                              <input value={rpReference} onChange={(e) => setRpReference(e.target.value)} placeholder="Check #, txn ID..." />
+                                            </label>
+                                            <label className={`${styles.paidActionField} ${styles.paidActionFieldWide}`}>
+                                              <span>Note</span>
+                                              <input value={rpNote} onChange={(e) => setRpNote(e.target.value)} placeholder="Optional" />
+                                            </label>
+                                          </div>
+                                          <div className={styles.paidActionButtons}>
+                                            <button
+                                              type="button"
+                                              className={creatorStyles.primaryButton}
+                                              onClick={() => void handleRecordPayment()}
+                                              disabled={paidActionBusy || !rpAmount}
+                                            >
+                                              {paidActionBusy ? "Recording..." : "Record & Allocate"}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className={creatorStyles.secondaryButton}
+                                              onClick={() => setPaidAction("")}
+                                              disabled={paidActionBusy}
+                                            >
+                                              Cancel
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ) : null}
+                                      {paidAction === "mark_paid" ? (
+                                        <div className={styles.paidActionForm}>
+                                          <h5 className={styles.paidActionTitle}>Mark Paid (No Payment Record)</h5>
+                                          <p className={styles.paidActionHint}>
+                                            Use this for credits applied, write-offs, or payments made outside the system.
+                                            A note is required.
+                                          </p>
+                                          <div className={styles.paidActionFields}>
+                                            <label className={`${styles.paidActionField} ${styles.paidActionFieldWide}`}>
+                                              <span>Note *</span>
+                                              <textarea
+                                                value={markPaidNote}
+                                                onChange={(e) => setMarkPaidNote(e.target.value)}
+                                                placeholder="Why is this bill being marked as paid without a payment record?"
+                                                rows={2}
+                                                required
+                                              />
+                                            </label>
+                                          </div>
+                                          <div className={styles.paidActionButtons}>
+                                            <button
+                                              type="button"
+                                              className={creatorStyles.primaryButton}
+                                              onClick={() => void handleMarkPaid()}
+                                              disabled={paidActionBusy || !markPaidNote.trim()}
+                                            >
+                                              {paidActionBusy ? "Updating..." : "Confirm Mark Paid"}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className={creatorStyles.secondaryButton}
+                                              onClick={() => setPaidAction("")}
+                                              disabled={paidActionBusy}
+                                            >
+                                              Cancel
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ) : null}
+                                    </>
+                                  ) : (
+                                    <div className={styles.viewerStatusActions}>
+                                      <button
+                                        type="button"
+                                        className={creatorStyles.primaryButton}
+                                        onClick={() => void handleUpdateVendorBillStatus()}
+                                        disabled={!selectedVendorBillId || !viewerNextStatus || !canMutateVendorBills}
+                                      >
+                                        Update Status
+                                      </button>
+                                    </div>
+                                  )}
+                                  {paidActionError ? (
+                                    <p className={styles.viewerErrorText} role="alert" aria-live="polite">
+                                      {paidActionError}
+                                    </p>
+                                  ) : null}
                                   {viewerErrorMessage ? (
                                     <p className={styles.viewerErrorText} role="alert" aria-live="polite">
                                       {viewerErrorMessage}

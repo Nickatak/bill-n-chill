@@ -365,6 +365,9 @@ def _handle_vb_status_transition(
             status=400,
         )
 
+    # Mark-paid note validation — required when provided (manual mark-paid path)
+    mark_paid_note = data.get("mark_paid_note", "").strip() if next_status == VendorBill.Status.PAID else ""
+
     # Line item validation
     line_items = data.get("line_items")
     has_line_items = line_items is not None
@@ -494,6 +497,7 @@ def _handle_vb_status_transition(
                     capture_status=next_status,
                     previous_status=previous_status,
                     acted_by=request.user,
+                    mark_paid_note=mark_paid_note,
                 )
 
     vendor_bill = _prefetch_vendor_bill_qs(VendorBill.objects.filter(id=vendor_bill.id)).get()

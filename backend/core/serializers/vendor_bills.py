@@ -116,4 +116,5 @@ class VendorBillWriteSerializer(serializers.Serializer):
     total = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
     notes = serializers.CharField(max_length=5000, required=False, allow_blank=True)
     line_items = VendorBillLineInputSerializer(many=True, required=False)
+    mark_paid_note = serializers.CharField(max_length=5000, required=False, allow_blank=True)
     duplicate_override = serializers.BooleanField(required=False, default=False)

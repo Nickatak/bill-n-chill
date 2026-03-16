@@ -59,13 +59,17 @@ class VendorBillSnapshot(ImmutableModelMixin):
         capture_status: str,
         previous_status: str,
         acted_by,
+        mark_paid_note: str = "",
     ):
         """Append an immutable snapshot row for a vendor-bill status transition."""
         snapshot = vendor_bill.build_snapshot()
-        snapshot["decision_context"] = {
+        decision_context = {
             "capture_status": capture_status,
             "previous_status": previous_status,
         }
+        if mark_paid_note:
+            decision_context["mark_paid_note"] = mark_paid_note
+        snapshot["decision_context"] = decision_context
         return cls.objects.create(
             vendor_bill=vendor_bill,
             capture_status=capture_status,
