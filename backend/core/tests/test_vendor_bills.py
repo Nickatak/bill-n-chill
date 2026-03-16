@@ -130,7 +130,7 @@ class VendorBillTests(TestCase):
         # Terminal statuses are computed from the policy transitions.
         self.assertIn("paid", payload["terminal_statuses"])
         self.assertIn("void", payload["terminal_statuses"])
-        self.assertTrue(str(payload["policy_version"]).startswith("2026-03-01.vendor_bills."))
+        self.assertTrue(str(payload["policy_version"]).startswith("2026-03-16.vendor_bills."))
 
     def test_vendor_bill_create_and_project_list(self):
         response = self.client.post(

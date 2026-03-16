@@ -88,6 +88,9 @@ const policyContract: VendorBillPolicyContract = {
     void: [],
   },
   terminal_statuses: ["paid", "void"],
+  kinds: ["bill", "receipt"],
+  kind_labels: { bill: "Bill", receipt: "Receipt" },
+  receipt_status: "recorded",
 };
 
 // ---------------------------------------------------------------------------

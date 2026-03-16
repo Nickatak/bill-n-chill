@@ -18,18 +18,23 @@ export type VendorRecord = {
 };
 
 export type VendorBillStatus = string;
+export type VendorBillKind = "bill" | "receipt";
 
 export type VendorBillRecord = {
   id: number;
+  kind: VendorBillKind;
   project: number;
   project_name: string;
-  vendor: number;
+  vendor: number | null;
   vendor_name: string;
   bill_number: string;
+  cost_code: number | null;
+  cost_code_code: string | null;
+  cost_code_name: string | null;
   status: VendorBillStatus;
   received_date: string | null;
-  issue_date: string;
-  due_date: string;
+  issue_date: string | null;
+  due_date: string | null;
   scheduled_for: string | null;
   subtotal: string;
   tax_amount: string;
@@ -87,6 +92,9 @@ export type VendorBillPolicyContract = {
   create_shortcut_statuses: string[];
   allowed_status_transitions: Record<string, string[]>;
   terminal_statuses: string[];
+  kinds: VendorBillKind[];
+  kind_labels: Record<string, string>;
+  receipt_status: string;
 };
 
 export type ApiResponse = {

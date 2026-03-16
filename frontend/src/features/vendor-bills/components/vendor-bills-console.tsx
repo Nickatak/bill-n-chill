@@ -8,7 +8,8 @@
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useCombobox } from "@/shared/hooks/use-combobox";
 import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
 import { useSearchParams } from "next/navigation";
 import { formatDateDisplay, todayDateInput, futureDateInput } from "@/shared/date-format";
@@ -44,7 +45,6 @@ import {
   VendorBillStatus,
   VendorRecord,
 } from "../types";
-import { PaymentRecorder, type AllocationTarget } from "@/features/payments";
 import styles from "./vendor-bills-console.module.css";
 import creatorStyles from "../../../shared/document-creator/creator-foundation.module.css";
 
@@ -207,13 +207,18 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   const [duplicateCandidates, setDuplicateCandidates] = useState<VendorBillRecord[]>([]);
 
+  // Receipt quick-entry form
+  const [receiptTotal, setReceiptTotal] = useState("");
+  const [receiptVendorId, setReceiptVendorId] = useState("");
+  const [receiptDate, setReceiptDate] = useState(todayDateInput());
+  const [receiptNotes, setReceiptNotes] = useState("");
+  const [receiptMessage, setReceiptMessage] = useState("");
+  const [receiptMessageTone, setReceiptMessageTone] = useState<"success" | "error">("success");
+
   // Accordion section state for inline viewer expansion
   const [isStatusSectionOpen, setIsStatusSectionOpen] = useState(true);
   const [isLineItemsSectionOpen, setIsLineItemsSectionOpen] = useState(false);
   const [isDetailsSectionOpen, setIsDetailsSectionOpen] = useState(false);
-
-  // Content tab (bills vs payments)
-  const [activeContentTab, setActiveContentTab] = useState<"bills" | "payments">("bills");
 
   // Workspace visibility + flash animation
   const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(true);
@@ -223,6 +228,27 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   // -------------------------------------------------------------------------
 
   const activeVendors = vendors.filter((vendor) => vendor.is_active);
+
+  // Receipt vendor combobox (must be after activeVendors)
+  const commitReceiptVendor = useCallback((vendor: VendorRecord | null) => {
+    setReceiptVendorId(vendor ? String(vendor.id) : "");
+    receiptVendorCombobox.close(!!vendor);
+    if (vendor) receiptVendorCombobox.setQuery(vendor.name);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const receiptVendorCombobox = useCombobox<VendorRecord>({
+    items: activeVendors,
+    getLabel: (v) => v.name,
+    onCommit: commitReceiptVendor,
+    syntheticPrefixCount: 1,
+  });
+
+  const selectedReceiptVendor = useMemo(
+    () => vendors.find((v) => String(v.id) === receiptVendorId) ?? null,
+    [vendors, receiptVendorId],
+  );
+
   const projectNeedle = projectSearch.trim().toLowerCase();
   const filteredProjects = !projectNeedle
     ? projects
@@ -468,6 +494,60 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   }
 
   /** Routes form submission to create or save based on the current editing mode. */
+  async function handleSubmitReceipt(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canMutateVendorBills || !selectedProjectId) return;
+
+    const totalNum = parseFloat(receiptTotal);
+    if (!totalNum || totalNum <= 0) {
+      setReceiptMessage("Enter a total amount.");
+      setReceiptMessageTone("error");
+      return;
+    }
+
+    try {
+      const body: Record<string, unknown> = {
+        kind: "receipt",
+        total: receiptTotal,
+        received_date: receiptDate || undefined,
+        notes: receiptNotes || undefined,
+      };
+      if (receiptVendorId) body.vendor = Number(receiptVendorId);
+
+      const response = await fetch(
+        `${normalizedBaseUrl}/projects/${selectedProjectId}/vendor-bills/`,
+        {
+          method: "POST",
+          headers: buildAuthHeaders(token, { contentType: "application/json" }),
+          body: JSON.stringify(body),
+        },
+      );
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        const msg =
+          payload.error?.message ?? "Failed to record receipt.";
+        setReceiptMessage(msg);
+        setReceiptMessageTone("error");
+        return;
+      }
+
+      // Reset form
+      setReceiptTotal("");
+      setReceiptVendorId("");
+      receiptVendorCombobox.setQuery("");
+      setReceiptDate(todayDateInput());
+      setReceiptNotes("");
+      setReceiptMessage("Receipt recorded.");
+      setReceiptMessageTone("success");
+
+      // Refresh the bill list
+      void loadVendorBills();
+    } catch {
+      setReceiptMessage("Network error recording receipt.");
+      setReceiptMessageTone("error");
+    }
+  }
+
   function handleSubmitVendorBillForm(event: FormEvent<HTMLFormElement>) {
     if (!canMutateVendorBills) {
       event.preventDefault();
@@ -486,8 +566,8 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setVendorId(String(item.vendor));
     setBillNumber(item.bill_number);
     setReceivedDate(item.received_date ?? "");
-    setIssueDate(item.issue_date);
-    setDueDate(item.due_date);
+    setIssueDate(item.issue_date ?? "");
+    setDueDate(item.due_date ?? "");
     setSubtotal(item.subtotal);
     setTaxAmount(item.tax_amount);
     setShippingAmount(item.shipping_amount);
@@ -954,8 +1034,8 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setNewVendorId(String(selected.vendor));
     setNewBillNumber("");
     setNewReceivedDate(selected.received_date ?? "");
-    setNewIssueDate(selected.issue_date);
-    setNewDueDate(selected.due_date);
+    setNewIssueDate(selected.issue_date ?? "");
+    setNewDueDate(selected.due_date ?? "");
     setNewSubtotal(selected.subtotal);
     setNewTaxAmount(selected.tax_amount);
     setNewShippingAmount(selected.shipping_amount);
@@ -1067,86 +1147,153 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
 
 
-  const billAllocationTargets: AllocationTarget[] = useMemo(
-    () =>
-      vendorBills.map((bill) => ({
-        id: bill.id,
-        label: bill.bill_number
-          ? `${bill.bill_number} — ${bill.vendor_name}`
-          : `Bill #${bill.id} — ${bill.vendor_name}`,
-        balanceDue: bill.balance_due,
-      })),
-    [vendorBills],
-  );
-
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
 
   return (
     <section className={styles.console}>
-      {projects.length > 0 ? (
-        <ProjectListViewer
-          showSearchAndFilters={!isProjectScoped}
-          contextHint={
-            selectedProject
-              ? `Project context: #${selectedProject.id} - ${selectedProject.name} (${selectedProject.customer_display_name})`
-              : `Project context: #${scopedProjectId}`
-          }
-          searchValue={projectSearch}
-          onSearchChange={setProjectSearch}
-          statusValues={PROJECT_STATUS_VALUES}
-          statusFilters={projectStatusFilters}
-          statusCounts={projectStatusCounts}
-          onToggleStatusFilter={toggleProjectStatusFilter}
-          onShowAllStatuses={() =>
-            setProjectStatusFilters(["active", "on_hold", "prospect", "completed", "cancelled"])
-          }
-          onResetStatuses={() => setProjectStatusFilters(DEFAULT_PROJECT_STATUS_FILTERS)}
-          projects={statusFilteredProjects.map((project) => ({
-            id: project.id,
-            name: project.name,
-            customer_display_name: project.customer_display_name,
-            status: project.status ?? "",
-          }))}
-          selectedProjectId={selectedProjectId}
-          onSelectProject={handleSelectProject}
-          statusLabel={projectStatusLabel}
-        />
-      ) : (
-        <p>Create or load a project before entering bills.</p>
-      )}
-
-      {selectedProjectId ? (
-        <div className={styles.contentTabBar}>
-          <button
-            type="button"
-            className={`${styles.contentTab} ${activeContentTab === "bills" ? styles.contentTabActive : ""}`}
-            onClick={() => setActiveContentTab("bills")}
-          >
-            Bills
-          </button>
-          <button
-            type="button"
-            className={`${styles.contentTab} ${activeContentTab === "payments" ? styles.contentTabActive : ""}`}
-            onClick={() => setActiveContentTab("payments")}
-          >
-            Payments
-          </button>
-        </div>
+      {!isProjectScoped ? (
+        projects.length > 0 ? (
+          <ProjectListViewer
+            showSearchAndFilters
+            contextHint={
+              selectedProject
+                ? `Project context: #${selectedProject.id} - ${selectedProject.name} (${selectedProject.customer_display_name})`
+                : `Project context: #${scopedProjectId}`
+            }
+            searchValue={projectSearch}
+            onSearchChange={setProjectSearch}
+            statusValues={PROJECT_STATUS_VALUES}
+            statusFilters={projectStatusFilters}
+            statusCounts={projectStatusCounts}
+            onToggleStatusFilter={toggleProjectStatusFilter}
+            onShowAllStatuses={() =>
+              setProjectStatusFilters(["active", "on_hold", "prospect", "completed", "cancelled"])
+            }
+            onResetStatuses={() => setProjectStatusFilters(DEFAULT_PROJECT_STATUS_FILTERS)}
+            projects={statusFilteredProjects.map((project) => ({
+              id: project.id,
+              name: project.name,
+              customer_display_name: project.customer_display_name,
+              status: project.status ?? "",
+            }))}
+            selectedProjectId={selectedProjectId}
+            onSelectProject={handleSelectProject}
+            statusLabel={projectStatusLabel}
+          />
+        ) : (
+          <p>Create or load a project before entering bills.</p>
+        )
       ) : null}
 
-      {activeContentTab === "payments" && selectedProjectId ? (
-        <PaymentRecorder
-          projectId={Number(selectedProjectId)}
-          direction="outbound"
-          allocationTargets={billAllocationTargets}
-          onPaymentsChanged={loadVendorBills}
-        />
+      {/* ── Quick Receipt Form ──────────────────────────────────── */}
+      {selectedProjectId && canMutateVendorBills ? (
+        <form className={styles.receiptForm} onSubmit={handleSubmitReceipt}>
+          <h3 className={styles.receiptTitle}>Quick Receipt</h3>
+          <div className={styles.receiptFields}>
+            <div className={styles.receiptField}>
+              <span className={styles.receiptFieldLabel}>Vendor</span>
+              <div className={styles.receiptCombobox}>
+                <div className={styles.receiptComboboxInputWrap}>
+                  <input
+                    ref={receiptVendorCombobox.inputRef}
+                    className={styles.receiptComboboxInput}
+                    role="combobox"
+                    aria-expanded={receiptVendorCombobox.isOpen}
+                    aria-controls="receipt-vendor-listbox"
+                    value={receiptVendorCombobox.isOpen ? receiptVendorCombobox.query : (selectedReceiptVendor?.name ?? "")}
+                    placeholder="Search vendors..."
+                    onFocus={() => receiptVendorCombobox.open(selectedReceiptVendor?.name ?? "")}
+                    onChange={(e) => {
+                      receiptVendorCombobox.handleInput(e.target.value);
+                      if (receiptVendorId) setReceiptVendorId("");
+                    }}
+                    onKeyDown={receiptVendorCombobox.handleKeyDown}
+                    autoComplete="off"
+                  />
+                  {receiptVendorId ? (
+                    <button
+                      type="button"
+                      className={styles.receiptComboboxClear}
+                      aria-label="Clear vendor"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => commitReceiptVendor(null)}
+                    >×</button>
+                  ) : (
+                    <button
+                      type="button"
+                      className={styles.receiptComboboxClear}
+                      aria-label="Open vendor list"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => { receiptVendorCombobox.inputRef.current?.focus(); receiptVendorCombobox.open(""); }}
+                    >▾</button>
+                  )}
+                </div>
+                {receiptVendorCombobox.isOpen ? (
+                  <div ref={receiptVendorCombobox.menuRef} id="receipt-vendor-listbox" className={styles.receiptComboboxMenu} role="listbox">
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={!receiptVendorId}
+                      className={`${styles.receiptComboboxOption} ${receiptVendorCombobox.highlightIndex === 0 ? styles.receiptComboboxOptionActive : ""}`}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onMouseEnter={() => receiptVendorCombobox.setHighlightIndex(0)}
+                      onClick={() => commitReceiptVendor(null)}
+                    >None</button>
+                    {receiptVendorCombobox.filteredItems.map((v, i) => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        role="option"
+                        aria-selected={String(v.id) === receiptVendorId}
+                        className={`${styles.receiptComboboxOption} ${receiptVendorCombobox.highlightIndex === i + 1 ? styles.receiptComboboxOptionActive : ""}`}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onMouseEnter={() => receiptVendorCombobox.setHighlightIndex(i + 1)}
+                        onClick={() => commitReceiptVendor(v)}
+                      >{v.name}</button>
+                    ))}
+                    {receiptVendorCombobox.filteredItems.length === 0 && receiptVendorCombobox.query.trim() ? (
+                      <div className={styles.receiptComboboxNoResults}>No matching vendors.</div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            <label className={styles.receiptField}>
+              <span className={styles.receiptFieldLabel}>Amount *</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={receiptTotal}
+                onChange={(e) => setReceiptTotal(e.target.value)}
+                placeholder="0.00"
+                required
+              />
+            </label>
+            <label className={styles.receiptField}>
+              <span className={styles.receiptFieldLabel}>Date</span>
+              <input type="date" value={receiptDate} onChange={(e) => setReceiptDate(e.target.value)} />
+            </label>
+            <label className={`${styles.receiptField} ${styles.receiptFieldNotes}`}>
+              <span className={styles.receiptFieldLabel}>Notes</span>
+              <input value={receiptNotes} onChange={(e) => setReceiptNotes(e.target.value)} placeholder="Optional" />
+            </label>
+            <button type="submit" className={styles.receiptSubmit}>
+              Record
+            </button>
+          </div>
+          {receiptMessage ? (
+            <p className={`${styles.receiptMessage} ${
+              receiptMessageTone === "success" ? styles.receiptMessageSuccess : styles.receiptMessageError
+            }`}>
+              {receiptMessage}
+            </p>
+          ) : null}
+        </form>
       ) : null}
 
-      {activeContentTab === "bills" ? (
-      <>
       {/* ── Viewer Panel: bill table + inline expansion ──────────── */}
       <div className={styles.viewerPanel}>
         <div className={styles.panelHeader}>
@@ -1803,8 +1950,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
             </div>
           ) : null}
         </div>
-      ) : null}
-      </>
       ) : null}
 
       {statusMessage ? <p className={styles.inlineHint}>{statusMessage}</p> : null}

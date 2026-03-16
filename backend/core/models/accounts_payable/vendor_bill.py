@@ -10,15 +10,22 @@ User = get_user_model()
 
 
 class VendorBill(StatusTransitionMixin, models.Model):
-    """AP bill received from a vendor/subcontractor for project costs.
+    """AP bill or casual receipt for project costs.
 
     Business workflow:
+    - Two kinds: ``bill`` (formal vendor bill with line items and approval
+      lifecycle) and ``receipt`` (lightweight expense record, created in
+      terminal ``recorded`` status).
     - Internal payable document (vendor-facing), not customer-facing billing.
-    - Tracks AP lifecycle from intake through approval/scheduling/payment.
+    - Bills track AP lifecycle from intake through approval/scheduling/payment.
     - Project + vendor + bill number must be unique for non-void bills (reuse allowed after void).
-    - `created_by` captures who created/owns the bill record, not who performed
+    - `created_by` captures who created/owns the record, not who performed
       later lifecycle decisions (those belong in immutable decision captures).
     """
+
+    class Kind(models.TextChoices):
+        BILL = "bill", "Bill"
+        RECEIPT = "receipt", "Receipt"
 
     class Status(models.TextChoices):
         PLANNED = "planned", "Planned"
@@ -27,6 +34,7 @@ class VendorBill(StatusTransitionMixin, models.Model):
         SCHEDULED = "scheduled", "Scheduled"
         PAID = "paid", "Paid"
         VOID = "void", "Void"
+        RECORDED = "recorded", "Recorded"
 
     # Transition-map format:
     # {from_status: {allowed_to_status_1, allowed_to_status_2, ...}}
@@ -41,8 +49,15 @@ class VendorBill(StatusTransitionMixin, models.Model):
         Status.SCHEDULED: {Status.PAID, Status.VOID},
         Status.PAID: set(),
         Status.VOID: set(),
+        Status.RECORDED: {Status.VOID},
     }
 
+    kind = models.CharField(
+        max_length=16,
+        choices=Kind.choices,
+        default=Kind.BILL,
+        db_index=True,
+    )
     project = models.ForeignKey(
         "Project",
         on_delete=models.PROTECT,
@@ -52,8 +67,18 @@ class VendorBill(StatusTransitionMixin, models.Model):
         "Vendor",
         on_delete=models.PROTECT,
         related_name="vendor_bills",
+        null=True,
+        blank=True,
     )
-    bill_number = models.CharField(max_length=50)
+    bill_number = models.CharField(max_length=50, blank=True, default="")
+    cost_code = models.ForeignKey(
+        "CostCode",
+        on_delete=models.PROTECT,
+        related_name="vendor_bills",
+        null=True,
+        blank=True,
+        help_text="Optional cost code for the entire bill/receipt (receipts without line items).",
+    )
     status = models.CharField(
         max_length=32,
         choices=Status.choices,
@@ -65,8 +90,8 @@ class VendorBill(StatusTransitionMixin, models.Model):
         blank=True,
         help_text="Date the bill was physically received. Distinct from vendor issue date.",
     )
-    issue_date = models.DateField()
-    due_date = models.DateField()
+    issue_date = models.DateField(null=True, blank=True)
+    due_date = models.DateField(null=True, blank=True)
     scheduled_for = models.DateField(null=True, blank=True)
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -89,17 +114,27 @@ class VendorBill(StatusTransitionMixin, models.Model):
                 "project",
                 "vendor",
                 models.functions.Lower("bill_number"),
-                condition=~models.Q(status="void"),
+                condition=~models.Q(status="void") & ~models.Q(bill_number=""),
                 name="uniq_active_vendor_bill_number_per_project_vendor_ci",
             )
         ]
 
     def __str__(self) -> str:
-        return f"{self.vendor.name} {self.bill_number}"
+        if self.kind == self.Kind.RECEIPT:
+            vendor_name = self.vendor.name if self.vendor_id else "Receipt"
+            return f"{vendor_name} ${self.total}"
+        return f"{self.vendor.name if self.vendor_id else '?'} {self.bill_number}"
 
     def clean(self):
         """Validate due date, scheduled_for requirement, and status transitions."""
         errors = {}
+
+        # Bills require vendor and bill_number.
+        if self.kind == self.Kind.BILL:
+            if not self.vendor_id:
+                errors.setdefault("vendor", []).append("Vendor is required for bills.")
+            if not self.bill_number:
+                errors.setdefault("bill_number", []).append("Bill number is required for bills.")
 
         if self.due_date and self.issue_date and self.due_date < self.issue_date:
             errors.setdefault("due_date", []).append("Due date must be on or after issue date.")
@@ -124,8 +159,10 @@ class VendorBill(StatusTransitionMixin, models.Model):
         return {
             "vendor_bill": {
                 "id": self.id,
+                "kind": self.kind,
                 "project_id": self.project_id,
                 "vendor_id": self.vendor_id,
+                "cost_code_id": self.cost_code_id,
                 "bill_number": self.bill_number,
                 "status": self.status,
                 "received_date": self.received_date.isoformat() if self.received_date else None,

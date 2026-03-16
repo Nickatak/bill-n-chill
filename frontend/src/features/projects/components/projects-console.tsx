@@ -622,6 +622,14 @@ export function ProjectsConsole() {
 
               </nav>
 
+              <Link href={`/projects/${selectedProject.id}/bills`} className={styles.billsLink}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="2" y="4" width="20" height="16" rx="2" />
+                  <path d="M7 15h0M2 9.5h20" />
+                </svg>
+                Bills
+              </Link>
+
             </div>
 
             {/* Inbound payment recorder — rough placement for iteration */}

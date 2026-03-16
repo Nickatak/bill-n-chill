@@ -69,9 +69,7 @@ export const debugWorkflowRoutes: NavRoute[] = [
 ];
 
 /** Dev-only business menu routes, shown in the org dropdown when NEXT_PUBLIC_DEBUG=true. */
-export const debugBusinessMenuRoutes: NavRoute[] = [
-  { href: "/bills", label: "Bills", exact: ["/bills"] },
-];
+export const debugBusinessMenuRoutes: NavRoute[] = [];
 
 /**
  * Determine whether a route should be highlighted as "active" for

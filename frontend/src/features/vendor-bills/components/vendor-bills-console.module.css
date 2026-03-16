@@ -3,35 +3,169 @@
   gap: var(--space-md);
 }
 
-/* ── Content Tab Bar ── */
+/* ── Quick Receipt Form ──────────────────────────────────────── */
 
-.contentTabBar {
-  display: flex;
-  gap: 0;
-  border-bottom: 2px solid var(--border);
+.receiptForm {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  background: var(--surface-secondary);
 }
 
-.contentTab {
-  flex: 1;
-  padding: var(--space-md) var(--space-md);
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
-  font-size: 1.05rem;
-  font-weight: 600;
+.receiptTitle {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--text-secondary);
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  margin: 0 0 var(--space-sm) 0;
 }
 
-.contentTab:hover {
+.receiptFields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-sm);
+}
+
+.receiptField {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 120px;
+}
+
+.receiptFieldNotes {
+  flex: 2 1 200px;
+}
+
+.receiptFieldLabel {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.receiptField input,
+.receiptField select {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-size: 0.88rem;
   color: var(--text-primary);
 }
 
-.contentTabActive {
+.receiptCombobox {
+  position: relative;
+}
+
+.receiptComboboxInputWrap {
+  position: relative;
+}
+
+.receiptComboboxInput {
+  width: 100%;
+  padding: 6px 28px 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-size: 0.88rem;
+  color: var(--text-primary);
+}
+
+.receiptComboboxClear {
+  all: unset;
+  box-sizing: border-box;
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.receiptComboboxClear:hover {
   color: var(--accent-text);
-  border-bottom-color: var(--accent);
+}
+
+.receiptComboboxMenu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 120;
+  margin-top: 4px;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.receiptComboboxOption {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-primary);
+  padding: 6px 10px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.84rem;
+}
+
+.receiptComboboxOption:first-child {
+  border-top: 0;
+}
+
+.receiptComboboxOptionActive {
+  background: var(--accent-light);
+}
+
+.receiptComboboxNoResults {
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.receiptSubmit {
+  padding: 6px 16px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--accent-on);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  align-self: flex-end;
+}
+
+.receiptSubmit:hover {
+  opacity: 0.9;
+}
+
+.receiptMessage {
+  margin: var(--space-xs) 0 0;
+  font-size: 0.8rem;
+}
+
+.receiptMessageSuccess {
+  color: var(--status-green-text);
+}
+
+.receiptMessageError {
+  color: var(--status-red-text);
 }
 
 /* ── Viewer panel ─────────────────────────────────────────────── */
