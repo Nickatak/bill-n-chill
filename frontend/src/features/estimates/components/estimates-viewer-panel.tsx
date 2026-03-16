@@ -1,0 +1,511 @@
+/**
+ * Presentational component for the estimates viewer panel.
+ *
+ * Renders the lifecycle section: status filter pills, family-grouped estimate
+ * tree, status transition controls, and status event history. All data and
+ * handlers are received via props — no hooks or side effects live here.
+ *
+ * Extracted from estimates-console.tsx to reduce component size.
+ */
+
+import Link from "next/link";
+import { formatDateTimeDisplay } from "@/shared/date-format";
+import { formatDecimal } from "@/shared/money-format";
+import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
+import { formatStatusAction, isNotatedStatusEvent } from "../helpers";
+import type { EstimateRecord, EstimateStatusEventRecord, ProjectRecord } from "../types";
+import styles from "./estimates-console.module.css";
+
+// ---------------------------------------------------------------------------
+// Pure display helpers (no component state dependency)
+// ---------------------------------------------------------------------------
+
+/** Build the public-facing estimate URL from a public ref token. */
+function publicEstimateHref(publicRef?: string): string {
+  if (!publicRef) {
+    return "";
+  }
+  return `/estimate/${publicRef}`;
+}
+
+/** Parse a numeric string, returning 0 for non-finite values. */
+function toNumber(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** Format a date string for display, falling back to the raw value. */
+function formatEventDate(dateValue: string): string {
+  return formatDateTimeDisplay(dateValue, dateValue);
+}
+
+/** Format the "last action" date for an estimate row. */
+function formatEstimateLastActionDate(estimate: EstimateRecord): string {
+  return formatEventDate(estimate.updated_at || estimate.created_at);
+}
+
+// ---------------------------------------------------------------------------
+// Status → CSS class mapping (depends only on the CSS module)
+// ---------------------------------------------------------------------------
+
+const statusClasses: Record<string, string> = {
+  draft: styles.statusDraft,
+  sent: styles.statusSent,
+  approved: styles.statusApproved,
+  rejected: styles.statusRejected,
+  void: styles.statusArchived,
+  archived: styles.statusArchived,
+};
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export type EstimateFamily = {
+  title: string;
+  items: EstimateRecord[];
+};
+
+export type EstimatesViewerPanelProps = {
+  selectedProject: ProjectRecord | null;
+  isMobile: boolean;
+  isViewerExpanded: boolean;
+  setIsViewerExpanded: React.Dispatch<React.SetStateAction<boolean>>;
+
+  // Filter pills
+  viewerStatusOptions: Array<{ value: string; label: string }>;
+  estimateStatusFilters: string[];
+  toggleEstimateStatusFilter: (value: string) => void;
+  estimateStatusCounts: Record<string, number>;
+  setEstimateStatusFilters: (filters: string[]) => void;
+  estimateStatusFilterValues: string[];
+  defaultEstimateStatusFilters: string[];
+
+  // Family tree
+  visibleEstimateFamilies: EstimateFamily[];
+  estimateFamiliesLength: number;
+  selectedEstimateId: string;
+  openFamilyHistory: Set<string>;
+  handleSelectFamilyLatest: (title: string, latest: EstimateRecord) => void;
+  handleSelectEstimate: (estimate: EstimateRecord) => void;
+  handleFamilyCardQuickAction: (estimate: EstimateRecord) => Promise<void>;
+  selectedProjectId: string;
+
+  // Display callbacks (depend on parent-derived data)
+  formatEstimateStatus: (status?: string) => string;
+  quickActionKindForStatus: (status: string) => "change_order" | "revision" | null;
+  quickActionTitleForStatus: (status: string) => string;
+
+  // Status lifecycle (only relevant when an estimate is selected)
+  isTerminalEstimateStatus: boolean;
+  nextStatusOptions: Array<{ value: string; label: string }>;
+  selectedStatus: string;
+  setSelectedStatus: (status: string) => void;
+  statusNote: string;
+  setStatusNote: (note: string) => void;
+  actionMessage: string;
+  actionTone: string;
+  canSubmitStatusUpdate: boolean;
+  canSubmitStatusNote: boolean;
+  handleUpdateEstimateStatus: () => void;
+  handleAddEstimateStatusNote: () => void;
+  statusEvents: EstimateStatusEventRecord[];
+};
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export function EstimatesViewerPanel({
+  selectedProject,
+  isMobile,
+  isViewerExpanded,
+  setIsViewerExpanded,
+  viewerStatusOptions,
+  estimateStatusFilters,
+  toggleEstimateStatusFilter,
+  estimateStatusCounts,
+  setEstimateStatusFilters,
+  estimateStatusFilterValues,
+  defaultEstimateStatusFilters,
+  visibleEstimateFamilies,
+  estimateFamiliesLength,
+  selectedEstimateId,
+  openFamilyHistory,
+  handleSelectFamilyLatest,
+  handleSelectEstimate,
+  handleFamilyCardQuickAction,
+  selectedProjectId,
+  formatEstimateStatus,
+  quickActionKindForStatus,
+  quickActionTitleForStatus,
+  isTerminalEstimateStatus,
+  nextStatusOptions,
+  selectedStatus,
+  setSelectedStatus,
+  statusNote,
+  setStatusNote,
+  actionMessage,
+  actionTone,
+  canSubmitStatusUpdate,
+  canSubmitStatusNote,
+  handleUpdateEstimateStatus,
+  handleAddEstimateStatusNote,
+  statusEvents,
+}: EstimatesViewerPanelProps) {
+  return (
+    <section className={styles.lifecycle}>
+      <div className={styles.lifecycleHeader}>
+        <h3>
+          {selectedProject
+            ? `Estimates for: ${selectedProject.name}`
+            : "Estimates"}
+        </h3>
+        {!isMobile ? (
+          <button
+            type="button"
+            className={collapseButtonStyles.collapseButton}
+            onClick={() => setIsViewerExpanded((current) => !current)}
+            aria-expanded={isViewerExpanded}
+          >
+            {isViewerExpanded ? "Collapse" : "Expand"}
+          </button>
+        ) : null}
+      </div>
+
+      {(isMobile || isViewerExpanded) ? (
+        <>
+          <div className={styles.versionFilters}>
+            <span className={styles.versionFiltersLabel}>Estimate status filter</span>
+            <div className={styles.versionFilterButtons}>
+              {viewerStatusOptions.map((option) => {
+                const active = estimateStatusFilters.includes(option.value);
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`${styles.statusPill} ${
+                      active ? statusClasses[option.value] : styles.statusPillInactive
+                    } ${active ? styles.statusPillActive : ""}`}
+                    aria-pressed={active}
+                    onClick={() => toggleEstimateStatusFilter(option.value)}
+                  >
+                    <span>{option.label}</span>
+                    <span className={styles.statusPillCount}>{estimateStatusCounts[option.value] ?? 0}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className={styles.versionFilterActions}>
+              <button
+                type="button"
+                className={styles.versionFilterActionButton}
+                onClick={() => setEstimateStatusFilters(estimateStatusFilterValues)}
+              >
+                Show All Statuses
+              </button>
+              <button
+                type="button"
+                className={styles.versionFilterActionButton}
+                onClick={() => setEstimateStatusFilters(defaultEstimateStatusFilters)}
+              >
+                Reset Filters
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.versionTree}>
+            {visibleEstimateFamilies.length > 0 ? (
+              visibleEstimateFamilies.map((family) => {
+                const latest = family.items[family.items.length - 1];
+                const history = family.items.slice(0, -1).reverse();
+                const selectedInFamily = family.items.find(
+                  (estimate) => String(estimate.id) === selectedEstimateId,
+                );
+                const isFamilyActive = Boolean(selectedInFamily);
+                const isViewingHistory =
+                  selectedInFamily && String(selectedInFamily.id) !== String(latest.id);
+                const isLatestSelected = String(latest.id) === selectedEstimateId;
+                const isHistoryOpen = openFamilyHistory.has(family.title);
+                const quickActionKind = quickActionKindForStatus(latest.status);
+                const quickActionTitle = quickActionTitleForStatus(latest.status);
+                const latestTotal = formatDecimal(toNumber(latest.grand_total || "0"));
+                return (
+                  <div
+                    key={family.title}
+                    data-family-title={family.title}
+                    className={`${styles.familyGroup} ${
+                      isFamilyActive ? styles.familyGroupActive : ""
+                    }`}
+                  >
+                    <div className={styles.familyRow}>
+                      <div className={styles.familyMainColumn}>
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          className={`${styles.familyMain} ${
+                            isLatestSelected ? styles.familyMainActive : ""
+                          }`}
+                          onClick={() => handleSelectFamilyLatest(family.title, latest)}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleSelectFamilyLatest(family.title, latest); } }}
+                        >
+                          <div className={styles.familyMainContent}>
+                            <span className={styles.familyTitleRow}>
+                              <span className={styles.familyTitle}>{family.title}</span>
+                              <span
+                                className={`${styles.versionStatus} ${
+                                  statusClasses[latest.status] ?? ""
+                                }`}
+                              >
+                                {formatEstimateStatus(latest.status)}
+                              </span>
+                            </span>
+                            <span className={styles.familyMeta}>
+                              ${latestTotal} · Estimate #{latest.id} · {history.length} history{" "}
+                              {history.length === 1 ? "entry" : "entries"}
+                            </span>
+                            <span className={styles.familyDate}>
+                              Last action: {formatEstimateLastActionDate(latest)}
+                            </span>
+                          </div>
+                          {(!isViewingHistory && latest.public_ref) || (quickActionKind === "change_order" && selectedProjectId) ? (
+                            <div className={styles.familyLinkBar}>
+                              {quickActionKind === "change_order" && selectedProjectId ? (
+                                <Link
+                                  href={`/projects/${selectedProjectId}/change-orders?origin_estimate=${latest.id}`}
+                                  className={styles.familyPublicLink}
+                                  aria-label={`${quickActionTitle} (estimate #${latest.id})`}
+                                  title={quickActionTitle}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  View Change Orders →
+                                </Link>
+                              ) : null}
+                              {!isViewingHistory && latest.public_ref ? (
+                                <Link
+                                  href={publicEstimateHref(latest.public_ref)}
+                                  className={`${styles.familyPublicLink} ${styles.familyLinkBarEnd}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  aria-label={`Open customer view for estimate #${latest.id}`}
+                                  title="Open customer view"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  Customer View →
+                                </Link>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                        {isViewingHistory || quickActionKind === "revision" ? (
+                          <div className={styles.familyFooter}>
+                            {isViewingHistory ? (
+                              <span className={styles.historyNotice}>
+                                Viewing v{selectedInFamily?.version}
+                              </span>
+                            ) : null}
+                            {quickActionKind === "revision" ? (
+                              <button
+                                type="button"
+                                className={styles.familyActionButton}
+                                aria-label={`${quickActionTitle} (estimate #${latest.id})`}
+                                title={quickActionTitle}
+                                onClick={() => void handleFamilyCardQuickAction(latest)}
+                              >
+                                New Revision
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                      {isHistoryOpen && history.length > 0 ? (
+                        <div className={styles.historyRow}>
+                          {history.map((estimate) => {
+                              const total = formatDecimal(toNumber(estimate.grand_total || "0"));
+                              const isSelected = String(estimate.id) === selectedEstimateId;
+                              return (
+                                <div key={estimate.id} className={styles.historyCardColumn}>
+                                  <button
+                                    type="button"
+                                    className={`${styles.historyCard} ${
+                                      isSelected ? styles.historyCardActive : ""
+                                    }`}
+                                    onClick={() => handleSelectEstimate(estimate)}
+                                  >
+                                    <span className={styles.historyMetaRow}>
+                                      <span className={styles.historyVersionMeta}>
+                                        v{estimate.version} <span className={styles.historyMeta}>#{estimate.id}</span>
+                                      </span>
+                                      <span
+                                        className={`${styles.versionStatus} ${
+                                          statusClasses[estimate.status] ?? ""
+                                        } ${styles.historyStatus}`}
+                                      >
+                                        {formatEstimateStatus(estimate.status)}
+                                      </span>
+                                    </span>
+                                    <span className={styles.historyAmount}>${total}</span>
+                                    <span className={styles.historyDate}>
+                                      {formatEstimateLastActionDate(estimate)}
+                                    </span>
+                                  </button>
+                                  {isSelected && estimate.public_ref ? (
+                                    <Link
+                                      href={publicEstimateHref(estimate.public_ref)}
+                                      className={styles.historyPublicLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      aria-label={`Open customer view for estimate #${estimate.id}`}
+                                      title="Open customer view"
+                                    >
+                                      Customer View →
+                                    </Link>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })
+            ) : estimateFamiliesLength > 0 ? (
+              <p className={styles.inlineHint}>No estimate families match the selected status filters.</p>
+            ) : (
+              <p className={styles.inlineHint}>No estimates yet. Use the workspace above to create one.</p>
+            )}
+          </div>
+
+          {/* Status & Actions — intentionally not extracted to a shared component.
+              See invoices-console.tsx for rationale. */}
+          {selectedEstimateId ? (
+            <>
+              <div className={styles.lifecycleGrid}>
+                {!isTerminalEstimateStatus ? (
+                  <div className={styles.statusPicker}>
+                    <span className={styles.lifecycleFieldLabel}>Next status</span>
+                    <div className={styles.statusPills}>
+                      {nextStatusOptions.map((option) => {
+                        const isSelected = selectedStatus === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className={`${styles.statusPill} ${
+                              isSelected ? statusClasses[option.value] ?? "" : styles.statusPillInactive
+                            } ${isSelected ? styles.statusPillActive : ""}`}
+                            onClick={() => setSelectedStatus(option.value)}
+                            aria-pressed={isSelected}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {selectedStatus === "sent" && !selectedProject?.customer_email?.trim() ? (
+                      <p className={styles.actionError}>WARNING: This customer has no email on file and will not receive an automated email.</p>
+                    ) : null}
+                    {nextStatusOptions.length === 0 ? (
+                      <p className={styles.inlineHint}>No next statuses available for this estimate.</p>
+                    ) : null}
+                  </div>
+                ) : null}
+                <label className={styles.lifecycleField}>
+                  Status note
+                  <textarea
+                    className={styles.statusNote}
+                    value={statusNote}
+                    onChange={(event) => setStatusNote(event.target.value)}
+                    placeholder={
+                      isTerminalEstimateStatus
+                        ? "Add note for this terminal estimate status"
+                        : "Optional note for this transition"
+                    }
+                    rows={3}
+                  />
+                </label>
+              </div>
+              {actionMessage && actionTone === "success" ? (
+                <p className={styles.actionSuccess}>{actionMessage}</p>
+              ) : null}
+              {actionMessage && actionTone === "error" ? (
+                <p className={styles.actionError}>{actionMessage}</p>
+              ) : null}
+              <div className={styles.lifecycleActions}>
+                {canSubmitStatusUpdate ? (
+                  <button
+                    type="button"
+                    className={`${styles.lifecycleActionButton} ${styles.lifecycleActionButtonPrimary}`}
+                    onClick={handleUpdateEstimateStatus}
+                    disabled={!canSubmitStatusUpdate}
+                  >
+                    Update Selected Estimate Status
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className={styles.lifecycleActionButton}
+                  onClick={handleAddEstimateStatusNote}
+                  disabled={!canSubmitStatusNote}
+                >
+                  Add Estimate Status Note
+                </button>
+              </div>
+            </>
+          ) : null}
+
+          {selectedEstimateId && statusEvents.length > 0 ? (
+            <div className={styles.statusEvents}>
+              <h4>Status Events</h4>
+              <div className={styles.statusEventsTableWrap}>
+                <table className={styles.statusEventsTable}>
+                  <thead>
+                    <tr>
+                      <th>Action</th>
+                      <th>Occurred</th>
+                      <th>Note</th>
+                      <th>Who</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {statusEvents.map((event) => {
+                      const toStatusClass = isNotatedStatusEvent(event)
+                        ? styles.statusNotated
+                        : statusClasses[event.to_status] ?? "";
+                      return (
+                        <tr key={event.id}>
+                          <td data-label="Action">
+                            <span className={`${styles.versionStatus} ${toStatusClass}`}>
+                              {formatStatusAction(event)}
+                            </span>
+                          </td>
+                          <td data-label="Occurred">{formatEventDate(event.changed_at)}</td>
+                          <td data-label="Note">{event.note || "—"}</td>
+                          <td data-label="Who">
+                            {event.changed_by_customer_id ? (
+                              <Link
+                                href={`/customers?customer=${event.changed_by_customer_id}`}
+                                className={styles.statusEventActorLink}
+                              >
+                                {event.changed_by_display || `Customer #${event.changed_by_customer_id}`}
+                              </Link>
+                            ) : (
+                              event.changed_by_display || event.changed_by_email || "Unknown user"
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <p className={styles.inlineHint}>Viewer collapsed. Expand to review versions, status transitions, and history.</p>
+      )}
+    </section>
+  );
+}

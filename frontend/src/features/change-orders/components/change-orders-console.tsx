@@ -10,13 +10,11 @@
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
-import Link from "next/link";
 import { parseAmount, formatDecimal } from "@/shared/money-format";
 import {
   coLabel,
   defaultChangeOrderTitle,
   emptyLine,
-  publicChangeOrderHref,
   readChangeOrderApiError,
   validateLineItems,
 } from "../helpers";
@@ -45,25 +43,13 @@ import {
   CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK,
   CHANGE_ORDER_MIN_LINE_ITEMS_ERROR,
   statusLabel,
-  quickStatusControlLabel,
-  formatEventDateTime,
-  eventActorLabel,
-  eventActorHref,
-  statusEventActionLabel,
-  approvalMeta,
-  approvedRollingDeltaForEstimate,
-  originalBudgetTotalForEstimate,
   currentApprovedBudgetTotalForEstimate,
-  lastStatusEventForChangeOrder,
+  originalBudgetTotalForEstimate,
   toLinePayload,
 } from "./change-orders-display";
 import { usePrintable } from "@/shared/shell/printable-context";
 import styles from "./change-orders-console.module.css";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
-import changeOrderCreatorStyles from "@/shared/document-creator/change-order-creator.module.css";
-import stampStyles from "@/shared/styles/decision-stamp.module.css";
-import { DocumentCreator } from "@/shared/document-creator";
-import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
 import {
   resolveOrganizationBranding,
 } from "@/shared/document-creator";
@@ -75,11 +61,8 @@ import {
 import { useMediaQuery } from "@/shared/hooks/use-media-query";
 import { useLineItems } from "@/shared/hooks/use-line-items";
 import { useClientPagination } from "@/shared/hooks/use-client-pagination";
-import { PaginationControls } from "@/shared/components/pagination-controls";
-import { MobileLineItemCard } from "@/shared/document-creator/mobile-line-card";
-import mobileCardStyles from "@/shared/document-creator/mobile-line-card.module.css";
-import { CostCodeCombobox } from "@/features/estimates/components/cost-code-combobox";
-import { ReadOnlyLineTable, readOnlyLineTableStyles as roTableStyles } from "@/shared/document-viewer/read-only-line-table";
+import { ChangeOrdersViewerPanel } from "./change-orders-viewer-panel";
+import { ChangeOrdersWorkspacePanel } from "./change-orders-workspace-panel";
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -391,79 +374,12 @@ export function ChangeOrdersConsole({
     setActionTone(tone);
   }, []);
 
-  function quickStatusToneClass(status: string): string {
-    const key = `quickStatus${status
-      .split("_")
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join("")}`;
-    return styles[key] ?? "";
-  }
-
   function editStatusBadgeClass(status: string): string {
     const key = `editStatus${status
       .split("_")
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
       .join("")}`;
     return styles[key] ?? styles.editStatusDraft;
-  }
-
-  function statusEventActionClass(event: AuditEventRecord): string {
-    const toStatus = event.to_status || "";
-    const fromStatus = event.from_status || "";
-    const statusAction = String(event.metadata_json?.status_action || "").toLowerCase();
-    if (statusAction === "notate") {
-      return styles.statusEventNeutral;
-    }
-    if (statusAction === "resend") {
-      return styles.statusEventSent;
-    }
-    if (!fromStatus && toStatus === "draft") {
-      return styles.statusEventCreated;
-    }
-    if (fromStatus === toStatus && (event.note || "").trim()) {
-      return styles.statusEventNeutral;
-    }
-    if (fromStatus === "pending_approval" && toStatus === "pending_approval") {
-      return styles.statusEventSent;
-    }
-    if (fromStatus === "draft" && toStatus === "pending_approval") {
-      return styles.statusEventSent;
-    }
-    if (toStatus === "approved") {
-      return styles.statusEventApproved;
-    }
-    if (toStatus === "rejected") {
-      return styles.statusEventRejected;
-    }
-    if (toStatus === "void") {
-      return styles.statusEventVoid;
-    }
-    if (toStatus === "draft" && fromStatus) {
-      return styles.statusEventReturnedDraft;
-    }
-    return styles.statusEventNeutral;
-  }
-
-  function viewerHistoryStatusClass(status: string): string {
-    const key = `viewerHistory${status
-      .split("_")
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join("")}`;
-    return styles[key] ?? "";
-  }
-
-  /** Render the actor label, optionally as a customer link. */
-  function renderEventActor(event: AuditEventRecord) {
-    const label = eventActorLabel(event);
-    const href = eventActorHref(event);
-    if (!href) {
-      return label;
-    }
-    return (
-      <Link href={href} className={styles.eventActorLink}>
-        {label}
-      </Link>
-    );
   }
 
   // -------------------------------------------------------------------------
@@ -1159,117 +1075,28 @@ export function ChangeOrdersConsole({
   }
 
   // -------------------------------------------------------------------------
-  // Contract breakdown (estimate + approved COs) — shared by viewer and both creators
+  // Viewer callbacks
   // -------------------------------------------------------------------------
 
-  /* Contract Breakdown — intentionally not extracted to a shared component.
-     CO version is read-only; invoice version has per-row duplicate buttons,
-     different cost code label formats, and markup display. Extracting would
-     create a ~12-prop wrapper with render callbacks that moves no complexity.
-     See invoices-console.tsx for the same decision. */
-  function renderContractBreakdown(opts?: { style?: React.CSSProperties }) {
-    if (!selectedViewerEstimate) return null;
-    const hasEstimateLines = selectedViewerEstimate.line_items.length > 0;
-    const hasApprovedCOs = approvedCOsForSelectedEstimate.length > 0;
-    if (!hasEstimateLines && !hasApprovedCOs) return null;
-
-    return (
-      <div className={styles.viewerSection} style={opts?.style}>
-        <button
-          type="button"
-          className={styles.viewerSectionToggle}
-          onClick={() => setIsOriginLineItemsSectionOpen((v) => !v)}
-          aria-expanded={isOriginLineItemsSectionOpen}
-        >
-          <h4>Contract Breakdown</h4>
-          <span className={styles.viewerSectionArrow}>▼</span>
-        </button>
-        {isOriginLineItemsSectionOpen ? (
-          <div className={styles.viewerSectionContent}>
-            {hasEstimateLines ? (
-              <ReadOnlyLineTable
-                caption={`Approved Estimate: ${selectedViewerEstimate.title} v${selectedViewerEstimate.version}`}
-                columns={["Cost code", "Description", "Qty", "Unit", "Unit cost", "Markup %", "Line total"]}
-                rows={selectedViewerEstimate.line_items.map((line) => {
-                  const qty = Number(line.quantity || 0);
-                  const unitCost = Number(line.unit_cost || 0);
-                  const unit = line.unit || "ea";
-                  const costCodeLabel = [line.cost_code_code, line.cost_code_name].filter(Boolean).join(" — ") || "—";
-                  return {
-                    key: line.id,
-                    cells: [
-                      costCodeLabel,
-                      line.description || "—",
-                      qty.toFixed(2),
-                      unit,
-                      `$${unitCost.toFixed(2)}`,
-                      `${line.markup_percent}%`,
-                      <>
-                        <span className={roTableStyles.mobileBreakdown}>
-                          {qty.toFixed(2)} {unit} × ${unitCost.toFixed(2)}
-                        </span>
-                        <span>${line.line_total}</span>
-                      </>,
-                    ],
-                  };
-                })}
-                mobileColumnLayout={[
-                  { order: 0, span: "full" },
-                  { order: 1, span: "full" },
-                  { order: 2, span: "half", hidden: true },
-                  { order: 3, span: "half", hidden: true },
-                  { order: 4, span: "half", hidden: true },
-                  { order: 5, span: "half" },
-                  { order: 6, span: "full", align: "right" },
-                ]}
-                afterTable={
-                  <div className={styles.viewerMetaRow}>
-                    <span className={styles.viewerMetaLabel}>Estimate grand total</span>
-                    <strong>${selectedViewerEstimate.grand_total}</strong>
-                  </div>
-                }
-              />
-            ) : null}
-
-            {hasApprovedCOs ? (
-              <ReadOnlyLineTable
-                caption={`Approved Change Orders (${approvedCOsForSelectedEstimate.length})`}
-                columns={["CO #", "Cost code", "Description", "Days delta", "Amount delta"]}
-                rows={approvedCOsForSelectedEstimate.flatMap((co) =>
-                  co.line_items.map((line) => {
-                    const costCodeLabel = [line.cost_code_code, line.cost_code_name].filter(Boolean).join(" — ") || "—";
-                    return {
-                      key: `${co.id}-${line.id}`,
-                      cells: [
-                        `${co.title} r${co.revision_number}`,
-                        costCodeLabel,
-                        line.description || "—",
-                        `${line.days_delta} days`,
-                        `$${line.amount_delta}`,
-                      ],
-                    };
-                  }),
-                )}
-                mobileColumnLayout={[
-                  { order: 0, span: "full" },
-                  { order: 1, span: "half" },
-                  { order: 2, span: "full" },
-                  { order: 3, span: "half" },
-                  { order: 4, span: "half", align: "right" },
-                ]}
-                afterTable={
-                  <div className={styles.viewerMetaRow}>
-                    <span className={styles.viewerMetaLabel}>Net contract total</span>
-                    <strong>${currentAcceptedTotal ?? "—"}</strong>
-                  </div>
-                }
-              />
-            ) : null}
-          </div>
-        ) : null}
-      </div>
+  /** Handle estimate rail selection: update viewer estimate and sync the edit form. */
+  const handleSelectViewerEstimate = useCallback((nextEstimateId: string) => {
+    setSelectedViewerEstimateId(nextEstimateId);
+    const related = sortChangeOrdersForViewer(
+      changeOrders.filter(
+        (changeOrder) => String(changeOrder.origin_estimate) === nextEstimateId,
+      ),
     );
-  }
+    if (!related.length) {
+      hydrateEditForm(undefined);
+      return;
+    }
+    const selectedStillValid = related.some(
+      (changeOrder) => String(changeOrder.id) === selectedChangeOrderId,
+    );
+    if (!selectedStillValid) {
+      hydrateEditForm(related[0]);
+    }
+  }, [changeOrders, hydrateEditForm, selectedChangeOrderId, sortChangeOrdersForViewer]);
 
   // -------------------------------------------------------------------------
   // Render
@@ -1294,373 +1121,55 @@ export function ChangeOrdersConsole({
         </p>
       ) : null}
 
-      <section className={styles.viewer}>
-        <div className={styles.viewerHeader}>
-          <div className={styles.viewerHeaderRow}>
-            <h3>{selectedProjectName ? `Change Orders for: ${selectedProjectName}` : "Change Orders"}</h3>
-            {!isMobile ? (
-              <button
-                type="button"
-                className={collapseButtonStyles.collapseButton}
-                style={{ background: "var(--surface)" }}
-                onClick={() => setIsViewerExpanded((current) => !current)}
-                aria-expanded={isViewerExpanded}
-              >
-                {isViewerExpanded ? "Collapse" : "Expand"}
-              </button>
-            ) : null}
-          </div>
-          <p>
-            Select an estimate to view its change orders.
-          </p>
-        </div>
-        {(isMobile || isViewerExpanded) ? (projectEstimates.length > 0 ? (
-          <div className={styles.viewerGrid}>
-            <div className={styles.viewerRail}>
-              <div className={styles.viewerRailHeader}>
-                <span className={styles.viewerRailHeading}>Approved Estimates</span>
-              </div>
-              {projectEstimates.map((estimate) => {
-                const active = String(estimate.id) === selectedViewerEstimateId;
-                const relatedCount = changeOrders.filter(
-                  (changeOrder) => changeOrder.origin_estimate === estimate.id,
-                ).length;
-                return (
-                  <div key={estimate.id} className={styles.viewerRailEntry}>
-                    <button
-                      type="button"
-                      className={`${styles.viewerRailItem} ${active ? styles.viewerRailItemActive : ""}`}
-                      onClick={() => {
-                        const nextEstimateId = String(estimate.id);
-                        setSelectedViewerEstimateId(nextEstimateId);
-                        const related = sortChangeOrdersForViewer(
-                          changeOrders.filter(
-                            (changeOrder) => String(changeOrder.origin_estimate) === nextEstimateId,
-                          ),
-                        );
-                        if (!related.length) {
-                          hydrateEditForm(undefined);
-                          return;
-                        }
-                        const selectedStillValid = related.some(
-                          (changeOrder) => String(changeOrder.id) === selectedChangeOrderId,
-                        );
-                        if (!selectedStillValid) {
-                          hydrateEditForm(related[0]);
-                        }
-                      }}
-                    >
-                      <span className={styles.viewerRailTitle}>
-                        {estimate.title}
-                        <span className={styles.viewerRailVersion}>
-                          Estimate #{estimate.id} · {relatedCount} COs
-                        </span>
-                      </span>
-                      <span className={styles.viewerRailSubtext}>
-                        {approvalMeta(estimate)}
-                      </span>
-                      <span className={styles.viewerRailMetrics}>
-                        <span className={styles.viewerMetricCurrent}>
-                          Current ${currentApprovedBudgetTotalForEstimate(estimate.id, changeOrders, originEstimateOriginalTotals)}
-                        </span>
-                        {" · "}
-                        <span className={styles.viewerMetricOriginal}>
-                          Original ${originalBudgetTotalForEstimate(estimate.id, originEstimateOriginalTotals)}
-                        </span>
-                        {" · "}
-                        <span className={styles.viewerMetricDelta}>
-                          CO Delta ${approvedRollingDeltaForEstimate(estimate.id, changeOrders)}
-                        </span>
-                      </span>
-                      {selectedProjectId ? (
-                        <Link
-                          href={`/projects/${selectedProjectId}/estimates?estimate=${estimate.id}`}
-                          className={styles.viewerCardLinkBar}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          View Estimate →
-                        </Link>
-                      ) : null}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-            {selectedViewerEstimate ? (
-              <div className={styles.viewerDetail}>
-                {viewerChangeOrders.length > 0 ? (
-                  <>
-                    <h4 className={styles.viewerSectionHeading}>Change Orders</h4>
-                    <div className={`${styles.viewerRail} ${styles.viewerHistoryRail}`}>
-                      {paginatedChangeOrders.map((changeOrder) => {
-                        const active = String(changeOrder.id) === selectedChangeOrderId;
-                        const lastStatusEvent = lastStatusEventForChangeOrder(changeOrder.id, projectAuditEvents);
-                        return (
-                          <div
-                            key={changeOrder.id}
-                            role="button"
-                            tabIndex={0}
-                            className={`${styles.viewerRailItem} ${styles.viewerHistoryItem} ${viewerHistoryStatusClass(changeOrder.status)} ${
-                              active ? `${styles.viewerRailItemActive} ${styles.viewerHistoryItemActive}` : ""
-                            }`}
-                            onClick={() => hydrateEditForm(changeOrder)}
-                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); hydrateEditForm(changeOrder); } }}
-                          >
-                            <span className={styles.viewerRailTitle}>
-                              <span className={styles.viewerRailTitleText}>
-                                {changeOrder.title || "Untitled"} · {coLabel(changeOrder)}
-                              </span>
-                              <span className={styles.viewerHistoryStatusText}>{statusLabel(changeOrder.status, changeOrderStatusLabels)}</span>
-                            </span>
-                            <span
-                              className={`${styles.viewerHistoryMetaText} ${styles.viewerHistoryLineDelta} ${
-                                ["approved", "accepted"].includes(changeOrder.status)
-                                  ? styles.viewerHistoryLineDeltaApproved
-                                  : ""
-                              }`}
-                            >
-                              Line delta: ${changeOrder.line_total_delta}
-                            </span>
-                            {lastStatusEvent ? (
-                              <span className={styles.viewerHistoryMetaText}>
-                                Last action: {statusEventActionLabel(lastStatusEvent, changeOrderStatusLabels)} on{" "}
-                                {formatEventDateTime(lastStatusEvent.created_at)} by {eventActorLabel(lastStatusEvent)}
-                              </span>
-                            ) : (
-                              <span className={styles.viewerHistoryMetaText}>No status events yet.</span>
-                            )}
-                            {changeOrder.public_ref ? (
-                              <Link
-                                href={publicChangeOrderHref(changeOrder.public_ref)}
-                                className={styles.viewerCardLinkBar}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                aria-label={`Open customer view for ${coLabel(changeOrder)}`}
-                                title="Open customer view"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                Customer View →
-                              </Link>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <PaginationControls page={coPage} totalPages={coTotalPages} totalCount={coTotalCount} onPageChange={setCoPage} />
-                    {selectedViewerChangeOrder ? (
-                      <>
-                        {/* Status & Actions — intentionally not extracted to a shared component.
-                           See invoices-console.tsx for rationale. */}
-                        <div className={styles.viewerSection}>
-                          <button
-                            type="button"
-                            className={styles.viewerSectionToggle}
-                            onClick={() => setIsStatusSectionOpen((v) => !v)}
-                            aria-expanded={isStatusSectionOpen}
-                          >
-                            <h4>Status &amp; Actions</h4>
-                            <span className={styles.viewerSectionArrow}>▼</span>
-                          </button>
-                          {isStatusSectionOpen ? (
-                            <div className={styles.viewerSectionContent}>
-                              {quickStatusOptions.length > 0 ? (
-                                <>
-                                  <span className={creatorStyles.lifecycleFieldLabel}>Next status</span>
-                                  <div className={styles.quickStatusPills}>
-                                    {quickStatusOptions.map((status) => {
-                                      const isSelected = quickStatus === status;
-                                      return (
-                                        <button
-                                          key={status}
-                                          type="button"
-                                          className={`${styles.quickStatusButton} ${
-                                            isSelected
-                                              ? `${styles.quickStatusButtonActive} ${quickStatusToneClass(status)}`
-                                              : styles.quickStatusButtonInactive
-                                          }`}
-                                          onClick={() => setQuickStatus(status)}
-                                          aria-pressed={isSelected}
-                                        >
-                                          {quickStatusControlLabel(status, changeOrderStatusLabels, selectedViewerChangeOrder?.status)}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                  {quickStatus === "pending_approval" && !selectedProjectCustomerEmail.trim() ? (
-                                    <p className={creatorStyles.actionError}>WARNING: This customer has no email on file and will not receive an automated email.</p>
-                                  ) : null}
-                                </>
-                              ) : null}
-                              <label className={creatorStyles.lifecycleField}>
-                                Status note
-                                <textarea
-                                  className={creatorStyles.statusNote}
-                                  value={quickStatusNote}
-                                  onChange={(event) => setQuickStatusNote(event.target.value)}
-                                  placeholder={quickStatusOptions.length > 0 ? "Optional note for this status action." : "Add a note without changing status."}
-                                  rows={2}
-                                />
-                              </label>
-                              {actionMessage && actionTone === "success" ? (
-                                <p className={creatorStyles.actionSuccess}>{actionMessage}</p>
-                              ) : null}
-                              {actionMessage && actionTone === "error" ? (
-                                <p className={creatorStyles.actionError}>{actionMessage}</p>
-                              ) : null}
-                              <div className={`${creatorStyles.lifecycleActions} ${styles.viewerStatusActionRow}`}>
-                                {quickStatusOptions.length > 0 ? (
-                                  <button
-                                    type="button"
-                                    className={`${styles.viewerStatusActionButton} ${styles.viewerStatusActionButtonPrimary}`}
-                                    onClick={handleQuickUpdateStatus}
-                                    disabled={!canMutateChangeOrders || !quickStatusOptions.length || !quickStatus}
-                                  >
-                                    Update CO Status
-                                  </button>
-                                ) : null}
-                                <button
-                                  type="button"
-                                  className={`${styles.viewerStatusActionButton} ${styles.viewerStatusActionButtonSecondary}`}
-                                  onClick={handleAddChangeOrderStatusNote}
-                                  disabled={!canMutateChangeOrders || !quickStatusNote.trim()}
-                                >
-                                  Add CO Status Note
-                                </button>
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
+      <ChangeOrdersViewerPanel
+        isMobile={isMobile}
+        isViewerExpanded={isViewerExpanded}
+        setIsViewerExpanded={setIsViewerExpanded}
+        selectedProjectId={selectedProjectId}
+        selectedProjectName={selectedProjectName}
+        selectedProjectCustomerEmail={selectedProjectCustomerEmail}
+        projectEstimates={projectEstimates}
+        selectedViewerEstimateId={selectedViewerEstimateId}
+        changeOrders={changeOrders}
+        originEstimateOriginalTotals={originEstimateOriginalTotals}
+        onSelectEstimate={handleSelectViewerEstimate}
+        selectedViewerEstimate={selectedViewerEstimate}
+        viewerChangeOrders={viewerChangeOrders}
+        paginatedChangeOrders={paginatedChangeOrders}
+        selectedChangeOrderId={selectedChangeOrderId}
+        coPage={coPage}
+        coTotalPages={coTotalPages}
+        coTotalCount={coTotalCount}
+        setCoPage={setCoPage}
+        onSelectChangeOrder={hydrateEditForm}
+        projectAuditEvents={projectAuditEvents}
+        changeOrderStatusLabels={changeOrderStatusLabels}
+        selectedViewerChangeOrder={selectedViewerChangeOrder}
+        selectedViewerWorkingTotals={selectedViewerWorkingTotals}
+        approvedCOsForSelectedEstimate={approvedCOsForSelectedEstimate}
+        canMutateChangeOrders={canMutateChangeOrders}
+        quickStatusOptions={quickStatusOptions}
+        quickStatus={quickStatus}
+        setQuickStatus={setQuickStatus}
+        quickStatusNote={quickStatusNote}
+        setQuickStatusNote={setQuickStatusNote}
+        onQuickUpdateStatus={handleQuickUpdateStatus}
+        onAddChangeOrderStatusNote={handleAddChangeOrderStatusNote}
+        actionMessage={actionMessage}
+        actionTone={actionTone}
+        isStatusSectionOpen={isStatusSectionOpen}
+        setIsStatusSectionOpen={setIsStatusSectionOpen}
+        isHistorySectionOpen={isHistorySectionOpen}
+        setIsHistorySectionOpen={setIsHistorySectionOpen}
+        isLineItemsSectionOpen={isLineItemsSectionOpen}
+        setIsLineItemsSectionOpen={setIsLineItemsSectionOpen}
+        isOriginLineItemsSectionOpen={isOriginLineItemsSectionOpen}
+        setIsOriginLineItemsSectionOpen={setIsOriginLineItemsSectionOpen}
+        selectedChangeOrderStatusEvents={selectedChangeOrderStatusEvents}
+        showAllEvents={showAllEvents}
+        setShowAllEvents={setShowAllEvents}
+      />
 
-                        {/* History section — intentionally not extracted to a shared component.
-                           CO uses AuditEventRecord with created_at; invoices use InvoiceStatusEvent
-                           with changed_at. Different actor rendering, action label functions, and
-                           CSS classes. See invoices-console.tsx for the same decision. */}
-                        <div className={styles.viewerSection}>
-                          <button
-                            type="button"
-                            className={styles.viewerSectionToggle}
-                            onClick={() => setIsHistorySectionOpen((v) => !v)}
-                            aria-expanded={isHistorySectionOpen}
-                          >
-                            <h4>History ({selectedChangeOrderStatusEvents.length})</h4>
-                            <span className={styles.viewerSectionArrow}>▼</span>
-                          </button>
-                          {isHistorySectionOpen ? (
-                            <div className={styles.viewerSectionContent}>
-                              {selectedChangeOrderStatusEvents.length > 0 ? (
-                                <>
-                                  <ul className={styles.viewerEventList}>
-                                    {(showAllEvents
-                                      ? selectedChangeOrderStatusEvents
-                                      : selectedChangeOrderStatusEvents.slice(0, 4)
-                                    ).map((event) => (
-                                      <li key={event.id} className={styles.viewerEventItem}>
-                                        <span className={`${styles.viewerEventAction} ${statusEventActionClass(event)}`}>
-                                          {statusEventActionLabel(event, changeOrderStatusLabels)}
-                                        </span>
-                                        <span className={styles.viewerEventMeta}>
-                                          {formatEventDateTime(event.created_at)} by {renderEventActor(event)}
-                                        </span>
-                                        {event.note ? (
-                                          <span className={styles.viewerEventNote}>{event.note}</span>
-                                        ) : null}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                  {selectedChangeOrderStatusEvents.length > 4 ? (
-                                    <button
-                                      type="button"
-                                      className={styles.showAllToggle}
-                                      onClick={() => setShowAllEvents((v) => !v)}
-                                    >
-                                      {showAllEvents
-                                        ? "Show less"
-                                        : `Show all ${selectedChangeOrderStatusEvents.length} events`}
-                                    </button>
-                                  ) : null}
-                                </>
-                              ) : (
-                                <p className={styles.viewerHint}>No status events recorded yet.</p>
-                              )}
-                            </div>
-                          ) : null}
-                        </div>
-
-                        {/* Line Items section */}
-                        <div className={styles.viewerSection}>
-                          <button
-                            type="button"
-                            className={styles.viewerSectionToggle}
-                            onClick={() => setIsLineItemsSectionOpen((v) => !v)}
-                            aria-expanded={isLineItemsSectionOpen}
-                          >
-                            <h4>Line Items ({selectedViewerChangeOrder.line_items.length})</h4>
-                            <span className={styles.viewerSectionArrow}>▼</span>
-                          </button>
-                          {isLineItemsSectionOpen ? (
-                            <div className={styles.viewerSectionContent}>
-                              {selectedViewerChangeOrder.line_items.length > 0 ? (
-                                  <div className={styles.lineTableWrap}>
-                                    <table className={styles.lineTable}>
-                                      <thead>
-                                        <tr>
-                                          <th>Cost code</th>
-                                          <th>Description</th>
-                                          <th>Adjustment reason</th>
-                                          <th>CO line delta ($)</th>
-                                          <th>Days delta</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {selectedViewerChangeOrder.line_items.map((line) => (
-                                          <tr key={line.id}>
-                                            <td data-label="Cost code">{line.cost_code_code || "—"}</td>
-                                            <td data-label="Description">{line.description || "—"}</td>
-                                            <td data-label="Reason">{line.adjustment_reason || "—"}</td>
-                                            <td data-label="CO delta ($)">${line.amount_delta}</td>
-                                            <td data-label="Days delta">{line.days_delta}</td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                              ) : (
-                                <p className={styles.viewerHint}>No line items yet on this change order.</p>
-                              )}
-                              <div className={styles.viewerMetaRow}>
-                                <span className={styles.viewerMetaLabel}>Line delta total</span>
-                                <strong>${selectedViewerChangeOrder.line_total_delta}</strong>
-                              </div>
-                              <div className={styles.viewerMetaRow}>
-                                <span className={styles.viewerMetaLabel}>Pre-approval total</span>
-                                <strong>${selectedViewerWorkingTotals.preApproval}</strong>
-                              </div>
-                              <div className={styles.viewerMetaRow}>
-                                <span className={styles.viewerMetaLabel}>Post-approval total</span>
-                                <strong>${selectedViewerWorkingTotals.postApproval}</strong>
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
-                      </>
-                    ) : null}
-                  </>
-                ) : (
-                  <p className={styles.viewerHint}>
-                    No change orders have been created yet for this approved origin estimate.
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p>Select an approved estimate to view linked change orders.</p>
-            )}
-          </div>
-        ) : (
-          <p className={styles.viewerHint}>No approved estimates yet for this project.</p>
-        )) : (
-          <p className={styles.viewerHint}>Viewer collapsed. Expand when you need linked estimate/CO context.</p>
-        )}
-      </section>
 
       {projectEstimates.length === 0 && !selectedChangeOrder ? (
         <p className={styles.viewerHint}>
@@ -1668,759 +1177,71 @@ export function ChangeOrdersConsole({
         </p>
       ) : (
       <>
-      <div className={styles.formToolbar}>
-        <div className={styles.formContext}>
-          <span className={styles.formContextLabel}>
-            {!selectedChangeOrder ? "Creating" : isSelectedChangeOrderEditable ? "Editing" : "Viewing"}
-          </span>
-          <div className={styles.formContextValueRow}>
-            <strong>{workspaceContext}</strong>
-            <span className={`${styles.editStatusBadge} ${workspaceBadgeClass}`}>
-              {workspaceBadgeLabel}
-            </span>
-          </div>
-        </div>
-        <div className={styles.formToolbarActions}>
-          <button
-            type="button"
-            className={styles.primaryCreateButton}
-            onClick={handleStartNewChangeOrder}
-          >
-            {selectedChangeOrder ? "Create New Change Order" : "Reset"}
-          </button>
-          {selectedChangeOrder && selectedViewerChangeOrder?.is_latest_revision ? (
-            <button
-              type="button"
-              className={styles.cloneRevisionButton}
-              onClick={handleCloneRevision}
-              disabled={!canMutateChangeOrders}
-            >
-              Duplicate as New Revision
-            </button>
-          ) : null}
-        </div>
-        {actionMessage && actionTone === "success" && /^Duplicated\b/i.test(actionMessage) ? (
-          <p className={creatorStyles.actionSuccess}>{actionMessage}</p>
-        ) : null}
-      </div>
-      {!selectedChangeOrder ? (
-        <div ref={createCreatorRef}>
-          <DocumentCreator
-          adapter={changeOrderCreatorAdapter}
-          document={null}
-          formState={createChangeOrderCreatorFormState}
-          className={`${creatorStyles.sheet} ${changeOrderCreatorStyles.workflowSheet} ${changeOrderCreatorStyles.createSheet}`}
-          sectionClassName={changeOrderCreatorStyles.changeOrderCreatorSection}
-          onSubmit={handleCreateChangeOrder}
-          sections={[{ slot: "context" }]}
-          renderers={{
-            context: () => (
-              <>
-                <div className={creatorStyles.sheetHeader}>
-                  <div className={creatorStyles.fromBlock}>
-                    <span className={creatorStyles.blockLabel}>From</span>
-                    <p className={creatorStyles.blockText}>{senderName || "Your Company"}</p>
-                    {senderAddressLines.length ? (
-                      senderAddressLines.map((line, index) => (
-                        <p key={`${line}-${index}`} className={creatorStyles.blockMuted}>
-                          {line}
-                        </p>
-                      ))
-                    ) : (
-                      <p className={creatorStyles.blockMuted}>
-                        Set sender address in Organization settings.
-                      </p>
-                    )}
-                  </div>
-                  <div className={creatorStyles.headerRight}>
-                    <div className={`${creatorStyles.logoBox} ${senderLogoUrl ? creatorStyles.logoBoxHasImage : ""}`}>
-                      {senderLogoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- user-uploaded logo
-                        <img
-                          className={creatorStyles.logoImage}
-                          src={senderLogoUrl}
-                          alt={`${senderName || "Company"} logo`}
-                        />
-                      ) : "No logo set"}
-                    </div>
-                    <div className={creatorStyles.sheetTitle}>Change Order</div>
-                    <div className={`${creatorStyles.sheetTitleValue} ${creatorStyles.printOnly}`}>
-                      {newTitle || "Untitled"}
-                    </div>
-                    <div className={`${creatorStyles.blockMuted} ${creatorStyles.printOnly}`}>Project #{selectedProjectId || "—"}</div>
-                    {selectedViewerEstimate ? (
-                      <div className={`${creatorStyles.blockMuted} ${creatorStyles.printOnly}`}>
-                        Estimate: {selectedViewerEstimate.title || `#${selectedViewerEstimate.id}`} v{selectedViewerEstimate.version}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className={creatorStyles.metaBlock}>
-                  <div className={creatorStyles.metaTitle}>Change Order Details</div>
-                  <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField} ${creatorStyles.screenOnly}`}>
-                    <span className={changeOrderCreatorStyles.coMetaLabel}>Title</span>
-                    <input
-                      className={`${creatorStyles.fieldInput} ${changeOrderCreatorStyles.coMetaInput}`}
-                      value={newTitle}
-                      onChange={(event) => {
-                        setNewTitle(event.target.value);
-                        setNewTitleManuallyEdited(true);
-                      }}
-                      required
-                    />
-                  </label>
-                  <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField} ${changeOrderCreatorStyles.coFieldWide}`}>
-                    <span className={changeOrderCreatorStyles.coMetaLabel}>Reason</span>
-                    <textarea
-                      className={`${creatorStyles.fieldInput} ${changeOrderCreatorStyles.coMetaInput}`}
-                      value={newReason}
-                      onChange={(event) => setNewReason(event.target.value)}
-                      rows={3}
-                      placeholder="Describe why this change order is needed"
-                    />
-                  </label>
-                </div>
-
-                <div className={changeOrderCreatorStyles.coLineSectionIntro}>
-                  <h3>Line Items</h3>
-                </div>
-
-                {isMobile ? (
-                  <div className={mobileCardStyles.cardList}>
-                    {newLineItems.map((line, index) => {
-                      const rowIssues = newLineValidation.issuesByLocalId.get(line.localId) ?? [];
-                      return (
-                        <MobileLineItemCard
-                          key={line.localId}
-                          index={index}
-                          isFirst={index === 0}
-                          isLast={index === newLineItems.length - 1}
-                          onRemove={() => removeNewLine(line.localId)}
-                          onMoveUp={() => moveNewLine(line.localId, "up")}
-                          onMoveDown={() => moveNewLine(line.localId, "down")}
-                          validationError={rowIssues.length ? `Row ${index + 1}: ${rowIssues.join(" ")}` : undefined}
-                          fields={[
-                            {
-                              label: "Cost Code",
-                              key: "costCode",
-                              span: "full",
-                              render: () => (
-                                <CostCodeCombobox
-                                  costCodes={costCodes}
-                                  value={line.costCodeId}
-                                  onChange={(nextValue) =>
-                                    updateNewLine(line.localId, { costCodeId: nextValue })
-                                  }
-                                  ariaLabel="Cost code"
-                                  placeholder="Search cost code"
-                                />
-                              ),
-                            },
-                            {
-                              label: "Description",
-                              key: "description",
-                              span: "full",
-                              render: () => (
-                                <input
-                                  className={mobileCardStyles.fieldInput}
-                                  value={line.description}
-                                  placeholder="Optional CO scope note"
-                                  onChange={(event) =>
-                                    updateNewLine(line.localId, { description: event.target.value })
-                                  }
-                                />
-                              ),
-                            },
-                            {
-                              label: "CO Delta ($)",
-                              key: "amountDelta",
-                              render: () => (
-                                <input
-                                  className={mobileCardStyles.fieldInput}
-                                  value={line.amountDelta}
-                                  placeholder="0.00 (USD)"
-                                  onChange={(event) =>
-                                    updateNewLine(line.localId, { amountDelta: event.target.value })
-                                  }
-                                  inputMode="decimal"
-                                />
-                              ),
-                            },
-                            {
-                              label: "Schedule (days)",
-                              key: "daysDelta",
-                              render: () => (
-                                <input
-                                  className={mobileCardStyles.fieldInput}
-                                  value={line.daysDelta}
-                                  placeholder="0 days"
-                                  onChange={(event) =>
-                                    updateNewLine(line.localId, { daysDelta: event.target.value })
-                                  }
-                                  inputMode="numeric"
-                                />
-                              ),
-                            },
-                          ]}
-                        />
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className={creatorStyles.lineTable}>
-                    <div className={changeOrderCreatorStyles.coLineHeader}>
-                      <span>Cost code</span>
-                      <span>Description</span>
-                      <span>CO delta ($)</span>
-                      <span>Schedule delta (days)</span>
-                      <span>Actions</span>
-                    </div>
-                    {newLineItems.map((line, index) => {
-                      const rowIssues = newLineValidation.issuesByLocalId.get(line.localId) ?? [];
-                      return (
-                        <div key={line.localId} className={changeOrderCreatorStyles.coLineRowGroup}>
-                          <div
-                            className={`${changeOrderCreatorStyles.coLineRow} ${index % 2 === 1 ? changeOrderCreatorStyles.coLineRowAlt : ""} ${
-                              rowIssues.length ? changeOrderCreatorStyles.coLineRowInvalid : ""
-                            }`}
-                          >
-                            <div>
-                              <span className={creatorStyles.printOnly}>
-                                {costCodes.find((c) => String(c.id) === line.costCodeId)?.code || "—"}
-                              </span>
-                              <span className={creatorStyles.screenOnly}>
-                                <CostCodeCombobox
-                                  costCodes={costCodes}
-                                  value={line.costCodeId}
-                                  onChange={(nextValue) =>
-                                    updateNewLine(line.localId, { costCodeId: nextValue })
-                                  }
-                                  ariaLabel="Cost code"
-                                  placeholder="Search cost code"
-                                />
-                              </span>
-                            </div>
-                            <input
-                              className={creatorStyles.lineInput}
-                              value={line.description}
-                              placeholder="Optional CO scope note"
-                              onChange={(event) =>
-                                updateNewLine(line.localId, { description: event.target.value })
-                              }
-                            />
-                            <input
-                              className={creatorStyles.lineInput}
-                              value={line.amountDelta}
-                              placeholder="0.00 (USD)"
-                              onChange={(event) =>
-                                updateNewLine(line.localId, { amountDelta: event.target.value })
-                              }
-                              inputMode="decimal"
-                            />
-                            <input
-                              className={creatorStyles.lineInput}
-                              value={line.daysDelta}
-                              placeholder="0 days"
-                              onChange={(event) =>
-                                updateNewLine(line.localId, { daysDelta: event.target.value })
-                              }
-                              inputMode="numeric"
-                            />
-                            <div className={changeOrderCreatorStyles.coLineRowActions}>
-                              <button
-                                type="button"
-                                className={`${creatorStyles.smallButton} ${index === 0 ? creatorStyles.actionDisabled : ""}`}
-                                onClick={() => moveNewLine(line.localId, "up")}
-                                disabled={index === 0}
-                              >
-                                Up
-                              </button>
-                              <button
-                                type="button"
-                                className={`${creatorStyles.smallButton} ${index === newLineItems.length - 1 ? creatorStyles.actionDisabled : ""}`}
-                                onClick={() => moveNewLine(line.localId, "down")}
-                                disabled={index === newLineItems.length - 1}
-                              >
-                                Down
-                              </button>
-                              <button
-                                type="button"
-                                className={creatorStyles.smallButton}
-                                onClick={() => removeNewLine(line.localId)}
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          </div>
-                          {rowIssues.length ? (
-                            <p className={changeOrderCreatorStyles.coLineIssue}>
-                              Row {index + 1}: {rowIssues.join(" ")}
-                            </p>
-                          ) : null}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                <div className={changeOrderCreatorStyles.coLineActions}>
-                  <button
-                    type="button"
-                    className={`${creatorStyles.secondaryButton} ${changeOrderCreatorStyles.coLineAddButton}`}
-                    onClick={() => addNewLine()}
-                  >
-                    Add Line Item
-                  </button>
-                </div>
-
-                {renderContractBreakdown({ style: { marginTop: "var(--space-md)" } })}
-
-                <div className={changeOrderCreatorStyles.coSheetFooter}>
-                  <div className={changeOrderCreatorStyles.coTotalsColumn}>
-                    <div className={`${creatorStyles.summary} ${changeOrderCreatorStyles.coSummaryCard}`}>
-                      <div className={creatorStyles.summaryRow}>
-                        <span>Original total</span>
-                        <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
-                          {originalEstimateTotal ? `$${originalEstimateTotal}` : "—"}
-                        </span>
-                      </div>
-                      <div className={creatorStyles.summaryRow}>
-                        <span>Current total (accepted)</span>
-                        <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
-                          {currentAcceptedTotal ? `$${currentAcceptedTotal}` : "—"}
-                        </span>
-                      </div>
-                      <div className={creatorStyles.summaryRow}>
-                        <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Cost delta ($)</span>
-                        <strong>{formatDecimal(newLineDeltaTotal)}</strong>
-                      </div>
-                      <div className={creatorStyles.summaryRow}>
-                        <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Time delta (days)</span>
-                        <strong>{newLineDaysTotal}</strong>
-                      </div>
-                    </div>
-                    <div className={changeOrderCreatorStyles.coSheetFooterActions}>
-                      {!selectedViewerEstimateId ? (
-                        <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint}`}>
-                          Select an approved origin estimate from the history selector before creating a change
-                          order.
-                        </p>
-                      ) : null}
-                      {actionMessage && actionTone === "error" ? (
-                        <p className={creatorStyles.actionError}>{actionMessage}</p>
-                      ) : null}
-                      <div className={changeOrderCreatorStyles.coActionButtonRow}>
-                        <button
-                          type="submit"
-                          className={`${creatorStyles.primaryButton} ${changeOrderCreatorStyles.coFooterPrimaryButton}`}
-                          disabled={isCreateSubmitDisabled}
-                        >
-                          Create Change Order
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={creatorStyles.terms}>
-                  <h4>Terms and Conditions</h4>
-                  {(newTermsText || defaultChangeOrderTerms || "Not set")
-                    .split("\n")
-                    .filter((line) => line.trim())
-                    .map((line, index) => (
-                      <p key={`${line}-${index}`}>{line}</p>
-                    ))}
-                </div>
-
-                <div className={creatorStyles.footer}>
-                  <span>{senderName || "Your Company"}</span>
-                  <span>{senderEmail || "Help email not set"}</span>
-                  <span>New Change Order Draft</span>
-                </div>
-              </>
-            ),
-          }}
-          />
-        </div>
-      ) : null}
-
-      {selectedChangeOrder ? (
-        <div ref={editCreatorRef}>
-        <DocumentCreator
-          adapter={changeOrderCreatorAdapter}
-          document={selectedChangeOrder}
-          formState={editChangeOrderCreatorFormState}
-          className={`${creatorStyles.sheet} ${changeOrderCreatorStyles.workflowSheet} ${changeOrderCreatorStyles.editSheet} ${!isSelectedChangeOrderEditable ? changeOrderCreatorStyles.editSheetLocked : ""}`}
-          sectionClassName={changeOrderCreatorStyles.changeOrderCreatorSection}
-          onSubmit={handleUpdateChangeOrder}
-          sections={[{ slot: "context" }]}
-          renderers={{
-            context: () => (
-              <>
-                <div className={creatorStyles.sheetHeader}>
-                  <div className={creatorStyles.fromBlock}>
-                    <span className={creatorStyles.blockLabel}>From</span>
-                    <p className={creatorStyles.blockText}>{senderName || "Your Company"}</p>
-                    {senderAddressLines.length ? (
-                      senderAddressLines.map((line, index) => (
-                        <p key={`${line}-${index}`} className={creatorStyles.blockMuted}>
-                          {line}
-                        </p>
-                      ))
-                    ) : (
-                      <p className={creatorStyles.blockMuted}>
-                        Set sender address in Organization settings.
-                      </p>
-                    )}
-                  </div>
-                  <div className={creatorStyles.headerRight}>
-                    <div className={`${creatorStyles.logoBox} ${senderLogoUrl ? creatorStyles.logoBoxHasImage : ""}`}>
-                      {senderLogoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- user-uploaded logo
-                        <img
-                          className={creatorStyles.logoImage}
-                          src={senderLogoUrl}
-                          alt={`${senderName || "Company"} logo`}
-                        />
-                      ) : "No logo set"}
-                    </div>
-                    <div className={`${creatorStyles.sheetTitle} ${creatorStyles.screenOnly}`}>Change Order Revision</div>
-                    <div className={`${creatorStyles.sheetTitle} ${creatorStyles.printOnly}`}>Change Order</div>
-                    <div className={`${creatorStyles.sheetTitleValue} ${creatorStyles.printOnly}`}>
-                      {editTitle || "Untitled"}
-                    </div>
-                    {(() => {
-                      const originEst = selectedChangeOrder?.origin_estimate
-                        ? projectEstimates.find((e) => e.id === selectedChangeOrder.origin_estimate)
-                        : null;
-                      return originEst ? (
-                        <div className={`${creatorStyles.blockMuted} ${creatorStyles.printOnly}`}>
-                          Estimate: {originEst.title || `#${originEst.id}`} v{originEst.version}
-                        </div>
-                      ) : null;
-                    })()}
-                  </div>
-                </div>
-
-                <div className={creatorStyles.metaBlock}>
-                  <div className={creatorStyles.metaTitle}>Change Order Details</div>
-                  <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField} ${creatorStyles.screenOnly}`}>
-                    <span className={changeOrderCreatorStyles.coMetaLabel}>Title</span>
-                    <input
-                      className={`${creatorStyles.fieldInput} ${changeOrderCreatorStyles.coMetaInput} ${changeOrderCreatorStyles.lockableControl}`}
-                      value={editTitle}
-                      onChange={(event) => setEditTitle(event.target.value)}
-                      disabled={!isSelectedChangeOrderEditable}
-                      required
-                    />
-                  </label>
-                  <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField} ${changeOrderCreatorStyles.coFieldWide}`}>
-                    <span className={changeOrderCreatorStyles.coMetaLabel}>Reason</span>
-                    <textarea
-                      className={`${creatorStyles.fieldInput} ${changeOrderCreatorStyles.coMetaInput} ${changeOrderCreatorStyles.lockableControl}`}
-                      value={editReason}
-                      onChange={(event) => setEditReason(event.target.value)}
-                      rows={3}
-                      placeholder="Describe why this change order revision is needed"
-                      disabled={!isSelectedChangeOrderEditable}
-                    />
-                  </label>
-                </div>
-
-                <div className={changeOrderCreatorStyles.coLineSectionIntro}>
-                  <h3>Line Items</h3>
-                </div>
-
-                {isMobile ? (
-                  <div className={mobileCardStyles.cardList}>
-                    {editLineItems.map((line, index) => {
-                      const rowIssues = editLineValidation.issuesByLocalId.get(line.localId) ?? [];
-                      return (
-                        <MobileLineItemCard
-                          key={line.localId}
-                          index={index}
-                          readOnly={!isSelectedChangeOrderEditable}
-                          isFirst={index === 0}
-                          isLast={index === editLineItems.length - 1}
-                          onRemove={isSelectedChangeOrderEditable ? () => removeEditLine(line.localId) : undefined}
-                          onMoveUp={isSelectedChangeOrderEditable ? () => moveEditLine(line.localId, "up") : undefined}
-                          onMoveDown={isSelectedChangeOrderEditable ? () => moveEditLine(line.localId, "down") : undefined}
-                          validationError={rowIssues.length ? `Row ${index + 1}: ${rowIssues.join(" ")}` : undefined}
-                          fields={[
-                            {
-                              label: "Cost Code",
-                              key: "costCode",
-                              span: "full",
-                              render: () => (
-                                <CostCodeCombobox
-                                  costCodes={costCodes}
-                                  value={line.costCodeId}
-                                  onChange={(nextValue) =>
-                                    updateEditLine(line.localId, { costCodeId: nextValue })
-                                  }
-                                  ariaLabel="Cost code"
-                                  disabled={!isSelectedChangeOrderEditable}
-                                  placeholder="Search cost code"
-                                />
-                              ),
-                            },
-                            {
-                              label: "Description",
-                              key: "description",
-                              span: "full",
-                              render: () => (
-                                <input
-                                  className={mobileCardStyles.fieldInput}
-                                  value={line.description}
-                                  placeholder="Optional CO scope note"
-                                  onChange={(event) =>
-                                    updateEditLine(line.localId, { description: event.target.value })
-                                  }
-                                  disabled={!isSelectedChangeOrderEditable}
-                                />
-                              ),
-                            },
-                            {
-                              label: "CO Delta ($)",
-                              key: "amountDelta",
-                              render: () => (
-                                <input
-                                  className={mobileCardStyles.fieldInput}
-                                  value={line.amountDelta}
-                                  placeholder="0.00 (USD)"
-                                  onChange={(event) =>
-                                    updateEditLine(line.localId, { amountDelta: event.target.value })
-                                  }
-                                  inputMode="decimal"
-                                  disabled={!isSelectedChangeOrderEditable}
-                                />
-                              ),
-                            },
-                            {
-                              label: "Schedule (days)",
-                              key: "daysDelta",
-                              render: () => (
-                                <input
-                                  className={mobileCardStyles.fieldInput}
-                                  value={line.daysDelta}
-                                  placeholder="0 days"
-                                  onChange={(event) =>
-                                    updateEditLine(line.localId, { daysDelta: event.target.value })
-                                  }
-                                  inputMode="numeric"
-                                  disabled={!isSelectedChangeOrderEditable}
-                                />
-                              ),
-                            },
-                          ]}
-                        />
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className={creatorStyles.lineTable}>
-                    <div className={`${changeOrderCreatorStyles.coLineHeader} ${!isSelectedChangeOrderEditable ? changeOrderCreatorStyles.coLineHeaderLocked : ""}`}>
-                      <span>Cost code</span>
-                      <span>Description</span>
-                      <span>CO delta ($)</span>
-                      <span>Schedule delta (days)</span>
-                      {isSelectedChangeOrderEditable ? <span>Actions</span> : null}
-                    </div>
-                    {editLineItems.map((line, index) => {
-                      const rowIssues = editLineValidation.issuesByLocalId.get(line.localId) ?? [];
-                      return (
-                        <div key={line.localId} className={changeOrderCreatorStyles.coLineRowGroup}>
-                          <div
-                            className={`${changeOrderCreatorStyles.coLineRow} ${!isSelectedChangeOrderEditable ? changeOrderCreatorStyles.coLineRowLocked : ""} ${index % 2 === 1 ? changeOrderCreatorStyles.coLineRowAlt : ""} ${
-                              rowIssues.length ? changeOrderCreatorStyles.coLineRowInvalid : ""
-                            }`}
-                          >
-                            <div>
-                              <span className={creatorStyles.printOnly}>
-                                {costCodes.find((c) => String(c.id) === line.costCodeId)?.code || "—"}
-                              </span>
-                              <span className={creatorStyles.screenOnly}>
-                                <CostCodeCombobox
-                                  costCodes={costCodes}
-                                  value={line.costCodeId}
-                                  onChange={(nextValue) =>
-                                    updateEditLine(line.localId, { costCodeId: nextValue })
-                                  }
-                                  ariaLabel="Cost code"
-                                  disabled={!isSelectedChangeOrderEditable}
-                                  placeholder="Search cost code"
-                                />
-                              </span>
-                            </div>
-                            <input
-                              className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
-                              value={line.description}
-                              placeholder="Optional CO scope note"
-                              onChange={(event) =>
-                                updateEditLine(line.localId, { description: event.target.value })
-                              }
-                              disabled={!isSelectedChangeOrderEditable}
-                            />
-                            <input
-                              className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
-                              value={line.amountDelta}
-                              placeholder="0.00 (USD)"
-                              onChange={(event) =>
-                                updateEditLine(line.localId, { amountDelta: event.target.value })
-                              }
-                              inputMode="decimal"
-                              disabled={!isSelectedChangeOrderEditable}
-                            />
-                            <input
-                              className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
-                              value={line.daysDelta}
-                              placeholder="0 days"
-                              onChange={(event) =>
-                                updateEditLine(line.localId, { daysDelta: event.target.value })
-                              }
-                              inputMode="numeric"
-                              disabled={!isSelectedChangeOrderEditable}
-                            />
-                            {isSelectedChangeOrderEditable ? (
-                              <div className={changeOrderCreatorStyles.coLineRowActions}>
-                                <button
-                                  type="button"
-                                  className={`${creatorStyles.smallButton} ${index === 0 ? creatorStyles.actionDisabled : ""}`}
-                                  onClick={() => moveEditLine(line.localId, "up")}
-                                  disabled={index === 0}
-                                >
-                                  Up
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`${creatorStyles.smallButton} ${index === editLineItems.length - 1 ? creatorStyles.actionDisabled : ""}`}
-                                  onClick={() => moveEditLine(line.localId, "down")}
-                                  disabled={index === editLineItems.length - 1}
-                                >
-                                  Down
-                                </button>
-                                <button
-                                  type="button"
-                                  className={creatorStyles.smallButton}
-                                  onClick={() => removeEditLine(line.localId)}
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            ) : null}
-                          </div>
-                          {rowIssues.length ? (
-                            <p className={changeOrderCreatorStyles.coLineIssue}>
-                              Row {index + 1}: {rowIssues.join(" ")}
-                            </p>
-                          ) : null}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                {isSelectedChangeOrderEditable ? (
-                  <div className={changeOrderCreatorStyles.coLineActions}>
-                    <button
-                      type="button"
-                      className={`${creatorStyles.secondaryButton} ${changeOrderCreatorStyles.coLineAddButton}`}
-                      onClick={() => addEditLine()}
-                    >
-                      Add Line Item
-                    </button>
-                  </div>
-                ) : null}
-
-                {renderContractBreakdown({ style: { marginTop: "var(--space-md)" } })}
-
-                <div className={changeOrderCreatorStyles.coSheetFooter}>
-                  <div className={changeOrderCreatorStyles.coTotalsColumn}>
-                    <div className={`${creatorStyles.summary} ${changeOrderCreatorStyles.coSummaryCard}`}>
-                      <div className={creatorStyles.summaryRow}>
-                        <span>Original total</span>
-                        <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
-                          {originalEstimateTotal ? `$${originalEstimateTotal}` : "—"}
-                        </span>
-                      </div>
-                      <div className={creatorStyles.summaryRow}>
-                        <span>Current total (accepted)</span>
-                        <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
-                          {currentAcceptedTotal ? `$${currentAcceptedTotal}` : "—"}
-                        </span>
-                      </div>
-                      <div className={creatorStyles.summaryRow}>
-                        <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Cost delta ($)</span>
-                        <strong>{formatDecimal(editLineDeltaTotal)}</strong>
-                      </div>
-                      <div className={creatorStyles.summaryRow}>
-                        <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Time delta (days)</span>
-                        <strong>{editLineDaysTotal}</strong>
-                      </div>
-                    </div>
-                    <div className={changeOrderCreatorStyles.coSheetFooterActions}>
-                      {selectedChangeOrder && !selectedChangeOrder.is_latest_revision ? (
-                        <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint} ${changeOrderCreatorStyles.coFooterErrorHint}`}>
-                          This revision is historical and read-only. Save/update actions are available on the latest revision only.
-                        </p>
-                      ) : null}
-                      {actionMessage && actionTone === "success" ? (
-                        <p className={creatorStyles.actionSuccess}>{actionMessage}</p>
-                      ) : null}
-                      {actionMessage && actionTone === "error" ? (
-                        <p className={creatorStyles.actionError}>{actionMessage}</p>
-                      ) : null}
-                      {isSelectedChangeOrderEditable ? (
-                        <div className={changeOrderCreatorStyles.coActionButtonRow}>
-                          <button
-                            type="submit"
-                            className={`${creatorStyles.primaryButton} ${changeOrderCreatorStyles.coFooterPrimaryButton}`}
-                            disabled={isEditSubmitDisabled}
-                          >
-                            Save Change Order
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-
-                <div className={creatorStyles.terms}>
-                  <h4>Terms and Conditions</h4>
-                  {(editTermsText || defaultChangeOrderTerms || "Not set")
-                    .split("\n")
-                    .filter((line) => line.trim())
-                    .map((line, index) => (
-                      <p key={`${line}-${index}`}>{line}</p>
-                    ))}
-                </div>
-
-                <div className={creatorStyles.footer}>
-                  <span>{senderName || "Your Company"}</span>
-                  <span>{senderEmail || "Help email not set"}</span>
-                  <span>
-                    {selectedChangeOrder
-                      ? `CO-${selectedChangeOrder.family_key} v${selectedChangeOrder.revision_number}`
-                      : "Change Order"}
-                  </span>
-                </div>
-              </>
-            ),
-          }}
-        />
-        {selectedChangeOrder && (selectedChangeOrder.status === "approved" || selectedChangeOrder.status === "rejected") ? (
-          <div
-            className={`${stampStyles.decisionStamp} ${
-              selectedChangeOrder.status === "approved" ? stampStyles.decisionStampApproved
-              : stampStyles.decisionStampRejected
-            }`}
-          >
-            <p className={stampStyles.decisionStampLabel}>
-              {selectedChangeOrder.status === "approved" ? "Approved" : "Rejected"}
-            </p>
-          </div>
-        ) : null}
-        </div>
-      ) : null}
+      <ChangeOrdersWorkspacePanel
+        isMobile={isMobile}
+        selectedProjectId={selectedProjectId}
+        selectedViewerEstimateId={selectedViewerEstimateId}
+        selectedViewerEstimate={selectedViewerEstimate}
+        projectEstimates={projectEstimates}
+        selectedChangeOrder={selectedChangeOrder}
+        selectedViewerChangeOrder={selectedViewerChangeOrder}
+        isSelectedChangeOrderEditable={isSelectedChangeOrderEditable}
+        workspaceContext={workspaceContext}
+        workspaceBadgeLabel={workspaceBadgeLabel}
+        workspaceBadgeClass={workspaceBadgeClass}
+        onStartNew={handleStartNewChangeOrder}
+        onCloneRevision={handleCloneRevision}
+        canMutateChangeOrders={canMutateChangeOrders}
+        role={role}
+        actionMessage={actionMessage}
+        actionTone={actionTone}
+        senderName={senderName}
+        senderEmail={senderEmail}
+        senderAddressLines={senderAddressLines}
+        senderLogoUrl={senderLogoUrl}
+        createCreatorRef={createCreatorRef}
+        changeOrderCreatorAdapter={changeOrderCreatorAdapter}
+        createChangeOrderCreatorFormState={createChangeOrderCreatorFormState}
+        newTitle={newTitle}
+        onNewTitleChange={(value) => { setNewTitle(value); setNewTitleManuallyEdited(true); }}
+        newReason={newReason}
+        onNewReasonChange={setNewReason}
+        newTermsText={newTermsText}
+        defaultChangeOrderTerms={defaultChangeOrderTerms}
+        newLineItems={newLineItems}
+        newLineValidation={newLineValidation}
+        newLineDeltaTotal={newLineDeltaTotal}
+        newLineDaysTotal={newLineDaysTotal}
+        costCodes={costCodes}
+        isCreateSubmitDisabled={isCreateSubmitDisabled}
+        onCreateSubmit={handleCreateChangeOrder}
+        onAddNewLine={addNewLine}
+        onRemoveNewLine={removeNewLine}
+        onUpdateNewLine={updateNewLine}
+        onMoveNewLine={moveNewLine}
+        editCreatorRef={editCreatorRef}
+        editChangeOrderCreatorFormState={editChangeOrderCreatorFormState}
+        editTitle={editTitle}
+        onEditTitleChange={setEditTitle}
+        editReason={editReason}
+        onEditReasonChange={setEditReason}
+        editTermsText={editTermsText}
+        editLineItems={editLineItems}
+        editLineValidation={editLineValidation}
+        editLineDeltaTotal={editLineDeltaTotal}
+        editLineDaysTotal={editLineDaysTotal}
+        isEditSubmitDisabled={isEditSubmitDisabled}
+        onEditSubmit={handleUpdateChangeOrder}
+        onAddEditLine={addEditLine}
+        onRemoveEditLine={removeEditLine}
+        onUpdateEditLine={updateEditLine}
+        onMoveEditLine={moveEditLine}
+        approvedCOsForSelectedEstimate={approvedCOsForSelectedEstimate}
+        isOriginLineItemsSectionOpen={isOriginLineItemsSectionOpen}
+        setIsOriginLineItemsSectionOpen={setIsOriginLineItemsSectionOpen}
+        currentAcceptedTotal={currentAcceptedTotal}
+        originalEstimateTotal={originalEstimateTotal}
+      />
       </>
       )}
     </section>

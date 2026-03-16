@@ -1,0 +1,1059 @@
+/**
+ * Workspace panel for the change-orders console -- toolbar, create form,
+ * edit form (DocumentCreator), contract breakdown, and decision stamp.
+ *
+ * Pure presentational component: all state and handlers live in the parent
+ * ChangeOrdersConsole and are passed down as props.
+ *
+ * Extracted from change-orders-console.tsx to reduce component size.
+ */
+"use client";
+
+import { FormEvent, RefObject } from "react";
+import { formatDecimal } from "@/shared/money-format";
+import { DocumentCreator } from "@/shared/document-creator";
+import type { DocumentCreatorAdapter, CreatorLineDraft } from "@/shared/document-creator/types";
+import { MobileLineItemCard } from "@/shared/document-creator/mobile-line-card";
+import { CostCodeCombobox } from "@/features/estimates/components/cost-code-combobox";
+import { ReadOnlyLineTable, readOnlyLineTableStyles as roTableStyles } from "@/shared/document-viewer/read-only-line-table";
+import type {
+  ChangeOrderLineInput,
+  ChangeOrderRecord,
+  CostCodeOption,
+  OriginEstimateRecord,
+} from "../types";
+import type { ChangeOrderFormState } from "../document-adapter";
+import styles from "./change-orders-console.module.css";
+import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
+import changeOrderCreatorStyles from "@/shared/document-creator/change-order-creator.module.css";
+import stampStyles from "@/shared/styles/decision-stamp.module.css";
+import mobileCardStyles from "@/shared/document-creator/mobile-line-card.module.css";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type LineValidationResult = {
+  issues: Array<{ localId: number; rowNumber: number; message: string }>;
+  issuesByLocalId: Map<number, string[]>;
+};
+
+export type ChangeOrdersWorkspacePanelProps = {
+  // Layout
+  isMobile: boolean;
+
+  // Project/estimate context
+  selectedProjectId: string;
+  selectedViewerEstimateId: string;
+  selectedViewerEstimate: OriginEstimateRecord | null;
+  projectEstimates: OriginEstimateRecord[];
+
+  // Workspace context
+  selectedChangeOrder: ChangeOrderRecord | null;
+  selectedViewerChangeOrder: ChangeOrderRecord | null;
+  isSelectedChangeOrderEditable: boolean;
+  workspaceContext: string;
+  workspaceBadgeLabel: string;
+  workspaceBadgeClass: string;
+
+  // Toolbar actions
+  onStartNew: () => void;
+  onCloneRevision: () => void;
+  canMutateChangeOrders: boolean;
+  role: string;
+
+  // Action feedback
+  actionMessage: string;
+  actionTone: string;
+
+  // Branding
+  senderName: string;
+  senderEmail: string;
+  senderAddressLines: string[];
+  senderLogoUrl: string;
+
+  // Create form
+  createCreatorRef: RefObject<HTMLDivElement | null>;
+  changeOrderCreatorAdapter: DocumentCreatorAdapter<ChangeOrderRecord, CreatorLineDraft, ChangeOrderFormState>;
+  createChangeOrderCreatorFormState: ChangeOrderFormState;
+  newTitle: string;
+  onNewTitleChange: (value: string) => void;
+  newReason: string;
+  onNewReasonChange: (value: string) => void;
+  newTermsText: string;
+  defaultChangeOrderTerms: string;
+  newLineItems: ChangeOrderLineInput[];
+  newLineValidation: LineValidationResult;
+  newLineDeltaTotal: number;
+  newLineDaysTotal: number;
+  costCodes: CostCodeOption[];
+  isCreateSubmitDisabled: boolean;
+  onCreateSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onAddNewLine: () => void;
+  onRemoveNewLine: (localId: number) => void;
+  onUpdateNewLine: (localId: number, updates: Partial<ChangeOrderLineInput>) => void;
+  onMoveNewLine: (localId: number, direction: "up" | "down") => void;
+
+  // Edit form
+  editCreatorRef: RefObject<HTMLDivElement | null>;
+  editChangeOrderCreatorFormState: ChangeOrderFormState;
+  editTitle: string;
+  onEditTitleChange: (value: string) => void;
+  editReason: string;
+  onEditReasonChange: (value: string) => void;
+  editTermsText: string;
+  editLineItems: ChangeOrderLineInput[];
+  editLineValidation: LineValidationResult;
+  editLineDeltaTotal: number;
+  editLineDaysTotal: number;
+  isEditSubmitDisabled: boolean;
+  onEditSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onAddEditLine: () => void;
+  onRemoveEditLine: (localId: number) => void;
+  onUpdateEditLine: (localId: number, updates: Partial<ChangeOrderLineInput>) => void;
+  onMoveEditLine: (localId: number, direction: "up" | "down") => void;
+
+  // Contract breakdown
+  approvedCOsForSelectedEstimate: ChangeOrderRecord[];
+  isOriginLineItemsSectionOpen: boolean;
+  setIsOriginLineItemsSectionOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  currentAcceptedTotal: string | null;
+  originalEstimateTotal: string | null;
+};
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export function ChangeOrdersWorkspacePanel({
+  isMobile,
+  selectedProjectId,
+  selectedViewerEstimateId,
+  selectedViewerEstimate,
+  projectEstimates,
+  selectedChangeOrder,
+  selectedViewerChangeOrder,
+  isSelectedChangeOrderEditable,
+  workspaceContext,
+  workspaceBadgeLabel,
+  workspaceBadgeClass,
+  onStartNew,
+  onCloneRevision,
+  canMutateChangeOrders,
+  role,
+  actionMessage,
+  actionTone,
+  senderName,
+  senderEmail,
+  senderAddressLines,
+  senderLogoUrl,
+  createCreatorRef,
+  changeOrderCreatorAdapter,
+  createChangeOrderCreatorFormState,
+  newTitle,
+  onNewTitleChange,
+  newReason,
+  onNewReasonChange,
+  newTermsText,
+  defaultChangeOrderTerms,
+  newLineItems,
+  newLineValidation,
+  newLineDeltaTotal,
+  newLineDaysTotal,
+  costCodes,
+  isCreateSubmitDisabled,
+  onCreateSubmit,
+  onAddNewLine,
+  onRemoveNewLine,
+  onUpdateNewLine,
+  onMoveNewLine,
+  editCreatorRef,
+  editChangeOrderCreatorFormState,
+  editTitle,
+  onEditTitleChange,
+  editReason,
+  onEditReasonChange,
+  editTermsText,
+  editLineItems,
+  editLineValidation,
+  editLineDeltaTotal,
+  editLineDaysTotal,
+  isEditSubmitDisabled,
+  onEditSubmit,
+  onAddEditLine,
+  onRemoveEditLine,
+  onUpdateEditLine,
+  onMoveEditLine,
+  approvedCOsForSelectedEstimate,
+  isOriginLineItemsSectionOpen,
+  setIsOriginLineItemsSectionOpen,
+  currentAcceptedTotal,
+  originalEstimateTotal,
+}: ChangeOrdersWorkspacePanelProps) {
+
+  // -------------------------------------------------------------------------
+  // Contract breakdown renderer
+  // -------------------------------------------------------------------------
+
+  function renderContractBreakdown(opts?: { style?: React.CSSProperties }) {
+    if (!selectedViewerEstimate) return null;
+    const hasEstimateLines = selectedViewerEstimate.line_items.length > 0;
+    const hasApprovedCOs = approvedCOsForSelectedEstimate.length > 0;
+    if (!hasEstimateLines && !hasApprovedCOs) return null;
+
+    return (
+      <div className={styles.viewerSection} style={opts?.style}>
+        <button
+          type="button"
+          className={styles.viewerSectionToggle}
+          onClick={() => setIsOriginLineItemsSectionOpen((v) => !v)}
+          aria-expanded={isOriginLineItemsSectionOpen}
+        >
+          <h4>Contract Breakdown</h4>
+          <span className={styles.viewerSectionArrow}>▼</span>
+        </button>
+        {isOriginLineItemsSectionOpen ? (
+          <div className={styles.viewerSectionContent}>
+            {hasEstimateLines ? (
+              <ReadOnlyLineTable
+                caption={`Approved Estimate: ${selectedViewerEstimate.title} v${selectedViewerEstimate.version}`}
+                columns={["Cost code", "Description", "Qty", "Unit", "Unit cost", "Markup %", "Line total"]}
+                rows={selectedViewerEstimate.line_items.map((line) => {
+                  const qty = Number(line.quantity || 0);
+                  const unitCost = Number(line.unit_cost || 0);
+                  const unit = line.unit || "ea";
+                  const costCodeLabel = [line.cost_code_code, line.cost_code_name].filter(Boolean).join(" — ") || "—";
+                  return {
+                    key: line.id,
+                    cells: [
+                      costCodeLabel,
+                      line.description || "—",
+                      qty.toFixed(2),
+                      unit,
+                      `$${unitCost.toFixed(2)}`,
+                      `${line.markup_percent}%`,
+                      <>
+                        <span className={roTableStyles.mobileBreakdown}>
+                          {qty.toFixed(2)} {unit} × ${unitCost.toFixed(2)}
+                        </span>
+                        <span>${line.line_total}</span>
+                      </>,
+                    ],
+                  };
+                })}
+                mobileColumnLayout={[
+                  { order: 0, span: "full" },
+                  { order: 1, span: "full" },
+                  { order: 2, span: "half", hidden: true },
+                  { order: 3, span: "half", hidden: true },
+                  { order: 4, span: "half", hidden: true },
+                  { order: 5, span: "half" },
+                  { order: 6, span: "full", align: "right" },
+                ]}
+                afterTable={
+                  <div className={styles.viewerMetaRow}>
+                    <span className={styles.viewerMetaLabel}>Estimate grand total</span>
+                    <strong>${selectedViewerEstimate.grand_total}</strong>
+                  </div>
+                }
+              />
+            ) : null}
+
+            {hasApprovedCOs ? (
+              <ReadOnlyLineTable
+                caption={`Approved Change Orders (${approvedCOsForSelectedEstimate.length})`}
+                columns={["CO #", "Cost code", "Description", "Days delta", "Amount delta"]}
+                rows={approvedCOsForSelectedEstimate.flatMap((co) =>
+                  co.line_items.map((line) => {
+                    const costCodeLabel = [line.cost_code_code, line.cost_code_name].filter(Boolean).join(" — ") || "—";
+                    return {
+                      key: `${co.id}-${line.id}`,
+                      cells: [
+                        `${co.title} r${co.revision_number}`,
+                        costCodeLabel,
+                        line.description || "—",
+                        `${line.days_delta} days`,
+                        `$${line.amount_delta}`,
+                      ],
+                    };
+                  }),
+                )}
+                mobileColumnLayout={[
+                  { order: 0, span: "full" },
+                  { order: 1, span: "half" },
+                  { order: 2, span: "full" },
+                  { order: 3, span: "half" },
+                  { order: 4, span: "half", align: "right" },
+                ]}
+                afterTable={
+                  <div className={styles.viewerMetaRow}>
+                    <span className={styles.viewerMetaLabel}>Net contract total</span>
+                    <strong>${currentAcceptedTotal ?? "—"}</strong>
+                  </div>
+                }
+              />
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className={styles.formToolbar}>
+        <div className={styles.formContext}>
+          <span className={styles.formContextLabel}>
+            {!selectedChangeOrder ? "Creating" : isSelectedChangeOrderEditable ? "Editing" : "Viewing"}
+          </span>
+          <div className={styles.formContextValueRow}>
+            <strong>{workspaceContext}</strong>
+            <span className={`${styles.editStatusBadge} ${workspaceBadgeClass}`}>
+              {workspaceBadgeLabel}
+            </span>
+          </div>
+        </div>
+        <div className={styles.formToolbarActions}>
+          <button
+            type="button"
+            className={styles.primaryCreateButton}
+            onClick={onStartNew}
+          >
+            {selectedChangeOrder ? "Create New Change Order" : "Reset"}
+          </button>
+          {selectedChangeOrder && selectedViewerChangeOrder?.is_latest_revision ? (
+            <button
+              type="button"
+              className={styles.cloneRevisionButton}
+              onClick={onCloneRevision}
+              disabled={!canMutateChangeOrders}
+            >
+              Duplicate as New Revision
+            </button>
+          ) : null}
+        </div>
+        {actionMessage && actionTone === "success" && /^Duplicated\b/i.test(actionMessage) ? (
+          <p className={creatorStyles.actionSuccess}>{actionMessage}</p>
+        ) : null}
+      </div>
+
+      {/* Create form */}
+      {!selectedChangeOrder ? (
+        <div ref={createCreatorRef}>
+          <DocumentCreator
+          adapter={changeOrderCreatorAdapter}
+          document={null}
+          formState={createChangeOrderCreatorFormState}
+          className={`${creatorStyles.sheet} ${changeOrderCreatorStyles.workflowSheet} ${changeOrderCreatorStyles.createSheet}`}
+          sectionClassName={changeOrderCreatorStyles.changeOrderCreatorSection}
+          onSubmit={onCreateSubmit}
+          sections={[{ slot: "context" }]}
+          renderers={{
+            context: () => (
+              <>
+                <div className={creatorStyles.sheetHeader}>
+                  <div className={creatorStyles.fromBlock}>
+                    <span className={creatorStyles.blockLabel}>From</span>
+                    <p className={creatorStyles.blockText}>{senderName || "Your Company"}</p>
+                    {senderAddressLines.length ? (
+                      senderAddressLines.map((line, index) => (
+                        <p key={`${line}-${index}`} className={creatorStyles.blockMuted}>
+                          {line}
+                        </p>
+                      ))
+                    ) : (
+                      <p className={creatorStyles.blockMuted}>
+                        Set sender address in Organization settings.
+                      </p>
+                    )}
+                  </div>
+                  <div className={creatorStyles.headerRight}>
+                    <div className={`${creatorStyles.logoBox} ${senderLogoUrl ? creatorStyles.logoBoxHasImage : ""}`}>
+                      {senderLogoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- user-uploaded logo
+                        <img
+                          className={creatorStyles.logoImage}
+                          src={senderLogoUrl}
+                          alt={`${senderName || "Company"} logo`}
+                        />
+                      ) : "No logo set"}
+                    </div>
+                    <div className={creatorStyles.sheetTitle}>Change Order</div>
+                    <div className={`${creatorStyles.sheetTitleValue} ${creatorStyles.printOnly}`}>
+                      {newTitle || "Untitled"}
+                    </div>
+                    <div className={`${creatorStyles.blockMuted} ${creatorStyles.printOnly}`}>Project #{selectedProjectId || "—"}</div>
+                    {selectedViewerEstimate ? (
+                      <div className={`${creatorStyles.blockMuted} ${creatorStyles.printOnly}`}>
+                        Estimate: {selectedViewerEstimate.title || `#${selectedViewerEstimate.id}`} v{selectedViewerEstimate.version}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className={creatorStyles.metaBlock}>
+                  <div className={creatorStyles.metaTitle}>Change Order Details</div>
+                  <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField} ${creatorStyles.screenOnly}`}>
+                    <span className={changeOrderCreatorStyles.coMetaLabel}>Title</span>
+                    <input
+                      className={`${creatorStyles.fieldInput} ${changeOrderCreatorStyles.coMetaInput}`}
+                      value={newTitle}
+                      onChange={(event) => onNewTitleChange(event.target.value)}
+                      required
+                    />
+                  </label>
+                  <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField} ${changeOrderCreatorStyles.coFieldWide}`}>
+                    <span className={changeOrderCreatorStyles.coMetaLabel}>Reason</span>
+                    <textarea
+                      className={`${creatorStyles.fieldInput} ${changeOrderCreatorStyles.coMetaInput}`}
+                      value={newReason}
+                      onChange={(event) => onNewReasonChange(event.target.value)}
+                      rows={3}
+                      placeholder="Describe why this change order is needed"
+                    />
+                  </label>
+                </div>
+
+                <div className={changeOrderCreatorStyles.coLineSectionIntro}>
+                  <h3>Line Items</h3>
+                </div>
+
+                {isMobile ? (
+                  <div className={mobileCardStyles.cardList}>
+                    {newLineItems.map((line, index) => {
+                      const rowIssues = newLineValidation.issuesByLocalId.get(line.localId) ?? [];
+                      return (
+                        <MobileLineItemCard
+                          key={line.localId}
+                          index={index}
+                          isFirst={index === 0}
+                          isLast={index === newLineItems.length - 1}
+                          onRemove={() => onRemoveNewLine(line.localId)}
+                          onMoveUp={() => onMoveNewLine(line.localId, "up")}
+                          onMoveDown={() => onMoveNewLine(line.localId, "down")}
+                          validationError={rowIssues.length ? `Row ${index + 1}: ${rowIssues.join(" ")}` : undefined}
+                          fields={[
+                            {
+                              label: "Cost Code",
+                              key: "costCode",
+                              span: "full",
+                              render: () => (
+                                <CostCodeCombobox
+                                  costCodes={costCodes}
+                                  value={line.costCodeId}
+                                  onChange={(nextValue) =>
+                                    onUpdateNewLine(line.localId, { costCodeId: nextValue })
+                                  }
+                                  ariaLabel="Cost code"
+                                  placeholder="Search cost code"
+                                />
+                              ),
+                            },
+                            {
+                              label: "Description",
+                              key: "description",
+                              span: "full",
+                              render: () => (
+                                <input
+                                  className={mobileCardStyles.fieldInput}
+                                  value={line.description}
+                                  placeholder="Optional CO scope note"
+                                  onChange={(event) =>
+                                    onUpdateNewLine(line.localId, { description: event.target.value })
+                                  }
+                                />
+                              ),
+                            },
+                            {
+                              label: "CO Delta ($)",
+                              key: "amountDelta",
+                              render: () => (
+                                <input
+                                  className={mobileCardStyles.fieldInput}
+                                  value={line.amountDelta}
+                                  placeholder="0.00 (USD)"
+                                  onChange={(event) =>
+                                    onUpdateNewLine(line.localId, { amountDelta: event.target.value })
+                                  }
+                                  inputMode="decimal"
+                                />
+                              ),
+                            },
+                            {
+                              label: "Schedule (days)",
+                              key: "daysDelta",
+                              render: () => (
+                                <input
+                                  className={mobileCardStyles.fieldInput}
+                                  value={line.daysDelta}
+                                  placeholder="0 days"
+                                  onChange={(event) =>
+                                    onUpdateNewLine(line.localId, { daysDelta: event.target.value })
+                                  }
+                                  inputMode="numeric"
+                                />
+                              ),
+                            },
+                          ]}
+                        />
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className={creatorStyles.lineTable}>
+                    <div className={changeOrderCreatorStyles.coLineHeader}>
+                      <span>Cost code</span>
+                      <span>Description</span>
+                      <span>CO delta ($)</span>
+                      <span>Schedule delta (days)</span>
+                      <span>Actions</span>
+                    </div>
+                    {newLineItems.map((line, index) => {
+                      const rowIssues = newLineValidation.issuesByLocalId.get(line.localId) ?? [];
+                      return (
+                        <div key={line.localId} className={changeOrderCreatorStyles.coLineRowGroup}>
+                          <div
+                            className={`${changeOrderCreatorStyles.coLineRow} ${index % 2 === 1 ? changeOrderCreatorStyles.coLineRowAlt : ""} ${
+                              rowIssues.length ? changeOrderCreatorStyles.coLineRowInvalid : ""
+                            }`}
+                          >
+                            <div>
+                              <span className={creatorStyles.printOnly}>
+                                {costCodes.find((c) => String(c.id) === line.costCodeId)?.code || "—"}
+                              </span>
+                              <span className={creatorStyles.screenOnly}>
+                                <CostCodeCombobox
+                                  costCodes={costCodes}
+                                  value={line.costCodeId}
+                                  onChange={(nextValue) =>
+                                    onUpdateNewLine(line.localId, { costCodeId: nextValue })
+                                  }
+                                  ariaLabel="Cost code"
+                                  placeholder="Search cost code"
+                                />
+                              </span>
+                            </div>
+                            <input
+                              className={creatorStyles.lineInput}
+                              value={line.description}
+                              placeholder="Optional CO scope note"
+                              onChange={(event) =>
+                                onUpdateNewLine(line.localId, { description: event.target.value })
+                              }
+                            />
+                            <input
+                              className={creatorStyles.lineInput}
+                              value={line.amountDelta}
+                              placeholder="0.00 (USD)"
+                              onChange={(event) =>
+                                onUpdateNewLine(line.localId, { amountDelta: event.target.value })
+                              }
+                              inputMode="decimal"
+                            />
+                            <input
+                              className={creatorStyles.lineInput}
+                              value={line.daysDelta}
+                              placeholder="0 days"
+                              onChange={(event) =>
+                                onUpdateNewLine(line.localId, { daysDelta: event.target.value })
+                              }
+                              inputMode="numeric"
+                            />
+                            <div className={changeOrderCreatorStyles.coLineRowActions}>
+                              <button
+                                type="button"
+                                className={`${creatorStyles.smallButton} ${index === 0 ? creatorStyles.actionDisabled : ""}`}
+                                onClick={() => onMoveNewLine(line.localId, "up")}
+                                disabled={index === 0}
+                              >
+                                Up
+                              </button>
+                              <button
+                                type="button"
+                                className={`${creatorStyles.smallButton} ${index === newLineItems.length - 1 ? creatorStyles.actionDisabled : ""}`}
+                                onClick={() => onMoveNewLine(line.localId, "down")}
+                                disabled={index === newLineItems.length - 1}
+                              >
+                                Down
+                              </button>
+                              <button
+                                type="button"
+                                className={creatorStyles.smallButton}
+                                onClick={() => onRemoveNewLine(line.localId)}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                          {rowIssues.length ? (
+                            <p className={changeOrderCreatorStyles.coLineIssue}>
+                              Row {index + 1}: {rowIssues.join(" ")}
+                            </p>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className={changeOrderCreatorStyles.coLineActions}>
+                  <button
+                    type="button"
+                    className={`${creatorStyles.secondaryButton} ${changeOrderCreatorStyles.coLineAddButton}`}
+                    onClick={onAddNewLine}
+                  >
+                    Add Line Item
+                  </button>
+                </div>
+
+                {renderContractBreakdown({ style: { marginTop: "var(--space-md)" } })}
+
+                <div className={changeOrderCreatorStyles.coSheetFooter}>
+                  <div className={changeOrderCreatorStyles.coTotalsColumn}>
+                    <div className={`${creatorStyles.summary} ${changeOrderCreatorStyles.coSummaryCard}`}>
+                      <div className={creatorStyles.summaryRow}>
+                        <span>Original total</span>
+                        <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
+                          {originalEstimateTotal ? `$${originalEstimateTotal}` : "—"}
+                        </span>
+                      </div>
+                      <div className={creatorStyles.summaryRow}>
+                        <span>Current total (accepted)</span>
+                        <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
+                          {currentAcceptedTotal ? `$${currentAcceptedTotal}` : "—"}
+                        </span>
+                      </div>
+                      <div className={creatorStyles.summaryRow}>
+                        <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Cost delta ($)</span>
+                        <strong>{formatDecimal(newLineDeltaTotal)}</strong>
+                      </div>
+                      <div className={creatorStyles.summaryRow}>
+                        <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Time delta (days)</span>
+                        <strong>{newLineDaysTotal}</strong>
+                      </div>
+                    </div>
+                    <div className={changeOrderCreatorStyles.coSheetFooterActions}>
+                      {!selectedViewerEstimateId ? (
+                        <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint}`}>
+                          Select an approved origin estimate from the history selector before creating a change
+                          order.
+                        </p>
+                      ) : null}
+                      {actionMessage && actionTone === "error" ? (
+                        <p className={creatorStyles.actionError}>{actionMessage}</p>
+                      ) : null}
+                      <div className={changeOrderCreatorStyles.coActionButtonRow}>
+                        <button
+                          type="submit"
+                          className={`${creatorStyles.primaryButton} ${changeOrderCreatorStyles.coFooterPrimaryButton}`}
+                          disabled={isCreateSubmitDisabled}
+                        >
+                          Create Change Order
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={creatorStyles.terms}>
+                  <h4>Terms and Conditions</h4>
+                  {(newTermsText || defaultChangeOrderTerms || "Not set")
+                    .split("\n")
+                    .filter((line) => line.trim())
+                    .map((line, index) => (
+                      <p key={`${line}-${index}`}>{line}</p>
+                    ))}
+                </div>
+
+                <div className={creatorStyles.footer}>
+                  <span>{senderName || "Your Company"}</span>
+                  <span>{senderEmail || "Help email not set"}</span>
+                  <span>New Change Order Draft</span>
+                </div>
+              </>
+            ),
+          }}
+          />
+        </div>
+      ) : null}
+
+      {/* Edit form */}
+      {selectedChangeOrder ? (
+        <div ref={editCreatorRef}>
+        <DocumentCreator
+          adapter={changeOrderCreatorAdapter}
+          document={selectedChangeOrder}
+          formState={editChangeOrderCreatorFormState}
+          className={`${creatorStyles.sheet} ${changeOrderCreatorStyles.workflowSheet} ${changeOrderCreatorStyles.editSheet} ${!isSelectedChangeOrderEditable ? changeOrderCreatorStyles.editSheetLocked : ""}`}
+          sectionClassName={changeOrderCreatorStyles.changeOrderCreatorSection}
+          onSubmit={onEditSubmit}
+          sections={[{ slot: "context" }]}
+          renderers={{
+            context: () => (
+              <>
+                <div className={creatorStyles.sheetHeader}>
+                  <div className={creatorStyles.fromBlock}>
+                    <span className={creatorStyles.blockLabel}>From</span>
+                    <p className={creatorStyles.blockText}>{senderName || "Your Company"}</p>
+                    {senderAddressLines.length ? (
+                      senderAddressLines.map((line, index) => (
+                        <p key={`${line}-${index}`} className={creatorStyles.blockMuted}>
+                          {line}
+                        </p>
+                      ))
+                    ) : (
+                      <p className={creatorStyles.blockMuted}>
+                        Set sender address in Organization settings.
+                      </p>
+                    )}
+                  </div>
+                  <div className={creatorStyles.headerRight}>
+                    <div className={`${creatorStyles.logoBox} ${senderLogoUrl ? creatorStyles.logoBoxHasImage : ""}`}>
+                      {senderLogoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- user-uploaded logo
+                        <img
+                          className={creatorStyles.logoImage}
+                          src={senderLogoUrl}
+                          alt={`${senderName || "Company"} logo`}
+                        />
+                      ) : "No logo set"}
+                    </div>
+                    <div className={`${creatorStyles.sheetTitle} ${creatorStyles.screenOnly}`}>Change Order Revision</div>
+                    <div className={`${creatorStyles.sheetTitle} ${creatorStyles.printOnly}`}>Change Order</div>
+                    <div className={`${creatorStyles.sheetTitleValue} ${creatorStyles.printOnly}`}>
+                      {editTitle || "Untitled"}
+                    </div>
+                    {(() => {
+                      const originEst = selectedChangeOrder?.origin_estimate
+                        ? projectEstimates.find((e) => e.id === selectedChangeOrder.origin_estimate)
+                        : null;
+                      return originEst ? (
+                        <div className={`${creatorStyles.blockMuted} ${creatorStyles.printOnly}`}>
+                          Estimate: {originEst.title || `#${originEst.id}`} v{originEst.version}
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                </div>
+
+                <div className={creatorStyles.metaBlock}>
+                  <div className={creatorStyles.metaTitle}>Change Order Details</div>
+                  <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField} ${creatorStyles.screenOnly}`}>
+                    <span className={changeOrderCreatorStyles.coMetaLabel}>Title</span>
+                    <input
+                      className={`${creatorStyles.fieldInput} ${changeOrderCreatorStyles.coMetaInput} ${changeOrderCreatorStyles.lockableControl}`}
+                      value={editTitle}
+                      onChange={(event) => onEditTitleChange(event.target.value)}
+                      disabled={!isSelectedChangeOrderEditable}
+                      required
+                    />
+                  </label>
+                  <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField} ${changeOrderCreatorStyles.coFieldWide}`}>
+                    <span className={changeOrderCreatorStyles.coMetaLabel}>Reason</span>
+                    <textarea
+                      className={`${creatorStyles.fieldInput} ${changeOrderCreatorStyles.coMetaInput} ${changeOrderCreatorStyles.lockableControl}`}
+                      value={editReason}
+                      onChange={(event) => onEditReasonChange(event.target.value)}
+                      rows={3}
+                      placeholder="Describe why this change order revision is needed"
+                      disabled={!isSelectedChangeOrderEditable}
+                    />
+                  </label>
+                </div>
+
+                <div className={changeOrderCreatorStyles.coLineSectionIntro}>
+                  <h3>Line Items</h3>
+                </div>
+
+                {isMobile ? (
+                  <div className={mobileCardStyles.cardList}>
+                    {editLineItems.map((line, index) => {
+                      const rowIssues = editLineValidation.issuesByLocalId.get(line.localId) ?? [];
+                      return (
+                        <MobileLineItemCard
+                          key={line.localId}
+                          index={index}
+                          readOnly={!isSelectedChangeOrderEditable}
+                          isFirst={index === 0}
+                          isLast={index === editLineItems.length - 1}
+                          onRemove={isSelectedChangeOrderEditable ? () => onRemoveEditLine(line.localId) : undefined}
+                          onMoveUp={isSelectedChangeOrderEditable ? () => onMoveEditLine(line.localId, "up") : undefined}
+                          onMoveDown={isSelectedChangeOrderEditable ? () => onMoveEditLine(line.localId, "down") : undefined}
+                          validationError={rowIssues.length ? `Row ${index + 1}: ${rowIssues.join(" ")}` : undefined}
+                          fields={[
+                            {
+                              label: "Cost Code",
+                              key: "costCode",
+                              span: "full",
+                              render: () => (
+                                <CostCodeCombobox
+                                  costCodes={costCodes}
+                                  value={line.costCodeId}
+                                  onChange={(nextValue) =>
+                                    onUpdateEditLine(line.localId, { costCodeId: nextValue })
+                                  }
+                                  ariaLabel="Cost code"
+                                  disabled={!isSelectedChangeOrderEditable}
+                                  placeholder="Search cost code"
+                                />
+                              ),
+                            },
+                            {
+                              label: "Description",
+                              key: "description",
+                              span: "full",
+                              render: () => (
+                                <input
+                                  className={mobileCardStyles.fieldInput}
+                                  value={line.description}
+                                  placeholder="Optional CO scope note"
+                                  onChange={(event) =>
+                                    onUpdateEditLine(line.localId, { description: event.target.value })
+                                  }
+                                  disabled={!isSelectedChangeOrderEditable}
+                                />
+                              ),
+                            },
+                            {
+                              label: "CO Delta ($)",
+                              key: "amountDelta",
+                              render: () => (
+                                <input
+                                  className={mobileCardStyles.fieldInput}
+                                  value={line.amountDelta}
+                                  placeholder="0.00 (USD)"
+                                  onChange={(event) =>
+                                    onUpdateEditLine(line.localId, { amountDelta: event.target.value })
+                                  }
+                                  inputMode="decimal"
+                                  disabled={!isSelectedChangeOrderEditable}
+                                />
+                              ),
+                            },
+                            {
+                              label: "Schedule (days)",
+                              key: "daysDelta",
+                              render: () => (
+                                <input
+                                  className={mobileCardStyles.fieldInput}
+                                  value={line.daysDelta}
+                                  placeholder="0 days"
+                                  onChange={(event) =>
+                                    onUpdateEditLine(line.localId, { daysDelta: event.target.value })
+                                  }
+                                  inputMode="numeric"
+                                  disabled={!isSelectedChangeOrderEditable}
+                                />
+                              ),
+                            },
+                          ]}
+                        />
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className={creatorStyles.lineTable}>
+                    <div className={`${changeOrderCreatorStyles.coLineHeader} ${!isSelectedChangeOrderEditable ? changeOrderCreatorStyles.coLineHeaderLocked : ""}`}>
+                      <span>Cost code</span>
+                      <span>Description</span>
+                      <span>CO delta ($)</span>
+                      <span>Schedule delta (days)</span>
+                      {isSelectedChangeOrderEditable ? <span>Actions</span> : null}
+                    </div>
+                    {editLineItems.map((line, index) => {
+                      const rowIssues = editLineValidation.issuesByLocalId.get(line.localId) ?? [];
+                      return (
+                        <div key={line.localId} className={changeOrderCreatorStyles.coLineRowGroup}>
+                          <div
+                            className={`${changeOrderCreatorStyles.coLineRow} ${!isSelectedChangeOrderEditable ? changeOrderCreatorStyles.coLineRowLocked : ""} ${index % 2 === 1 ? changeOrderCreatorStyles.coLineRowAlt : ""} ${
+                              rowIssues.length ? changeOrderCreatorStyles.coLineRowInvalid : ""
+                            }`}
+                          >
+                            <div>
+                              <span className={creatorStyles.printOnly}>
+                                {costCodes.find((c) => String(c.id) === line.costCodeId)?.code || "—"}
+                              </span>
+                              <span className={creatorStyles.screenOnly}>
+                                <CostCodeCombobox
+                                  costCodes={costCodes}
+                                  value={line.costCodeId}
+                                  onChange={(nextValue) =>
+                                    onUpdateEditLine(line.localId, { costCodeId: nextValue })
+                                  }
+                                  ariaLabel="Cost code"
+                                  disabled={!isSelectedChangeOrderEditable}
+                                  placeholder="Search cost code"
+                                />
+                              </span>
+                            </div>
+                            <input
+                              className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
+                              value={line.description}
+                              placeholder="Optional CO scope note"
+                              onChange={(event) =>
+                                onUpdateEditLine(line.localId, { description: event.target.value })
+                              }
+                              disabled={!isSelectedChangeOrderEditable}
+                            />
+                            <input
+                              className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
+                              value={line.amountDelta}
+                              placeholder="0.00 (USD)"
+                              onChange={(event) =>
+                                onUpdateEditLine(line.localId, { amountDelta: event.target.value })
+                              }
+                              inputMode="decimal"
+                              disabled={!isSelectedChangeOrderEditable}
+                            />
+                            <input
+                              className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
+                              value={line.daysDelta}
+                              placeholder="0 days"
+                              onChange={(event) =>
+                                onUpdateEditLine(line.localId, { daysDelta: event.target.value })
+                              }
+                              inputMode="numeric"
+                              disabled={!isSelectedChangeOrderEditable}
+                            />
+                            {isSelectedChangeOrderEditable ? (
+                              <div className={changeOrderCreatorStyles.coLineRowActions}>
+                                <button
+                                  type="button"
+                                  className={`${creatorStyles.smallButton} ${index === 0 ? creatorStyles.actionDisabled : ""}`}
+                                  onClick={() => onMoveEditLine(line.localId, "up")}
+                                  disabled={index === 0}
+                                >
+                                  Up
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`${creatorStyles.smallButton} ${index === editLineItems.length - 1 ? creatorStyles.actionDisabled : ""}`}
+                                  onClick={() => onMoveEditLine(line.localId, "down")}
+                                  disabled={index === editLineItems.length - 1}
+                                >
+                                  Down
+                                </button>
+                                <button
+                                  type="button"
+                                  className={creatorStyles.smallButton}
+                                  onClick={() => onRemoveEditLine(line.localId)}
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
+                          {rowIssues.length ? (
+                            <p className={changeOrderCreatorStyles.coLineIssue}>
+                              Row {index + 1}: {rowIssues.join(" ")}
+                            </p>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {isSelectedChangeOrderEditable ? (
+                  <div className={changeOrderCreatorStyles.coLineActions}>
+                    <button
+                      type="button"
+                      className={`${creatorStyles.secondaryButton} ${changeOrderCreatorStyles.coLineAddButton}`}
+                      onClick={onAddEditLine}
+                    >
+                      Add Line Item
+                    </button>
+                  </div>
+                ) : null}
+
+                {renderContractBreakdown({ style: { marginTop: "var(--space-md)" } })}
+
+                <div className={changeOrderCreatorStyles.coSheetFooter}>
+                  <div className={changeOrderCreatorStyles.coTotalsColumn}>
+                    <div className={`${creatorStyles.summary} ${changeOrderCreatorStyles.coSummaryCard}`}>
+                      <div className={creatorStyles.summaryRow}>
+                        <span>Original total</span>
+                        <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
+                          {originalEstimateTotal ? `$${originalEstimateTotal}` : "—"}
+                        </span>
+                      </div>
+                      <div className={creatorStyles.summaryRow}>
+                        <span>Current total (accepted)</span>
+                        <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
+                          {currentAcceptedTotal ? `$${currentAcceptedTotal}` : "—"}
+                        </span>
+                      </div>
+                      <div className={creatorStyles.summaryRow}>
+                        <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Cost delta ($)</span>
+                        <strong>{formatDecimal(editLineDeltaTotal)}</strong>
+                      </div>
+                      <div className={creatorStyles.summaryRow}>
+                        <span className={changeOrderCreatorStyles.coSummaryPrimaryLabel}>Time delta (days)</span>
+                        <strong>{editLineDaysTotal}</strong>
+                      </div>
+                    </div>
+                    <div className={changeOrderCreatorStyles.coSheetFooterActions}>
+                      {selectedChangeOrder && !selectedChangeOrder.is_latest_revision ? (
+                        <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint} ${changeOrderCreatorStyles.coFooterErrorHint}`}>
+                          This revision is historical and read-only. Save/update actions are available on the latest revision only.
+                        </p>
+                      ) : null}
+                      {actionMessage && actionTone === "success" ? (
+                        <p className={creatorStyles.actionSuccess}>{actionMessage}</p>
+                      ) : null}
+                      {actionMessage && actionTone === "error" ? (
+                        <p className={creatorStyles.actionError}>{actionMessage}</p>
+                      ) : null}
+                      {isSelectedChangeOrderEditable ? (
+                        <div className={changeOrderCreatorStyles.coActionButtonRow}>
+                          <button
+                            type="submit"
+                            className={`${creatorStyles.primaryButton} ${changeOrderCreatorStyles.coFooterPrimaryButton}`}
+                            disabled={isEditSubmitDisabled}
+                          >
+                            Save Change Order
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+
+                <div className={creatorStyles.terms}>
+                  <h4>Terms and Conditions</h4>
+                  {(editTermsText || defaultChangeOrderTerms || "Not set")
+                    .split("\n")
+                    .filter((line) => line.trim())
+                    .map((line, index) => (
+                      <p key={`${line}-${index}`}>{line}</p>
+                    ))}
+                </div>
+
+                <div className={creatorStyles.footer}>
+                  <span>{senderName || "Your Company"}</span>
+                  <span>{senderEmail || "Help email not set"}</span>
+                  <span>
+                    {selectedChangeOrder
+                      ? `CO-${selectedChangeOrder.family_key} v${selectedChangeOrder.revision_number}`
+                      : "Change Order"}
+                  </span>
+                </div>
+              </>
+            ),
+          }}
+        />
+        {selectedChangeOrder && (selectedChangeOrder.status === "approved" || selectedChangeOrder.status === "rejected") ? (
+          <div
+            className={`${stampStyles.decisionStamp} ${
+              selectedChangeOrder.status === "approved" ? stampStyles.decisionStampApproved
+              : stampStyles.decisionStampRejected
+            }`}
+          >
+            <p className={stampStyles.decisionStampLabel}>
+              {selectedChangeOrder.status === "approved" ? "Approved" : "Rejected"}
+            </p>
+          </div>
+        ) : null}
+        </div>
+      ) : null}
+    </>
+  );
+}

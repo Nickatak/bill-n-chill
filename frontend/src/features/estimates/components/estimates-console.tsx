@@ -19,19 +19,15 @@ import { usePolicyContract } from "@/shared/hooks/use-policy-contract";
 import { useStatusFilters } from "@/shared/hooks/use-status-filters";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { canDo } from "@/shared/session/rbac";
-import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
-import stampStyles from "@/shared/styles/decision-stamp.module.css";
 import { usePrintable } from "@/shared/shell/printable-context";
 import styles from "./estimates-console.module.css";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import {
   formatDateInputFromIso,
   formatDateTimeDisplay,
   todayDateInput,
   addDaysToDateInput,
 } from "@/shared/date-format";
-import { formatDecimal } from "@/shared/money-format";
 import {
   ApiResponse,
   CostCode,
@@ -43,8 +39,6 @@ import {
 } from "../types";
 import {
   emptyLine,
-  formatStatusAction,
-  isNotatedStatusEvent,
   mapEstimateLineItemsToInputs,
   normalizeFamilyTitle,
   readEstimateApiError,
@@ -52,8 +46,9 @@ import {
   resolveEstimateValidationDeltaDays,
   validateEstimateLineItems,
 } from "../helpers";
-import { EstimateSheet, OrganizationDocumentDefaults } from "./estimate-sheet";
-import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
+import type { OrganizationDocumentDefaults } from "./estimate-sheet";
+import { EstimatesViewerPanel } from "./estimates-viewer-panel";
+import { EstimatesWorkspacePanel } from "./estimates-workspace-panel";
 import { useLineItems } from "@/shared/hooks/use-line-items";
 import { useMediaQuery } from "@/shared/hooks/use-media-query";
 
@@ -342,10 +337,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     return formatDateTimeDisplay(dateValue, dateValue);
   }
 
-  function formatEstimateLastActionDate(estimate: EstimateRecord): string {
-    return formatEventDate(estimate.updated_at || estimate.created_at);
-  }
-
   function toNumber(value: string): number {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
@@ -485,12 +476,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     });
   }, [estimateFamilies, estimateStatusFilters]);
 
-  function publicEstimateHref(publicRef?: string): string {
-    if (!publicRef) {
-      return "";
-    }
-    return `/estimate/${publicRef}`;
-  }
 
   const loadEstimateIntoForm = useCallback((estimate: EstimateRecord) => {
     const estimateTerms = (estimate.terms_text || "").trim();
@@ -1252,521 +1237,113 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
   return (
     <section className={styles.console}>
-      <section className={styles.lifecycle}>
-        <div className={styles.lifecycleHeader}>
-          <h3>
-            {selectedProject
-              ? `Estimates for: ${selectedProject.name}`
-              : "Estimates"}
-          </h3>
-          {!isMobile ? (
-            <button
-              type="button"
-              className={collapseButtonStyles.collapseButton}
-              onClick={() => setIsViewerExpanded((current) => !current)}
-              aria-expanded={isViewerExpanded}
-            >
-              {isViewerExpanded ? "Collapse" : "Expand"}
-            </button>
-          ) : null}
-        </div>
+      <EstimatesViewerPanel
+        selectedProject={selectedProject}
+        isMobile={isMobile}
+        isViewerExpanded={isViewerExpanded}
+        setIsViewerExpanded={setIsViewerExpanded}
+        viewerStatusOptions={viewerStatusOptions}
+        estimateStatusFilters={estimateStatusFilters}
+        toggleEstimateStatusFilter={toggleEstimateStatusFilter}
+        estimateStatusCounts={estimateStatusCounts}
+        setEstimateStatusFilters={setEstimateStatusFilters}
+        estimateStatusFilterValues={estimateStatusFilterValues}
+        defaultEstimateStatusFilters={defaultEstimateStatusFilters}
+        visibleEstimateFamilies={visibleEstimateFamilies}
+        estimateFamiliesLength={estimateFamilies.length}
+        selectedEstimateId={selectedEstimateId}
+        openFamilyHistory={openFamilyHistory}
+        handleSelectFamilyLatest={handleSelectFamilyLatest}
+        handleSelectEstimate={handleSelectEstimate}
+        handleFamilyCardQuickAction={handleFamilyCardQuickAction}
+        selectedProjectId={selectedProjectId}
+        formatEstimateStatus={formatEstimateStatus}
+        quickActionKindForStatus={quickActionKindForStatus}
+        quickActionTitleForStatus={quickActionTitleForStatus}
+        isTerminalEstimateStatus={isTerminalEstimateStatus}
+        nextStatusOptions={nextStatusOptions}
+        selectedStatus={selectedStatus}
+        setSelectedStatus={setSelectedStatus}
+        statusNote={statusNote}
+        setStatusNote={setStatusNote}
+        actionMessage={actionMessage}
+        actionTone={actionTone}
+        canSubmitStatusUpdate={canSubmitStatusUpdate}
+        canSubmitStatusNote={canSubmitStatusNote}
+        handleUpdateEstimateStatus={handleUpdateEstimateStatus}
+        handleAddEstimateStatusNote={handleAddEstimateStatusNote}
+        statusEvents={statusEvents}
+      />
 
-        {(isMobile || isViewerExpanded) ? (
-          <>
-            <div className={styles.versionFilters}>
-              <span className={styles.versionFiltersLabel}>Estimate status filter</span>
-              <div className={styles.versionFilterButtons}>
-                {viewerStatusOptions.map((option) => {
-                  const active = estimateStatusFilters.includes(option.value);
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={`${styles.statusPill} ${
-                        active ? statusClasses[option.value] : styles.statusPillInactive
-                      } ${active ? styles.statusPillActive : ""}`}
-                      aria-pressed={active}
-                      onClick={() => toggleEstimateStatusFilter(option.value)}
-                    >
-                      <span>{option.label}</span>
-                      <span className={styles.statusPillCount}>{estimateStatusCounts[option.value] ?? 0}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className={styles.versionFilterActions}>
-                <button
-                  type="button"
-                  className={styles.versionFilterActionButton}
-                  onClick={() => setEstimateStatusFilters(estimateStatusFilterValues)}
-                >
-                  Show All Statuses
-                </button>
-                <button
-                  type="button"
-                  className={styles.versionFilterActionButton}
-                  onClick={() => setEstimateStatusFilters(defaultEstimateStatusFilters)}
-                >
-                  Reset Filters
-                </button>
-              </div>
-            </div>
-
-            <div className={styles.versionTree}>
-              {visibleEstimateFamilies.length > 0 ? (
-                visibleEstimateFamilies.map((family) => {
-                  const latest = family.items[family.items.length - 1];
-                  const history = family.items.slice(0, -1).reverse();
-                  const selectedInFamily = family.items.find(
-                    (estimate) => String(estimate.id) === selectedEstimateId,
-                  );
-                  const isFamilyActive = Boolean(selectedInFamily);
-                  const isViewingHistory =
-                    selectedInFamily && String(selectedInFamily.id) !== String(latest.id);
-                  const isLatestSelected = String(latest.id) === selectedEstimateId;
-                  const isHistoryOpen = openFamilyHistory.has(family.title);
-                  const quickActionKind = quickActionKindForStatus(latest.status);
-                  const quickActionTitle = quickActionTitleForStatus(latest.status);
-                  const latestTotal = formatDecimal(toNumber(latest.grand_total || "0"));
-                  return (
-                    <div
-                      key={family.title}
-                      data-family-title={family.title}
-                      className={`${styles.familyGroup} ${
-                        isFamilyActive ? styles.familyGroupActive : ""
-                      }`}
-                    >
-                      <div className={styles.familyRow}>
-                        <div className={styles.familyMainColumn}>
-                          <div
-                            role="button"
-                            tabIndex={0}
-                            className={`${styles.familyMain} ${
-                              isLatestSelected ? styles.familyMainActive : ""
-                            }`}
-                            onClick={() => handleSelectFamilyLatest(family.title, latest)}
-                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleSelectFamilyLatest(family.title, latest); } }}
-                          >
-                            <div className={styles.familyMainContent}>
-                              <span className={styles.familyTitleRow}>
-                                <span className={styles.familyTitle}>{family.title}</span>
-                                <span
-                                  className={`${styles.versionStatus} ${
-                                    statusClasses[latest.status] ?? ""
-                                  }`}
-                                >
-                                  {formatEstimateStatus(latest.status)}
-                                </span>
-                              </span>
-                              <span className={styles.familyMeta}>
-                                ${latestTotal} · Estimate #{latest.id} · {history.length} history{" "}
-                                {history.length === 1 ? "entry" : "entries"}
-                              </span>
-                              <span className={styles.familyDate}>
-                                Last action: {formatEstimateLastActionDate(latest)}
-                              </span>
-                            </div>
-                            {(!isViewingHistory && latest.public_ref) || (quickActionKind === "change_order" && selectedProjectId) ? (
-                              <div className={styles.familyLinkBar}>
-                                {quickActionKind === "change_order" && selectedProjectId ? (
-                                  <Link
-                                    href={`/projects/${selectedProjectId}/change-orders?origin_estimate=${latest.id}`}
-                                    className={styles.familyPublicLink}
-                                    aria-label={`${quickActionTitle} (estimate #${latest.id})`}
-                                    title={quickActionTitle}
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    View Change Orders →
-                                  </Link>
-                                ) : null}
-                                {!isViewingHistory && latest.public_ref ? (
-                                  <Link
-                                    href={publicEstimateHref(latest.public_ref)}
-                                    className={`${styles.familyPublicLink} ${styles.familyLinkBarEnd}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    aria-label={`Open customer view for estimate #${latest.id}`}
-                                    title="Open customer view"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    Customer View →
-                                  </Link>
-                                ) : null}
-                              </div>
-                            ) : null}
-                          </div>
-                          {isViewingHistory || quickActionKind === "revision" ? (
-                            <div className={styles.familyFooter}>
-                              {isViewingHistory ? (
-                                <span className={styles.historyNotice}>
-                                  Viewing v{selectedInFamily?.version}
-                                </span>
-                              ) : null}
-                              {quickActionKind === "revision" ? (
-                                <button
-                                  type="button"
-                                  className={styles.familyActionButton}
-                                  aria-label={`${quickActionTitle} (estimate #${latest.id})`}
-                                  title={quickActionTitle}
-                                  onClick={() => void handleFamilyCardQuickAction(latest)}
-                                >
-                                  New Revision
-                                </button>
-                              ) : null}
-                            </div>
-                          ) : null}
-                        </div>
-                        {isHistoryOpen && history.length > 0 ? (
-                          <div className={styles.historyRow}>
-                            {history.map((estimate) => {
-                                const total = formatDecimal(toNumber(estimate.grand_total || "0"));
-                                const isSelected = String(estimate.id) === selectedEstimateId;
-                                return (
-                                  <div key={estimate.id} className={styles.historyCardColumn}>
-                                    <button
-                                      type="button"
-                                      className={`${styles.historyCard} ${
-                                        isSelected ? styles.historyCardActive : ""
-                                      }`}
-                                      onClick={() => handleSelectEstimate(estimate)}
-                                    >
-                                      <span className={styles.historyMetaRow}>
-                                        <span className={styles.historyVersionMeta}>
-                                          v{estimate.version} <span className={styles.historyMeta}>#{estimate.id}</span>
-                                        </span>
-                                        <span
-                                          className={`${styles.versionStatus} ${
-                                            statusClasses[estimate.status] ?? ""
-                                          } ${styles.historyStatus}`}
-                                        >
-                                          {formatEstimateStatus(estimate.status)}
-                                        </span>
-                                      </span>
-                                      <span className={styles.historyAmount}>${total}</span>
-                                      <span className={styles.historyDate}>
-                                        {formatEstimateLastActionDate(estimate)}
-                                      </span>
-                                    </button>
-                                    {isSelected && estimate.public_ref ? (
-                                      <Link
-                                        href={publicEstimateHref(estimate.public_ref)}
-                                        className={styles.historyPublicLink}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        aria-label={`Open customer view for estimate #${estimate.id}`}
-                                        title="Open customer view"
-                                      >
-                                        Customer View →
-                                      </Link>
-                                    ) : null}
-                                  </div>
-                                );
-                              })}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  );
-                })
-              ) : estimateFamilies.length > 0 ? (
-                <p className={styles.inlineHint}>No estimate families match the selected status filters.</p>
-              ) : (
-                <p className={styles.inlineHint}>No estimates yet. Use the workspace above to create one.</p>
-              )}
-            </div>
-
-            {/* Status & Actions — intentionally not extracted to a shared component.
-                See invoices-console.tsx for rationale. */}
-            {selectedEstimateId ? (
-              <>
-                <div className={styles.lifecycleGrid}>
-                  {!isTerminalEstimateStatus ? (
-                    <div className={styles.statusPicker}>
-                      <span className={styles.lifecycleFieldLabel}>Next status</span>
-                      <div className={styles.statusPills}>
-                        {nextStatusOptions.map((option) => {
-                          const isSelected = selectedStatus === option.value;
-                          return (
-                            <button
-                              key={option.value}
-                              type="button"
-                              className={`${styles.statusPill} ${
-                                isSelected ? statusClasses[option.value] ?? "" : styles.statusPillInactive
-                              } ${isSelected ? styles.statusPillActive : ""}`}
-                              onClick={() => setSelectedStatus(option.value)}
-                              aria-pressed={isSelected}
-                            >
-                              {option.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {selectedStatus === "sent" && !selectedProject?.customer_email?.trim() ? (
-                        <p className={styles.actionError}>WARNING: This customer has no email on file and will not receive an automated email.</p>
-                      ) : null}
-                      {nextStatusOptions.length === 0 ? (
-                        <p className={styles.inlineHint}>No next statuses available for this estimate.</p>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  <label className={styles.lifecycleField}>
-                    Status note
-                    <textarea
-                      className={styles.statusNote}
-                      value={statusNote}
-                      onChange={(event) => setStatusNote(event.target.value)}
-                      placeholder={
-                        isTerminalEstimateStatus
-                          ? "Add note for this terminal estimate status"
-                          : "Optional note for this transition"
-                      }
-                      rows={3}
-                    />
-                  </label>
-                </div>
-                {actionMessage && actionTone === "success" ? (
-                  <p className={styles.actionSuccess}>{actionMessage}</p>
-                ) : null}
-                {actionMessage && actionTone === "error" ? (
-                  <p className={styles.actionError}>{actionMessage}</p>
-                ) : null}
-                <div className={styles.lifecycleActions}>
-                  {canSubmitStatusUpdate ? (
-                    <button
-                      type="button"
-                      className={`${styles.lifecycleActionButton} ${styles.lifecycleActionButtonPrimary}`}
-                      onClick={handleUpdateEstimateStatus}
-                      disabled={!canSubmitStatusUpdate}
-                    >
-                      Update Selected Estimate Status
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className={styles.lifecycleActionButton}
-                    onClick={handleAddEstimateStatusNote}
-                    disabled={!canSubmitStatusNote}
-                  >
-                    Add Estimate Status Note
-                  </button>
-                </div>
-              </>
-            ) : null}
-
-            {selectedEstimateId && statusEvents.length > 0 ? (
-              <div className={styles.statusEvents}>
-                <h4>Status Events</h4>
-                <div className={styles.statusEventsTableWrap}>
-                  <table className={styles.statusEventsTable}>
-                    <thead>
-                      <tr>
-                        <th>Action</th>
-                        <th>Occurred</th>
-                        <th>Note</th>
-                        <th>Who</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {statusEvents.map((event) => {
-                        const toStatusClass = isNotatedStatusEvent(event)
-                          ? styles.statusNotated
-                          : statusClasses[event.to_status] ?? "";
-                        return (
-                          <tr key={event.id}>
-                            <td data-label="Action">
-                              <span className={`${styles.versionStatus} ${toStatusClass}`}>
-                                {formatStatusAction(event)}
-                              </span>
-                            </td>
-                            <td data-label="Occurred">{formatEventDate(event.changed_at)}</td>
-                            <td data-label="Note">{event.note || "—"}</td>
-                            <td data-label="Who">
-                              {event.changed_by_customer_id ? (
-                                <Link
-                                  href={`/customers?customer=${event.changed_by_customer_id}`}
-                                  className={styles.statusEventActorLink}
-                                >
-                                  {event.changed_by_display || `Customer #${event.changed_by_customer_id}`}
-                                </Link>
-                              ) : (
-                                event.changed_by_display || event.changed_by_email || "Unknown user"
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : null}
-          </>
-        ) : (
-          <p className={styles.inlineHint}>Viewer collapsed. Expand to review versions, status transitions, and history.</p>
-        )}
-      </section>
-
-      <section className={styles.composerPrep}>
-        <div className={styles.workspaceToolbar}>
-          <div className={styles.workspaceContext}>
-            <span className={styles.workspaceContextLabel}>{workspaceContextLabel}</span>
-            <div className={styles.workspaceContextValueRow}>
-              <strong>{workspaceContext}</strong>
-              <span className={`${styles.versionStatus} ${workspaceBadgeClass}`}>
-                {workspaceBadgeLabel}
-              </span>
-            </div>
-            <p className={styles.workspaceToolbarHint}>
-              Create New Estimate opens a fresh draft workspace. Duplicate creates a new draft from the selected estimate.
-            </p>
-          </div>
-          <div className={`${styles.lifecycleActions} ${styles.composerPrepActions} ${styles.workspaceToolbarActions}`}>
-            <button type="button" className={styles.toolbarPrimaryButton} onClick={startNewEstimate}>
-              {selectedEstimate ? "Create New Estimate" : "Reset"}
-            </button>
-            {selectedEstimate ? (
-              <button
-                type="button"
-                className={styles.toolbarSecondaryButton}
-                onClick={() => {
-                  setDuplicateTitle(`${selectedEstimate.title || "Estimate"} Copy`);
-                  duplicateDialogRef.current?.showModal();
-                }}
-              >
-                Duplicate as New Estimate
-              </button>
-            ) : null}
-          </div>
-        </div>
-        {actionMessage && actionTone === "success" && /^Duplicated\b/i.test(actionMessage) ? (
-          <p className={creatorStyles.actionSuccess}>{actionMessage}</p>
-        ) : null}
-        {actionMessage && actionTone !== "success" ? <p className={`${styles.actionError} ${styles.composerPrepMessage}`}>{actionMessage}</p> : null}
-        <dialog ref={duplicateDialogRef} className={styles.duplicateDialog}>
-          <p className={styles.inlineHint}>
-            Duplicating in project{" "}
-            {selectedProject
-              ? `#${selectedProject.id} - ${selectedProject.name} (${selectedProject.customer_display_name})`
-              : "current selection"}.
-          </p>
-          <label className={styles.lifecycleField}>
-            New estimate title
-            <input
-              value={duplicateTitle}
-              onChange={(event) => setDuplicateTitle(event.target.value)}
-              placeholder="Estimate title"
-            />
-          </label>
-          <div className={styles.lifecycleActions}>
-            <button type="button" className={creatorStyles.primaryButton} onClick={handleDuplicateEstimate}>
-              Confirm Duplicate
-            </button>
-            <button type="button" className={creatorStyles.secondaryButton} onClick={() => duplicateDialogRef.current?.close()}>
-              Cancel
-            </button>
-          </div>
-        </dialog>
-        {familyCollisionPrompt ? (
-          <div className={`${styles.duplicatePanel} ${styles.composerPrepPanel}`}>
-            <p className={styles.inlineHint}>
-              A family titled <strong>{familyCollisionPrompt.title}</strong> already exists
-              {familyCollisionPrompt.latestVersion
-                ? ` (latest v${familyCollisionPrompt.latestVersion})`
-                : ""}
-              . Creating now will add a new version to that family.
-            </p>
-            <div className={styles.lifecycleActions}>
-              <button
-                type="button"
-                onClick={() => {
-                  const projectId = Number(selectedProjectId);
-                  const trimmedTitle = estimateTitle.trim();
-                  if (!projectId) {
-                    setFormErrorMessage("Select a project first.");
-                    return;
-                  }
-                  if (!trimmedTitle) {
-                    setFormErrorMessage("Estimate title is required.");
-                    return;
-                  }
-                  setConfirmedFamilyTitleKey(normalizeFamilyTitle(trimmedTitle));
-                  setFamilyCollisionPrompt(null);
-                  void submitNewEstimateWithTitle({
-                    projectId,
-                    title: trimmedTitle,
-                    allowExistingTitleFamily: true,
-                  });
-                }}
-              >
-                Create Revision In Existing Family
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirmedFamilyTitleKey("");
-                  setFamilyCollisionPrompt(null);
-                }}
-              >
-                Use Different Title
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </section>
-
-      {!canMutateEstimates ? (
-        <p className={styles.inlineHint}>Role `{role}` can view estimates but cannot create or update.</p>
-      ) : null}
-
-      <div ref={estimateComposerRef}>
-        <EstimateSheet
-          project={selectedProject}
-          organizationDefaults={organizationDefaults}
-          estimateId={selectedEstimateId}
-          estimateTitle={estimateTitle}
-          estimateDate={estimateDate}
-          validThrough={validThrough}
-          termsText={termsText}
-          taxPercent={taxPercent}
-          lineItems={lineItems}
-          lineTotals={lineTotals}
-          subtotal={subtotal}
-          taxAmount={taxAmount}
-          totalAmount={totalAmount}
-          costCodes={costCodes}
-          canSubmit={canCreateEstimate}
-          isSubmitting={isSubmitting}
-          isEditingDraft={isEditingDraft}
-          readOnly={isReadOnly}
-          formErrorMessage={formErrorMessage}
-          formSuccessMessage={formSuccessMessage}
-          lineValidation={lineValidation}
-          lineSortKey={lineSortKey}
-          lineSortDirection={lineSortDirection}
-          onTitleChange={handleEstimateTitleChange}
-          onValidThroughChange={setValidThrough}
-          onTaxPercentChange={setTaxPercent}
-          onLineItemChange={updateLineItem}
-          onAddLineItem={addLineItem}
-          onMoveLineItem={moveLineItem}
-          onDuplicateLineItem={duplicateLineItem}
-          onRemoveLineItem={removeLineItem}
-          onSortLineItems={handleSortLineItems}
-          onSubmit={handleCreateEstimate}
-        />
-        {selectedEstimate && (selectedEstimate.status === "approved" || selectedEstimate.status === "rejected") ? (
-          <div
-            className={`${stampStyles.decisionStamp} ${
-              selectedEstimate.status === "approved" ? stampStyles.decisionStampApproved
-              : stampStyles.decisionStampRejected
-            }`}
-          >
-            <p className={stampStyles.decisionStampLabel}>
-              {selectedEstimate.status === "approved" ? "Approved" : "Rejected"}
-            </p>
-          </div>
-        ) : null}
-      </div>
+      <EstimatesWorkspacePanel
+        workspaceContextLabel={workspaceContextLabel}
+        workspaceContext={workspaceContext}
+        workspaceBadgeClass={workspaceBadgeClass}
+        workspaceBadgeLabel={workspaceBadgeLabel}
+        selectedEstimate={selectedEstimate}
+        onStartNew={startNewEstimate}
+        onOpenDuplicate={() => {
+          setDuplicateTitle(`${selectedEstimate?.title || "Estimate"} Copy`);
+          duplicateDialogRef.current?.showModal();
+        }}
+        actionMessage={actionMessage}
+        actionTone={actionTone}
+        duplicateDialogRef={duplicateDialogRef}
+        duplicateTitle={duplicateTitle}
+        onDuplicateTitleChange={setDuplicateTitle}
+        onConfirmDuplicate={handleDuplicateEstimate}
+        selectedProject={selectedProject}
+        familyCollisionPrompt={familyCollisionPrompt}
+        estimateTitle={estimateTitle}
+        selectedProjectId={selectedProjectId}
+        onConfirmCollision={(projectId, title) => {
+          setConfirmedFamilyTitleKey(normalizeFamilyTitle(title));
+          setFamilyCollisionPrompt(null);
+          void submitNewEstimateWithTitle({
+            projectId,
+            title,
+            allowExistingTitleFamily: true,
+          });
+        }}
+        onDismissCollision={() => {
+          setConfirmedFamilyTitleKey("");
+          setFamilyCollisionPrompt(null);
+        }}
+        canMutateEstimates={canMutateEstimates}
+        role={role}
+        estimateComposerRef={estimateComposerRef}
+        organizationDefaults={organizationDefaults}
+        estimateId={selectedEstimateId}
+        estimateDate={estimateDate}
+        validThrough={validThrough}
+        termsText={termsText}
+        taxPercent={taxPercent}
+        lineItems={lineItems}
+        lineTotals={lineTotals}
+        subtotal={subtotal}
+        taxAmount={taxAmount}
+        totalAmount={totalAmount}
+        costCodes={costCodes}
+        canSubmit={canCreateEstimate}
+        isSubmitting={isSubmitting}
+        isEditingDraft={isEditingDraft}
+        readOnly={isReadOnly}
+        formErrorMessage={formErrorMessage}
+        formSuccessMessage={formSuccessMessage}
+        lineValidation={lineValidation}
+        lineSortKey={lineSortKey}
+        lineSortDirection={lineSortDirection}
+        onTitleChange={handleEstimateTitleChange}
+        onValidThroughChange={setValidThrough}
+        onTaxPercentChange={setTaxPercent}
+        onLineItemChange={updateLineItem}
+        onAddLineItem={addLineItem}
+        onMoveLineItem={moveLineItem}
+        onDuplicateLineItem={duplicateLineItem}
+        onRemoveLineItem={removeLineItem}
+        onSortLineItems={handleSortLineItems}
+        onSubmit={handleCreateEstimate}
+      />
     </section>
   );
 }

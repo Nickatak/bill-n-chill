@@ -10,17 +10,13 @@
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
-import Link from "next/link";
-import { formatDateDisplay, formatDateTimeDisplay, todayDateInput, futureDateInput } from "@/shared/date-format";
-import { parseAmount, formatDecimal } from "@/shared/money-format";
+import { todayDateInput, futureDateInput } from "@/shared/date-format";
+import { parseAmount } from "@/shared/money-format";
 import {
   dueDateFromIssueDate,
   emptyLine,
-  invoiceNextActionHint,
-  invoiceStatusEventActionLabel,
   invoiceStatusLabel,
   nextInvoiceNumberPreview,
-  publicInvoiceHref,
   readInvoiceApiError,
   validateInvoiceLineItems,
 } from "../helpers";
@@ -41,7 +37,6 @@ import {
   OrganizationInvoiceDefaults,
   ProjectRecord,
 } from "../types";
-import { DocumentCreator } from "@/shared/document-creator";
 import {
   resolveOrganizationBranding,
 } from "@/shared/document-creator";
@@ -54,18 +49,12 @@ import { useMediaQuery } from "@/shared/hooks/use-media-query";
 import { useLineItems } from "@/shared/hooks/use-line-items";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import { useClientPagination } from "@/shared/hooks/use-client-pagination";
-import { PaginationControls } from "@/shared/components/pagination-controls";
 import { usePolicyContract } from "@/shared/hooks/use-policy-contract";
 import { usePrintable } from "@/shared/shell/printable-context";
 import styles from "./invoices-console.module.css";
-import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
-import { MobileLineItemCard } from "@/shared/document-creator/mobile-line-card";
-import mobileCardStyles from "@/shared/document-creator/mobile-line-card.module.css";
-import invoiceCreatorStyles from "@/shared/document-creator/invoice-creator.module.css";
-import stampStyles from "@/shared/styles/decision-stamp.module.css";
-import { ReadOnlyLineTable, readOnlyLineTableStyles as roTableStyles } from "@/shared/document-viewer/read-only-line-table";
-import { CostCodeCombobox } from "@/features/estimates/components/cost-code-combobox";
 import type { CostCode } from "../types";
+import { InvoicesViewerPanel } from "./invoices-viewer-panel";
+import { InvoicesWorkspacePanel } from "./invoices-workspace-panel";
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -133,79 +122,17 @@ const INVOICE_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
 const INVOICE_DEFAULT_STATUS_FILTERS_FALLBACK = ["draft", "sent", "partially_paid"];
 const INVOICE_TERMINAL_STATUSES_FALLBACK = ["paid", "partially_paid", "void"];
 const INVOICE_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
-// ---------------------------------------------------------------------------
-// Display helpers
-// ---------------------------------------------------------------------------
+// Most display helpers moved to invoices-viewer-panel.tsx. Only invoiceStatusClass
+// is retained here because workspaceBadgeClass depends on it.
 
 /** Map an invoice status to its CSS module class for badge coloring. */
 function invoiceStatusClass(status: string): string {
-  if (status === "draft") {
-    return styles.statusDraft;
-  }
-  if (status === "sent") {
-    return styles.statusSent;
-  }
-  if (status === "partially_paid") {
-    return styles.statusPartial;
-  }
-  if (status === "paid") {
-    return styles.statusPaid;
-  }
-  if (status === "void") {
-    return styles.statusVoid;
-  }
+  if (status === "draft") return styles.statusDraft;
+  if (status === "sent") return styles.statusSent;
+  if (status === "partially_paid") return styles.statusPartial;
+  if (status === "paid") return styles.statusPaid;
+  if (status === "void") return styles.statusVoid;
   return "";
-}
-
-/** Map an invoice status to its tone class for inline status accents. */
-function invoiceStatusToneClass(status: string): string {
-  if (status === "draft") {
-    return styles.statusToneDraft;
-  }
-  if (status === "sent") {
-    return styles.statusToneSent;
-  }
-  if (status === "partially_paid") {
-    return styles.statusTonePartial;
-  }
-  if (status === "paid") {
-    return styles.statusTonePaid;
-  }
-  if (status === "void") {
-    return styles.statusToneVoid;
-  }
-  return "";
-}
-
-/** Map an invoice status to its card-level CSS class for list card border/accent. */
-function invoiceCardStatusClass(status: string): string {
-  if (status === "draft") {
-    return styles.invoiceCardStatusDraft;
-  }
-  if (status === "sent") {
-    return styles.invoiceCardStatusSent;
-  }
-  if (status === "partially_paid") {
-    return styles.invoiceCardStatusPartial;
-  }
-  if (status === "paid") {
-    return styles.invoiceCardStatusPaid;
-  }
-  if (status === "void") {
-    return styles.invoiceCardStatusVoid;
-  }
-  return "";
-}
-
-/** Map a status event to its visual tone class for the history timeline. */
-function invoiceStatusEventToneClass(event: InvoiceStatusEventRecord): string {
-  if (event.action_type === "resend" || (event.from_status === "sent" && event.to_status === "sent")) {
-    return styles.statusToneSent;
-  }
-  if (event.action_type === "notate" || (event.from_status === event.to_status && (event.note || "").trim())) {
-    return styles.statusToneNotate;
-  }
-  return invoiceStatusToneClass(event.to_status);
 }
 
 // ---------------------------------------------------------------------------
@@ -1031,166 +958,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     }, 500);
   }
 
-  function renderDuplicateButton(lineKey: string, fields: Omit<InvoiceLineInput, "localId">) {
-    return (
-      <button
-        type="button"
-        className={`${styles.contractDuplicateButton}${flashingButtons.has(lineKey) ? ` ${styles.duplicateFlash}` : ""}`}
-        title="Add to invoice"
-        onClick={() => duplicateContractLineToInvoice(lineKey, fields)}
-      >
-        +
-      </button>
-    );
-  }
-
-  /* Contract Breakdown — intentionally not extracted to a shared component.
-     Invoice version has per-row duplicate buttons and markup display;
-     CO version is read-only with different cost code labels. Extracting
-     would create a prop-heavy wrapper with render callbacks. */
-  function renderContractBreakdown(opts?: { style?: React.CSSProperties }) {
-    if (!contractBreakdown?.active_estimate) return null;
-    const estimate = contractBreakdown.active_estimate;
-    const approvedCOs = contractBreakdown.approved_change_orders;
-    const hasEstimateLines = estimate.line_items.length > 0;
-    const hasApprovedCOs = approvedCOs.length > 0;
-    if (!hasEstimateLines && !hasApprovedCOs) return null;
-    const canDuplicate = !workspaceIsLocked;
-
-    const estimateColumns = ["Cost code", "Description", "Qty", "Unit", "Unit cost", "Markup %", "Line total"];
-    const estimateMobileLayout: { order: number; span: "full" | "half"; align?: "left" | "right"; hidden?: boolean }[] = [
-      { order: 0, span: "full" },
-      { order: 1, span: "full" },
-      { order: 2, span: "half", hidden: true },
-      { order: 3, span: "half", hidden: true },
-      { order: 4, span: "half", hidden: true },
-      { order: 5, span: "full" },
-      { order: 7, span: "full", align: "right" },
-    ];
-    const coColumns = ["CO #", "Cost code", "Description", "Days delta", "Amount delta"];
-    const coMobileLayout: { order: number; span: "full" | "half"; align?: "left" | "right"; hidden?: boolean }[] = [
-      { order: 0, span: "full" },
-      { order: 1, span: "half" },
-      { order: 2, span: "full" },
-      { order: 3, span: "full", align: "right" },
-      { order: 5, span: "full", align: "right" },
-    ];
-
-    if (canDuplicate) {
-      estimateColumns.push("");
-      estimateMobileLayout[6] = { order: 7, span: "half", align: "right" };
-      estimateMobileLayout.push({ order: 6, span: "half" });
-      coColumns.push("");
-      coMobileLayout[4] = { order: 5, span: "half", align: "right" };
-      coMobileLayout.push({ order: 4, span: "half" });
-    }
-
-    return (
-      <div className={styles.contractBreakdown} style={opts?.style}>
-        <button
-          type="button"
-          className={styles.contractBreakdownToggle}
-          onClick={() => setIsContractBreakdownOpen((v) => !v)}
-          aria-expanded={isContractBreakdownOpen}
-        >
-          <h4>Contract Breakdown</h4>
-          <span className={styles.contractBreakdownArrow}>▼</span>
-        </button>
-
-        {isContractBreakdownOpen && hasEstimateLines ? (
-          <ReadOnlyLineTable
-            caption={`Approved Estimate: ${estimate.title} v${estimate.version}`}
-            columns={estimateColumns}
-            rows={estimate.line_items.map((line) => {
-              const qty = parseAmount(line.quantity);
-              const markedUpUnitPrice = qty !== 0
-                ? formatDecimal(parseAmount(line.line_total) / qty)
-                : line.unit_cost;
-              const unit = line.unit || "ea";
-              const costCodeLabel = line.cost_code_code || "—";
-              const cells: React.ReactNode[] = [
-                costCodeLabel,
-                line.description || "—",
-                Number(line.quantity).toFixed(2),
-                unit,
-                `$${Number(line.unit_cost).toFixed(2)}`,
-                `${line.markup_percent}%`,
-                <>
-                  <span className={roTableStyles.mobileBreakdown}>
-                    {Number(line.quantity).toFixed(2)} {unit} × ${Number(line.unit_cost).toFixed(2)}
-                    {parseAmount(line.markup_percent) !== 0 ? ` + ${line.markup_percent}%` : ""}
-                  </span>
-                  <span>${line.line_total}</span>
-                </>,
-              ];
-              if (canDuplicate) {
-                cells.push(
-                  renderDuplicateButton(`est-${line.id}`, {
-                    costCode: line.cost_code ? String(line.cost_code) : "",
-                    description: line.description,
-                    quantity: line.quantity,
-                    unit: line.unit,
-                    unitPrice: markedUpUnitPrice,
-                  }),
-                );
-              }
-              return { key: line.id, cells };
-            })}
-            mobileColumnLayout={estimateMobileLayout}
-            afterTable={
-              <div className={styles.invoiceViewerMetaRow}>
-                <span className={styles.invoiceViewerMetaLabel}>Estimate grand total</span>
-                <strong>${estimate.grand_total}</strong>
-              </div>
-            }
-          />
-        ) : null}
-
-        {isContractBreakdownOpen && hasApprovedCOs ? (
-          <ReadOnlyLineTable
-            caption={`Approved Change Orders (${approvedCOs.length})`}
-            columns={coColumns}
-            rows={approvedCOs.flatMap((co) =>
-              co.line_items.map((line) => {
-                const costCodeLabel = line.cost_code_code || "—";
-                const cells: React.ReactNode[] = [
-                  co.title,
-                  costCodeLabel,
-                  line.description || "—",
-                  `${line.days_delta} days`,
-                  `$${line.amount_delta}`,
-                ];
-                if (canDuplicate) {
-                  cells.push(
-                    renderDuplicateButton(`co-${co.id}-${line.id}`, {
-                      costCode: String(costCodes.find((c) => c.code === line.cost_code_code)?.id ?? ""),
-                      description: line.description,
-                      quantity: "1",
-                      unit: "",
-                      unitPrice: formatDecimal(parseAmount(line.amount_delta)),
-                    }),
-                  );
-                }
-                return { key: `${co.id}-${line.id}`, cells };
-              }),
-            )}
-            mobileColumnLayout={coMobileLayout}
-            afterTable={
-              <div className={styles.invoiceViewerMetaRow}>
-                <span className={styles.invoiceViewerMetaLabel}>Net contract total</span>
-                <strong>
-                  ${formatDecimal(
-                    parseAmount(estimate.grand_total) +
-                      approvedCOs.reduce((sum, co) => sum + parseAmount(co.amount_delta), 0),
-                  )}
-                </strong>
-              </div>
-            }
-          />
-        ) : null}
-      </div>
-    );
-  }
+  // renderDuplicateButton and renderContractBreakdown moved to invoices-viewer-panel.tsx.
 
   // -------------------------------------------------------------------------
   // Render
@@ -1220,730 +988,90 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
             <p className={styles.readOnlyNotice}>Role `{role}` can view invoices but cannot create, update, or send.</p>
           ) : null}
 
-          <section className={`${styles.panel} ${styles.viewerPanel}`}>
-              <div className={styles.panelHeader}>
-                <h3>{selectedProject ? `Invoices for: ${selectedProject.name}` : "Invoices"}</h3>
-              </div>
+          <InvoicesViewerPanel
+            selectedProject={selectedProject}
+            invoiceSearch={invoiceSearch}
+            onInvoiceSearchChange={setInvoiceSearch}
+            invoiceStatuses={invoiceStatuses}
+            invoiceStatusFilters={invoiceStatusFilters}
+            toggleInvoiceStatusFilter={toggleInvoiceStatusFilter}
+            invoiceStatusTotals={invoiceStatusTotals}
+            statusLabel={statusLabel}
+            paginatedInvoices={paginatedInvoices}
+            invoices={invoices}
+            invoiceNeedle={invoiceNeedle}
+            selectedInvoiceId={selectedInvoiceId}
+            onSelectInvoice={handleSelectInvoice}
+            invoicePage={invoicePage}
+            invoiceTotalPages={invoiceTotalPages}
+            invoiceTotalCount={invoiceTotalCount}
+            setInvoicePage={setInvoicePage}
+            selectedInvoice={selectedInvoice}
+            canMutateInvoices={canMutateInvoices}
+            nextStatusOptions={nextStatusOptions}
+            selectedStatus={selectedStatus}
+            setSelectedStatus={setSelectedStatus}
+            statusNote={statusNote}
+            setStatusNote={setStatusNote}
+            viewerActionMessage={viewerActionMessage}
+            viewerActionTone={viewerActionTone}
+            onUpdateStatus={handleUpdateInvoiceStatus}
+            onAddStatusNote={handleAddInvoiceStatusNote}
+            selectedInvoiceStatusEvents={selectedInvoiceStatusEvents}
+            statusEventsLoading={statusEventsLoading}
+            showAllEvents={showAllEvents}
+            setShowAllEvents={setShowAllEvents}
+            contractBreakdown={contractBreakdown}
+            isContractBreakdownOpen={isContractBreakdownOpen}
+            setIsContractBreakdownOpen={setIsContractBreakdownOpen}
+            workspaceIsLocked={workspaceIsLocked}
+            costCodes={costCodes}
+            flashingButtons={flashingButtons}
+            onDuplicateContractLine={duplicateContractLineToInvoice}
+          />
 
-              <input
-                className={styles.invoiceSearchInput}
-                type="text"
-                placeholder="Search invoices..."
-                value={invoiceSearch}
-                onChange={(e) => setInvoiceSearch(e.target.value)}
-              />
-
-              <div className={styles.statusFilters}>
-                {invoiceStatuses.map((status) => {
-                  const active = invoiceStatusFilters.includes(status);
-                  return (
-                    <button
-                      key={status}
-                      type="button"
-                      className={`${styles.statusFilterPill} ${
-                        active
-                          ? `${styles.statusFilterPillActive} ${invoiceStatusToneClass(status)}`
-                          : styles.statusFilterPillInactive
-                      }`}
-                      onClick={() => toggleInvoiceStatusFilter(status)}
-                    >
-                      <span>{statusLabel(status)}</span>
-                      <span className={styles.statusFilterCount}>{invoiceStatusTotals.get(status) ?? 0}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className={styles.invoiceRail}>
-                {paginatedInvoices.length ? (
-                  paginatedInvoices.map((invoice) => {
-                    const isSelected = String(invoice.id) === selectedInvoiceId;
-                    return (
-                      <article
-                        key={invoice.id}
-                        className={`${styles.invoiceCard} ${invoiceCardStatusClass(invoice.status)} ${
-                          isSelected ? styles.invoiceCardSelected : ""
-                        }`}
-                        onClick={() => handleSelectInvoice(invoice)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            handleSelectInvoice(invoice);
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        aria-pressed={isSelected}
-                      >
-                        <div className={styles.invoiceCardRow}>
-                          <div className={styles.invoiceCardIdentity}>
-                            <strong>{invoice.invoice_number}</strong>
-                            <span className={`${styles.statusBadge} ${invoiceStatusClass(invoice.status)}`}>
-                              {statusLabel(invoice.status)}
-                            </span>
-                          </div>
-                        </div>
-                        <div className={styles.invoiceMetaGrid}>
-                          <span><span className={styles.invoiceMetaLabel}>Total</span> ${invoice.total}</span>
-                          <span><span className={styles.invoiceMetaLabel}>Due</span> ${invoice.balance_due}</span>
-                          <span><span className={styles.invoiceMetaLabel}>Issued</span> {formatDateDisplay(invoice.issue_date)}</span>
-                          <span><span className={styles.invoiceMetaLabel}>Due</span> {formatDateDisplay(invoice.due_date)}</span>
-                        </div>
-                        {invoice.public_ref ? (
-                          <div className={styles.invoiceLinkBar}>
-                            <a
-                              href={publicInvoiceHref(invoice.public_ref)}
-                              className={styles.invoiceLinkBarLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(event) => event.stopPropagation()}
-                              onKeyDown={(event) => event.stopPropagation()}
-                            >
-                              Customer View →
-                            </a>
-                          </div>
-                        ) : null}
-
-                        {isSelected && selectedInvoice ? (
-                          <div className={styles.invoiceExpandedSections}>
-                            {/* Status & Actions — intentionally not extracted to a shared component.
-                               The pill/note/button pattern is similar across EST/CO/INV but each
-                               console owns its own state, labels, tone classes, and layout variants
-                               (e.g. CO wraps in a collapsible). Extracting would just create a
-                               ~12-prop wrapper that moves no complexity. CSS consolidation is the
-                               real win here, not component extraction. */}
-                            <div className={styles.invoiceViewerSection}>
-                              <h4 className={styles.invoiceViewerSectionHeading}>Status &amp; Actions</h4>
-                                <div className={styles.invoiceViewerSectionContent}>
-                                  <p className={styles.inlineHint}>{invoiceNextActionHint(selectedInvoice.status)}</p>
-                                  {canMutateInvoices ? (
-                                    <>
-                                      {nextStatusOptions.length > 0 ? (
-                                        <>
-                                          <span className={styles.lifecycleFieldLabel}>Next status</span>
-                                          <div className={styles.invoiceQuickStatusPills}>
-                                            {nextStatusOptions.map((status) => {
-                                              const isActive = selectedStatus === status;
-                                              return (
-                                                <button
-                                                  key={status}
-                                                  type="button"
-                                                  className={`${styles.invoiceQuickStatusButton} ${
-                                                    isActive
-                                                      ? `${styles.invoiceQuickStatusButtonActive} ${invoiceStatusToneClass(status)}`
-                                                      : styles.invoiceQuickStatusButtonInactive
-                                                  }`}
-                                                  onClick={(e) => { e.stopPropagation(); setSelectedStatus(status); }}
-                                                  aria-pressed={isActive}
-                                                >
-                                                  {selectedInvoice.status === "sent" && status === "sent"
-                                                    ? "Re-send"
-                                                    : statusLabel(status)}
-                                                </button>
-                                              );
-                                            })}
-                                          </div>
-                                          {selectedStatus === "sent" && !selectedProject?.customer_email?.trim() ? (
-                                            <p className={styles.invoiceViewerActionError}>WARNING: This customer has no email on file and will not receive an automated email.</p>
-                                          ) : null}
-                                        </>
-                                      ) : (
-                                        <p className={styles.inlineHint}>No next statuses available.</p>
-                                      )}
-                                      <label className={styles.invoiceViewerField} onClick={(e) => e.stopPropagation()}>
-                                        Status note
-                                        <textarea
-                                          value={statusNote}
-                                          onChange={(e) => setStatusNote(e.target.value)}
-                                          placeholder="Optional note for this status action or history-only note."
-                                          rows={2}
-                                        />
-                                      </label>
-                                      {viewerActionMessage ? (
-                                        <p
-                                          className={viewerActionTone === "error" ? styles.invoiceViewerActionError : styles.invoiceViewerActionSuccess}
-                                          role="status"
-                                          onClick={(e) => e.stopPropagation()}
-                                        >
-                                          {viewerActionMessage}
-                                        </p>
-                                      ) : null}
-                                      <div className={styles.invoiceViewerActionRow}>
-                                        {nextStatusOptions.length > 0 ? (
-                                          <button
-                                            type="button"
-                                            className={`${styles.invoiceViewerActionButton} ${styles.invoiceViewerActionButtonPrimary}`}
-                                            onClick={(e) => { e.stopPropagation(); handleUpdateInvoiceStatus(); }}
-                                            disabled={!selectedStatus}
-                                          >
-                                            Update Status
-                                          </button>
-                                        ) : null}
-                                        <button
-                                          type="button"
-                                          className={`${styles.invoiceViewerActionButton} ${styles.invoiceViewerActionButtonSecondary}`}
-                                          onClick={(e) => { e.stopPropagation(); handleAddInvoiceStatusNote(); }}
-                                          disabled={!statusNote.trim()}
-                                        >
-                                          Add Status Note
-                                        </button>
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <p className={styles.inlineHint}>Status actions are read-only for your role.</p>
-                                  )}
-                                </div>
-                            </div>
-
-                            {/* History — intentionally not extracted to a shared component.
-                               Different event shapes, actor rendering, and action label functions
-                               across CO and invoice consoles. See change-orders-console.tsx. */}
-                            <div className={styles.invoiceViewerSection}>
-                              <h4 className={styles.invoiceViewerSectionHeading}>History ({selectedInvoiceStatusEvents.length})</h4>
-                                <div className={styles.invoiceViewerSectionContent}>
-                                  {selectedInvoiceStatusEvents.length > 0 ? (
-                                    <>
-                                      <ul className={styles.invoiceViewerEventList}>
-                                        {(showAllEvents
-                                          ? selectedInvoiceStatusEvents
-                                          : selectedInvoiceStatusEvents.slice(0, 4)
-                                        ).map((event) => (
-                                          <li key={event.id} className={styles.invoiceViewerEventItem}>
-                                            <span className={`${styles.invoiceViewerEventAction} ${invoiceStatusEventToneClass(event)}`}>
-                                              {invoiceStatusEventActionLabel(event, statusLabel)}
-                                            </span>
-                                            <span className={styles.invoiceViewerEventMeta}>
-                                              {formatDateTimeDisplay(event.changed_at, "--")} by{" "}
-                                              {event.changed_by_customer_id ? (
-                                                <Link
-                                                  href={`/customers?customer=${event.changed_by_customer_id}`}
-                                                  className={styles.statusActorLink}
-                                                  onClick={(e) => e.stopPropagation()}
-                                                >
-                                                  {event.changed_by_display || `Customer #${event.changed_by_customer_id}`}
-                                                </Link>
-                                              ) : (
-                                                event.changed_by_display || event.changed_by_email || `User #${event.changed_by}`
-                                              )}
-                                            </span>
-                                            {event.note ? (
-                                              <span className={styles.invoiceViewerEventNote}>{event.note}</span>
-                                            ) : null}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                      {selectedInvoiceStatusEvents.length > 4 ? (
-                                        <button
-                                          type="button"
-                                          className={styles.invoiceShowAllToggle}
-                                          onClick={(e) => { e.stopPropagation(); setShowAllEvents((v) => !v); }}
-                                        >
-                                          {showAllEvents
-                                            ? "Show less"
-                                            : `Show all ${selectedInvoiceStatusEvents.length} events`}
-                                        </button>
-                                      ) : null}
-                                    </>
-                                  ) : (
-                                    <p className={styles.inlineHint}>
-                                      {statusEventsLoading ? "Loading status history..." : "No status history yet."}
-                                    </p>
-                                  )}
-                                </div>
-                            </div>
-
-                            {/* Line Items */}
-                            <div className={styles.invoiceViewerSection}>
-                              <h4 className={styles.invoiceViewerSectionHeading}>Line Items ({invoice.line_items?.length ?? 0})</h4>
-                                <div className={styles.invoiceViewerSectionContent}>
-                                  <ReadOnlyLineTable
-                                    columns={["Description", "Qty", "Unit", "Unit Price", "Line Total"]}
-                                    rows={(invoice.line_items ?? []).map((line) => ({
-                                      key: line.id,
-                                      cells: [
-                                        line.description || "—",
-                                        line.quantity,
-                                        line.unit,
-                                        `$${line.unit_price}`,
-                                        `$${line.line_total}`,
-                                      ],
-                                    }))}
-                                    emptyMessage="No line items."
-                                    mobileColumnLayout={[
-                                      { order: 0, span: "full" },
-                                      { order: 1, span: "half" },
-                                      { order: 2, span: "half" },
-                                      { order: 3, span: "half" },
-                                      { order: 4, span: "half", align: "right" },
-                                    ]}
-                                  />
-                                </div>
-                            </div>
-                          </div>
-                        ) : null}
-                      </article>
-                    );
-                  })
-                ) : (
-                  <p className={styles.emptyState}>
-                    {invoices.length
-                      ? invoiceNeedle
-                        ? "No invoices match your search."
-                        : "No invoices match the selected status filters."
-                      : "No invoices yet for this project."}
-                  </p>
-                )}
-              </div>
-              <PaginationControls page={invoicePage} totalPages={invoiceTotalPages} totalCount={invoiceTotalCount} onPageChange={setInvoicePage} />
-            </section>
-
-          <div className={styles.workspace}>
-              {canMutateInvoices ? (
-                <div className={styles.workspaceToolbar}>
-                  <div className={styles.workspaceContext}>
-                    <span className={styles.workspaceContextLabel}>
-                      {!workspaceSourceInvoice ? "Creating" : workspaceIsLocked ? "Viewing" : "Editing"}
-                    </span>
-                    <div className={styles.workspaceContextValueRow}>
-                      <strong>{workspaceContext}</strong>
-                      <span className={`${styles.statusBadge} ${workspaceBadgeClass}`}>{workspaceBadgeLabel}</span>
-                    </div>
-                  </div>
-                  <div className={styles.workspaceToolbarActions}>
-                    <button
-                      type="button"
-                      className={styles.toolbarPrimaryButton}
-                      onClick={handleStartNewInvoiceDraft}
-                    >
-                      {workspaceSourceInvoice ? "Create New Invoice" : "Reset"}
-                    </button>
-                    {workspaceSourceInvoice ? (
-                      <button
-                        type="button"
-                        className={styles.toolbarSecondaryButton}
-                        onClick={handleDuplicateInvoiceIntoDraft}
-                      >
-                        Duplicate as New Invoice
-                      </button>
-                    ) : null}
-                  </div>
-                  {statusMessageAtToolbar ? (
-                    <p className={creatorStyles.actionSuccess}>{statusMessage}</p>
-                  ) : null}
-                </div>
-              ) : null}
-              <div ref={invoiceCreatorRef}>
-                <DocumentCreator
-                  adapter={invoiceCreatorAdapter}
-                  document={null}
-                  formState={invoiceDraftFormState}
-                  className={`${creatorStyles.sheet} ${invoiceCreatorStyles.invoiceCreatorSheet} ${workspaceIsLocked ? `${invoiceCreatorStyles.invoiceCreatorSheetLocked} ${creatorStyles.sheetReadOnly}` : ""}`}
-                  sectionClassName={invoiceCreatorStyles.invoiceCreatorSection}
-                  onSubmit={handleCreateInvoice}
-                  sections={[{ slot: "context" }]}
-                  renderers={{
-                    context: () => (
-                      <>
-                      <div className={creatorStyles.sheetHeader}>
-                        <div className={invoiceCreatorStyles.invoicePartyStack}>
-                          <div className={creatorStyles.fromBlock}>
-                            <span className={creatorStyles.blockLabel}>From</span>
-                            <p className={creatorStyles.blockText}>
-                              {senderDisplayName}
-                            </p>
-                            {senderAddressLines.length
-                              ? senderAddressLines.map((line, index) => (
-                                  <p key={`${line}-${index}`} className={creatorStyles.blockMuted}>
-                                    {line}
-                                  </p>
-                                ))
-                              : (
-                                <p className={creatorStyles.blockMuted}>
-                                  Set sender address in Organization settings.
-                                </p>
-                              )}
-                          </div>
-                          <div className={creatorStyles.toBlock}>
-                            <span className={creatorStyles.blockLabel}>To</span>
-                            <p className={creatorStyles.blockText}>
-                              {selectedProject?.customer_display_name}
-                            </p>
-                            <p className={creatorStyles.blockMuted}>
-                              {selectedProject
-                                ? `#${selectedProject.id} ${selectedProject.name}`
-                                : ""}
-                            </p>
-                          </div>
-                        </div>
-                        <div className={creatorStyles.headerRight}>
-                          <div className={`${creatorStyles.logoBox} ${senderLogoUrl ? creatorStyles.logoBoxHasImage : ""}`}>
-                            {senderLogoUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element -- user-uploaded logo
-                              <img
-                                className={creatorStyles.logoImage}
-                                src={senderLogoUrl}
-                                alt={`${senderDisplayName || "Company"} logo`}
-                              />
-                            ) : "No logo set"}
-                          </div>
-                          <div className={creatorStyles.sheetTitle}>Invoice</div>
-                        </div>
-                      </div>
-
-                        <div className={creatorStyles.metaBlock}>
-                          <div className={creatorStyles.metaTitle}>Invoice Details</div>
-                          <div className={creatorStyles.metaLine}>
-                            <span>Invoice #</span>
-                            <div className={invoiceCreatorStyles.invoiceNumberContext}>
-                              <input
-                                className={`${creatorStyles.fieldInput} ${invoiceCreatorStyles.invoiceNumberInput}`}
-                                value={workspaceInvoiceNumber}
-                                readOnly
-                                disabled
-                                autoComplete="one-time-code"
-                                aria-label="Invoice number"
-                              />
-                              {!workspaceSourceInvoice ? (
-                                <span
-                                  className={`${invoiceCreatorStyles.invoiceNumberIndicator} ${invoiceCreatorStyles.invoiceNumberIndicatorGenerated}`}
-                                >
-                                  New
-                                </span>
-                              ) : null}
-                            </div>
-                          </div>
-                          <label className={creatorStyles.inlineField}>
-                            Issue date
-                            <input
-                              className={`${creatorStyles.fieldInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                              type="date"
-                              value={issueDate}
-                              onChange={(event) => setIssueDate(event.target.value)}
-                              required
-                              disabled={workspaceIsLocked}
-                            />
-                          </label>
-                          <label className={creatorStyles.inlineField}>
-                            Due date
-                            <input
-                              className={`${creatorStyles.fieldInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                              type="date"
-                              value={dueDate}
-                              onChange={(event) => setDueDate(event.target.value)}
-                              required
-                              disabled={workspaceIsLocked}
-                            />
-                          </label>
-                        </div>
-
-                      <div className={invoiceCreatorStyles.invoiceLineSectionIntro}>
-                        <h3>Line Items</h3>
-                      </div>
-                      {workspaceIsLocked ? (
-                        <div className={styles.lockedLineTableWrap}>
-                        <ReadOnlyLineTable
-                          columns={["Cost Code", "Description", "Qty", "Unit", "Unit Price", "Amount"]}
-                          rows={lineItems.map((line) => {
-                            const lineAmount = parseAmount(line.quantity) * parseAmount(line.unitPrice);
-                            return {
-                              key: line.localId,
-                              cells: [
-                                costCodes.find((c) => String(c.id) === line.costCode)?.code || "—",
-                                line.description || "—",
-                                line.quantity,
-                                line.unit,
-                                `$${line.unitPrice}`,
-                                `$${formatDecimal(lineAmount)}`,
-                              ],
-                            };
-                          })}
-                          emptyMessage="No line items."
-                          mobileColumnLayout={[
-                            { order: 0, span: "full" },
-                            { order: 1, span: "full" },
-                            { order: 2, span: "half" },
-                            { order: 3, span: "half" },
-                            { order: 4, span: "half" },
-                            { order: 5, span: "half", align: "right" },
-                          ]}
-                        />
-                        </div>
-                      ) : isMobile ? (
-                        <div className={mobileCardStyles.cardList}>
-                          {lineItems.map((line, index) => {
-                            const lineAmount = parseAmount(line.quantity) * parseAmount(line.unitPrice);
-                            const rowIssues = lineValidation.issuesByLocalId.get(line.localId) ?? [];
-                            return (
-                              <MobileLineItemCard
-                                key={line.localId}
-                                index={index}
-                                readOnly={false}
-                                isFirst={index === 0}
-                                isLast={index === lineItems.length - 1}
-                                onRemove={() => removeLineItem(line.localId)}
-                                validationError={rowIssues.length ? `Row ${index + 1}: ${rowIssues.join(" ")}` : undefined}
-                                fields={[
-                                  {
-                                    label: "Description",
-                                    key: "description",
-                                    span: "full",
-                                    render: () => (
-                                      <input
-                                        className={mobileCardStyles.fieldInput}
-                                        value={line.description}
-                                        onChange={(event) => updateLineItem(line.localId, "description", event.target.value)}
-                                      />
-                                    ),
-                                  },
-                                  {
-                                    label: "Cost Code",
-                                    key: "costCode",
-                                    span: "full",
-                                    render: () => (
-                                      <CostCodeCombobox
-                                        costCodes={costCodes}
-                                        value={line.costCode}
-                                        onChange={(nextValue) => updateLineItem(line.localId, "costCode", nextValue)}
-                                        ariaLabel="Cost code"
-                                        allowEmptySelection
-                                        emptySelectionLabel="No cost code (optional)"
-                                        placeholder="Search cost code"
-                                      />
-                                    ),
-                                  },
-                                  {
-                                    label: "Qty",
-                                    key: "quantity",
-                                    render: () => (
-                                      <input
-                                        className={mobileCardStyles.fieldInput}
-                                        value={line.quantity}
-                                        onChange={(event) => updateLineItem(line.localId, "quantity", event.target.value)}
-                                        inputMode="decimal"
-                                      />
-                                    ),
-                                  },
-                                  {
-                                    label: "Unit",
-                                    key: "unit",
-                                    render: () => (
-                                      <input
-                                        className={mobileCardStyles.fieldInput}
-                                        value={line.unit}
-                                        onChange={(event) => updateLineItem(line.localId, "unit", event.target.value)}
-                                      />
-                                    ),
-                                  },
-                                  {
-                                    label: "Unit Price",
-                                    key: "unitPrice",
-                                    render: () => (
-                                      <input
-                                        className={mobileCardStyles.fieldInput}
-                                        value={line.unitPrice}
-                                        onChange={(event) => updateLineItem(line.localId, "unitPrice", event.target.value)}
-                                        inputMode="decimal"
-                                      />
-                                    ),
-                                  },
-                                  {
-                                    label: "Amount",
-                                    key: "amount",
-                                    render: () => (
-                                      <span className={mobileCardStyles.fieldStatic}>
-                                        ${formatDecimal(lineAmount)}
-                                      </span>
-                                    ),
-                                  },
-                                ]}
-                              />
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className={creatorStyles.lineTable}>
-                          <div className={invoiceCreatorStyles.invoiceLineHeader}>
-                            <span>Cost Code</span>
-                            <span>Description</span>
-                            <span>Qty</span>
-                            <span>Unit</span>
-                            <span>Unit price</span>
-                            <span>Amount</span>
-                            <span>Actions</span>
-                          </div>
-                          {lineItems.map((line, index) => {
-                            const lineAmount = parseAmount(line.quantity) * parseAmount(line.unitPrice);
-                            const rowIssues = lineValidation.issuesByLocalId.get(line.localId) ?? [];
-                            return (
-                              <div
-                                key={line.localId}
-                                className={`${invoiceCreatorStyles.invoiceLineRow} ${index % 2 === 1 ? invoiceCreatorStyles.invoiceLineRowAlt : ""} ${rowIssues.length ? creatorStyles.lineRowInvalid : ""}`}
-                              >
-                                <div>
-                                  <span className={creatorStyles.printOnly}>
-                                    {costCodes.find((c) => String(c.id) === line.costCode)?.code || "—"}
-                                  </span>
-                                  <span className={creatorStyles.screenOnly}>
-                                    <CostCodeCombobox
-                                      costCodes={costCodes}
-                                      value={line.costCode}
-                                      onChange={(nextValue) => updateLineItem(line.localId, "costCode", nextValue)}
-                                      ariaLabel="Cost code"
-                                      allowEmptySelection
-                                      emptySelectionLabel="No cost code (optional)"
-                                      placeholder="Search cost code"
-                                    />
-                                  </span>
-                                </div>
-                                <input
-                                  className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                                  value={line.description}
-                                  onChange={(event) =>
-                                    updateLineItem(line.localId, "description", event.target.value)
-                                  }
-                                />
-                                <input
-                                  className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                                  value={line.quantity}
-                                  onChange={(event) =>
-                                    updateLineItem(line.localId, "quantity", event.target.value)
-                                  }
-                                  inputMode="decimal"
-                                />
-                                <input
-                                  className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                                  value={line.unit}
-                                  onChange={(event) => updateLineItem(line.localId, "unit", event.target.value)}
-                                />
-                                <input
-                                  className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                                  value={line.unitPrice}
-                                  onChange={(event) =>
-                                    updateLineItem(line.localId, "unitPrice", event.target.value)
-                                  }
-                                  inputMode="decimal"
-                                />
-                                <span className={`${creatorStyles.amountCell} ${invoiceCreatorStyles.invoiceReadAmount}`}>
-                                  ${formatDecimal(lineAmount)}
-                                </span>
-                                <div className={invoiceCreatorStyles.invoiceLineActionsCell}>
-                                  <button
-                                    type="button"
-                                    className={creatorStyles.smallButton}
-                                    onClick={() => removeLineItem(line.localId)}
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
-                                {rowIssues.length ? (
-                                  <p className={creatorStyles.lineIssue}>
-                                    Row {index + 1}: {rowIssues.join(" ")}
-                                  </p>
-                                ) : null}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {!workspaceIsLocked ? (
-                        <div className={invoiceCreatorStyles.invoiceLineActions}>
-                          <button
-                            type="button"
-                            className={creatorStyles.secondaryButton}
-                            onClick={addLineItem}
-                          >
-                            Add Line Item
-                          </button>
-                        </div>
-                      ) : null}
-
-                      {renderContractBreakdown({ style: { marginTop: "var(--space-md)" } })}
-
-                      <div className={invoiceCreatorStyles.invoiceSheetFooter}>
-                        <div className={invoiceCreatorStyles.invoiceTotalsColumn}>
-                          <div className={creatorStyles.summary}>
-                            <div className={creatorStyles.summaryRow}>
-                              <span>Subtotal</span>
-                              <strong>${formatDecimal(draftLineSubtotal)}</strong>
-                            </div>
-                            <div className={creatorStyles.summaryRow}>
-                              <span>Sales Tax</span>
-                              <span className={creatorStyles.summaryTaxLine}>
-                                <label className={creatorStyles.summaryTaxRate}>
-                                  <input
-                                    className={`${creatorStyles.summaryTaxInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                                    value={taxPercent}
-                                    onChange={(event) => setTaxPercent(event.target.value)}
-                                    inputMode="decimal"
-                                    disabled={workspaceIsLocked}
-                                  />
-                                  <span className={creatorStyles.summaryTaxSuffix}>%</span>
-                                </label>
-                                <span className={creatorStyles.summaryTaxAmount}>
-                                  ${formatDecimal(draftTaxTotal)}
-                                </span>
-                              </span>
-                            </div>
-                            <div className={`${creatorStyles.summaryRow} ${creatorStyles.summaryTotal}`}>
-                              <span>Total</span>
-                              <strong>${formatDecimal(draftTotal)}</strong>
-                            </div>
-                          </div>
-                          {canMutateInvoices && !workspaceIsLocked ? (
-                            <>
-                              {statusMessageAtCreator ? (
-                                <p className={`${creatorStyles.actionSuccess} ${invoiceCreatorStyles.invoiceCreateStatusMessage}`}>
-                                  {statusMessage}
-                                </p>
-                              ) : null}
-                              <div className={invoiceCreatorStyles.invoiceCreateActions}>
-                                <button
-                                  type="submit"
-                                  className={`${creatorStyles.primaryButton} ${invoiceCreatorStyles.invoiceCreatePrimary}`}
-                                >
-                                  {editingDraftInvoiceId ? "Save Draft" : "Create Invoice"}
-                                </button>
-                              </div>
-                            </>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      <div className={creatorStyles.terms}>
-                        <h4>Terms and Conditions</h4>
-                        {(termsText || organizationInvoiceDefaults?.invoice_terms_and_conditions || "Not set")
-                          .split("\n")
-                          .filter((line) => line.trim())
-                          .map((line, index) => (
-                            <p key={`${line}-${index}`}>{line}</p>
-                          ))}
-                      </div>
-
-                      <div className={creatorStyles.footer}>
-                        <span>{senderDisplayName || "Your Company"}</span>
-                        <span>{senderEmail || "Help email not set"}</span>
-                        <span>{workspaceInvoiceNumber ? `Invoice ${workspaceInvoiceNumber}` : "New Invoice Draft"}</span>
-                      </div>
-                      </>
-                    ),
-                    header: () => null,
-                    meta: () => null,
-                    line_items: () => null,
-                    totals: () => null,
-                    status: () => null,
-                    status_events: () => null,
-                    footer: () => null,
-                  }}
-                />
-              </div>
-              {workspaceSourceInvoice?.status === "paid" ? (
-                <div className={`${stampStyles.decisionStamp} ${stampStyles.decisionStampPaid}`}>
-                  <p className={stampStyles.decisionStampLabel}>Paid</p>
-                </div>
-              ) : null}
-
-          </div>
+          <InvoicesWorkspacePanel
+            isMobile={isMobile}
+            canMutateInvoices={canMutateInvoices}
+            workspaceSourceInvoice={workspaceSourceInvoice}
+            workspaceIsLocked={workspaceIsLocked}
+            workspaceContext={workspaceContext}
+            workspaceBadgeLabel={workspaceBadgeLabel}
+            workspaceBadgeClass={workspaceBadgeClass}
+            editingDraftInvoiceId={editingDraftInvoiceId}
+            onStartNewDraft={handleStartNewInvoiceDraft}
+            onDuplicateIntoDraft={handleDuplicateInvoiceIntoDraft}
+            statusMessageAtToolbar={statusMessageAtToolbar}
+            statusMessage={statusMessage}
+            invoiceCreatorRef={invoiceCreatorRef}
+            invoiceCreatorAdapter={invoiceCreatorAdapter}
+            invoiceDraftFormState={invoiceDraftFormState}
+            senderDisplayName={senderDisplayName}
+            senderEmail={senderEmail}
+            senderAddressLines={senderAddressLines}
+            senderLogoUrl={senderLogoUrl}
+            selectedProject={selectedProject}
+            workspaceInvoiceNumber={workspaceInvoiceNumber}
+            issueDate={issueDate}
+            onIssueDateChange={setIssueDate}
+            dueDate={dueDate}
+            onDueDateChange={setDueDate}
+            lineItems={lineItems}
+            lineValidation={lineValidation}
+            costCodes={costCodes}
+            onAddLineItem={addLineItem}
+            onRemoveLineItem={removeLineItem}
+            onUpdateLineItem={updateLineItem}
+            draftLineSubtotal={draftLineSubtotal}
+            draftTaxTotal={draftTaxTotal}
+            draftTotal={draftTotal}
+            taxPercent={taxPercent}
+            onTaxPercentChange={setTaxPercent}
+            onSubmit={handleCreateInvoice}
+            statusMessageAtCreator={statusMessageAtCreator}
+            termsText={termsText}
+            organizationInvoiceDefaults={organizationInvoiceDefaults}
+          />
       </>
       ) : null}
     </section>
