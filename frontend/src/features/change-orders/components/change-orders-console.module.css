@@ -1,12 +1,5 @@
 .primaryCreateButton {
-  border: 1px solid var(--accent-hover);
-  border-radius: 10px;
-  background: var(--accent-hover);
-  color: var(--text-on-accent);
-  padding: 8px 14px;
-  font-size: var(--font-sm);
-  font-weight: 700;
-  cursor: pointer;
+  composes: toolbarPrimaryButton from "../../../shared/document-creator/creator-foundation.module.css";
 }
 
 .formToolbar {
@@ -428,15 +421,8 @@
 }
 
 .cloneRevisionButton {
+  composes: toolbarSecondaryButton from "../../../shared/document-creator/creator-foundation.module.css";
   width: fit-content;
-  border: 1px solid var(--accent);
-  border-radius: 10px;
-  background: var(--accent);
-  color: var(--text-on-accent);
-  padding: 8px 14px;
-  font-size: var(--font-sm);
-  font-weight: 700;
-  cursor: pointer;
 }
 
 .cloneRevisionButton:hover {

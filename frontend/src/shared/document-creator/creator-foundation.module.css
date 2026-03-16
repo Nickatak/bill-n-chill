@@ -674,6 +674,31 @@
   cursor: pointer;
 }
 
+/* Toolbar-weight action buttons — bolder than in-form buttons.
+   Used for primary/secondary actions in workspace toolbars across
+   estimates, invoices, and change order consoles. */
+.toolbarPrimaryButton {
+  border: 1px solid var(--accent-hover);
+  border-radius: 10px;
+  background: var(--accent-hover);
+  color: var(--text-on-accent);
+  padding: 8px 14px;
+  font-size: var(--font-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.toolbarSecondaryButton {
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  padding: 8px 14px;
+  font-size: var(--font-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .summary {
   max-width: 320px;
   margin-left: auto;
