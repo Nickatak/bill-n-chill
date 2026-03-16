@@ -10,7 +10,6 @@ _Regenerate: `python scripts/generate_ai_index.py`_
 - [Features — Customers](#features-customers)
 - [Features — Dashboard](#features-dashboard)
 - [Features — Estimates](#features-estimates)
-- [Features — Financials Auditing](#features-financials-auditing)
 - [Features — Invoices](#features-invoices)
 - [Features — Onboarding](#features-onboarding)
 - [Features — Organization](#features-organization)
@@ -31,6 +30,15 @@ _Regenerate: `python scripts/generate_ai_index.py`_
 - [Shared — Types](#shared-types)
 
 ## App Routes
+
+### `frontend/src/app/accounting/page.tsx`
+_Accounting page — org-wide ledger for reconciliation and payment management._
+
+**Depends on:**
+- `@/features/payments`
+- `@/shared/shell`
+
+- [default] `AccountingPage`
 
 ### `frontend/src/app/admin/impersonate/page.tsx`
 _Superuser impersonation page — lists all impersonatable users_
@@ -180,21 +188,11 @@ _Superuser impersonation page — lists all impersonatable users_
 
 - [default] `Home`
 
-### `frontend/src/app/payments/page.tsx`
-_Payments page — first-class workflow page for recording and managing payments._
-
-**Depends on:**
-- `@/features/payments`
-- `@/shared/shell`
-
-- [default] `PaymentsPage`
-
 ### `frontend/src/app/projects/[projectId]/audit-trail/page.tsx`
 
 **Depends on:**
 - `@/features/projects/components/project-activity-console`
 - `@/shared/shell`
-- `@/shared/shell/page-shell.module.css`
 - `@/shared/shell/route-metadata`
 
 - [Component] `generateMetadata({...})`
@@ -292,6 +290,7 @@ _Accessible combobox for selecting a cost code._
 - `@/shared/document-creator/creator-foundation.module.css`
 - `@/shared/document-viewer/public-document-viewer-shell`
 - `@/shared/document-viewer/signing-ceremony`
+- `@/shared/hooks/use-creator-flash`
 - `@/shared/hooks/use-print-context`
 - `@/shared/money-format`
 - `@/shared/styles/decision-stamp.module.css`
@@ -316,7 +315,7 @@ _Estimate document creator sheet used for both creating and editing estimates._
 
 **Depends on:**
 - `@/shared/document-creator/creator-foundation.module.css`
-- `@/shared/financial-baseline`
+- `@/shared/hooks/use-creator-flash`
 - `@/shared/hooks/use-media-query`
 - `@/shared/hooks/use-policy-contract`
 - `@/shared/hooks/use-status-filters`
@@ -345,6 +344,7 @@ _Pure helper functions for the estimates feature._
 
 - [fn] `normalizeEstimatePolicy({...})`
 - [fn] `resolveAutoSelectEstimate(rows, activeFilters, hints)` — Pick the best estimate to auto-select after a list load.
+- [fn] `validateEstimateLineItems(lines)`
 - [fn] `resolveEstimateValidationDeltaDays(defaults)`
 - [fn] `emptyLine(localId, defaultCostCodeId = "")`
 - [fn] `mapEstimateLineItemsToInputs(items)`
@@ -356,7 +356,8 @@ _Pure helper functions for the estimates feature._
 - [fn] `formatStatusAction(event)`
 - [fn] `isNotatedStatusEvent(event)`
 - [type] `NormalizedEstimatePolicy` { statuses, statusLabels, allowedTransitions, quickActionByStatus, defaultCreateStatus, defaultStatusFilters }
-- [re-export] `estimateFinancialBaselineStatus, formatFinancialBaselineStatus, ` from `@/shared/financial-baseline`
+- [type] `LineValidationIssue` { localId, rowNumber, message }
+- [type] `LineValidationResult` { issues, issuesByLocalId }
 
 ### `frontend/src/features/estimates/index.ts`
 
@@ -397,6 +398,7 @@ _Change-order feature API layer._
 - `@/shared/document-creator/creator-foundation.module.css`
 - `@/shared/document-viewer/public-document-viewer-shell`
 - `@/shared/document-viewer/signing-ceremony`
+- `@/shared/hooks/use-creator-flash`
 - `@/shared/hooks/use-print-context`
 - `@/shared/money-format`
 - `@/shared/styles/decision-stamp.module.css`
@@ -406,13 +408,16 @@ _Change-order feature API layer._
 ### `frontend/src/features/change-orders/components/change-orders-console.tsx`
 
 **Depends on:**
+- `@/features/estimates/components/cost-code-combobox`
 - `@/shared/components/pagination-controls`
 - `@/shared/document-creator`
 - `@/shared/document-creator/change-order-creator.module.css`
 - `@/shared/document-creator/creator-foundation.module.css`
 - `@/shared/document-creator/mobile-line-card`
 - `@/shared/document-creator/mobile-line-card.module.css`
+- `@/shared/document-viewer/read-only-line-table`
 - `@/shared/hooks/use-client-pagination`
+- `@/shared/hooks/use-creator-flash`
 - `@/shared/hooks/use-media-query`
 - `@/shared/hooks/use-policy-contract`
 - `@/shared/money-format`
@@ -424,6 +429,27 @@ _Change-order feature API layer._
 - `@/shared/styles/decision-stamp.module.css`
 
 - [fn] `ChangeOrdersConsole({...})`
+
+### `frontend/src/features/change-orders/components/change-orders-display.ts`
+_Pure display helpers for change order consoles and viewers._
+
+**Depends on:**
+- `@/shared/money-format`
+
+- [fn] `statusLabel(status, statusLabels, string>)`
+- [fn] `quickStatusControlLabel(status, statusLabels, string>, currentStatus)` — Derive a user-facing control label for a quick-status pill button.
+- [fn] `statusEventLabel(status, statusLabels, string>)` — Resolve a status to its human label, returning "Unset" for empty/falsy values.
+- [fn] `formatEventDateTime(dateValue)`
+- [fn] `formatApprovedDate(dateValue)`
+- [fn] `eventActorLabel(event)`
+- [fn] `eventActorHref(event)`
+- [fn] `statusEventActionLabel(event, statusLabels, string>)` — Derive a past-tense action label from a status audit event.
+- [fn] `approvalMeta(estimate)`
+- [fn] `approvedRollingDeltaForEstimate(estimateId, changeOrders)` — Sum approved change order deltas for a given origin estimate.
+- [fn] `originalBudgetTotalForEstimate(estimateId, originEstimateOriginalTotals, number>)`
+- [fn] `currentApprovedBudgetTotalForEstimate({...})`
+- [fn] `lastStatusEventForChangeOrder(changeOrderId, projectAuditEvents)` — Find the most recent status event for a specific change order from the project's audit events.
+- [fn] `toLinePayload(lines)`
 
 ### `frontend/src/features/change-orders/document-adapter.ts`
 _Document-creator adapter for change orders._
@@ -455,9 +481,13 @@ _Pure helper functions for the change-orders feature._
 ### `frontend/src/features/change-orders/types.ts`
 
 **Depends on:**
+- `@/shared/document-creator`
 - `@/shared/types/domain`
 
 - [type] `ProjectRecord` { id }
+- [type] `OriginEstimateLineItem` { id, cost_code_code, cost_code_name, description, quantity, unit, ... }
+- [type] `OriginEstimateRecord` { id, title, version, approved_at, approved_by_email, grand_total, ... }
+- [type] `AuditEventRecord` { id, event_type, object_type, object_id, from_status, to_status, ... }
 - [type] `CostCodeOption` { id, code, name, is_active }
 - [type] `ChangeOrderLineRecord` { id, change_order, cost_code, cost_code_id, cost_code_code, cost_code_name, ... }
 - [type] `ChangeOrderRecord` { id, project, family_key, revision_number, title, status, ... }
@@ -482,9 +512,9 @@ _Invoices feature API layer._
 
 **Depends on:**
 - `@/shared/date-format`
-- `@/shared/document-creator/creator-foundation.module.css`
 - `@/shared/document-viewer/public-document-viewer-shell`
 - `@/shared/document-viewer/signing-ceremony`
+- `@/shared/hooks/use-creator-flash`
 - `@/shared/hooks/use-print-context`
 - `@/shared/money-format`
 - `@/shared/styles/decision-stamp.module.css`
@@ -494,6 +524,7 @@ _Invoices feature API layer._
 ### `frontend/src/features/invoices/components/invoices-console.tsx`
 
 **Depends on:**
+- `@/features/estimates/components/cost-code-combobox`
 - `@/shared/components/pagination-controls`
 - `@/shared/date-format`
 - `@/shared/document-creator`
@@ -501,13 +532,14 @@ _Invoices feature API layer._
 - `@/shared/document-creator/invoice-creator.module.css`
 - `@/shared/document-creator/mobile-line-card`
 - `@/shared/document-creator/mobile-line-card.module.css`
+- `@/shared/document-viewer/read-only-line-table`
 - `@/shared/hooks/use-client-pagination`
+- `@/shared/hooks/use-creator-flash`
 - `@/shared/hooks/use-media-query`
 - `@/shared/hooks/use-policy-contract`
 - `@/shared/hooks/use-status-filters`
 - `@/shared/hooks/use-status-message`
 - `@/shared/money-format`
-- `@/shared/project-list-viewer`
 - `@/shared/session/auth-headers`
 - `@/shared/session/rbac`
 - `@/shared/session/use-shared-session`
@@ -539,6 +571,9 @@ _Pure helper functions for the invoices feature._
 - [fn] `invoiceStatusEventActionLabel(event, statusLabel)`
 - [fn] `readInvoiceApiError(payload, fallback)`
 - [fn] `projectStatusLabel(statusValue)`
+- [fn] `validateInvoiceLineItems(lines)`
+- [type] `InvoiceLineValidationIssue` { localId, rowNumber, message }
+- [type] `InvoiceLineValidationResult` { issues, issuesByLocalId }
 
 ### `frontend/src/features/invoices/index.ts`
 
@@ -577,6 +612,7 @@ _Vendor-bills feature API layer._
 - `@/features/payments`
 - `@/shared/api/error`
 - `@/shared/date-format`
+- `@/shared/hooks/use-creator-flash`
 - `@/shared/hooks/use-policy-contract`
 - `@/shared/hooks/use-status-filters`
 - `@/shared/session/auth-headers`
@@ -634,7 +670,7 @@ _Payments feature API layer._
 - `@/shared/session/use-shared-session`
 
 - [fn] `PaymentRecorder({...})`
-- [type] `PaymentRecorderProps` { projectId, direction, allocationTargets, onPaymentsChanged }
+- [type] `PaymentRecorderProps` { projectId, direction, allocationTargets, onPaymentsChanged, hideHeader, createOnly }
 
 ### `frontend/src/features/payments/components/payments-console.tsx`
 
@@ -642,6 +678,7 @@ _Payments feature API layer._
 - `@/shared/components/pagination-controls`
 - `@/shared/date-format`
 - `@/shared/hooks/use-client-pagination`
+- `@/shared/hooks/use-combobox`
 - `@/shared/hooks/use-status-message`
 - `@/shared/session/auth-headers`
 - `@/shared/session/rbac`
@@ -693,6 +730,7 @@ _Projects feature API configuration._
 ### `frontend/src/features/projects/components/projects-console.tsx`
 
 **Depends on:**
+- `@/features/payments`
 - `@/shared/api/error`
 - `@/shared/hooks/use-status-message`
 - `@/shared/money-format`
@@ -760,7 +798,6 @@ _Customers feature API layer._
 
 **Depends on:**
 - `@/features/projects/types`
-- `@/shared/project-list-viewer`
 - `@/shared/session/auth-headers`
 - `@/shared/session/rbac`
 - `@/shared/session/use-shared-session`
@@ -1006,16 +1043,6 @@ _Organization feature API configuration._
 ### `frontend/src/features/onboarding/index.ts`
 
 - [re-export] `OnboardingChecklist, ORG_VISITED_KEY` from `./components/onboarding-checklist`
-
-## Features — Financials Auditing
-
-### `frontend/src/features/financials-auditing/components/financials-auditing-console.tsx`
-
-- [fn] `FinancialsAuditingConsole()`
-
-### `frontend/src/features/financials-auditing/index.ts`
-
-- [re-export] `FinancialsAuditingConsole` from `./components/financials-auditing-console`
 
 ## Shared — Api
 
@@ -1263,6 +1290,26 @@ _Workflow shell region rendered below the app toolbar._
 
 - [fn] `useClientPagination(items, pageSize = 20)` — Client-side pagination for an already-loaded list.
 
+### `frontend/src/shared/hooks/use-combobox.ts`
+
+- [fn] `useCombobox(options)` — Generic combobox state and interaction hook.
+- [type] `UseComboboxOptions`
+- [type] `UseComboboxReturn`
+
+### `frontend/src/shared/hooks/use-creator-flash.ts`
+
+**Depends on:**
+- `@/shared/document-creator/creator-foundation.module.css`
+
+- [fn] `useCreatorFlash()` — Encapsulates the creator sheet flash animation pattern.
+- [type] `UseCreatorFlashReturn`
+
+### `frontend/src/shared/hooks/use-line-items.ts`
+
+- [fn] `useLineItems(options)` — Generic line item CRUD hook.
+- [type] `UseLineItemsOptions`
+- [type] `UseLineItemsReturn`
+
 ### `frontend/src/shared/hooks/use-media-query.ts`
 
 - [fn] `useMediaQuery(query)`
@@ -1342,7 +1389,7 @@ _Organization branding resolution for the internal document composer._
 _Context resolution for public (token-authenticated) document viewers._
 
 - [fn] `toAddressLines(value)` — Split an address string into individual display lines.
-- [fn] `resolvePublicSender(organizationContext)` — Resolve organization context into a display-ready sender shape.
+- [fn] `resolvePublicSender(organizationContext, documentSender)` — Resolve organization context into a display-ready sender shape.
 - [fn] `resolvePublicRecipient(projectContext)` — Resolve project context into a display-ready recipient shape.
 - [fn] `resolveDefaultTerms(organizationContext, documentType)` — Look up the default terms text for a given document type.
 - [type] `PublicViewerSender` { companyName, senderName, senderAddress, senderAddressLines, logoUrl, helpEmail }
@@ -1358,6 +1405,11 @@ _Structural frame for public-facing document pages (invoices, estimates, change 
 _Layout shell for public document viewer pages._
 
 - [Component] `PublicDocumentViewerShell({...})` — Render the outer shell of a public document viewer page.
+
+### `frontend/src/shared/document-viewer/read-only-line-table.tsx`
+_ReadOnlyLineTable — polished read-only line-items table for reference data._
+
+- [Component] `ReadOnlyLineTable({...})`
 
 ### `frontend/src/shared/document-viewer/signing-ceremony.tsx`
 
@@ -1391,9 +1443,9 @@ _Shared domain types used across multiple feature modules._
 - [re-export] `collapseToggleButtonStyles` from `./collapse-toggle-button.module.css`
 
 ### `frontend/src/shared/project-list-viewer/project-list-viewer.tsx`
-_Collapsible project list panel with search, status filters, and card grid._
+_Project list panel with search, status filters, and card grid._
 
-- [Component] `ProjectListViewer({...})` — Render a collapsible project list with search, status filters, and card grid.
+- [Component] `ProjectListViewer({...})` — Render a project list with search, status filters, and card grid.
 - [type] `ProjectListEntry` { id, name, customer_display_name, status }
 
 ## Shared — Utilities
@@ -1407,12 +1459,6 @@ _Date formatting utilities for consistent human-readable date display._
 - [fn] `todayDateInput()`
 - [fn] `futureDateInput(daysFromNow = 30)`
 - [fn] `addDaysToDateInput(baseDateInput, daysToAdd)` — Add (or subtract) days from a YYYY-MM-DD base date, returning YYYY-MM-DD.
-
-### `frontend/src/shared/financial-baseline.ts`
-_Shared financial-baseline status helpers._
-
-- [fn] `financialBaselineStatus(record)`
-- [fn] `formatFinancialBaselineStatus(status)`
 
 ### `frontend/src/shared/money-format.ts`
 _Shared money-formatting utilities._

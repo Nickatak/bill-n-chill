@@ -334,7 +334,7 @@ _Payment and PaymentAllocation models — cash movement records with AR/AP alloc
 **class Payment(StatusTransitionMixin, models.Model)**
 > Recorded money movement at the organization level (AR inbound or AP outbound).
 - _class_ `Direction(models.TextChoices)` — INBOUND, OUTBOUND
-- _class_ `Method(models.TextChoices)` — ACH, CARD, CHECK, WIRE, ZELLE, CASH, OTHER
+- _class_ `Method(models.TextChoices)` — CHECK, ZELLE, ACH, CASH, WIRE, CARD, OTHER
 - _class_ `Status(models.TextChoices)` — PENDING, SETTLED, VOID
 - _class_ `Meta` — ordering
 - `allocated_total()` `@property` — Sum of all applied allocation amounts for this payment.
@@ -378,7 +378,7 @@ _ChangeOrderSnapshot model — immutable point-in-time capture for change-order 
 > Immutable financial-audit snapshot for decision outcomes on a change order.
 - _class_ `DecisionStatus(models.TextChoices)` — APPROVED, REJECTED, VOID
 - _class_ `Meta` — ordering
-- `record(change_order, decision_status: str, previous_status: str, applied_financial_delta, decided_by)` `@classmethod` — Append an immutable snapshot row for a change-order decision event.
+- `record(change_order, decision_status: str, previous_status: str, applied_financial_delta, decided_by, ip_address, user_agent)` `@classmethod` — Append an immutable snapshot row for a change-order decision event.
 - `__str__()`
 
 
@@ -403,7 +403,7 @@ _EstimateStatusEvent model — immutable audit trail of estimate status transiti
 **class EstimateStatusEvent(models.Model)**
 > Audit trail of estimate status transitions.
 - _class_ `Meta` — ordering
-- `record(estimate, from_status, to_status, note, changed_by)` `@classmethod` — Append an immutable estimate status transition row.
+- `record(estimate, from_status, to_status, note, changed_by, ip_address, user_agent)` `@classmethod` — Append an immutable estimate status transition row.
 - `__str__()`
 
 
@@ -413,7 +413,7 @@ _InvoiceStatusEvent model — immutable audit trail of invoice status transition
 **class InvoiceStatusEvent(models.Model)**
 > Audit trail of invoice status transitions.
 - _class_ `Meta` — ordering
-- `record(invoice, from_status, to_status, note, changed_by)` `@classmethod` — Append an immutable invoice status transition row.
+- `record(invoice, from_status, to_status, note, changed_by, ip_address, user_agent)` `@classmethod` — Append an immutable invoice status transition row.
 - `__str__()`
 
 
@@ -1073,7 +1073,7 @@ _Project CRUD and detail endpoints._
 - `project_detail_view(project_id: int)` `@api_view(['GET', 'PATCH'])` `@permission_classes([IsAuthenticated])` — Fetch or patch a project profile with terminal-state and transition protections.
 - `project_financial_summary_view(project_id: int)` `@api_view(['GET'])` `@permission_classes([IsAuthenticated])` — Return normalized AR/AP/CO financial summary plus traceability for one project.
 - `project_accounting_export_view(project_id: int)` `@api_view(['GET'])` `@permission_classes([IsAuthenticated])` — Export project accounting summary as JSON or CSV (`export_format` query param).
-- `project_contract_breakdown_view(project_id: int)` `@api_view(['GET'])` `@permission_classes([IsAuthenticated])` — Return the active financial baseline estimate and approved change orders for a project.
+- `project_contract_breakdown_view(project_id: int)` `@api_view(['GET'])` `@permission_classes([IsAuthenticated])` — Return the most recently approved estimate and approved change orders for a project.
 - `project_audit_events_view(project_id: int)` `@api_view(['GET'])` `@permission_classes([IsAuthenticated])` — Audit events endpoint — removed.
 
 ### `backend/core/views/shared_operations/projects_helpers.py`
@@ -1091,7 +1091,7 @@ _Domain-specific helpers for project views._
 _Cross-project reporting and dashboard endpoints._
 
 **Depends on:**
-- `from core.models import ChangeOrder, Estimate, EstimateStatusEvent, Invoice, Payment, Project, VendorBill`
+- `from core.models import ChangeOrder, ChangeOrderSnapshot, Estimate, EstimateStatusEvent, Invoice, InvoiceStatusEvent, Payment, PaymentRecord, Project, VendorBill, VendorBillSnapshot`
 - `from core.serializers import AttentionFeedSerializer, ChangeImpactSummarySerializer, PortfolioSnapshotSerializer, ProjectTimelineSerializer, QuickJumpSearchSerializer`
 - `from core.views.helpers import _ensure_membership`
 - `from core.views.shared_operations.projects_helpers import _build_project_financial_summary_data, _date_filter_from_query`
@@ -1136,6 +1136,7 @@ _Estimate authoring and public sharing endpoints._
 - `from core.serializers import EstimateDuplicateSerializer, EstimateSerializer, EstimateStatusEventSerializer, EstimateWriteSerializer`
 - `from core.views.estimating.estimates_helpers import _activate_project_from_estimate_approval, _apply_estimate_lines_and_totals, _archive_estimate_family, _next_estimate_family_version, _serialize_estimate, _serialize_estimates`
 - `from core.models import SigningCeremonyRecord`
+- `from core.utils.request import get_client_ip`
 - `from core.utils.signing import compute_document_content_hash`
 - `from core.views.helpers import _build_public_decision_note, _capability_gate, _ensure_membership, _resolve_organization_for_public_actor, _serialize_public_organization_context, _serialize_public_project_context, _validate_estimate_for_user, _validate_project_for_user`
 - `from core.utils.email import send_document_sent_email`
@@ -1163,7 +1164,7 @@ _Domain-specific helpers for estimate views._
 - `_archive_estimate_family(project, user, title, exclude_ids, note)` — Archive all same-title estimates in a family except the excluded IDs.
 - `_next_estimate_family_version(project, title)` — Return the next version number for an estimate family identified by title.
 - `_serialize_estimate(estimate)` — Serialize a single estimate.
-- `_serialize_estimates(estimates, project)` — Serialize multiple estimates sharing the same project.
+- `_serialize_estimates(estimates, project)` — Serialize multiple estimates.
 - `_sync_project_contract_baseline_if_unset(estimate)` — Set the project's original and current contract values from the estimate if both are zero.
 - `_activate_project_from_estimate_approval(estimate, actor, note: str)` — Transition a prospect or on-hold project to active when its estimate is approved.
 - `_calculate_line_totals(line_items_data)` — Compute per-line totals with markup and return normalized items, subtotal, and markup total.
@@ -1183,6 +1184,7 @@ _Change-order creation, revision, and lifecycle endpoints._
 - `from core.views.change_orders.change_orders_helpers import _model_validation_error_payload, _next_change_order_family_key, _serialize_public_change_order, _sync_change_order_lines, _validate_change_order_lines, _validation_error_payload`
 - `from core.models import SigningCeremonyRecord`
 - `from core.serializers import ChangeOrderSerializer`
+- `from core.utils.request import get_client_ip`
 - `from core.utils.signing import compute_document_content_hash`
 - `from core.views.helpers import _build_public_decision_note, _capability_gate, _ensure_membership, _validate_project_for_user`
 - `from core.views.public_signing_helpers import get_ceremony_context, validate_ceremony_on_decision`
@@ -1230,7 +1232,7 @@ _Invoice ingress adapter for normalizing external write payloads._
 _Accounts receivable invoice endpoints and state transitions._
 
 **Depends on:**
-- `from core.models import Invoice, InvoiceStatusEvent`
+- `from core.models import Invoice, InvoiceStatusEvent, Payment, PaymentAllocation`
 - `from core.policies import get_invoice_policy_contract`
 - `from core.serializers import InvoiceSerializer, InvoiceStatusEventSerializer, InvoiceWriteSerializer`
 - `from core.utils.email import send_document_sent_email`
@@ -1238,6 +1240,7 @@ _Accounts receivable invoice endpoints and state transitions._
 - `from core.views.accounts_receivable.invoice_ingress import build_invoice_create_ingress, build_invoice_patch_ingress`
 - `from core.views.accounts_receivable.invoices_helpers import _activate_project_from_invoice_creation, _apply_invoice_lines_and_totals, _calculate_invoice_line_totals, _invoice_line_apply_error_response, _next_invoice_number`
 - `from core.models import SigningCeremonyRecord`
+- `from core.utils.request import get_client_ip`
 - `from core.utils.signing import compute_document_content_hash`
 - `from core.views.helpers import _build_public_decision_note, _capability_gate, _ensure_membership, _resolve_cost_codes_for_user, _resolve_organization_for_public_actor, _serialize_public_organization_context, _serialize_public_project_context, _validate_project_for_user`
 - `from core.views.public_signing_helpers import get_ceremony_context, validate_ceremony_on_decision`
@@ -1254,7 +1257,7 @@ _Accounts receivable invoice endpoints and state transitions._
 _Domain-specific helpers for invoice views._
 
 **Depends on:**
-- `from core.models import Invoice, InvoiceLine, Project`
+- `from core.models import Invoice, InvoiceLine, Payment, PaymentAllocation, Project`
 - `from core.utils.money import MONEY_ZERO, quantize_money`
 - `from core.views.helpers import _resolve_cost_codes_for_user`
 
@@ -1321,13 +1324,14 @@ _Domain-specific helpers for payment and allocation views._
 
 **Depends on:**
 - `from core.models import Invoice, Payment, PaymentAllocation, VendorBill`
+- `from core.models.financial_auditing.invoice_status_event import InvoiceStatusEvent`
 - `from core.utils.money import MONEY_ZERO, quantize_money`
 
 - `_settled_allocated_total(payment: Payment)` — Return the total amount allocated from a payment's settled allocations only.
 - `_all_allocated_total(payment: Payment)` — Return the total amount allocated from a payment across all statuses.
-- `_set_invoice_balance_from_allocations(invoice: Invoice)` — Recompute an invoice's balance_due and status from its settled payment allocations.
+- `_set_invoice_balance_from_allocations(invoice: Invoice, changed_by: 'User')` — Recompute an invoice's balance_due and status from its settled payment allocations.
 - `_set_vendor_bill_balance_from_allocations(vendor_bill: VendorBill)` — Recompute a vendor bill's balance_due and status from its settled payment allocations.
-- `_recalculate_payment_allocation_targets(payment: Payment)` — Refresh balance_due on all invoices and vendor bills linked to a payment.
+- `_recalculate_payment_allocation_targets(payment: Payment, changed_by: 'User')` — Refresh balance_due on all invoices and vendor bills linked to a payment.
 - `_direction_target_mismatch(direction: str, target_type: str)` — Return True if the allocation target type is incompatible with the payment direction.
 
 ## Utils
@@ -1362,6 +1366,11 @@ _Organization-level default helpers for document branding/templates._
 
 - `build_org_defaults(owner_email: str)` — Build the default field values for a new or backfilled organization.
 - `apply_missing_org_defaults(organization, owner_email: str)` — Apply missing defaults to an existing organization in-memory.
+
+### `backend/core/utils/request.py`
+_Request utilities — helpers for extracting metadata from Django/DRF requests._
+
+- `get_client_ip()` — Extract the real client IP from a request, respecting reverse proxy headers.
 
 ### `backend/core/utils/signing.py`
 _Signing ceremony utilities — content hashing, consent text, email masking._
@@ -1979,6 +1988,10 @@ _Tests for the forgot-password / reset-password flow._
 - `test_payment_record_is_immutable()`
 - `test_payment_allocation_record_is_immutable()`
 - `test_payment_validates_required_fields_and_positive_amount()`
+- `test_void_payment_reopens_fully_paid_invoice()` — Voiding a payment that fully paid an invoice should revert the invoice to sent.
+- `test_void_one_of_two_payments_reverts_paid_invoice_to_partially_paid()` — Voiding one of two payments on a fully paid invoice should revert to partially_paid.
+- `test_void_payment_reopens_fully_paid_vendor_bill()` — Voiding a payment that fully paid a vendor bill should revert the bill to scheduled.
+- `test_user_cannot_manually_transition_paid_invoice_to_sent()` — The paid → sent transition should only be allowed by the system, not by user API calls.
 
 
 ### `backend/core/tests/test_projects_cost_codes.py`
