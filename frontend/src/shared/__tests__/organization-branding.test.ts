@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  resolveOrganizationBranding,
-  toAddressLines,
-} from "../document-creator/organization-branding";
+import { resolveOrganizationBranding } from "../document-creator/organization-branding";
+import { toAddressLines } from "../utils/address";
 
 // ---------------------------------------------------------------------------
 // toAddressLines

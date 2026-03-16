@@ -5,6 +5,7 @@
  * display-ready shape used by invoice/estimate/change-order composer headers.
  */
 
+import { toAddressLines } from "../utils/address";
 import type { OrganizationBrandingDefaults } from "./types";
 
 /** Resolved branding fields ready for rendering in composer document headers. */
@@ -16,17 +17,6 @@ export type ResolvedOrganizationBranding = {
   logoUrl: string;
   helpEmail: string;
 };
-
-/**
- * Split a multi-line address string into individual trimmed lines,
- * discarding any blank entries.
- */
-export function toAddressLines(address: string): string[] {
-  return address
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
 
 /**
  * Resolve raw organization branding defaults into a normalized shape.

@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { defaultApiBaseUrl } from "@/shared/api/base";
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
-import { startImpersonation } from "@/shared/session/client-session";
+import { startImpersonation, type SessionRole } from "@/shared/session/client-session";
 import { useSessionAuthorization } from "@/shared/session/session-authorization";
 
 import styles from "./page.module.css";

@@ -13,6 +13,7 @@
 "use client";
 
 import { ReactNode } from "react";
+import { joinClassNames } from "../utils/class-names";
 import styles from "./public-document-frame.module.css";
 
 // ---------------------------------------------------------------------------
@@ -65,15 +66,6 @@ type PublicDocumentFrameProps = {
 };
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Join class name fragments, filtering out falsy values. */
-function cx(...parts: Array<string | undefined | false>) {
-  return parts.filter(Boolean).join(" ");
-}
-
-// ---------------------------------------------------------------------------
 // Class name factory
 // ---------------------------------------------------------------------------
 
@@ -88,15 +80,15 @@ export function publicDocumentViewerClassNames(
   overrides?: Partial<PublicDocumentViewerClassNames>,
 ): PublicDocumentViewerClassNames {
   return {
-    root: cx(styles.viewer, overrides?.root),
-    statusMessage: cx(styles.statusMessage, overrides?.statusMessage),
-    banner: cx(styles.banner, overrides?.banner),
-    bannerPending: cx(styles.bannerPending, overrides?.bannerPending),
-    bannerComplete: cx(styles.bannerComplete, overrides?.bannerComplete),
-    bannerBody: cx(styles.bannerBody, overrides?.bannerBody),
-    bannerEyebrow: cx(styles.bannerEyebrow, overrides?.bannerEyebrow),
-    bannerText: cx(styles.bannerText, overrides?.bannerText),
-    bannerLink: cx(styles.bannerLink, overrides?.bannerLink),
+    root: joinClassNames(styles.viewer, overrides?.root),
+    statusMessage: joinClassNames(styles.statusMessage, overrides?.statusMessage),
+    banner: joinClassNames(styles.banner, overrides?.banner),
+    bannerPending: joinClassNames(styles.bannerPending, overrides?.bannerPending),
+    bannerComplete: joinClassNames(styles.bannerComplete, overrides?.bannerComplete),
+    bannerBody: joinClassNames(styles.bannerBody, overrides?.bannerBody),
+    bannerEyebrow: joinClassNames(styles.bannerEyebrow, overrides?.bannerEyebrow),
+    bannerText: joinClassNames(styles.bannerText, overrides?.bannerText),
+    bannerLink: joinClassNames(styles.bannerLink, overrides?.bannerLink),
   };
 }
 

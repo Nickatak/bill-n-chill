@@ -10,6 +10,7 @@
 "use client";
 
 import { ReactNode } from "react";
+import { joinClassNames } from "../utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,15 +47,6 @@ type PublicDocumentViewerShellProps = {
   banner?: BannerConfig;
   children: ReactNode;
 };
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Join class name fragments, filtering out falsy values. */
-function joinClassNames(...parts: Array<string | undefined | false>): string {
-  return parts.filter(Boolean).join(" ");
-}
 
 // ---------------------------------------------------------------------------
 // Component

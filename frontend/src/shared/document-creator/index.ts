@@ -1,8 +1,6 @@
 export { DocumentCreator } from "./document-creator";
-export {
-  resolveOrganizationBranding,
-  toAddressLines,
-} from "./organization-branding";
+export { resolveOrganizationBranding } from "./organization-branding";
+export { toAddressLines } from "../utils/address";
 export type {
   CreatorAction,
   CreatorLineDraft,

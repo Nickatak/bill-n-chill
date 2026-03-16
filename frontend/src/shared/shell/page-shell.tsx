@@ -6,6 +6,7 @@
  * these to get consistent max-width, padding, and spacing.
  */
 import type { ReactNode } from "react";
+import { joinClassNames } from "../utils/class-names";
 import shell from "./page-shell.module.css";
 
 type PageShellProps = {
@@ -20,11 +21,6 @@ type PageCardProps = {
   muted?: boolean;
   className?: string;
 };
-
-/** Merge class-name fragments, filtering out falsy values. */
-function joinClassNames(...parts: Array<string | false | null | undefined>): string {
-  return parts.filter(Boolean).join(" ");
-}
 
 /**
  * Outer page wrapper providing the `div.page > main.main` structure.

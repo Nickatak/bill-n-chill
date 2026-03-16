@@ -10,11 +10,11 @@ import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { canDo } from "@/shared/session/rbac";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { usePagination } from "@/shared/hooks/use-pagination";
+import { useApiList } from "@/shared/hooks/use-api-list";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { ApiResponse, VendorCsvImportResult, VendorPayload, VendorRecord } from "../types";
-import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import segmented from "../../../shared/styles/segmented.module.css";
 import styles from "./vendors-console.module.css";
 type ActivityFilter = "active" | "all";
@@ -24,16 +24,7 @@ export function VendorsConsole() {
   const { token, authMessage, capabilities } = useSharedSessionAuth();
   const canMutateVendors = canDo(capabilities, "vendors", "create");
 
-  const [rows, setRows] = useState<VendorRecord[]>([]);
-  const [selectedId, setSelectedId] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const {
-    message: statusMessage,
-    tone: statusTone,
-    setNeutral: setNeutralStatus,
-    setSuccess: setSuccessStatus,
-    setError: setErrorStatus,
-  } = useStatusMessage();
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("active");
   const [includeCanonical, setIncludeCanonical] = useState(false);
 
@@ -55,6 +46,25 @@ export function VendorsConsole() {
   const [importExpanded, setImportExpanded] = useState(false);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+
+  const {
+    items: rows,
+    setItems: setRows,
+    selectedId,
+    setSelectedId,
+    refresh: refreshVendors,
+    status: { message: statusMessage, tone: statusTone, setNeutral: setNeutralStatus, setSuccess: setSuccessStatus, setError: setErrorStatus },
+  } = useApiList<VendorRecord>({
+    endpoint: "/vendors/",
+    token,
+    autoSelect: false,
+    onSuccess() {
+      resetPage();
+      setDuplicateCandidates([]);
+      setPendingCreatePayload(null);
+      setImportResult(null);
+    },
+  });
 
   const orderedRows = useMemo(
     () =>
@@ -132,42 +142,6 @@ export function VendorsConsole() {
     setIsActive(item.is_active);
   }
 
-  /** Fetch all vendor records from the API. Filtering is handled client-side. */
-  async function loadVendors() {
-    if (!token) {
-      setErrorStatus("No shared session found. Go to / and login first.");
-      return;
-    }
-    setNeutralStatus("Loading vendors...");
-
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/vendors/`, {
-        headers: buildAuthHeaders(token),
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setErrorStatus(payload.error?.message ?? "Could not load vendors.");
-        return;
-      }
-      const items = (payload.data as VendorRecord[]) ?? [];
-      setRows(items);
-      resetPage();
-      setDuplicateCandidates([]);
-      setPendingCreatePayload(null);
-      setImportResult(null);
-      const persistedSelection = items.find((row) => String(row.id) === selectedId) ?? null;
-      if (persistedSelection) {
-        setSelectedId(String(persistedSelection.id));
-        hydrate(persistedSelection);
-      } else if (selectedId) {
-        setSelectedId("");
-        clearFormFields();
-      }
-      setSuccessStatus(`Loaded ${items.length} vendor(s).`);
-    } catch {
-      setErrorStatus("Could not reach vendor endpoint.");
-    }
-  }
 
   /** Select a vendor row and populate the edit form. */
   function handleSelect(id: string) {
@@ -309,21 +283,12 @@ export function VendorsConsole() {
         `${dryRun ? "Previewed" : "Applied"} ${result.total_rows} row(s): create ${result.created_count}, update ${result.updated_count}, errors ${result.error_count}.`,
       );
       if (!dryRun) {
-        await loadVendors();
+        await refreshVendors();
       }
     } catch {
       setErrorStatus("Could not reach vendor CSV import endpoint.");
     }
   }
-
-  // Initial data load once a session token is available
-  useEffect(() => {
-    if (!token) {
-      return;
-    }
-    void loadVendors();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
 
   // Reset to page 1 when filters change so the user always sees the first matching results
   useEffect(() => {

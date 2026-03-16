@@ -52,6 +52,8 @@ export type PublicViewerRecipient = {
   phone: string;
 };
 
+import { toAddressLines } from "../utils/address";
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -59,24 +61,6 @@ export type PublicViewerRecipient = {
 /** Trim a nullable string to a safe empty-string default. */
 function normalizeValue(value?: string | null): string {
   return (value || "").trim();
-}
-
-/**
- * Split an address string into individual display lines.
- *
- * Handles both newline-delimited and comma-delimited addresses so it works
- * regardless of how the address was entered in organization settings.
- */
-export function toAddressLines(value?: string | null): string[] {
-  const normalized = normalizeValue(value);
-  if (!normalized) {
-    return [];
-  }
-  return normalized
-    .replace(/\s*,\s*/g, "\n")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
 }
 
 // ---------------------------------------------------------------------------
