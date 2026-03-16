@@ -20,7 +20,7 @@ vi.mock("@/shared/session/use-shared-session", () => ({
 }));
 
 vi.mock("@/shared/session/rbac", () => ({
-  canDo: vi.fn((_caps: unknown, resource: string, _action: string) => {
+  canDo: vi.fn((_caps: unknown, resource: string) => {
     if (resource === "vendor_bills") return true;
     return false;
   }),

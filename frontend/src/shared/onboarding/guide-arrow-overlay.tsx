@@ -151,7 +151,7 @@ export function GuideArrowOverlay() {
         });
       });
     },
-    [isWide, clearHighlight],
+    [isWide],
   );
 
   const hideArrow = useCallback(() => {

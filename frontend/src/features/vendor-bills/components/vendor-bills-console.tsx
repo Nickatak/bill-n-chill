@@ -129,7 +129,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     statuses: billStatuses,
     statusLabels: billStatusLabels,
     allowedTransitions: allowedStatusTransitions,
-    defaultCreateStatus: policyDefaultCreateStatus,
   } = usePolicyContract<VendorBillPolicyContract>({
     fetchContract: fetchVendorBillPolicyContract,
     fallbackStatuses: VENDOR_BILL_STATUSES_FALLBACK,

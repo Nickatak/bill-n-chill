@@ -22,8 +22,6 @@ type CustomerEditorFormProps = {
   onBillingAddressChange: (value: string) => void;
   isArchived: boolean;
   onIsArchivedChange: (value: boolean) => void;
-  projectCount: number;
-  activeProjectCount: number;
   hasActiveOrOnHoldProject: boolean;
   onSubmit: FormEventHandler<HTMLFormElement>;
   readOnly?: boolean;
@@ -43,8 +41,6 @@ export function CustomerEditorForm({
   onBillingAddressChange,
   isArchived,
   onIsArchivedChange,
-  projectCount,
-  activeProjectCount,
   hasActiveOrOnHoldProject,
   onSubmit,
   readOnly = false,

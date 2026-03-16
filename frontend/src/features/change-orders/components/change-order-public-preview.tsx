@@ -33,20 +33,6 @@ type ChangeOrderPublicPreviewProps = {
   publicToken: string;
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: "Draft",
-  pending_approval: "Pending Approval",
-  approved: "Approved",
-  rejected: "Rejected",
-  void: "Void",
-};
-
-/** Resolve a status value to its human-readable label, falling back gracefully. */
-function statusLabel(status?: string): string {
-  const value = (status || "").trim();
-  return STATUS_LABELS[value] || value || "Unknown";
-}
-
 /** Build the public-facing estimate URL for a cross-reference link. */
 function publicEstimateHref(publicRef?: string): string {
   if (!publicRef) {
@@ -70,6 +56,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
   const hasDecision = changeOrder?.status === "approved" || changeOrder?.status === "rejected";
   const sender = useMemo(
     () => resolvePublicSender(changeOrder?.organization_context, changeOrder),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally granular deps
     [changeOrder?.organization_context, changeOrder?.sender_name, changeOrder?.sender_address, changeOrder?.sender_logo_url],
   );
   const recipient = useMemo(

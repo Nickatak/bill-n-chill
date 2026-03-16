@@ -84,7 +84,7 @@ export function PaymentsConsole() {
   const canMutatePayments = canCreatePayments || canEditPayments;
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
-  const { message: statusMessage, tone: statusTone, setNeutral, setSuccess, setError, setMessage: setStatusMessage, clear: clearStatus } = useStatusMessage();
+  const { message: statusMessage, tone: statusTone, setNeutral, setSuccess, setError } = useStatusMessage();
 
   // -- URL params (deep-link from other pages) --
   const searchParams = useSearchParams();
@@ -115,16 +115,18 @@ export function PaymentsConsole() {
 
   // Commit handlers live outside the hooks so they can reference each other's
   // setQuery without circular initialization issues.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const commitCustomerRef = { current: (_c: CustomerRecord | null) => {} };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const commitProjectRef = { current: (_p: ProjectRecord | null) => {} };
 
-  const customerCombobox = useCombobox<CustomerRecord>({
+  const { inputRef: customerInputRef, menuRef: customerMenuRef, ...customerCombobox } = useCombobox<CustomerRecord>({
     items: customers,
     getLabel: (c) => c.display_name,
     onCommit: (c) => commitCustomerRef.current(c),
   });
 
-  const projectCombobox = useCombobox<ProjectRecord>({
+  const { inputRef: projectInputRef, menuRef: projectMenuRef, ...projectCombobox } = useCombobox<ProjectRecord>({
     items: customerProjects,
     getLabel: (p) => `${p.name} ${p.customer_display_name}`,
     onCommit: (p) => commitProjectRef.current(p),
@@ -421,12 +423,14 @@ export function PaymentsConsole() {
     if (!selectedCustomerId || customerCombobox.query) return;
     const match = customers.find((c) => String(c.id) === selectedCustomerId);
     if (match) customerCombobox.setQuery(match.display_name);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally depends on .query only, not the full combobox object
   }, [customers, selectedCustomerId, customerCombobox.query]);
 
   useEffect(() => {
     if (!selectedProjectId || projectCombobox.query) return;
     const match = projects.find((p) => String(p.id) === selectedProjectId);
     if (match) projectCombobox.setQuery(projectDisplayLabel(match));
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally depends on .query only, not the full combobox object
   }, [projects, selectedProjectId, projectCombobox.query]);
 
   // Load invoices (allocation targets) when project selection changes
@@ -699,10 +703,11 @@ export function PaymentsConsole() {
                   <div className={styles.projectCombobox}>
                     <div className={styles.projectInputWrap}>
                       <input
-                        ref={customerCombobox.inputRef}
+                        ref={customerInputRef}
                         className={styles.projectInput}
                         role="combobox"
                         aria-expanded={customerCombobox.isOpen}
+                        aria-controls="customer-combobox-listbox"
                         value={customerCombobox.isOpen ? customerCombobox.query : (selectedCustomer ? selectedCustomer.display_name : "")}
                         placeholder="Type to search customers..."
                         onFocus={() => customerCombobox.open(selectedCustomer ? selectedCustomer.display_name : "")}
@@ -724,7 +729,7 @@ export function PaymentsConsole() {
                           className={styles.projectClear}
                           aria-label="Clear customer selection"
                           onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => customerCombobox.onCommit(null)}
+                          onClick={() => commitCustomer(null)}
                         >
                           ×
                         </button>
@@ -734,14 +739,14 @@ export function PaymentsConsole() {
                           className={styles.projectClear}
                           aria-label="Open customer options"
                           onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => { customerCombobox.inputRef.current?.focus(); customerCombobox.open(""); }}
+                          onClick={() => { customerInputRef.current?.focus(); customerCombobox.open(""); }}
                         >
                           ▾
                         </button>
                       )}
                     </div>
                     {customerCombobox.isOpen ? (
-                      <div ref={customerCombobox.menuRef} className={styles.projectMenu} role="listbox">
+                      <div ref={customerMenuRef} id="customer-combobox-listbox" className={styles.projectMenu} role="listbox">
                         {customerCombobox.filteredItems.map((c, i) => (
                           <button
                             key={c.id}
@@ -751,7 +756,7 @@ export function PaymentsConsole() {
                             className={`${styles.projectOption} ${customerCombobox.highlightIndex === i ? styles.projectOptionActive : ""}`}
                             onMouseDown={(e) => e.preventDefault()}
                             onMouseEnter={() => customerCombobox.setHighlightIndex(i)}
-                            onClick={() => customerCombobox.onCommit(c)}
+                            onClick={() => commitCustomer(c)}
                           >
                             {c.display_name}
                           </button>
@@ -769,10 +774,11 @@ export function PaymentsConsole() {
                   <div className={styles.projectCombobox}>
                     <div className={styles.projectInputWrap}>
                       <input
-                        ref={projectCombobox.inputRef}
+                        ref={projectInputRef}
                         className={styles.projectInput}
                         role="combobox"
                         aria-expanded={projectCombobox.isOpen}
+                        aria-controls="project-combobox-listbox"
                         value={projectCombobox.isOpen ? projectCombobox.query : (selectedProject ? projectDisplayLabel(selectedProject) : "")}
                         placeholder="Type to search projects..."
                         onFocus={() => projectCombobox.open(selectedProject ? projectDisplayLabel(selectedProject) : "")}
@@ -799,14 +805,14 @@ export function PaymentsConsole() {
                           className={styles.projectClear}
                           aria-label="Open project options"
                           onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => { projectCombobox.inputRef.current?.focus(); projectCombobox.open(""); }}
+                          onClick={() => { projectInputRef.current?.focus(); projectCombobox.open(""); }}
                         >
                           ▾
                         </button>
                       )}
                     </div>
                     {projectCombobox.isOpen ? (
-                      <div ref={projectCombobox.menuRef} className={styles.projectMenu} role="listbox">
+                      <div ref={projectMenuRef} id="project-combobox-listbox" className={styles.projectMenu} role="listbox">
                         <button
                           type="button"
                           role="option"

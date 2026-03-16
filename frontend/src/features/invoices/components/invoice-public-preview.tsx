@@ -32,34 +32,20 @@ type InvoicePublicPreviewProps = {
   publicToken: string;
 };
 
-/** Maps API status values to user-facing display labels. */
-const STATUS_LABELS: Record<string, string> = {
-  draft: "Draft",
-  sent: "Sent",
-  partially_paid: "Partially Paid",
-  paid: "Paid",
-  void: "Void",
-};
-
-/** Resolve a human-readable label for an invoice status value. */
-function invoiceStatusLabel(status?: string): string {
-  const normalized = (status || "").trim();
-  return STATUS_LABELS[normalized] || normalized || "Unknown";
-}
-
 /** Renders the public invoice preview page for a customer accessing via tokenized URL. */
 export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps) {
   const [statusMessage, setStatusMessage] = useState("Loading invoice...");
   const [invoice, setInvoice] = useState<InvoiceRecord | null>(null);
   const [decisionMessage, setDecisionMessage] = useState("");
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
-  const [decisionReceiptName, setDecisionReceiptName] = useState("");
+  const [, setDecisionReceiptName] = useState("");
   const { ref: decisionSectionRef, flash: flashDecision } = useCreatorFlash();
   const { printTimestamp } = usePrintContext();
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const sender = useMemo(
     () => resolvePublicSender(invoice?.organization_context, invoice),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally granular deps
     [invoice?.organization_context, invoice?.sender_name, invoice?.sender_address, invoice?.sender_logo_url],
   );
   const recipient = useMemo(
@@ -79,7 +65,6 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
   }, [invoice?.organization_context, invoice?.terms_text]);
   const canDecide =
     invoice?.status === "sent" || invoice?.status === "partially_paid";
-  const decisionStatusLabel = invoiceStatusLabel(invoice?.status);
 
   // Clear stale decision feedback when the invoice is no longer actionable.
   useEffect(() => {
@@ -210,6 +195,7 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
               <>
                 <div className={frameStyles.logoBox}>
                   {sender.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- user-uploaded logo
                     <img
                       className={frameStyles.logoImage}
                       src={sender.logoUrl}

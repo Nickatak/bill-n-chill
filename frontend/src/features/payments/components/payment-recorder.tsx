@@ -37,7 +37,6 @@ import styles from "./payment-recorder.module.css";
 // Fallback constants (used if policy contract fetch fails)
 // ---------------------------------------------------------------------------
 
-const PAYMENT_STATUSES_FALLBACK = ["pending", "settled", "void"];
 const PAYMENT_STATUS_LABELS_FALLBACK: Record<string, string> = {
   pending: "Pending",
   settled: "Settled",

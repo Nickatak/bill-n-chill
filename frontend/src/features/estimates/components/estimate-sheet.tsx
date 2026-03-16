@@ -250,6 +250,7 @@ export function EstimateSheet({
             <div className={creatorStyles.headerRight}>
               <div className={`${creatorStyles.logoBox} ${senderLogoUrl ? creatorStyles.logoBoxHasImage : ""}`}>
                 {senderLogoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- user-uploaded logo
                   <img
                     className={creatorStyles.logoImage}
                     src={senderLogoUrl}

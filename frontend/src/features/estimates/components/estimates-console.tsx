@@ -148,7 +148,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     statuses: estimateStatuses,
     statusLabels: estimateStatusLabels,
     allowedTransitions: estimateAllowedStatusTransitions,
-    defaultCreateStatus,
   } = usePolicyContract<EstimatePolicyContract>({
     fetchContract: fetchEstimatePolicyContract,
     fallbackStatuses: ESTIMATE_STATUSES_FALLBACK,

@@ -21,7 +21,6 @@ import { ProjectListViewer } from "@/shared/project-list-viewer";
 import { ApiResponse, ProjectFinancialSummary, ProjectRecord } from "../types";
 import {
   PROJECT_STATUS_VALUES,
-  PROJECT_STATUS_TRANSITIONS,
   DEFAULT_PROJECT_STATUS_FILTERS,
   parseMoneyValue,
   formatCustomerName,
@@ -58,7 +57,6 @@ export function ProjectsConsole() {
     accepted: number;
   } | null>(null);
   const [acceptedEstimateTotal, setAcceptedEstimateTotal] = useState("--");
-  const [acceptedChangeOrderDeltaTotal, setAcceptedChangeOrderDeltaTotal] = useState("--");
   const [invoiceAllocationTargets, setInvoiceAllocationTargets] = useState<AllocationTarget[]>([]);
   const [isProjectEditOpen, setIsProjectEditOpen] = useState(false);
   const projectEditFormRef = useRef<HTMLFormElement | null>(null);
@@ -270,7 +268,6 @@ export function ProjectsConsole() {
       let draft = 0;
       let sent = 0;
       let accepted = 0;
-      let acceptedDelta = 0;
       for (const changeOrder of rows) {
         if (changeOrder.status === "draft") {
           draft += 1;
@@ -278,14 +275,11 @@ export function ProjectsConsole() {
           sent += 1;
         } else if (changeOrder.status === "approved") {
           accepted += 1;
-          acceptedDelta += parseMoneyValue(changeOrder.amount_delta);
         }
       }
       setChangeOrderStatusCounts({ draft, sent, accepted });
-      setAcceptedChangeOrderDeltaTotal(formatCurrency(acceptedDelta));
     } catch {
       setChangeOrderStatusCounts(null);
-      setAcceptedChangeOrderDeltaTotal("--");
     }
   }
 
@@ -365,7 +359,6 @@ export function ProjectsConsole() {
     setEstimateStatusCounts(null);
     setChangeOrderStatusCounts(null);
     setAcceptedEstimateTotal("--");
-    setAcceptedChangeOrderDeltaTotal("--");
   }, [selectedProjectId, statusFilteredProjects]);
 
   // Scroll the profile form into view when it opens, so users don't miss it off-screen.
@@ -404,7 +397,6 @@ export function ProjectsConsole() {
     setEstimateStatusCounts(null);
     setChangeOrderStatusCounts(null);
     setAcceptedEstimateTotal("--");
-    setAcceptedChangeOrderDeltaTotal("--");
   }
 
   /** Toggles the project profile editor open/closed, pre-selecting the first allowed status. */

@@ -5,11 +5,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-
 import { defaultApiBaseUrl } from "@/shared/api/base";
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
-import { startImpersonation, type SessionRole } from "@/shared/session/client-session";
+import { startImpersonation } from "@/shared/session/client-session";
 import { useSessionAuthorization } from "@/shared/session/session-authorization";
 
 import styles from "./page.module.css";
@@ -26,7 +24,6 @@ type ImpersonatableUser = {
 
 export default function ImpersonatePage() {
   const { token, isSuperuser } = useSessionAuthorization();
-  const router = useRouter();
   const [users, setUsers] = useState<ImpersonatableUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

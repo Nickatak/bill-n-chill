@@ -483,7 +483,6 @@ describe("OrganizationConsole > Team Tab", () => {
 
   it("invite role dropdown excludes owner", async () => {
     await renderAndSwitchToTeam();
-    const options = screen.getAllByRole("option").map((el) => el.textContent);
     // Membership role selects include "owner", but the invite dropdown must not.
     // The invite dropdown is the last <select> — filter to options inside it.
     const inviteSelect = screen.getByDisplayValue("viewer");

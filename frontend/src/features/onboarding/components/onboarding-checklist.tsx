@@ -217,7 +217,7 @@ export function OnboardingChecklist() {
 
   useEffect(() => {
     if (!token) {
-      setLoading(false);
+      setLoading(false); // eslint-disable-line react-hooks/set-state-in-effect -- early return guard
       return;
     }
     void checkProgress();

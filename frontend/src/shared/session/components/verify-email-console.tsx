@@ -54,7 +54,7 @@ export function VerifyEmailConsole({ token }: VerifyEmailConsoleProps) {
 
   useEffect(() => {
     if (!token) {
-      setStatus("error");
+      setStatus("error"); // eslint-disable-line react-hooks/set-state-in-effect -- early return guard
       setErrorMessage("No verification token provided.");
       return;
     }

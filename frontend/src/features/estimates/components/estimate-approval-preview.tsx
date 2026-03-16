@@ -23,7 +23,7 @@ import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import stampStyles from "@/shared/styles/decision-stamp.module.css";
 import styles from "./estimates-console.module.css";
-import { ApiResponse, EstimateLineInput, EstimateRecord } from "../types";
+import { ApiResponse, EstimateRecord } from "../types";
 import {
   estimateStatusLabel,
   mapLineCostCodes,
@@ -55,6 +55,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
   const validThrough = estimate?.valid_through ?? "";
   const sender = useMemo(
     () => resolvePublicSender(estimate?.organization_context, estimate),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally granular deps
     [estimate?.organization_context, estimate?.sender_name, estimate?.sender_address, estimate?.sender_logo_url],
   );
   const recipient = useMemo(
@@ -229,6 +230,7 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
               <>
                 <div className={frameStyles.logoBox}>
                   {sender.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- user-uploaded logo
                     <img
                       className={frameStyles.logoImage}
                       src={sender.logoUrl}

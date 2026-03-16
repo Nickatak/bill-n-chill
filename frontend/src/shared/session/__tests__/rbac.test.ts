@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Capabilities, SessionRole } from "../client-session";
+import type { Capabilities } from "../client-session";
 import { canDo, hasAnyRole } from "../rbac";
 
 describe("hasAnyRole", () => {

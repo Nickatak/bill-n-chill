@@ -18,7 +18,7 @@ export function useClientPagination<T>(items: T[], pageSize = 20) {
   );
 
   useEffect(() => {
-    setPage(1);
+    setPage(1); // eslint-disable-line react-hooks/set-state-in-effect -- reset page on item count change
   }, [items.length]);
 
   return {

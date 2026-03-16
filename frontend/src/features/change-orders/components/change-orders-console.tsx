@@ -50,12 +50,10 @@ import {
   eventActorLabel,
   eventActorHref,
   statusEventActionLabel,
-  formatApprovedDate,
   approvalMeta,
   approvedRollingDeltaForEstimate,
   originalBudgetTotalForEstimate,
   currentApprovedBudgetTotalForEstimate,
-  statusEventLabel,
   lastStatusEventForChangeOrder,
   toLinePayload,
 } from "./change-orders-display";
@@ -1776,6 +1774,7 @@ export function ChangeOrdersConsole({
                   <div className={creatorStyles.headerRight}>
                     <div className={`${creatorStyles.logoBox} ${senderLogoUrl ? creatorStyles.logoBoxHasImage : ""}`}>
                       {senderLogoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- user-uploaded logo
                         <img
                           className={creatorStyles.logoImage}
                           src={senderLogoUrl}
@@ -2116,6 +2115,7 @@ export function ChangeOrdersConsole({
                   <div className={creatorStyles.headerRight}>
                     <div className={`${creatorStyles.logoBox} ${senderLogoUrl ? creatorStyles.logoBoxHasImage : ""}`}>
                       {senderLogoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- user-uploaded logo
                         <img
                           className={creatorStyles.logoImage}
                           src={senderLogoUrl}

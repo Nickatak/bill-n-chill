@@ -31,7 +31,7 @@ export function MobileBottomNav() {
 
   // Close the "More" menu on route change.
   useEffect(() => {
-    setMoreOpen(false);
+    setMoreOpen(false); // eslint-disable-line react-hooks/set-state-in-effect -- reset on navigation
   }, [pathname]);
 
   // Close on Escape.

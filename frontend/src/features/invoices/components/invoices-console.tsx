@@ -245,7 +245,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     statuses: invoiceStatuses,
     statusLabels: invoiceStatusLabels,
     allowedTransitions: invoiceAllowedStatusTransitions,
-    defaultCreateStatus,
   } = usePolicyContract<InvoicePolicyContract>({
     fetchContract: fetchInvoicePolicyContract,
     fallbackStatuses: INVOICE_STATUSES_FALLBACK,
@@ -596,6 +595,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       }
     })();
     void loadContractBreakdown(scopedProjectId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- resetCreateDraft is an untracked plain function; adding it would re-fire on every render
   }, [loadContractBreakdown, loadInvoiceIntoWorkspace, loadInvoices, scopedProjectId, token]);
 
   // Pre-select the most likely next status when the selected invoice changes.
@@ -1580,6 +1580,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
                         <div className={creatorStyles.headerRight}>
                           <div className={`${creatorStyles.logoBox} ${senderLogoUrl ? creatorStyles.logoBoxHasImage : ""}`}>
                             {senderLogoUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element -- user-uploaded logo
                               <img
                                 className={creatorStyles.logoImage}
                                 src={senderLogoUrl}

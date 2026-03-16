@@ -21,7 +21,7 @@ vi.mock("@/shared/session/use-shared-session", () => ({
 }));
 
 vi.mock("@/shared/session/rbac", () => ({
-  canDo: vi.fn((_caps: unknown, resource: string, action: string) => {
+  canDo: vi.fn((_caps: unknown, resource: string) => {
     if (resource === "estimates") return true;
     return false;
   }),
