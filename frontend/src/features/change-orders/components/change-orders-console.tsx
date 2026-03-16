@@ -29,11 +29,35 @@ import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { canDo } from "@/shared/session/rbac";
 import {
   ApiResponse,
+  AuditEventRecord,
   ChangeOrderLineInput,
   ChangeOrderPolicyContract,
   ChangeOrderRecord,
   CostCodeOption,
+  OrganizationDocumentDefaults,
+  OriginEstimateLineItem,
+  OriginEstimateRecord,
 } from "../types";
+import {
+  CHANGE_ORDER_STATUS_LABELS_FALLBACK,
+  CHANGE_ORDER_STATUSES_FALLBACK,
+  CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK,
+  CHANGE_ORDER_MIN_LINE_ITEMS_ERROR,
+  statusLabel,
+  quickStatusControlLabel,
+  formatEventDateTime,
+  eventActorLabel,
+  eventActorHref,
+  statusEventActionLabel,
+  formatApprovedDate,
+  approvalMeta,
+  approvedRollingDeltaForEstimate,
+  originalBudgetTotalForEstimate,
+  currentApprovedBudgetTotalForEstimate,
+  statusEventLabel,
+  lastStatusEventForChangeOrder,
+  toLinePayload,
+} from "./change-orders-display";
 import { usePrintable } from "@/shared/shell/printable-context";
 import styles from "./change-orders-console.module.css";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
@@ -43,7 +67,6 @@ import { DocumentCreator } from "@/shared/document-creator";
 import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
 import {
   resolveOrganizationBranding,
-  type OrganizationBrandingDefaults,
 } from "@/shared/document-creator";
 import {
   createChangeOrderDocumentAdapter,
@@ -73,65 +96,6 @@ type ChangeOrdersConsoleProps = {
   initialOriginEstimateId?: number | null;
 };
 
-type OriginEstimateLineItem = {
-  id: number;
-  cost_code_code?: string;
-  cost_code_name?: string;
-  description: string;
-  quantity: string;
-  unit: string;
-  unit_cost: string;
-  markup_percent: string;
-  line_total: string;
-};
-
-type OriginEstimateRecord = {
-  id: number;
-  title: string;
-  version: number;
-  approved_at: string | null;
-  approved_by_email: string | null;
-  grand_total: string;
-  line_items: OriginEstimateLineItem[];
-};
-
-type AuditEventRecord = {
-  id: number;
-  event_type: string;
-  object_type: string;
-  object_id: number;
-  from_status: string;
-  to_status: string;
-  note: string;
-  metadata_json?: Record<string, unknown> | null;
-  created_by: number;
-  created_by_email: string | null;
-  created_by_display?: string | null;
-  created_by_customer_id?: number | null;
-  created_at: string;
-};
-
-type OrganizationDocumentDefaults = OrganizationBrandingDefaults & {
-  change_order_terms_and_conditions: string;
-};
-
-const CHANGE_ORDER_STATUS_LABELS_FALLBACK: Record<string, string> = {
-  draft: "Draft",
-  pending_approval: "Pending Approval",
-  approved: "Approved",
-  rejected: "Rejected",
-  void: "Void",
-};
-const CHANGE_ORDER_STATUSES_FALLBACK = ["draft", "pending_approval", "approved", "rejected", "void"];
-
-const CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
-  draft: ["pending_approval", "void"],
-  pending_approval: ["approved", "rejected", "void"],
-  approved: [],
-  rejected: ["void"],
-  void: [],
-};
-const CHANGE_ORDER_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
 
 // ---------------------------------------------------------------------------
 // Component
@@ -358,10 +322,10 @@ export function ChangeOrdersConsole({
       : editStatusBadgeClass(selectedChangeOrder.status);
   const isEditSubmitDisabled = !isSelectedChangeOrderEditable;
   const currentAcceptedTotal = selectedViewerEstimate
-    ? currentApprovedBudgetTotalForEstimate(selectedViewerEstimate.id)
+    ? currentApprovedBudgetTotalForEstimate(selectedViewerEstimate.id, changeOrders, originEstimateOriginalTotals)
     : null;
   const originalEstimateTotal = selectedViewerEstimate
-    ? originalBudgetTotalForEstimate(selectedViewerEstimate.id)
+    ? originalBudgetTotalForEstimate(selectedViewerEstimate.id, originEstimateOriginalTotals)
     : null;
   const changeOrderCreatorStatusPolicy = useMemo(
     () =>
@@ -444,21 +408,8 @@ export function ChangeOrdersConsole({
   })();
 
   // -------------------------------------------------------------------------
-  // Display helpers
+  // Display helpers (CSS-dependent — kept in component; pure helpers in change-orders-display.ts)
   // -------------------------------------------------------------------------
-
-  /** Resolve a status value to its human-readable label. */
-  function statusLabel(status: string): string {
-    const label = changeOrderStatusLabels[status];
-    if (label) {
-      return label;
-    }
-    return status
-      .split("_")
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(" ");
-  }
-
 
   const setFeedback = useCallback((message: string, tone: "error" | "success" | "info" = "info") => {
     setActionMessage(message);
@@ -473,154 +424,12 @@ export function ChangeOrdersConsole({
     return styles[key] ?? "";
   }
 
-  function quickStatusControlLabel(status: string, currentStatus?: string): string {
-    if (status === "pending_approval" || status === "sent") {
-      return currentStatus === status ? "Re-send" : "Send";
-    }
-    if (status === "void") {
-      return "Void";
-    }
-    if (status === "approved") {
-      return "Approved";
-    }
-    if (status === "rejected") {
-      return "Rejected";
-    }
-    if (status === "draft") {
-      return "Draft";
-    }
-    return statusLabel(status);
-  }
-
   function editStatusBadgeClass(status: string): string {
     const key = `editStatus${status
       .split("_")
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
       .join("")}`;
     return styles[key] ?? styles.editStatusDraft;
-  }
-
-  /** Format an ISO datetime string into a short human-readable date+time. */
-  function formatEventDateTime(dateValue: string): string {
-    const parsed = new Date(dateValue);
-    if (Number.isNaN(parsed.getTime())) {
-      return "unknown";
-    }
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    }).format(parsed);
-  }
-
-  /** Derive a display name for the actor of an audit event. */
-  function eventActorLabel(event: AuditEventRecord): string {
-    const actorDisplay = (event.created_by_display || "").trim();
-    if (actorDisplay) {
-      return actorDisplay;
-    }
-    const actorEmail = (event.created_by_email || "").trim();
-    if (actorEmail) {
-      return actorEmail;
-    }
-    if (Number.isFinite(event.created_by)) {
-      return `user #${event.created_by}`;
-    }
-    return "unknown user";
-  }
-
-  /** Build a link to the customer record if the actor was a customer. */
-  function eventActorHref(event: AuditEventRecord): string | null {
-    const actorCustomerId = Number(event.created_by_customer_id);
-    if (Number.isInteger(actorCustomerId) && actorCustomerId > 0) {
-      return `/customers?customer=${actorCustomerId}`;
-    }
-    return null;
-  }
-
-  /** Render the actor label, optionally as a customer link. */
-  function renderEventActor(event: AuditEventRecord) {
-    const label = eventActorLabel(event);
-    const href = eventActorHref(event);
-    if (!href) {
-      return label;
-    }
-    return (
-      <Link href={href} className={styles.eventActorLink}>
-        {label}
-      </Link>
-    );
-  }
-
-  /** Sum approved CO deltas for a given origin estimate. */
-  function approvedRollingDeltaForEstimate(estimateId: number): string {
-    const total = changeOrders.reduce((sum, changeOrder) => {
-      if (
-        changeOrder.origin_estimate !== estimateId ||
-        changeOrder.status !== "approved"
-      ) {
-        return sum;
-      }
-      return sum + parseAmount(changeOrder.amount_delta);
-    }, 0);
-    return formatDecimal(total);
-  }
-
-  function originalBudgetTotalForEstimate(estimateId: number): string {
-    return formatDecimal(originEstimateOriginalTotals[estimateId] ?? 0);
-  }
-
-  function currentApprovedBudgetTotalForEstimate(estimateId: number): string {
-    return formatDecimal(
-      parseAmount(originalBudgetTotalForEstimate(estimateId)) + parseAmount(approvedRollingDeltaForEstimate(estimateId)),
-    );
-  }
-
-  function statusEventLabel(status: string): string {
-    if (!status) {
-      return "Unset";
-    }
-    return statusLabel(status);
-  }
-
-  /** Derive a past-tense action label from a status audit event. */
-  function statusEventActionLabel(event: AuditEventRecord): string {
-    const fromStatus = event.from_status || "";
-    const toStatus = event.to_status || "";
-    const statusAction = String(event.metadata_json?.status_action || "").toLowerCase();
-    if (statusAction === "notate") {
-      return "Notated";
-    }
-    if (statusAction === "resend") {
-      return "Re-sent";
-    }
-    if (!fromStatus && toStatus === "draft") {
-      return "Created";
-    }
-    if (fromStatus === toStatus && (event.note || "").trim()) {
-      return "Notated";
-    }
-    if (fromStatus === "pending_approval" && toStatus === "pending_approval") {
-      return "Re-sent";
-    }
-    if (fromStatus === "draft" && toStatus === "pending_approval") {
-      return "Sent";
-    }
-    if (toStatus === "approved") {
-      return "Approved";
-    }
-    if (toStatus === "rejected") {
-      return "Rejected";
-    }
-    if (toStatus === "void") {
-      return "Voided";
-    }
-    if (toStatus === "draft" && fromStatus) {
-      return "Returned to Draft";
-    }
-    return `${statusEventLabel(fromStatus)} -> ${statusEventLabel(toStatus)}`;
   }
 
   function statusEventActionClass(event: AuditEventRecord): string {
@@ -668,45 +477,18 @@ export function ChangeOrdersConsole({
     return styles[key] ?? "";
   }
 
-  function lastStatusEventForChangeOrder(changeOrderId: number): AuditEventRecord | null {
-    const events = projectAuditEvents
-      .filter((event) =>
-        event.event_type === "change_order_updated" &&
-        event.object_type === "change_order" &&
-        event.object_id === changeOrderId &&
-        (Boolean(event.from_status) || Boolean(event.to_status)))
-      .sort((left, right) => {
-        const leftTime = Date.parse(left.created_at);
-        const rightTime = Date.parse(right.created_at);
-        if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) {
-          return rightTime - leftTime;
-        }
-        return right.id - left.id;
-      });
-    return events[0] ?? null;
-  }
-
-  function formatApprovedDate(dateValue: string | null): string {
-    if (!dateValue) {
-      return "unknown date";
+  /** Render the actor label, optionally as a customer link. */
+  function renderEventActor(event: AuditEventRecord) {
+    const label = eventActorLabel(event);
+    const href = eventActorHref(event);
+    if (!href) {
+      return label;
     }
-    const parsed = new Date(dateValue);
-    if (Number.isNaN(parsed.getTime())) {
-      return "unknown date";
-    }
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(parsed);
-  }
-
-  function approvalMeta(estimate: OriginEstimateRecord): string {
-    const dateLabel = formatApprovedDate(estimate.approved_at);
-    if (estimate.approved_by_email) {
-      return `approved on ${dateLabel} by ${estimate.approved_by_email}`;
-    }
-    return `approved on ${dateLabel}`;
+    return (
+      <Link href={href} className={styles.eventActorLink}>
+        {label}
+      </Link>
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -1071,19 +853,6 @@ export function ChangeOrdersConsole({
   // Line item handlers
   // -------------------------------------------------------------------------
 
-  /** Convert local line-item state into the API payload shape. */
-  function toLinePayload(lines: ChangeOrderLineInput[]) {
-    return lines
-      .filter((line) => line.costCodeId.trim() !== "")
-      .map((line) => ({
-        cost_code: Number(line.costCodeId),
-        description: line.description,
-        adjustment_reason: line.adjustmentReason,
-        amount_delta: line.amountDelta.trim() || "0",
-        days_delta: Number(line.daysDelta.trim() || "0"),
-      }));
-  }
-
   /** Patch a single field on a line item in a given line-item set. */
   function updateLine(
     setter: LineSetter,
@@ -1324,14 +1093,14 @@ export function ChangeOrdersConsole({
         const persisted = rows.find((row) => row.id === updated.id);
         hydrateEditForm(persisted ?? updated);
         await loadProjectAuditEvents(projectId);
-        setFeedback(`Saved change order ${coLabel(updated)} (${statusLabel(updated.status)}).`, "success");
+        setFeedback(`Saved change order ${coLabel(updated)} (${statusLabel(updated.status, changeOrderStatusLabels)}).`, "success");
       } else {
         setChangeOrders((current) =>
           current.map((row) => (row.id === updated.id ? updated : row)),
         );
         hydrateEditForm(updated);
         await loadProjectAuditEvents(projectId);
-        setFeedback(`Saved change order ${coLabel(updated)} (${statusLabel(updated.status)}).`, "success");
+        setFeedback(`Saved change order ${coLabel(updated)} (${statusLabel(updated.status, changeOrderStatusLabels)}).`, "success");
       }
     } catch {
       setFeedback("Could not reach change order detail endpoint.", "error");
@@ -1390,7 +1159,7 @@ export function ChangeOrdersConsole({
       if (isResend) {
         setFeedback(`Re-sent ${coLabel(updated)} for approval. History updated.${emailNote}`, "success");
       } else {
-        setFeedback(`Updated ${coLabel(updated)} to ${statusLabel(updated.status)}. History updated.${emailNote}`, "success");
+        setFeedback(`Updated ${coLabel(updated)} to ${statusLabel(updated.status, changeOrderStatusLabels)}. History updated.${emailNote}`, "success");
       }
       setQuickStatus("");
       setQuickStatusNote("");
@@ -1653,15 +1422,15 @@ export function ChangeOrdersConsole({
                       </span>
                       <span className={styles.viewerRailMetrics}>
                         <span className={styles.viewerMetricCurrent}>
-                          Current ${currentApprovedBudgetTotalForEstimate(estimate.id)}
+                          Current ${currentApprovedBudgetTotalForEstimate(estimate.id, changeOrders, originEstimateOriginalTotals)}
                         </span>
                         {" · "}
                         <span className={styles.viewerMetricOriginal}>
-                          Original ${originalBudgetTotalForEstimate(estimate.id)}
+                          Original ${originalBudgetTotalForEstimate(estimate.id, originEstimateOriginalTotals)}
                         </span>
                         {" · "}
                         <span className={styles.viewerMetricDelta}>
-                          CO Delta ${approvedRollingDeltaForEstimate(estimate.id)}
+                          CO Delta ${approvedRollingDeltaForEstimate(estimate.id, changeOrders)}
                         </span>
                       </span>
                       {selectedProjectId ? (
@@ -1686,7 +1455,7 @@ export function ChangeOrdersConsole({
                     <div className={`${styles.viewerRail} ${styles.viewerHistoryRail}`}>
                       {paginatedChangeOrders.map((changeOrder) => {
                         const active = String(changeOrder.id) === selectedChangeOrderId;
-                        const lastStatusEvent = lastStatusEventForChangeOrder(changeOrder.id);
+                        const lastStatusEvent = lastStatusEventForChangeOrder(changeOrder.id, projectAuditEvents);
                         return (
                           <div
                             key={changeOrder.id}
@@ -1702,7 +1471,7 @@ export function ChangeOrdersConsole({
                               <span className={styles.viewerRailTitleText}>
                                 {changeOrder.title || "Untitled"} · {coLabel(changeOrder)}
                               </span>
-                              <span className={styles.viewerHistoryStatusText}>{statusLabel(changeOrder.status)}</span>
+                              <span className={styles.viewerHistoryStatusText}>{statusLabel(changeOrder.status, changeOrderStatusLabels)}</span>
                             </span>
                             <span
                               className={`${styles.viewerHistoryMetaText} ${styles.viewerHistoryLineDelta} ${
@@ -1715,7 +1484,7 @@ export function ChangeOrdersConsole({
                             </span>
                             {lastStatusEvent ? (
                               <span className={styles.viewerHistoryMetaText}>
-                                Last action: {statusEventActionLabel(lastStatusEvent)} on{" "}
+                                Last action: {statusEventActionLabel(lastStatusEvent, changeOrderStatusLabels)} on{" "}
                                 {formatEventDateTime(lastStatusEvent.created_at)} by {eventActorLabel(lastStatusEvent)}
                               </span>
                             ) : (
@@ -1773,7 +1542,7 @@ export function ChangeOrdersConsole({
                                           onClick={() => setQuickStatus(status)}
                                           aria-pressed={isSelected}
                                         >
-                                          {quickStatusControlLabel(status, selectedViewerChangeOrder?.status)}
+                                          {quickStatusControlLabel(status, changeOrderStatusLabels, selectedViewerChangeOrder?.status)}
                                         </button>
                                       );
                                     })}
@@ -1845,7 +1614,7 @@ export function ChangeOrdersConsole({
                                     ).map((event) => (
                                       <li key={event.id} className={styles.viewerEventItem}>
                                         <span className={`${styles.viewerEventAction} ${statusEventActionClass(event)}`}>
-                                          {statusEventActionLabel(event)}
+                                          {statusEventActionLabel(event, changeOrderStatusLabels)}
                                         </span>
                                         <span className={styles.viewerEventMeta}>
                                           {formatEventDateTime(event.created_at)} by {renderEventActor(event)}

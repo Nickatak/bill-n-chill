@@ -1,7 +1,50 @@
 import type { UserData, OrganizationPublicContext } from "@/shared/types/domain";
 export type { UserData, OrganizationPublicContext } from "@/shared/types/domain";
+import type { OrganizationBrandingDefaults } from "@/shared/document-creator";
 
 export type ProjectRecord = { id: number; name: string; customer_display_name: string };
+
+export type OriginEstimateLineItem = {
+  id: number;
+  cost_code_code?: string;
+  cost_code_name?: string;
+  description: string;
+  quantity: string;
+  unit: string;
+  unit_cost: string;
+  markup_percent: string;
+  line_total: string;
+};
+
+export type OriginEstimateRecord = {
+  id: number;
+  title: string;
+  version: number;
+  approved_at: string | null;
+  approved_by_email: string | null;
+  grand_total: string;
+  line_items: OriginEstimateLineItem[];
+};
+
+export type AuditEventRecord = {
+  id: number;
+  event_type: string;
+  object_type: string;
+  object_id: number;
+  from_status: string;
+  to_status: string;
+  note: string;
+  metadata_json?: Record<string, unknown> | null;
+  created_by: number;
+  created_by_email: string | null;
+  created_by_display?: string | null;
+  created_by_customer_id?: number | null;
+  created_at: string;
+};
+
+export type OrganizationDocumentDefaults = OrganizationBrandingDefaults & {
+  change_order_terms_and_conditions: string;
+};
 
 export type CostCodeOption = {
   id: number;
