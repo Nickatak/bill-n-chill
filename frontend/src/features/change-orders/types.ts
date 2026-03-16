@@ -4,6 +4,7 @@ import type { OrganizationBrandingDefaults } from "@/shared/document-creator";
 
 export type ProjectRecord = { id: number; name: string; customer_display_name: string };
 
+/** A single line item from an approved origin estimate, used in contract breakdown displays. */
 export type OriginEstimateLineItem = {
   id: number;
   cost_code_code?: string;
@@ -16,6 +17,7 @@ export type OriginEstimateLineItem = {
   line_total: string;
 };
 
+/** An approved estimate linked as the origin/baseline for change orders. */
 export type OriginEstimateRecord = {
   id: number;
   title: string;
@@ -26,6 +28,7 @@ export type OriginEstimateRecord = {
   line_items: OriginEstimateLineItem[];
 };
 
+/** A project-level audit event record from the status-events timeline API. */
 export type AuditEventRecord = {
   id: number;
   event_type: string;
@@ -42,6 +45,7 @@ export type AuditEventRecord = {
   created_at: string;
 };
 
+/** Organization branding defaults extended with change-order-specific T&C. */
 export type OrganizationDocumentDefaults = OrganizationBrandingDefaults & {
   change_order_terms_and_conditions: string;
 };
