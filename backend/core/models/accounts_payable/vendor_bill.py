@@ -107,6 +107,9 @@ class VendorBill(StatusTransitionMixin, models.Model):
         if self.status == self.Status.SCHEDULED and self.scheduled_for is None:
             errors.setdefault("scheduled_for", []).append("Provide a scheduled payment date.")
 
+        # Standard Django pattern: system-controlled status changes (e.g.
+        # payment allocation) set this flag to bypass user-facing transition
+        # rules.  See payments_helpers.py.
         if not getattr(self, "_skip_transition_validation", False):
             self.validate_status_transition(errors)
 

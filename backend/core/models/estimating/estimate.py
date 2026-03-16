@@ -124,10 +124,14 @@ class Estimate(StatusTransitionMixin, models.Model):
     def save(self, *args, **kwargs):
         """Auto-generate public token if missing, then validate and persist."""
         if not self.public_token:
-            while True:
+            # 24-char token space makes collisions near-impossible; bounded
+            # loop is a safeguard so a broken generator can't hang save().
+            for _ in range(10):
                 candidate = generate_public_token()
                 if not Estimate.objects.filter(public_token=candidate).exists():
                     self.public_token = candidate
                     break
+            else:
+                raise RuntimeError("Failed to generate unique public token after 10 attempts")
         self.full_clean()
         return super().save(*args, **kwargs)

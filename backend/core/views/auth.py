@@ -1015,17 +1015,20 @@ def impersonate_users_view(request):
 
     users = (
         User.objects.filter(is_active=True, is_superuser=False)
-        .select_related()
         .order_by("email")
     )
 
+    memberships_by_user = {}
+    for m in OrganizationMembership.objects.select_related("organization").filter(user__in=users):
+        memberships_by_user.setdefault(m.user_id, m)
+
     result = []
     for user in users:
-        membership = OrganizationMembership.objects.select_related("organization").filter(user=user).first()
         entry = {
             "id": user.id,
             "email": user.email,
         }
+        membership = memberships_by_user.get(user.id)
         if membership:
             entry["organization"] = {
                 "id": membership.organization_id,

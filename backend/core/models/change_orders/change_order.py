@@ -277,11 +277,15 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
         """Auto-generate public token if missing, then validate and persist."""
         update_fields = kwargs.get("update_fields")
         if not self.public_token:
-            while True:
+            # 24-char token space makes collisions near-impossible; bounded
+            # loop is a safeguard so a broken generator can't hang save().
+            for _ in range(10):
                 candidate = generate_public_token()
                 if not type(self).objects.filter(public_token=candidate).exists():
                     self.public_token = candidate
                     break
+            else:
+                raise RuntimeError("Failed to generate unique public token after 10 attempts")
             if update_fields is not None:
                 update_fields_set = set(update_fields)
                 update_fields_set.add("public_token")

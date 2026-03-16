@@ -82,6 +82,9 @@ class Payment(StatusTransitionMixin, models.Model):
     )
     direction = models.CharField(max_length=16, choices=Direction.choices)
     method = models.CharField(max_length=16, choices=Method.choices)
+    # Default is SETTLED because payments are currently recorded manually
+    # (i.e., money already received). PENDING exists for future gateway/QBO
+    # integration where payments may need to clear before settling.
     status = models.CharField(
         max_length=16,
         choices=Status.choices,
