@@ -136,10 +136,10 @@ Expected URLs (key surfaces):
 - Frontend app: `http://localhost:3000`
 - Customers: `http://localhost:3000/customers`
 - Projects: `http://localhost:3000/projects`
-- Estimates: `http://localhost:3000/estimates`
-- Change Orders: `http://localhost:3000/change-orders`
+- Accounting: `http://localhost:3000/accounting`
 - Invoices: `http://localhost:3000/invoices`
-- Vendor Bills: `http://localhost:3000/vendor-bills`
+- Bills: `http://localhost:3000/bills`
+- Change Orders: `http://localhost:3000/change-orders`
 - Organization: `http://localhost:3000/ops/organization`
 
 For the full API route map see `docs/api.md`. For the full frontend route map see `frontend/ARCHITECTURE_MAP.md`.

@@ -95,7 +95,7 @@ All: `fetch PATCH /api/v1/invoices/{invoiceId}/`
   - **Line items branch** (three-way):
     - `has_line_items` → [`_apply_invoice_lines_and_totals()`](../../backend/core/views/accounts_receivable/invoices_helpers.py#L77) — full line replace + totals recompute, sets `balance_due = total` (or 0 if paid)
     - `has_tax_percent` only → re-applies existing lines with new tax (same helper)
-    - **status change only** → ⚠️ naively resets `balance_due` to 0 (paid) or `invoice.total` (other) — **ignores existing payment allocations** (see bug #1)
+    - **status change only** → recomputes `balance_due` from settled payment allocations (fixed 2026-03-15; honors `PAID` override)
   - **Status event:** [`InvoiceStatusEvent.record(from, to, note)`](../../backend/core/models) — recorded when status changed, re-sent, or note requested
 
 *── post-commit: email ──*
@@ -177,8 +177,8 @@ All: `fetch PATCH /api/v1/invoices/{invoiceId}/`
 - Returns `InvoiceStatusEvent` history for one invoice
 
 
-## Known Issues
+## Resolved Issues (2026-03-15)
 
-1. **balance_due reset on status-only PATCH** ([invoices.py:556-560](../../backend/core/views/accounts_receivable/invoices.py#L556)): When a PATCH changes only status (no line items or tax), `balance_due` is naively reset to `invoice.total` (or 0 for paid). This ignores existing settled payment allocations. A partially-paid invoice that gets a status change would have its balance_due blown back to the full total. Should use `_set_invoice_balance_from_allocations()` from `payments_helpers.py` instead.
+1. **balance_due reset on status-only PATCH** — Fixed: now recomputes from settled `PaymentAllocation` records instead of naively resetting to `invoice.total`.
 
-2. **`_apply_invoice_lines_and_totals` also has the same pattern** ([invoices_helpers.py:112](../../backend/core/views/accounts_receivable/invoices_helpers.py#L112)): `balance_due = MONEY_ZERO if status == PAID else total` — same naive reset, ignoring allocations. If line items are edited on a partially-paid invoice, allocations are wiped.
+2. **`_apply_invoice_lines_and_totals` allocation-unaware reset** — Fixed: queries settled allocations and computes `balance_due = new_total - applied_total`, clamped to 0.
