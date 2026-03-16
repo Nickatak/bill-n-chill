@@ -120,8 +120,6 @@ export function ProjectsConsole() {
   const statusFilteredProjects = filteredProjects.filter((project) =>
     projectStatusFilters.includes(project.status as ProjectStatusValue),
   );
-  const contractOriginalDisplay =
-    summary?.contract_value_original ?? selectedProject?.contract_value_original ?? "--";
   const acceptedContractRaw =
     summary?.accepted_contract_total ??
     selectedProject?.accepted_contract_total ??
@@ -244,7 +242,7 @@ export function ProjectsConsole() {
           draft += 1;
         } else if (estimate.status === "sent") {
           sent += 1;
-        } else if (estimate.status === "approved" || estimate.status === "accepted") {
+        } else if (estimate.status === "approved") {
           approved += 1;
           acceptedTotal += parseMoneyValue(estimate.grand_total);
         }
@@ -278,7 +276,7 @@ export function ProjectsConsole() {
           draft += 1;
         } else if (changeOrder.status === "pending_approval" || changeOrder.status === "sent") {
           sent += 1;
-        } else if (changeOrder.status === "accepted" || changeOrder.status === "approved") {
+        } else if (changeOrder.status === "approved") {
           accepted += 1;
           acceptedDelta += parseMoneyValue(changeOrder.amount_delta);
         }

@@ -281,8 +281,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     (option) => !ESTIMATE_SYSTEM_ONLY_STATUSES.has(option.value),
   );
   const estimateStatusFilterValues = viewerStatusOptions.map((option) => option.value);
-  const statusDisplayOptions = statusOptions;
-  const statusLabelByValue = statusDisplayOptions.reduce<Record<string, string>>((labels, option) => {
+  const statusLabelByValue = statusOptions.reduce<Record<string, string>>((labels, option) => {
     labels[option.value] = option.label;
     return labels;
   }, {});
@@ -532,7 +531,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setConfirmedFamilyTitleKey("");
     loadEstimateIntoForm(estimate);
     setDuplicateTitle(`${estimate.title || "Estimate"} Copy`);
-  }, [estimateAllowedStatusTransitions, loadEstimateIntoForm]);
+  }, [loadEstimateIntoForm]);
 
   // Keep the ref in sync so async callbacks always see the latest selection.
   useEffect(() => {
@@ -568,11 +567,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setEstimateDate(nextEstimateDate);
     setValidThrough(nextValidThrough);
     duplicateDialogRef.current?.close();
-  }, [
-    costCodes,
-    defaultCreateStatus,
-    organizationDefaults,
-  ]);
+  }, [organizationDefaults]);
 
   /** Reset the composer to a blank draft. */
   function startNewEstimate() {

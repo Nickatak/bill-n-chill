@@ -282,7 +282,7 @@ export function ChangeOrdersConsole({
   const selectedViewerEstimateRecordId = selectedViewerEstimate?.id ?? null;
   const approvedCOsForSelectedEstimate = useMemo(() => {
     return viewerChangeOrders.filter((co) =>
-      ["approved", "accepted"].includes(co.status),
+      co.status === "approved",
     );
   }, [viewerChangeOrders]);
   const selectedViewerChangeOrderIdValue = selectedViewerChangeOrder?.id ?? null;
@@ -290,14 +290,13 @@ export function ChangeOrdersConsole({
     ? parseAmount(selectedViewerChangeOrder.line_total_delta || selectedViewerChangeOrder.amount_delta)
     : 0;
   const selectedViewerChangeOrderIsApproved = Boolean(
-    selectedViewerChangeOrder && ["approved", "accepted"].includes(selectedViewerChangeOrder.status),
+    selectedViewerChangeOrder && selectedViewerChangeOrder.status === "approved",
   );
   const senderBranding = resolveOrganizationBranding(organizationDefaults);
   const senderName = senderBranding.senderDisplayName;
   const senderEmail = senderBranding.helpEmail;
   const senderAddressLines = senderBranding.senderAddressLines;
   const senderLogoUrl = senderBranding.logoUrl;
-  const defaultChangeOrderReason = "";
   const defaultChangeOrderTerms = (organizationDefaults?.change_order_terms_and_conditions || "").trim();
   const newLineDeltaTotal = useMemo(
     () =>
@@ -426,7 +425,7 @@ export function ChangeOrdersConsole({
     const approvedRollingDelta = changeOrders.reduce((sum, changeOrder) => {
       if (
         changeOrder.origin_estimate !== selectedViewerEstimateRecordId ||
-        !["approved", "accepted"].includes(changeOrder.status)
+        changeOrder.status !== "approved"
       ) {
         return sum;
       }
@@ -481,7 +480,7 @@ export function ChangeOrdersConsole({
     if (status === "void") {
       return "Void";
     }
-    if (status === "approved" || status === "accepted") {
+    if (status === "approved") {
       return "Approved";
     }
     if (status === "rejected") {
@@ -560,7 +559,7 @@ export function ChangeOrdersConsole({
     const total = changeOrders.reduce((sum, changeOrder) => {
       if (
         changeOrder.origin_estimate !== estimateId ||
-        !["approved", "accepted"].includes(changeOrder.status)
+        changeOrder.status !== "approved"
       ) {
         return sum;
       }
@@ -609,7 +608,7 @@ export function ChangeOrdersConsole({
     if (fromStatus === "draft" && toStatus === "pending_approval") {
       return "Sent";
     }
-    if (toStatus === "approved" || toStatus === "accepted") {
+    if (toStatus === "approved") {
       return "Approved";
     }
     if (toStatus === "rejected") {
@@ -646,7 +645,7 @@ export function ChangeOrdersConsole({
     if (fromStatus === "draft" && toStatus === "pending_approval") {
       return styles.statusEventSent;
     }
-    if (toStatus === "approved" || toStatus === "accepted") {
+    if (toStatus === "approved") {
       return styles.statusEventApproved;
     }
     if (toStatus === "rejected") {
@@ -1150,7 +1149,7 @@ export function ChangeOrdersConsole({
     hydrateEditForm(undefined);
     setNewTitleManuallyEdited(false);
     setNewTitle(defaultChangeOrderTitle(selectedProjectName));
-    setNewReason(defaultChangeOrderReason);
+    setNewReason("");
     setNewTermsText(defaultChangeOrderTerms);
     setNewLineItems([emptyLine(1)]);
     setNewLineNextLocalId(2);
@@ -1219,7 +1218,7 @@ export function ChangeOrdersConsole({
       setNewLineNextLocalId(2);
       setNewTitleManuallyEdited(false);
       setNewTitle(defaultChangeOrderTitle(selectedProjectName));
-      setNewReason(defaultChangeOrderReason);
+      setNewReason("");
       setNewTermsText(defaultChangeOrderTerms);
       setCreateFlashCount((c) => c + 1);
     } catch {
