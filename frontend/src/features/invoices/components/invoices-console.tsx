@@ -51,6 +51,7 @@ import {
   toInvoiceStatusPolicy,
 } from "../document-adapter";
 import { useMediaQuery } from "@/shared/hooks/use-media-query";
+import { useLineItems } from "@/shared/hooks/use-line-items";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import { useClientPagination } from "@/shared/hooks/use-client-pagination";
 import { PaginationControls } from "@/shared/components/pagination-controls";
@@ -280,9 +281,17 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
   const [dueDate, setDueDate] = useState(futureDateInput());
   const [taxPercent, setTaxPercent] = useState("0");
   const [termsText, setTermsText] = useState("");
-  const [lineItems, setLineItems] = useState<InvoiceLineInput[]>([emptyLine(1)]);
+  const {
+    items: lineItems,
+    setItems: setLineItems,
+    nextId: nextLineId,
+    setNextId: setNextLineId,
+    add: addLine,
+    remove: removeLine,
+    update: updateLine,
+    reset: resetLines,
+  } = useLineItems<InvoiceLineInput>({ createEmpty: emptyLine });
   const lineValidation = useMemo(() => validateInvoiceLineItems(lineItems), [lineItems]);
-  const [nextLineId, setNextLineId] = useState(2);
   const [workspaceSourceInvoiceId, setWorkspaceSourceInvoiceId] = useState<number | null>(null);
   const [editingDraftInvoiceId, setEditingDraftInvoiceId] = useState<number | null>(null);
   const [workspaceContext, setWorkspaceContext] = useState("New invoice draft");
@@ -561,7 +570,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
         setWorkspaceContext(`Viewing ${invoice.invoice_number} (locked)`);
       }
     },
-    [invoiceToWorkspaceLines],
+    [invoiceToWorkspaceLines, setLineItems, setNextLineId],
   );
 
   // -------------------------------------------------------------------------
@@ -648,29 +657,19 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     if (statusTone === "error" && statusMessage === INVOICE_MIN_LINE_ITEMS_ERROR) {
       clearStatus();
     }
-    setLineItems((current) => [...current, emptyLine(nextLineId)]);
-    setNextLineId((value) => value + 1);
+    addLine();
   }
 
   /** Remove a line item by local ID, enforcing the minimum-one-line constraint. */
   function removeLineItem(localId: number) {
-    if (lineItems.length <= 1) {
+    if (!removeLine(localId)) {
       setErrorStatus(INVOICE_MIN_LINE_ITEMS_ERROR);
-      return;
     }
-    setLineItems((current) => current.filter((line) => line.localId !== localId));
   }
 
   /** Update a single field on a line item. */
   function updateLineItem(localId: number, key: keyof Omit<InvoiceLineInput, "localId">, value: string) {
-    setLineItems((current) =>
-      current.map((line) => {
-        if (line.localId !== localId) {
-          return line;
-        }
-        return { ...line, [key]: value };
-      }),
-    );
+    updateLine(localId, { [key]: value });
   }
 
   /** Select an invoice from the list and load it into the creator workspace. */
@@ -690,8 +689,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     setDueDate(dueDateFromIssueDate(nextIssueDate, dueDays));
     setTaxPercent("0");
     setTermsText(organizationInvoiceDefaults?.invoice_terms_and_conditions || "");
-    setLineItems([emptyLine(1)]);
-    setNextLineId(2);
+    resetLines();
     setWorkspaceSourceInvoiceId(null);
     setEditingDraftInvoiceId(null);
     setWorkspaceContext("New invoice draft");

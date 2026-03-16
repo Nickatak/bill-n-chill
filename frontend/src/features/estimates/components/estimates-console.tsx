@@ -54,6 +54,7 @@ import {
 } from "../helpers";
 import { EstimateSheet, OrganizationDocumentDefaults } from "./estimate-sheet";
 import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
+import { useLineItems } from "@/shared/hooks/use-line-items";
 import { useMediaQuery } from "@/shared/hooks/use-media-query";
 
 // ---------------------------------------------------------------------------
@@ -193,10 +194,15 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const [confirmedFamilyTitleKey, setConfirmedFamilyTitleKey] = useState("");
   const [termsText, setTermsText] = useState("");
   const [taxPercent, setTaxPercent] = useState("0");
-  const [lineItems, setLineItems] = useState<EstimateLineInput[]>([emptyLine(1)]);
+  const {
+    items: lineItems, setItems: setLineItems,
+    setNextId: setNextLineId,
+    add: addLineRaw, remove: removeLineRaw,
+    update: updateLineRaw, move: moveLineRaw,
+    duplicate: duplicateLineRaw, reset: resetLines,
+  } = useLineItems<EstimateLineInput>({ createEmpty: emptyLine });
   const [lineSortKey, setLineSortKey] = useState<LineSortKey | null>(null);
   const [lineSortDirection, setLineSortDirection] = useState<"asc" | "desc">("asc");
-  const [nextLineId, setNextLineId] = useState(2);
   const [estimateDate, setEstimateDate] = useState("");
   const [validThrough, setValidThrough] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -499,7 +505,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     if (createdDate) {
       setEstimateDate(createdDate);
     }
-  }, [organizationDefaults?.estimate_terms_and_conditions]);
+  }, [organizationDefaults?.estimate_terms_and_conditions, setLineItems, setNextLineId]);
 
   const handleSelectEstimate = useCallback((estimate: EstimateRecord) => {
     const nextEstimateId = String(estimate.id);
@@ -547,14 +553,13 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setConfirmedFamilyTitleKey("");
     setTermsText(organizationDefaults?.estimate_terms_and_conditions || "");
     setTaxPercent("0");
-    setLineItems([emptyLine(1)]);
+    resetLines();
     setLineSortKey(null);
     setLineSortDirection("asc");
-    setNextLineId(2);
     setEstimateDate(nextEstimateDate);
     setValidThrough(nextValidThrough);
     duplicateDialogRef.current?.close();
-  }, [organizationDefaults]);
+  }, [organizationDefaults, resetLines]);
 
   /** Reset the composer to a blank draft. */
   function startNewEstimate() {
@@ -778,53 +783,26 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   // -------------------------------------------------------------------------
 
   function addLineItem() {
-    if (formErrorMessage === ESTIMATE_MIN_LINE_ITEMS_ERROR) {
-      setFormErrorMessage("");
-    }
-    setLineItems((current) => [...current, emptyLine(nextLineId)]);
-    setNextLineId((value) => value + 1);
+    if (formErrorMessage === ESTIMATE_MIN_LINE_ITEMS_ERROR) setFormErrorMessage("");
+    addLineRaw();
   }
 
   function duplicateLineItem(localId: number) {
-    if (formErrorMessage === ESTIMATE_MIN_LINE_ITEMS_ERROR) {
-      setFormErrorMessage("");
-    }
-    const target = lineItems.find((line) => line.localId === localId);
-    if (!target) {
-      return;
-    }
-    setLineItems((current) => [...current, { ...target, localId: nextLineId }]);
-    setNextLineId((value) => value + 1);
+    if (formErrorMessage === ESTIMATE_MIN_LINE_ITEMS_ERROR) setFormErrorMessage("");
+    duplicateLineRaw(localId);
   }
 
   function moveLineItem(localId: number, direction: "up" | "down") {
-    setLineItems((current) => {
-      const index = current.findIndex((line) => line.localId === localId);
-      if (index === -1) {
-        return current;
-      }
-      const targetIndex = direction === "up" ? index - 1 : index + 1;
-      if (targetIndex < 0 || targetIndex >= current.length) {
-        return current;
-      }
-      const next = [...current];
-      const [item] = next.splice(index, 1);
-      next.splice(targetIndex, 0, item);
-      return next;
-    });
+    moveLineRaw(localId, direction);
     setLineSortKey(null);
     setLineSortDirection("asc");
   }
 
   function removeLineItem(localId: number) {
-    if (lineItems.length <= 1) {
+    if (!removeLineRaw(localId)) {
       setFormErrorMessage(ESTIMATE_MIN_LINE_ITEMS_ERROR);
       setFormSuccessMessage("");
-        return;
     }
-    setLineItems((current) => {
-      return current.filter((line) => line.localId !== localId);
-    });
   }
 
   function updateLineItem(
@@ -834,9 +812,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   ) {
     setFormErrorMessage("");
     setFormSuccessMessage("");
-    setLineItems((current) =>
-      current.map((line) => (line.localId === localId ? { ...line, [key]: value } : line)),
-    );
+    updateLineRaw(localId, { [key]: value });
   }
 
   /** Sort line items by the given column key, toggling direction on repeat clicks. */

@@ -8,10 +8,10 @@
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { canDo } from "@/shared/session/rbac";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
-import { useStatusMessage } from "@/shared/hooks/use-status-message";
+import { useApiList } from "@/shared/hooks/use-api-list";
 import { useClientPagination } from "@/shared/hooks/use-client-pagination";
 import { PaginationControls } from "@/shared/components/pagination-controls";
 import styles from "./cost-codes-console.module.css";
@@ -25,16 +25,35 @@ export function CostCodesConsole() {
   const { token, authMessage, capabilities } = useSharedSessionAuth();
   const canMutateCostCodes = canDo(capabilities, "cost_codes", "create");
 
-  const [rows, setRows] = useState<CostCode[]>([]);
-  const [selectedId, setSelectedId] = useState<string>("");
   const {
-    message: statusMessage,
-    tone: statusTone,
-    setNeutral: setNeutralStatus,
-    setSuccess: setSuccessStatus,
-    setError: setErrorStatus,
-    setMessage: setStatusMessage,
-  } = useStatusMessage();
+    items: rows,
+    setItems: setRows,
+    selectedId,
+    setSelectedId,
+    refresh: refreshCostCodes,
+    status: {
+      message: statusMessage,
+      tone: statusTone,
+      setNeutral: setNeutralStatus,
+      setSuccess: setSuccessStatus,
+      setError: setErrorStatus,
+    },
+  } = useApiList<CostCode>({
+    endpoint: "/cost-codes/",
+    token,
+    autoSelect: true,
+    onSuccess(items) {
+      if (!items.length) {
+        switchToCreate();
+        return;
+      }
+      // Hydrate form synchronously so the edit panel renders immediately.
+      // For initial load, selectedId is "" so we fall through to items[0].
+      // For reloads (e.g. CSV import), re-select the previously-selected item.
+      const preferred = items.find((row) => String(row.id) === selectedId) ?? items[0];
+      hydrate(preferred);
+    },
+  });
   const [searchTerm, setSearchTerm] = useState("");
   const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("active");
 
@@ -46,7 +65,6 @@ export function CostCodesConsole() {
   const [importCsvText, setImportCsvText] = useState("code,name\n");
   const [importResult, setImportResult] = useState<CsvImportResult | null>(null);
   const [importExpanded, setImportExpanded] = useState(false);
-  const selectedIdRef = useRef<string>("");
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const orderedRows = useMemo(
@@ -90,61 +108,6 @@ export function CostCodesConsole() {
     setIsActive(true);
     setFormMode("create");
   }
-
-  // Keep ref in sync so the async loadCostCodes callback can read the latest selection
-  useEffect(() => {
-    selectedIdRef.current = selectedId;
-  }, [selectedId]);
-
-  /** Fetch all cost codes and re-select the previously-selected row if still present. */
-  const loadCostCodes = useCallback(
-    async (options?: { keepStatusOnSuccess?: boolean }) => {
-      setNeutralStatus("Loading cost codes...");
-      try {
-        const response = await fetch(`${normalizedBaseUrl}/cost-codes/`, {
-          headers: buildAuthHeaders(token),
-        });
-        const payload: ApiResponse = await response.json();
-        if (!response.ok) {
-          setErrorStatus(payload.error?.message ?? "Could not load cost codes.");
-          return;
-        }
-
-        const items = (payload.data as CostCode[]) ?? [];
-        setRows(items);
-
-        if (!items.length) {
-          switchToCreate();
-          if (!options?.keepStatusOnSuccess) {
-            setNeutralStatus("No cost codes found. Create one to get started.");
-          }
-          return;
-        }
-
-        const preferred =
-          items.find((row) => String(row.id) === selectedIdRef.current) ?? items[0];
-        setSelectedId(String(preferred.id));
-        hydrate(preferred);
-        if (!options?.keepStatusOnSuccess) {
-          setStatusMessage("");
-        }
-      } catch {
-        setErrorStatus("Could not reach cost code endpoint.");
-      }
-    },
-    [normalizedBaseUrl, setErrorStatus, setNeutralStatus, setStatusMessage, token],
-  );
-
-  // Initial data load once a session token is available
-  useEffect(() => {
-    if (!token) {
-      return;
-    }
-    const run = window.setTimeout(() => {
-      void loadCostCodes();
-    }, 0);
-    return () => window.clearTimeout(run);
-  }, [loadCostCodes, token]);
 
   /** Select a cost code row and populate the edit form. */
   function handleSelect(id: string) {
@@ -240,12 +203,12 @@ export function CostCodesConsole() {
 
       const result = payload.data as CsvImportResult;
       setImportResult(result);
+      if (!dryRun) {
+        await refreshCostCodes();
+      }
       setSuccessStatus(
         `${dryRun ? "Previewed" : "Applied"} ${result.total_rows} row(s): create ${result.created_count}, update ${result.updated_count}, errors ${result.error_count}.`,
       );
-      if (!dryRun) {
-        await loadCostCodes({ keepStatusOnSuccess: true });
-      }
     } catch {
       setErrorStatus("Could not reach cost code CSV import endpoint.");
     }

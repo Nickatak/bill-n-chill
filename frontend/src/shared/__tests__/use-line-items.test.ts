@@ -147,6 +147,27 @@ describe("useLineItems", () => {
   });
 
   // ---------------------------------------------------------------------------
+  // duplicate
+  // ---------------------------------------------------------------------------
+
+  it("duplicates a line with a new localId", () => {
+    const { result } = setup();
+    act(() => { result.current.update(1, { description: "Original", amount: "500" }); });
+    act(() => { result.current.duplicate(1); });
+    expect(result.current.items).toHaveLength(2);
+    expect(result.current.items[1].description).toBe("Original");
+    expect(result.current.items[1].amount).toBe("500");
+    expect(result.current.items[1].localId).toBe(2);
+    expect(result.current.nextId).toBe(3);
+  });
+
+  it("does not add a line when duplicating non-existent localId", () => {
+    const { result } = setup();
+    act(() => { result.current.duplicate(999); });
+    expect(result.current.items).toHaveLength(1);
+  });
+
+  // ---------------------------------------------------------------------------
   // reset
   // ---------------------------------------------------------------------------
 

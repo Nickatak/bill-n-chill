@@ -31,6 +31,8 @@ export interface UseLineItemsReturn<T extends HasLocalId> {
   update: (localId: number, patch: Partial<T>) => void;
   /** Move a line item up or down by one position. */
   move: (localId: number, direction: "up" | "down") => void;
+  /** Duplicate an existing line item with a new localId. Returns the new localId. */
+  duplicate: (localId: number) => number;
   /** Reset to a single empty line with localId=1. */
   reset: () => void;
 }
@@ -91,10 +93,21 @@ export function useLineItems<T extends HasLocalId>(
     });
   }, []);
 
+  const duplicate = useCallback((localId: number): number => {
+    const newLocalId = nextId;
+    setNextId((current) => current + 1);
+    setItems((current) => {
+      const source = current.find((line) => line.localId === localId);
+      if (!source) return current;
+      return [...current, { ...source, localId: newLocalId }];
+    });
+    return newLocalId;
+  }, [nextId]);
+
   const reset = useCallback(() => {
     setItems([createEmpty(1)]);
     setNextId(2);
   }, [createEmpty]);
 
-  return { items, setItems, nextId, setNextId, add, remove, update, move, reset };
+  return { items, setItems, nextId, setNextId, add, remove, update, move, duplicate, reset };
 }

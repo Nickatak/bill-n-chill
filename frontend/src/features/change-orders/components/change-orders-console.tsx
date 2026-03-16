@@ -73,6 +73,7 @@ import {
   toChangeOrderStatusPolicy,
 } from "../document-adapter";
 import { useMediaQuery } from "@/shared/hooks/use-media-query";
+import { useLineItems } from "@/shared/hooks/use-line-items";
 import { useClientPagination } from "@/shared/hooks/use-client-pagination";
 import { PaginationControls } from "@/shared/components/pagination-controls";
 import { MobileLineItemCard } from "@/shared/document-creator/mobile-line-card";
@@ -83,12 +84,6 @@ import { ReadOnlyLineTable, readOnlyLineTableStyles as roTableStyles } from "@/s
 // ---------------------------------------------------------------------------
 // Types & constants
 // ---------------------------------------------------------------------------
-
-type LineSetter = (
-  value:
-    | ChangeOrderLineInput[]
-    | ((current: ChangeOrderLineInput[]) => ChangeOrderLineInput[]),
-) => void;
 
 type ChangeOrdersConsoleProps = {
   scopedProjectId?: number | null;
@@ -121,8 +116,17 @@ export function ChangeOrdersConsole({
   >({});
   const [projectEstimates, setProjectEstimates] = useState<OriginEstimateRecord[]>([]);
   const [projectAuditEvents, setProjectAuditEvents] = useState<AuditEventRecord[]>([]);
-  const [newLineNextLocalId, setNewLineNextLocalId] = useState(2);
-  const [editLineNextLocalId, setEditLineNextLocalId] = useState(2);
+  const {
+    items: newLineItems,
+    add: addNewLineRaw, remove: removeNewLineRaw,
+    update: updateNewLine, move: moveNewLine, reset: resetNewLines,
+  } = useLineItems<ChangeOrderLineInput>({ createEmpty: emptyLine });
+  const {
+    items: editLineItems, setItems: setEditLineItems,
+    setNextId: setEditLineNextLocalId,
+    add: addEditLineRaw, remove: removeEditLineRaw,
+    update: updateEditLine, move: moveEditLine, reset: resetEditLines,
+  } = useLineItems<ChangeOrderLineInput>({ createEmpty: emptyLine });
   const [selectedProjectName, setSelectedProjectName] = useState("");
   const [selectedProjectCustomerEmail, setSelectedProjectCustomerEmail] = useState("");
   const [organizationDefaults, setOrganizationDefaults] =
@@ -132,12 +136,10 @@ export function ChangeOrdersConsole({
   const [newTitleManuallyEdited, setNewTitleManuallyEdited] = useState(false);
   const [newReason, setNewReason] = useState("");
   const [newTermsText, setNewTermsText] = useState("");
-  const [newLineItems, setNewLineItems] = useState<ChangeOrderLineInput[]>([emptyLine(1)]);
 
   const [editTitle, setEditTitle] = useState("");
   const [editReason, setEditReason] = useState("");
   const [editTermsText, setEditTermsText] = useState("");
-  const [editLineItems, setEditLineItems] = useState<ChangeOrderLineInput[]>([emptyLine(1)]);
   const [quickStatus, setQuickStatus] = useState("");
   const [quickStatusNote, setQuickStatusNote] = useState("");
   const [isStatusSectionOpen, setIsStatusSectionOpen] = useState(true);
@@ -474,8 +476,7 @@ export function ChangeOrdersConsole({
       setEditTitle("");
       setEditReason("");
       setEditTermsText("");
-      setEditLineItems([emptyLine(1)]);
-      setEditLineNextLocalId(2);
+      resetEditLines();
       setQuickStatus("");
       setQuickStatusNote("");
       return;
@@ -506,7 +507,7 @@ export function ChangeOrdersConsole({
     setQuickStatus("");
     setQuickStatusNote("");
     setShowAllEvents(false);
-  }, [setFeedback]);
+  }, [setFeedback, resetEditLines, setEditLineItems, setEditLineNextLocalId]);
 
   const loadProjectEstimates = useCallback(async (projectId: number) => {
     try {
@@ -706,8 +707,7 @@ export function ChangeOrdersConsole({
         return;
       }
       const rows = (payload.data as Array<{ id: number; name: string; customer_email?: string }>) ?? [];
-      setNewLineItems([emptyLine(1)]);
-      setNewLineNextLocalId(2);
+      resetNewLines();
       if (rows[0]) {
         const scopedMatch = scopedProjectId
           ? rows.find((project) => project.id === scopedProjectId)
@@ -760,6 +760,7 @@ export function ChangeOrdersConsole({
     loadProjectAuditEvents,
     loadProjectEstimates,
     normalizedBaseUrl,
+    resetNewLines,
     scopedProjectId,
     setFeedback,
     token,
@@ -826,60 +827,22 @@ export function ChangeOrdersConsole({
   // Line item handlers
   // -------------------------------------------------------------------------
 
-  /** Patch a single field on a line item in a given line-item set. */
-  function updateLine(
-    setter: LineSetter,
-    localId: number,
-    patch: Partial<ChangeOrderLineInput>,
-  ) {
-    setter((current) =>
-      current.map((line) => (line.localId === localId ? { ...line, ...patch } : line)),
-    );
+  /** Append a new blank line, clearing a min-line error if present. */
+  function addNewLine() {
+    if (actionTone === "error" && actionMessage === CHANGE_ORDER_MIN_LINE_ITEMS_ERROR) setFeedback("");
+    addNewLineRaw();
   }
-
-  /** Append a new blank line to the given line-item set. */
-  function addLine(
-    setter: LineSetter,
-    idCounter: number,
-    setIdCounter: React.Dispatch<React.SetStateAction<number>>,
-  ) {
-    if (actionTone === "error" && actionMessage === CHANGE_ORDER_MIN_LINE_ITEMS_ERROR) {
-      setFeedback("");
-    }
-    const localId = idCounter;
-    setIdCounter((current) => current + 1);
-    setter((current) => [...current, emptyLine(localId)]);
+  function addEditLine() {
+    if (actionTone === "error" && actionMessage === CHANGE_ORDER_MIN_LINE_ITEMS_ERROR) setFeedback("");
+    addEditLineRaw();
   }
 
   /** Remove a line item, enforcing the minimum of one line. */
-  function removeLine(
-    setter: LineSetter,
-    lines: ChangeOrderLineInput[],
-    localId: number,
-  ) {
-    if (lines.length <= 1) {
-      setFeedback(CHANGE_ORDER_MIN_LINE_ITEMS_ERROR, "error");
-      return;
-    }
-    setter((current) => current.filter((line) => line.localId !== localId));
+  function removeNewLine(localId: number) {
+    if (!removeNewLineRaw(localId)) setFeedback(CHANGE_ORDER_MIN_LINE_ITEMS_ERROR, "error");
   }
-
-  /** Swap a line item up or down within the given line-item set. */
-  function moveLine(
-    setter: LineSetter,
-    localId: number,
-    direction: "up" | "down",
-  ) {
-    setter((current) => {
-      const index = current.findIndex((line) => line.localId === localId);
-      if (index === -1) return current;
-      const targetIndex = direction === "up" ? index - 1 : index + 1;
-      if (targetIndex < 0 || targetIndex >= current.length) return current;
-      const next = [...current];
-      const [item] = next.splice(index, 1);
-      next.splice(targetIndex, 0, item);
-      return next;
-    });
+  function removeEditLine(localId: number) {
+    if (!removeEditLineRaw(localId)) setFeedback(CHANGE_ORDER_MIN_LINE_ITEMS_ERROR, "error");
   }
 
   // -------------------------------------------------------------------------
@@ -893,8 +856,7 @@ export function ChangeOrdersConsole({
     setNewTitle(defaultChangeOrderTitle(selectedProjectName));
     setNewReason("");
     setNewTermsText(defaultChangeOrderTerms);
-    setNewLineItems([emptyLine(1)]);
-    setNewLineNextLocalId(2);
+    resetNewLines();
     setFeedback("Ready for a new change order draft.", "info");
     flashCreate();
   }
@@ -956,8 +918,7 @@ export function ChangeOrdersConsole({
         await loadProjectAuditEvents(projectId);
       }
       setFeedback(`Created change order #${created.id}.`, "success");
-      setNewLineItems([emptyLine(1)]);
-      setNewLineNextLocalId(2);
+      resetNewLines();
       setNewTitleManuallyEdited(false);
       setNewTitle(defaultChangeOrderTitle(selectedProjectName));
       setNewReason("");
@@ -1835,9 +1796,9 @@ export function ChangeOrdersConsole({
                           index={index}
                           isFirst={index === 0}
                           isLast={index === newLineItems.length - 1}
-                          onRemove={() => removeLine(setNewLineItems, newLineItems, line.localId)}
-                          onMoveUp={() => moveLine(setNewLineItems, line.localId, "up")}
-                          onMoveDown={() => moveLine(setNewLineItems, line.localId, "down")}
+                          onRemove={() => removeNewLine(line.localId)}
+                          onMoveUp={() => moveNewLine(line.localId, "up")}
+                          onMoveDown={() => moveNewLine(line.localId, "down")}
                           validationError={rowIssues.length ? `Row ${index + 1}: ${rowIssues.join(" ")}` : undefined}
                           fields={[
                             {
@@ -1849,7 +1810,7 @@ export function ChangeOrdersConsole({
                                   costCodes={costCodes}
                                   value={line.costCodeId}
                                   onChange={(nextValue) =>
-                                    updateLine(setNewLineItems, line.localId, { costCodeId: nextValue })
+                                    updateNewLine(line.localId, { costCodeId: nextValue })
                                   }
                                   ariaLabel="Cost code"
                                   placeholder="Search cost code"
@@ -1866,7 +1827,7 @@ export function ChangeOrdersConsole({
                                   value={line.description}
                                   placeholder="Optional CO scope note"
                                   onChange={(event) =>
-                                    updateLine(setNewLineItems, line.localId, { description: event.target.value })
+                                    updateNewLine(line.localId, { description: event.target.value })
                                   }
                                 />
                               ),
@@ -1880,7 +1841,7 @@ export function ChangeOrdersConsole({
                                   value={line.amountDelta}
                                   placeholder="0.00 (USD)"
                                   onChange={(event) =>
-                                    updateLine(setNewLineItems, line.localId, { amountDelta: event.target.value })
+                                    updateNewLine(line.localId, { amountDelta: event.target.value })
                                   }
                                   inputMode="decimal"
                                 />
@@ -1895,7 +1856,7 @@ export function ChangeOrdersConsole({
                                   value={line.daysDelta}
                                   placeholder="0 days"
                                   onChange={(event) =>
-                                    updateLine(setNewLineItems, line.localId, { daysDelta: event.target.value })
+                                    updateNewLine(line.localId, { daysDelta: event.target.value })
                                   }
                                   inputMode="numeric"
                                 />
@@ -1933,7 +1894,7 @@ export function ChangeOrdersConsole({
                                   costCodes={costCodes}
                                   value={line.costCodeId}
                                   onChange={(nextValue) =>
-                                    updateLine(setNewLineItems, line.localId, { costCodeId: nextValue })
+                                    updateNewLine(line.localId, { costCodeId: nextValue })
                                   }
                                   ariaLabel="Cost code"
                                   placeholder="Search cost code"
@@ -1945,7 +1906,7 @@ export function ChangeOrdersConsole({
                               value={line.description}
                               placeholder="Optional CO scope note"
                               onChange={(event) =>
-                                updateLine(setNewLineItems, line.localId, { description: event.target.value })
+                                updateNewLine(line.localId, { description: event.target.value })
                               }
                             />
                             <input
@@ -1953,7 +1914,7 @@ export function ChangeOrdersConsole({
                               value={line.amountDelta}
                               placeholder="0.00 (USD)"
                               onChange={(event) =>
-                                updateLine(setNewLineItems, line.localId, { amountDelta: event.target.value })
+                                updateNewLine(line.localId, { amountDelta: event.target.value })
                               }
                               inputMode="decimal"
                             />
@@ -1962,7 +1923,7 @@ export function ChangeOrdersConsole({
                               value={line.daysDelta}
                               placeholder="0 days"
                               onChange={(event) =>
-                                updateLine(setNewLineItems, line.localId, { daysDelta: event.target.value })
+                                updateNewLine(line.localId, { daysDelta: event.target.value })
                               }
                               inputMode="numeric"
                             />
@@ -1970,7 +1931,7 @@ export function ChangeOrdersConsole({
                               <button
                                 type="button"
                                 className={`${creatorStyles.smallButton} ${index === 0 ? creatorStyles.actionDisabled : ""}`}
-                                onClick={() => moveLine(setNewLineItems, line.localId, "up")}
+                                onClick={() => moveNewLine(line.localId, "up")}
                                 disabled={index === 0}
                               >
                                 Up
@@ -1978,7 +1939,7 @@ export function ChangeOrdersConsole({
                               <button
                                 type="button"
                                 className={`${creatorStyles.smallButton} ${index === newLineItems.length - 1 ? creatorStyles.actionDisabled : ""}`}
-                                onClick={() => moveLine(setNewLineItems, line.localId, "down")}
+                                onClick={() => moveNewLine(line.localId, "down")}
                                 disabled={index === newLineItems.length - 1}
                               >
                                 Down
@@ -1986,7 +1947,7 @@ export function ChangeOrdersConsole({
                               <button
                                 type="button"
                                 className={creatorStyles.smallButton}
-                                onClick={() => removeLine(setNewLineItems, newLineItems, line.localId)}
+                                onClick={() => removeNewLine(line.localId)}
                               >
                                 Remove
                               </button>
@@ -2006,7 +1967,7 @@ export function ChangeOrdersConsole({
                   <button
                     type="button"
                     className={`${creatorStyles.secondaryButton} ${changeOrderCreatorStyles.coLineAddButton}`}
-                    onClick={() => addLine(setNewLineItems, newLineNextLocalId, setNewLineNextLocalId)}
+                    onClick={() => addNewLine()}
                   >
                     Add Line Item
                   </button>
@@ -2181,9 +2142,9 @@ export function ChangeOrdersConsole({
                           readOnly={!isSelectedChangeOrderEditable}
                           isFirst={index === 0}
                           isLast={index === editLineItems.length - 1}
-                          onRemove={isSelectedChangeOrderEditable ? () => removeLine(setEditLineItems, editLineItems, line.localId) : undefined}
-                          onMoveUp={isSelectedChangeOrderEditable ? () => moveLine(setEditLineItems, line.localId, "up") : undefined}
-                          onMoveDown={isSelectedChangeOrderEditable ? () => moveLine(setEditLineItems, line.localId, "down") : undefined}
+                          onRemove={isSelectedChangeOrderEditable ? () => removeEditLine(line.localId) : undefined}
+                          onMoveUp={isSelectedChangeOrderEditable ? () => moveEditLine(line.localId, "up") : undefined}
+                          onMoveDown={isSelectedChangeOrderEditable ? () => moveEditLine(line.localId, "down") : undefined}
                           validationError={rowIssues.length ? `Row ${index + 1}: ${rowIssues.join(" ")}` : undefined}
                           fields={[
                             {
@@ -2195,7 +2156,7 @@ export function ChangeOrdersConsole({
                                   costCodes={costCodes}
                                   value={line.costCodeId}
                                   onChange={(nextValue) =>
-                                    updateLine(setEditLineItems, line.localId, { costCodeId: nextValue })
+                                    updateEditLine(line.localId, { costCodeId: nextValue })
                                   }
                                   ariaLabel="Cost code"
                                   disabled={!isSelectedChangeOrderEditable}
@@ -2213,7 +2174,7 @@ export function ChangeOrdersConsole({
                                   value={line.description}
                                   placeholder="Optional CO scope note"
                                   onChange={(event) =>
-                                    updateLine(setEditLineItems, line.localId, { description: event.target.value })
+                                    updateEditLine(line.localId, { description: event.target.value })
                                   }
                                   disabled={!isSelectedChangeOrderEditable}
                                 />
@@ -2228,7 +2189,7 @@ export function ChangeOrdersConsole({
                                   value={line.amountDelta}
                                   placeholder="0.00 (USD)"
                                   onChange={(event) =>
-                                    updateLine(setEditLineItems, line.localId, { amountDelta: event.target.value })
+                                    updateEditLine(line.localId, { amountDelta: event.target.value })
                                   }
                                   inputMode="decimal"
                                   disabled={!isSelectedChangeOrderEditable}
@@ -2244,7 +2205,7 @@ export function ChangeOrdersConsole({
                                   value={line.daysDelta}
                                   placeholder="0 days"
                                   onChange={(event) =>
-                                    updateLine(setEditLineItems, line.localId, { daysDelta: event.target.value })
+                                    updateEditLine(line.localId, { daysDelta: event.target.value })
                                   }
                                   inputMode="numeric"
                                   disabled={!isSelectedChangeOrderEditable}
@@ -2283,7 +2244,7 @@ export function ChangeOrdersConsole({
                                   costCodes={costCodes}
                                   value={line.costCodeId}
                                   onChange={(nextValue) =>
-                                    updateLine(setEditLineItems, line.localId, { costCodeId: nextValue })
+                                    updateEditLine(line.localId, { costCodeId: nextValue })
                                   }
                                   ariaLabel="Cost code"
                                   disabled={!isSelectedChangeOrderEditable}
@@ -2296,7 +2257,7 @@ export function ChangeOrdersConsole({
                               value={line.description}
                               placeholder="Optional CO scope note"
                               onChange={(event) =>
-                                updateLine(setEditLineItems, line.localId, { description: event.target.value })
+                                updateEditLine(line.localId, { description: event.target.value })
                               }
                               disabled={!isSelectedChangeOrderEditable}
                             />
@@ -2305,7 +2266,7 @@ export function ChangeOrdersConsole({
                               value={line.amountDelta}
                               placeholder="0.00 (USD)"
                               onChange={(event) =>
-                                updateLine(setEditLineItems, line.localId, { amountDelta: event.target.value })
+                                updateEditLine(line.localId, { amountDelta: event.target.value })
                               }
                               inputMode="decimal"
                               disabled={!isSelectedChangeOrderEditable}
@@ -2315,7 +2276,7 @@ export function ChangeOrdersConsole({
                               value={line.daysDelta}
                               placeholder="0 days"
                               onChange={(event) =>
-                                updateLine(setEditLineItems, line.localId, { daysDelta: event.target.value })
+                                updateEditLine(line.localId, { daysDelta: event.target.value })
                               }
                               inputMode="numeric"
                               disabled={!isSelectedChangeOrderEditable}
@@ -2325,7 +2286,7 @@ export function ChangeOrdersConsole({
                                 <button
                                   type="button"
                                   className={`${creatorStyles.smallButton} ${index === 0 ? creatorStyles.actionDisabled : ""}`}
-                                  onClick={() => moveLine(setEditLineItems, line.localId, "up")}
+                                  onClick={() => moveEditLine(line.localId, "up")}
                                   disabled={index === 0}
                                 >
                                   Up
@@ -2333,7 +2294,7 @@ export function ChangeOrdersConsole({
                                 <button
                                   type="button"
                                   className={`${creatorStyles.smallButton} ${index === editLineItems.length - 1 ? creatorStyles.actionDisabled : ""}`}
-                                  onClick={() => moveLine(setEditLineItems, line.localId, "down")}
+                                  onClick={() => moveEditLine(line.localId, "down")}
                                   disabled={index === editLineItems.length - 1}
                                 >
                                   Down
@@ -2341,7 +2302,7 @@ export function ChangeOrdersConsole({
                                 <button
                                   type="button"
                                   className={creatorStyles.smallButton}
-                                  onClick={() => removeLine(setEditLineItems, editLineItems, line.localId)}
+                                  onClick={() => removeEditLine(line.localId)}
                                 >
                                   Remove
                                 </button>
@@ -2363,7 +2324,7 @@ export function ChangeOrdersConsole({
                     <button
                       type="button"
                       className={`${creatorStyles.secondaryButton} ${changeOrderCreatorStyles.coLineAddButton}`}
-                      onClick={() => addLine(setEditLineItems, editLineNextLocalId, setEditLineNextLocalId)}
+                      onClick={() => addEditLine()}
                     >
                       Add Line Item
                     </button>
