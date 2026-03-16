@@ -613,25 +613,29 @@ def payment_allocate_view(request, payment_id: int):
             status=400,
         )
 
-    existing_total = _all_allocated_total(payment)
-    max_allocatable = quantize_money(Decimal(str(payment.amount)) - existing_total)
-    if new_total > max_allocatable:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "Allocation amount exceeds unapplied payment balance.",
-                    "fields": {
-                        "allocations": [
-                            f"Requested {new_total}, but only {max_allocatable} remains unapplied."
-                        ]
-                    },
-                }
-            },
-            status=400,
-        )
-
     with transaction.atomic():
+        # Lock the payment row so concurrent allocation requests serialize
+        # and cannot double-spend the unapplied balance.
+        Payment.objects.select_for_update().get(id=payment.id)
+
+        existing_total = _all_allocated_total(payment)
+        max_allocatable = quantize_money(Decimal(str(payment.amount)) - existing_total)
+        if new_total > max_allocatable:
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "Allocation amount exceeds unapplied payment balance.",
+                        "fields": {
+                            "allocations": [
+                                f"Requested {new_total}, but only {max_allocatable} remains unapplied."
+                            ]
+                        },
+                    }
+                },
+                status=400,
+            )
+
         created_allocations = []
         for row, invoice, vendor_bill in resolved_targets:
             created_allocations.append(

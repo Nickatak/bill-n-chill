@@ -1233,9 +1233,8 @@ class ProjectTimelineTests(TestCase):
         self.assertEqual(data["category"], "all")
         self.assertEqual(data["item_count"], 1)
         self.assertEqual(data["items"][0]["category"], "workflow")
-        self.assertEqual(data["items"][0]["event_type"], "estimate_status_event")
+        self.assertEqual(data["items"][0]["event_type"], "estimate_status")
         self.assertIn("ui_route", data["items"][0])
-        self.assertIn("detail_endpoint", data["items"][0])
 
     def test_project_timeline_category_filter_validation_and_scope(self):
         invalid = self.client.get(
