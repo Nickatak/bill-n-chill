@@ -228,47 +228,8 @@
   font-weight: 600;
 }
 
-.fieldInput,
-.fieldSelect {
-  border: 1px solid var(--border-accent);
-  border-radius: var(--radius-md);
-  padding: 8px 10px;
-  background: var(--input-bg);
-  color: var(--input-text);
-  font-size: 0.95rem;
-}
-
-.fieldInput[readonly] {
-  background: var(--input-readonly-bg);
-  color: var(--input-readonly-text);
-}
-
-.fieldInput:disabled,
-.lineInput:disabled,
-.summaryTaxInput:disabled,
-.lineSelect:disabled {
-  background: var(--input-disabled-bg);
-  color: var(--input-disabled-text);
-  border-color: var(--input-disabled-border);
-  opacity: 1;
-  cursor: default;
-}
-
-.sheetReadOnly .fieldInput,
-.sheetReadOnly .lineInput,
-.sheetReadOnly .summaryTaxInput {
-  background: var(--input-readonly-bg);
-  color: var(--input-readonly-text);
-  border-color: var(--input-disabled-border);
-}
-
-.sheetReadOnly .lineSelect:disabled {
-  background: var(--input-readonly-bg);
-  color: var(--input-readonly-text);
-  border-color: var(--input-disabled-border);
-  opacity: 1;
-  cursor: not-allowed;
-}
+/* Input/field/disabled/readonly styles are in creator-foundation.module.css.
+   All TSX references use creatorStyles.fieldInput, not styles.fieldInput. */
 
 .inlineHint {
   margin: 0;
@@ -1881,21 +1842,5 @@
     background: var(--surface);
   }
 
-  /* Flatten inputs */
-  .fieldInput,
-  .fieldSelect,
-  .lineInput,
-  .lineSelect,
-  .summaryTaxInput,
-  .termsInput,
-  .staticFieldValue,
-  .staticFieldInlineValue {
-    border: 0;
-    background: transparent;
-    padding: 0;
-    min-height: 0;
-    color: #000000;
-    -webkit-text-fill-color: #000000;
-  }
-
+  /* Input print flattening handled by creator-foundation.module.css @media print block. */
 }
