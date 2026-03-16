@@ -637,12 +637,13 @@ def verify_email_view(request):
         status, code, message = _VERIFY_ERROR_MAP[error_code]
         return Response({"error": {"code": code, "message": message}}, status=status)
 
-    token_obj.consumed_at = timezone.now()
-    token_obj.save(update_fields=["consumed_at"])
+    with transaction.atomic():
+        token_obj.consumed_at = timezone.now()
+        token_obj.save(update_fields=["consumed_at"])
 
-    user = token_obj.user
-    user.is_active = True
-    user.save(update_fields=["is_active"])
+        user = token_obj.user
+        user.is_active = True
+        user.save(update_fields=["is_active"])
 
     membership = _ensure_membership(user)
     return Response({"data": _build_auth_response_payload(user, membership)})
@@ -871,12 +872,13 @@ def reset_password_view(request):
         status, code, message = _RESET_ERROR_MAP[error_code]
         return Response({"error": {"code": code, "message": message}}, status=status)
 
-    token_obj.consumed_at = timezone.now()
-    token_obj.save(update_fields=["consumed_at"])
+    with transaction.atomic():
+        token_obj.consumed_at = timezone.now()
+        token_obj.save(update_fields=["consumed_at"])
 
-    user = token_obj.user
-    user.set_password(new_password)
-    user.save(update_fields=["password"])
+        user = token_obj.user
+        user.set_password(new_password)
+        user.save(update_fields=["password"])
 
     membership = _ensure_membership(user)
     return Response({"data": _build_auth_response_payload(user, membership)})

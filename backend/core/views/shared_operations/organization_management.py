@@ -208,10 +208,10 @@ def organization_logo_upload_view(request):
     if organization.logo:
         organization.logo.delete(save=False)
 
-    organization.logo = logo_file
-    organization.save(update_fields=["logo", "updated_at"])
-
     with transaction.atomic():
+        organization.logo = logo_file
+        organization.save(update_fields=["logo", "updated_at"])
+
         OrganizationRecord.record(
             organization=organization,
             event_type=OrganizationRecord.EventType.UPDATED,

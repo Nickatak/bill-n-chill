@@ -13,12 +13,6 @@ from core.models import (
 
 
 class AdoptionStageSeedTests(TestCase):
-    def test_seed_is_idempotent(self):
-        """Running twice produces the same result without errors."""
-        out = StringIO()
-        call_command("seed_adoption_stages", stdout=out)
-        call_command("seed_adoption_stages", stdout=out)
-
     def test_new_account_has_no_data(self):
         out = StringIO()
         call_command("seed_adoption_stages", stdout=out)

@@ -621,8 +621,6 @@ def estimate_detail_view(request, estimate_id: int):
                 estimate.sender_logo_url = request.build_absolute_uri(organization.logo.url)
                 update_fields.append("sender_logo_url")
 
-    estimate.save(update_fields=update_fields)
-
     if "line_items" in data:
         line_items = data["line_items"]
         if not line_items:
@@ -636,42 +634,6 @@ def estimate_detail_view(request, estimate_id: int):
                 },
                 status=400,
             )
-        apply_error = _apply_estimate_lines_and_totals(
-            estimate=estimate,
-            line_items_data=line_items,
-            tax_percent=data.get("tax_percent", estimate.tax_percent),
-            user=request.user,
-        )
-        if apply_error:
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_error",
-                        "message": "One or more cost codes are invalid for this user.",
-                        "fields": {"cost_code": apply_error["missing_cost_codes"]},
-                    }
-                },
-                status=400,
-            )
-    elif "tax_percent" in data:
-        # Recalculate totals with existing lines when tax is updated.
-        existing_lines = [
-            {
-                "cost_code": line.cost_code_id,
-                "description": line.description,
-                "quantity": line.quantity,
-                "unit": line.unit,
-                "unit_cost": line.unit_cost,
-                "markup_percent": line.markup_percent,
-            }
-            for line in estimate.line_items.all()
-        ]
-        _apply_estimate_lines_and_totals(
-            estimate=estimate,
-            line_items_data=existing_lines,
-            tax_percent=estimate.tax_percent,
-            user=request.user,
-        )
 
     should_record_status_event = status_changing and (
         previous_status != estimate.status
@@ -685,29 +647,74 @@ def estimate_detail_view(request, estimate_id: int):
         )
     )
     email_sent = False
-    if should_record_status_event:
-        EstimateStatusEvent.record(
-            estimate=estimate,
-            from_status=previous_status,
-            to_status=estimate.status,
-            note=status_note,
-            changed_by=request.user,
-        )
-        if estimate.status == Estimate.Status.SENT:
-            customer_email = (estimate.project.customer.email or "").strip()
-            email_sent = send_document_sent_email(
-                document_type="Estimate",
-                document_title=f"{estimate.title} (v{estimate.version})",
-                public_url=f"{settings.FRONTEND_URL}/estimate/{estimate.public_ref}",
-                recipient_email=customer_email,
-                sender_user=request.user,
-            )
-        if estimate.status == Estimate.Status.APPROVED:
-            _activate_project_from_estimate_approval(
+
+    with transaction.atomic():
+        estimate.save(update_fields=update_fields)
+
+        if "line_items" in data:
+            apply_error = _apply_estimate_lines_and_totals(
                 estimate=estimate,
-                actor=request.user,
-                note=f"Project moved to active after approval of estimate #{estimate.id}.",
+                line_items_data=line_items,
+                tax_percent=data.get("tax_percent", estimate.tax_percent),
+                user=request.user,
             )
+            if apply_error:
+                transaction.set_rollback(True)
+                return Response(
+                    {
+                        "error": {
+                            "code": "validation_error",
+                            "message": "One or more cost codes are invalid for this user.",
+                            "fields": {"cost_code": apply_error["missing_cost_codes"]},
+                        }
+                    },
+                    status=400,
+                )
+        elif "tax_percent" in data:
+            # Recalculate totals with existing lines when tax is updated.
+            existing_lines = [
+                {
+                    "cost_code": line.cost_code_id,
+                    "description": line.description,
+                    "quantity": line.quantity,
+                    "unit": line.unit,
+                    "unit_cost": line.unit_cost,
+                    "markup_percent": line.markup_percent,
+                }
+                for line in estimate.line_items.all()
+            ]
+            _apply_estimate_lines_and_totals(
+                estimate=estimate,
+                line_items_data=existing_lines,
+                tax_percent=estimate.tax_percent,
+                user=request.user,
+            )
+
+        if should_record_status_event:
+            EstimateStatusEvent.record(
+                estimate=estimate,
+                from_status=previous_status,
+                to_status=estimate.status,
+                note=status_note,
+                changed_by=request.user,
+            )
+            if estimate.status == Estimate.Status.APPROVED:
+                _activate_project_from_estimate_approval(
+                    estimate=estimate,
+                    actor=request.user,
+                    note=f"Project moved to active after approval of estimate #{estimate.id}.",
+                )
+
+    # Email is sent outside the transaction — fire-and-forget side effect.
+    if should_record_status_event and estimate.status == Estimate.Status.SENT:
+        customer_email = (estimate.project.customer.email or "").strip()
+        email_sent = send_document_sent_email(
+            document_type="Estimate",
+            document_title=f"{estimate.title} (v{estimate.version})",
+            public_url=f"{settings.FRONTEND_URL}/estimate/{estimate.public_ref}",
+            recipient_email=customer_email,
+            sender_user=request.user,
+        )
 
     estimate.refresh_from_db()
     return Response({"data": _serialize_estimate(estimate=estimate), "email_sent": email_sent})
@@ -760,57 +767,58 @@ def estimate_clone_version_view(request, estimate_id: int):
     if organization.logo:
         sender_logo_url = request.build_absolute_uri(organization.logo.url)
 
-    cloned = Estimate.objects.create(
-        project=estimate.project,
-        created_by=request.user,
-        version=next_version,
-        status=Estimate.Status.DRAFT,
-        title=estimate.title,
-        valid_through=estimate.valid_through,
-        terms_text=estimate.terms_text,
-        sender_name=(organization.display_name or "").strip(),
-        sender_address=organization.formatted_billing_address,
-        sender_logo_url=sender_logo_url,
-        tax_percent=estimate.tax_percent,
-    )
-
-    line_items = [
-        {
-            "cost_code": line.cost_code_id,
-            "description": line.description,
-            "quantity": line.quantity,
-            "unit": line.unit,
-            "unit_cost": line.unit_cost,
-            "markup_percent": line.markup_percent,
-        }
-        for line in estimate.line_items.all()
-    ]
-    if line_items:
-        _apply_estimate_lines_and_totals(
-            estimate=cloned,
-            line_items_data=line_items,
+    with transaction.atomic():
+        cloned = Estimate.objects.create(
+            project=estimate.project,
+            created_by=request.user,
+            version=next_version,
+            status=Estimate.Status.DRAFT,
+            title=estimate.title,
+            valid_through=estimate.valid_through,
+            terms_text=estimate.terms_text,
+            sender_name=(organization.display_name or "").strip(),
+            sender_address=organization.formatted_billing_address,
+            sender_logo_url=sender_logo_url,
             tax_percent=estimate.tax_percent,
-            user=request.user,
         )
 
-    cloned.refresh_from_db()
-    EstimateStatusEvent.record(
-        estimate=cloned,
-        from_status=None,
-        to_status=cloned.status,
-        note=f"Cloned from estimate #{estimate.id}.",
-        changed_by=request.user,
-    )
-    if estimate.status == Estimate.Status.SENT:
-        estimate.status = Estimate.Status.REJECTED
-        estimate.save(update_fields=["status", "updated_at"])
+        line_items = [
+            {
+                "cost_code": line.cost_code_id,
+                "description": line.description,
+                "quantity": line.quantity,
+                "unit": line.unit,
+                "unit_cost": line.unit_cost,
+                "markup_percent": line.markup_percent,
+            }
+            for line in estimate.line_items.all()
+        ]
+        if line_items:
+            _apply_estimate_lines_and_totals(
+                estimate=cloned,
+                line_items_data=line_items,
+                tax_percent=estimate.tax_percent,
+                user=request.user,
+            )
+
+        cloned.refresh_from_db()
         EstimateStatusEvent.record(
-            estimate=estimate,
-            from_status=Estimate.Status.SENT,
-            to_status=Estimate.Status.REJECTED,
-            note=f"Auto-rejected because revision #{cloned.id} was created.",
+            estimate=cloned,
+            from_status=None,
+            to_status=cloned.status,
+            note=f"Cloned from estimate #{estimate.id}.",
             changed_by=request.user,
         )
+        if estimate.status == Estimate.Status.SENT:
+            estimate.status = Estimate.Status.REJECTED
+            estimate.save(update_fields=["status", "updated_at"])
+            EstimateStatusEvent.record(
+                estimate=estimate,
+                from_status=Estimate.Status.SENT,
+                to_status=Estimate.Status.REJECTED,
+                note=f"Auto-rejected because revision #{cloned.id} was created.",
+                changed_by=request.user,
+            )
     return Response(
         {
             "data": _serialize_estimate(estimate=cloned),
@@ -883,47 +891,48 @@ def estimate_duplicate_view(request, estimate_id: int):
     if organization.logo:
         sender_logo_url = request.build_absolute_uri(organization.logo.url)
 
-    duplicated = Estimate.objects.create(
-        project=target_project,
-        created_by=request.user,
-        version=next_version,
-        status=Estimate.Status.DRAFT,
-        title=target_title,
-        valid_through=estimate.valid_through,
-        terms_text=estimate.terms_text,
-        sender_name=(organization.display_name or "").strip(),
-        sender_address=organization.formatted_billing_address,
-        sender_logo_url=sender_logo_url,
-        tax_percent=estimate.tax_percent,
-    )
-
-    line_items = [
-        {
-            "cost_code": line.cost_code_id,
-            "description": line.description,
-            "quantity": line.quantity,
-            "unit": line.unit,
-            "unit_cost": line.unit_cost,
-            "markup_percent": line.markup_percent,
-        }
-        for line in estimate.line_items.all()
-    ]
-    if line_items:
-        _apply_estimate_lines_and_totals(
-            estimate=duplicated,
-            line_items_data=line_items,
+    with transaction.atomic():
+        duplicated = Estimate.objects.create(
+            project=target_project,
+            created_by=request.user,
+            version=next_version,
+            status=Estimate.Status.DRAFT,
+            title=target_title,
+            valid_through=estimate.valid_through,
+            terms_text=estimate.terms_text,
+            sender_name=(organization.display_name or "").strip(),
+            sender_address=organization.formatted_billing_address,
+            sender_logo_url=sender_logo_url,
             tax_percent=estimate.tax_percent,
-            user=request.user,
         )
 
-    duplicated.refresh_from_db()
-    EstimateStatusEvent.record(
-        estimate=duplicated,
-        from_status=None,
-        to_status=duplicated.status,
-        note=f"Duplicated from estimate #{estimate.id}.",
-        changed_by=request.user,
-    )
+        line_items = [
+            {
+                "cost_code": line.cost_code_id,
+                "description": line.description,
+                "quantity": line.quantity,
+                "unit": line.unit,
+                "unit_cost": line.unit_cost,
+                "markup_percent": line.markup_percent,
+            }
+            for line in estimate.line_items.all()
+        ]
+        if line_items:
+            _apply_estimate_lines_and_totals(
+                estimate=duplicated,
+                line_items_data=line_items,
+                tax_percent=estimate.tax_percent,
+                user=request.user,
+            )
+
+        duplicated.refresh_from_db()
+        EstimateStatusEvent.record(
+            estimate=duplicated,
+            from_status=None,
+            to_status=duplicated.status,
+            note=f"Duplicated from estimate #{estimate.id}.",
+            changed_by=request.user,
+        )
     return Response(
         {
             "data": _serialize_estimate(estimate=duplicated),
