@@ -404,54 +404,55 @@ def project_estimates_view(request, project_id: int):
     if organization.logo:
         sender_logo_url = request.build_absolute_uri(organization.logo.url)
 
-    estimate = Estimate.objects.create(
-        project=project,
-        created_by=request.user,
-        version=next_version,
-        status=data.get("status", Estimate.Status.DRAFT),
-        title=data.get("title", ""),
-        valid_through=resolved_valid_through,
-        terms_text=terms_text,
-        sender_name=(organization.display_name or "").strip(),
-        sender_address=organization.formatted_billing_address,
-        sender_logo_url=sender_logo_url,
-        tax_percent=data.get("tax_percent", Decimal("0")),
-    )
-
-    apply_error = _apply_estimate_lines_and_totals(
-        estimate=estimate,
-        line_items_data=line_items,
-        tax_percent=data.get("tax_percent", Decimal("0")),
-        user=request.user,
-    )
-    if apply_error:
-        estimate.delete()
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "One or more cost codes are invalid for this user.",
-                    "fields": {"cost_code": apply_error["missing_cost_codes"]},
-                }
-            },
-            status=400,
+    with transaction.atomic():
+        estimate = Estimate.objects.create(
+            project=project,
+            created_by=request.user,
+            version=next_version,
+            status=data.get("status", Estimate.Status.DRAFT),
+            title=data.get("title", ""),
+            valid_through=resolved_valid_through,
+            terms_text=terms_text,
+            sender_name=(organization.display_name or "").strip(),
+            sender_address=organization.formatted_billing_address,
+            sender_logo_url=sender_logo_url,
+            tax_percent=data.get("tax_percent", Decimal("0")),
         )
 
-    estimate.refresh_from_db()
-    EstimateStatusEvent.record(
-        estimate=estimate,
-        from_status=None,
-        to_status=estimate.status,
-        note="Estimate created.",
-        changed_by=request.user,
-    )
-    _archive_estimate_family(
-        project=project,
-        user=request.user,
-        title=estimate.title,
-        exclude_ids=[estimate.id],
-        note=f"Archived because estimate #{estimate.id} superseded this version.",
-    )
+        apply_error = _apply_estimate_lines_and_totals(
+            estimate=estimate,
+            line_items_data=line_items,
+            tax_percent=data.get("tax_percent", Decimal("0")),
+            user=request.user,
+        )
+        if apply_error:
+            transaction.set_rollback(True)
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "One or more cost codes are invalid for this user.",
+                        "fields": {"cost_code": apply_error["missing_cost_codes"]},
+                    }
+                },
+                status=400,
+            )
+
+        estimate.refresh_from_db()
+        EstimateStatusEvent.record(
+            estimate=estimate,
+            from_status=None,
+            to_status=estimate.status,
+            note="Estimate created.",
+            changed_by=request.user,
+        )
+        _archive_estimate_family(
+            project=project,
+            user=request.user,
+            title=estimate.title,
+            exclude_ids=[estimate.id],
+            note=f"Archived because estimate #{estimate.id} superseded this version.",
+        )
     return Response(
         {"data": _serialize_estimate(estimate=estimate)},
         status=201,

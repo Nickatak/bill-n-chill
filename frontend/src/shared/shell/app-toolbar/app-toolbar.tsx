@@ -81,7 +81,7 @@ export function AppToolbar() {
   return (
     <div className={`${styles.controls} ${isPublicDocument ? lightTheme.lightTheme : ""}`}>
       {hasSession && isPublicDocument ? (
-        <Link href="/projects" className={styles.publicButton}>
+        <Link href="/customers" className={styles.publicButton}>
           Home
         </Link>
       ) : null}

@@ -12,6 +12,7 @@ Per-domain call chain docs trace the chronological function-call order for each 
 - [customers.md](customers.md) — Customer list, edit, project creation, quick-add intake
 - [change-orders.md](change-orders.md) — CO page initialization, line item local ID race condition, add-line flow
 - [estimates.md](estimates.md) — Estimate CRUD, status transitions, clone/duplicate, public signing ceremony
+- [invoices.md](invoices.md) — Invoice CRUD, status transitions, line composition, send/email, public decision
 - [public-signing.md](public-signing.md) — OTP-verified e-sign ceremony for public document approval links
 
 ## Format

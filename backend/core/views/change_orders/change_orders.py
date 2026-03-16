@@ -5,7 +5,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import F, Max, Sum
+from django.db.models import F, OuterRef, Subquery, Sum
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -261,10 +261,18 @@ def project_change_orders_view(request, project_id: int):
             .prefetch_related("line_items", "line_items__cost_code")
             .order_by("-created_at", "-revision_number")
         )
+        max_rev_subquery = (
+            ChangeOrder.objects.filter(
+                project=project,
+                family_key=OuterRef("family_key"),
+            )
+            .order_by("-revision_number")
+            .values("id")[:1]
+        )
         latest_ids = (
             ChangeOrder.objects.filter(project=project)
             .values("family_key")
-            .annotate(latest_id=Max("id"))
+            .annotate(latest_id=Subquery(max_rev_subquery))
             .values_list("latest_id", flat=True)
         )
         is_latest_revision_map = {pk: True for pk in latest_ids}

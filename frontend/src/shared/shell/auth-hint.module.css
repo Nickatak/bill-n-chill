@@ -88,6 +88,10 @@
   .spacer {
     min-height: 0;
   }
+
+  .hintSpacer {
+    min-height: 0;
+  }
 }
 
 @media print {

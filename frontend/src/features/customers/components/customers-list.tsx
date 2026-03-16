@@ -281,7 +281,7 @@ export function CustomersList({
                                     </span>
                                   </Link>
                                   <Link
-                                    href={`/accounting?customer=${row.id}&project=${project.id}`}
+                                    href={`/projects?project=${project.id}`}
                                     className={styles.projectQuickLink}
                                     title="Record a payment for this project"
                                   >

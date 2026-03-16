@@ -7,6 +7,8 @@ from django.db.models import Sum
 from core.models import (
     Invoice,
     InvoiceLine,
+    Payment,
+    PaymentAllocation,
     Project,
 )
 from core.utils.money import MONEY_ZERO, quantize_money
@@ -105,11 +107,23 @@ def _apply_invoice_lines_and_totals(invoice, line_items_data, tax_percent, user)
 
     InvoiceLine.objects.bulk_create(new_lines)
 
+    # Recompute balance_due from the new total minus any settled payment allocations.
+    applied_total = (
+        PaymentAllocation.objects.filter(
+            invoice=invoice,
+            payment__status=Payment.Status.SETTLED,
+        ).aggregate(total=Sum("applied_amount")).get("total")
+        or Decimal("0")
+    )
+    balance_due = quantize_money(total - applied_total)
+    if balance_due < MONEY_ZERO:
+        balance_due = MONEY_ZERO
+
     invoice.subtotal = subtotal
     invoice.tax_percent = tax_percent
     invoice.tax_total = tax_total
     invoice.total = total
-    invoice.balance_due = MONEY_ZERO if invoice.status == Invoice.Status.PAID else total
+    invoice.balance_due = balance_due
     invoice.save(
         update_fields=[
             "subtotal",

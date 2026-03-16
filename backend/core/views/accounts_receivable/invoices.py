@@ -9,7 +9,9 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import Invoice, InvoiceStatusEvent
+from django.db.models import Sum
+
+from core.models import Invoice, InvoiceStatusEvent, Payment, PaymentAllocation
 from core.policies import get_invoice_policy_contract
 from core.serializers import (
     InvoiceSerializer,
@@ -554,9 +556,22 @@ def invoice_detail_view(request, invoice_id: int):
                 user=request.user,
             )
         elif status_changing:
-            invoice.balance_due = (
-                Decimal("0") if invoice.status == Invoice.Status.PAID else invoice.total
+            # Recompute balance_due from settled allocations without overriding
+            # the status the user just set (the full helper is payment-driven and
+            # would clobber the explicit status choice).
+            applied_total = (
+                PaymentAllocation.objects.filter(
+                    invoice=invoice,
+                    payment__status=Payment.Status.SETTLED,
+                ).aggregate(total=Sum("applied_amount")).get("total")
+                or Decimal("0")
             )
+            invoice.balance_due = max(
+                quantize_money(Decimal(str(invoice.total)) - applied_total),
+                Decimal("0"),
+            )
+            if invoice.status == Invoice.Status.PAID:
+                invoice.balance_due = Decimal("0")
             invoice.save(update_fields=["balance_due", "updated_at"])
 
         should_record_status_event = previous_status != next_status or is_resend or status_note_requested

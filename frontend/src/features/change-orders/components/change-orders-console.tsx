@@ -752,7 +752,7 @@ export function ChangeOrdersConsole({
     setQuickStatus("");
     setQuickStatusNote("");
     setShowAllEvents(false);
-  }, [changeOrderAllowedTransitions, setFeedback]);
+  }, [setFeedback]);
 
   const loadProjectEstimates = useCallback(async (projectId: number) => {
     try {

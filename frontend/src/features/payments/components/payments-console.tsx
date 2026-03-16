@@ -298,7 +298,7 @@ export function PaymentsConsole() {
     }
     document.addEventListener("mousedown", handleMouseDown);
     return () => document.removeEventListener("mousedown", handleMouseDown);
-  });
+  }, [customerMenuOpen]);
 
   // -------------------------------------------------------------------------
   // Project combobox
@@ -397,7 +397,7 @@ export function PaymentsConsole() {
     }
     document.addEventListener("mousedown", handleMouseDown);
     return () => document.removeEventListener("mousedown", handleMouseDown);
-  });
+  }, [projectMenuOpen]);
 
   // -------------------------------------------------------------------------
   // Helpers

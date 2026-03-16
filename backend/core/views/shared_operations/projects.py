@@ -329,7 +329,7 @@ def project_contract_breakdown_view(request, project_id: int):
     approved_cos = (
         ChangeOrder.objects.filter(
             project=project,
-            status__in=["approved", "accepted"],
+            status="approved",
         )
         .prefetch_related("line_items", "line_items__cost_code")
         .order_by("created_at", "id")
