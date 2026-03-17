@@ -9,15 +9,17 @@ User = get_user_model()
 
 
 class VendorBillSnapshot(ImmutableModelMixin):
-    """Immutable AP lifecycle snapshot for financially meaningful vendor-bill statuses.
+    """Immutable AP document lifecycle snapshot for vendor-bill status transitions.
 
     Business workflow:
-    - Captured when a vendor bill transitions into an auditable AP lifecycle state.
-    - Stores point-in-time header + allocation snapshot for traceability/replay.
+    - Captured when a vendor bill transitions into an auditable document state.
+    - Stores point-in-time header + line item snapshot for traceability/replay.
+    - Payment status is NOT captured here — it's derived from PaymentAllocations.
+      See ``docs/decisions/ap-model-separation.md``.
 
     Current policy:
     - Append-only (`create` only). Existing rows are immutable.
-    - Captured statuses: `received`, `approved`, `scheduled`, `paid`, `void`.
+    - Captured statuses: `received`, `approved`, `disputed`, `closed`, `void`.
     - Lifecycle control: `system-managed`.
     - Visibility: `internal-facing`.
     """
@@ -27,8 +29,8 @@ class VendorBillSnapshot(ImmutableModelMixin):
     class CaptureStatus(models.TextChoices):
         RECEIVED = "received", "Received"
         APPROVED = "approved", "Approved"
-        SCHEDULED = "scheduled", "Scheduled"
-        PAID = "paid", "Paid"
+        DISPUTED = "disputed", "Disputed"
+        CLOSED = "closed", "Closed"
         VOID = "void", "Void"
 
     vendor_bill = models.ForeignKey(
@@ -59,17 +61,13 @@ class VendorBillSnapshot(ImmutableModelMixin):
         capture_status: str,
         previous_status: str,
         acted_by,
-        mark_paid_note: str = "",
     ):
         """Append an immutable snapshot row for a vendor-bill status transition."""
         snapshot = vendor_bill.build_snapshot()
-        decision_context = {
+        snapshot["decision_context"] = {
             "capture_status": capture_status,
             "previous_status": previous_status,
         }
-        if mark_paid_note:
-            decision_context["mark_paid_note"] = mark_paid_note
-        snapshot["decision_context"] = decision_context
         return cls.objects.create(
             vendor_bill=vendor_bill,
             capture_status=capture_status,

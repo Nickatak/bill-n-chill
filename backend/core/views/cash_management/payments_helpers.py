@@ -90,7 +90,12 @@ def _set_invoice_balance_from_allocations(invoice: Invoice, *, changed_by: "User
 
 
 def _set_vendor_bill_balance_from_allocations(vendor_bill: VendorBill):
-    """Recompute a vendor bill's balance_due and status from its settled payment allocations."""
+    """Recompute a vendor bill's balance_due from its settled payment allocations.
+
+    Bill document status is NOT changed — payment status (unpaid/partial/paid)
+    is derived from allocation coverage, not stored as a bill status.
+    See ``docs/decisions/ap-model-separation.md``.
+    """
     applied_total = (
         PaymentAllocation.objects.filter(
             vendor_bill=vendor_bill,
@@ -103,21 +108,11 @@ def _set_vendor_bill_balance_from_allocations(vendor_bill: VendorBill):
     if next_balance < MONEY_ZERO:
         next_balance = MONEY_ZERO
 
-    update_fields = ["balance_due", "updated_at"]
     vendor_bill.balance_due = next_balance
-
-    if vendor_bill.status != VendorBill.Status.VOID:
-        if next_balance == MONEY_ZERO:
-            vendor_bill.status = VendorBill.Status.PAID
-            update_fields.append("status")
-        elif vendor_bill.status == VendorBill.Status.PAID:
-            vendor_bill.status = VendorBill.Status.SCHEDULED
-            update_fields.append("status")
-
-    # System-driven status reversals bypass transition validation.
+    # System-driven balance update — bypass transition validation.
     vendor_bill._skip_transition_validation = True
     try:
-        vendor_bill.save(update_fields=list(dict.fromkeys(update_fields)))
+        vendor_bill.save(update_fields=["balance_due", "updated_at"])
     finally:
         vendor_bill._skip_transition_validation = False
 

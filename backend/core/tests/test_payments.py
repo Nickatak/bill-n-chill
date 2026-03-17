@@ -84,7 +84,7 @@ class PaymentTests(TestCase):
             created_by=self.user,
         )
 
-    def _create_vendor_bill(self, *, total="1000.00", status="scheduled"):
+    def _create_vendor_bill(self, *, total="1000.00", status="approved"):
         vendor = Vendor.objects.create(
             name=f"Vendor {Vendor.objects.filter(created_by=self.user, organization=self.org).count() + 1}",
             email=f"vendor{Vendor.objects.filter(created_by=self.user).count() + 1}@example.com",
@@ -98,7 +98,6 @@ class PaymentTests(TestCase):
             status=status,
             issue_date="2026-02-13",
             due_date="2026-03-15",
-            scheduled_for="2026-02-25" if status == VendorBill.Status.SCHEDULED else None,
             total=total,
             balance_due=total,
             created_by=self.user,
@@ -314,7 +313,8 @@ class PaymentTests(TestCase):
         bill_a.refresh_from_db()
         bill_b.refresh_from_db()
         self.assertEqual(str(bill_a.balance_due), "0.00")
-        self.assertEqual(bill_a.status, VendorBill.Status.PAID)
+        # Document status stays as-is — payment status is derived, not a bill status
+        self.assertEqual(bill_a.status, VendorBill.Status.APPROVED)
         self.assertEqual(str(bill_b.balance_due), "400.00")
 
     def test_payment_allocation_blocks_direction_mismatch_and_overallocation(self):
@@ -596,12 +596,12 @@ class PaymentTests(TestCase):
         self.assertEqual(invoice.status, Invoice.Status.PARTIALLY_PAID)
         self.assertEqual(str(invoice.balance_due), "300.00")
 
-    def test_void_payment_reopens_fully_paid_vendor_bill(self):
-        """Voiding a payment that fully paid a vendor bill should revert the bill to scheduled."""
+    def test_void_payment_restores_vendor_bill_balance(self):
+        """Voiding a payment restores the vendor bill's balance_due without changing document status."""
         payment_id = self._create_payment(status="settled", amount="1000.00", direction="outbound")
-        bill = self._create_vendor_bill(total="1000.00", status="scheduled")
+        bill = self._create_vendor_bill(total="1000.00", status="approved")
 
-        # Allocate full amount → bill becomes paid
+        # Allocate full amount → balance becomes 0
         alloc = self.client.post(
             f"/api/v1/payments/{payment_id}/allocate/",
             data={
@@ -614,10 +614,11 @@ class PaymentTests(TestCase):
         )
         self.assertEqual(alloc.status_code, 201)
         bill.refresh_from_db()
-        self.assertEqual(bill.status, VendorBill.Status.PAID)
+        # Document status stays as approved — payment status is derived
+        self.assertEqual(bill.status, VendorBill.Status.APPROVED)
         self.assertEqual(str(bill.balance_due), "0.00")
 
-        # Void the payment → bill should revert to scheduled with full balance restored
+        # Void the payment → balance restored, document status unchanged
         void_resp = self.client.patch(
             f"/api/v1/payments/{payment_id}/",
             data={"status": "void"},
@@ -626,7 +627,7 @@ class PaymentTests(TestCase):
         )
         self.assertEqual(void_resp.status_code, 200)
         bill.refresh_from_db()
-        self.assertEqual(bill.status, VendorBill.Status.SCHEDULED)
+        self.assertEqual(bill.status, VendorBill.Status.APPROVED)
         self.assertEqual(str(bill.balance_due), "1000.00")
 
     def test_user_cannot_manually_transition_paid_invoice_to_sent(self):

@@ -1,4 +1,6 @@
 
+from decimal import Decimal
+
 from core.tests.common import *
 
 
@@ -79,17 +81,17 @@ class VendorBillTests(TestCase):
         )
 
     def _create_vendor_bill(self, *, bill_number="B-1001", total="1250.00"):
+        """Create a bill via API. Bills always start as received."""
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/vendor-bills/",
             data={
                 "vendor": self.vendor.id,
                 "bill_number": bill_number,
-                "status": "planned",
                 "issue_date": "2026-02-13",
                 "due_date": "2026-03-15",
                 "notes": "Initial AP intake.",
                 "line_items": [
-                    {"description": "Initial AP intake", "quantity": "1", "unit": "ea", "unit_price": total}
+                    {"description": "Initial AP intake", "amount": total}
                 ],
             },
             content_type="application/json",
@@ -115,35 +117,35 @@ class VendorBillTests(TestCase):
 
         self.assertEqual(payload["statuses"], expected_statuses)
         self.assertEqual(payload["status_labels"], expected_labels)
-        self.assertEqual(payload["default_create_status"], VendorBill.Status.PLANNED)
-        self.assertEqual(
-            payload["create_shortcut_statuses"],
-            [VendorBill.Status.PLANNED, VendorBill.Status.RECEIVED],
-        )
+        self.assertEqual(payload["default_create_status"], VendorBill.Status.RECEIVED)
 
-        # Policy transitions include compound paths (received → scheduled).
+        # Document lifecycle transitions
         received_transitions = payload["allowed_status_transitions"]["received"]
         self.assertIn("approved", received_transitions)
-        self.assertIn("scheduled", received_transitions)
         self.assertIn("void", received_transitions)
 
-        # Terminal statuses are computed from the policy transitions.
-        self.assertIn("paid", payload["terminal_statuses"])
+        approved_transitions = payload["allowed_status_transitions"]["approved"]
+        self.assertIn("disputed", approved_transitions)
+        self.assertIn("closed", approved_transitions)
+        self.assertIn("void", approved_transitions)
+
+        # Terminal statuses
+        self.assertIn("closed", payload["terminal_statuses"])
         self.assertIn("void", payload["terminal_statuses"])
         self.assertTrue(str(payload["policy_version"]).startswith("2026-03-16.vendor_bills."))
 
     def test_vendor_bill_create_and_project_list(self):
+        """Bills are created in received status with description+amount line items."""
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/vendor-bills/",
             data={
                 "vendor": self.vendor.id,
                 "bill_number": "B-2001",
-                "status": "planned",
                 "issue_date": "2026-02-13",
                 "due_date": "2026-03-15",
                 "notes": "Tile package.",
                 "line_items": [
-                    {"description": "Tile package", "quantity": "1", "unit": "ea", "unit_price": "1250.00"}
+                    {"description": "Tile package", "amount": "1250.00"}
                 ],
             },
             content_type="application/json",
@@ -151,11 +153,16 @@ class VendorBillTests(TestCase):
         )
         self.assertEqual(response.status_code, 201)
         payload = response.json()["data"]
-        self.assertEqual(payload["status"], "planned")
+        self.assertEqual(payload["status"], "received")
+        self.assertEqual(payload["payment_status"], "unpaid")
         self.assertEqual(payload["vendor"], self.vendor.id)
         self.assertEqual(payload["bill_number"], "B-2001")
         self.assertEqual(payload["total"], "1250.00")
         self.assertEqual(payload["balance_due"], "1250.00")
+        # Line items use description + amount (not qty × rate)
+        self.assertEqual(len(payload["line_items"]), 1)
+        self.assertEqual(payload["line_items"][0]["amount"], "1250.00")
+        self.assertEqual(payload["line_items"][0]["description"], "Tile package")
 
         list_response = self.client.get(
             f"/api/v1/projects/{self.project.id}/vendor-bills/",
@@ -166,33 +173,15 @@ class VendorBillTests(TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["project"], self.project.id)
 
-    def test_vendor_bill_create_requires_initial_status(self):
-        response = self.client.post(
-            f"/api/v1/projects/{self.project.id}/vendor-bills/",
-            data={
-                "vendor": self.vendor.id,
-                "bill_number": "B-2002",
-                "line_items": [
-                    {"description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "1250.00"}
-                ],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 400)
-        payload = response.json()["error"]
-        self.assertEqual(payload["code"], "validation_error")
-        self.assertEqual(payload["fields"]["status"], ["This field is required."])
-
-    def test_vendor_bill_create_received_requires_issue_and_due_date(self):
+    def test_vendor_bill_create_requires_issue_date(self):
+        """Bills require issue_date (all bills start as received)."""
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/vendor-bills/",
             data={
                 "vendor": self.vendor.id,
                 "bill_number": "B-2003",
-                "status": "received",
                 "line_items": [
-                    {"description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "1250.00"}
+                    {"description": "Materials", "amount": "1250.00"}
                 ],
             },
             content_type="application/json",
@@ -202,31 +191,6 @@ class VendorBillTests(TestCase):
         payload = response.json()["error"]
         self.assertEqual(payload["code"], "validation_error")
         self.assertIn("issue_date", payload["fields"])
-        self.assertIn("due_date", payload["fields"])
-
-    def test_vendor_bill_create_allows_received_when_dates_present(self):
-        response = self.client.post(
-            f"/api/v1/projects/{self.project.id}/vendor-bills/",
-            data={
-                "vendor": self.vendor.id,
-                "bill_number": "B-2004",
-                "status": "received",
-                "issue_date": "2026-02-13",
-                "due_date": "2026-03-15",
-                "notes": "Received bill path.",
-                "line_items": [
-                    {"description": "Received bill", "quantity": "1", "unit": "ea", "unit_price": "1250.00"}
-                ],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 201)
-        payload = response.json()["data"]
-        self.assertEqual(payload["status"], "received")
-        self.assertEqual(payload["issue_date"], "2026-02-13")
-        self.assertEqual(payload["due_date"], "2026-03-15")
-
 
     def test_vendor_bill_list_scoped_by_project_and_user(self):
         self._create_vendor_bill()
@@ -235,7 +199,7 @@ class VendorBillTests(TestCase):
             project=self.other_project,
             vendor=self.other_vendor,
             bill_number="B-9999",
-            status=VendorBill.Status.PLANNED,
+            status=VendorBill.Status.RECEIVED,
             issue_date="2026-02-13",
             due_date="2026-03-20",
             total="200.00",
@@ -270,9 +234,10 @@ class VendorBillTests(TestCase):
             data={
                 "vendor": self.vendor.id,
                 "bill_number": "b-3100",
-                "status": "planned",
+                "issue_date": "2026-02-13",
+                "due_date": "2026-03-15",
                 "line_items": [
-                    {"description": "Duplicate test", "quantity": "1", "unit": "ea", "unit_price": "500.00"}
+                    {"description": "Duplicate test", "amount": "500.00"}
                 ],
             },
             content_type="application/json",
@@ -302,9 +267,10 @@ class VendorBillTests(TestCase):
             data={
                 "vendor": self.vendor.id,
                 "bill_number": "B-3100",
-                "status": "planned",
+                "issue_date": "2026-02-13",
+                "due_date": "2026-03-15",
                 "line_items": [
-                    {"description": "Duplicate test", "quantity": "1", "unit": "ea", "unit_price": "500.00"}
+                    {"description": "Duplicate test", "amount": "500.00"}
                 ],
             },
             content_type="application/json",
@@ -313,86 +279,91 @@ class VendorBillTests(TestCase):
         self.assertEqual(allowed.status_code, 201)
         self.assertFalse(allowed.json()["meta"]["duplicate_override_used"])
 
-    def test_vendor_bill_status_transition_and_balance_due(self):
+    def test_vendor_bill_document_lifecycle_transitions(self):
+        """Walk through the full document lifecycle: received → approved."""
         vendor_bill_id = self._create_vendor_bill(total="900.00")
 
+        # received → disputed (invalid, must be approved first)
         invalid = self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "approved"},
+            data={"status": "disputed"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(invalid.status_code, 400)
         self.assertEqual(invalid.json()["error"]["code"], "validation_error")
 
-        received = self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "received"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(received.status_code, 200)
-
-        for status in ["approved", "scheduled", "paid"]:
-            patch_payload = {
-                "status": status,
-                "line_items": [
-                    {"cost_code": self.cost_code.id, "description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "900.00"}
-                ],
-            }
-            if status == "scheduled":
-                patch_payload["scheduled_for"] = "2026-02-25"
-            response = self.client.patch(
-                f"/api/v1/vendor-bills/{vendor_bill_id}/",
-                data=patch_payload,
-                content_type="application/json",
-                HTTP_AUTHORIZATION=f"Token {self.token.key}",
-            )
-            self.assertEqual(response.status_code, 200)
-
-        payload = response.json()["data"]
-        self.assertEqual(payload["status"], "paid")
-        self.assertEqual(payload["balance_due"], "0.00")
-        self.assertEqual(len(payload["line_items"]), 1)
-        self.assertEqual(payload["line_items"][0]["cost_code"], self.cost_code.id)
-
-    def test_vendor_bill_can_move_from_approved_to_paid_directly(self):
-        vendor_bill_id = self._create_vendor_bill(total="900.00")
-
-        received = self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "received"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(received.status_code, 200)
-
+        # received → approved
         approved = self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
             data={
                 "status": "approved",
                 "line_items": [
-                    {"cost_code": self.cost_code.id, "description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "900.00"}
+                    {"cost_code": self.cost_code.id, "description": "Materials", "amount": "900.00"}
                 ],
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(approved.status_code, 200)
+        payload = approved.json()["data"]
+        self.assertEqual(payload["status"], "approved")
+        # Balance is still full — payment status is derived, not from document status
+        self.assertEqual(payload["balance_due"], "900.00")
+        self.assertEqual(payload["payment_status"], "unpaid")
+        self.assertEqual(len(payload["line_items"]), 1)
+        self.assertEqual(payload["line_items"][0]["cost_code"], self.cost_code.id)
 
-        paid = self.client.patch(
+    def test_vendor_bill_disputed_and_closed_transitions(self):
+        """Approved bills can be disputed; disputed bills can be closed or re-approved."""
+        vendor_bill_id = self._create_vendor_bill(total="500.00")
+
+        # Walk to approved
+        self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={
-                "status": "paid",
-                "line_items": [
-                    {"cost_code": self.cost_code.id, "description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "900.00"}
-                ],
-            },
+            data={"status": "approved"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(paid.status_code, 200)
-        self.assertEqual(paid.json()["data"]["status"], "paid")
+
+        # approved → disputed
+        disputed = self.client.patch(
+            f"/api/v1/vendor-bills/{vendor_bill_id}/",
+            data={"status": "disputed"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(disputed.status_code, 200)
+        self.assertEqual(disputed.json()["data"]["status"], "disputed")
+
+        # disputed → approved (re-approve after resolving dispute)
+        re_approved = self.client.patch(
+            f"/api/v1/vendor-bills/{vendor_bill_id}/",
+            data={"status": "approved"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(re_approved.status_code, 200)
+        self.assertEqual(re_approved.json()["data"]["status"], "approved")
+
+        # approved → closed (manual reconciliation)
+        closed = self.client.patch(
+            f"/api/v1/vendor-bills/{vendor_bill_id}/",
+            data={"status": "closed"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(closed.status_code, 200)
+        self.assertEqual(closed.json()["data"]["status"], "closed")
+
+        # closed is terminal
+        void_attempt = self.client.patch(
+            f"/api/v1/vendor-bills/{vendor_bill_id}/",
+            data={"status": "void"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(void_attempt.status_code, 400)
 
     def test_vendor_bill_patch_rejects_bill_number_change(self):
         vendor_bill_id = self._create_vendor_bill(bill_number="B-4200", total="300.00")
@@ -444,12 +415,11 @@ class VendorBillTests(TestCase):
             data={
                 "vendor": canonical_vendor.id,
                 "bill_number": "B-CANON-1",
-                "status": "planned",
                 "issue_date": "2026-02-13",
                 "due_date": "2026-03-15",
                 "notes": "Canonical vendor intake path.",
                 "line_items": [
-                    {"description": "Canonical vendor intake", "quantity": "1", "unit": "ea", "unit_price": "1250.00"}
+                    {"description": "Canonical vendor intake", "amount": "1250.00"}
                 ],
             },
             content_type="application/json",
@@ -457,36 +427,6 @@ class VendorBillTests(TestCase):
         )
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["data"]["vendor"], canonical_vendor.id)
-
-    def test_vendor_bill_patch_requires_scheduled_for_when_status_scheduled(self):
-        vendor_bill_id = self._create_vendor_bill(total="200.00")
-        received = self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "received"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(received.status_code, 200)
-        approved = self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={
-                "status": "approved",
-                "line_items": [
-                    {"cost_code": self.cost_code.id, "description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "200.00"}
-                ],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(approved.status_code, 200)
-        scheduled = self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "scheduled"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(scheduled.status_code, 400)
-        self.assertEqual(scheduled.json()["error"]["code"], "validation_error")
 
     def test_vendor_bill_patch_rejects_line_items_with_wrong_org_cost_code(self):
         other_code, _ = CostCode.objects.get_or_create(
@@ -503,7 +443,7 @@ class VendorBillTests(TestCase):
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
             data={
                 "line_items": [
-                    {"cost_code": other_code.id, "description": "Invalid org code", "quantity": "1", "unit": "ea", "unit_price": "50.00"}
+                    {"cost_code": other_code.id, "description": "Invalid org code", "amount": "50.00"}
                 ]
             },
             content_type="application/json",
@@ -512,98 +452,48 @@ class VendorBillTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["error"]["code"], "validation_error")
 
-    def test_vendor_bill_status_transitions_create_snapshots_for_all_captured_statuses(self):
+    def test_vendor_bill_status_transitions_create_snapshots(self):
+        """Each document status transition creates an immutable snapshot."""
         vendor_bill_id = self._create_vendor_bill(total="300.00")
 
-        received = self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "received"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(received.status_code, 200)
-
-        approved = self.client.patch(
+        # received → approved
+        self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
             data={
                 "status": "approved",
                 "line_items": [
-                    {"cost_code": self.cost_code.id, "description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "300.00"}
+                    {"cost_code": self.cost_code.id, "description": "Materials", "amount": "300.00"}
                 ],
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(approved.status_code, 200)
 
-        scheduled = self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "scheduled", "scheduled_for": "2026-02-25"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(scheduled.status_code, 200)
-
-        paid = self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "paid"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(paid.status_code, 200)
-
-        snapshots = VendorBillSnapshot.objects.filter(vendor_bill_id=vendor_bill_id).order_by("created_at", "id")
-        self.assertEqual(snapshots.count(), 4)
-        self.assertEqual(
-            list(snapshots.values_list("capture_status", flat=True)),
-            ["received", "approved", "scheduled", "paid"],
-        )
-        self.assertTrue(all(snapshot.acted_by_id == self.user.id for snapshot in snapshots))
-
-    def test_vendor_bill_paid_cannot_transition_to_void(self):
-        """Paid bills are terminal — voiding a paid bill is not allowed."""
-        vendor_bill_id = self._create_vendor_bill(total="500.00")
-
-        # Walk to paid status
-        for status, extra in [
-            ("received", {}),
-            ("approved", {"line_items": [{"cost_code": self.cost_code.id, "description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "500.00"}]}),
-            ("scheduled", {"scheduled_for": "2026-03-01"}),
-            ("paid", {}),
-        ]:
-            response = self.client.patch(
-                f"/api/v1/vendor-bills/{vendor_bill_id}/",
-                data={"status": status, **extra},
-                content_type="application/json",
-                HTTP_AUTHORIZATION=f"Token {self.token.key}",
-            )
-            self.assertEqual(response.status_code, 200, f"Failed to transition to {status}")
-
-        # Attempt paid -> void should be rejected
-        voided = self.client.patch(
+        # approved → void
+        self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
             data={"status": "void"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(voided.status_code, 400)
-        self.assertEqual(voided.json()["error"]["code"], "validation_error")
+
+        snapshots = VendorBillSnapshot.objects.filter(vendor_bill_id=vendor_bill_id).order_by("created_at", "id")
+        self.assertEqual(snapshots.count(), 2)
+        self.assertEqual(
+            list(snapshots.values_list("capture_status", flat=True)),
+            ["approved", "void"],
+        )
+        self.assertTrue(all(snapshot.acted_by_id == self.user.id for snapshot in snapshots))
 
     def test_vendor_bill_snapshot_payload_captures_line_items_and_context(self):
         vendor_bill_id = self._create_vendor_bill(total="200.00")
 
         self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "received"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
             data={
                 "status": "approved",
                 "line_items": [
-                    {"cost_code": self.cost_code.id, "description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "200.00"}
+                    {"cost_code": self.cost_code.id, "description": "Materials", "amount": "200.00"}
                 ],
             },
             content_type="application/json",
@@ -620,39 +510,44 @@ class VendorBillTests(TestCase):
         self.assertEqual(snapshot.snapshot_json["decision_context"]["capture_status"], "approved")
         self.assertEqual(len(snapshot.snapshot_json["line_items"]), 1)
         self.assertEqual(snapshot.snapshot_json["line_items"][0]["cost_code_id"], self.cost_code.id)
+        # Line items use amount, not qty × rate
+        self.assertEqual(snapshot.snapshot_json["line_items"][0]["amount"], "200.00")
 
-    def test_vendor_bill_compound_received_to_scheduled_creates_two_snapshots(self):
-        """Compound transition: received → scheduled atomically walks through approved."""
-        vendor_bill_id = self._create_vendor_bill(total="200.00")
-        self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "received"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        # Send received → scheduled directly (compound path)
-        response = self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
+    def test_vendor_bill_receipt_creates_payment_and_allocation(self):
+        """Recording a receipt auto-creates an outbound payment allocated to it."""
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/vendor-bills/",
             data={
-                "status": "scheduled",
-                "scheduled_for": "2026-03-10",
-                "line_items": [
-                    {"cost_code": self.cost_code.id, "description": "Materials", "quantity": "1", "unit": "ea", "unit_price": "200.00"}
-                ],
+                "kind": "receipt",
+                "total": "237.50",
+                "vendor": self.vendor.id,
+                "notes": "Home Depot run.",
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["data"]["status"], "scheduled")
+        self.assertEqual(response.status_code, 201)
+        receipt = response.json()["data"]
+        self.assertEqual(receipt["kind"], "receipt")
+        self.assertEqual(receipt["status"], "approved")
+        self.assertEqual(receipt["payment_status"], "paid")
+        self.assertEqual(receipt["total"], "237.50")
+        self.assertEqual(receipt["balance_due"], "0.00")
 
-        # Should have THREE snapshots: received (from planned), approved (compound), scheduled (compound)
-        snapshots = list(
-            VendorBillSnapshot.objects.filter(vendor_bill_id=vendor_bill_id).order_by("id")
-        )
-        self.assertEqual(len(snapshots), 3)
-        self.assertEqual(snapshots[0].capture_status, "received")
-        self.assertEqual(snapshots[1].capture_status, "approved")
-        self.assertEqual(snapshots[1].snapshot_json["decision_context"]["previous_status"], "received")
-        self.assertEqual(snapshots[2].capture_status, "scheduled")
-        self.assertEqual(snapshots[2].snapshot_json["decision_context"]["previous_status"], "approved")
+        # Verify payment was created
+        from core.models import Payment, PaymentAllocation
+
+        payment = Payment.objects.filter(
+            organization=self.org,
+            direction=Payment.Direction.OUTBOUND,
+        ).latest("id")
+        self.assertEqual(payment.amount, Decimal("237.50"))
+        self.assertEqual(payment.status, Payment.Status.SETTLED)
+
+        allocation = PaymentAllocation.objects.filter(
+            payment=payment,
+            vendor_bill_id=receipt["id"],
+        ).first()
+        self.assertIsNotNone(allocation)
+        self.assertEqual(allocation.applied_amount, Decimal("237.50"))
+        self.assertEqual(allocation.target_type, PaymentAllocation.TargetType.VENDOR_BILL)

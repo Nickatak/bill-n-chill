@@ -8,8 +8,7 @@
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { useCombobox } from "@/shared/hooks/use-combobox";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
 import { useSearchParams } from "next/navigation";
 import { formatDateDisplay, todayDateInput, futureDateInput } from "@/shared/date-format";
@@ -39,6 +38,7 @@ import {
   ApiResponse,
   ProjectRecord,
   VendorBillLineInput,
+  VendorBillPaymentStatus,
   VendorBillPolicyContract,
   VendorBillPayload,
   VendorBillRecord,
@@ -53,39 +53,26 @@ import creatorStyles from "../../../shared/document-creator/creator-foundation.m
 // ---------------------------------------------------------------------------
 
 const VENDOR_BILL_STATUSES_FALLBACK: string[] = [
-  "planned",
   "received",
   "approved",
-  "scheduled",
-  "paid",
+  "disputed",
+  "closed",
   "void",
 ];
 const VENDOR_BILL_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
-  planned: ["received", "void"],
-  received: ["approved", "scheduled", "void"],
-  approved: ["scheduled", "paid", "void"],
-  scheduled: ["paid", "void"],
-  paid: [],
+  received: ["approved", "void"],
+  approved: ["disputed", "closed", "void"],
+  disputed: ["approved", "closed", "void"],
+  closed: [],
   void: [],
 };
-const VENDOR_BILL_CREATE_SHORTCUT_STATUSES_FALLBACK = ["planned", "received"];
 const VENDOR_BILL_STATUS_LABELS_FALLBACK: Record<string, string> = {
-  planned: "Planned",
   received: "Received",
   approved: "Approved",
-  scheduled: "Scheduled",
-  paid: "Paid",
+  disputed: "Disputed",
+  closed: "Closed",
   void: "Void",
 };
-const PAYMENT_METHODS = [
-  { value: "check", label: "Check" },
-  { value: "ach", label: "ACH" },
-  { value: "wire", label: "Wire" },
-  { value: "zelle", label: "Zelle" },
-  { value: "card", label: "Card" },
-  { value: "cash", label: "Cash" },
-  { value: "other", label: "Other" },
-];
 
 type ProjectStatusValue = ProjectListStatusValue;
 const DEFAULT_PROJECT_STATUS_FILTERS: ProjectStatusValue[] = ["active", "prospect"];
@@ -147,33 +134,16 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     baseUrl: normalizedBaseUrl,
     token,
     onLoaded(contract) {
-      // Resolve create-shortcut statuses from contract.
-      const shortcuts =
-        Array.isArray(contract.create_shortcut_statuses) && contract.create_shortcut_statuses.length
-          ? contract.create_shortcut_statuses
-          : VENDOR_BILL_CREATE_SHORTCUT_STATUSES_FALLBACK.filter((s) =>
-              contract.statuses.includes(s),
-            );
-      const fallbackCreate =
-        contract.default_create_status || contract.statuses[0] || VENDOR_BILL_STATUSES_FALLBACK[0];
-      setCreateStatusOptions(shortcuts.length ? shortcuts : [fallbackCreate]);
       setBillStatusFilters((current) => {
         const retained = current.filter((s) => contract.statuses.includes(s));
         return retained.length ? retained : defaultBillStatusFilters(contract.statuses);
       });
-      setNewStatus((current) => {
-        if (contract.statuses.includes(current)) return current;
-        return shortcuts[0] || fallbackCreate;
-      });
       setStatus((current) =>
-        contract.statuses.includes(current) ? current : fallbackCreate,
+        contract.statuses.includes(current) ? current : (contract.default_create_status || contract.statuses[0] || VENDOR_BILL_STATUSES_FALLBACK[0]),
       );
     },
   });
 
-  const [createStatusOptions, setCreateStatusOptions] = useState<string[]>(
-    VENDOR_BILL_CREATE_SHORTCUT_STATUSES_FALLBACK,
-  );
   const {
     filters: billStatusFilters,
     setFilters: setBillStatusFilters,
@@ -192,8 +162,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const [newSubtotal, setNewSubtotal] = useState("0.00");
   const [newTaxAmount, setNewTaxAmount] = useState("0.00");
   const [newShippingAmount, setNewShippingAmount] = useState("0.00");
-  const [newScheduledFor, setNewScheduledFor] = useState("");
-  const [newStatus, setNewStatus] = useState<string>("planned");
   const [newTotal, setNewTotal] = useState("0.00");
   const [newNotes, setNewNotes] = useState("");
   const [newLineItems, setNewLineItems] = useState<VendorBillLineFormRow[]>([
@@ -208,33 +176,14 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const [subtotal, setSubtotal] = useState("0.00");
   const [taxAmount, setTaxAmount] = useState("0.00");
   const [shippingAmount, setShippingAmount] = useState("0.00");
-  const [scheduledFor, setScheduledFor] = useState("");
   const [total, setTotal] = useState("0.00");
   const [notes, setNotes] = useState("");
   const [lineItems, setLineItems] = useState<VendorBillLineFormRow[]>([createEmptyVendorBillLineRow()]);
-  const [status, setStatus] = useState<string>("planned");
+  const [status, setStatus] = useState<string>("received");
   const [viewerNextStatus, setViewerNextStatus] = useState<string>("");
 
   const [duplicateCandidates, setDuplicateCandidates] = useState<VendorBillRecord[]>([]);
 
-  // Receipt quick-entry form
-  const [receiptTotal, setReceiptTotal] = useState("");
-  const [receiptVendorId, setReceiptVendorId] = useState("");
-  const [receiptDate, setReceiptDate] = useState(todayDateInput());
-  const [receiptNotes, setReceiptNotes] = useState("");
-  const [receiptMessage, setReceiptMessage] = useState("");
-  const [receiptMessageTone, setReceiptMessageTone] = useState<"success" | "error">("success");
-
-  // Payment action state (Record Payment / Mark Paid on status → paid)
-  const [paidAction, setPaidAction] = useState<"" | "record_payment" | "mark_paid">("");
-  const [rpAmount, setRpAmount] = useState("");
-  const [rpMethod, setRpMethod] = useState("check");
-  const [rpDate, setRpDate] = useState(todayDateInput());
-  const [rpReference, setRpReference] = useState("");
-  const [rpNote, setRpNote] = useState("");
-  const [markPaidNote, setMarkPaidNote] = useState("");
-  const [paidActionError, setPaidActionError] = useState("");
-  const [paidActionBusy, setPaidActionBusy] = useState(false);
 
   // Accordion section state for inline viewer expansion
   const [isStatusSectionOpen, setIsStatusSectionOpen] = useState(true);
@@ -249,26 +198,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   // -------------------------------------------------------------------------
 
   const activeVendors = vendors.filter((vendor) => vendor.is_active);
-
-  // Receipt vendor combobox (must be after activeVendors)
-  const commitReceiptVendor = useCallback((vendor: VendorRecord | null) => {
-    setReceiptVendorId(vendor ? String(vendor.id) : "");
-    receiptVendorCombobox.close(!!vendor);
-    if (vendor) receiptVendorCombobox.setQuery(vendor.name);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const receiptVendorCombobox = useCombobox<VendorRecord>({
-    items: activeVendors,
-    getLabel: (v) => v.name,
-    onCommit: commitReceiptVendor,
-    syntheticPrefixCount: 1,
-  });
-
-  const selectedReceiptVendor = useMemo(
-    () => vendors.find((v) => String(v.id) === receiptVendorId) ?? null,
-    [vendors, receiptVendorId],
-  );
 
   const projectNeedle = projectSearch.trim().toLowerCase();
   const filteredProjects = !projectNeedle
@@ -314,7 +243,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     if (dueFilter === "all") {
       return true;
     }
-    if (!bill.due_date || bill.status === "paid" || bill.status === "void") {
+    if (!bill.due_date || bill.status === "closed" || bill.status === "void") {
       return false;
     }
     const today = todayDateInput();
@@ -331,14 +260,13 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   const canMutateVendorBills = canDo(capabilities, "vendor_bills", "create");
   const canApproveVendorBills = canDo(capabilities, "vendor_bills", "approve");
-  const canPayVendorBills = canDo(capabilities, "vendor_bills", "pay");
   const isProjectScoped = scopedProjectId !== null;
   const selectedProject =
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;
   const selectedVendorBill =
     vendorBills.find((vendorBill) => String(vendorBill.id) === selectedVendorBillId) ?? null;
   const isEditingMode = Boolean(selectedVendorBillId);
-  const workspaceIsLockedByStatus = selectedVendorBill ? selectedVendorBill.status !== "planned" : false;
+  const workspaceIsLockedByStatus = selectedVendorBill ? selectedVendorBill.status !== "received" : false;
   const workspaceIsLocked = !canMutateVendorBills || workspaceIsLockedByStatus;
   const workspaceBadgeLabel = !selectedVendorBill
     ? "CREATING"
@@ -346,10 +274,10 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       ? "READ-ONLY"
       : "EDITING";
   const workspaceBadgeClass = !selectedVendorBill
-    ? styles.tableStatusPlanned
+    ? styles.tableStatusReceived
     : workspaceIsLocked
       ? styles[`tableStatus${selectedVendorBill.status[0].toUpperCase()}${selectedVendorBill.status.slice(1)}`] ?? ""
-      : styles.tableStatusPlanned;
+      : styles.tableStatusReceived;
   const workspaceContext = selectedVendorBill
     ? `#${selectedVendorBill.id} — ${selectedVendorBill.bill_number || "Untitled"}`
     : "New vendor bill";
@@ -362,13 +290,9 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const formSubtotal = isEditingMode ? subtotal : newSubtotal;
   const formTaxAmount = isEditingMode ? taxAmount : newTaxAmount;
   const formShippingAmount = isEditingMode ? shippingAmount : newShippingAmount;
-  const formScheduledFor = isEditingMode ? scheduledFor : newScheduledFor;
   const formTotal = isEditingMode ? total : newTotal;
   const formNotes = isEditingMode ? notes : newNotes;
   const formLineItems = isEditingMode ? lineItems : newLineItems;
-  const formStatus: VendorBillStatus = isEditingMode ? status : newStatus;
-  const canEditScheduledFor = formStatus === "approved" || formStatus === "scheduled";
-  const scheduledForMissing = canEditScheduledFor && !formScheduledFor;
   const formSubtotalAmount = Number(formSubtotal || 0);
   const formTaxAmountValue = Number(formTaxAmount || 0);
   const formShippingAmountValue = Number(formShippingAmount || 0);
@@ -377,7 +301,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     : []
   ).filter((status: string) => {
     if (status === "approved") return canApproveVendorBills;
-    if (status === "paid") return canPayVendorBills;
     return true;
   });
   const computedTotalFromParts = (
@@ -458,18 +381,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
   }
 
-  function setFormScheduledFor(value: string) {
-    if (isEditingMode) {
-      if (value && value < todayDateInput()) {
-        setStatusMessage("Scheduled for date cannot be in the past.");
-        return;
-      }
-      setScheduledFor(value);
-    } else {
-      setNewScheduledFor(value);
-    }
-  }
-
   function setFormTotal(value: string) {
     if (isEditingMode) {
       setTotal(value);
@@ -514,61 +425,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setFormLineItems([...formLineItems, createEmptyVendorBillLineRow()]);
   }
 
-  /** Routes form submission to create or save based on the current editing mode. */
-  async function handleSubmitReceipt(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!canMutateVendorBills || !selectedProjectId) return;
-
-    const totalNum = parseFloat(receiptTotal);
-    if (!totalNum || totalNum <= 0) {
-      setReceiptMessage("Enter a total amount.");
-      setReceiptMessageTone("error");
-      return;
-    }
-
-    try {
-      const body: Record<string, unknown> = {
-        kind: "receipt",
-        total: receiptTotal,
-        received_date: receiptDate || undefined,
-        notes: receiptNotes || undefined,
-      };
-      if (receiptVendorId) body.vendor = Number(receiptVendorId);
-
-      const response = await fetch(
-        `${normalizedBaseUrl}/projects/${selectedProjectId}/vendor-bills/`,
-        {
-          method: "POST",
-          headers: buildAuthHeaders(token, { contentType: "application/json" }),
-          body: JSON.stringify(body),
-        },
-      );
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        const msg =
-          payload.error?.message ?? "Failed to record receipt.";
-        setReceiptMessage(msg);
-        setReceiptMessageTone("error");
-        return;
-      }
-
-      // Reset form
-      setReceiptTotal("");
-      setReceiptVendorId("");
-      receiptVendorCombobox.setQuery("");
-      setReceiptDate(todayDateInput());
-      setReceiptNotes("");
-      setReceiptMessage("Receipt recorded.");
-      setReceiptMessageTone("success");
-
-      // Refresh the bill list
-      void loadVendorBills();
-    } catch {
-      setReceiptMessage("Network error recording receipt.");
-      setReceiptMessageTone("error");
-    }
-  }
-
   function handleSubmitVendorBillForm(event: FormEvent<HTMLFormElement>) {
     if (!canMutateVendorBills) {
       event.preventDefault();
@@ -592,16 +448,13 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setSubtotal(item.subtotal);
     setTaxAmount(item.tax_amount);
     setShippingAmount(item.shipping_amount);
-    setScheduledFor(item.scheduled_for ?? "");
     setTotal(item.total);
     setNotes(item.notes);
     setStatus(item.status);
     const mapped = (item.line_items ?? []).map((row) => ({
       costCode: row.cost_code,
       description: row.description,
-      quantity: row.quantity,
-      unit: row.unit,
-      unitPrice: row.unit_price,
+      amount: row.amount,
     }));
     setLineItems(mapped.length > 0 ? mapped : [createEmptyVendorBillLineRow()]);
   }
@@ -619,6 +472,26 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   /** Returns the CSS class for a status pill button. */
   function statusPillClass(value: VendorBillStatus): string {
     return styles[`statusPill${value[0].toUpperCase()}${value.slice(1)}`] ?? "";
+  }
+
+  /** Returns the CSS class for a payment status badge. */
+  function paymentStatusBadgeClass(value: VendorBillPaymentStatus): string {
+    const map: Record<VendorBillPaymentStatus, string> = {
+      unpaid: styles.paymentStatusUnpaid ?? "",
+      partial: styles.paymentStatusPartial ?? "",
+      paid: styles.paymentStatusPaid ?? "",
+    };
+    return map[value] ?? "";
+  }
+
+  /** Returns the display label for a payment status. */
+  function paymentStatusLabel(value: VendorBillPaymentStatus): string {
+    const map: Record<VendorBillPaymentStatus, string> = {
+      unpaid: "Unpaid",
+      partial: "Partial",
+      paid: "Paid",
+    };
+    return map[value] ?? value;
   }
 
   /** Toggles a project status in or out of the project list filter. */
@@ -767,18 +640,14 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
         body: JSON.stringify({
           vendor: payloadBody.vendor,
           bill_number: payloadBody.bill_number,
-          status: payloadBody.status,
           issue_date: payloadBody.issue_date,
           due_date: payloadBody.due_date,
-          scheduled_for: payloadBody.scheduled_for ?? null,
           total: payloadBody.total,
           notes: payloadBody.notes,
           line_items: (payloadBody.line_items ?? []).map((row) => ({
             cost_code: row.costCode || null,
             description: row.description,
-            quantity: row.quantity,
-            unit: row.unit,
-            unit_price: row.unitPrice,
+            amount: row.amount,
           })),
         }),
       },
@@ -833,23 +702,19 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
     setStatusMessage("Creating vendor bill...");
     const normalizedLineItems: VendorBillLineInput[] = newLineItems
-      .filter((row) => row.description || row.quantity || row.unitPrice)
+      .filter((row) => row.description || row.amount)
       .map((row) => ({
         costCode: row.costCode || null,
         description: row.description,
-        quantity: row.quantity,
-        unit: row.unit,
-        unitPrice: row.unitPrice,
+        amount: row.amount,
       }));
     await createVendorBill({
       projectId,
       vendor,
       bill_number: newBillNumber,
-      status: newStatus,
       received_date: newReceivedDate || null,
       issue_date: newIssueDate,
       due_date: newDueDate,
-      scheduled_for: newScheduledFor || null,
       subtotal: newSubtotal,
       tax_amount: newTaxAmount,
       shipping_amount: newShippingAmount,
@@ -891,8 +756,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setNewSubtotal("0.00");
     setNewTaxAmount("0.00");
     setNewShippingAmount("0.00");
-    setNewScheduledFor("");
-    setNewStatus(createStatusOptions[0] ?? billStatuses[0] ?? "planned");
     setNewTotal("0.00");
     setNewNotes("");
     setNewLineItems([createEmptyVendorBillLineRow()]);
@@ -921,13 +784,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       setStatusMessage(message);
       return;
     }
-    if (scheduledFor && scheduledFor < todayDateInput()) {
-      const message = "Scheduled for date cannot be in the past.";
-      setEditErrorMessage(message);
-      setStatusMessage(message);
-      return;
-    }
-
     setStatusMessage("Saving vendor bill...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/vendor-bills/${vendorBillId}/`, {
@@ -939,20 +795,17 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
           received_date: receivedDate || null,
           issue_date: issueDate,
           due_date: dueDate,
-          scheduled_for: scheduledFor || null,
           subtotal,
           tax_amount: taxAmount,
           shipping_amount: shippingAmount,
           total,
           notes,
           line_items: lineItems
-            .filter((row) => row.description || row.quantity || row.unitPrice)
+            .filter((row) => row.description || row.amount)
             .map((row) => ({
               cost_code: row.costCode || null,
               description: row.description,
-              quantity: row.quantity,
-              unit: row.unit,
-              unit_price: row.unitPrice,
+              amount: row.amount,
             })),
           status,
         }),
@@ -1041,126 +894,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     await handleQuickVendorBillStatus(viewerNextStatus);
   }
 
-  /** Opens the Record Payment inline form, pre-filling amount from balance_due. */
-  function handleOpenRecordPayment() {
-    if (!selectedVendorBill) return;
-    setRpAmount(selectedVendorBill.balance_due);
-    setRpMethod("check");
-    setRpDate(todayDateInput());
-    setRpReference("");
-    setRpNote("");
-    setPaidActionError("");
-    setPaidAction("record_payment");
-  }
-
-  /** Opens the Mark Paid inline form. */
-  function handleOpenMarkPaid() {
-    setMarkPaidNote("");
-    setPaidActionError("");
-    setPaidAction("mark_paid");
-  }
-
-  /** Creates an outbound payment, allocates it to the selected bill, then refreshes. */
-  async function handleRecordPayment() {
-    if (!selectedVendorBill || !selectedProjectId) return;
-    const amount = Number(rpAmount);
-    if (!amount || amount <= 0) {
-      setPaidActionError("Enter a payment amount greater than zero.");
-      return;
-    }
-    setPaidActionBusy(true);
-    setPaidActionError("");
-    try {
-      // Step 1: Create outbound payment
-      const createRes = await fetch(
-        `${normalizedBaseUrl}/projects/${selectedProjectId}/payments/`,
-        {
-          method: "POST",
-          headers: buildAuthHeaders(token, { contentType: "application/json" }),
-          body: JSON.stringify({
-            direction: "outbound",
-            method: rpMethod,
-            amount: rpAmount,
-            payment_date: rpDate || todayDateInput(),
-            reference_number: rpReference,
-            notes: rpNote,
-          }),
-        },
-      );
-      const createPayload = await createRes.json();
-      if (!createRes.ok) {
-        setPaidActionError(readApiErrorMessage(createPayload, "Failed to create payment."));
-        return;
-      }
-      const payment = createPayload.data;
-
-      // Step 2: Allocate payment to this vendor bill
-      const allocateRes = await fetch(
-        `${normalizedBaseUrl}/payments/${payment.id}/allocate/`,
-        {
-          method: "POST",
-          headers: buildAuthHeaders(token, { contentType: "application/json" }),
-          body: JSON.stringify({
-            allocations: [{
-              target_type: "vendor_bill",
-              target_id: selectedVendorBill.id,
-              applied_amount: rpAmount,
-            }],
-          }),
-        },
-      );
-      const allocatePayload = await allocateRes.json();
-      if (!allocateRes.ok) {
-        setPaidActionError(readApiErrorMessage(allocatePayload, "Payment created but allocation failed."));
-        return;
-      }
-
-      // Refresh bill list to pick up updated balance_due and status
-      await loadVendorBills();
-      setPaidAction("");
-      setViewerNextStatus("");
-      setStatusMessage(`Payment of $${rpAmount} recorded and allocated to bill #${selectedVendorBill.id}.`);
-    } catch {
-      setPaidActionError("Network error recording payment.");
-    } finally {
-      setPaidActionBusy(false);
-    }
-  }
-
-  /** Marks the selected bill as paid with a required note (no payment record). */
-  async function handleMarkPaid() {
-    if (!selectedVendorBill) return;
-    const note = markPaidNote.trim();
-    if (!note) {
-      setPaidActionError("A note is required when marking a bill as paid without a payment record.");
-      return;
-    }
-    setPaidActionBusy(true);
-    setPaidActionError("");
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/vendor-bills/${selectedVendorBill.id}/`, {
-        method: "PATCH",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
-        body: JSON.stringify({ status: "paid", mark_paid_note: note }),
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setPaidActionError(readApiErrorMessage(payload, "Failed to mark bill as paid."));
-        return;
-      }
-      const updated = payload.data as VendorBillRecord;
-      setVendorBills((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-      hydrate(updated);
-      setPaidAction("");
-      setViewerNextStatus("");
-      setStatusMessage(`Bill #${updated.id} marked as paid.`);
-    } catch {
-      setPaidActionError("Network error marking bill as paid.");
-    } finally {
-      setPaidActionBusy(false);
-    }
-  }
-
   /** Copies the selected bill's details into the create form for a "recreate" workflow. */
   function handleRecreateAsNewDraftTemplate() {
     if (!selectedVendorBillId) {
@@ -1180,22 +913,19 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setNewSubtotal(selected.subtotal);
     setNewTaxAmount(selected.tax_amount);
     setNewShippingAmount(selected.shipping_amount);
-    setNewScheduledFor(selected.scheduled_for ?? "");
     setNewTotal(selected.total);
     setNewNotes(selected.notes || "");
     const copiedLineItems = (selected.line_items ?? []).map((row) => ({
       costCode: row.cost_code,
       description: row.description,
-      quantity: row.quantity,
-      unit: row.unit,
-      unitPrice: row.unit_price,
+      amount: row.amount,
     }));
     setNewLineItems(
       copiedLineItems.length > 0 ? copiedLineItems : [createEmptyVendorBillLineRow()],
     );
     setSelectedVendorBillId("");
     setDuplicateCandidates([]);
-    setCreateErrorMessage("Enter a new bill number, then create the recreated planned bill.");
+    setCreateErrorMessage("Enter a new bill number, then create the recreated bill.");
     setStatusMessage(`Copied bill #${selected.id} into create form.`);
     flashCreator();
     setIsWorkspaceExpanded(true);
@@ -1284,13 +1014,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setViewerNextStatus("");
   }, [allowedStatusTransitions, selectedVendorBill]);
 
-  // Reset paid action forms when next-status changes away from "paid" or bill changes.
-  useEffect(() => {
-    setPaidAction("");
-    setPaidActionError("");
-  }, [viewerNextStatus, selectedVendorBillId]);
-
-
 
 
 
@@ -1332,113 +1055,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
         ) : (
           <p>Create or load a project before entering bills.</p>
         )
-      ) : null}
-
-      {/* ── Quick Receipt Form ──────────────────────────────────── */}
-      {selectedProjectId && canMutateVendorBills ? (
-        <form className={styles.receiptForm} onSubmit={handleSubmitReceipt}>
-          <h3 className={styles.receiptTitle}>Quick Receipt</h3>
-          <div className={styles.receiptFields}>
-            <div className={styles.receiptField}>
-              <span className={styles.receiptFieldLabel}>Vendor</span>
-              <div className={styles.receiptCombobox}>
-                <div className={styles.receiptComboboxInputWrap}>
-                  <input
-                    ref={receiptVendorCombobox.inputRef}
-                    className={styles.receiptComboboxInput}
-                    role="combobox"
-                    aria-expanded={receiptVendorCombobox.isOpen}
-                    aria-controls="receipt-vendor-listbox"
-                    value={receiptVendorCombobox.isOpen ? receiptVendorCombobox.query : (selectedReceiptVendor?.name ?? "")}
-                    placeholder="Search vendors..."
-                    onFocus={() => receiptVendorCombobox.open(selectedReceiptVendor?.name ?? "")}
-                    onChange={(e) => {
-                      receiptVendorCombobox.handleInput(e.target.value);
-                      if (receiptVendorId) setReceiptVendorId("");
-                    }}
-                    onKeyDown={receiptVendorCombobox.handleKeyDown}
-                    autoComplete="off"
-                  />
-                  {receiptVendorId ? (
-                    <button
-                      type="button"
-                      className={styles.receiptComboboxClear}
-                      aria-label="Clear vendor"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => commitReceiptVendor(null)}
-                    >×</button>
-                  ) : (
-                    <button
-                      type="button"
-                      className={styles.receiptComboboxClear}
-                      aria-label="Open vendor list"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => { receiptVendorCombobox.inputRef.current?.focus(); receiptVendorCombobox.open(""); }}
-                    >▾</button>
-                  )}
-                </div>
-                {receiptVendorCombobox.isOpen ? (
-                  <div ref={receiptVendorCombobox.menuRef} id="receipt-vendor-listbox" className={styles.receiptComboboxMenu} role="listbox">
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={!receiptVendorId}
-                      className={`${styles.receiptComboboxOption} ${receiptVendorCombobox.highlightIndex === 0 ? styles.receiptComboboxOptionActive : ""}`}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onMouseEnter={() => receiptVendorCombobox.setHighlightIndex(0)}
-                      onClick={() => commitReceiptVendor(null)}
-                    >None</button>
-                    {receiptVendorCombobox.filteredItems.map((v, i) => (
-                      <button
-                        key={v.id}
-                        type="button"
-                        role="option"
-                        aria-selected={String(v.id) === receiptVendorId}
-                        className={`${styles.receiptComboboxOption} ${receiptVendorCombobox.highlightIndex === i + 1 ? styles.receiptComboboxOptionActive : ""}`}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onMouseEnter={() => receiptVendorCombobox.setHighlightIndex(i + 1)}
-                        onClick={() => commitReceiptVendor(v)}
-                      >{v.name}</button>
-                    ))}
-                    {receiptVendorCombobox.filteredItems.length === 0 && receiptVendorCombobox.query.trim() ? (
-                      <div className={styles.receiptComboboxNoResults}>No matching vendors.</div>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-            <label className={styles.receiptField}>
-              <span className={styles.receiptFieldLabel}>Amount *</span>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                value={receiptTotal}
-                onChange={(e) => setReceiptTotal(e.target.value)}
-                placeholder="0.00"
-                required
-              />
-            </label>
-            <label className={styles.receiptField}>
-              <span className={styles.receiptFieldLabel}>Date</span>
-              <input type="date" value={receiptDate} onChange={(e) => setReceiptDate(e.target.value)} />
-            </label>
-            <label className={`${styles.receiptField} ${styles.receiptFieldNotes}`}>
-              <span className={styles.receiptFieldLabel}>Notes</span>
-              <input value={receiptNotes} onChange={(e) => setReceiptNotes(e.target.value)} placeholder="Optional" />
-            </label>
-            <button type="submit" className={styles.receiptSubmit}>
-              Record
-            </button>
-          </div>
-          {receiptMessage ? (
-            <p className={`${styles.receiptMessage} ${
-              receiptMessageTone === "success" ? styles.receiptMessageSuccess : styles.receiptMessageError
-            }`}>
-              {receiptMessage}
-            </p>
-          ) : null}
-        </form>
       ) : null}
 
       {/* ── Viewer Panel: bill table + inline expansion ──────────── */}
@@ -1523,6 +1139,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                 <th>Bill</th>
                 <th>Vendor</th>
                 <th>Status</th>
+                <th>Payment</th>
                 <th>Issue</th>
                 <th>Due</th>
                 <th>Total</th>
@@ -1548,6 +1165,11 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                           {statusDisplayLabel(vendorBill.status)}
                         </span>
                       </td>
+                      <td>
+                        <span className={`${styles.tableStatusBadge} ${paymentStatusBadgeClass(vendorBill.payment_status)}`}>
+                          {paymentStatusLabel(vendorBill.payment_status)}
+                        </span>
+                      </td>
                       <td>{formatDateDisplay(vendorBill.issue_date)}</td>
                       <td>{formatDateDisplay(vendorBill.due_date)}</td>
                       <td>${vendorBill.total}</td>
@@ -1555,7 +1177,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                     </tr>,
                     isSelected ? (
                       <tr key={`expanded-${vendorBill.id}`} className={styles.expandedRow}>
-                        <td colSpan={7}>
+                        <td colSpan={8}>
                           <div className={styles.expandedSections}>
                             {/* Status & Actions */}
                             <div className={styles.viewerSection}>
@@ -1595,139 +1217,16 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                                   ) : (
                                     <p className={styles.viewerHint}>No next statuses available for this bill.</p>
                                   )}
-                                  {viewerNextStatus === "paid" ? (
-                                    <>
-                                      <div className={styles.viewerStatusActions}>
-                                        <button
-                                          type="button"
-                                          className={creatorStyles.primaryButton}
-                                          onClick={handleOpenRecordPayment}
-                                          disabled={!selectedVendorBillId || !canMutateVendorBills || paidActionBusy}
-                                        >
-                                          Record Payment
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className={creatorStyles.secondaryButton}
-                                          onClick={handleOpenMarkPaid}
-                                          disabled={!selectedVendorBillId || !canMutateVendorBills || paidActionBusy}
-                                        >
-                                          Mark Paid
-                                        </button>
-                                      </div>
-                                      {paidAction === "record_payment" ? (
-                                        <div className={styles.paidActionForm}>
-                                          <h5 className={styles.paidActionTitle}>Record Outbound Payment</h5>
-                                          <div className={styles.paidActionFields}>
-                                            <label className={styles.paidActionField}>
-                                              <span>Amount *</span>
-                                              <input
-                                                type="number"
-                                                step="0.01"
-                                                min="0.01"
-                                                value={rpAmount}
-                                                onChange={(e) => setRpAmount(e.target.value)}
-                                                required
-                                              />
-                                            </label>
-                                            <label className={styles.paidActionField}>
-                                              <span>Method</span>
-                                              <select value={rpMethod} onChange={(e) => setRpMethod(e.target.value)}>
-                                                {PAYMENT_METHODS.map((m) => (
-                                                  <option key={m.value} value={m.value}>{m.label}</option>
-                                                ))}
-                                              </select>
-                                            </label>
-                                            <label className={styles.paidActionField}>
-                                              <span>Date</span>
-                                              <input type="date" value={rpDate} onChange={(e) => setRpDate(e.target.value)} />
-                                            </label>
-                                            <label className={styles.paidActionField}>
-                                              <span>Reference #</span>
-                                              <input value={rpReference} onChange={(e) => setRpReference(e.target.value)} placeholder="Check #, txn ID..." />
-                                            </label>
-                                            <label className={`${styles.paidActionField} ${styles.paidActionFieldWide}`}>
-                                              <span>Note</span>
-                                              <input value={rpNote} onChange={(e) => setRpNote(e.target.value)} placeholder="Optional" />
-                                            </label>
-                                          </div>
-                                          <div className={styles.paidActionButtons}>
-                                            <button
-                                              type="button"
-                                              className={creatorStyles.primaryButton}
-                                              onClick={() => void handleRecordPayment()}
-                                              disabled={paidActionBusy || !rpAmount}
-                                            >
-                                              {paidActionBusy ? "Recording..." : "Record & Allocate"}
-                                            </button>
-                                            <button
-                                              type="button"
-                                              className={creatorStyles.secondaryButton}
-                                              onClick={() => setPaidAction("")}
-                                              disabled={paidActionBusy}
-                                            >
-                                              Cancel
-                                            </button>
-                                          </div>
-                                        </div>
-                                      ) : null}
-                                      {paidAction === "mark_paid" ? (
-                                        <div className={styles.paidActionForm}>
-                                          <h5 className={styles.paidActionTitle}>Mark Paid (No Payment Record)</h5>
-                                          <p className={styles.paidActionHint}>
-                                            Use this for credits applied, write-offs, or payments made outside the system.
-                                            A note is required.
-                                          </p>
-                                          <div className={styles.paidActionFields}>
-                                            <label className={`${styles.paidActionField} ${styles.paidActionFieldWide}`}>
-                                              <span>Note *</span>
-                                              <textarea
-                                                value={markPaidNote}
-                                                onChange={(e) => setMarkPaidNote(e.target.value)}
-                                                placeholder="Why is this bill being marked as paid without a payment record?"
-                                                rows={2}
-                                                required
-                                              />
-                                            </label>
-                                          </div>
-                                          <div className={styles.paidActionButtons}>
-                                            <button
-                                              type="button"
-                                              className={creatorStyles.primaryButton}
-                                              onClick={() => void handleMarkPaid()}
-                                              disabled={paidActionBusy || !markPaidNote.trim()}
-                                            >
-                                              {paidActionBusy ? "Updating..." : "Confirm Mark Paid"}
-                                            </button>
-                                            <button
-                                              type="button"
-                                              className={creatorStyles.secondaryButton}
-                                              onClick={() => setPaidAction("")}
-                                              disabled={paidActionBusy}
-                                            >
-                                              Cancel
-                                            </button>
-                                          </div>
-                                        </div>
-                                      ) : null}
-                                    </>
-                                  ) : (
-                                    <div className={styles.viewerStatusActions}>
-                                      <button
-                                        type="button"
-                                        className={creatorStyles.primaryButton}
-                                        onClick={() => void handleUpdateVendorBillStatus()}
-                                        disabled={!selectedVendorBillId || !viewerNextStatus || !canMutateVendorBills}
-                                      >
-                                        Update Status
-                                      </button>
-                                    </div>
-                                  )}
-                                  {paidActionError ? (
-                                    <p className={styles.viewerErrorText} role="alert" aria-live="polite">
-                                      {paidActionError}
-                                    </p>
-                                  ) : null}
+                                  <div className={styles.viewerStatusActions}>
+                                    <button
+                                      type="button"
+                                      className={creatorStyles.primaryButton}
+                                      onClick={() => void handleUpdateVendorBillStatus()}
+                                      disabled={!selectedVendorBillId || !viewerNextStatus || !canMutateVendorBills}
+                                    >
+                                      Update Status
+                                    </button>
+                                  </div>
                                   {viewerErrorMessage ? (
                                     <p className={styles.viewerErrorText} role="alert" aria-live="polite">
                                       {viewerErrorMessage}
@@ -1757,10 +1256,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                                           <tr>
                                             <th>Cost Code</th>
                                             <th>Description</th>
-                                            <th>Qty</th>
-                                            <th>Unit</th>
-                                            <th>Unit Price</th>
-                                            <th>Total</th>
+                                            <th>Amount</th>
                                           </tr>
                                         </thead>
                                         <tbody>
@@ -1768,10 +1264,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                                               <tr key={lineIdx}>
                                                 <td>{lineItem.cost_code_code || "—"}</td>
                                                 <td>{lineItem.description || "—"}</td>
-                                                <td>{lineItem.quantity}</td>
-                                                <td>{lineItem.unit || "—"}</td>
-                                                <td>${lineItem.unit_price}</td>
-                                                <td>${lineItem.line_total}</td>
+                                                <td>${lineItem.amount}</td>
                                               </tr>
                                           ))}
                                         </tbody>
@@ -1822,17 +1315,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                                       <p className={styles.detailLabel}>Balance Due</p>
                                       <p className={styles.detailValue}>${vendorBill.balance_due}</p>
                                     </div>
-                                    {vendorBill.scheduled_for ? (
-                                      <div>
-                                        <p className={styles.detailLabel}>Scheduled For</p>
-                                        <p className={styles.detailValue}>{formatDateDisplay(vendorBill.scheduled_for)}</p>
-                                      </div>
-                                    ) : (vendorBill.status === "approved" || vendorBill.status === "scheduled") ? (
-                                      <div>
-                                        <p className={styles.detailLabel}>Scheduled For</p>
-                                        <p className={`${styles.detailValue} ${styles.detailMissing}`}>Not set</p>
-                                      </div>
-                                    ) : null}
                                     {vendorBill.notes ? (
                                       <div style={{ gridColumn: "1 / -1" }}>
                                         <p className={styles.detailLabel}>Notes</p>
@@ -1851,7 +1333,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                 })
               ) : (
                 <tr>
-                  <td colSpan={7} className={styles.projectEmptyCell}>
+                  <td colSpan={8} className={styles.projectEmptyCell}>
                     No bills match the selected status/due filters.
                   </td>
                 </tr>
@@ -1979,22 +1461,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                   />
                 </label>
 
-                {!isEditingMode || canEditScheduledFor ? (
-                  <label className={scheduledForMissing ? styles.fieldHighlight : undefined}>
-                    Scheduled for
-                    <input
-                      type="date"
-                      value={formScheduledFor}
-                      onChange={(event) => setFormScheduledFor(event.target.value)}
-                      disabled={!selectedProjectId || !canEditScheduledFor}
-                      className={scheduledForMissing ? styles.inputHighlight : undefined}
-                    />
-                    {scheduledForMissing ? (
-                      <span className={styles.fieldHintWarn}>Set a payment date before scheduling.</span>
-                    ) : null}
-                  </label>
-                ) : null}
-
                 <label>
                   Subtotal
                   <input
@@ -2051,15 +1517,13 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                 <div className={`${styles.fieldSpan2} ${styles.allocationsBlock}`}>
                   <div className={styles.formSectionHeader}>
                     <h4 className={styles.formSectionTitle}>Line Items</h4>
-                    <p className={styles.formSectionHint}>Itemize this bill with cost codes, quantities, and unit prices.</p>
+                    <p className={styles.formSectionHint}>Itemize this bill with cost codes, descriptions, and amounts.</p>
                   </div>
                   <div className={creatorStyles.lineTable}>
                     <div className={`${creatorStyles.lineHeader} ${styles.allocationLineHeader}`}>
                       <div className={creatorStyles.lineHeaderCell}>Cost Code</div>
                       <div className={creatorStyles.lineHeaderCell}>Description</div>
-                      <div className={creatorStyles.lineHeaderCell}>Qty</div>
-                      <div className={creatorStyles.lineHeaderCell}>Unit</div>
-                      <div className={creatorStyles.lineHeaderCell}>Unit Price</div>
+                      <div className={creatorStyles.lineHeaderCell}>Amount</div>
                       <div className={creatorStyles.lineHeaderCell} />
                     </div>
                     {formLineItems.map((row, index) => (
@@ -2093,25 +1557,8 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                           <div className={creatorStyles.lineCell}>
                             <input
                               className={creatorStyles.lineInput}
-                              value={row.quantity}
-                              onChange={(event) => updateFormLineItem(index, { quantity: event.target.value })}
-                              placeholder="1"
-                              inputMode="decimal"
-                            />
-                          </div>
-                          <div className={creatorStyles.lineCell}>
-                            <input
-                              className={creatorStyles.lineInput}
-                              value={row.unit}
-                              onChange={(event) => updateFormLineItem(index, { unit: event.target.value })}
-                              placeholder="ea"
-                            />
-                          </div>
-                          <div className={creatorStyles.lineCell}>
-                            <input
-                              className={creatorStyles.lineInput}
-                              value={row.unitPrice}
-                              onChange={(event) => updateFormLineItem(index, { unitPrice: event.target.value })}
+                              value={row.amount}
+                              onChange={(event) => updateFormLineItem(index, { amount: event.target.value })}
                               placeholder="0.00"
                               inputMode="decimal"
                             />
@@ -2139,11 +1586,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                       Add Line Item
                     </button>
                   </div>
-                  {scheduledForMissing ? (
-                    <p className={styles.errorText}>
-                      Set a <strong>scheduled for</strong> date before saving.
-                    </p>
-                  ) : null}
                 </div>
 
                 <label className={styles.fieldSpan2}>
@@ -2154,30 +1596,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                     disabled={!selectedProjectId}
                   />
                 </label>
-
-                {!isEditingMode ? (
-                  <div className={`${styles.statusPicker} ${styles.fieldSpan2}`}>
-                    <span className={styles.statusPickerLabel}>Initial status</span>
-                    <div className={styles.statusPills}>
-                      {createStatusOptions.map((statusOption) => {
-                        const active = statusOption === newStatus;
-                        return (
-                          <button
-                            key={statusOption}
-                            type="button"
-                            className={`${styles.statusPill} ${
-                              active ? statusPillClass(statusOption) : styles.statusPillInactive
-                            } ${active ? styles.statusPillActive : ""}`}
-                            aria-pressed={active}
-                            onClick={() => setNewStatus(statusOption)}
-                          >
-                            {statusDisplayLabel(statusOption)}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : null}
 
                 <div className={`${styles.submitRow} ${styles.fieldSpan2}`}>
                   {isEditingMode && editErrorMessage ? (
@@ -2196,8 +1614,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                     disabled={
                       !canMutateVendorBills ||
                       !selectedProjectId ||
-                      !formVendorId ||
-                      scheduledForMissing
+                      !formVendorId
                     }
                   >
                     {isEditingMode ? "Save Vendor Bill" : "Create Vendor Bill"}

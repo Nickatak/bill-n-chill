@@ -2,10 +2,10 @@
  *
  * Canonical color slots:
  *   blue    — draft, prospect, planned
- *   amber   — sent, pending_approval, on_hold, received, scheduled
+ *   amber   — sent, pending_approval, on_hold, received, scheduled, reviewed
  *   green   — approved, active
- *   red     — rejected, cancelled
- *   gray    — void, completed, archived, inactive
+ *   red     — rejected, cancelled, disputed
+ *   gray    — void, completed, archived, inactive, closed
  *   emerald — paid
  *   orange  — overdue
  *   violet  — partially_paid
@@ -29,26 +29,29 @@
 .prospect { composes: badge; background: var(--status-blue-bg); border-color: var(--status-blue-border); color: var(--status-blue-text); }
 .planned  { composes: badge; background: var(--status-blue-bg); border-color: var(--status-blue-border); color: var(--status-blue-text); }
 
-/* --- Amber: sent, pending_approval, on_hold, received, scheduled --- */
+/* --- Amber: sent, pending_approval, on_hold, received, scheduled, reviewed --- */
 .sent            { composes: badge; background: var(--status-amber-bg); border-color: var(--status-amber-border); color: var(--status-amber-text); }
 .pendingApproval { composes: badge; background: var(--status-amber-bg); border-color: var(--status-amber-border); color: var(--status-amber-text); }
 .onHold          { composes: badge; background: var(--status-amber-bg); border-color: var(--status-amber-border); color: var(--status-amber-text); }
 .received        { composes: badge; background: var(--status-amber-bg); border-color: var(--status-amber-border); color: var(--status-amber-text); }
 .scheduled       { composes: badge; background: var(--status-amber-bg); border-color: var(--status-amber-border); color: var(--status-amber-text); }
+.reviewed        { composes: badge; background: var(--status-amber-bg); border-color: var(--status-amber-border); color: var(--status-amber-text); }
 
 /* --- Green: approved, active --- */
 .approved { composes: badge; background: var(--status-green-bg); border-color: var(--status-green-border); color: var(--status-green-text); }
 .active   { composes: badge; background: var(--status-green-bg); border-color: var(--status-green-border); color: var(--status-green-text); }
 
-/* --- Red: rejected, cancelled --- */
+/* --- Red: rejected, cancelled, disputed --- */
 .rejected  { composes: badge; background: var(--status-red-bg); border-color: var(--status-red-border); color: var(--status-red-text); }
 .cancelled { composes: badge; background: var(--status-red-bg); border-color: var(--status-red-border); color: var(--status-red-text); }
+.disputed  { composes: badge; background: var(--status-red-bg); border-color: var(--status-red-border); color: var(--status-red-text); }
 
-/* --- Gray: void, completed, archived, inactive --- */
+/* --- Gray: void, completed, archived, inactive, closed --- */
 .void      { composes: badge; background: var(--status-gray-bg); border-color: var(--status-gray-border); color: var(--status-gray-text); }
 .completed { composes: badge; background: var(--status-gray-bg); border-color: var(--status-gray-border); color: var(--status-gray-text); }
 .archived  { composes: badge; background: var(--status-gray-bg); border-color: var(--status-gray-border); color: var(--status-gray-text); }
 .inactive  { composes: badge; background: var(--status-gray-bg); border-color: var(--status-gray-border); color: var(--status-gray-text); }
+.closed    { composes: badge; background: var(--status-gray-bg); border-color: var(--status-gray-border); color: var(--status-gray-text); }
 
 /* --- Emerald: paid --- */
 .paid { composes: badge; background: var(--status-emerald-bg); border-color: var(--status-emerald-border); color: var(--status-emerald-text); }

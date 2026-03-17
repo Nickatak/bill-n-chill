@@ -16,7 +16,8 @@ import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import styles from "./projects-console.module.css";
-import { PaymentRecorder, type AllocationTarget } from "@/features/payments";
+import { type AllocationTarget } from "@/features/payments";
+import { QuickEntryTabs } from "./quick-entry-tabs";
 import { ProjectListViewer } from "@/shared/project-list-viewer";
 import { ApiResponse, ProjectFinancialSummary, ProjectRecord } from "../types";
 import {
@@ -632,14 +633,11 @@ export function ProjectsConsole() {
 
             </div>
 
-            {/* Inbound payment recorder — rough placement for iteration */}
             <div className={styles.paymentRecorderSection}>
-              <PaymentRecorder
+              <QuickEntryTabs
                 projectId={selectedProject.id}
-                direction="inbound"
+                token={token ?? ""}
                 allocationTargets={invoiceAllocationTargets}
-                hideHeader
-                createOnly
                 onPaymentsChanged={() => {
                   void loadFinancialSummary();
                   void loadInvoiceAllocationTargets(selectedProject.id);

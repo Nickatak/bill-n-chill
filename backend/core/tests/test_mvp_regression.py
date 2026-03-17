@@ -185,11 +185,10 @@ class MvpRegressionMoneyLoopTests(TestCase):
             data={
                 "vendor": vendor.id,
                 "bill_number": "VB-100",
-                "status": "received",
                 "issue_date": "2026-02-13",
                 "due_date": "2026-03-15",
                 "line_items": [
-                    {"description": "Tile materials", "quantity": "1", "unit": "ea", "unit_price": "500.00"}
+                    {"description": "Tile materials", "amount": "500.00"}
                 ],
             },
             content_type="application/json",
@@ -205,16 +204,6 @@ class MvpRegressionMoneyLoopTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(to_approved.status_code, 200)
-        to_scheduled = self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={
-                "status": "scheduled",
-                "scheduled_for": "2026-02-25",
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(to_scheduled.status_code, 200)
 
         outbound_payment = self.client.post(
             f"/api/v1/projects/{self.project.id}/payments/",
@@ -268,5 +257,5 @@ class MvpRegressionMoneyLoopTests(TestCase):
         vendor_bill = VendorBill.objects.get(id=vendor_bill_id)
         self.assertEqual(invoice.status, Invoice.Status.PAID)
         self.assertEqual(str(invoice.balance_due), "0.00")
-        self.assertEqual(vendor_bill.status, VendorBill.Status.PAID)
+        self.assertEqual(vendor_bill.status, VendorBill.Status.APPROVED)
         self.assertEqual(str(vendor_bill.balance_due), "0.00")

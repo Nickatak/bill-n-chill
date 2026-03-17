@@ -13,12 +13,15 @@ class VendorBill(StatusTransitionMixin, models.Model):
     """AP bill or casual receipt for project costs.
 
     Business workflow:
-    - Two kinds: ``bill`` (formal vendor bill with line items and approval
+    - Two kinds: ``bill`` (formal vendor bill with line items and document
       lifecycle) and ``receipt`` (lightweight expense record, created in
-      terminal ``recorded`` status).
+      ``approved`` status with an auto-created outbound payment).
     - Internal payable document (vendor-facing), not customer-facing billing.
-    - Bills track AP lifecycle from intake through approval/scheduling/payment.
-    - Project + vendor + bill number must be unique for non-void bills (reuse allowed after void).
+    - Bills track document lifecycle only (received → approved).
+      Payment status is derived from PaymentAllocation coverage, not a bill
+      status. See ``docs/decisions/ap-model-separation.md``.
+    - Project + vendor + bill number must be unique for non-void bills
+      (reuse allowed after void).
     - `created_by` captures who created/owns the record, not who performed
       later lifecycle decisions (those belong in immutable decision captures).
     """
@@ -28,28 +31,20 @@ class VendorBill(StatusTransitionMixin, models.Model):
         RECEIPT = "receipt", "Receipt"
 
     class Status(models.TextChoices):
-        PLANNED = "planned", "Planned"
         RECEIVED = "received", "Received"
         APPROVED = "approved", "Approved"
-        SCHEDULED = "scheduled", "Scheduled"
-        PAID = "paid", "Paid"
+        DISPUTED = "disputed", "Disputed"
+        CLOSED = "closed", "Closed"
         VOID = "void", "Void"
-        RECORDED = "recorded", "Recorded"
 
-    # Transition-map format:
-    # {from_status: {allowed_to_status_1, allowed_to_status_2, ...}}
-    # Example: `received -> approved` is allowed because
-    # `Status.APPROVED` is in `ALLOWED_STATUS_TRANSITIONS[Status.RECEIVED]`.
     _status_label = "vendor bill"
 
     ALLOWED_STATUS_TRANSITIONS = {
-        Status.PLANNED: {Status.RECEIVED, Status.VOID},
         Status.RECEIVED: {Status.APPROVED, Status.VOID},
-        Status.APPROVED: {Status.SCHEDULED, Status.PAID, Status.VOID},
-        Status.SCHEDULED: {Status.PAID, Status.VOID},
-        Status.PAID: set(),
+        Status.APPROVED: {Status.DISPUTED, Status.CLOSED, Status.VOID},
+        Status.DISPUTED: {Status.APPROVED, Status.CLOSED, Status.VOID},
+        Status.CLOSED: set(),
         Status.VOID: set(),
-        Status.RECORDED: {Status.VOID},
     }
 
     kind = models.CharField(
@@ -82,7 +77,7 @@ class VendorBill(StatusTransitionMixin, models.Model):
     status = models.CharField(
         max_length=32,
         choices=Status.choices,
-        default=Status.PLANNED,
+        default=Status.RECEIVED,
         db_index=True,
     )
     received_date = models.DateField(
@@ -92,7 +87,6 @@ class VendorBill(StatusTransitionMixin, models.Model):
     )
     issue_date = models.DateField(null=True, blank=True)
     due_date = models.DateField(null=True, blank=True)
-    scheduled_for = models.DateField(null=True, blank=True)
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     shipping_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -126,7 +120,7 @@ class VendorBill(StatusTransitionMixin, models.Model):
         return f"{self.vendor.name if self.vendor_id else '?'} {self.bill_number}"
 
     def clean(self):
-        """Validate due date, scheduled_for requirement, and status transitions."""
+        """Validate due date and status transitions."""
         errors = {}
 
         # Bills require vendor and bill_number.
@@ -139,12 +133,6 @@ class VendorBill(StatusTransitionMixin, models.Model):
         if self.due_date and self.issue_date and self.due_date < self.issue_date:
             errors.setdefault("due_date", []).append("Due date must be on or after issue date.")
 
-        if self.status == self.Status.SCHEDULED and self.scheduled_for is None:
-            errors.setdefault("scheduled_for", []).append("Provide a scheduled payment date.")
-
-        # Standard Django pattern: system-controlled status changes (e.g.
-        # payment allocation) set this flag to bypass user-facing transition
-        # rules.  See payments_helpers.py.
         if not getattr(self, "_skip_transition_validation", False):
             self.validate_status_transition(errors)
 
@@ -168,7 +156,6 @@ class VendorBill(StatusTransitionMixin, models.Model):
                 "received_date": self.received_date.isoformat() if self.received_date else None,
                 "issue_date": self.issue_date.isoformat() if self.issue_date else None,
                 "due_date": self.due_date.isoformat() if self.due_date else None,
-                "scheduled_for": self.scheduled_for.isoformat() if self.scheduled_for else None,
                 "subtotal": str(self.subtotal),
                 "tax_amount": str(self.tax_amount),
                 "shipping_amount": str(self.shipping_amount),
@@ -183,10 +170,7 @@ class VendorBill(StatusTransitionMixin, models.Model):
                     "cost_code_code": row.cost_code.code if row.cost_code else None,
                     "cost_code_name": row.cost_code.name if row.cost_code else None,
                     "description": row.description,
-                    "quantity": str(row.quantity),
-                    "unit": row.unit,
-                    "unit_price": str(row.unit_price),
-                    "line_total": str(row.line_total),
+                    "amount": str(row.amount),
                 }
                 for row in line_rows
             ],
@@ -202,8 +186,11 @@ class VendorBillLine(models.Model):
     """Individual line item on a vendor bill.
 
     Business workflow:
-    - Captures quantity/unit/price for vendor-billed work or materials.
-    - Uses cost codes for internal categorization.
+    - Simple transcription of what the vendor wrote on their invoice:
+      description + amount.  Not a pricing unit (no qty × rate).
+    - Optional cost code tag for internal classification (input convenience
+      only — authoritative cost attribution lives on PaymentAllocation).
+    - See ``docs/decisions/ap-model-separation.md``.
     """
 
     vendor_bill = models.ForeignKey(
@@ -219,10 +206,7 @@ class VendorBillLine(models.Model):
         blank=True,
     )
     description = models.CharField(max_length=255, blank=True)
-    quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    unit = models.CharField(max_length=30, default="ea")
-    unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    line_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

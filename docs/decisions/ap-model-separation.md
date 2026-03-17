@@ -28,7 +28,7 @@ The sub on the other end is a different user running the same loop. This means b
 
 **Bills** are inbound documents, project-scoped, with a document lifecycle:
 - They are the AP mirror of invoices (AR). One you author and send out, one you receive and process.
-- Lifecycle is about the document: **Received → Reviewed → Approved → Disputed / Voided / Closed**. These are document statuses, not payment statuses. **Closed** is the manual reconciliation mechanism — it settles a bill that is only partially paid (e.g., dispute resolved, negotiated discount, write-off). The bill's original amount stays as-is (it's what the vendor sent), but Closed signals "we're done with this, the gap is intentional."
+- Lifecycle is about the document: **Received → Approved → Disputed / Voided / Closed**. These are document statuses, not payment statuses. **Closed** is the manual reconciliation mechanism — it settles a bill that is only partially paid (e.g., dispute resolved, negotiated discount, write-off). The bill's original amount stays as-is (it's what the vendor sent), but Closed signals "we're done with this, the gap is intentional."
 - "Paid" is not a bill status — it's derived state from payment allocations covering the balance. (This differs from invoices, which keep an explicit PAID status transition — because you control the invoice amount, there's no reconciliation gap to worry about. On AP, you don't control the bill amount, so derived status + Closed is needed for flexibility.)
 - No `PLANNED` status. That was a budget concept that doesn't belong here.
 - Bill line items are **not** estimate/invoice-style (no qty × rate). They are simple transcriptions of what the vendor wrote on their invoice: **description + amount**. The GC is recording what they received, not reconstructing someone else's cost structure.
@@ -72,6 +72,19 @@ Cost code profitability (and project profitability generally) is derived from **
 
 Bill line item cost code tags are an input convenience (the GC classifying what they received). They may serve as default suggestions when creating allocations, but are not authoritative for profitability metrics.
 
+## Quick-Entry Location: Projects Page
+
+Both quick-entry shortcuts live on the **projects page** as a tabbed form (not on the bills page or accounting page):
+
+- **Quick Payment** tab — inbound, customer paid you (already exists). Creates payment allocated to an existing invoice.
+- **Quick Receipt** tab — outbound, you spent money. Creates a bill (in approved status) + outbound payment allocated to it, in one action.
+
+Both are project-scoped — you're already in project context, so the form skips "which project?" The project provides the fiscal vehicle.
+
+The **bills console** (`/projects/[projectId]/bills`) is for the formal vendor bill workflow only — receiving, approving, disputing. No quick-entry form there.
+
+The **accounting page** will eventually have its own entry forms for when you're not starting from a project context — but that's a separate effort.
+
 ## Implications
 
 - Bill `PLANNED` status is removed.
@@ -80,6 +93,7 @@ Bill line item cost code tags are an input convenience (the GC classifying what 
 - Receipt creation also creates an outbound payment record.
 - Accounting page is the single home for all payment recording and cash movement visibility.
 - Record Payment flow moves from the bill status panel to the accounting page. Mark Paid is replaced by the **Closed** bill status.
+- Quick Receipt form moves from the bills console to the projects page (tabbed alongside Quick Payment).
 
 ## What This Does NOT Change
 

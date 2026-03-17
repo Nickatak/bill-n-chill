@@ -17,14 +17,12 @@ export type VendorBillLineFormRow = VendorBillLineInput;
 // Factory helpers
 // ---------------------------------------------------------------------------
 
-/** Creates a blank line item row for the vendor bill form. */
+/** Creates a blank line item row for the vendor bill form (description + amount). */
 export function createEmptyVendorBillLineRow(): VendorBillLineFormRow {
   return {
     costCode: null,
     description: "",
-    quantity: "",
-    unit: "",
-    unitPrice: "",
+    amount: "",
   };
 }
 
@@ -34,7 +32,7 @@ export function createEmptyVendorBillLineRow(): VendorBillLineFormRow {
 
 /** Returns default bill status filters — active (non-terminal) statuses only. */
 export function defaultBillStatusFilters(statuses: string[]): string[] {
-  const TERMINAL = new Set(["paid", "void"]);
+  const TERMINAL = new Set(["closed", "void"]);
   const active = statuses.filter((value) => !TERMINAL.has(value));
   return active.length ? active : statuses;
 }

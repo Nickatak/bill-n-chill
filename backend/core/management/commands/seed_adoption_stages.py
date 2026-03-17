@@ -355,11 +355,6 @@ class Command(BaseCommand):
                 "status": status,
                 "issue_date": kwargs.get("issue_date", today),
                 "due_date": kwargs.get("due_date", today + timedelta(days=21)),
-                "scheduled_for": (
-                    today + timedelta(days=10)
-                    if status in {VendorBill.Status.SCHEDULED, VendorBill.Status.PAID}
-                    else None
-                ),
                 "subtotal": total,
                 "tax_amount": Decimal("0.00"),
                 "shipping_amount": Decimal("0.00"),
@@ -372,11 +367,6 @@ class Command(BaseCommand):
         vb.status = status
         vb.issue_date = kwargs.get("issue_date", today)
         vb.due_date = kwargs.get("due_date", today + timedelta(days=21))
-        vb.scheduled_for = (
-            today + timedelta(days=10)
-            if status in {VendorBill.Status.SCHEDULED, VendorBill.Status.PAID}
-            else None
-        )
         vb.subtotal = total
         vb.tax_amount = Decimal("0.00")
         vb.shipping_amount = Decimal("0.00")
@@ -392,10 +382,7 @@ class Command(BaseCommand):
             description=kwargs.get("notes", "") or f"Materials — {bill_number}",
             defaults={
                 "cost_code": cost_code,
-                "quantity": Decimal("1"),
-                "unit": "ea",
-                "unit_price": total,
-                "line_total": total,
+                "amount": total,
             },
         )
         return vb
@@ -633,18 +620,18 @@ class Command(BaseCommand):
         self._make_vendor_bill(user, p_active1, v_trade2, "VB-002",
             VendorBill.Status.APPROVED, Decimal("1800.00"), Decimal("1800.00"),
             notes="Plumbing fixtures.")
-        vb_paid = self._make_vendor_bill(user, p_completed, v_trade1, "VB-003",
-            VendorBill.Status.PAID, Decimal("4500.00"), Decimal("0.00"),
+        vb_closed = self._make_vendor_bill(user, p_completed, v_trade1, "VB-003",
+            VendorBill.Status.CLOSED, Decimal("4500.00"), Decimal("0.00"),
             notes="Final electrical install.")
         self._make_vendor_bill(user, p_cancelled, v_trade2, "VB-004",
             VendorBill.Status.VOID, Decimal("2000.00"), Decimal("0.00"),
             notes="Cancelled with project.")
         self._make_vendor_bill(user, p_active1, v_trade1, "VB-005",
-            VendorBill.Status.PLANNED, Decimal("1500.00"), Decimal("1500.00"),
+            VendorBill.Status.RECEIVED, Decimal("1500.00"), Decimal("1500.00"),
             notes="Upcoming material order.")
         self._make_vendor_bill(user, p_active1, v_trade2, "VB-006",
-            VendorBill.Status.SCHEDULED, Decimal("2200.00"), Decimal("2200.00"),
-            notes="Scheduled plumbing payment.")
+            VendorBill.Status.RECEIVED, Decimal("2200.00"), Decimal("2200.00"),
+            notes="Plumbing bill under review.")
 
         # Payments
         pay_in = self._make_payment(user, p_completed, Payment.Direction.INBOUND,
@@ -652,7 +639,7 @@ class Command(BaseCommand):
         self._allocate_payment(user, pay_in, invoice=inv_paid)
         pay_out = self._make_payment(user, p_completed, Payment.Direction.OUTBOUND,
             "AP-001", Payment.Method.CHECK, Payment.Status.SETTLED, Decimal("4500.00"))
-        self._allocate_payment(user, pay_out, vendor_bill=vb_paid)
+        self._allocate_payment(user, pay_out, vendor_bill=vb_closed)
         self._make_payment(user, p_active1, Payment.Direction.INBOUND,
             "AR-002", Payment.Method.CARD, Payment.Status.PENDING, Decimal("3000.00"))
 
@@ -852,21 +839,21 @@ class Command(BaseCommand):
         vb_specs = [
             (3, 0, VendorBill.Status.RECEIVED, "4200.00", "4200.00"),
             (3, 1, VendorBill.Status.APPROVED, "3800.00", "3800.00"),
-            (4, 2, VendorBill.Status.SCHEDULED, "6500.00", "6500.00"),
-            (4, 3, VendorBill.Status.PAID, "8200.00", "0.00"),
-            (5, 0, VendorBill.Status.PLANNED, "2100.00", "2100.00"),
+            (4, 2, VendorBill.Status.APPROVED, "6500.00", "6500.00"),
+            (4, 3, VendorBill.Status.CLOSED, "8200.00", "0.00"),
+            (5, 0, VendorBill.Status.RECEIVED, "2100.00", "2100.00"),
             (7, 1, VendorBill.Status.RECEIVED, "3500.00", "3500.00"),
-            (10, 4, VendorBill.Status.PAID, "5000.00", "0.00"),
-            (11, 5, VendorBill.Status.PAID, "7200.00", "0.00"),
-            (14, 2, VendorBill.Status.PAID, "12000.00", "0.00"),
-            (14, 3, VendorBill.Status.PAID, "8500.00", "0.00"),
+            (10, 4, VendorBill.Status.CLOSED, "5000.00", "0.00"),
+            (11, 5, VendorBill.Status.CLOSED, "7200.00", "0.00"),
+            (14, 2, VendorBill.Status.CLOSED, "12000.00", "0.00"),
+            (14, 3, VendorBill.Status.CLOSED, "8500.00", "0.00"),
             (16, 0, VendorBill.Status.VOID, "4000.00", "0.00"),
         ]
         paid_vendor_bills = []
         for p_idx, v_idx, status, total, balance in vb_specs:
             vb = self._make_vendor_bill(user, late_projects[p_idx], late_vendors[v_idx],
                 f"VB-{vb_num:03d}", status, Decimal(total), Decimal(balance))
-            if status == VendorBill.Status.PAID:
+            if status == VendorBill.Status.CLOSED:
                 paid_vendor_bills.append(vb)
             vb_num += 1
 

@@ -19,6 +19,7 @@ export type VendorRecord = {
 
 export type VendorBillStatus = string;
 export type VendorBillKind = "bill" | "receipt";
+export type VendorBillPaymentStatus = "unpaid" | "partial" | "paid";
 
 export type VendorBillRecord = {
   id: number;
@@ -32,10 +33,10 @@ export type VendorBillRecord = {
   cost_code_code: string | null;
   cost_code_name: string | null;
   status: VendorBillStatus;
+  payment_status: VendorBillPaymentStatus;
   received_date: string | null;
   issue_date: string | null;
   due_date: string | null;
-  scheduled_for: string | null;
   subtotal: string;
   tax_amount: string;
   shipping_amount: string;
@@ -51,31 +52,24 @@ export type VendorBillLineRecord = {
   id: number;
   cost_code: number | null;
   cost_code_code: string;
-  cost_code_description: string;
+  cost_code_name: string;
   description: string;
-  quantity: string;
-  unit: string;
-  unit_price: string;
-  line_total: string;
+  amount: string;
 };
 
 export type VendorBillLineInput = {
   costCode: number | null;
   description: string;
-  quantity: string;
-  unit: string;
-  unitPrice: string;
+  amount: string;
 };
 
 export type VendorBillPayload = {
   projectId: number;
   vendor: number;
   bill_number: string;
-  status?: VendorBillStatus;
   received_date?: string | null;
   issue_date: string;
   due_date: string;
-  scheduled_for?: string | null;
   subtotal?: string;
   tax_amount?: string;
   shipping_amount?: string;
@@ -89,12 +83,10 @@ export type VendorBillPolicyContract = {
   status_labels: Record<string, string>;
   statuses: string[];
   default_create_status: string;
-  create_shortcut_statuses: string[];
   allowed_status_transitions: Record<string, string[]>;
   terminal_statuses: string[];
   kinds: VendorBillKind[];
   kind_labels: Record<string, string>;
-  receipt_status: string;
 };
 
 export type ApiResponse = {

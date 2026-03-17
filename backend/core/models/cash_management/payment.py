@@ -170,6 +170,9 @@ class PaymentAllocation(models.Model):
     - Supports split allocations from one payment across multiple targets.
     - Drives recalculation of target balances and payment unapplied remainder.
     - Exactly one target FK is expected based on `target_type`.
+    - ``cost_code`` is the authoritative cost attribution for profitability
+      metrics — classified at payment time, not inherited from the document.
+      See ``docs/decisions/ap-model-separation.md``.
 
     Current policy:
     - Lifecycle control: `system-managed` via allocation endpoint write paths.
@@ -201,6 +204,14 @@ class PaymentAllocation(models.Model):
         blank=True,
     )
     applied_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    cost_code = models.ForeignKey(
+        "CostCode",
+        on_delete=models.PROTECT,
+        related_name="payment_allocations",
+        null=True,
+        blank=True,
+        help_text="Authoritative cost attribution — classified at payment time for profitability metrics.",
+    )
     created_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -221,6 +232,7 @@ class PaymentAllocation(models.Model):
                 "invoice_id": self.invoice_id,
                 "vendor_bill_id": self.vendor_bill_id,
                 "applied_amount": str(self.applied_amount),
+                "cost_code_id": self.cost_code_id,
                 "created_by_id": self.created_by_id,
                 "created_at": self.created_at.isoformat() if self.created_at else None,
             },

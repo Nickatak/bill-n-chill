@@ -91,7 +91,7 @@ def portfolio_snapshot_view(request):
     overdue_vendor_bills = VendorBill.objects.filter(
         project__organization_id=membership.organization_id,
         due_date__lt=today,
-    ).exclude(status__in=[VendorBill.Status.PAID, VendorBill.Status.VOID])
+    ).exclude(status__in=[VendorBill.Status.CLOSED, VendorBill.Status.VOID])
 
     if date_from:
         overdue_invoices = overdue_invoices.filter(issue_date__gte=date_from)
@@ -214,7 +214,7 @@ def attention_feed_view(request):
             due_date__gte=today,
             due_date__lte=due_soon_date,
         )
-        .exclude(status__in=[VendorBill.Status.PAID, VendorBill.Status.VOID])
+        .exclude(status__in=[VendorBill.Status.CLOSED, VendorBill.Status.VOID])
         .select_related("project")
         .order_by("due_date", "id")
     )

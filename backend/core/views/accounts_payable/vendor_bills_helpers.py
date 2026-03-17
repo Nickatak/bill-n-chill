@@ -6,7 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.response import Response
 
-from core.models import CostCode, Vendor, VendorBill, VendorBillLine, VendorBillSnapshot
+from core.models import CostCode, Payment, PaymentAllocation, Vendor, VendorBill, VendorBillLine, VendorBillSnapshot
 from core.serializers import VendorBillSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import _resolve_cost_codes_for_user, _vendor_scope_filter  # noqa: F401 — re-exported for vendor_bills.py
@@ -39,19 +39,18 @@ def _find_duplicate_vendor_bills(
 
 
 def _calculate_vendor_bill_line_totals(line_items_data):
-    """Compute per-line totals and return normalized items with a running subtotal."""
+    """Sum line item amounts and return normalized items with a running subtotal.
+
+    Bill line items are simple description + amount transcriptions (not qty × rate).
+    """
     subtotal = MONEY_ZERO
     normalized_items = []
     for item in line_items_data:
-        quantity = Decimal(str(item["quantity"]))
-        unit_price = Decimal(str(item["unit_price"]))
-        line_total = quantize_money(quantity * unit_price)
-        subtotal = quantize_money(subtotal + line_total)
+        amount = quantize_money(Decimal(str(item["amount"])))
+        subtotal = quantize_money(subtotal + amount)
         normalized_items.append({
             **item,
-            "quantity": quantity,
-            "unit_price": unit_price,
-            "line_total": line_total,
+            "amount": amount,
         })
     return normalized_items, subtotal
 
@@ -60,8 +59,8 @@ def _apply_vendor_bill_lines_and_totals(vendor_bill, line_items_data, tax_amount
     """Replace a vendor bill's line items and recompute all totals.
 
     Returns an error dict on failure, or None on success.
-    Unlike invoices (which use tax_percent), vendor bills store tax_amount
-    and shipping_amount as flat values — total = subtotal + tax + shipping.
+    Line items are description + amount pairs with optional cost code tags.
+    Total = subtotal (sum of line amounts) + tax + shipping.
     """
     normalized_items, subtotal = _calculate_vendor_bill_line_totals(line_items_data)
     code_map, missing = _resolve_cost_codes_for_user(user, normalized_items)
@@ -81,11 +80,8 @@ def _apply_vendor_bill_lines_and_totals(vendor_bill, line_items_data, tax_amount
             VendorBillLine(
                 vendor_bill=vendor_bill,
                 cost_code=cost_code,
-                description=item["description"],
-                quantity=item["quantity"],
-                unit=item.get("unit", "ea"),
-                unit_price=item["unit_price"],
-                line_total=item["line_total"],
+                description=item.get("description", ""),
+                amount=item["amount"],
             )
         )
     VendorBillLine.objects.bulk_create(new_lines)
@@ -138,11 +134,19 @@ def _prefetch_vendor_bill_qs(qs):
     )
 
 
-RECEIVED_PLUS_STATUSES = {
+# Statuses that require issue_date and due_date.
+DATE_REQUIRED_STATUSES = {
     VendorBill.Status.RECEIVED,
     VendorBill.Status.APPROVED,
-    VendorBill.Status.SCHEDULED,
-    VendorBill.Status.PAID,
+}
+
+# Statuses that trigger snapshot capture on transition.
+SNAPSHOT_CAPTURE_STATUSES = {
+    VendorBill.Status.RECEIVED,
+    VendorBill.Status.APPROVED,
+    VendorBill.Status.DISPUTED,
+    VendorBill.Status.CLOSED,
+    VendorBill.Status.VOID,
 }
 
 
@@ -162,13 +166,12 @@ def _handle_vb_document_save(request, vendor_bill, data):
     # Date validation
     next_issue_date = data.get("issue_date", vendor_bill.issue_date)
     next_due_date = data.get("due_date", vendor_bill.due_date)
-    next_scheduled_for = data.get("scheduled_for", vendor_bill.scheduled_for)
-    if next_status in RECEIVED_PLUS_STATUSES:
+    if next_status in DATE_REQUIRED_STATUSES:
         fields = {}
         if next_issue_date is None:
-            fields["issue_date"] = ["Issue/received date is required for received-or-later bills."]
+            fields["issue_date"] = ["Issue date is required."]
         if next_due_date is None:
-            fields["due_date"] = ["Due date is required for received-or-later bills."]
+            fields["due_date"] = ["Due date is required."]
         if fields:
             return Response(
                 {
@@ -180,24 +183,13 @@ def _handle_vb_document_save(request, vendor_bill, data):
                 },
                 status=400,
             )
-    if next_due_date < next_issue_date:
+    if next_due_date and next_issue_date and next_due_date < next_issue_date:
         return Response(
             {
                 "error": {
                     "code": "validation_error",
                     "message": "due_date cannot be before issue_date.",
                     "fields": {"due_date": ["Due date must be on or after issue date."]},
-                }
-            },
-            status=400,
-        )
-    if next_status == VendorBill.Status.SCHEDULED and not next_scheduled_for:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "scheduled_for is required when status is scheduled.",
-                    "fields": {"scheduled_for": ["Provide a scheduled payment date."]},
                 }
             },
             status=400,
@@ -235,9 +227,6 @@ def _handle_vb_document_save(request, vendor_bill, data):
     if "due_date" in data:
         vendor_bill.due_date = data["due_date"]
         update_fields.append("due_date")
-    if "scheduled_for" in data:
-        vendor_bill.scheduled_for = data["scheduled_for"]
-        update_fields.append("scheduled_for")
     if "notes" in data:
         vendor_bill.notes = data["notes"]
         update_fields.append("notes")
@@ -264,9 +253,7 @@ def _handle_vb_document_save(request, vendor_bill, data):
                 {
                     "cost_code": line.cost_code_id,
                     "description": line.description,
-                    "quantity": line.quantity,
-                    "unit": line.unit,
-                    "unit_price": line.unit_price,
+                    "amount": line.amount,
                 }
                 for line in vendor_bill.line_items.all()
             ]
@@ -277,14 +264,8 @@ def _handle_vb_document_save(request, vendor_bill, data):
                     vendor_bill, existing_lines, next_tax, next_shipping, request.user,
                 )
 
-        # Recompute balance_due based on status
-        vendor_bill.refresh_from_db()
-        candidate_balance_due = (
-            MONEY_ZERO if next_status == VendorBill.Status.PAID else vendor_bill.total
-        )
-        if candidate_balance_due != vendor_bill.balance_due:
-            vendor_bill.balance_due = candidate_balance_due
-            vendor_bill.save(update_fields=["balance_due", "updated_at"])
+        # balance_due is now purely driven by payment allocations, not status.
+        # No balance recomputation on save — that happens in the allocation flow.
 
     vendor_bill = _prefetch_vendor_bill_qs(VendorBill.objects.filter(id=vendor_bill.id)).get()
     return Response(
@@ -295,18 +276,12 @@ def _handle_vb_document_save(request, vendor_bill, data):
 def _handle_vb_status_transition(
     request, vendor_bill, data, previous_status, next_status,
 ):
-    """Handle a vendor bill status transition: validate, apply, snapshot, balance.
+    """Handle a vendor bill status transition: validate, apply, snapshot.
 
     Called when the PATCH includes a real status change (previous != next).
-    Handles the compound received -> scheduled shortcut (walks through approved
-    intermediate), snapshot recording, and balance_due recomputation.
+    Document lifecycle only — no payment/balance logic.
     """
-    compound_received_to_scheduled = (
-        previous_status == VendorBill.Status.RECEIVED
-        and next_status == VendorBill.Status.SCHEDULED
-    )
-
-    if not compound_received_to_scheduled and not VendorBill.is_transition_allowed(
+    if not VendorBill.is_transition_allowed(
         current_status=previous_status,
         next_status=next_status,
     ):
@@ -324,13 +299,12 @@ def _handle_vb_status_transition(
     # Date validation
     next_issue_date = data.get("issue_date", vendor_bill.issue_date)
     next_due_date = data.get("due_date", vendor_bill.due_date)
-    next_scheduled_for = data.get("scheduled_for", vendor_bill.scheduled_for)
-    if next_status in RECEIVED_PLUS_STATUSES:
+    if next_status in DATE_REQUIRED_STATUSES:
         fields = {}
         if next_issue_date is None:
-            fields["issue_date"] = ["Issue/received date is required for received-or-later bills."]
+            fields["issue_date"] = ["Issue date is required."]
         if next_due_date is None:
-            fields["due_date"] = ["Due date is required for received-or-later bills."]
+            fields["due_date"] = ["Due date is required."]
         if fields:
             return Response(
                 {
@@ -342,7 +316,7 @@ def _handle_vb_status_transition(
                 },
                 status=400,
             )
-    if next_due_date < next_issue_date:
+    if next_due_date and next_issue_date and next_due_date < next_issue_date:
         return Response(
             {
                 "error": {
@@ -353,20 +327,6 @@ def _handle_vb_status_transition(
             },
             status=400,
         )
-    if next_status == VendorBill.Status.SCHEDULED and not next_scheduled_for:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "scheduled_for is required when status is scheduled.",
-                    "fields": {"scheduled_for": ["Provide a scheduled payment date."]},
-                }
-            },
-            status=400,
-        )
-
-    # Mark-paid note validation — required when provided (manual mark-paid path)
-    mark_paid_note = data.get("mark_paid_note", "").strip() if next_status == VendorBill.Status.PAID else ""
 
     # Line item validation
     line_items = data.get("line_items")
@@ -400,9 +360,6 @@ def _handle_vb_status_transition(
     if "due_date" in data:
         vendor_bill.due_date = data["due_date"]
         update_fields.append("due_date")
-    if "scheduled_for" in data:
-        vendor_bill.scheduled_for = data["scheduled_for"]
-        update_fields.append("scheduled_for")
     if "notes" in data:
         vendor_bill.notes = data["notes"]
         update_fields.append("notes")
@@ -410,95 +367,41 @@ def _handle_vb_status_transition(
     update_fields.append("status")
 
     with transaction.atomic():
-        if compound_received_to_scheduled:
-            # Step 1: received -> approved (intermediate)
-            vendor_bill.status = VendorBill.Status.APPROVED
-            intermediate_update_fields = [f for f in update_fields if f != "status"] + ["status"]
-            vendor_bill.save(update_fields=intermediate_update_fields)
+        vendor_bill.save(update_fields=update_fields)
+
+        if has_line_items:
+            next_tax = quantize_money(data.get("tax_amount", vendor_bill.tax_amount))
+            next_shipping = quantize_money(data.get("shipping_amount", vendor_bill.shipping_amount))
+            apply_error = _apply_vendor_bill_lines_and_totals(
+                vendor_bill, line_items, next_tax, next_shipping, request.user,
+            )
+            if apply_error:
+                transaction.set_rollback(True)
+                payload, status_code = _vendor_bill_line_apply_error_response(apply_error)
+                return Response(payload, status=status_code)
+        elif "tax_amount" in data or "shipping_amount" in data:
+            existing_lines = [
+                {
+                    "cost_code": line.cost_code_id,
+                    "description": line.description,
+                    "amount": line.amount,
+                }
+                for line in vendor_bill.line_items.all()
+            ]
+            if existing_lines:
+                next_tax = quantize_money(data.get("tax_amount", vendor_bill.tax_amount))
+                next_shipping = quantize_money(data.get("shipping_amount", vendor_bill.shipping_amount))
+                _apply_vendor_bill_lines_and_totals(
+                    vendor_bill, existing_lines, next_tax, next_shipping, request.user,
+                )
+
+        if next_status in SNAPSHOT_CAPTURE_STATUSES:
             VendorBillSnapshot.record(
                 vendor_bill=vendor_bill,
-                capture_status=VendorBill.Status.APPROVED,
+                capture_status=next_status,
                 previous_status=previous_status,
                 acted_by=request.user,
             )
-            if has_line_items:
-                next_tax = quantize_money(data.get("tax_amount", vendor_bill.tax_amount))
-                next_shipping = quantize_money(data.get("shipping_amount", vendor_bill.shipping_amount))
-                apply_error = _apply_vendor_bill_lines_and_totals(
-                    vendor_bill, line_items, next_tax, next_shipping, request.user,
-                )
-                if apply_error:
-                    transaction.set_rollback(True)
-                    payload, status_code = _vendor_bill_line_apply_error_response(apply_error)
-                    return Response(payload, status=status_code)
-
-            # Step 2: approved -> scheduled (final)
-            vendor_bill.status = VendorBill.Status.SCHEDULED
-            vendor_bill.save(update_fields=["status", "updated_at"])
-            VendorBillSnapshot.record(
-                vendor_bill=vendor_bill,
-                capture_status=VendorBill.Status.SCHEDULED,
-                previous_status=VendorBill.Status.APPROVED,
-                acted_by=request.user,
-            )
-        else:
-            if len(update_fields) > 1:
-                vendor_bill.save(update_fields=update_fields)
-
-            if has_line_items:
-                next_tax = quantize_money(data.get("tax_amount", vendor_bill.tax_amount))
-                next_shipping = quantize_money(data.get("shipping_amount", vendor_bill.shipping_amount))
-                apply_error = _apply_vendor_bill_lines_and_totals(
-                    vendor_bill, line_items, next_tax, next_shipping, request.user,
-                )
-                if apply_error:
-                    transaction.set_rollback(True)
-                    payload, status_code = _vendor_bill_line_apply_error_response(apply_error)
-                    return Response(payload, status=status_code)
-            elif "tax_amount" in data or "shipping_amount" in data:
-                existing_lines = [
-                    {
-                        "cost_code": line.cost_code_id,
-                        "description": line.description,
-                        "quantity": line.quantity,
-                        "unit": line.unit,
-                        "unit_price": line.unit_price,
-                    }
-                    for line in vendor_bill.line_items.all()
-                ]
-                if existing_lines:
-                    next_tax = quantize_money(data.get("tax_amount", vendor_bill.tax_amount))
-                    next_shipping = quantize_money(data.get("shipping_amount", vendor_bill.shipping_amount))
-                    _apply_vendor_bill_lines_and_totals(
-                        vendor_bill, existing_lines, next_tax, next_shipping, request.user,
-                    )
-
-            # Recompute balance_due based on status
-            vendor_bill.refresh_from_db()
-            candidate_balance_due = (
-                MONEY_ZERO if next_status == VendorBill.Status.PAID else vendor_bill.total
-            )
-            if candidate_balance_due != vendor_bill.balance_due:
-                vendor_bill.balance_due = candidate_balance_due
-                vendor_bill.save(update_fields=["balance_due", "updated_at"])
-
-            if (
-                previous_status != next_status
-                and next_status in {
-                    VendorBill.Status.RECEIVED,
-                    VendorBill.Status.APPROVED,
-                    VendorBill.Status.SCHEDULED,
-                    VendorBill.Status.PAID,
-                    VendorBill.Status.VOID,
-                }
-            ):
-                VendorBillSnapshot.record(
-                    vendor_bill=vendor_bill,
-                    capture_status=next_status,
-                    previous_status=previous_status,
-                    acted_by=request.user,
-                    mark_paid_note=mark_paid_note,
-                )
 
     vendor_bill = _prefetch_vendor_bill_qs(VendorBill.objects.filter(id=vendor_bill.id)).get()
     return Response(
@@ -512,11 +415,17 @@ def _handle_vb_status_transition(
 
 
 def _create_receipt(request, project, data):
-    """Create a lightweight receipt (terminal ``recorded`` status, no line items required).
+    """Create a lightweight receipt and its corresponding outbound payment.
+
+    A receipt collapses document + payment into one action. Creates a VendorBill
+    in ``approved`` status and an outbound Payment allocated against it.
+    See ``docs/decisions/ap-model-separation.md``.
 
     Required fields: ``total``.
     Optional: ``vendor``, ``cost_code``, ``notes``, ``received_date``.
     """
+    from core.user_helpers import _ensure_membership
+
     total_raw = data.get("total")
     if total_raw is None:
         return Response(
@@ -564,8 +473,6 @@ def _create_receipt(request, project, data):
     cost_code = None
     cost_code_id = data.get("cost_code")
     if cost_code_id is not None:
-        from core.user_helpers import _ensure_membership
-
         membership = _ensure_membership(request.user)
         cost_code = CostCode.objects.filter(
             organization_id=membership.organization_id,
@@ -585,19 +492,42 @@ def _create_receipt(request, project, data):
             )
 
     received_date = data.get("received_date") or timezone.localdate()
+    membership = _ensure_membership(request.user)
 
     with transaction.atomic():
+        # 1. Create the receipt (bill record in terminal status)
         receipt = VendorBill.objects.create(
             kind=VendorBill.Kind.RECEIPT,
             project=project,
             vendor=vendor,
             cost_code=cost_code,
             bill_number="",
-            status=VendorBill.Status.RECORDED,
+            status=VendorBill.Status.APPROVED,
             received_date=received_date,
             total=total,
             balance_due=MONEY_ZERO,
             notes=data.get("notes", ""),
+            created_by=request.user,
+        )
+
+        # 2. Auto-create the outbound payment allocated to this receipt
+        payment = Payment.objects.create(
+            organization_id=membership.organization_id,
+            project=project,
+            direction=Payment.Direction.OUTBOUND,
+            method=Payment.Method.OTHER,
+            status=Payment.Status.SETTLED,
+            amount=total,
+            payment_date=received_date,
+            notes=f"Auto-created from receipt #{receipt.id}",
+            created_by=request.user,
+        )
+        PaymentAllocation.objects.create(
+            payment=payment,
+            target_type=PaymentAllocation.TargetType.VENDOR_BILL,
+            vendor_bill=receipt,
+            applied_amount=total,
+            cost_code=cost_code,
             created_by=request.user,
         )
 

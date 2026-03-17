@@ -3,13 +3,7 @@
 from core.models import VendorBill
 from core.policies._base import _build_base_policy_contract
 
-VENDOR_BILL_POLICY_VERSION = "2026-03-16.vendor_bills.v3"
-
-# Compound transitions the view layer supports beyond the model's atomic map.
-# received -> scheduled is a shortcut that atomically walks through approved.
-COMPOUND_TRANSITIONS = {
-    VendorBill.Status.RECEIVED: [VendorBill.Status.SCHEDULED],
-}
+VENDOR_BILL_POLICY_VERSION = "2026-03-16.vendor_bills.v4"
 
 
 def get_vendor_bill_policy_contract() -> dict:
@@ -17,16 +11,9 @@ def get_vendor_bill_policy_contract() -> dict:
     contract = _build_base_policy_contract(
         model_class=VendorBill,
         policy_version=VENDOR_BILL_POLICY_VERSION,
-        default_create_status=VendorBill.Status.PLANNED,
-        extra_transitions=COMPOUND_TRANSITIONS,
-        extra_fields={
-            "create_shortcut_statuses": [
-                VendorBill.Status.PLANNED,
-                VendorBill.Status.RECEIVED,
-            ],
-        },
+        default_create_status=VendorBill.Status.RECEIVED,
+        extra_fields={},
     )
     contract["kinds"] = [k.value for k in VendorBill.Kind]
     contract["kind_labels"] = {k.value: k.label for k in VendorBill.Kind}
-    contract["receipt_status"] = VendorBill.Status.RECORDED
     return contract

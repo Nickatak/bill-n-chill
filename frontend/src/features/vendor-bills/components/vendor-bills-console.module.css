@@ -3,171 +3,6 @@
   gap: var(--space-md);
 }
 
-/* ── Quick Receipt Form ──────────────────────────────────────── */
-
-.receiptForm {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-md);
-  background: var(--surface-secondary);
-}
-
-.receiptTitle {
-  font-size: 0.85rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  margin: 0 0 var(--space-sm) 0;
-}
-
-.receiptFields {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-sm);
-}
-
-.receiptField {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1 1 120px;
-}
-
-.receiptFieldNotes {
-  flex: 2 1 200px;
-}
-
-.receiptFieldLabel {
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-secondary);
-}
-
-.receiptField input,
-.receiptField select {
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  font-size: 0.88rem;
-  color: var(--text-primary);
-}
-
-.receiptCombobox {
-  position: relative;
-}
-
-.receiptComboboxInputWrap {
-  position: relative;
-}
-
-.receiptComboboxInput {
-  width: 100%;
-  padding: 6px 28px 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  font-size: 0.88rem;
-  color: var(--text-primary);
-}
-
-.receiptComboboxClear {
-  all: unset;
-  box-sizing: border-box;
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 18px;
-  height: 18px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.receiptComboboxClear:hover {
-  color: var(--accent-text);
-}
-
-.receiptComboboxMenu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  z-index: 120;
-  margin-top: 4px;
-  border: 1px solid var(--border-accent);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.receiptComboboxOption {
-  width: 100%;
-  border: 0;
-  border-top: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-primary);
-  padding: 6px 10px;
-  text-align: left;
-  cursor: pointer;
-  font-size: 0.84rem;
-}
-
-.receiptComboboxOption:first-child {
-  border-top: 0;
-}
-
-.receiptComboboxOptionActive {
-  background: var(--accent-light);
-}
-
-.receiptComboboxNoResults {
-  padding: 6px 10px;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-
-.receiptSubmit {
-  padding: 6px 16px;
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-md);
-  background: var(--accent);
-  color: var(--accent-on);
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  align-self: flex-end;
-}
-
-.receiptSubmit:hover {
-  opacity: 0.9;
-}
-
-.receiptMessage {
-  margin: var(--space-xs) 0 0;
-  font-size: 0.8rem;
-}
-
-.receiptMessageSuccess {
-  color: var(--status-green-text);
-}
-
-.receiptMessageError {
-  color: var(--status-red-text);
-}
-
 /* ── Viewer panel ─────────────────────────────────────────────── */
 
 .viewerPanel {
@@ -297,10 +132,6 @@
   text-transform: uppercase;
 }
 
-.tableStatusPlanned {
-  composes: planned from '../../../shared/styles/status.module.css';
-}
-
 .tableStatusReceived {
   composes: received from '../../../shared/styles/status.module.css';
 }
@@ -309,16 +140,29 @@
   composes: approved from '../../../shared/styles/status.module.css';
 }
 
-.tableStatusScheduled {
-  composes: scheduled from '../../../shared/styles/status.module.css';
+.tableStatusDisputed {
+  composes: disputed from '../../../shared/styles/status.module.css';
 }
 
-.tableStatusPaid {
-  composes: paid from '../../../shared/styles/status.module.css';
+.tableStatusClosed {
+  composes: closed from '../../../shared/styles/status.module.css';
 }
 
 .tableStatusVoid {
   composes: void from '../../../shared/styles/status.module.css';
+}
+
+/* Payment status badges (separate from document status) */
+.paymentStatusUnpaid {
+  composes: void from '../../../shared/styles/status.module.css';
+}
+
+.paymentStatusPartial {
+  composes: partiallyPaid from '../../../shared/styles/status.module.css';
+}
+
+.paymentStatusPaid {
+  composes: paid from '../../../shared/styles/status.module.css';
 }
 
 .table tbody tr {
@@ -485,76 +329,10 @@
   background: var(--surface);
 }
 
-/* ── Paid Action Forms (Record Payment / Mark Paid) ────────── */
-
-.paidActionForm {
-  margin-top: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-}
-
-.paidActionTitle {
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  margin: 0 0 var(--space-xs) 0;
-}
-
-.paidActionHint {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  margin: 0 0 var(--space-sm) 0;
-}
-
-.paidActionFields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  align-items: flex-end;
-}
-
-.paidActionField {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 120px;
-  flex: 1;
-  font-size: 0.82rem;
-}
-
-.paidActionField span {
-  font-weight: 600;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-secondary);
-}
-
-.paidActionFieldWide {
-  flex: 2;
-  min-width: 200px;
-}
-
-.paidActionButtons {
-  display: flex;
-  gap: var(--space-sm);
-  margin-top: var(--space-sm);
-}
-
 .statusFilterButtons {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-sm);
-}
-
-.statusFilterPlanned {
-  background: var(--status-blue-bg);
-  color: var(--status-blue-text);
-  border-color: var(--status-blue-border);
 }
 
 .statusFilterReceived {
@@ -569,16 +347,16 @@
   border-color: var(--status-green-border);
 }
 
-.statusFilterScheduled {
-  background: var(--status-orange-bg);
-  color: var(--status-orange-text);
-  border-color: var(--status-orange-border);
+.statusFilterDisputed {
+  background: var(--status-red-bg);
+  color: var(--status-red-text);
+  border-color: var(--status-red-border);
 }
 
-.statusFilterPaid {
-  background: var(--status-emerald-bg);
-  color: var(--status-emerald-text);
-  border-color: var(--status-emerald-border);
+.statusFilterClosed {
+  background: var(--status-gray-bg);
+  color: var(--status-gray-text);
+  border-color: var(--status-gray-border);
 }
 
 .statusFilterVoid {
@@ -586,6 +364,7 @@
   color: var(--status-gray-text);
   border-color: var(--status-gray-border);
 }
+
 
 .filterPillDue {
   background: var(--surface-hover);
@@ -666,12 +445,6 @@
   transform: translateY(-1px);
 }
 
-.statusPillActive.statusPillPlanned {
-  background: var(--status-blue-solid);
-  border-color: var(--status-blue-solid);
-  color: var(--status-blue-solid-text);
-}
-
 .statusPillActive.statusPillReceived {
   background: var(--status-amber-solid);
   border-color: var(--status-amber-border);
@@ -684,28 +457,22 @@
   color: var(--status-green-solid-text);
 }
 
-.statusPillActive.statusPillScheduled {
-  background: var(--status-amber-solid);
-  border-color: var(--status-amber-border);
-  color: var(--status-amber-solid-text);
+.statusPillActive.statusPillDisputed {
+  background: var(--status-red-solid);
+  border-color: var(--status-red-solid);
+  color: var(--status-red-solid-text);
 }
 
-.statusPillActive.statusPillPaid {
-  background: var(--status-emerald-solid);
-  border-color: var(--status-emerald-solid);
-  color: var(--status-emerald-solid-text);
+.statusPillActive.statusPillClosed {
+  background: var(--status-gray-solid);
+  border-color: var(--status-gray-border);
+  color: var(--status-gray-solid-text);
 }
 
 .statusPillActive.statusPillVoid {
   background: var(--status-gray-solid);
   border-color: var(--status-gray-border);
   color: var(--status-gray-solid-text);
-}
-
-.statusPillPlanned {
-  border-color: var(--status-blue-border);
-  background: var(--status-blue-bg);
-  color: var(--status-blue-text);
 }
 
 .statusPillReceived {
@@ -720,22 +487,22 @@
   color: var(--status-green-text);
 }
 
-.statusPillScheduled {
-  border-color: var(--status-amber-border);
-  background: var(--status-amber-bg);
-  color: var(--status-amber-text);
+.statusPillDisputed {
+  border-color: var(--status-red-border);
+  background: var(--status-red-bg);
+  color: var(--status-red-text);
 }
 
-.statusPillPaid {
-  border-color: var(--status-emerald-border);
-  background: var(--status-emerald-bg);
-  color: var(--status-emerald-text);
+.statusPillClosed {
+  border-color: var(--status-gray-border);
+  background: var(--status-gray-bg);
+  color: var(--status-gray-text);
 }
 
 .statusPillVoid {
   border-color: var(--status-gray-border);
   background: var(--status-gray-bg);
-  color: var(--status-gray-solid);
+  color: var(--status-gray-text);
 }
 
 .billForm {
@@ -857,13 +624,13 @@
 /* Bill-specific allocation line table grid (extends shared lineTable) */
 
 .allocationLineHeader {
-  grid-template-columns: 1.6fr 1.2fr 100px 1.2fr 72px;
-  min-width: 680px;
+  grid-template-columns: 1.2fr 2fr 1fr 72px;
+  min-width: 480px;
 }
 
 .allocationLineRow {
-  grid-template-columns: 1.6fr 1.2fr 100px 1.2fr 72px;
-  min-width: 680px;
+  grid-template-columns: 1.2fr 2fr 1fr 72px;
+  min-width: 480px;
 }
 
 .allocationMetaRow {

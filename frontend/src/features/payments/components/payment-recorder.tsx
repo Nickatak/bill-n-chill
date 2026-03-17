@@ -66,6 +66,8 @@ export type PaymentRecorderProps = {
   hideHeader?: boolean;
   /** Show only the create form — hide the payment list and detail card (e.g. on project page). */
   createOnly?: boolean;
+  /** Hide the workspace form title (e.g. when parent tabs already label the form). */
+  hideWorkspaceTitle?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -93,6 +95,7 @@ export function PaymentRecorder({
   onPaymentsChanged,
   hideHeader = false,
   createOnly = false,
+  hideWorkspaceTitle = false,
 }: PaymentRecorderProps) {
   const { token, role, capabilities } = useSharedSessionAuth();
   const [statusMessage, setStatusMessage] = useState("");
@@ -674,14 +677,16 @@ export function PaymentRecorder({
       {/* ── Workspace form (create / edit) ────────────────── */}
 
       <form className={`${styles.workspace} ${createOnly ? styles.workspaceEmbedded : ""}`} onSubmit={handleSubmit}>
-        <h3 className={styles.workspaceTitle}>
-          {workspaceMode === "create" ? "Record Payment" : `Editing Payment #${selectedPaymentId}`}
-          {!createOnly && (
-            <span className={styles.workspaceBadge}>
-              {workspaceMode === "create" ? "New" : "Edit"}
-            </span>
-          )}
-        </h3>
+        {!hideWorkspaceTitle && (
+          <h3 className={styles.workspaceTitle}>
+            {workspaceMode === "create" ? "Record Payment" : `Editing Payment #${selectedPaymentId}`}
+            {!createOnly && (
+              <span className={styles.workspaceBadge}>
+                {workspaceMode === "create" ? "New" : "Edit"}
+              </span>
+            )}
+          </h3>
+        )}
 
         <div className={styles.fieldGrid}>
           <div className={styles.field}>

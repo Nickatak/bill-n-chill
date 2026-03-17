@@ -16,9 +16,7 @@ describe("createEmptyVendorBillLineRow", () => {
     expect(row).toEqual({
       costCode: null,
       description: "",
-      quantity: "",
-      unit: "",
-      unitPrice: "",
+      amount: "",
     });
   });
 
@@ -35,19 +33,19 @@ describe("createEmptyVendorBillLineRow", () => {
 // ---------------------------------------------------------------------------
 
 describe("defaultBillStatusFilters", () => {
-  it("excludes terminal statuses (paid, void)", () => {
-    const statuses = ["planned", "received", "approved", "scheduled", "paid", "void"];
+  it("excludes terminal statuses (closed, void)", () => {
+    const statuses = ["received", "approved", "disputed", "closed", "void"];
     const result = defaultBillStatusFilters(statuses);
-    expect(result).toEqual(["planned", "received", "approved", "scheduled"]);
+    expect(result).toEqual(["received", "approved", "disputed"]);
   });
 
   it("returns all statuses when none are terminal", () => {
-    const statuses = ["planned", "received", "approved"];
+    const statuses = ["received", "approved"];
     expect(defaultBillStatusFilters(statuses)).toEqual(statuses);
   });
 
   it("returns all statuses when all are terminal", () => {
-    const statuses = ["paid", "void"];
+    const statuses = ["closed", "void"];
     expect(defaultBillStatusFilters(statuses)).toEqual(statuses);
   });
 
@@ -56,11 +54,11 @@ describe("defaultBillStatusFilters", () => {
   });
 
   it("handles single non-terminal status", () => {
-    expect(defaultBillStatusFilters(["planned"])).toEqual(["planned"]);
+    expect(defaultBillStatusFilters(["received"])).toEqual(["received"]);
   });
 
   it("handles single terminal status", () => {
-    expect(defaultBillStatusFilters(["paid"])).toEqual(["paid"]);
+    expect(defaultBillStatusFilters(["closed"])).toEqual(["closed"]);
   });
 });
 
