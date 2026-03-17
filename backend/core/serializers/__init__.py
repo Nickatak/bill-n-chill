@@ -52,6 +52,7 @@ from core.serializers.projects import (
     ProjectSerializer,
     QuickJumpSearchSerializer,
 )
+from core.serializers.receipts import ReceiptSerializer, ReceiptWriteSerializer
 from core.serializers.vendor_bills import VendorBillSerializer, VendorBillWriteSerializer
 from core.serializers.vendors import VendorSerializer, VendorWriteSerializer
 
@@ -102,4 +103,6 @@ __all__ = [
     "PaymentWriteSerializer",
     "PaymentAllocationSerializer",
     "PaymentAllocateSerializer",
+    "ReceiptSerializer",
+    "ReceiptWriteSerializer",
 ]

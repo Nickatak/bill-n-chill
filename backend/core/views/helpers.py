@@ -182,9 +182,7 @@ def _cost_code_scope_filter(user) -> Q:
 def _vendor_scope_filter(user) -> Q:
     """Build a Q filter for vendors visible to the given user's organization."""
     membership = _ensure_membership(user)
-    return Q(organization__isnull=True, is_canonical=True) | Q(
-        organization_id=membership.organization_id
-    )
+    return Q(organization_id=membership.organization_id)
 
 
 def _resolve_cost_codes_for_user(user, line_items_data, *, cost_code_key="cost_code"):

@@ -1401,8 +1401,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                     ) : null}
                     {vendorOptions.map((vendor) => (
                       <option key={vendor.id} value={vendor.id}>
-                        #{vendor.id} - {vendor.name} [{vendor.vendor_type}]
-                        {vendor.is_canonical ? " [canonical]" : ""}
+                        #{vendor.id} - {vendor.name}
                         {!vendor.is_active ? " [inactive]" : ""}
                       </option>
                     ))}

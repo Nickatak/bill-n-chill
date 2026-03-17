@@ -18,13 +18,11 @@ from core.utils.money import quantize_money
 from core.views.accounts_payable.vendor_bills_helpers import (
     DATE_REQUIRED_STATUSES,
     _apply_vendor_bill_lines_and_totals,
-    _create_receipt,
     _find_duplicate_vendor_bills,
     _handle_vb_document_save,
     _handle_vb_status_transition,
     _prefetch_vendor_bill_qs,
     _vendor_bill_line_apply_error_response,
-    _vendor_scope_filter,
 )
 from core.views.helpers import (
     _capability_gate,
@@ -114,7 +112,7 @@ def project_vendor_bills_view(request, project_id: int):
     if request.method == "GET":
         rows = (
             VendorBill.objects.filter(project=project)
-            .select_related("project", "vendor", "cost_code")
+            .select_related("project", "vendor")
             .prefetch_related("line_items", "line_items__cost_code")
             .order_by("-created_at")
         )
@@ -128,12 +126,7 @@ def project_vendor_bills_view(request, project_id: int):
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
 
-    # ── Receipt creation (lightweight path) ──────────────────────
-    kind = data.get("kind", VendorBill.Kind.BILL)
-    if kind == VendorBill.Kind.RECEIPT:
-        return _create_receipt(request, project, data)
-
-    # ── Bill creation (full path) ────────────────────────────────
+    # Vendor and bill_number are required
     fields = {}
     if "vendor" not in data or data.get("vendor") is None:
         fields["vendor"] = ["This field is required."]
@@ -164,7 +157,10 @@ def project_vendor_bills_view(request, project_id: int):
             status=400,
         )
 
-    vendor = Vendor.objects.filter(_vendor_scope_filter(request.user), id=data["vendor"]).first()
+    membership = _ensure_membership(request.user)
+    vendor = Vendor.objects.filter(
+        organization_id=membership.organization_id, id=data["vendor"],
+    ).first()
     if not vendor:
         return Response(
             {
@@ -283,25 +279,6 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
       - `403`: role gate denied for patch.
       - `404`: vendor bill not found for this user.
       - `409`: duplicate non-void vendor bill would result from identity change.
-
-    - Incoming payload (`PATCH`) shape:
-      - JSON map:
-        {
-          "vendor": "integer (optional)",
-          "status": "received|approved|disputed|closed|void (optional)",
-          "issue_date": "YYYY-MM-DD (optional)",
-          "due_date": "YYYY-MM-DD (optional, must be >= issue_date)",
-          "tax_amount": "decimal (optional)",
-          "shipping_amount": "decimal (optional)",
-          "notes": "string (optional)",
-          "line_items": [
-            {
-              "cost_code": "integer (optional)",
-              "description": "string (optional)",
-              "amount": "decimal (required)"
-            }
-          ]
-        }
     """
     membership = _ensure_membership(request.user)
     try:
@@ -352,36 +329,24 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
             status=400,
         )
 
-    # Vendor lookup — nullable for receipts
-    next_vendor = None
-    if next_vendor_id is not None:
-        next_vendor = Vendor.objects.filter(_vendor_scope_filter(request.user), id=next_vendor_id).first()
-        if not next_vendor:
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_error",
-                        "message": "Vendor is invalid for this user.",
-                        "fields": {"vendor": ["Select a valid vendor."]},
-                    }
-                },
-                status=400,
-            )
-    elif vendor_bill.kind == VendorBill.Kind.BILL:
-        # Bills require a vendor
+    # Vendor lookup — always required for bills
+    next_vendor = Vendor.objects.filter(
+        organization_id=membership.organization_id, id=next_vendor_id,
+    ).first()
+    if not next_vendor:
         return Response(
             {
                 "error": {
                     "code": "validation_error",
-                    "message": "Vendor is required for bills.",
-                    "fields": {"vendor": ["This field is required."]},
+                    "message": "Vendor is invalid for this user.",
+                    "fields": {"vendor": ["Select a valid vendor."]},
                 }
             },
             status=400,
         )
 
-    identity_changed = (next_vendor.id if next_vendor else None) != vendor_bill.vendor_id
-    if identity_changed and next_vendor and next_bill_number:
+    identity_changed = next_vendor.id != vendor_bill.vendor_id
+    if identity_changed and next_bill_number:
         duplicates = _find_duplicate_vendor_bills(
             request.user,
             vendor_id=next_vendor.id,

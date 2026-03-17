@@ -30,8 +30,6 @@ function makeVendor(overrides: Record<string, unknown> = {}) {
   return {
     id: 1,
     name: "Acme Supply",
-    vendor_type: "trade",
-    is_canonical: false,
     email: "acme@example.com",
     phone: "5551234567",
     tax_id_last4: "1234",
@@ -289,30 +287,6 @@ describe("VendorsConsole", () => {
     await waitFor(() => {
       expect(screen.getByText(/Created vendor #50/)).toBeInTheDocument();
     });
-  });
-
-  it("shows canonical vendor as read-only", async () => {
-    setupDefaultFetch({
-      vendors: [makeVendor({ id: 1, name: "System Vendor", is_canonical: true })],
-    });
-    render(<VendorsConsole />);
-
-    await waitFor(() => {
-      // Need to enable canonical filter to see it
-      expect(screen.getByText("Canonical")).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: /Canonical/ }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/System Vendor/)).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText(/System Vendor/).closest("tr")!);
-
-    // Canonical vendor fields should be disabled/read-only
-    const nameInput = screen.getByLabelText("Name") as HTMLInputElement;
-    expect(nameInput.disabled).toBe(true);
   });
 
   it("shows pagination when vendors exceed page size", async () => {

@@ -11,27 +11,20 @@ export type ProjectRecord = {
 export type VendorRecord = {
   id: number;
   name: string;
-  vendor_type: "trade" | "retail";
-  is_canonical: boolean;
   email: string;
   is_active: boolean;
 };
 
 export type VendorBillStatus = string;
-export type VendorBillKind = "bill" | "receipt";
 export type VendorBillPaymentStatus = "unpaid" | "partial" | "paid";
 
 export type VendorBillRecord = {
   id: number;
-  kind: VendorBillKind;
   project: number;
   project_name: string;
-  vendor: number | null;
+  vendor: number;
   vendor_name: string;
   bill_number: string;
-  cost_code: number | null;
-  cost_code_code: string | null;
-  cost_code_name: string | null;
   status: VendorBillStatus;
   payment_status: VendorBillPaymentStatus;
   received_date: string | null;
@@ -85,8 +78,6 @@ export type VendorBillPolicyContract = {
   default_create_status: string;
   allowed_status_transitions: Record<string, string[]>;
   terminal_statuses: string[];
-  kinds: VendorBillKind[];
-  kind_labels: Record<string, string>;
 };
 
 export type ApiResponse = {

@@ -1,4 +1,4 @@
-"""Vendor model — payee directory record for accounts payable and commitments."""
+"""Vendor model — B2B payee directory record for accounts payable."""
 
 from django.contrib.auth import get_user_model
 from django.db import models
@@ -7,40 +7,26 @@ User = get_user_model()
 
 
 class Vendor(models.Model):
-    """Payee directory record used for AP bills and commitments.
+    """B2B vendor/subcontractor record used for AP bills.
 
     Business workflow:
+    - Represents a business relationship: subcontractors, trades, suppliers
+      who send you invoices. Symmetrical to Customer on the AR side.
+    - NOT for retail purchases (Home Depot, Lowe's) — those are receipts
+      with a free-text store name. See ``Receipt`` model and
+      ``docs/decisions/receipt-vendor-separation.md``.
     - Maintained internally by the contractor/user.
-    - Plain English: this is who the user/company pays (money out), not who pays us.
-    - Reused for downstream AP and commitment workflows.
     - Duplicate warnings are handled at application level by name/email.
     - Duplicate matches are warning-level and allow explicit user override when needed
-        (e.g. two different legitimate Vendors with the same name).
+      (e.g. two different legitimate Vendors with the same name).
 
     Current policy:
-    - `vendor_type` is currently advisory metadata (label/filter intent only),
-      not a hard behavior switch in workflow logic yet.
-    - It is intentionally retained for future extensions
-      (for example type-specific defaults/rules/reporting).
-    - `is_canonical` currently marks seeded system-default vendor entries
-      (practically the built-in retail catalog flag), not user-created records.
-    - Vendor rows are scoped by `organization`; legacy null-org rows remain readable
-      via transitional fallback in query helpers.
-    - Lifecycle control: `user-managed` for normal rows; seeded canonical rows are `system-managed`.
-    - Visibility: `internal-facing`.
+    - Always org-scoped (no system-wide/canonical vendors).
+    - Lifecycle control: ``user-managed``.
+    - Visibility: ``internal-facing``.
     """
 
-    class VendorType(models.TextChoices):
-        TRADE = "trade", "Trade"
-        RETAIL = "retail", "Retail"
-
     name = models.CharField(max_length=255)
-    vendor_type = models.CharField(
-        max_length=20,
-        choices=VendorType.choices,
-        default=VendorType.TRADE,
-    )
-    is_canonical = models.BooleanField(default=False)
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=50, blank=True)
     tax_id_last4 = models.CharField(max_length=4, blank=True)
@@ -50,8 +36,6 @@ class Vendor(models.Model):
         "Organization",
         on_delete=models.PROTECT,
         related_name="vendors",
-        null=True,
-        blank=True,
     )
     created_by = models.ForeignKey(
         User,
@@ -63,12 +47,6 @@ class Vendor(models.Model):
 
     class Meta:
         ordering = ["name", "id"]
-        constraints = [
-            models.CheckConstraint(
-                condition=models.Q(organization__isnull=False) | models.Q(is_canonical=True),
-                name="vendor_org_required_unless_canonical",
-            ),
-        ]
 
     def __str__(self) -> str:
         return self.name

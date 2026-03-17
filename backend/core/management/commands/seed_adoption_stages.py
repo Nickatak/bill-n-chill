@@ -42,18 +42,6 @@ User = get_user_model()
 
 PASSWORD = "a"
 
-CANONICAL_RETAIL_VENDORS = [
-    "Home Depot",
-    "Lowe's",
-    "Menards",
-    "Amazon Business",
-    "Sherwin-Williams",
-    "Floor & Decor",
-    "Ferguson",
-    "Ace Hardware",
-]
-
-
 class Command(BaseCommand):
     help = "Seed demo accounts at four adoption stages (new, early, mid, late)."
 
@@ -94,21 +82,6 @@ class Command(BaseCommand):
             )
             codes = [c1, c2]
         return codes[0], codes[1]
-
-    def _seed_canonical_vendors(self, user):
-        for name in CANONICAL_RETAIL_VENDORS:
-            v, _ = Vendor.objects.get_or_create(
-                created_by=user, name=name,
-                defaults={
-                    "vendor_type": Vendor.VendorType.RETAIL,
-                    "is_canonical": True,
-                    "is_active": True,
-                },
-            )
-            v.vendor_type = Vendor.VendorType.RETAIL
-            v.is_canonical = True
-            v.is_active = True
-            v.save(update_fields=["vendor_type", "is_canonical", "is_active", "updated_at"])
 
     def _add_team_member(self, owner_membership, email, full_name, role):
         """Create a user and add them as a team member on the owner's org."""
@@ -431,7 +404,6 @@ class Command(BaseCommand):
     def _seed_new(self):
         """Fresh signup. Org + cost codes bootstrapped, nothing else."""
         user, token, membership = self._get_or_create_user("new@test.com")
-        self._seed_canonical_vendors(user)
         self.stdout.write(self.style.SUCCESS("  new@test.com — empty workspace"))
         return user, token
 
@@ -440,7 +412,6 @@ class Command(BaseCommand):
     def _seed_early(self):
         """~2 months in. First customers, first projects, first estimates."""
         user, token, membership = self._get_or_create_user("early@test.com")
-        self._seed_canonical_vendors(user)
         code1, code2 = self._cost_codes(user)
 
         # 4 customers
@@ -480,8 +451,6 @@ class Command(BaseCommand):
             created_by=user, name="Pacific Tile & Stone",
             defaults={
                 "organization": membership.organization,
-                "vendor_type": Vendor.VendorType.TRADE,
-                "is_canonical": False,
                 "email": "orders@pacifictile.example",
             },
         )
@@ -496,7 +465,6 @@ class Command(BaseCommand):
     def _seed_mid(self):
         """~8 months in. One of each status for every entity type."""
         user, token, membership = self._get_or_create_user("mid@test.com")
-        self._seed_canonical_vendors(user)
         code1, code2 = self._cost_codes(user)
         today = date.today()
 
@@ -599,18 +567,18 @@ class Command(BaseCommand):
         # Custom vendors
         v_trade1, _ = Vendor.objects.get_or_create(
             created_by=user, name="Summit Electrical",
-            defaults={"organization": membership.organization, "vendor_type": Vendor.VendorType.TRADE,
-                       "is_canonical": False, "email": "billing@summitelec.example"},
+            defaults={"organization": membership.organization,
+                       "email": "billing@summitelec.example"},
         )
         v_trade2, _ = Vendor.objects.get_or_create(
             created_by=user, name="Valley Plumbing Supply",
-            defaults={"organization": membership.organization, "vendor_type": Vendor.VendorType.TRADE,
-                       "is_canonical": False, "email": "orders@valleyplumb.example"},
+            defaults={"organization": membership.organization,
+                       "email": "orders@valleyplumb.example"},
         )
         Vendor.objects.get_or_create(
             created_by=user, name="Metro Lumber Co",
-            defaults={"organization": membership.organization, "vendor_type": Vendor.VendorType.TRADE,
-                       "is_canonical": False, "email": "sales@metrolumber.example"},
+            defaults={"organization": membership.organization,
+                       "email": "sales@metrolumber.example"},
         )
 
         # Vendor bills across statuses
@@ -659,7 +627,6 @@ class Command(BaseCommand):
     def _seed_late(self):
         """~2 years in. Full portfolio with history across all domains."""
         user, token, membership = self._get_or_create_user("late@test.com")
-        self._seed_canonical_vendors(user)
         code1, code2 = self._cost_codes(user)
         today = date.today()
 
@@ -818,19 +785,18 @@ class Command(BaseCommand):
 
         # Custom vendors
         vendor_names = [
-            ("Pinnacle Electric", Vendor.VendorType.TRADE, "billing@pinnacle.example"),
-            ("Riverside Plumbing", Vendor.VendorType.TRADE, "ap@riverside.example"),
-            ("Harbor HVAC Solutions", Vendor.VendorType.TRADE, "invoices@harborhvac.example"),
-            ("Crestview Lumber", Vendor.VendorType.TRADE, "orders@crestview.example"),
-            ("Summit Concrete", Vendor.VendorType.TRADE, "billing@summitconcrete.example"),
-            ("Ironclad Roofing Supply", Vendor.VendorType.TRADE, "ap@ironclad.example"),
+            ("Pinnacle Electric", "billing@pinnacle.example"),
+            ("Riverside Plumbing", "ap@riverside.example"),
+            ("Harbor HVAC Solutions", "invoices@harborhvac.example"),
+            ("Crestview Lumber", "orders@crestview.example"),
+            ("Summit Concrete", "billing@summitconcrete.example"),
+            ("Ironclad Roofing Supply", "ap@ironclad.example"),
         ]
         late_vendors = []
-        for vname, vtype, vemail in vendor_names:
+        for vname, vemail in vendor_names:
             v, _ = Vendor.objects.get_or_create(
                 created_by=user, name=vname,
-                defaults={"organization": membership.organization, "vendor_type": vtype,
-                           "is_canonical": False, "email": vemail},
+                defaults={"organization": membership.organization, "email": vemail},
             )
             late_vendors.append(v)
 

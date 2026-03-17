@@ -3,13 +3,12 @@
 from decimal import Decimal
 
 from django.db import transaction
-from django.utils import timezone
 from rest_framework.response import Response
 
-from core.models import CostCode, Payment, PaymentAllocation, Vendor, VendorBill, VendorBillLine, VendorBillSnapshot
+from core.models import VendorBill, VendorBillLine, VendorBillSnapshot
 from core.serializers import VendorBillSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
-from core.views.helpers import _resolve_cost_codes_for_user, _vendor_scope_filter  # noqa: F401 — re-exported for vendor_bills.py
+from core.views.helpers import _resolve_cost_codes_for_user
 
 
 def _find_duplicate_vendor_bills(
@@ -129,7 +128,7 @@ def _vendor_bill_line_apply_error_response(apply_error):
 
 def _prefetch_vendor_bill_qs(qs):
     """Apply standard select/prefetch for vendor bill queries."""
-    return qs.select_related("project", "vendor", "cost_code").prefetch_related(
+    return qs.select_related("project", "vendor").prefetch_related(
         "line_items", "line_items__cost_code"
     )
 
@@ -406,136 +405,4 @@ def _handle_vb_status_transition(
     vendor_bill = _prefetch_vendor_bill_qs(VendorBill.objects.filter(id=vendor_bill.id)).get()
     return Response(
         {"data": VendorBillSerializer(vendor_bill).data, "meta": {"duplicate_override_used": False}}
-    )
-
-
-# ---------------------------------------------------------------------------
-# Receipt creation
-# ---------------------------------------------------------------------------
-
-
-def _create_receipt(request, project, data):
-    """Create a lightweight receipt and its corresponding outbound payment.
-
-    A receipt collapses document + payment into one action. Creates a VendorBill
-    in ``approved`` status and an outbound Payment allocated against it.
-    See ``docs/decisions/ap-model-separation.md``.
-
-    Required fields: ``total``.
-    Optional: ``vendor``, ``cost_code``, ``notes``, ``received_date``.
-    """
-    from core.user_helpers import _ensure_membership
-
-    total_raw = data.get("total")
-    if total_raw is None:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "Total is required for receipts.",
-                    "fields": {"total": ["This field is required."]},
-                }
-            },
-            status=400,
-        )
-
-    total = quantize_money(total_raw)
-    if total <= MONEY_ZERO:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "Total must be greater than zero.",
-                    "fields": {"total": ["Must be greater than zero."]},
-                }
-            },
-            status=400,
-        )
-
-    # Optional vendor
-    vendor = None
-    vendor_id = data.get("vendor")
-    if vendor_id is not None:
-        vendor = Vendor.objects.filter(_vendor_scope_filter(request.user), id=vendor_id).first()
-        if not vendor:
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_error",
-                        "message": "Vendor is invalid for this user.",
-                        "fields": {"vendor": ["Select a valid vendor."]},
-                    }
-                },
-                status=400,
-            )
-
-    # Optional cost code
-    cost_code = None
-    cost_code_id = data.get("cost_code")
-    if cost_code_id is not None:
-        membership = _ensure_membership(request.user)
-        cost_code = CostCode.objects.filter(
-            organization_id=membership.organization_id,
-            id=cost_code_id,
-            is_active=True,
-        ).first()
-        if not cost_code:
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_error",
-                        "message": "Cost code is invalid.",
-                        "fields": {"cost_code": ["Select a valid cost code."]},
-                    }
-                },
-                status=400,
-            )
-
-    received_date = data.get("received_date") or timezone.localdate()
-    membership = _ensure_membership(request.user)
-
-    with transaction.atomic():
-        # 1. Create the receipt (bill record in terminal status)
-        receipt = VendorBill.objects.create(
-            kind=VendorBill.Kind.RECEIPT,
-            project=project,
-            vendor=vendor,
-            cost_code=cost_code,
-            bill_number="",
-            status=VendorBill.Status.APPROVED,
-            received_date=received_date,
-            total=total,
-            balance_due=MONEY_ZERO,
-            notes=data.get("notes", ""),
-            created_by=request.user,
-        )
-
-        # 2. Auto-create the outbound payment allocated to this receipt
-        payment = Payment.objects.create(
-            organization_id=membership.organization_id,
-            project=project,
-            direction=Payment.Direction.OUTBOUND,
-            method=Payment.Method.OTHER,
-            status=Payment.Status.SETTLED,
-            amount=total,
-            payment_date=received_date,
-            notes=f"Auto-created from receipt #{receipt.id}",
-            created_by=request.user,
-        )
-        PaymentAllocation.objects.create(
-            payment=payment,
-            target_type=PaymentAllocation.TargetType.VENDOR_BILL,
-            vendor_bill=receipt,
-            applied_amount=total,
-            cost_code=cost_code,
-            created_by=request.user,
-        )
-
-    return Response(
-        {
-            "data": VendorBillSerializer(
-                _prefetch_vendor_bill_qs(VendorBill.objects.filter(id=receipt.id)).get()
-            ).data,
-        },
-        status=201,
     )

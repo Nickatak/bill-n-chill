@@ -85,8 +85,6 @@ const policyContract: VendorBillPolicyContract = {
     void: [],
   },
   terminal_statuses: ["closed", "void"],
-  kinds: ["bill", "receipt"],
-  kind_labels: { bill: "Bill", receipt: "Receipt" },
 };
 
 // ---------------------------------------------------------------------------
@@ -133,8 +131,6 @@ function makeVendor(overrides: Record<string, unknown> = {}) {
   return {
     id: 1,
     name: "Acme Lumber",
-    vendor_type: "trade",
-    is_canonical: false,
     email: "acme@example.com",
     is_active: true,
     ...overrides,

@@ -63,6 +63,7 @@ from core.views import (
     project_estimates_view,
     project_invoices_view,
     project_payments_view,
+    project_receipts_view,
     project_vendor_bills_view,
     portfolio_snapshot_view,
     project_detail_view,
@@ -194,6 +195,11 @@ urlpatterns = [
         "contracts/invoices/",
         invoice_contract_view,
         name="contracts-invoices",
+    ),
+    path(
+        "projects/<int:project_id>/receipts/",
+        project_receipts_view,
+        name="project-receipts",
     ),
     path(
         "projects/<int:project_id>/vendor-bills/",

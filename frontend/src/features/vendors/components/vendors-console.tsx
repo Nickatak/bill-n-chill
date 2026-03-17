@@ -3,7 +3,7 @@
 /**
  * Vendor directory console. Supports paginated browsing, search/filter, CRUD for
  * individual vendor records, duplicate-detection with override, and bulk CSV import.
- * Vendors are canonical records reused across bills, AP workflows, and payment allocation.
+ * Vendors are B2B subcontractor/trade relationships used for AP bills.
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
@@ -26,8 +26,6 @@ export function VendorsConsole() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("active");
-  const [includeCanonical, setIncludeCanonical] = useState(false);
-
   const [name, setName] = useState("");
   const [vendorEmail, setVendorEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -35,12 +33,11 @@ export function VendorsConsole() {
   const [notes, setNotes] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [duplicateOverrideOnSave, setDuplicateOverrideOnSave] = useState(false);
-  const [vendorType, setVendorType] = useState<"trade" | "retail">("trade");
 
   const [duplicateCandidates, setDuplicateCandidates] = useState<VendorRecord[]>([]);
   const [pendingCreatePayload, setPendingCreatePayload] = useState<VendorPayload | null>(null);
   const [importCsvText, setImportCsvText] = useState(
-    "name,vendor_type,email,phone,tax_id_last4,notes\n",
+    "name,email,phone,tax_id_last4,notes\n",
   );
   const [importResult, setImportResult] = useState<VendorCsvImportResult | null>(null);
   const [importExpanded, setImportExpanded] = useState(false);
@@ -79,9 +76,6 @@ export function VendorsConsole() {
   const filteredRows = useMemo(() => {
     const needle = searchTerm.trim().toLowerCase();
     return orderedRows.filter((row) => {
-      if (!includeCanonical && row.is_canonical) {
-        return false;
-      }
       if (activityFilter === "active" && !row.is_active) {
         return false;
       }
@@ -91,7 +85,7 @@ export function VendorsConsole() {
       const haystack = `${row.id} ${row.name} ${row.email} ${row.phone} ${row.tax_id_last4}`.toLowerCase();
       return haystack.includes(needle);
     });
-  }, [activityFilter, includeCanonical, orderedRows, searchTerm]);
+  }, [activityFilter, orderedRows, searchTerm]);
   const {
     pageItems: pagedRows,
     currentPage: currentPageSafe,
@@ -106,15 +100,12 @@ export function VendorsConsole() {
     () => rows.find((row) => String(row.id) === selectedId) ?? null,
     [rows, selectedId],
   );
-  const selectedVendorIsCanonical = Boolean(selectedVendor?.is_canonical);
   const activeCount = useMemo(() => rows.filter((row) => row.is_active).length, [rows]);
   const inactiveCount = rows.length - activeCount;
-  const canonicalCount = useMemo(() => rows.filter((row) => row.is_canonical).length, [rows]);
 
   /** Reset all vendor form fields to their empty defaults. */
   function clearFormFields() {
     setName("");
-    setVendorType("trade");
     setVendorEmail("");
     setPhone("");
     setTaxIdLast4("");
@@ -134,7 +125,6 @@ export function VendorsConsole() {
   /** Populate the form fields from a vendor record. */
   function hydrate(item: VendorRecord) {
     setName(item.name);
-    setVendorType(item.vendor_type);
     setVendorEmail(item.email);
     setPhone(item.phone);
     setTaxIdLast4(item.tax_id_last4);
@@ -214,7 +204,6 @@ export function VendorsConsole() {
     }
     const payloadBody: VendorPayload = {
       name: name.trim(),
-      vendor_type: vendorType,
       email: vendorEmail.trim(),
       phone: phone.trim(),
       tax_id_last4: taxIdLast4.trim(),
@@ -293,7 +282,7 @@ export function VendorsConsole() {
   // Reset to page 1 when filters change so the user always sees the first matching results
   useEffect(() => {
     resetPage();
-  }, [activityFilter, includeCanonical, searchTerm, resetPage]);
+  }, [activityFilter, searchTerm, resetPage]);
 
   return (
     <section className={styles.console}>
@@ -305,7 +294,6 @@ export function VendorsConsole() {
           <span className={styles.headerStatPill}>Total {rows.length}</span>
           <span className={styles.headerStatPill}>Active {activeCount}</span>
           <span className={styles.headerStatPill}>Inactive {inactiveCount}</span>
-          <span className={styles.headerStatPill}>Canonical {canonicalCount}</span>
         </div>
       </header>
 
@@ -358,15 +346,6 @@ export function VendorsConsole() {
                   All
                 </button>
               </div>
-              <button
-                type="button"
-                className={`${styles.filterPill} ${includeCanonical ? styles.filterPillActive : ""}`}
-                onClick={() => setIncludeCanonical(!includeCanonical)}
-                aria-pressed={includeCanonical}
-              >
-                Canonical
-                <span className={styles.filterPillCount}>{canonicalCount}</span>
-              </button>
             </div>
 
             {filteredRows.length > 0 ? (
@@ -377,7 +356,6 @@ export function VendorsConsole() {
                       <tr>
                         <th>Vendor</th>
                         <th>Contact</th>
-                        <th>Type</th>
                         <th>Status</th>
                       </tr>
                     </thead>
@@ -401,16 +379,6 @@ export function VendorsConsole() {
                             <td>
                               <span className={styles.rowPrimary}>{row.email || "no-email"}</span>
                               <span className={styles.rowSecondary}>{row.phone || "no-phone"}</span>
-                            </td>
-                            <td>
-                              <span className={styles.inlinePill}>
-                                {row.vendor_type === "trade" ? "Trade" : "Retail"}
-                              </span>
-                              {row.is_canonical ? (
-                                <span className={`${styles.inlinePill} ${styles.inlinePillCanonical}`}>
-                                  Canonical
-                                </span>
-                              ) : null}
                             </td>
                             <td>
                               <span
@@ -476,7 +444,7 @@ export function VendorsConsole() {
 
           <div className={styles.layoutRight}>
             <form
-              className={`${styles.panel} ${selectedVendorIsCanonical ? styles.panelLocked : ""}`}
+              className={styles.panel}
               onSubmit={handleSubmit}
             >
               <div className={styles.panelHeader}>
@@ -495,26 +463,13 @@ export function VendorsConsole() {
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   required
-                  disabled={selectedVendorIsCanonical}
                 />
-              </label>
-              <label className={styles.field}>
-                <span>Vendor type</span>
-                <select
-                  value={vendorType}
-                  onChange={(event) => setVendorType(event.target.value as "trade" | "retail")}
-                  disabled={selectedVendorIsCanonical}
-                >
-                  <option value="trade">Trade</option>
-                  <option value="retail">Retail</option>
-                </select>
               </label>
               <label className={styles.field}>
                 <span>Email</span>
                 <input
                   value={vendorEmail}
                   onChange={(event) => setVendorEmail(event.target.value)}
-                  disabled={selectedVendorIsCanonical}
                 />
               </label>
               <label className={styles.field}>
@@ -522,7 +477,6 @@ export function VendorsConsole() {
                 <input
                   value={phone}
                   onChange={(event) => setPhone(event.target.value)}
-                  disabled={selectedVendorIsCanonical}
                 />
               </label>
               <label className={styles.field}>
@@ -532,7 +486,6 @@ export function VendorsConsole() {
                   onChange={(event) => setTaxIdLast4(event.target.value)}
                   inputMode="numeric"
                   maxLength={4}
-                  disabled={selectedVendorIsCanonical}
                 />
               </label>
               <label className={styles.field}>
@@ -541,7 +494,6 @@ export function VendorsConsole() {
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
                   rows={4}
-                  disabled={selectedVendorIsCanonical}
                 />
               </label>
               {selectedVendor ? (
@@ -550,7 +502,6 @@ export function VendorsConsole() {
                   <select
                     value={isActive ? "true" : "false"}
                     onChange={(event) => setIsActive(event.target.value === "true")}
-                    disabled={selectedVendorIsCanonical}
                   >
                     <option value="true">Active</option>
                     <option value="false">Inactive</option>
@@ -562,7 +513,6 @@ export function VendorsConsole() {
                   type="checkbox"
                   checked={duplicateOverrideOnSave}
                   onChange={(event) => setDuplicateOverrideOnSave(event.target.checked)}
-                  disabled={selectedVendorIsCanonical}
                 />
                 <span className={styles.overrideBody}>
                   <strong className={styles.overrideTitle}>Allow duplicate vendor identity</strong>
@@ -572,7 +522,7 @@ export function VendorsConsole() {
                 </span>
               </label>
               <div className={styles.formActions}>
-                <button type="submit" className={styles.primaryButton} disabled={selectedVendorIsCanonical || !canMutateVendors}>
+                <button type="submit" className={styles.primaryButton} disabled={!canMutateVendors}>
                   {selectedVendor ? "Save Vendor" : "Create Vendor"}
                 </button>
                 {selectedVendor ? (

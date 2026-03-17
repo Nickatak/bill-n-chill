@@ -52,7 +52,6 @@ class ReportingTestBase(TestCase):
         self.vendor = Vendor.objects.create(
             organization=self.org,
             name="Test Vendor",
-            vendor_type="trade",
             created_by=self.user,
         )
 

@@ -98,7 +98,6 @@ def vendors_list_create_view(request):
     vendor = Vendor.objects.create(
         organization_id=membership.organization_id,
         name=data["name"],
-        vendor_type=data.get("vendor_type", Vendor.VendorType.TRADE),
         email=data.get("email", ""),
         phone=data.get("phone", ""),
         tax_id_last4=data.get("tax_id_last4", ""),
@@ -168,9 +167,6 @@ def vendor_detail_view(request, vendor_id: int):
     if "name" in data:
         vendor.name = data["name"]
         update_fields.append("name")
-    if "vendor_type" in data:
-        vendor.vendor_type = data["vendor_type"]
-        update_fields.append("vendor_type")
     if "email" in data:
         vendor.email = data["email"]
         update_fields.append("email")
@@ -211,18 +207,9 @@ def vendors_import_csv_view(request):
     membership = _ensure_membership(request.user)
     scope_filter = _vendor_scope_filter(request.user)
 
-    valid_vendor_types = {Vendor.VendorType.TRADE, Vendor.VendorType.RETAIL}
-
     def validate_row(row):
-        # Apply vendor_type default before validation (mirrors original behavior).
-        if not row.get("vendor_type"):
-            row["vendor_type"] = Vendor.VendorType.TRADE
-        else:
-            row["vendor_type"] = row["vendor_type"].lower()
         if not row.get("name"):
             return "name is required."
-        if row["vendor_type"] not in valid_vendor_types:
-            return "vendor_type must be trade or retail."
         return None
 
     def lookup_existing(row):
@@ -233,7 +220,6 @@ def vendors_import_csv_view(request):
             created_by=request.user,
             organization_id=membership.organization_id,
             name=row["name"],
-            vendor_type=row.get("vendor_type", Vendor.VendorType.TRADE),
             email=row.get("email", ""),
             phone=row.get("phone", ""),
             tax_id_last4=row.get("tax_id_last4", ""),
@@ -242,13 +228,12 @@ def vendors_import_csv_view(request):
         )
 
     def update_vendor(existing, row):
-        existing.vendor_type = row.get("vendor_type", Vendor.VendorType.TRADE)
         existing.email = row.get("email", "")
         existing.phone = row.get("phone", "")
         existing.tax_id_last4 = row.get("tax_id_last4", "")
         existing.notes = row.get("notes", "")
         existing.save(
-            update_fields=["vendor_type", "email", "phone", "tax_id_last4", "notes", "updated_at"]
+            update_fields=["email", "phone", "tax_id_last4", "notes", "updated_at"]
         )
         return existing
 
@@ -260,7 +245,7 @@ def vendors_import_csv_view(request):
             csv_text=csv_text,
             dry_run=dry_run,
             required_headers={"name"},
-            allowed_headers={"name", "vendor_type", "email", "phone", "tax_id_last4", "notes"},
+            allowed_headers={"name", "email", "phone", "tax_id_last4", "notes"},
             entity_name="vendor",
             lookup_existing_fn=lookup_existing,
             create_fn=create_vendor,

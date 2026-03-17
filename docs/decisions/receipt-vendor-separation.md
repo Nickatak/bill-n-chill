@@ -25,13 +25,14 @@ Receipts become their own model, decoupled from VendorBill entirely:
 - Shape: amount, date, store name (string), notes, project FK, payment FK. Possibly a cost code.
 - The payment is created alongside the receipt atomically (same as today), but allocated to the receipt directly — no bill intermediary.
 
-### Store Name Is a String, Not a FK
+### Store Is an Org-Scoped Lookup Table
 
-The "vendor" on a receipt is just a text field:
+The "vendor" on a receipt is a lightweight `Store` model — just a name label:
 
-- No foreign key to the Vendor model. No shared dataset across orgs. No canonical vendor seeding.
-- Autocomplete from the user's own prior receipt store names is a possible future convenience, but not a modeling concern.
-- This eliminates the crowdsourced-data problem (typo deduplication, cross-tenant data leaking, entity resolution complexity).
+- Org-scoped: each organization builds its own store list. No cross-tenant data.
+- Auto-created on receipt submission: user types a store name, backend finds-or-creates (case-insensitive) the Store record for that org.
+- Provides consistent naming, autocomplete from prior entries, and clean aggregation/filtering.
+- NOT a Vendor — no contact info, no B2B relationship, no invoices. Just a label.
 
 ### Vendors Are B2B Only
 

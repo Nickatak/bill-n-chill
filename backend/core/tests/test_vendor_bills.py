@@ -401,33 +401,6 @@ class VendorBillTests(TestCase):
         self.assertEqual(invalid_due.status_code, 400)
         self.assertEqual(invalid_due.json()["error"]["code"], "validation_error")
 
-    def test_vendor_bill_create_allows_global_canonical_vendor(self):
-        canonical_vendor = Vendor.objects.create(
-            name="Global Canonical Vendor",
-            email="canonical@vendor.example.com",
-            created_by=self.other_user,
-            organization=None,
-            is_canonical=True,
-            is_active=True,
-        )
-        response = self.client.post(
-            f"/api/v1/projects/{self.project.id}/vendor-bills/",
-            data={
-                "vendor": canonical_vendor.id,
-                "bill_number": "B-CANON-1",
-                "issue_date": "2026-02-13",
-                "due_date": "2026-03-15",
-                "notes": "Canonical vendor intake path.",
-                "line_items": [
-                    {"description": "Canonical vendor intake", "amount": "1250.00"}
-                ],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()["data"]["vendor"], canonical_vendor.id)
-
     def test_vendor_bill_patch_rejects_line_items_with_wrong_org_cost_code(self):
         other_code, _ = CostCode.objects.get_or_create(
             code="50-200",
@@ -513,14 +486,13 @@ class VendorBillTests(TestCase):
         # Line items use amount, not qty × rate
         self.assertEqual(snapshot.snapshot_json["line_items"][0]["amount"], "200.00")
 
-    def test_vendor_bill_receipt_creates_payment_and_allocation(self):
-        """Recording a receipt auto-creates an outbound payment allocated to it."""
+    def test_receipt_creates_payment(self):
+        """Recording a receipt auto-creates an outbound settled payment."""
         response = self.client.post(
-            f"/api/v1/projects/{self.project.id}/vendor-bills/",
+            f"/api/v1/projects/{self.project.id}/receipts/",
             data={
-                "kind": "receipt",
-                "total": "237.50",
-                "vendor": self.vendor.id,
+                "store_name": "Home Depot",
+                "amount": "237.50",
                 "notes": "Home Depot run.",
             },
             content_type="application/json",
@@ -528,26 +500,29 @@ class VendorBillTests(TestCase):
         )
         self.assertEqual(response.status_code, 201)
         receipt = response.json()["data"]
-        self.assertEqual(receipt["kind"], "receipt")
-        self.assertEqual(receipt["status"], "approved")
-        self.assertEqual(receipt["payment_status"], "paid")
-        self.assertEqual(receipt["total"], "237.50")
-        self.assertEqual(receipt["balance_due"], "0.00")
+        self.assertIn("store_name", receipt)
+        self.assertIn("amount", receipt)
+        self.assertIn("receipt_date", receipt)
+        self.assertIn("payment", receipt)
+        self.assertEqual(receipt["store_name"], "Home Depot")
+        self.assertEqual(receipt["amount"], "237.50")
 
         # Verify payment was created
-        from core.models import Payment, PaymentAllocation
+        from core.models import Payment, Receipt
 
-        payment = Payment.objects.filter(
-            organization=self.org,
-            direction=Payment.Direction.OUTBOUND,
-        ).latest("id")
-        self.assertEqual(payment.amount, Decimal("237.50"))
+        payment = Payment.objects.get(id=receipt["payment"])
+        self.assertEqual(payment.direction, Payment.Direction.OUTBOUND)
         self.assertEqual(payment.status, Payment.Status.SETTLED)
+        self.assertEqual(payment.amount, Decimal("237.50"))
 
-        allocation = PaymentAllocation.objects.filter(
-            payment=payment,
-            vendor_bill_id=receipt["id"],
-        ).first()
-        self.assertIsNotNone(allocation)
-        self.assertEqual(allocation.applied_amount, Decimal("237.50"))
-        self.assertEqual(allocation.target_type, PaymentAllocation.TargetType.VENDOR_BILL)
+        # Verify the receipt's payment field matches
+        db_receipt = Receipt.objects.get(id=receipt["id"])
+        self.assertEqual(db_receipt.payment_id, payment.id)
+
+        # Verify Store was auto-created
+        from core.models import Store
+
+        self.assertIsNotNone(receipt["store"])
+        store = Store.objects.get(id=receipt["store"])
+        self.assertEqual(store.name, "Home Depot")
+        self.assertEqual(store.organization_id, self.org.id)

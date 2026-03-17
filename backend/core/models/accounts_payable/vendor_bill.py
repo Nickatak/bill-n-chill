@@ -10,13 +10,12 @@ User = get_user_model()
 
 
 class VendorBill(StatusTransitionMixin, models.Model):
-    """AP bill or casual receipt for project costs.
+    """AP bill from a vendor/subcontractor — inbound document only.
 
     Business workflow:
-    - Two kinds: ``bill`` (formal vendor bill with line items and document
-      lifecycle) and ``receipt`` (lightweight expense record, created in
-      ``approved`` status with an auto-created outbound payment).
     - Internal payable document (vendor-facing), not customer-facing billing.
+    - Vendor is always a B2B relationship (sub/trade). Receipts (retail
+      expenses) are a separate model — see ``Receipt``.
     - Bills track document lifecycle only (received → approved).
       Payment status is derived from PaymentAllocation coverage, not a bill
       status. See ``docs/decisions/ap-model-separation.md``.
@@ -25,10 +24,6 @@ class VendorBill(StatusTransitionMixin, models.Model):
     - `created_by` captures who created/owns the record, not who performed
       later lifecycle decisions (those belong in immutable decision captures).
     """
-
-    class Kind(models.TextChoices):
-        BILL = "bill", "Bill"
-        RECEIPT = "receipt", "Receipt"
 
     class Status(models.TextChoices):
         RECEIVED = "received", "Received"
@@ -47,12 +42,6 @@ class VendorBill(StatusTransitionMixin, models.Model):
         Status.VOID: set(),
     }
 
-    kind = models.CharField(
-        max_length=16,
-        choices=Kind.choices,
-        default=Kind.BILL,
-        db_index=True,
-    )
     project = models.ForeignKey(
         "Project",
         on_delete=models.PROTECT,
@@ -62,18 +51,8 @@ class VendorBill(StatusTransitionMixin, models.Model):
         "Vendor",
         on_delete=models.PROTECT,
         related_name="vendor_bills",
-        null=True,
-        blank=True,
     )
     bill_number = models.CharField(max_length=50, blank=True, default="")
-    cost_code = models.ForeignKey(
-        "CostCode",
-        on_delete=models.PROTECT,
-        related_name="vendor_bills",
-        null=True,
-        blank=True,
-        help_text="Optional cost code for the entire bill/receipt (receipts without line items).",
-    )
     status = models.CharField(
         max_length=32,
         choices=Status.choices,
@@ -114,21 +93,16 @@ class VendorBill(StatusTransitionMixin, models.Model):
         ]
 
     def __str__(self) -> str:
-        if self.kind == self.Kind.RECEIPT:
-            vendor_name = self.vendor.name if self.vendor_id else "Receipt"
-            return f"{vendor_name} ${self.total}"
-        return f"{self.vendor.name if self.vendor_id else '?'} {self.bill_number}"
+        return f"{self.vendor.name} {self.bill_number}"
 
     def clean(self):
         """Validate due date and status transitions."""
         errors = {}
 
-        # Bills require vendor and bill_number.
-        if self.kind == self.Kind.BILL:
-            if not self.vendor_id:
-                errors.setdefault("vendor", []).append("Vendor is required for bills.")
-            if not self.bill_number:
-                errors.setdefault("bill_number", []).append("Bill number is required for bills.")
+        if not self.vendor_id:
+            errors.setdefault("vendor", []).append("Vendor is required for bills.")
+        if not self.bill_number:
+            errors.setdefault("bill_number", []).append("Bill number is required for bills.")
 
         if self.due_date and self.issue_date and self.due_date < self.issue_date:
             errors.setdefault("due_date", []).append("Due date must be on or after issue date.")
@@ -147,10 +121,8 @@ class VendorBill(StatusTransitionMixin, models.Model):
         return {
             "vendor_bill": {
                 "id": self.id,
-                "kind": self.kind,
                 "project_id": self.project_id,
                 "vendor_id": self.vendor_id,
-                "cost_code_id": self.cost_code_id,
                 "bill_number": self.bill_number,
                 "status": self.status,
                 "received_date": self.received_date.isoformat() if self.received_date else None,

@@ -35,8 +35,6 @@ class VendorTests(TestCase):
         payload = create.json()["data"]
         self.assertEqual(payload["name"], "Stone Supply LLC")
         self.assertEqual(payload["tax_id_last4"], "7788")
-        self.assertEqual(payload["vendor_type"], Vendor.VendorType.TRADE)
-        self.assertFalse(payload["is_canonical"])
 
         list_all = self.client.get(
             "/api/v1/vendors/",
@@ -74,24 +72,6 @@ class VendorTests(TestCase):
         rows = response.json()["data"]
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["name"], "Owner Vendor")
-
-    def test_vendor_list_includes_global_canonical_vendors(self):
-        canonical = Vendor.objects.create(
-            name="Global Canonical Vendor",
-            email="canonical@vendor.example.com",
-            created_by=self.other_user,
-            is_canonical=True,
-            organization=None,
-        )
-
-        response = self.client.get(
-            "/api/v1/vendors/",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 200)
-        rows = response.json()["data"]
-        returned_ids = {row["id"] for row in rows}
-        self.assertIn(canonical.id, returned_ids)
 
     def test_vendor_list_includes_rows_created_by_other_user_in_same_org(self):
         shared_org = Organization.objects.create(
@@ -279,22 +259,6 @@ class VendorTests(TestCase):
         self.assertEqual(vendor.notes, "Updated note")
         self.assertFalse(vendor.is_active)
 
-    def test_vendor_create_accepts_retail_vendor_type(self):
-        create = self.client.post(
-            "/api/v1/vendors/",
-            data={
-                "name": "Home Depot",
-                "vendor_type": Vendor.VendorType.RETAIL,
-                "email": "",
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(create.status_code, 201)
-        payload = create.json()["data"]
-        self.assertEqual(payload["vendor_type"], Vendor.VendorType.RETAIL)
-        self.assertFalse(payload["is_canonical"])
-
     def test_vendor_create_rejects_inactive_state(self):
         create = self.client.post(
             "/api/v1/vendors/",
@@ -333,27 +297,9 @@ class VendorTests(TestCase):
         vendor = Vendor.objects.get(id=response.json()["data"]["id"])
         self.assertEqual(vendor.organization_id, membership.organization_id)
 
-    def test_vendor_patch_updates_vendor_type(self):
-        vendor = Vendor.objects.create(
-            name="Switchable Vendor",
-            vendor_type=Vendor.VendorType.TRADE,
-            created_by=self.user,
-            organization=self.org,
-        )
-        response = self.client.patch(
-            f"/api/v1/vendors/{vendor.id}/",
-            data={"vendor_type": Vendor.VendorType.RETAIL},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 200)
-        vendor.refresh_from_db()
-        self.assertEqual(vendor.vendor_type, Vendor.VendorType.RETAIL)
-
     def test_vendor_csv_import_preview_and_apply(self):
         Vendor.objects.create(
             name="Stone Supply LLC",
-            vendor_type=Vendor.VendorType.TRADE,
             email="old@stone.example.com",
             created_by=self.user,
             organization=self.org,
@@ -363,7 +309,7 @@ class VendorTests(TestCase):
             "/api/v1/vendors/import-csv/",
             data={
                 "dry_run": True,
-                "csv_text": "name,vendor_type,email,phone\nStone Supply LLC,trade,ap@stone.example.com,555-1111\nFraming Crew,trade,frame@example.com,555-2222\n",
+                "csv_text": "name,email,phone\nStone Supply LLC,ap@stone.example.com,555-1111\nFraming Crew,frame@example.com,555-2222\n",
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -377,7 +323,7 @@ class VendorTests(TestCase):
             "/api/v1/vendors/import-csv/",
             data={
                 "dry_run": False,
-                "csv_text": "name,vendor_type,email,phone\nStone Supply LLC,trade,ap@stone.example.com,555-1111\nFraming Crew,trade,frame@example.com,555-2222\n",
+                "csv_text": "name,email,phone\nStone Supply LLC,ap@stone.example.com,555-1111\nFraming Crew,frame@example.com,555-2222\n",
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -393,7 +339,7 @@ class VendorTests(TestCase):
             "/api/v1/vendors/import-csv/",
             data={
                 "dry_run": "false",
-                "csv_text": "name,vendor_type,email,phone\nFraming Crew,trade,frame@example.com,555-2222\n",
+                "csv_text": "name,email,phone\nFraming Crew,frame@example.com,555-2222\n",
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -411,7 +357,7 @@ class VendorTests(TestCase):
             "/api/v1/vendors/import-csv/",
             data={
                 "dry_run": True,
-                "csv_text": "name,vendor_type,email,phone,is_active\nFraming Crew,trade,frame@example.com,555-2222,true\n",
+                "csv_text": "name,email,phone,is_active\nFraming Crew,frame@example.com,555-2222,true\n",
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
