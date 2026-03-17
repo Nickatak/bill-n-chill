@@ -57,6 +57,11 @@ export function ProjectsConsole() {
     sent: number;
     accepted: number;
   } | null>(null);
+  const [billStatusCounts, setBillStatusCounts] = useState<{
+    received: number;
+    approved: number;
+    disputed: number;
+  } | null>(null);
   const [acceptedEstimateTotal, setAcceptedEstimateTotal] = useState("--");
   const [invoiceAllocationTargets, setInvoiceAllocationTargets] = useState<AllocationTarget[]>([]);
   const [isProjectEditOpen, setIsProjectEditOpen] = useState(false);
@@ -193,6 +198,7 @@ export function ProjectsConsole() {
         setSummary(null);
         setEstimateStatusCounts(null);
         setChangeOrderStatusCounts(null);
+        setBillStatusCounts(null);
       }
     } catch {
       // Network error — silently fail; the empty project list is visible feedback.
@@ -284,6 +290,36 @@ export function ProjectsConsole() {
     }
   }
 
+  /** Loads vendor bill counts by status for the pipeline badges. */
+  async function loadBillStatusCounts(projectId: number) {
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/vendor-bills/`, {
+        headers: buildAuthHeaders(token),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setBillStatusCounts(null);
+        return;
+      }
+      const rows = (payload.data as Array<{ status?: string }>) ?? [];
+      let received = 0;
+      let approved = 0;
+      let disputed = 0;
+      for (const bill of rows) {
+        if (bill.status === "received") {
+          received += 1;
+        } else if (bill.status === "approved") {
+          approved += 1;
+        } else if (bill.status === "disputed") {
+          disputed += 1;
+        }
+      }
+      setBillStatusCounts({ received, approved, disputed });
+    } catch {
+      setBillStatusCounts(null);
+    }
+  }
+
   /** Loads invoices for the selected project and maps them to allocation targets. */
   async function loadInvoiceAllocationTargets(projectId: number) {
     try {
@@ -336,6 +372,7 @@ export function ProjectsConsole() {
     void loadFinancialSummary();
     void loadEstimateStatusCounts(projectId);
     void loadChangeOrderStatusCounts(projectId);
+    void loadBillStatusCounts(projectId);
     void loadInvoiceAllocationTargets(projectId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProjectId, token]);
@@ -359,6 +396,7 @@ export function ProjectsConsole() {
     setSummary(null);
     setEstimateStatusCounts(null);
     setChangeOrderStatusCounts(null);
+    setBillStatusCounts(null);
     setAcceptedEstimateTotal("--");
   }, [selectedProjectId, statusFilteredProjects]);
 
@@ -397,6 +435,7 @@ export function ProjectsConsole() {
     setSummary(null);
     setEstimateStatusCounts(null);
     setChangeOrderStatusCounts(null);
+    setBillStatusCounts(null);
     setAcceptedEstimateTotal("--");
   }
 
@@ -621,15 +660,33 @@ export function ProjectsConsole() {
                   <span className={styles.pipelineLabel}>Invoices</span>
                 </Link>
 
-              </nav>
+                <span className={styles.pipelineArrow} aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <polyline points="12 5 19 12 12 19" />
+                  </svg>
+                </span>
 
-              <Link href={`/projects/${selectedProject.id}/bills`} className={styles.billsLink}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <rect x="2" y="4" width="20" height="16" rx="2" />
-                  <path d="M7 15h0M2 9.5h20" />
-                </svg>
-                Bills
-              </Link>
+                <Link href={`/projects/${selectedProject.id}/bills`} className={styles.pipelineStage}>
+                  <svg className={styles.pipelineIcon} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="2" y="4" width="20" height="16" rx="2" />
+                    <path d="M7 15h0M2 9.5h20" />
+                  </svg>
+                  <span className={styles.pipelineLabel}>Bills</span>
+                  <span className={styles.pipelineCounts}>
+                    <span className={`${styles.estimateCountPill} ${styles.billCountReceived}`}>
+                      R{billStatusCounts ? billStatusCounts.received : "--"}
+                    </span>
+                    <span className={`${styles.estimateCountPill} ${styles.billCountDisputed}`}>
+                      D{billStatusCounts ? billStatusCounts.disputed : "--"}
+                    </span>
+                    <span className={`${styles.estimateCountPill} ${styles.estimateCountApproved}`}>
+                      A{billStatusCounts ? billStatusCounts.approved : "--"}
+                    </span>
+                  </span>
+                </Link>
+
+              </nav>
 
             </div>
 

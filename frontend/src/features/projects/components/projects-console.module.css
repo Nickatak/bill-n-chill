@@ -161,25 +161,6 @@
   opacity: 0.5;
 }
 
-.billsLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: var(--space-sm);
-  padding: var(--space-xs) var(--space-sm);
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-decoration: none;
-  border-radius: var(--radius-md);
-  transition: color 140ms ease, background 140ms ease;
-}
-
-.billsLink:hover {
-  color: var(--accent-text);
-  background: var(--surface);
-}
-
 .estimateCountPill {
   font-size: 0.66rem;
   font-weight: 700;
@@ -203,6 +184,16 @@
 .estimateCountApproved {
   background: var(--status-green-bg);
   color: var(--status-green-text);
+}
+
+.billCountReceived {
+  background: var(--status-amber-bg);
+  color: var(--status-amber-text);
+}
+
+.billCountDisputed {
+  background: var(--status-red-bg);
+  color: var(--status-red-text);
 }
 
 .metricsPanel {
