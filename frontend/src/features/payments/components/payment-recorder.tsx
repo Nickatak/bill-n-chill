@@ -48,9 +48,9 @@ const PAYMENT_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
   settled: ["void"],
   void: [],
 };
-const PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK: Record<string, PaymentAllocationTargetType> = {
-  inbound: "invoice",
-  outbound: "vendor_bill",
+const PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK: Record<string, PaymentAllocationTargetType[]> = {
+  inbound: ["invoice"],
+  outbound: ["vendor_bill", "receipt"],
 };
 
 // ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ export function PaymentRecorder({
     PAYMENT_ALLOWED_STATUS_TRANSITIONS_FALLBACK,
   );
   const [allocationTargetByDirection, setAllocationTargetByDirection] = useState<
-    Record<string, PaymentAllocationTargetType>
+    Record<string, PaymentAllocationTargetType[]>
   >(PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK);
   const [defaultCreateMethod, setDefaultCreateMethod] = useState<string>(PAYMENT_METHODS_FALLBACK[0]);
 
@@ -140,8 +140,8 @@ export function PaymentRecorder({
 
   const directionLabel = direction === "inbound" ? "Inbound" : "Outbound";
   const targetLabel = direction === "inbound" ? "Invoice" : "Bill";
-  const allocationTargetType: PaymentAllocationTargetType =
-    allocationTargetByDirection[direction] ?? PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK[direction];
+  const allocationTargetTypes = allocationTargetByDirection[direction] ?? PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK[direction];
+  const allocationTargetType: PaymentAllocationTargetType = allocationTargetTypes[0];
 
   const payableTargets = useMemo(
     () => allocationTargets.filter((t) => Number(t.balanceDue) > 0),

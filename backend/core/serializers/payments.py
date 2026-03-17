@@ -21,14 +21,19 @@ class PaymentAllocationSerializer(serializers.ModelSerializer):
             "target_id",
             "invoice",
             "vendor_bill",
+            "receipt",
             "applied_amount",
             "created_at",
         ]
         read_only_fields = fields
 
     def get_target_id(self, obj: PaymentAllocation):
-        """Return the invoice or vendor bill ID based on target type."""
-        return obj.invoice_id if obj.target_type == PaymentAllocation.TargetType.INVOICE else obj.vendor_bill_id
+        """Return the target document ID based on target type."""
+        if obj.target_type == PaymentAllocation.TargetType.INVOICE:
+            return obj.invoice_id
+        if obj.target_type == PaymentAllocation.TargetType.VENDOR_BILL:
+            return obj.vendor_bill_id
+        return obj.receipt_id
 
 
 class PaymentSerializer(serializers.ModelSerializer):

@@ -20,6 +20,7 @@ class ReceiptSerializer(serializers.ModelSerializer):
             "store",
             "store_name",
             "amount",
+            "balance_due",
             "receipt_date",
             "notes",
             "created_at",

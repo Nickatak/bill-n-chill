@@ -57,6 +57,18 @@ def vendor_bill_contract_view(_request):
     return Response({"data": get_vendor_bill_policy_contract()})
 
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def org_vendor_bills_view(request):
+    """Org-level vendor bill list — all bills across all projects for the accounting page."""
+    membership = _ensure_membership(request.user)
+    rows = _prefetch_vendor_bill_qs(
+        VendorBill.objects.filter(project__organization_id=membership.organization_id)
+        .order_by("-created_at")
+    )
+    return Response({"data": VendorBillSerializer(rows, many=True).data})
+
+
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_vendor_bills_view(request, project_id: int):

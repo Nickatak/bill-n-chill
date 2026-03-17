@@ -20,6 +20,18 @@ def _prefetch_receipt_qs(qs):
     return qs.select_related("project", "store")
 
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def org_receipts_view(request):
+    """Org-level receipt list — all receipts across all projects for the accounting page."""
+    membership = _ensure_membership(request.user)
+    rows = _prefetch_receipt_qs(
+        Receipt.objects.filter(project__organization_id=membership.organization_id)
+        .order_by("-receipt_date", "-created_at")
+    )
+    return Response({"data": ReceiptSerializer(rows, many=True).data})
+
+
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_receipts_view(request, project_id: int):
@@ -93,6 +105,7 @@ def project_receipts_view(request, project_id: int):
         project=project,
         store=store,
         amount=amount,
+        balance_due=amount,
         receipt_date=receipt_date,
         notes=data.get("notes", ""),
         created_by=request.user,

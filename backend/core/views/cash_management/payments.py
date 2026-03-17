@@ -15,6 +15,7 @@ from core.models import (
     PaymentAllocation,
     PaymentAllocationRecord,
     PaymentRecord,
+    Receipt,
     VendorBill,
 )
 from core.policies import get_payment_policy_contract
@@ -35,6 +36,7 @@ from core.views.cash_management.payments_helpers import (
     _direction_target_mismatch,
     _recalculate_payment_allocation_targets,
     _set_invoice_balance_from_allocations,
+    _set_receipt_balance_from_allocations,
     _set_vendor_bill_balance_from_allocations,
 )
 
@@ -576,8 +578,8 @@ def payment_allocate_view(request, payment_id: int):
                     "Invoice has no remaining balance due."
                 ]
                 continue
-            resolved_targets.append((row, target, None))
-        else:
+            resolved_targets.append({"row": row, "invoice": target})
+        elif target_type == PaymentAllocation.TargetType.VENDOR_BILL:
             target = VendorBill.objects.filter(
                 id=target_id,
                 project__organization_id=payment.organization_id,
@@ -597,7 +599,23 @@ def payment_allocate_view(request, payment_id: int):
                     "Vendor bill has no remaining balance due."
                 ]
                 continue
-            resolved_targets.append((row, None, target))
+            resolved_targets.append({"row": row, "vendor_bill": target})
+        elif target_type == PaymentAllocation.TargetType.RECEIPT:
+            target = Receipt.objects.filter(
+                id=target_id,
+                project__organization_id=payment.organization_id,
+            ).first()
+            if not target:
+                fields[f"allocations[{index}].target_id"] = [
+                    "Receipt not found in this organization."
+                ]
+                continue
+            if target.balance_due <= Decimal("0"):
+                fields[f"allocations[{index}].target_id"] = [
+                    "Receipt has no remaining balance due."
+                ]
+                continue
+            resolved_targets.append({"row": row, "receipt": target})
 
         new_total = quantize_money(new_total + Decimal(str(row["applied_amount"])))
 
@@ -637,25 +655,25 @@ def payment_allocate_view(request, payment_id: int):
             )
 
         created_allocations = []
-        for row, invoice, vendor_bill in resolved_targets:
-            created_allocations.append(
-                (
-                    PaymentAllocation.objects.create(
-                    payment=payment,
-                    target_type=row["target_type"],
-                    invoice=invoice,
-                    vendor_bill=vendor_bill,
-                    applied_amount=row["applied_amount"],
-                    created_by=request.user,
-                    ),
-                    row,
-                    invoice,
-                    vendor_bill,
-                )
+        for entry in resolved_targets:
+            row = entry["row"]
+            invoice = entry.get("invoice")
+            vendor_bill = entry.get("vendor_bill")
+            receipt = entry.get("receipt")
+            allocation = PaymentAllocation.objects.create(
+                payment=payment,
+                target_type=row["target_type"],
+                invoice=invoice,
+                vendor_bill=vendor_bill,
+                receipt=receipt,
+                applied_amount=row["applied_amount"],
+                created_by=request.user,
             )
+            created_allocations.append({"allocation": allocation, "row": row})
 
-        touched_invoice_ids = [invoice.id for _, invoice, _ in resolved_targets if invoice]
-        touched_vendor_bill_ids = [vendor_bill.id for _, _, vendor_bill in resolved_targets if vendor_bill]
+        touched_invoice_ids = [e["invoice"].id for e in resolved_targets if e.get("invoice")]
+        touched_vendor_bill_ids = [e["vendor_bill"].id for e in resolved_targets if e.get("vendor_bill")]
+        touched_receipt_ids = [e["receipt"].id for e in resolved_targets if e.get("receipt")]
 
         for invoice in Invoice.objects.filter(id__in=touched_invoice_ids):
             _set_invoice_balance_from_allocations(invoice, changed_by=request.user)
@@ -663,9 +681,13 @@ def payment_allocate_view(request, payment_id: int):
         for vendor_bill in VendorBill.objects.filter(id__in=touched_vendor_bill_ids):
             _set_vendor_bill_balance_from_allocations(vendor_bill)
 
-        for allocation, row, invoice, vendor_bill in created_allocations:
-            target_id = invoice.id if invoice else vendor_bill.id
-            target_type = "invoice" if invoice else "vendor_bill"
+        for receipt in Receipt.objects.filter(id__in=touched_receipt_ids):
+            _set_receipt_balance_from_allocations(receipt)
+
+        for entry in created_allocations:
+            allocation = entry["allocation"]
+            target_type = allocation.target_type
+            target_id = allocation.invoice_id or allocation.vendor_bill_id or allocation.receipt_id
             PaymentAllocationRecord.record(
                 payment=payment,
                 allocation=allocation,
@@ -694,19 +716,19 @@ def payment_allocate_view(request, payment_id: int):
                 "allocation_count": len(resolved_targets),
                 "allocations": [
                     {
-                        "target_type": "invoice" if invoice else "vendor_bill",
-                        "target_id": invoice.id if invoice else vendor_bill.id,
-                        "applied_amount": str(row["applied_amount"]),
-                        "payment_allocation_id": allocation.id,
+                        "target_type": e["allocation"].target_type,
+                        "target_id": e["allocation"].invoice_id or e["allocation"].vendor_bill_id or e["allocation"].receipt_id,
+                        "applied_amount": str(e["row"]["applied_amount"]),
+                        "payment_allocation_id": e["allocation"].id,
                     }
-                    for allocation, row, invoice, vendor_bill in created_allocations
+                    for e in created_allocations
                 ],
             },
         )
 
     payment.refresh_from_db()
     payment = Payment.objects.select_related("customer", "project").prefetch_related("allocations").get(id=payment.id)
-    created_rows = [allocation for allocation, _, _, _ in created_allocations]
+    created_rows = [e["allocation"] for e in created_allocations]
 
     return Response(
         {

@@ -56,6 +56,8 @@ from core.views import (
     attention_feed_view,
     change_impact_summary_view,
     org_payments_view,
+    org_receipts_view,
+    org_vendor_bills_view,
     payment_detail_view,
     payment_allocate_view,
     payment_contract_view,
@@ -322,6 +324,8 @@ urlpatterns = [
     path("payments/", org_payments_view, name="org-payments"),
     path("payments/<int:payment_id>/", payment_detail_view, name="payment-detail"),
     path("payments/<int:payment_id>/allocate/", payment_allocate_view, name="payment-allocate"),
+    path("vendor-bills/", org_vendor_bills_view, name="org-vendor-bills"),
+    path("receipts/", org_receipts_view, name="org-receipts"),
     path(
         "accounting-sync-events/<int:sync_event_id>/retry/",
         accounting_sync_event_retry_view,

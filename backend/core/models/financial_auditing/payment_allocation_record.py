@@ -39,6 +39,7 @@ class PaymentAllocationRecord(ImmutableModelMixin):
     class TargetType(models.TextChoices):
         INVOICE = "invoice", "Invoice"
         VENDOR_BILL = "vendor_bill", "Vendor Bill"
+        RECEIPT = "receipt", "Receipt"
 
     payment = models.ForeignKey(
         "Payment",

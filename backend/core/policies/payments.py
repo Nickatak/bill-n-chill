@@ -18,8 +18,8 @@ def get_payment_policy_contract() -> dict:
             "default_create_direction": Payment.Direction.INBOUND,
             "default_create_method": Payment.Method.CHECK,
             "allocation_target_by_direction": {
-                Payment.Direction.INBOUND: "invoice",
-                Payment.Direction.OUTBOUND: "vendor_bill",
+                Payment.Direction.INBOUND: ["invoice"],
+                Payment.Direction.OUTBOUND: ["vendor_bill", "receipt"],
             },
         },
     )

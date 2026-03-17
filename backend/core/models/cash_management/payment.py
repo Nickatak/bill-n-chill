@@ -163,7 +163,7 @@ class Payment(StatusTransitionMixin, models.Model):
 
 
 class PaymentAllocation(models.Model):
-    """Applied amount from one payment to one invoice or vendor bill.
+    """Applied amount from one payment to one invoice, vendor bill, or receipt.
 
     Business workflow:
     - Allocation join row attributing part of a payment to a concrete AR/AP target.
@@ -182,6 +182,7 @@ class PaymentAllocation(models.Model):
     class TargetType(models.TextChoices):
         INVOICE = "invoice", "Invoice"
         VENDOR_BILL = "vendor_bill", "Vendor Bill"
+        RECEIPT = "receipt", "Receipt"
 
     payment = models.ForeignKey(
         "Payment",
@@ -198,6 +199,13 @@ class PaymentAllocation(models.Model):
     )
     vendor_bill = models.ForeignKey(
         "VendorBill",
+        on_delete=models.CASCADE,
+        related_name="payment_allocations",
+        null=True,
+        blank=True,
+    )
+    receipt = models.ForeignKey(
+        "Receipt",
         on_delete=models.CASCADE,
         related_name="payment_allocations",
         null=True,
@@ -231,6 +239,7 @@ class PaymentAllocation(models.Model):
                 "target_type": self.target_type,
                 "invoice_id": self.invoice_id,
                 "vendor_bill_id": self.vendor_bill_id,
+                "receipt_id": self.receipt_id,
                 "applied_amount": str(self.applied_amount),
                 "cost_code_id": self.cost_code_id,
                 "created_by_id": self.created_by_id,

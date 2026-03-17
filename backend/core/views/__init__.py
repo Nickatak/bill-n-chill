@@ -76,8 +76,9 @@ from core.views.shared_operations.reporting import (
     project_timeline_events_view,
     quick_jump_search_view,
 )
-from core.views.accounts_payable.receipts import project_receipts_view
+from core.views.accounts_payable.receipts import org_receipts_view, project_receipts_view
 from core.views.accounts_payable.vendor_bills import (
+    org_vendor_bills_view,
     project_vendor_bills_view,
     vendor_bill_contract_view,
     vendor_bill_detail_view,
@@ -169,7 +170,9 @@ __all__ = [
     "vendors_list_create_view",
     "vendor_detail_view",
     "vendors_import_csv_view",
+    "org_receipts_view",
     "project_receipts_view",
+    "org_vendor_bills_view",
     "project_vendor_bills_view",
     "vendor_bill_contract_view",
     "vendor_bill_detail_view",

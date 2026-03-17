@@ -1,16 +1,17 @@
 /**
- * Accounting page — org-wide ledger for reconciliation and payment management.
+ * Accounting page — tabbed hub for payments, bills, and receipts.
  *
- * Both inbound (from customers) and outbound (to vendors) payments are visible
- * here with a direction toggle. Day-to-day payment recording lives on the
- * project page; this is the bookkeeper's reconciliation view.
+ * Tab 1: Payments — org-wide ledger (inbound + outbound).
+ * Tab 2: Bills — vendor bill browser (selector documents for outbound payments).
+ * Tab 3: Receipts — receipt browser (selector documents for outbound payments).
  *
- * See docs/decisions/product-direction-refinement.md for strategic context.
+ * Day-to-day payment recording lives on the project page via Quick Pay.
+ * See docs/decisions/accounting-page-redesign.md for strategic context.
  */
 
 import type { Metadata } from "next";
 import { PageShell } from "@/shared/shell";
-import { PaymentsConsole } from "@/features/payments";
+import { AccountingConsole } from "@/features/payments";
 
 export const metadata: Metadata = {
   title: "Accounting",
@@ -19,7 +20,7 @@ export const metadata: Metadata = {
 export default function AccountingPage() {
   return (
     <PageShell>
-      <PaymentsConsole />
+      <AccountingConsole />
     </PageShell>
   );
 }

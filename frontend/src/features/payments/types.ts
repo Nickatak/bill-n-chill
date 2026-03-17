@@ -12,7 +12,7 @@ export type ProjectRecord = {
 export type PaymentDirection = string; // "inbound" | "outbound"
 export type PaymentMethod = string; // "ach" | "card" | "check" | "wire" | "cash" | "other"
 export type PaymentStatus = string; // "pending" | "settled" | "void" ("failed" removed — sync deferred)
-export type PaymentAllocationTargetType = "invoice" | "vendor_bill";
+export type PaymentAllocationTargetType = "invoice" | "vendor_bill" | "receipt";
 
 /** Generic allocation target shape accepted by PaymentRecorder. */
 export type AllocationTarget = {
@@ -28,6 +28,7 @@ export type PaymentAllocationRecord = {
   target_id: number;
   invoice: number | null;
   vendor_bill: number | null;
+  receipt: number | null;
   applied_amount: string;
   created_at: string;
 };
@@ -90,7 +91,7 @@ export type PaymentPolicyContract = {
   default_create_method: string;
   allowed_status_transitions: Record<string, string[]>;
   terminal_statuses: string[];
-  allocation_target_by_direction: Record<string, PaymentAllocationTargetType>;
+  allocation_target_by_direction: Record<string, PaymentAllocationTargetType[]>;
 };
 
 export type ApiResponse = {

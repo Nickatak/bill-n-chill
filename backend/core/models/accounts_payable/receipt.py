@@ -78,6 +78,7 @@ class Receipt(models.Model):
         blank=True,
     )
     amount = models.DecimalField(max_digits=12, decimal_places=2)
+    balance_due = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     receipt_date = models.DateField()
     notes = models.TextField(blank=True)
     created_by = models.ForeignKey(

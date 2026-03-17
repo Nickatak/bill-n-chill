@@ -1,0 +1,260 @@
+/* Accounting console — tabbed hub for payments, bills, and receipts. */
+
+.console {
+  display: grid;
+  gap: var(--space-md);
+  color: var(--text-primary);
+}
+
+/* ── Auth / loading notices ──────────────────────── */
+
+.authNotice {
+  composes: noticeWarning from "../../../shared/styles/notices.module.css";
+}
+
+.loadingText {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  padding: var(--space-md) 0;
+}
+
+/* ── Tab Bar ─────────────────────────────────────── */
+
+.tabBar {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+}
+
+.tab {
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab:hover {
+  color: var(--text-primary);
+}
+
+.tabActive {
+  color: var(--accent-text);
+  border-bottom-color: var(--accent);
+}
+
+.tabContent {
+  min-height: 200px;
+}
+
+/* ── Shared table styles for bills/receipts tabs ── */
+
+.documentList {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.documentRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface-secondary);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.88rem;
+  align-items: center;
+}
+
+.documentRow:last-child {
+  border-bottom: none;
+}
+
+.documentRow:hover {
+  background: var(--surface-hover);
+}
+
+.documentIdentity {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.documentPrimary {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.documentSecondary {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.documentAmount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-size: 0.94rem;
+  text-align: right;
+}
+
+.documentBalance {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Status badges ────────────────────────────────── */
+
+.statusReceived {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--status-blue-bg);
+  border-color: var(--status-blue-border);
+  color: var(--status-blue-text);
+}
+
+.statusApproved {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--status-green-bg);
+  border-color: var(--status-green-border);
+  color: var(--status-green-text);
+}
+
+.statusDisputed {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--status-amber-bg);
+  border-color: var(--status-amber-border);
+  color: var(--status-amber-text);
+}
+
+.statusClosed {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--status-gray-bg);
+  border-color: var(--status-gray-border);
+  color: var(--status-gray-text);
+}
+
+.statusVoid {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--status-gray-bg);
+  border-color: var(--status-gray-border);
+  color: var(--status-gray-text);
+}
+
+/* Payment status badges (reused from payments-console) */
+
+.statusPending {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--status-amber-bg);
+  border-color: var(--status-amber-border);
+  color: var(--status-amber-text);
+}
+
+.statusSettled {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--status-green-bg);
+  border-color: var(--status-green-border);
+  color: var(--status-green-text);
+}
+
+/* ── Direction badges ────────────────────────────── */
+
+.directionInbound {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--status-green-bg);
+  border-color: var(--status-green-border);
+  color: var(--status-green-text);
+}
+
+.directionOutbound {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--status-blue-bg);
+  border-color: var(--status-blue-border);
+  color: var(--status-blue-text);
+}
+
+/* ── Filter controls ─────────────────────────────── */
+
+.filterBar {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filterPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-secondary);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.filterPillActive {
+  border-color: var(--accent-border);
+  background: var(--accent-light);
+  color: var(--accent-text);
+}
+
+.filterPill:not(.filterPillActive):hover {
+  background: var(--surface-hover);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 140px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-secondary);
+  color: var(--text-primary);
+  padding: var(--space-sm) 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+/* ── Empty state ──────────────────────────────────── */
+
+.emptyState {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: var(--space-md);
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+/* ── Responsive ───────────────────────────────────── */
+
+@media (max-width: 700px) {
+  .filterBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media print {
+  .console {
+    display: none;
+  }
+}

@@ -144,8 +144,8 @@ class PaymentTests(TestCase):
         self.assertEqual(
             payload["allocation_target_by_direction"],
             {
-                Payment.Direction.INBOUND: "invoice",
-                Payment.Direction.OUTBOUND: "vendor_bill",
+                Payment.Direction.INBOUND: ["invoice"],
+                Payment.Direction.OUTBOUND: ["vendor_bill", "receipt"],
             },
         )
         self.assertTrue(str(payload["policy_version"]).startswith("2026-03-05.payments."))
