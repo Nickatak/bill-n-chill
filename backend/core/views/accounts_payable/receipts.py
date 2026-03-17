@@ -1,12 +1,11 @@
 """Receipt endpoints — project-scoped expense records."""
 
-from django.db import transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import Payment, Receipt, Store
+from core.models import Receipt, Store
 from core.serializers import ReceiptSerializer, ReceiptWriteSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
@@ -18,7 +17,7 @@ from core.user_helpers import _ensure_membership
 
 def _prefetch_receipt_qs(qs):
     """Apply standard select/prefetch for receipt queries."""
-    return qs.select_related("project", "payment", "store")
+    return qs.select_related("project", "store")
 
 
 @api_view(["GET", "POST"])
@@ -28,9 +27,8 @@ def project_receipts_view(request, project_id: int):
 
     Contract:
     - ``GET``: returns all receipts for the project.
-    - ``POST`` (requires ``owner|pm|bookkeeping``): creates a receipt with
-      its corresponding outbound payment atomically. If ``store_name`` is
-      provided, finds or creates an org-scoped Store record.
+    - ``POST`` (requires ``owner|pm|bookkeeping``): creates a receipt record.
+      If ``store_name`` is provided, finds or creates an org-scoped Store record.
 
     Incoming payload (``POST``):
       {
@@ -90,32 +88,15 @@ def project_receipts_view(request, project_id: int):
         )
 
     receipt_date = data.get("receipt_date") or timezone.localdate()
-    membership = _ensure_membership(request.user)
 
-    with transaction.atomic():
-        # Create the outbound payment
-        payment = Payment.objects.create(
-            organization_id=membership.organization_id,
-            project=project,
-            direction=Payment.Direction.OUTBOUND,
-            method=Payment.Method.OTHER,
-            status=Payment.Status.SETTLED,
-            amount=amount,
-            payment_date=receipt_date,
-            notes=data.get("notes", ""),
-            created_by=request.user,
-        )
-
-        # Create the receipt owning the payment
-        receipt = Receipt.objects.create(
-            project=project,
-            payment=payment,
-            store=store,
-            amount=amount,
-            receipt_date=receipt_date,
-            notes=data.get("notes", ""),
-            created_by=request.user,
-        )
+    receipt = Receipt.objects.create(
+        project=project,
+        store=store,
+        amount=amount,
+        receipt_date=receipt_date,
+        notes=data.get("notes", ""),
+        created_by=request.user,
+    )
 
     return Response(
         {"data": ReceiptSerializer(_prefetch_receipt_qs(Receipt.objects.filter(id=receipt.id)).get()).data},

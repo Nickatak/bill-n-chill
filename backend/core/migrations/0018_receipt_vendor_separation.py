@@ -1,6 +1,6 @@
 """Receipt & Vendor model separation.
 
-- Create standalone Receipt model (project-scoped expense with direct payment ownership)
+- Create standalone Receipt model (project-scoped expense record)
 - Remove receipt-kind VendorBill rows and associated PaymentAllocations/Payments
 - Remove kind, cost_code fields from VendorBill (if they exist)
 - Make vendor non-nullable on VendorBill
@@ -147,7 +147,6 @@ class Migration(migrations.Migration):
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
                 ("created_by", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="receipts", to=settings.AUTH_USER_MODEL)),
-                ("payment", models.OneToOneField(on_delete=django.db.models.deletion.PROTECT, related_name="receipt", to="core.payment")),
                 ("project", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="receipts", to="core.project")),
                 ("store", models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name="receipts", to="core.store")),
             ],

@@ -50,17 +50,18 @@ class Store(models.Model):
 
 
 class Receipt(models.Model):
-    """Standalone expense record for a project purchase.
+    """Expense record for a project purchase.
 
     Business workflow:
     - Records an expense that already happened (money already left).
     - NOT a bill — no document lifecycle, no vendor relationship, no line items.
-    - Owns its payment directly (OneToOne) — no allocation indirection.
+    - NOT a financial instrument — just a record of the purchase.
+    - Cash movement (Payment) is a separate concern, handled on the Accounting page.
     - ``store`` is an optional FK to a Store lookup record for consistent naming.
     - See ``docs/decisions/receipt-vendor-separation.md``.
 
     Current policy:
-    - Lifecycle control: ``user-managed``, created once, no status transitions.
+    - Lifecycle control: ``user-managed``.
     - Visibility: ``internal-facing``.
     """
 
@@ -68,11 +69,6 @@ class Receipt(models.Model):
         "Project",
         on_delete=models.PROTECT,
         related_name="receipts",
-    )
-    payment = models.OneToOneField(
-        "Payment",
-        on_delete=models.PROTECT,
-        related_name="receipt",
     )
     store = models.ForeignKey(
         "Store",

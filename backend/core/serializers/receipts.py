@@ -17,7 +17,6 @@ class ReceiptSerializer(serializers.ModelSerializer):
             "id",
             "project",
             "project_name",
-            "payment",
             "store",
             "store_name",
             "amount",

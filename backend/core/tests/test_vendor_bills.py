@@ -486,8 +486,8 @@ class VendorBillTests(TestCase):
         # Line items use amount, not qty × rate
         self.assertEqual(snapshot.snapshot_json["line_items"][0]["amount"], "200.00")
 
-    def test_receipt_creates_payment(self):
-        """Recording a receipt auto-creates an outbound settled payment."""
+    def test_receipt_creation_and_store_autocreate(self):
+        """Creating a receipt records the expense and auto-creates an org-scoped Store."""
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/receipts/",
             data={
@@ -500,24 +500,10 @@ class VendorBillTests(TestCase):
         )
         self.assertEqual(response.status_code, 201)
         receipt = response.json()["data"]
-        self.assertIn("store_name", receipt)
-        self.assertIn("amount", receipt)
-        self.assertIn("receipt_date", receipt)
-        self.assertIn("payment", receipt)
         self.assertEqual(receipt["store_name"], "Home Depot")
         self.assertEqual(receipt["amount"], "237.50")
-
-        # Verify payment was created
-        from core.models import Payment, Receipt
-
-        payment = Payment.objects.get(id=receipt["payment"])
-        self.assertEqual(payment.direction, Payment.Direction.OUTBOUND)
-        self.assertEqual(payment.status, Payment.Status.SETTLED)
-        self.assertEqual(payment.amount, Decimal("237.50"))
-
-        # Verify the receipt's payment field matches
-        db_receipt = Receipt.objects.get(id=receipt["id"])
-        self.assertEqual(db_receipt.payment_id, payment.id)
+        self.assertIn("receipt_date", receipt)
+        self.assertNotIn("payment", receipt)
 
         # Verify Store was auto-created
         from core.models import Store
