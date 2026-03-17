@@ -62,6 +62,11 @@ export function ProjectsConsole() {
     approved: number;
     disputed: number;
   } | null>(null);
+  const [invoiceStatusCounts, setInvoiceStatusCounts] = useState<{
+    draft: number;
+    sent: number;
+    partially_paid: number;
+  } | null>(null);
   const [acceptedEstimateTotal, setAcceptedEstimateTotal] = useState("--");
   const [invoiceAllocationTargets, setInvoiceAllocationTargets] = useState<AllocationTarget[]>([]);
   const [isProjectEditOpen, setIsProjectEditOpen] = useState(false);
@@ -199,6 +204,7 @@ export function ProjectsConsole() {
         setEstimateStatusCounts(null);
         setChangeOrderStatusCounts(null);
         setBillStatusCounts(null);
+        setInvoiceStatusCounts(null);
       }
     } catch {
       // Network error — silently fail; the empty project list is visible feedback.
@@ -320,6 +326,36 @@ export function ProjectsConsole() {
     }
   }
 
+  /** Loads invoice counts by status for the pipeline badges. */
+  async function loadInvoiceStatusCounts(projectId: number) {
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/invoices/`, {
+        headers: buildAuthHeaders(token),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setInvoiceStatusCounts(null);
+        return;
+      }
+      const rows = (payload.data as Array<{ status?: string }>) ?? [];
+      let draft = 0;
+      let sent = 0;
+      let partially_paid = 0;
+      for (const invoice of rows) {
+        if (invoice.status === "draft") {
+          draft += 1;
+        } else if (invoice.status === "sent") {
+          sent += 1;
+        } else if (invoice.status === "partially_paid") {
+          partially_paid += 1;
+        }
+      }
+      setInvoiceStatusCounts({ draft, sent, partially_paid });
+    } catch {
+      setInvoiceStatusCounts(null);
+    }
+  }
+
   /** Loads invoices for the selected project and maps them to allocation targets. */
   async function loadInvoiceAllocationTargets(projectId: number) {
     try {
@@ -373,6 +409,7 @@ export function ProjectsConsole() {
     void loadEstimateStatusCounts(projectId);
     void loadChangeOrderStatusCounts(projectId);
     void loadBillStatusCounts(projectId);
+    void loadInvoiceStatusCounts(projectId);
     void loadInvoiceAllocationTargets(projectId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProjectId, token]);
@@ -397,6 +434,7 @@ export function ProjectsConsole() {
     setEstimateStatusCounts(null);
     setChangeOrderStatusCounts(null);
     setBillStatusCounts(null);
+    setInvoiceStatusCounts(null);
     setAcceptedEstimateTotal("--");
   }, [selectedProjectId, statusFilteredProjects]);
 
@@ -436,6 +474,7 @@ export function ProjectsConsole() {
     setEstimateStatusCounts(null);
     setChangeOrderStatusCounts(null);
     setBillStatusCounts(null);
+    setInvoiceStatusCounts(null);
     setAcceptedEstimateTotal("--");
   }
 
@@ -658,6 +697,17 @@ export function ProjectsConsole() {
                     <line x1="16" y1="17" x2="8" y2="17" />
                   </svg>
                   <span className={styles.pipelineLabel}>Invoices</span>
+                  <span className={styles.pipelineCounts}>
+                    <span className={`${styles.estimateCountPill} ${styles.estimateCountDraft}`}>
+                      D{invoiceStatusCounts ? invoiceStatusCounts.draft : "--"}
+                    </span>
+                    <span className={`${styles.estimateCountPill} ${styles.estimateCountSent}`}>
+                      S{invoiceStatusCounts ? invoiceStatusCounts.sent : "--"}
+                    </span>
+                    <span className={`${styles.estimateCountPill} ${styles.invoiceCountPartial}`}>
+                      P{invoiceStatusCounts ? invoiceStatusCounts.partially_paid : "--"}
+                    </span>
+                  </span>
                 </Link>
 
                 <span className={styles.pipelineArrow} aria-hidden="true">

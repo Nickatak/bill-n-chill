@@ -196,6 +196,11 @@
   color: var(--status-red-text);
 }
 
+.invoiceCountPartial {
+  background: var(--status-violet-bg);
+  color: var(--status-violet-text);
+}
+
 .metricsPanel {
   grid-column: 1 / -1;
   border: 1px solid var(--border);
