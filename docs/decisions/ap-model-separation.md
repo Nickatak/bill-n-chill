@@ -99,4 +99,4 @@ The **accounting page** will eventually have its own entry forms for when you're
 
 - Estimates, invoices, and change orders are unaffected. Invoices keep their explicit PAID status transition (you control both sides of the data).
 - Inbound payment recording against invoices follows the same universal pattern — moves to accounting page as already planned.
-- Vendor model is unaffected — bills and receipts still reference vendors.
+- ~~Vendor model is unaffected~~ — Superseded by [Receipt & Vendor Model Separation](receipt-vendor-separation.md). Receipts are decoupled from bills, vendors become B2B only.
