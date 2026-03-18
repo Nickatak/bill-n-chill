@@ -336,9 +336,9 @@
 }
 
 .statusFilterReceived {
-  background: var(--status-amber-bg);
-  color: var(--status-amber-text);
-  border-color: var(--status-amber-border);
+  background: var(--status-blue-bg);
+  color: var(--status-blue-text);
+  border-color: var(--status-blue-border);
 }
 
 .statusFilterApproved {
@@ -348,9 +348,9 @@
 }
 
 .statusFilterDisputed {
-  background: var(--status-red-bg);
-  color: var(--status-red-text);
-  border-color: var(--status-red-border);
+  background: var(--status-orange-bg);
+  color: var(--status-orange-text);
+  border-color: var(--status-orange-border);
 }
 
 .statusFilterClosed {

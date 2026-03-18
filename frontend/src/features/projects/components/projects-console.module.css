@@ -187,13 +187,13 @@
 }
 
 .billCountReceived {
-  background: var(--status-amber-bg);
-  color: var(--status-amber-text);
+  background: var(--status-blue-bg);
+  color: var(--status-blue-text);
 }
 
 .billCountDisputed {
-  background: var(--status-red-bg);
-  color: var(--status-red-text);
+  background: var(--status-orange-bg);
+  color: var(--status-orange-text);
 }
 
 .invoiceCountPartial {
