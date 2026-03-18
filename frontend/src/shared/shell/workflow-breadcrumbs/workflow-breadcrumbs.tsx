@@ -44,7 +44,7 @@ type HierarchyRule = {
 
 const CUSTOMERS_HUB_CRUMB: CrumbDef = { href: "/customers", label: "Customers" };
 const PROJECTS_HUB_CRUMB: CrumbDef = { href: "/projects", label: "Projects" };
-const BILLING_HUB_CRUMB: CrumbDef = { href: "/bills", label: "Billing" };
+const ACCOUNTING_HUB_CRUMB: CrumbDef = { href: "/accounting", label: "Accounting" };
 const META_HUB_CRUMB: CrumbDef = { href: "/ops/organization", label: "Business" };
 
 import { defaultApiBaseUrl } from "@/shared/api/base";
@@ -53,9 +53,7 @@ import { defaultApiBaseUrl } from "@/shared/api/base";
  * Top-level routes that historically accepted `?project=<id>` for
  * project scoping before the nested `/projects/:id/...` URLs existed.
  */
-const legacyProjectScopedPrefixes = [
-  "/change-orders",
-];
+const legacyProjectScopedPrefixes: string[] = [];
 
 /**
  * Static rule table mapping pathnames to breadcrumb hierarchies.
@@ -82,16 +80,19 @@ const hierarchyRules: HierarchyRule[] = [
   },
   {
     when: (pathname) => pathname === "/change-orders" || /^\/projects\/\d+\/change-orders$/.test(pathname),
-    crumbs: [{ href: "/change-orders", label: "Change Orders" }],
+    crumbs: [PROJECTS_HUB_CRUMB, { href: "/change-orders", label: "Change Orders" }],
   },
   {
     when: (pathname) => /^\/projects\/\d+\/invoices$/.test(pathname),
     crumbs: [PROJECTS_HUB_CRUMB, { href: "/invoices", label: "Invoices" }],
   },
   {
-    when: (pathname) =>
-      pathname === "/bills",
-    crumbs: [BILLING_HUB_CRUMB, { href: "/bills", label: "Bills" }],
+    when: (pathname) => /^\/projects\/\d+\/bills$/.test(pathname),
+    crumbs: [PROJECTS_HUB_CRUMB, { href: "/bills", label: "Bills" }],
+  },
+  {
+    when: (pathname) => pathname === "/accounting",
+    crumbs: [ACCOUNTING_HUB_CRUMB],
   },
   {
     when: (pathname) => pathname === "/ops/organization",
@@ -161,11 +162,6 @@ function isLegacyProjectScopedRoute(pathname: string): boolean {
   );
 }
 
-/** Billing hub routes don't show a project crumb even when project-scoped. */
-function isBillingRoute(pathname: string): boolean {
-  return pathname === "/bills";
-}
-
 /**
  * Rewrite a generic crumb href to carry the active project context.
  *
@@ -186,7 +182,7 @@ function projectScopedHref(href: string, projectId: string): string {
     return `/projects/${encodeURIComponent(projectId)}/invoices`;
   }
   if (href === "/bills") {
-    return `/bills?project=${encodeURIComponent(projectId)}`;
+    return `/projects/${encodeURIComponent(projectId)}/bills`;
   }
   if (href === "/audit-trail") {
     return `/projects/${encodeURIComponent(projectId)}/audit-trail`;
@@ -227,7 +223,7 @@ export function WorkflowBreadcrumbs() {
     projectId &&
       /^\d+$/.test(projectId) &&
       (Boolean(pathProjectId) || isLegacyProjectScopedRoute(pathnameValue)),
-  ) && !isBillingRoute(pathnameValue);
+  );
 
   // Fetch the project name so the breadcrumb shows "Project: Riverside Remodel"
   // instead of "Project #42". Skipped when no project is in scope.

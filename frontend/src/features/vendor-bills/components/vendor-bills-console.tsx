@@ -96,7 +96,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const preferredProjectId = scopedProjectId ?? queryProjectId;
 
   const { token, role, capabilities } = useSharedSessionAuth();
-  const dueSoonWindowDays = 7;
   const [statusMessage, setStatusMessage] = useState("");
   const [createErrorMessage, setCreateErrorMessage] = useState("");
   const [editErrorMessage, setEditErrorMessage] = useState("");
@@ -144,7 +143,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     allStatuses: billStatuses,
     defaultFilters: defaultBillStatusFilters(VENDOR_BILL_STATUSES_FALLBACK),
   });
-  const [dueFilter, setDueFilter] = useState<"all" | "due_soon" | "overdue">("all");
+
 
   const [newVendorId, setNewVendorId] = useState("");
   const [newBillNumber, setNewBillNumber] = useState("");
@@ -228,18 +227,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     if (billStatusFilters.length === 0 || !billStatusFilters.includes(bill.status)) {
       return false;
     }
-    if (dueFilter === "all") {
-      return true;
-    }
-    if (!bill.due_date || bill.status === "closed" || bill.status === "void") {
-      return false;
-    }
-    const today = todayDateInput();
-    if (dueFilter === "overdue") {
-      return bill.due_date < today;
-    }
-    const dueSoonDate = futureDateInput(dueSoonWindowDays);
-    return bill.due_date >= today && bill.due_date <= dueSoonDate;
+    return true;
   });
   const canMutateVendorBills = canDo(capabilities, "vendor_bills", "create");
   const canApproveVendorBills = canDo(capabilities, "vendor_bills", "approve");
@@ -657,6 +645,18 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       setCreateErrorMessage("Selected vendor is inactive. Pick an active vendor.");
       return;
     }
+    if (!newBillNumber.trim()) {
+      setCreateErrorMessage("Bill number is required.");
+      return;
+    }
+    if (!newIssueDate) {
+      setCreateErrorMessage("Issue date is required.");
+      return;
+    }
+    if (!newDueDate) {
+      setCreateErrorMessage("Due date is required.");
+      return;
+    }
     setStatusMessage("Creating vendor bill...");
     const normalizedLineItems: VendorBillLineInput[] = newLineItems
       .filter((row) => row.description || row.unit_price)
@@ -735,6 +735,24 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
     if (!vendor) {
       const message = "Select a vendor first.";
+      setEditErrorMessage(message);
+      setStatusMessage(message);
+      return;
+    }
+    if (!billNumber.trim()) {
+      const message = "Bill number is required.";
+      setEditErrorMessage(message);
+      setStatusMessage(message);
+      return;
+    }
+    if (!issueDate) {
+      const message = "Issue date is required.";
+      setEditErrorMessage(message);
+      setStatusMessage(message);
+      return;
+    }
+    if (!dueDate) {
+      const message = "Due date is required.";
       setEditErrorMessage(message);
       setStatusMessage(message);
       return;
@@ -1054,36 +1072,19 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                 </button>
               );
             })}
-            {(["all", "due_soon", "overdue"] as const).map((filterValue) => {
-              const active = dueFilter === filterValue;
-              const label = filterValue === "all" ? "All Due" : filterValue === "due_soon" ? `Due Soon (${dueSoonWindowDays}d)` : "Overdue";
-              return (
-                <button
-                  key={filterValue}
-                  type="button"
-                  className={`${styles.filterPill} ${
-                    active ? `${styles.filterPillActive} ${styles.filterPillDue}` : styles.filterPillInactive
-                  }`}
-                  aria-pressed={active}
-                  onClick={() => setDueFilter(filterValue)}
-                >
-                  {label}
-                </button>
-              );
-            })}
           </div>
           <div className={styles.filterActions}>
             <button
               type="button"
               className={styles.filterActionButton}
-              onClick={() => { setBillStatusFilters([...billStatuses]); setDueFilter("all"); }}
+              onClick={() => { setBillStatusFilters([...billStatuses]); }}
             >
               Show All
             </button>
             <button
               type="button"
               className={styles.filterActionButton}
-              onClick={() => { setBillStatusFilters(defaultBillStatusFilters(billStatuses)); setDueFilter("all"); }}
+              onClick={() => { setBillStatusFilters(defaultBillStatusFilters(billStatuses)); }}
             >
               Reset Filters
             </button>
@@ -1369,7 +1370,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                       }}
                       onKeyDown={vendorCombobox.handleKeyDown}
                       autoComplete="off"
-                      required
                       disabled={workspaceIsLocked}
                     />
                     {!workspaceIsLocked ? (
@@ -1427,7 +1427,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                   value={formBillNumber}
                   onChange={(event) => setFormBillNumber(event.target.value)}
                   placeholder="e.g. INV-001"
-                  required
                   disabled={workspaceIsLocked || !selectedProjectId}
                 />
               </div>
@@ -1441,7 +1440,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                   type="date"
                   value={formIssueDate}
                   onChange={(event) => setFormIssueDate(event.target.value)}
-                  required
                   disabled={workspaceIsLocked || !selectedProjectId}
                 />
               </label>
@@ -1451,7 +1449,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                   type="date"
                   value={formDueDate}
                   onChange={(event) => setFormDueDate(event.target.value)}
-                  required
                   disabled={workspaceIsLocked || !selectedProjectId}
                 />
               </label>

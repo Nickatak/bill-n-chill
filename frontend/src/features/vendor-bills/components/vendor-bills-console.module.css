@@ -366,11 +366,6 @@
 }
 
 
-.filterPillDue {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-  border-color: var(--border-accent);
-}
 
 .filterPillCount {
   border: 1px solid color-mix(in srgb, var(--text-secondary) 40%, transparent);
