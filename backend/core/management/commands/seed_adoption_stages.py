@@ -348,14 +348,13 @@ class Command(BaseCommand):
         vb.notes = kwargs.get("notes", "")
         vb.created_by = user
         vb.save()
-        # Create a single vendor bill line
-        cost_code = kwargs.get("cost_code")
+        # Create a single vendor bill line (no cost code — attribution lives on PaymentAllocation)
         VendorBillLine.objects.get_or_create(
             vendor_bill=vb,
             description=kwargs.get("notes", "") or f"Materials — {bill_number}",
             defaults={
-                "cost_code": cost_code,
-                "amount": total,
+                "quantity": Decimal("1.00"),
+                "unit_price": total,
             },
         )
         return vb

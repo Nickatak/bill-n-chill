@@ -21,6 +21,8 @@ class VendorBillLineSerializer(serializers.ModelSerializer):
             "cost_code_code",
             "cost_code_name",
             "description",
+            "quantity",
+            "unit_price",
             "amount",
             "created_at",
             "updated_at",
@@ -88,11 +90,12 @@ class VendorBillSerializer(serializers.ModelSerializer):
 
 
 class VendorBillLineInputSerializer(serializers.Serializer):
-    """Write serializer for a single vendor bill line item (description + amount)."""
+    """Write serializer for a single vendor bill line item (description, quantity × unit_price)."""
 
     cost_code = serializers.IntegerField(required=False, allow_null=True)
     description = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
-    amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    quantity = serializers.DecimalField(max_digits=10, decimal_places=4, required=False, default=1)
+    unit_price = serializers.DecimalField(max_digits=12, decimal_places=2)
 
 
 class VendorBillWriteSerializer(serializers.Serializer):

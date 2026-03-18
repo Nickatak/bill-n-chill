@@ -35,9 +35,9 @@ class VendorBill(StatusTransitionMixin, models.Model):
     _status_label = "vendor bill"
 
     ALLOWED_STATUS_TRANSITIONS = {
-        Status.RECEIVED: {Status.APPROVED, Status.VOID},
-        Status.APPROVED: {Status.DISPUTED, Status.CLOSED, Status.VOID},
-        Status.DISPUTED: {Status.APPROVED, Status.CLOSED, Status.VOID},
+        Status.RECEIVED: {Status.DISPUTED, Status.APPROVED, Status.VOID},
+        Status.DISPUTED: {Status.APPROVED, Status.VOID},
+        Status.APPROVED: {Status.CLOSED, Status.VOID},
         Status.CLOSED: set(),
         Status.VOID: set(),
     }
@@ -142,6 +142,8 @@ class VendorBill(StatusTransitionMixin, models.Model):
                     "cost_code_code": row.cost_code.code if row.cost_code else None,
                     "cost_code_name": row.cost_code.name if row.cost_code else None,
                     "description": row.description,
+                    "quantity": str(row.quantity),
+                    "unit_price": str(row.unit_price),
                     "amount": str(row.amount),
                 }
                 for row in line_rows
@@ -158,8 +160,10 @@ class VendorBillLine(models.Model):
     """Individual line item on a vendor bill.
 
     Business workflow:
-    - Simple transcription of what the vendor wrote on their invoice:
-      description + amount.  Not a pricing unit (no qty × rate).
+    - Transcription of a vendor's invoice line: description, quantity ×
+      unit_price = amount.
+    - ``amount`` is a stored computed field set automatically on save
+      (quantity × unit_price).  bulk_create callers must supply it directly.
     - Optional cost code tag for internal classification (input convenience
       only — authoritative cost attribution lives on PaymentAllocation).
     - See ``docs/decisions/ap-model-separation.md``.
@@ -178,6 +182,8 @@ class VendorBillLine(models.Model):
         blank=True,
     )
     description = models.CharField(max_length=255, blank=True)
+    quantity = models.DecimalField(max_digits=10, decimal_places=4, default=1)
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -187,3 +193,8 @@ class VendorBillLine(models.Model):
 
     def __str__(self) -> str:
         return f"Bill {self.vendor_bill_id} line: {self.description}"
+
+    def save(self, *args, **kwargs):
+        """Compute amount = quantity × unit_price before persisting."""
+        self.amount = self.quantity * self.unit_price
+        super().save(*args, **kwargs)

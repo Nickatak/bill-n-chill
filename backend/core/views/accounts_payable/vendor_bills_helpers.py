@@ -38,17 +38,18 @@ def _find_duplicate_vendor_bills(
 
 
 def _calculate_vendor_bill_line_totals(line_items_data):
-    """Sum line item amounts and return normalized items with a running subtotal.
-
-    Bill line items are simple description + amount transcriptions (not qty × rate).
-    """
+    """Compute per-line amounts (quantity × unit_price) and return normalized items with a running subtotal."""
     subtotal = MONEY_ZERO
     normalized_items = []
     for item in line_items_data:
-        amount = quantize_money(Decimal(str(item["amount"])))
+        quantity = Decimal(str(item.get("quantity", 1)))
+        unit_price = quantize_money(Decimal(str(item["unit_price"])))
+        amount = quantize_money(quantity * unit_price)
         subtotal = quantize_money(subtotal + amount)
         normalized_items.append({
             **item,
+            "quantity": quantity,
+            "unit_price": unit_price,
             "amount": amount,
         })
     return normalized_items, subtotal
@@ -58,7 +59,7 @@ def _apply_vendor_bill_lines_and_totals(vendor_bill, line_items_data, tax_amount
     """Replace a vendor bill's line items and recompute all totals.
 
     Returns an error dict on failure, or None on success.
-    Line items are description + amount pairs with optional cost code tags.
+    Line items are quantity × unit_price transcriptions with optional cost code tags.
     Total = subtotal (sum of line amounts) + tax + shipping.
     """
     normalized_items, subtotal = _calculate_vendor_bill_line_totals(line_items_data)
@@ -80,7 +81,9 @@ def _apply_vendor_bill_lines_and_totals(vendor_bill, line_items_data, tax_amount
                 vendor_bill=vendor_bill,
                 cost_code=cost_code,
                 description=item.get("description", ""),
-                amount=item["amount"],
+                quantity=item["quantity"],
+                unit_price=item["unit_price"],
+                amount=item["amount"],  # pre-computed; bulk_create bypasses save()
             )
         )
     VendorBillLine.objects.bulk_create(new_lines)
@@ -252,7 +255,8 @@ def _handle_vb_document_save(request, vendor_bill, data):
                 {
                     "cost_code": line.cost_code_id,
                     "description": line.description,
-                    "amount": line.amount,
+                    "quantity": line.quantity,
+                    "unit_price": line.unit_price,
                 }
                 for line in vendor_bill.line_items.all()
             ]
@@ -383,7 +387,8 @@ def _handle_vb_status_transition(
                 {
                     "cost_code": line.cost_code_id,
                     "description": line.description,
-                    "amount": line.amount,
+                    "quantity": line.quantity,
+                    "unit_price": line.unit_price,
                 }
                 for line in vendor_bill.line_items.all()
             ]

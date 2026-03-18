@@ -47,13 +47,15 @@ export type VendorBillLineRecord = {
   cost_code_code: string;
   cost_code_name: string;
   description: string;
+  quantity: string;
+  unit_price: string;
   amount: string;
 };
 
 export type VendorBillLineInput = {
-  costCode: number | null;
   description: string;
-  amount: string;
+  quantity: string;
+  unit_price: string;
 };
 
 export type VendorBillPayload = {

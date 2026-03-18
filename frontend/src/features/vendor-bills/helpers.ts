@@ -17,12 +17,12 @@ export type VendorBillLineFormRow = VendorBillLineInput;
 // Factory helpers
 // ---------------------------------------------------------------------------
 
-/** Creates a blank line item row for the vendor bill form (description + amount). */
+/** Creates a blank line item row for the vendor bill form (description, qty × unit_price). */
 export function createEmptyVendorBillLineRow(): VendorBillLineFormRow {
   return {
-    costCode: null,
     description: "",
-    amount: "",
+    quantity: "1",
+    unit_price: "",
   };
 }
 

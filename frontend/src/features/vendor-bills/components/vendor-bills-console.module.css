@@ -505,24 +505,384 @@
   color: var(--status-gray-text);
 }
 
-.billForm {
+/* ── WYSIWYG Bill Document Form ───────────────────────────────── */
+
+.billDocument {
   display: grid;
-  gap: 14px;
+  gap: var(--space-lg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: var(--space-xl) var(--space-xl) var(--space-lg);
 }
 
-.billForm label {
+/* Header: vendor (left) + bill number (right) */
+.billDocHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.billDocFrom {
   display: grid;
-  gap: 6px;
-  font-size: var(--font-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  gap: 5px;
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.vendorCombobox {
+  position: relative;
+}
+
+.vendorInputWrap {
+  position: relative;
+}
+
+.vendorInput {
+  width: 100%;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text-primary);
+  padding: 8px 36px 8px var(--space-md);
+  font-size: var(--font-md);
   font-weight: 600;
+}
+
+.vendorInput:disabled {
+  background: var(--input-readonly-bg);
+  color: var(--input-readonly-text);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.vendorChevron {
+  all: unset;
+  box-sizing: border-box;
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--font-sm);
+}
+
+.vendorChevron:hover {
+  color: var(--accent-text);
+}
+
+.vendorMenu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--text-primary) 12%, transparent);
+  z-index: 200;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.vendorOption {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--table-border);
+  background: transparent;
+  color: var(--text-primary);
+  padding: 8px var(--space-md);
+  text-align: left;
+  cursor: pointer;
+  font-size: var(--font-base);
+}
+
+.vendorOption:first-child {
+  border-top: 0;
+}
+
+.vendorOptionActive {
+  background: var(--accent-light);
+}
+
+.vendorInactiveBadge {
+  color: var(--text-secondary);
+  font-size: var(--font-xs);
+}
+
+.vendorNoResults {
+  padding: 8px var(--space-md);
+  font-size: var(--font-sm);
   color: var(--text-secondary);
 }
 
-.billForm label > input,
-.billForm label > select,
-.billForm label > textarea {
+.billDocBillNum {
+  display: grid;
+  gap: 5px;
+  flex: 0 0 220px;
+  text-align: right;
+}
+
+.billDocBillNumInput {
+  width: 100%;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text-primary);
+  padding: 8px var(--space-md);
+  font-size: var(--font-base);
+  text-align: right;
+}
+
+.billDocBillNumInput:disabled {
+  background: var(--input-readonly-bg);
+  color: var(--input-readonly-text);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.billDocFieldLabel {
+  font-size: var(--font-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+/* Dates row */
+.billDocDates {
+  display: flex;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--border);
+}
+
+.billDocDateField {
+  display: grid;
+  gap: 5px;
+  flex: 1 1 140px;
+  font-size: var(--font-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.billDocDateField > input {
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text-primary);
+  padding: 8px var(--space-md);
+  font-size: var(--font-base);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.billDocDateField > input:disabled {
+  background: var(--input-readonly-bg);
+  color: var(--input-readonly-text);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+/* Line items table */
+.billDocLineTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.billDocLineDescHead {
+  text-align: left;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  font-weight: 700;
+  border-bottom: 2px solid var(--border);
+}
+
+.billDocLineQtyHead,
+.billDocLineAmtHead {
+  text-align: right;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  font-weight: 700;
+  border-bottom: 2px solid var(--border);
+}
+
+.billDocLineQtyHead {
+  width: 64px;
+}
+
+.billDocLineAmtHead {
+  width: 120px;
+}
+
+.billDocLineActHead {
+  border-bottom: 2px solid var(--border);
+  width: 36px;
+}
+
+.billDocLineTable tbody tr {
+  border-bottom: 1px solid var(--table-border);
+}
+
+.billDocLineTable tbody td {
+  padding: 4px var(--space-xs);
+  vertical-align: middle;
+}
+
+.billDocLineInput {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  padding: 6px var(--space-sm);
+  font-size: var(--font-base);
+  transition: border-color 100ms ease, background-color 100ms ease;
+}
+
+.billDocLineInput:focus {
+  outline: none;
+  border-color: var(--input-border);
+  background: var(--surface);
+}
+
+.billDocLineInput:disabled {
+  color: var(--text-primary);
+  cursor: default;
+}
+
+.billDocQtyInput {
+  text-align: right;
+  width: 64px;
+}
+
+.billDocAmtInput {
+  text-align: right;
+  width: 120px;
+}
+
+.billDocLineAmtDisplay {
+  text-align: right;
+  padding: 6px var(--space-sm);
+  font-size: var(--font-base);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  width: 120px;
+}
+
+.billDocLineActCell {
+  text-align: center;
+  width: 36px;
+}
+
+.billDocLineRemove {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--font-sm);
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  line-height: 1;
+}
+
+.billDocLineRemove:hover:not(:disabled) {
+  background: var(--tone-error-bg);
+  color: var(--tone-error-text);
+}
+
+.billDocLineRemove:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Add line row */
+.billDocAddLineRow td {
+  padding: 6px var(--space-xs);
+}
+
+.billDocAddLineBtn {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px dashed var(--border-accent);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 5px var(--space-md);
+  font-size: var(--font-sm);
+  cursor: pointer;
+  transition: color 100ms ease, border-color 100ms ease;
+}
+
+.billDocAddLineBtn:hover {
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+/* Totals footer */
+.billDocTotalRow td {
+  padding: 5px var(--space-sm);
+  font-size: var(--font-sm);
+  vertical-align: middle;
+}
+
+.billDocTotalRow:first-of-type td {
+  padding-top: var(--space-md);
+  border-top: 2px solid var(--border);
+}
+
+.billDocTotalLabel {
+  text-align: right;
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+  padding-right: var(--space-md) !important;
+}
+
+.billDocTotalValue {
+  text-align: right;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  width: 140px;
+}
+
+.billDocGrandTotal .billDocTotalLabel {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: var(--font-base);
+}
+
+.billDocGrandTotal .billDocTotalValue {
+  font-weight: 700;
+  font-size: var(--font-base);
+}
+
+/* Notes */
+.billDocNotes {
+  display: grid;
+  gap: 6px;
+}
+
+.billDocNotesInput {
   width: 100%;
   border: 1px solid var(--input-border);
   border-radius: var(--radius-lg);
@@ -530,18 +890,13 @@
   color: var(--text-primary);
   padding: 10px var(--space-md);
   font-size: var(--font-base);
-}
-
-.billForm label > textarea {
-  min-height: 92px;
+  min-height: 80px;
   resize: vertical;
+  font-family: inherit;
 }
 
-.billForm label > input:disabled,
-.billForm label > select:disabled,
-.billForm label > textarea:disabled {
+.billDocNotesInput:disabled {
   background: var(--input-readonly-bg);
-  border-color: var(--input-border);
   color: var(--input-readonly-text);
   cursor: not-allowed;
   opacity: 1;
@@ -859,8 +1214,10 @@
   .filterPill,
   .viewerStatusActions,
   .viewerSecondaryButton,
-  .formSection,
-  .formActionsRow,
+  .billDocAddLineRow,
+  .billDocLineRemove,
+  .billDocLineActHead,
+  .billDocLineActCell,
   .workspaceToolbar,
   .workspaceToolbarActions,
   .toolbarActionButton,

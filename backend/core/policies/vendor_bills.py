@@ -3,7 +3,7 @@
 from core.models import VendorBill
 from core.policies._base import _build_base_policy_contract
 
-VENDOR_BILL_POLICY_VERSION = "2026-03-16.vendor_bills.v5"
+VENDOR_BILL_POLICY_VERSION = "2026-03-18.vendor_bills.v6"
 
 
 def get_vendor_bill_policy_contract() -> dict:
