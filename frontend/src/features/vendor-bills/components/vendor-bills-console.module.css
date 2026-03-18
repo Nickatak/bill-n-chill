@@ -1088,6 +1088,17 @@
   padding: var(--space-sm) 10px;
 }
 
+.submitRow .submitSuccessText {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid var(--status-green-border);
+  border-radius: var(--radius-md);
+  background: var(--tone-success-bg);
+  color: var(--tone-success-text);
+  padding: var(--space-sm) 10px;
+}
+
 .viewerErrorText {
   margin: 6px 0 0;
   border: 1px solid var(--status-red-border);

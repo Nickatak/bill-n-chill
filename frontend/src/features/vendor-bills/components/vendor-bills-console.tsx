@@ -9,6 +9,7 @@
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import { useCombobox } from "@/shared/hooks/use-combobox";
 import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
 import { useSearchParams } from "next/navigation";
@@ -16,8 +17,6 @@ import { formatDateDisplay, todayDateInput, futureDateInput } from "@/shared/dat
 import { readApiErrorMessage } from "@/shared/api/error";
 import {
   collapseToggleButtonStyles as collapseButtonStyles,
-  ProjectListStatusValue,
-  ProjectListViewer,
 } from "@/shared/project-list-viewer";
 
 import {
@@ -31,7 +30,6 @@ import {
   VendorBillLineFormRow,
   createEmptyVendorBillLineRow,
   defaultBillStatusFilters,
-  projectStatusLabel,
 } from "../helpers";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { canDo } from "@/shared/session/rbac";
@@ -39,7 +37,6 @@ import {
   ApiResponse,
   ProjectRecord,
   VendorBillLineInput,
-  VendorBillPaymentStatus,
   VendorBillPolicyContract,
   VendorBillPayload,
   VendorBillRecord,
@@ -74,9 +71,6 @@ const VENDOR_BILL_STATUS_LABELS_FALLBACK: Record<string, string> = {
   void: "Void",
 };
 
-type ProjectStatusValue = ProjectListStatusValue;
-const DEFAULT_PROJECT_STATUS_FILTERS: ProjectStatusValue[] = ["active", "prospect"];
-const PROJECT_STATUS_VALUES: ProjectStatusValue[] = ["prospect", "active", "on_hold", "completed", "cancelled"];
 
 type VendorBillsConsoleProps = {
   scopedProjectId?: number | null;
@@ -96,14 +90,8 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const preferredProjectId = scopedProjectId ?? queryProjectId;
 
   const { token, role, capabilities } = useSharedSessionAuth();
-  const [statusMessage, setStatusMessage] = useState("");
-  const [createErrorMessage, setCreateErrorMessage] = useState("");
-  const [editErrorMessage, setEditErrorMessage] = useState("");
+  const { message: formMessage, tone: formTone, setSuccess: setFormSuccess, setError: setFormError, clear: clearFormMessage } = useStatusMessage();
   const [viewerErrorMessage, setViewerErrorMessage] = useState("");
-  const [projectSearch, setProjectSearch] = useState("");
-  const [projectStatusFilters, setProjectStatusFilters] = useState<ProjectStatusValue[]>(
-    DEFAULT_PROJECT_STATUS_FILTERS,
-  );
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [vendors, setVendors] = useState<VendorRecord[]>([]);
@@ -186,35 +174,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   const activeVendors = vendors.filter((vendor) => vendor.is_active);
 
-  const projectNeedle = projectSearch.trim().toLowerCase();
-  const filteredProjects = !projectNeedle
-    ? projects
-    : projects.filter((project) => {
-        const haystack = [String(project.id), project.name, project.customer_display_name, project.status ?? ""]
-          .join(" ")
-          .toLowerCase();
-        return haystack.includes(projectNeedle);
-      });
-  const projectStatusCounts = PROJECT_STATUS_VALUES.reduce<Record<ProjectStatusValue, number>>(
-    (acc, statusValue) => {
-      acc[statusValue] = filteredProjects.filter(
-        (project) => (project.status as ProjectStatusValue) === statusValue,
-      ).length;
-      return acc;
-    },
-    {
-      prospect: 0,
-      active: 0,
-      on_hold: 0,
-      completed: 0,
-      cancelled: 0,
-    },
-  );
-  const statusFilteredProjects = scopedProjectId !== null
-    ? filteredProjects.filter((project) => String(project.id) === String(scopedProjectId))
-    : filteredProjects.filter((project) =>
-        projectStatusFilters.includes((project.status as ProjectStatusValue) ?? "active"),
-      );
   const billStatusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const bill of vendorBills) {
@@ -231,7 +190,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   });
   const canMutateVendorBills = canDo(capabilities, "vendor_bills", "create");
   const canApproveVendorBills = canDo(capabilities, "vendor_bills", "approve");
-  const isProjectScoped = scopedProjectId !== null;
   const selectedProject =
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;
   const selectedVendorBill =
@@ -393,7 +351,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   function handleSubmitVendorBillForm(event: FormEvent<HTMLFormElement>) {
     if (!canMutateVendorBills) {
       event.preventDefault();
-      setStatusMessage(`Role ${role} is read-only for vendor bill mutations.`);
+      setFormError(`Role ${role} is read-only for vendor bill mutations.`);
       return;
     }
     if (isEditingMode) {
@@ -437,42 +395,9 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     return styles[`statusPill${value[0].toUpperCase()}${value.slice(1)}`] ?? "";
   }
 
-  /** Returns the CSS class for a payment status badge. */
-  function paymentStatusBadgeClass(value: VendorBillPaymentStatus): string {
-    const map: Record<VendorBillPaymentStatus, string> = {
-      unpaid: styles.paymentStatusUnpaid ?? "",
-      partial: styles.paymentStatusPartial ?? "",
-      paid: styles.paymentStatusPaid ?? "",
-    };
-    return map[value] ?? "";
-  }
 
-  /** Returns the display label for a payment status. */
-  function paymentStatusLabel(value: VendorBillPaymentStatus): string {
-    const map: Record<VendorBillPaymentStatus, string> = {
-      unpaid: "Unpaid",
-      partial: "Partial",
-      paid: "Paid",
-    };
-    return map[value] ?? value;
-  }
 
-  /** Toggles a project status in or out of the project list filter. */
-  function toggleProjectStatusFilter(statusValue: ProjectStatusValue) {
-    setProjectStatusFilters((current) =>
-      current.includes(statusValue)
-        ? current.filter((status) => status !== statusValue)
-        : [...current, statusValue],
-    );
-  }
 
-  /** Switches the selected project context for bill loading. */
-  function handleSelectProject(project: { id: number }) {
-    if (String(project.id) === selectedProjectId) {
-      return;
-    }
-    setSelectedProjectId(String(project.id));
-  }
 
   // -------------------------------------------------------------------------
   // Data loading & form hydration
@@ -480,8 +405,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   /** Loads projects and vendors in parallel on initial mount. */
   async function loadDependencies() {
-    setStatusMessage("Loading projects and vendors...");
-
     try {
       const [projectsResponse, vendorsResponse] = await Promise.all([
         fetch(`${normalizedBaseUrl}/projects/`, {
@@ -495,7 +418,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       const projectsPayload: ApiResponse = await projectsResponse.json();
       const vendorsPayload: ApiResponse = await vendorsResponse.json();
       if (!projectsResponse.ok || !vendorsResponse.ok) {
-        setStatusMessage("Could not load projects/vendors.");
+        setFormError("Could not load projects/vendors.");
         return;
       }
 
@@ -513,7 +436,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
           setSelectedProjectId(String(preferredProject.id));
         } else if (scopedProjectId) {
           setSelectedProjectId("");
-          setStatusMessage(
+          setFormError(
             `Project #${scopedProjectId} is not available in your scope. Select a valid project.`,
           );
           return;
@@ -526,10 +449,8 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       } else if (vendorRows[0]) {
         setNewVendorId(String(vendorRows[0].id));
       }
-
-      setStatusMessage(`Loaded ${projectRows.length} project(s) and ${vendorRows.length} vendor(s).`);
     } catch {
-      setStatusMessage("Could not reach projects/vendors endpoints.");
+      setFormError("Could not reach projects/vendors endpoints.");
     }
   }
 
@@ -537,18 +458,17 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   async function loadVendorBills() {
     const projectId = Number(selectedProjectId);
     if (!projectId) {
-      setStatusMessage("Select a project first.");
+      setFormError("Select a project first.");
       return;
     }
 
-    setStatusMessage("Loading bills...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/vendor-bills/`, {
         headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setStatusMessage(payload.error?.message ?? "Could not load bills.");
+        setFormError(payload.error?.message ?? "Could not load bills.");
         return;
       }
 
@@ -566,9 +486,9 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       } else {
         setSelectedVendorBillId("");
       }
-      setStatusMessage("");
+      clearFormMessage();
     } catch {
-      setStatusMessage("Could not reach vendor-bills endpoint.");
+      setFormError("Could not reach vendor-bills endpoint.");
     }
   }
 
@@ -603,12 +523,12 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     if (response.status === 409 && payload.error?.code === "duplicate_detected") {
       const duplicateData = payload.data as { duplicate_candidates?: VendorBillRecord[] };
       setDuplicateCandidates(duplicateData.duplicate_candidates ?? []);
-      setStatusMessage("Duplicate blocked: void existing matching bill(s) before reusing this bill number.");
+      setFormError("Duplicate blocked: void existing matching bill(s) before reusing this bill number.");
       return;
     }
 
     if (!response.ok) {
-      setStatusMessage(payload.error?.message ?? "Create vendor bill failed.");
+      setFormError(payload.error?.message ?? "Create vendor bill failed.");
       return;
     }
 
@@ -619,45 +539,43 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     );
     setSelectedVendorBillId(String(created.id));
     hydrate(created);
-    setCreateErrorMessage("");
     setNewBillNumber("");
     setNewNotes("");
     setNewLineItems([createEmptyVendorBillLineRow()]);
     setDuplicateCandidates([]);
-    setStatusMessage(`Created vendor bill #${created.id}.`);
+    setFormSuccess(`Created vendor bill #${created.id}.`);
   }
 
   /** Validates form inputs and delegates to createVendorBill. */
   async function handleCreateVendorBill(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setCreateErrorMessage("");
+    clearFormMessage();
     const projectId = Number(selectedProjectId);
     const vendor = Number(newVendorId);
     if (!projectId) {
-      setCreateErrorMessage("Select a project first.");
+      setFormError("Select a project first.");
       return;
     }
     if (!vendor) {
-      setCreateErrorMessage("Select an active vendor first.");
+      setFormError("Select an active vendor first.");
       return;
     }
     if (!activeVendors.find((row) => row.id === vendor)) {
-      setCreateErrorMessage("Selected vendor is inactive. Pick an active vendor.");
+      setFormError("Selected vendor is inactive. Pick an active vendor.");
       return;
     }
     if (!newBillNumber.trim()) {
-      setCreateErrorMessage("Bill number is required.");
+      setFormError("Bill number is required.");
       return;
     }
     if (!newIssueDate) {
-      setCreateErrorMessage("Issue date is required.");
+      setFormError("Issue date is required.");
       return;
     }
     if (!newDueDate) {
-      setCreateErrorMessage("Due date is required.");
+      setFormError("Due date is required.");
       return;
     }
-    setStatusMessage("Creating vendor bill...");
     const normalizedLineItems: VendorBillLineInput[] = newLineItems
       .filter((row) => row.description || row.unit_price)
       .map((row) => ({
@@ -685,7 +603,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   function handleSelectVendorBill(id: string) {
     setSelectedVendorBillId(id);
     setViewerErrorMessage("");
-    setStatusMessage("");
+    clearFormMessage();
     // Reset accordion sections to defaults on selection change
     setIsStatusSectionOpen(true);
     setIsLineItemsSectionOpen(false);
@@ -702,8 +620,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     const today = todayDateInput();
     const due = futureDateInput();
     setSelectedVendorBillId("");
-    setCreateErrorMessage("");
-    setEditErrorMessage("");
+    clearFormMessage();
     setViewerErrorMessage("");
     setDuplicateCandidates([]);
     setNewBillNumber("");
@@ -717,47 +634,35 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     if (activeVendors[0]) {
       setNewVendorId(String(activeVendors[0].id));
     }
-    setStatusMessage("New vendor bill create mode.");
     flashCreator();
   }
 
   /** PATCHes the currently selected vendor bill with the edit form values. */
   async function handleSaveVendorBill(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setEditErrorMessage("");
+    clearFormMessage();
     const vendorBillId = Number(selectedVendorBillId);
     const vendor = Number(vendorId);
     if (!vendorBillId) {
-      const message = "Select a vendor bill first.";
-      setEditErrorMessage(message);
-      setStatusMessage(message);
+      setFormError("Select a vendor bill first.");
       return;
     }
     if (!vendor) {
-      const message = "Select a vendor first.";
-      setEditErrorMessage(message);
-      setStatusMessage(message);
+      setFormError("Select a vendor first.");
       return;
     }
     if (!billNumber.trim()) {
-      const message = "Bill number is required.";
-      setEditErrorMessage(message);
-      setStatusMessage(message);
+      setFormError("Bill number is required.");
       return;
     }
     if (!issueDate) {
-      const message = "Issue date is required.";
-      setEditErrorMessage(message);
-      setStatusMessage(message);
+      setFormError("Issue date is required.");
       return;
     }
     if (!dueDate) {
-      const message = "Due date is required.";
-      setEditErrorMessage(message);
-      setStatusMessage(message);
+      setFormError("Due date is required.");
       return;
     }
-    setStatusMessage("Saving vendor bill...");
     try {
       const response = await fetch(`${normalizedBaseUrl}/vendor-bills/${vendorBillId}/`, {
         method: "PATCH",
@@ -787,15 +692,11 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       if (response.status === 409 && payload.error?.code === "duplicate_detected") {
         const duplicateData = payload.data as { duplicate_candidates?: VendorBillRecord[] };
         setDuplicateCandidates(duplicateData.duplicate_candidates ?? []);
-        const message = "Duplicate blocked: void existing matching bill(s) before reusing this bill number.";
-        setEditErrorMessage(message);
-        setStatusMessage(message);
+        setFormError("Duplicate blocked: void existing matching bill(s) before reusing this bill number.");
         return;
       }
       if (!response.ok) {
-        const message = readApiErrorMessage(payload, "Save vendor bill failed.");
-        setEditErrorMessage(message);
-        setStatusMessage(message);
+        setFormError(readApiErrorMessage(payload, "Save vendor bill failed."));
         return;
       }
 
@@ -804,32 +705,24 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
         current.map((vendorBill) => (vendorBill.id === updated.id ? updated : vendorBill)),
       );
       setDuplicateCandidates([]);
-      setEditErrorMessage("");
-      setStatusMessage(`Saved vendor bill #${updated.id}.`);
+      setFormSuccess(`Saved vendor bill #${updated.id}.`);
     } catch {
-      const message = "Could not reach vendor bill detail endpoint.";
-      setEditErrorMessage(message);
-      setStatusMessage(message);
+      setFormError("Could not reach vendor bill detail endpoint.");
     }
   }
 
   /** Applies a single-field status transition to the selected vendor bill. */
   async function handleQuickVendorBillStatus(nextStatus: VendorBillStatus) {
     if (!canMutateVendorBills) {
-      const message = `Role ${role} is read-only for vendor bill mutations.`;
-      setViewerErrorMessage(message);
-      setStatusMessage(message);
+      setViewerErrorMessage(`Role ${role} is read-only for vendor bill mutations.`);
       return;
     }
     const vendorBillId = Number(selectedVendorBillId);
     if (!vendorBillId) {
-      const message = "Select a vendor bill first.";
-      setViewerErrorMessage(message);
-      setStatusMessage(message);
+      setViewerErrorMessage("Select a vendor bill first.");
       return;
     }
     setViewerErrorMessage("");
-    setStatusMessage(`Updating vendor bill status to ${nextStatus}...`);
     try {
       const response = await fetch(`${normalizedBaseUrl}/vendor-bills/${vendorBillId}/`, {
         method: "PATCH",
@@ -838,9 +731,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        const message = readApiErrorMessage(payload, "Quick status update failed.");
-        setViewerErrorMessage(message);
-        setStatusMessage(message);
+        setViewerErrorMessage(readApiErrorMessage(payload, "Quick status update failed."));
         return;
       }
       const updated = payload.data as VendorBillRecord;
@@ -848,20 +739,16 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       hydrate(updated);
       setViewerErrorMessage("");
       setViewerNextStatus("");
-      setStatusMessage(`Updated vendor bill #${updated.id} to ${updated.status}. History updated.`);
+      setFormSuccess(`Updated status to ${updated.status}.`);
     } catch {
-      const message = "Could not reach vendor bill quick status endpoint.";
-      setViewerErrorMessage(message);
-      setStatusMessage(message);
+      setViewerErrorMessage("Could not reach vendor bill quick status endpoint.");
     }
   }
 
   /** Validates that a next status is selected, then delegates to the quick status handler. */
   async function handleUpdateVendorBillStatus() {
     if (!viewerNextStatus) {
-      const message = "Select a next status first.";
-      setViewerErrorMessage(message);
-      setStatusMessage(message);
+      setViewerErrorMessage("Select a next status first.");
       return;
     }
     await handleQuickVendorBillStatus(viewerNextStatus);
@@ -870,12 +757,12 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   /** Copies the selected bill's details into the create form for a "recreate" workflow. */
   function handleRecreateAsNewDraftTemplate() {
     if (!selectedVendorBillId) {
-      setStatusMessage("Select a vendor bill first.");
+      setFormError("Select a vendor bill first.");
       return;
     }
     const selected = vendorBills.find((row) => String(row.id) === selectedVendorBillId);
     if (!selected) {
-      setStatusMessage("Selected vendor bill could not be found.");
+      setFormError("Selected vendor bill could not be found.");
       return;
     }
     setNewVendorId(String(selected.vendor));
@@ -896,8 +783,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     );
     setSelectedVendorBillId("");
     setDuplicateCandidates([]);
-    setCreateErrorMessage("Enter a new bill number, then create the recreated bill.");
-    setStatusMessage(`Copied bill #${selected.id} into create form.`);
+    setFormSuccess(`Copied bill #${selected.id} into create form. Enter a new bill number.`);
     flashCreator();
     setIsWorkspaceExpanded(true);
   }
@@ -942,20 +828,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, selectedProjectId]);
 
-  // If the selected project is filtered out, fall back to the first visible project.
-  useEffect(() => {
-    if (!statusFilteredProjects.length) {
-      return;
-    }
-    const selectedStillVisible = statusFilteredProjects.some(
-      (project) => String(project.id) === selectedProjectId,
-    );
-    if (selectedStillVisible) {
-      return;
-    }
-    setSelectedProjectId(String(statusFilteredProjects[0].id));
-  }, [statusFilteredProjects, selectedProjectId]);
-
   // If the selected bill is no longer visible after filter changes, fall back to the first match.
   useEffect(() => {
     if (!filteredVendorBills.length) {
@@ -999,40 +871,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
         the vendor wrote — not your internal cost structure. Payments and cost attribution live on the
         Accounting page.
       </p>
-      {!isProjectScoped ? (
-        projects.length > 0 ? (
-          <ProjectListViewer
-            showSearchAndFilters
-            contextHint={
-              selectedProject
-                ? `Project context: #${selectedProject.id} - ${selectedProject.name} (${selectedProject.customer_display_name})`
-                : `Project context: #${scopedProjectId}`
-            }
-            searchValue={projectSearch}
-            onSearchChange={setProjectSearch}
-            statusValues={PROJECT_STATUS_VALUES}
-            statusFilters={projectStatusFilters}
-            statusCounts={projectStatusCounts}
-            onToggleStatusFilter={toggleProjectStatusFilter}
-            onShowAllStatuses={() =>
-              setProjectStatusFilters(["active", "on_hold", "prospect", "completed", "cancelled"])
-            }
-            onResetStatuses={() => setProjectStatusFilters(DEFAULT_PROJECT_STATUS_FILTERS)}
-            projects={statusFilteredProjects.map((project) => ({
-              id: project.id,
-              name: project.name,
-              customer_display_name: project.customer_display_name,
-              status: project.status ?? "",
-            }))}
-            selectedProjectId={selectedProjectId}
-            onSelectProject={handleSelectProject}
-            statusLabel={projectStatusLabel}
-          />
-        ) : (
-          <p>Create or load a project before entering bills.</p>
-        )
-      ) : null}
-
       {/* ── Viewer Panel: bill table + inline expansion ──────────── */}
       <div className={styles.viewerPanel}>
         <div className={styles.panelHeader}>
@@ -1098,8 +936,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                 <th>Bill</th>
                 <th>Vendor</th>
                 <th>Status</th>
-                <th>Payment</th>
-                <th>Issue</th>
                 <th>Due</th>
                 <th>Total</th>
                 <th>Balance</th>
@@ -1124,19 +960,13 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                           {statusDisplayLabel(vendorBill.status)}
                         </span>
                       </td>
-                      <td>
-                        <span className={`${styles.tableStatusBadge} ${paymentStatusBadgeClass(vendorBill.payment_status)}`}>
-                          {paymentStatusLabel(vendorBill.payment_status)}
-                        </span>
-                      </td>
-                      <td>{formatDateDisplay(vendorBill.issue_date)}</td>
                       <td>{formatDateDisplay(vendorBill.due_date)}</td>
                       <td>${vendorBill.total}</td>
                       <td>${vendorBill.balance_due}</td>
                     </tr>,
                     isSelected ? (
                       <tr key={`expanded-${vendorBill.id}`} className={styles.expandedRow}>
-                        <td colSpan={8}>
+                        <td colSpan={6}>
                           <div className={styles.expandedSections}>
                             {/* Status & Actions */}
                             <div className={styles.viewerSection}>
@@ -1294,7 +1124,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                 })
               ) : (
                 <tr>
-                  <td colSpan={8} className={styles.projectEmptyCell}>
+                  <td colSpan={6} className={styles.projectEmptyCell}>
                     No bills match the selected status/due filters.
                   </td>
                 </tr>
@@ -1595,14 +1425,9 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
             {/* Submit */}
             {!workspaceIsLocked ? (
               <div className={styles.submitRow}>
-                {isEditingMode && editErrorMessage ? (
-                  <p className={styles.submitErrorText} role="alert" aria-live="polite">
-                    {editErrorMessage}
-                  </p>
-                ) : null}
-                {!isEditingMode && createErrorMessage ? (
-                  <p className={styles.submitErrorText} role="alert" aria-live="polite">
-                    {createErrorMessage}
+                {formMessage ? (
+                  <p className={formTone === "error" ? styles.submitErrorText : styles.submitSuccessText} role="alert" aria-live="polite">
+                    {formMessage}
                   </p>
                 ) : null}
                 <button
@@ -1631,7 +1456,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
         </div>
       ) : null}
 
-      {statusMessage ? <p className={styles.inlineHint}>{statusMessage}</p> : null}
       {!canMutateVendorBills ? <p className={styles.inlineHint}>Role `{role}` can view bills but cannot create or update.</p> : null}
     </section>
   );
