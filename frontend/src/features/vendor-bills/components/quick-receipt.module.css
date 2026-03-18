@@ -5,6 +5,39 @@
   padding: var(--space-sm) 0 0;
 }
 
+/* ── Scan receipt photo ──────────────────────────────── */
+
+.scanRow {
+  margin-bottom: var(--space-sm);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.scanButton {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-secondary);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.scanButton:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.scanButton:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
 .fields {
   display: grid;
   grid-template-columns: 1fr 1fr;

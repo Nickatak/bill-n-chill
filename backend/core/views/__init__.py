@@ -78,6 +78,7 @@ from core.views.shared_operations.reporting import (
     quick_jump_search_view,
 )
 from core.views.accounts_payable.receipts import org_receipts_view, project_receipts_view
+from core.views.accounts_payable.receipt_scan import receipt_scan_view
 from core.views.accounts_payable.vendor_bills import (
     org_vendor_bills_view,
     project_vendor_bills_view,
@@ -174,6 +175,7 @@ __all__ = [
     "vendors_import_csv_view",
     "org_receipts_view",
     "project_receipts_view",
+    "receipt_scan_view",
     "org_vendor_bills_view",
     "project_vendor_bills_view",
     "vendor_bill_contract_view",

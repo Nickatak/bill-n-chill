@@ -59,6 +59,7 @@ from core.views import (
     org_payments_view,
     org_receipts_view,
     org_vendor_bills_view,
+    receipt_scan_view,
     payment_detail_view,
     payment_allocate_view,
     payment_contract_view,
@@ -328,6 +329,7 @@ urlpatterns = [
     path("invoices/", org_invoices_view, name="org-invoices"),
     path("vendor-bills/", org_vendor_bills_view, name="org-vendor-bills"),
     path("receipts/", org_receipts_view, name="org-receipts"),
+    path("receipts/scan/", receipt_scan_view, name="receipt-scan"),
     path(
         "accounting-sync-events/<int:sync_event_id>/retry/",
         accounting_sync_event_retry_view,
