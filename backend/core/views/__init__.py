@@ -48,6 +48,7 @@ from core.views.shared_operations.customers import (
 from core.views.accounts_receivable.invoices import (
     invoice_contract_view,
     invoice_detail_view,
+    org_invoices_view,
     public_invoice_decision_view,
     invoice_send_view,
     invoice_status_events_view,
@@ -162,6 +163,7 @@ __all__ = [
     "invoice_detail_view",
     "invoice_send_view",
     "invoice_status_events_view",
+    "org_invoices_view",
     "project_payments_view",
     "org_payments_view",
     "payment_contract_view",

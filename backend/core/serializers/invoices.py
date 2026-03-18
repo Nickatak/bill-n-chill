@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 
-from core.models import Invoice, InvoiceLine, InvoiceStatusEvent
+from core.models import Invoice, InvoiceLine, InvoiceStatusEvent, PaymentAllocation
 from core.serializers.mixins import resolve_public_actor_customer_id, resolve_public_actor_display
 
 
@@ -47,11 +47,38 @@ class InvoiceLineSerializer(serializers.ModelSerializer):
         ]
 
 
+class InvoiceAllocationSerializer(serializers.ModelSerializer):
+    """Read-only allocation summary surfacing parent payment details."""
+
+    payment_date = serializers.DateField(source="payment.payment_date", read_only=True)
+    payment_method = serializers.CharField(source="payment.method", read_only=True)
+    payment_status = serializers.CharField(source="payment.status", read_only=True)
+    payment_reference = serializers.CharField(source="payment.reference_number", read_only=True)
+
+    class Meta:
+        model = PaymentAllocation
+        fields = [
+            "id",
+            "payment",
+            "applied_amount",
+            "payment_date",
+            "payment_method",
+            "payment_status",
+            "payment_reference",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+
 class InvoiceSerializer(serializers.ModelSerializer):
     """Read-only invoice with nested line items and customer display name."""
 
     customer_display_name = serializers.CharField(source="customer.display_name", read_only=True)
+    project_name = serializers.CharField(source="project.name", read_only=True)
     line_items = InvoiceLineSerializer(many=True, read_only=True)
+    allocations = InvoiceAllocationSerializer(
+        source="payment_allocations", many=True, read_only=True,
+    )
     public_ref = serializers.CharField(read_only=True)
 
     class Meta:
@@ -59,6 +86,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "project",
+            "project_name",
             "customer",
             "customer_display_name",
             "invoice_number",
@@ -78,6 +106,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "tax_total",
             "total",
             "balance_due",
+            "allocations",
             "line_items",
             "created_at",
             "updated_at",

@@ -43,6 +43,25 @@ from core.views.public_signing_helpers import get_ceremony_context, validate_cer
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def org_invoices_view(request):
+    """Org-level invoice list — all invoices across all projects for the accounting page."""
+    membership = _ensure_membership(request.user)
+    rows = (
+        Invoice.objects.filter(project__organization_id=membership.organization_id)
+        .select_related("project", "customer")
+        .prefetch_related(
+            "line_items",
+            "line_items__cost_code",
+            "payment_allocations",
+            "payment_allocations__payment",
+        )
+        .order_by("-created_at")
+    )
+    return Response({"data": InvoiceSerializer(rows, many=True).data})
+
+
+@api_view(["GET"])
 @permission_classes([AllowAny])
 def public_invoice_detail_view(request, public_token: str):
     """Return public invoice detail for share links, including lightweight project context."""

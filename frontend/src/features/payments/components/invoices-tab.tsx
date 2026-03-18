@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * Receipts tab — org-wide receipt browser for the accounting page.
+ * Invoices tab — org-wide invoice browser for the accounting page.
  *
- * Shows all receipts across projects. Rows expand inline to show
- * attached payments and a form to record a new outbound payment against
- * the receipt. Creating a payment auto-allocates it to the receipt.
+ * Shows all invoices across projects. Rows expand inline to show
+ * attached payments and a form to record a new inbound payment against
+ * the invoice. Creating a payment auto-allocates it to the invoice.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -19,10 +19,10 @@ import { PaginationControls } from "@/shared/components/pagination-controls";
 import styles from "./accounting-console.module.css";
 
 // ---------------------------------------------------------------------------
-// Types
+// Types (lightweight — only what the tab needs from the org-level endpoint)
 // ---------------------------------------------------------------------------
 
-type ReceiptAllocationRecord = {
+type InvoiceAllocationRecord = {
   id: number;
   payment: number;
   applied_amount: string;
@@ -33,24 +33,33 @@ type ReceiptAllocationRecord = {
   created_at: string;
 };
 
-type ReceiptRecord = {
+type InvoiceListRecord = {
   id: number;
   project: number;
   project_name: string;
-  store: number | null;
-  store_name: string;
-  amount: string;
+  customer: number;
+  customer_display_name: string;
+  invoice_number: string;
+  status: string;
+  issue_date: string;
+  due_date: string;
+  total: string;
   balance_due: string;
-  allocations: ReceiptAllocationRecord[];
-  receipt_date: string;
-  notes: string;
-  created_at: string;
-  updated_at: string;
+  allocations: InvoiceAllocationRecord[];
 };
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
+
+const INVOICE_STATUS_CLASS: Record<string, string> = {
+  draft: styles.statusReceived,
+  sent: styles.statusApproved,
+  partially_paid: styles.statusPending,
+  paid: styles.statusSettled,
+  void: styles.statusVoid,
+  disputed: styles.statusDisputed,
+};
 
 const PAYMENT_STATUS_CLASS: Record<string, string> = {
   pending: styles.statusPending,
@@ -92,7 +101,7 @@ function defaultPaymentForm(balanceDue: string): NewPaymentForm {
   const balance = Number(balanceDue);
   return {
     amount: balance > 0 ? balanceDue : "",
-    method: "card",
+    method: "check",
     payment_date: todayDateInput(),
     reference_number: "",
     notes: "",
@@ -103,19 +112,19 @@ function defaultPaymentForm(balanceDue: string): NewPaymentForm {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ReceiptsTab({
+export function InvoicesTab({
   token,
   baseUrl,
 }: {
   token: string;
   baseUrl: string;
 }) {
-  const [receipts, setReceipts] = useState<ReceiptRecord[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceListRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
   // Expand state
-  const [selectedReceiptId, setSelectedReceiptId] = useState<string>("");
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>("");
   const [paymentForm, setPaymentForm] = useState<NewPaymentForm | null>(null);
   const [saving, setSaving] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
@@ -126,12 +135,12 @@ export function ReceiptsTab({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${apiBase}/receipts/`, {
+      const res = await fetch(`${apiBase}/invoices/`, {
         headers: buildAuthHeaders(token),
       });
       if (res.ok) {
         const json = await res.json();
-        setReceipts(json.data ?? []);
+        setInvoices(json.data ?? []);
       }
     } finally {
       setLoading(false);
@@ -146,25 +155,25 @@ export function ReceiptsTab({
   // Selection
   // -------------------------------------------------------------------------
 
-  const handleSelectReceipt = useCallback(
-    (r: ReceiptRecord) => {
-      const id = String(r.id);
-      if (selectedReceiptId === id) {
-        setSelectedReceiptId("");
+  const handleSelectInvoice = useCallback(
+    (inv: InvoiceListRecord) => {
+      const id = String(inv.id);
+      if (selectedInvoiceId === id) {
+        setSelectedInvoiceId("");
         setPaymentForm(null);
         setActionMessage("");
       } else {
-        setSelectedReceiptId(id);
-        setPaymentForm(defaultPaymentForm(r.balance_due));
+        setSelectedInvoiceId(id);
+        setPaymentForm(defaultPaymentForm(inv.balance_due));
         setActionMessage("");
       }
     },
-    [selectedReceiptId],
+    [selectedInvoiceId],
   );
 
-  const selectedReceipt = useMemo(
-    () => receipts.find((r) => String(r.id) === selectedReceiptId) ?? null,
-    [receipts, selectedReceiptId],
+  const selectedInvoice = useMemo(
+    () => invoices.find((inv) => String(inv.id) === selectedInvoiceId) ?? null,
+    [invoices, selectedInvoiceId],
   );
 
   // -------------------------------------------------------------------------
@@ -180,7 +189,7 @@ export function ReceiptsTab({
   );
 
   const handleRecordPayment = useCallback(async () => {
-    if (!paymentForm || !selectedReceipt) return;
+    if (!paymentForm || !selectedInvoice) return;
 
     const amount = Number(paymentForm.amount);
     if (!amount || amount <= 0) {
@@ -194,9 +203,9 @@ export function ReceiptsTab({
       return;
     }
 
-    const balanceDue = Number(selectedReceipt.balance_due);
+    const balanceDue = Number(selectedInvoice.balance_due);
     if (amount > balanceDue) {
-      setActionMessage(`Amount exceeds balance due (${formatMoney(selectedReceipt.balance_due)}).`);
+      setActionMessage(`Amount exceeds balance due (${formatMoney(selectedInvoice.balance_due)}).`);
       setActionTone("error");
       return;
     }
@@ -205,19 +214,19 @@ export function ReceiptsTab({
     setActionMessage("");
 
     try {
-      // Step 1: Create the outbound payment
+      // Step 1: Create the inbound payment
       const createRes = await fetch(`${apiBase}/payments/`, {
         method: "POST",
         headers: { ...buildAuthHeaders(token), "Content-Type": "application/json" },
         body: JSON.stringify({
-          direction: "outbound",
+          direction: "inbound",
           method: paymentForm.method,
           status: "settled",
           amount: paymentForm.amount,
           payment_date: paymentForm.payment_date,
           reference_number: paymentForm.reference_number,
           notes: paymentForm.notes,
-          project: selectedReceipt.project,
+          project: selectedInvoice.project,
         }),
       });
       const createJson = await createRes.json();
@@ -230,15 +239,15 @@ export function ReceiptsTab({
 
       const paymentId = createJson.data?.id;
 
-      // Step 2: Allocate to this receipt
+      // Step 2: Allocate to this invoice
       const allocateRes = await fetch(`${apiBase}/payments/${paymentId}/allocate/`, {
         method: "POST",
         headers: { ...buildAuthHeaders(token), "Content-Type": "application/json" },
         body: JSON.stringify({
           allocations: [
             {
-              target_type: "receipt",
-              target_id: selectedReceipt.id,
+              target_type: "invoice",
+              target_id: selectedInvoice.id,
               applied_amount: paymentForm.amount,
             },
           ],
@@ -253,15 +262,15 @@ export function ReceiptsTab({
         return;
       }
 
-      // Success — reload receipts to get updated balances and allocations
+      // Success — reload invoices to get updated balances and allocations
       setActionMessage("Payment recorded and applied.");
       setActionTone("success");
       await load();
 
-      // Re-select the receipt and reset the form with updated balance
-      const refreshedReceipt = receipts.find((r) => r.id === selectedReceipt.id);
-      if (refreshedReceipt) {
-        setPaymentForm(defaultPaymentForm(refreshedReceipt.balance_due));
+      // Re-select the invoice and reset the form with updated balance
+      const refreshedInvoice = invoices.find((inv) => inv.id === selectedInvoice.id);
+      if (refreshedInvoice) {
+        setPaymentForm(defaultPaymentForm(refreshedInvoice.balance_due));
       }
     } catch {
       setActionMessage("Network error — could not record payment.");
@@ -269,23 +278,23 @@ export function ReceiptsTab({
     } finally {
       setSaving(false);
     }
-  }, [paymentForm, selectedReceipt, apiBase, token, load, receipts]);
+  }, [paymentForm, selectedInvoice, apiBase, token, load, invoices]);
 
   // -------------------------------------------------------------------------
   // Filtering
   // -------------------------------------------------------------------------
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return receipts;
+    if (!search.trim()) return invoices;
     const q = search.trim().toLowerCase();
-    return receipts.filter(
-      (r) =>
-        r.store_name.toLowerCase().includes(q) ||
-        r.project_name.toLowerCase().includes(q) ||
-        r.amount.includes(q) ||
-        r.notes.toLowerCase().includes(q),
+    return invoices.filter(
+      (inv) =>
+        inv.customer_display_name.toLowerCase().includes(q) ||
+        inv.invoice_number.toLowerCase().includes(q) ||
+        inv.project_name.toLowerCase().includes(q) ||
+        inv.total.includes(q),
     );
-  }, [receipts, search]);
+  }, [invoices, search]);
 
   const { page, paginatedItems, totalPages, totalCount, setPage } = useClientPagination(filtered, 25);
 
@@ -293,7 +302,7 @@ export function ReceiptsTab({
   // Render helpers
   // -------------------------------------------------------------------------
 
-  function renderAllocations(allocations: ReceiptAllocationRecord[]) {
+  function renderAllocations(allocations: InvoiceAllocationRecord[]) {
     if (allocations.length === 0) {
       return <p className={styles.allocationMeta}>No payments recorded yet.</p>;
     }
@@ -319,20 +328,20 @@ export function ReceiptsTab({
     );
   }
 
-  function renderExpanded(r: ReceiptRecord) {
+  function renderExpanded(inv: InvoiceListRecord) {
     if (!paymentForm) return null;
-    const balanceDue = Number(r.balance_due);
-    const canRecordPayment = balanceDue > 0;
+    const balanceDue = Number(inv.balance_due);
+    const canRecordPayment = balanceDue > 0 && inv.status !== "void";
 
     return (
       <div className={styles.paymentExpandedSections} onClick={(e) => e.stopPropagation()}>
         {/* Existing payments */}
         <div className={styles.paymentSection}>
           <h4 className={styles.paymentSectionHeading}>
-            Payments ({r.allocations.length})
+            Payments ({inv.allocations.length})
           </h4>
           <div className={styles.paymentSectionContent}>
-            {renderAllocations(r.allocations)}
+            {renderAllocations(inv.allocations)}
           </div>
         </div>
 
@@ -348,11 +357,11 @@ export function ReceiptsTab({
                     type="number"
                     step="0.01"
                     min="0.01"
-                    max={r.balance_due}
+                    max={inv.balance_due}
                     value={paymentForm.amount}
                     onChange={(e) => updateField("amount", e.target.value)}
                     disabled={saving}
-                    placeholder={`Up to ${formatMoney(r.balance_due)}`}
+                    placeholder={`Up to ${formatMoney(inv.balance_due)}`}
                   />
                 </label>
                 <label className={styles.paymentField}>
@@ -429,7 +438,7 @@ export function ReceiptsTab({
   // -------------------------------------------------------------------------
 
   if (loading) {
-    return <p className={styles.loadingText}>Loading receipts...</p>;
+    return <p className={styles.loadingText}>Loading invoices...</p>;
   }
 
   return (
@@ -438,28 +447,28 @@ export function ReceiptsTab({
         <input
           type="text"
           className={styles.searchInput}
-          placeholder="Search receipts..."
+          placeholder="Search invoices..."
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
         />
       </div>
 
       {filtered.length === 0 ? (
-        <p className={styles.emptyState}>No receipts found.</p>
+        <p className={styles.emptyState}>No invoices found.</p>
       ) : (
         <>
           <div className={styles.documentList}>
-            {paginatedItems.map((r) => {
-              const isSelected = String(r.id) === selectedReceiptId;
+            {paginatedItems.map((inv) => {
+              const isSelected = String(inv.id) === selectedInvoiceId;
               return (
                 <article
-                  key={r.id}
+                  key={inv.id}
                   className={`${styles.paymentRow} ${isSelected ? styles.paymentRowSelected : ""}`}
-                  onClick={() => handleSelectReceipt(r)}
+                  onClick={() => handleSelectInvoice(inv)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      handleSelectReceipt(r);
+                      handleSelectInvoice(inv);
                     }
                   }}
                   role="button"
@@ -468,26 +477,27 @@ export function ReceiptsTab({
                 >
                   <div className={styles.documentIdentity}>
                     <div className={styles.documentPrimary}>
-                      <span>{r.store_name || "Receipt"}</span>
+                      <span className={INVOICE_STATUS_CLASS[inv.status] ?? ""}>{inv.status}</span>
+                      <span>{inv.customer_display_name}</span>
+                      <span style={{ color: "var(--text-secondary)", fontWeight: 400 }}>#{inv.invoice_number}</span>
                     </div>
                     <div className={styles.documentSecondary}>
-                      <span>{r.project_name}</span>
-                      <span>{formatDateDisplay(r.receipt_date)}</span>
-                      {r.notes ? <span>{r.notes.length > 40 ? `${r.notes.slice(0, 40)}...` : r.notes}</span> : null}
+                      <span>{inv.project_name}</span>
+                      {inv.due_date ? <span>Due {formatDateDisplay(inv.due_date)}</span> : null}
                     </div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div className={styles.documentAmount}>{formatMoney(r.amount)}</div>
-                    {Number(r.balance_due) > 0 && Number(r.balance_due) < Number(r.amount) ? (
+                    <div className={styles.documentAmount}>{formatMoney(inv.total)}</div>
+                    {Number(inv.balance_due) > 0 && Number(inv.balance_due) < Number(inv.total) ? (
                       <div className={styles.documentBalance}>
-                        {formatMoney(r.balance_due)} due
+                        {formatMoney(inv.balance_due)} due
                       </div>
-                    ) : Number(r.balance_due) <= 0 && Number(r.amount) > 0 ? (
+                    ) : Number(inv.balance_due) <= 0 && Number(inv.total) > 0 ? (
                       <div className={styles.documentBalance}>Paid</div>
                     ) : null}
                   </div>
 
-                  {isSelected && selectedReceipt ? renderExpanded(selectedReceipt) : null}
+                  {isSelected && selectedInvoice ? renderExpanded(selectedInvoice) : null}
                 </article>
               );
             })}
