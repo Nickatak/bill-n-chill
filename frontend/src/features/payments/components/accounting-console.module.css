@@ -233,6 +233,227 @@
   font-weight: 600;
 }
 
+/* ── Selectable payment rows ─────────────────────── */
+
+.paymentRow {
+  composes: documentRow;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.paymentRow:last-child {
+  border-bottom: none;
+}
+
+.paymentRowSelected {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent),
+    inset 2px 0 0 var(--accent);
+  background: var(--surface);
+}
+
+/* ── Expanded payment sections ───────────────────── */
+
+.paymentExpandedSections {
+  display: grid;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--border);
+  grid-column: 1 / -1;
+}
+
+.paymentSection {
+  display: grid;
+  gap: var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: var(--space-sm);
+  background: var(--surface-secondary);
+}
+
+.paymentSectionHeading {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
+.paymentSectionContent {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+/* ── Edit form fields ────────────────────────────── */
+
+.paymentFieldGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm);
+}
+
+.paymentField {
+  display: grid;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.paymentFieldFull {
+  composes: paymentField;
+  grid-column: 1 / -1;
+}
+
+.paymentField input,
+.paymentField select,
+.paymentField textarea {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) 10px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  font-family: inherit;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.paymentField textarea {
+  min-height: 48px;
+  resize: vertical;
+}
+
+.paymentField select {
+  cursor: pointer;
+}
+
+.paymentFieldReadOnly {
+  composes: paymentField;
+}
+
+.paymentFieldReadOnly .paymentFieldValue {
+  font-size: 0.92rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text-primary);
+  padding: var(--space-sm) 0;
+}
+
+/* ── Action buttons ──────────────────────────────── */
+
+.paymentActionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: 2px;
+}
+
+.paymentActionButton {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  font-size: var(--font-sm);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: filter 120ms ease, transform 120ms ease;
+}
+
+.paymentActionButton:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.paymentActionButton:not(:disabled):hover,
+.paymentActionButton:not(:disabled):focus-visible {
+  filter: brightness(1.03);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.paymentActionButtonPrimary {
+  composes: paymentActionButton;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.paymentActionButtonSecondary {
+  composes: paymentActionButton;
+  background: var(--border);
+  border-color: var(--border);
+  color: var(--status-gray-text);
+}
+
+.paymentActionButtonDanger {
+  composes: paymentActionButton;
+  background: var(--tone-error-bg);
+  border-color: var(--tone-error-border);
+  color: var(--tone-error-text);
+}
+
+/* ── Status / error messages ─────────────────────── */
+
+.paymentActionSuccess {
+  margin: 0;
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--tone-success-text);
+}
+
+.paymentActionError {
+  margin: 0;
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--tone-error-text);
+}
+
+/* ── Allocations list ────────────────────────────── */
+
+.allocationList {
+  display: grid;
+  gap: 0;
+}
+
+.allocationRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.84rem;
+}
+
+.allocationRow:last-child {
+  border-bottom: none;
+}
+
+.allocationTarget {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.allocationAmount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.allocationMeta {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
 /* ── Empty state ──────────────────────────────────── */
 
 .emptyState {
@@ -250,6 +471,10 @@
   .filterBar {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .paymentFieldGrid {
+    grid-template-columns: 1fr;
   }
 }
 
