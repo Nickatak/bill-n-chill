@@ -54,22 +54,22 @@ import styles from "./vendor-bills-console.module.css";
 
 const VENDOR_BILL_STATUSES_FALLBACK: string[] = [
   "received",
-  "approved",
   "disputed",
+  "approved",
   "closed",
   "void",
 ];
 const VENDOR_BILL_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
-  received: ["approved", "void"],
-  approved: ["disputed", "closed", "void"],
-  disputed: ["approved", "closed", "void"],
+  received: ["disputed", "approved", "void"],
+  disputed: ["approved", "void"],
+  approved: ["closed", "void"],
   closed: [],
   void: [],
 };
 const VENDOR_BILL_STATUS_LABELS_FALLBACK: Record<string, string> = {
   received: "Received",
-  approved: "Approved",
   disputed: "Disputed",
+  approved: "Approved",
   closed: "Closed",
   void: "Void",
 };

@@ -27,8 +27,8 @@ class VendorBill(StatusTransitionMixin, models.Model):
 
     class Status(models.TextChoices):
         RECEIVED = "received", "Received"
-        APPROVED = "approved", "Approved"
         DISPUTED = "disputed", "Disputed"
+        APPROVED = "approved", "Approved"
         CLOSED = "closed", "Closed"
         VOID = "void", "Void"
 
