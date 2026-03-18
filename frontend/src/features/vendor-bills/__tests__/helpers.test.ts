@@ -11,12 +11,12 @@ import {
 // ---------------------------------------------------------------------------
 
 describe("createEmptyVendorBillLineRow", () => {
-  it("returns a blank line item row with null cost code", () => {
+  it("returns a blank line item row with default quantity", () => {
     const row = createEmptyVendorBillLineRow();
     expect(row).toEqual({
-      costCode: null,
       description: "",
-      amount: "",
+      quantity: "1",
+      unit_price: "",
     });
   });
 

@@ -44,6 +44,9 @@ jobs:
             FLUSH PRIVILEGES;
           "
 
+      - name: Audit Python dependencies
+        run: pip install pip-audit && pip-audit -r backend/requirements.txt
+
       - name: Run tests
         working-directory: backend
         env:
@@ -66,6 +69,10 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: npm install
+
+      - name: Audit npm dependencies
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Lint
         working-directory: frontend
