@@ -18,6 +18,17 @@ export type VendorRecord = {
 export type VendorBillStatus = string;
 export type VendorBillPaymentStatus = "unpaid" | "partial" | "paid";
 
+export type VendorBillAllocationRecord = {
+  id: number;
+  payment: number;
+  applied_amount: string;
+  payment_date: string;
+  payment_method: string;
+  payment_status: string;
+  payment_reference: string;
+  created_at: string;
+};
+
 export type VendorBillRecord = {
   id: number;
   project: number;
@@ -35,6 +46,7 @@ export type VendorBillRecord = {
   shipping_amount: string;
   total: string;
   balance_due: string;
+  allocations: VendorBillAllocationRecord[];
   line_items: VendorBillLineRecord[];
   notes: string;
   created_at: string;

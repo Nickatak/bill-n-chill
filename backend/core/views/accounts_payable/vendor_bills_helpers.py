@@ -132,7 +132,8 @@ def _vendor_bill_line_apply_error_response(apply_error):
 def _prefetch_vendor_bill_qs(qs):
     """Apply standard select/prefetch for vendor bill queries."""
     return qs.select_related("project", "vendor").prefetch_related(
-        "line_items", "line_items__cost_code"
+        "line_items", "line_items__cost_code",
+        "payment_allocations", "payment_allocations__payment",
     )
 
 
