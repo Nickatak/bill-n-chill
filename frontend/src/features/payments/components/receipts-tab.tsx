@@ -106,9 +106,11 @@ function defaultPaymentForm(balanceDue: string): NewPaymentForm {
 export function ReceiptsTab({
   token,
   baseUrl,
+  isMobile: _isMobile,
 }: {
   token: string;
   baseUrl: string;
+  isMobile: boolean;
 }) {
   const [receipts, setReceipts] = useState<ReceiptRecord[]>([]);
   const [loading, setLoading] = useState(true);

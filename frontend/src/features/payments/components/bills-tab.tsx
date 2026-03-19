@@ -6,6 +6,9 @@
  * Shows all vendor bills across projects. Rows expand inline to show
  * attached payments and a form to record a new outbound payment against
  * the bill. Creating a payment auto-allocates it to the bill.
+ *
+ * Desktop: dense document list (grid rows).
+ * Mobile:  card list with summary banner, collapsible search.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -85,13 +88,17 @@ function defaultPaymentForm(balanceDue: string): NewPaymentForm {
 export function BillsTab({
   token,
   baseUrl,
+  isMobile,
 }: {
   token: string;
   baseUrl: string;
+  isMobile: boolean;
 }) {
   const [bills, setBills] = useState<VendorBillRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [hideVoided, setHideVoided] = useState(true);
+  const [filterUnpaid, setFilterUnpaid] = useState(true);
 
   // Expand state
   const [selectedBillId, setSelectedBillId] = useState<string>("");
@@ -252,25 +259,42 @@ export function BillsTab({
   }, [paymentForm, selectedBill, apiBase, token, load, bills]);
 
   // -------------------------------------------------------------------------
-  // Filtering
+  // Filtering + summary
   // -------------------------------------------------------------------------
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return bills;
+    let result = bills;
+    if (hideVoided) {
+      result = result.filter((b) => b.status !== "void" && b.status !== "closed");
+    }
+    if (filterUnpaid) {
+      result = result.filter((b) => b.payment_status !== "paid");
+    }
     const q = search.trim().toLowerCase();
-    return bills.filter(
-      (b) =>
-        b.vendor_name.toLowerCase().includes(q) ||
-        b.bill_number.toLowerCase().includes(q) ||
-        b.project_name.toLowerCase().includes(q) ||
-        b.total.includes(q),
-    );
-  }, [bills, search]);
+    if (q) {
+      result = result.filter(
+        (b) =>
+          b.vendor_name.toLowerCase().includes(q) ||
+          b.bill_number.toLowerCase().includes(q) ||
+          b.project_name.toLowerCase().includes(q) ||
+          b.total.includes(q),
+      );
+    }
+    return result;
+  }, [bills, search, hideVoided, filterUnpaid]);
+
+  const summary = useMemo(() => {
+    // Summary excludes voided bills to match what the user sees
+    const visible = hideVoided ? bills.filter((b) => b.status !== "void" && b.status !== "closed") : bills;
+    const unpaid = visible.filter((b) => b.payment_status !== "paid");
+    const totalOutstanding = unpaid.reduce((sum, b) => sum + Number(b.balance_due), 0);
+    return { unpaidCount: unpaid.length, totalOutstanding };
+  }, [bills, hideVoided]);
 
   const { page, paginatedItems, totalPages, totalCount, setPage } = useClientPagination(filtered, 25);
 
   // -------------------------------------------------------------------------
-  // Render helpers
+  // Shared render helpers
   // -------------------------------------------------------------------------
 
   function renderAllocations(allocations: VendorBillAllocationRecord[]) {
@@ -290,7 +314,7 @@ export function BillsTab({
                 {a.payment_reference ? ` · Ref: ${a.payment_reference}` : ""}
               </span>
               {" "}
-              <span className={PAYMENT_STATUS_CLASS[a.payment_status] ?? ""}>{a.payment_status}</span>
+              {a.payment_status !== "settled" ? <span className={PAYMENT_STATUS_CLASS[a.payment_status] ?? ""}>{a.payment_status}</span> : null}
             </div>
             <span className={styles.allocationAmount}>{formatMoney(a.applied_amount)}</span>
           </div>
@@ -299,7 +323,7 @@ export function BillsTab({
     );
   }
 
-  function renderExpanded(b: VendorBillRecord) {
+  function renderPaymentForm(b: VendorBillRecord) {
     if (!paymentForm) return null;
     const balanceDue = Number(b.balance_due);
     const canRecordPayment = balanceDue > 0 && b.status !== "void";
@@ -405,6 +429,104 @@ export function BillsTab({
   }
 
   // -------------------------------------------------------------------------
+  // Desktop row render
+  // -------------------------------------------------------------------------
+
+  function renderDesktopRow(b: VendorBillRecord) {
+    const isSelected = String(b.id) === selectedBillId;
+    return (
+      <article
+        key={b.id}
+        className={`${styles.paymentRow} ${isSelected ? styles.paymentRowSelected : ""}`}
+        onClick={() => handleSelectBill(b)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            handleSelectBill(b);
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-pressed={isSelected}
+      >
+        <div className={styles.documentIdentity}>
+          <div className={styles.documentPrimary}>
+            <span className={BILL_STATUS_CLASS[b.status] ?? ""}>{b.status}</span>
+            <span>{b.vendor_name}</span>
+            {b.bill_number ? <span style={{ color: "var(--text-secondary)", fontWeight: 400 }}>#{b.bill_number}</span> : null}
+          </div>
+          <div className={styles.documentSecondary}>
+            <span>{b.project_name}</span>
+            {b.due_date ? <span>Due {formatDateDisplay(b.due_date)}</span> : null}
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div className={styles.documentAmount}>{formatMoney(b.total)}</div>
+          {Number(b.balance_due) > 0 && Number(b.balance_due) < Number(b.total) ? (
+            <div className={styles.documentBalance}>
+              {formatMoney(b.balance_due)} due
+            </div>
+          ) : Number(b.balance_due) <= 0 && Number(b.total) > 0 ? (
+            <div className={styles.documentBalance}>Paid</div>
+          ) : null}
+        </div>
+
+        {isSelected && selectedBill ? renderPaymentForm(selectedBill) : null}
+      </article>
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Mobile card render
+  // -------------------------------------------------------------------------
+
+  function renderMobileCard(b: VendorBillRecord) {
+    const isSelected = String(b.id) === selectedBillId;
+    const isPaid = Number(b.balance_due) <= 0 && Number(b.total) > 0;
+    const isPartial = Number(b.balance_due) > 0 && Number(b.balance_due) < Number(b.total);
+
+    return (
+      <article
+        key={b.id}
+        className={`${styles.mobileCard} ${isSelected ? styles.mobileCardSelected : ""}`}
+        onClick={() => handleSelectBill(b)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            handleSelectBill(b);
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-pressed={isSelected}
+      >
+        <div className={styles.mobileCardTop}>
+          <div className={styles.mobileCardIdentity}>
+            <span className={styles.mobileCardVendor}>{b.vendor_name}</span>
+            <span className={styles.mobileCardProject}>{b.project_name}</span>
+          </div>
+          <div className={styles.mobileCardAmountBlock}>
+            <span className={styles.mobileCardAmount}>{formatMoney(b.total)}</span>
+            {isPartial ? (
+              <span className={styles.mobileCardBalanceDue}>{formatMoney(b.balance_due)} due</span>
+            ) : isPaid ? (
+              <span className={styles.mobileCardBalancePaid}>Paid</span>
+            ) : null}
+          </div>
+        </div>
+
+        <div className={styles.mobileCardMeta}>
+          <span className={BILL_STATUS_CLASS[b.status] ?? ""}>{b.status}</span>
+          {b.bill_number ? <span>#{b.bill_number}</span> : null}
+          {b.due_date ? <span>Due {formatDateDisplay(b.due_date)}</span> : null}
+        </div>
+
+        {isSelected && selectedBill ? renderPaymentForm(selectedBill) : null}
+      </article>
+    );
+  }
+
+  // -------------------------------------------------------------------------
   // Main render
   // -------------------------------------------------------------------------
 
@@ -414,6 +536,23 @@ export function BillsTab({
 
   return (
     <div>
+      {/* Mobile: summary banner — tap "unpaid" to filter */}
+      {isMobile ? (
+        <div className={styles.summaryBanner}>
+          <button
+            type="button"
+            className={`${styles.summaryBannerButton} ${filterUnpaid ? styles.summaryBannerButtonActive : ""}`}
+            onClick={() => { setFilterUnpaid((v) => !v); setPage(1); }}
+          >
+            {summary.unpaidCount} unpaid
+          </button>
+          <span className={styles.summaryBannerAmount}>
+            {formatMoney(String(summary.totalOutstanding))} outstanding
+          </span>
+        </div>
+      ) : null}
+
+      {/* Filter bar */}
       <div className={styles.filterBar}>
         <input
           type="text"
@@ -422,57 +561,37 @@ export function BillsTab({
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
         />
+        {!isMobile ? (
+          <button
+            type="button"
+            className={`${styles.filterPill} ${filterUnpaid ? styles.filterPillActive : ""}`}
+            onClick={() => { setFilterUnpaid((v) => !v); setPage(1); }}
+          >
+            Unpaid only
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className={`${styles.filterPill} ${hideVoided ? styles.filterPillActive : ""}`}
+          onClick={() => { setHideVoided((v) => !v); setPage(1); }}
+        >
+          Hide closed
+        </button>
       </div>
 
       {filtered.length === 0 ? (
         <p className={styles.emptyState}>No vendor bills found.</p>
       ) : (
         <>
-          <div className={styles.documentList}>
-            {paginatedItems.map((b) => {
-              const isSelected = String(b.id) === selectedBillId;
-              return (
-                <article
-                  key={b.id}
-                  className={`${styles.paymentRow} ${isSelected ? styles.paymentRowSelected : ""}`}
-                  onClick={() => handleSelectBill(b)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      handleSelectBill(b);
-                    }
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  aria-pressed={isSelected}
-                >
-                  <div className={styles.documentIdentity}>
-                    <div className={styles.documentPrimary}>
-                      <span className={BILL_STATUS_CLASS[b.status] ?? ""}>{b.status}</span>
-                      <span>{b.vendor_name}</span>
-                      {b.bill_number ? <span style={{ color: "var(--text-secondary)", fontWeight: 400 }}>#{b.bill_number}</span> : null}
-                    </div>
-                    <div className={styles.documentSecondary}>
-                      <span>{b.project_name}</span>
-                      {b.due_date ? <span>Due {formatDateDisplay(b.due_date)}</span> : null}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div className={styles.documentAmount}>{formatMoney(b.total)}</div>
-                    {Number(b.balance_due) > 0 && Number(b.balance_due) < Number(b.total) ? (
-                      <div className={styles.documentBalance}>
-                        {formatMoney(b.balance_due)} due
-                      </div>
-                    ) : Number(b.balance_due) <= 0 && Number(b.total) > 0 ? (
-                      <div className={styles.documentBalance}>Paid</div>
-                    ) : null}
-                  </div>
-
-                  {isSelected && selectedBill ? renderExpanded(selectedBill) : null}
-                </article>
-              );
-            })}
-          </div>
+          {isMobile ? (
+            <div className={styles.mobileCardList}>
+              {paginatedItems.map((b) => renderMobileCard(b))}
+            </div>
+          ) : (
+            <div className={styles.documentList}>
+              {paginatedItems.map((b) => renderDesktopRow(b))}
+            </div>
+          )}
           {totalPages > 1 ? (
             <PaginationControls page={page} totalPages={totalPages} totalCount={totalCount} onPageChange={setPage} />
           ) : null}

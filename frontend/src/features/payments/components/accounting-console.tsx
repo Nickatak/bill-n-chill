@@ -15,6 +15,7 @@ import { useState } from "react";
 
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { defaultApiBaseUrl } from "@/shared/api/base";
+import { useMediaQuery } from "@/shared/hooks/use-media-query";
 
 import { InvoicesTab } from "./invoices-tab";
 import { BillsTab } from "./bills-tab";
@@ -32,6 +33,7 @@ const TABS: Array<{ key: AccountingTab; label: string }> = [
 export function AccountingConsole() {
   const { token } = useSharedSessionAuth();
   const [activeTab, setActiveTab] = useState<AccountingTab>("invoices");
+  const isMobile = useMediaQuery("(max-width: 700px)");
 
   if (!token) {
     return <p className={styles.authNotice}>Sign in to view accounting data.</p>;
@@ -54,13 +56,13 @@ export function AccountingConsole() {
 
       <div className={styles.tabContent}>
         {activeTab === "invoices" ? (
-          <InvoicesTab token={token} baseUrl={defaultApiBaseUrl} />
+          <InvoicesTab token={token} baseUrl={defaultApiBaseUrl} isMobile={isMobile} />
         ) : null}
         {activeTab === "bills" ? (
-          <BillsTab token={token} baseUrl={defaultApiBaseUrl} />
+          <BillsTab token={token} baseUrl={defaultApiBaseUrl} isMobile={isMobile} />
         ) : null}
         {activeTab === "receipts" ? (
-          <ReceiptsTab token={token} baseUrl={defaultApiBaseUrl} />
+          <ReceiptsTab token={token} baseUrl={defaultApiBaseUrl} isMobile={isMobile} />
         ) : null}
       </div>
     </div>

@@ -226,7 +226,7 @@
   min-width: 140px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--surface-secondary);
+  background: var(--surface);
   color: var(--text-primary);
   padding: var(--space-sm) 10px;
   font-size: 0.88rem;
@@ -465,9 +465,183 @@
   font-size: 0.88rem;
 }
 
+/* ── Summary banner (mobile) ─────────────────────── */
+
+.summaryBanner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-sm);
+}
+
+.summaryBannerButton {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 4px 8px;
+  font-size: inherit;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.summaryBannerButton:active {
+  background: var(--surface-hover);
+}
+
+.summaryBannerButtonActive {
+  border-color: var(--accent-border);
+  background: var(--accent-light);
+  color: var(--accent-text);
+}
+
+.summaryBannerAmount {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Filter toggle (mobile) ──────────────────────── */
+
+.filterToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  min-height: 44px;
+}
+
+/* ── Mobile card list ────────────────────────────── */
+
+.mobileCardList {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.mobileCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.mobileCard:active {
+  background: var(--surface-hover);
+}
+
+.mobileCardSelected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent);
+  background: var(--surface);
+}
+
+.mobileCardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.mobileCardIdentity {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mobileCardVendor {
+  font-weight: 700;
+  font-size: 0.94rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobileCardProject {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobileCardAmountBlock {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.mobileCardAmount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 1rem;
+  display: block;
+}
+
+.mobileCardBalanceDue {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.mobileCardBalancePaid {
+  font-size: 0.78rem;
+  color: var(--status-green-text);
+  font-weight: 600;
+}
+
+.mobileCardMeta {
+  display: flex;
+  gap: var(--space-sm);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-top: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 /* ── Responsive ───────────────────────────────────── */
 
 @media (max-width: 700px) {
+  /* Segmented control tab bar */
+  .tabBar {
+    background: var(--surface-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    border-bottom: 1px solid var(--border);
+    padding: 3px;
+    gap: 3px;
+  }
+
+  .tab {
+    border-radius: var(--radius-md);
+    border-bottom: none;
+    margin-bottom: 0;
+    text-align: center;
+    min-height: 40px;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .tabActive {
+    background: var(--accent);
+    color: var(--text-on-accent);
+    border-bottom-color: transparent;
+  }
+
   .filterBar {
     flex-direction: column;
     align-items: stretch;
@@ -475,6 +649,61 @@
 
   .paymentFieldGrid {
     grid-template-columns: 1fr;
+  }
+
+  /* Desktop document rows still collapse in case they render on mobile */
+  .documentRow,
+  .paymentRow {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .documentAmount {
+    text-align: left;
+  }
+
+  .documentPrimary {
+    flex-wrap: wrap;
+  }
+
+  .allocationRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+}
+
+@media (max-width: 640px) {
+  .tab {
+    min-height: 44px;
+    font-size: 0.82rem;
+    padding: var(--space-sm);
+  }
+
+  .searchInput {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+
+  .filterPill {
+    min-height: 44px;
+    padding: 8px 12px;
+  }
+
+  .paymentField input,
+  .paymentField select,
+  .paymentField textarea {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+
+  .paymentActionButton,
+  .paymentActionButtonPrimary,
+  .paymentActionButtonSecondary,
+  .paymentActionButtonDanger {
+    min-height: 44px;
+    width: 100%;
+    justify-content: center;
   }
 }
 

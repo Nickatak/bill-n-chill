@@ -115,9 +115,11 @@ function defaultPaymentForm(balanceDue: string): NewPaymentForm {
 export function InvoicesTab({
   token,
   baseUrl,
+  isMobile: _isMobile,
 }: {
   token: string;
   baseUrl: string;
+  isMobile: boolean;
 }) {
   const [invoices, setInvoices] = useState<InvoiceListRecord[]>([]);
   const [loading, setLoading] = useState(true);
