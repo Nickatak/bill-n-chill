@@ -301,6 +301,8 @@
 
   .projectCardGrid {
     grid-template-columns: 1fr;
+    max-height: none;
+    overflow-y: visible;
   }
 
   .panelHeaderActions {
@@ -338,6 +340,6 @@
   }
 
   .projectCardGrid {
-    max-height: 280px;
+    max-height: none;
   }
 }
