@@ -3,8 +3,8 @@
 /**
  * Tabbed quick-entry panel for the projects page.
  *
- * Offers two tabs — "Quick Payment" (inbound payment recorder) and
- * "Quick Receipt" (standalone receipt form) — so users can record
+ * Offers two tabs — "Customer Payment" (inbound payment recorder) and
+ * "Expense Receipt" (standalone receipt form) — so users can record
  * cash-in or expense receipts without leaving the project hub.
  */
 
@@ -41,7 +41,7 @@ export function QuickEntryTabs({
           aria-pressed={activeTab === "payment"}
           onClick={() => setActiveTab("payment")}
         >
-          Quick Payment
+          Customer Payment
         </button>
         <button
           type="button"
@@ -49,7 +49,7 @@ export function QuickEntryTabs({
           aria-pressed={activeTab === "receipt"}
           onClick={() => setActiveTab("receipt")}
         >
-          Quick Receipt
+          Expense Receipt
         </button>
       </div>
       <div className={styles.tabContent}>
