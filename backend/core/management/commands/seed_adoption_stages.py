@@ -19,6 +19,7 @@ from rest_framework.authtoken.models import Token
 
 from core.models import (
     ChangeOrder,
+    ChangeOrderLine,
     CostCode,
     Customer,
     Estimate,
@@ -252,6 +253,10 @@ class Command(BaseCommand):
             )
 
     def _make_change_order(self, user, project, family_key, title, status, amount, **kwargs):
+        origin_estimate = kwargs.get("origin_estimate") or Estimate.objects.filter(
+            project=project, status=Estimate.Status.APPROVED,
+        ).order_by("-version").first()
+        code1, code2 = self._cost_codes(user)
         co, _ = ChangeOrder.objects.get_or_create(
             project=project, family_key=family_key,
             defaults={
@@ -263,6 +268,7 @@ class Command(BaseCommand):
                 "requested_by": user,
                 "approved_by": user if status == ChangeOrder.Status.APPROVED else None,
                 "approved_at": timezone.now() if status == ChangeOrder.Status.APPROVED else None,
+                "origin_estimate": origin_estimate,
             },
         )
         co.title = title
@@ -273,7 +279,17 @@ class Command(BaseCommand):
         co.requested_by = user
         co.approved_by = user if status == ChangeOrder.Status.APPROVED else None
         co.approved_at = timezone.now() if status == ChangeOrder.Status.APPROVED else None
+        co.origin_estimate = origin_estimate
         co.save()
+        # Seed a single line item matching the CO delta
+        ChangeOrderLine.objects.filter(change_order=co).delete()
+        ChangeOrderLine.objects.create(
+            change_order=co,
+            cost_code=code1,
+            description=title,
+            amount_delta=amount,
+            days_delta=kwargs.get("days_delta", 0),
+        )
         return co
 
     def _make_invoice(self, user, project, customer, number, status, total, balance_due, **kwargs):
