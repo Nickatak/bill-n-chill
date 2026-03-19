@@ -66,6 +66,12 @@ export const debugWorkflowRoutes: NavRoute[] = [
     shortLabel: "Dash",
     exact: ["/dashboard"],
   },
+  {
+    href: "/dev-notes",
+    label: "Dev Notes",
+    shortLabel: "Notes",
+    exact: ["/dev-notes"],
+  },
 ];
 
 /** Dev-only business menu routes, shown in the org dropdown when NEXT_PUBLIC_DEBUG=true. */
