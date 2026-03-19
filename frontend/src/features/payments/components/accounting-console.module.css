@@ -454,6 +454,16 @@
   color: var(--text-secondary);
 }
 
+.missingReference {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--status-amber-text);
+  background: var(--status-amber-bg);
+  border: 1px solid var(--status-amber-border);
+  border-radius: var(--radius-pill);
+  padding: 1px 6px;
+}
+
 /* ── Empty state ──────────────────────────────────── */
 
 .emptyState {

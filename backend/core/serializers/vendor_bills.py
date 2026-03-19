@@ -3,22 +3,22 @@
 from django.db.models import Sum
 from rest_framework import serializers
 
-from core.models import PaymentAllocation, VendorBill, VendorBillLine
+from core.models import Payment, VendorBill, VendorBillLine, VendorBillSnapshot
 
 
-class VendorBillAllocationSerializer(serializers.ModelSerializer):
-    """Read-only allocation summary surfacing parent payment details."""
+class VendorBillPaymentSerializer(serializers.ModelSerializer):
+    """Read-only payment summary for display on vendor bill detail."""
 
-    payment_date = serializers.DateField(source="payment.payment_date", read_only=True)
-    payment_method = serializers.CharField(source="payment.method", read_only=True)
-    payment_status = serializers.CharField(source="payment.status", read_only=True)
-    payment_reference = serializers.CharField(source="payment.reference_number", read_only=True)
+    applied_amount = serializers.DecimalField(source="amount", max_digits=12, decimal_places=2, read_only=True)
+    payment_date = serializers.DateField(read_only=True)
+    payment_method = serializers.CharField(source="method", read_only=True)
+    payment_status = serializers.CharField(source="status", read_only=True)
+    payment_reference = serializers.CharField(source="reference_number", read_only=True)
 
     class Meta:
-        model = PaymentAllocation
+        model = Payment
         fields = [
             "id",
-            "payment",
             "applied_amount",
             "payment_date",
             "payment_method",
@@ -59,8 +59,8 @@ class VendorBillSerializer(serializers.ModelSerializer):
     project_name = serializers.CharField(source="project.name", read_only=True)
     vendor_name = serializers.CharField(source="vendor.name", read_only=True)
     line_items = VendorBillLineSerializer(many=True, read_only=True)
-    allocations = VendorBillAllocationSerializer(
-        source="payment_allocations", many=True, read_only=True,
+    allocations = VendorBillPaymentSerializer(
+        source="target_payments", many=True, read_only=True,
     )
     payment_status = serializers.SerializerMethodField()
 
@@ -101,10 +101,7 @@ class VendorBillSerializer(serializers.ModelSerializer):
         ]
 
     def get_payment_status(self, obj) -> str:
-        """Derive payment status from allocation coverage.
-
-        Returns 'unpaid', 'partial', or 'paid'.
-        """
+        """Derive payment status from payment coverage."""
         total = obj.total
         if total <= 0:
             return "paid"
@@ -114,6 +111,45 @@ class VendorBillSerializer(serializers.ModelSerializer):
         if balance < total:
             return "partial"
         return "unpaid"
+
+
+class VendorBillSnapshotSerializer(serializers.ModelSerializer):
+    """Read-only vendor bill snapshot with computed action type and actor display."""
+
+    acted_by_email = serializers.CharField(source="acted_by.email", read_only=True)
+    acted_by_display = serializers.SerializerMethodField()
+    action_type = serializers.SerializerMethodField()
+
+    def get_action_type(self, obj: VendorBillSnapshot) -> str:
+        """Classify the snapshot as transition, notate, or unchanged."""
+        decision = (obj.snapshot_json or {}).get("decision_context", {})
+        previous = decision.get("previous_status", "")
+        current = obj.capture_status or ""
+        note = (obj.status_note or "").strip()
+        if previous != current:
+            return "transition"
+        if note:
+            return "notate"
+        return "unchanged"
+
+    def get_acted_by_display(self, obj: VendorBillSnapshot) -> str:
+        """Return a human-readable display name for the actor."""
+        return obj.acted_by.email if obj.acted_by_id else ""
+
+    class Meta:
+        model = VendorBillSnapshot
+        fields = [
+            "id",
+            "vendor_bill",
+            "capture_status",
+            "status_note",
+            "acted_by",
+            "acted_by_email",
+            "acted_by_display",
+            "created_at",
+            "action_type",
+        ]
+        read_only_fields = fields
 
 
 class VendorBillLineInputSerializer(serializers.Serializer):
@@ -142,5 +178,6 @@ class VendorBillWriteSerializer(serializers.Serializer):
     shipping_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
     total = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
     notes = serializers.CharField(max_length=5000, required=False, allow_blank=True)
+    status_note = serializers.CharField(max_length=5000, required=False, allow_blank=True)
     line_items = VendorBillLineInputSerializer(many=True, required=False)
     duplicate_override = serializers.BooleanField(required=False, default=False)

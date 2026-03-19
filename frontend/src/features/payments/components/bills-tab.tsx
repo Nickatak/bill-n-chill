@@ -52,6 +52,15 @@ const METHOD_LABELS: Record<string, string> = {
 
 const METHOD_OPTIONS = Object.entries(METHOD_LABELS);
 
+/** Methods where a reference # is expected for traceability. */
+const METHODS_EXPECTING_REFERENCE = new Set(["check", "ach", "wire", "card"]);
+
+function hasMissingReference(allocations: VendorBillAllocationRecord[]): boolean {
+  return allocations.some(
+    (a) => !a.payment_reference && METHODS_EXPECTING_REFERENCE.has(a.payment_method),
+  );
+}
+
 function formatMoney(val: string): string {
   const n = Number(val);
   if (Number.isNaN(n)) return val;
@@ -458,6 +467,9 @@ export function BillsTab({
           <div className={styles.documentSecondary}>
             <span>{b.project_name}</span>
             {b.due_date ? <span>Due {formatDateDisplay(b.due_date)}</span> : null}
+            {hasMissingReference(b.allocations) ? (
+              <span className={styles.missingReference} title="Payment missing reference #">No ref #</span>
+            ) : null}
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
@@ -519,6 +531,9 @@ export function BillsTab({
           <span className={BILL_STATUS_CLASS[b.status] ?? ""}>{b.status}</span>
           {b.bill_number ? <span>#{b.bill_number}</span> : null}
           {b.due_date ? <span>Due {formatDateDisplay(b.due_date)}</span> : null}
+          {hasMissingReference(b.allocations) ? (
+            <span className={styles.missingReference} title="Payment missing reference #">No ref #</span>
+          ) : null}
         </div>
 
         {isSelected && selectedBill ? renderPaymentForm(selectedBill) : null}

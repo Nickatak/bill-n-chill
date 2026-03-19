@@ -18,7 +18,7 @@ from core.user_helpers import _ensure_membership
 def _prefetch_receipt_qs(qs):
     """Apply standard select/prefetch for receipt queries."""
     return qs.select_related("project", "store").prefetch_related(
-        "payment_allocations", "payment_allocations__payment",
+        "target_payments",
     )
 
 

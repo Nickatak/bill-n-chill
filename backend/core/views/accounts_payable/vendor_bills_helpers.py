@@ -133,7 +133,7 @@ def _prefetch_vendor_bill_qs(qs):
     """Apply standard select/prefetch for vendor bill queries."""
     return qs.select_related("project", "vendor").prefetch_related(
         "line_items", "line_items__cost_code",
-        "payment_allocations", "payment_allocations__payment",
+        "target_payments",
     )
 
 
@@ -401,12 +401,37 @@ def _handle_vb_status_transition(
                 )
 
         if next_status in SNAPSHOT_CAPTURE_STATUSES:
+            status_note = (data.get("status_note", "") or "").strip()
             VendorBillSnapshot.record(
                 vendor_bill=vendor_bill,
                 capture_status=next_status,
                 previous_status=previous_status,
                 acted_by=request.user,
+                status_note=status_note,
             )
+
+    vendor_bill = _prefetch_vendor_bill_qs(VendorBill.objects.filter(id=vendor_bill.id)).get()
+    return Response(
+        {"data": VendorBillSerializer(vendor_bill).data, "meta": {"duplicate_override_used": False}}
+    )
+
+
+def _handle_vb_status_note(request, vendor_bill, data):
+    """Append a status note snapshot without changing vendor bill status.
+
+    Called when the PATCH includes a status_note but no actual status change.
+    Records a snapshot with capture_status matching the current status.
+    """
+    note_text = (data.get("status_note", "") or "").strip()
+
+    with transaction.atomic():
+        VendorBillSnapshot.record(
+            vendor_bill=vendor_bill,
+            capture_status=vendor_bill.status,
+            previous_status=vendor_bill.status,
+            acted_by=request.user,
+            status_note=note_text,
+        )
 
     vendor_bill = _prefetch_vendor_bill_qs(VendorBill.objects.filter(id=vendor_bill.id)).get()
     return Response(

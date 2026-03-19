@@ -1,4 +1,4 @@
-"""Cash-management payment and allocation endpoints."""
+"""Cash-management payment endpoints."""
 
 from decimal import Decimal
 
@@ -12,86 +12,122 @@ from core.models import (
     Customer,
     Invoice,
     Payment,
-    PaymentAllocation,
-    PaymentAllocationRecord,
     PaymentRecord,
     Receipt,
     VendorBill,
 )
 from core.policies import get_payment_policy_contract
 from core.serializers import (
-    PaymentAllocateSerializer,
-    PaymentAllocationSerializer,
     PaymentSerializer,
     PaymentWriteSerializer,
 )
-from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import (
     _capability_gate,
     _ensure_membership,
     _validate_project_for_user,
 )
 from core.views.cash_management.payments_helpers import (
-    _all_allocated_total,
     _direction_target_mismatch,
-    _recalculate_payment_allocation_targets,
-    _set_invoice_balance_from_allocations,
-    _set_receipt_balance_from_allocations,
-    _set_vendor_bill_balance_from_allocations,
+    _recalculate_payment_target,
+    _set_invoice_balance_from_payments,
+    _set_receipt_balance_from_payments,
+    _set_vendor_bill_balance_from_payments,
 )
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def payment_contract_view(_request):
-    """Return canonical payment workflow policy for frontend UX guards.
-
-    Contract:
-    - `GET`:
-      - `200`: payment policy contract returned.
-        - Guarantees:
-          - statuses/transitions mirror backend model-level transition guards. `[APP]`
-          - no object mutations. `[APP]`
-      - `401`: authentication missing/invalid.
-        - Guarantees: no object mutations. `[APP]`
-
-    - Preconditions:
-      - caller must be authenticated (`IsAuthenticated`).
-
-    - Object mutations:
-      - `GET`: none.
-
-    - Idempotency and retry semantics:
-      - `GET` is idempotent and read-only.
-
-    - Test anchors:
-      - `backend/core/tests/test_payments.py::PaymentTests::test_payment_contract_requires_authentication`
-      - `backend/core/tests/test_payments.py::PaymentTests::test_payment_contract_matches_model_transition_policy`
-    """
+    """Return canonical payment workflow policy for frontend UX guards."""
     return Response({"data": get_payment_policy_contract()})
+
+
+def _resolve_and_link_target(data, payment_kwargs, membership, fields):
+    """Resolve target_type + target_id from payload, populate payment FK kwargs.
+
+    Returns the resolved target object or None.  Validation errors are
+    appended to ``fields`` dict.
+    """
+    target_type = data.get("target_type", "")
+    target_id = data.get("target_id")
+    direction = payment_kwargs.get("direction", "")
+
+    if not target_type or not target_id:
+        # Target is optional at creation (unlinked payment)
+        return None
+
+    if _direction_target_mismatch(direction, target_type):
+        fields["target_type"] = ["target_type does not match payment direction."]
+        return None
+
+    payment_kwargs["target_type"] = target_type
+
+    if target_type == Payment.TargetType.INVOICE:
+        target = Invoice.objects.filter(
+            id=target_id,
+            project__organization_id=membership.organization_id,
+        ).first()
+        if not target:
+            fields["target_id"] = ["Invoice not found in this organization."]
+            return None
+        if target.status == Invoice.Status.VOID:
+            fields["target_id"] = ["Cannot link payment to a void invoice."]
+            return None
+        payment_kwargs["invoice"] = target
+        return target
+
+    if target_type == Payment.TargetType.VENDOR_BILL:
+        target = VendorBill.objects.filter(
+            id=target_id,
+            project__organization_id=membership.organization_id,
+        ).first()
+        if not target:
+            fields["target_id"] = ["Vendor bill not found in this organization."]
+            return None
+        if target.status == VendorBill.Status.VOID:
+            fields["target_id"] = ["Cannot link payment to a void vendor bill."]
+            return None
+        payment_kwargs["vendor_bill"] = target
+        return target
+
+    if target_type == Payment.TargetType.RECEIPT:
+        target = Receipt.objects.filter(
+            id=target_id,
+            project__organization_id=membership.organization_id,
+        ).first()
+        if not target:
+            fields["target_id"] = ["Receipt not found in this organization."]
+            return None
+        payment_kwargs["receipt"] = target
+        return target
+
+    fields["target_type"] = ["Invalid target type."]
+    return None
+
+
+def _recalculate_target_balance(target, target_type, changed_by):
+    """Recalculate the balance on a resolved target after payment creation."""
+    if target_type == Payment.TargetType.INVOICE:
+        _set_invoice_balance_from_payments(target, changed_by=changed_by)
+    elif target_type == Payment.TargetType.VENDOR_BILL:
+        _set_vendor_bill_balance_from_payments(target)
+    elif target_type == Payment.TargetType.RECEIPT:
+        _set_receipt_balance_from_payments(target)
 
 
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def org_payments_view(request):
-    """Org-level payment endpoint: `GET` lists all payments, `POST` creates a payment.
+    """Org-level payment endpoint: GET lists all payments, POST creates a payment.
 
-    Payments belong to the organization. Project is optional context.
-
-    Contract:
-    - `GET`: returns all payments for the caller's organization.
-    - `POST` (requires role `owner|bookkeeping`):
-      - `201`: payment created. Optional `project` field associates to a project.
-      - `400`: validation failed.
-      - `403`: role gate denied.
+    POST accepts optional target_type + target_id to link directly to a document.
     """
     membership = _ensure_membership(request.user)
 
     if request.method == "GET":
         rows = (
             Payment.objects.filter(organization_id=membership.organization_id)
-            .select_related("customer", "project")
-            .prefetch_related("allocations")
+            .select_related("customer", "project", "invoice", "vendor_bill", "receipt")
             .order_by("-payment_date", "-created_at")
         )
         return Response({"data": PaymentSerializer(rows, many=True).data})
@@ -113,17 +149,11 @@ def org_payments_view(request):
         fields["amount"] = ["This field is required."]
     if fields:
         return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "Missing required fields for payment creation.",
-                    "fields": fields,
-                }
-            },
+            {"error": {"code": "validation_error", "message": "Missing required fields.", "fields": fields}},
             status=400,
         )
 
-    # Resolve customer (required for inbound, must belong to the same org)
+    # Resolve customer
     customer = None
     customer_id = data.get("customer")
     direction = data["direction"]
@@ -138,17 +168,11 @@ def org_payments_view(request):
             )
     elif direction == Payment.Direction.INBOUND:
         return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "Customer is required for inbound payments.",
-                    "fields": {"customer": ["This field is required for inbound payments."]},
-                }
-            },
+            {"error": {"code": "validation_error", "message": "Customer is required for inbound payments.", "fields": {"customer": ["This field is required for inbound payments."]}}},
             status=400,
         )
 
-    # Resolve optional project (must belong to the same org)
+    # Resolve optional project
     project = None
     project_id = data.get("project")
     if project_id:
@@ -159,20 +183,31 @@ def org_payments_view(request):
                 status=404,
             )
 
-    with transaction.atomic():
-        payment = Payment.objects.create(
-            organization_id=membership.organization_id,
-            customer=customer,
-            project=project,
-            direction=data["direction"],
-            method=data["method"],
-            status=data.get("status", Payment.Status.SETTLED),
-            amount=data["amount"],
-            payment_date=data.get("payment_date") or timezone.localdate(),
-            reference_number=data.get("reference_number", ""),
-            notes=data.get("notes", ""),
-            created_by=request.user,
+    payment_kwargs = {
+        "organization_id": membership.organization_id,
+        "customer": customer,
+        "project": project,
+        "direction": data["direction"],
+        "method": data["method"],
+        "status": data.get("status", Payment.Status.SETTLED),
+        "amount": data["amount"],
+        "payment_date": data.get("payment_date") or timezone.localdate(),
+        "reference_number": data.get("reference_number", ""),
+        "notes": data.get("notes", ""),
+        "created_by": request.user,
+    }
+
+    # Resolve target document
+    target_fields = {}
+    target = _resolve_and_link_target(data, payment_kwargs, membership, target_fields)
+    if target_fields:
+        return Response(
+            {"error": {"code": "validation_error", "message": "Invalid target.", "fields": target_fields}},
+            status=400,
         )
+
+    with transaction.atomic():
+        payment = Payment.objects.create(**payment_kwargs)
         PaymentRecord.record(
             payment=payment,
             event_type=PaymentRecord.EventType.CREATED,
@@ -183,13 +218,16 @@ def org_payments_view(request):
             note="Payment created.",
             metadata={"direction": payment.direction, "method": payment.method},
         )
+        if target and payment.status == Payment.Status.SETTLED:
+            _recalculate_target_balance(target, payment.target_type, request.user)
+
     return Response({"data": PaymentSerializer(payment).data}, status=201)
 
 
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_payments_view(request, project_id: int):
-    """Project-scoped payment endpoint: `GET` lists project payments, `POST` creates attached to project."""
+    """Project-scoped payment endpoint: GET lists project payments, POST creates attached to project."""
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -197,11 +235,12 @@ def project_payments_view(request, project_id: int):
             status=404,
         )
 
+    membership = _ensure_membership(request.user)
+
     if request.method == "GET":
         rows = (
             Payment.objects.filter(project=project)
-            .select_related("project")
-            .prefetch_related("allocations")
+            .select_related("project", "invoice", "vendor_bill", "receipt")
             .order_by("-payment_date", "-created_at")
         )
         return Response({"data": PaymentSerializer(rows, many=True).data})
@@ -223,30 +262,35 @@ def project_payments_view(request, project_id: int):
         fields["amount"] = ["This field is required."]
     if fields:
         return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "Missing required fields for payment creation.",
-                    "fields": fields,
-                }
-            },
+            {"error": {"code": "validation_error", "message": "Missing required fields.", "fields": fields}},
+            status=400,
+        )
+
+    payment_kwargs = {
+        "organization_id": project.organization_id,
+        "customer": project.customer if data.get("direction") == Payment.Direction.INBOUND else None,
+        "project": project,
+        "direction": data["direction"],
+        "method": data["method"],
+        "status": data.get("status", Payment.Status.SETTLED),
+        "amount": data["amount"],
+        "payment_date": data.get("payment_date") or timezone.localdate(),
+        "reference_number": data.get("reference_number", ""),
+        "notes": data.get("notes", ""),
+        "created_by": request.user,
+    }
+
+    # Resolve target document
+    target_fields = {}
+    target = _resolve_and_link_target(data, payment_kwargs, membership, target_fields)
+    if target_fields:
+        return Response(
+            {"error": {"code": "validation_error", "message": "Invalid target.", "fields": target_fields}},
             status=400,
         )
 
     with transaction.atomic():
-        payment = Payment.objects.create(
-            organization_id=project.organization_id,
-            customer=project.customer if data.get("direction") == Payment.Direction.INBOUND else None,
-            project=project,
-            direction=data["direction"],
-            method=data["method"],
-            status=data.get("status", Payment.Status.SETTLED),
-            amount=data["amount"],
-            payment_date=data.get("payment_date") or timezone.localdate(),
-            reference_number=data.get("reference_number", ""),
-            notes=data.get("notes", ""),
-            created_by=request.user,
-        )
+        payment = Payment.objects.create(**payment_kwargs)
         PaymentRecord.record(
             payment=payment,
             event_type=PaymentRecord.EventType.CREATED,
@@ -257,73 +301,21 @@ def project_payments_view(request, project_id: int):
             note="Payment created.",
             metadata={"direction": payment.direction, "method": payment.method},
         )
+        if target and payment.status == Payment.Status.SETTLED:
+            _recalculate_target_balance(target, payment.target_type, request.user)
+
     return Response({"data": PaymentSerializer(payment).data}, status=201)
 
 
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def payment_detail_view(request, payment_id: int):
-    """Fetch or update a payment while enforcing transition and allocation safety rules.
-
-    Contract:
-    - `GET`:
-      - `200`: payment detail returned.
-        - Guarantees: no object mutations. `[APP]`
-      - `404`: payment not found for this user.
-        - Guarantees: no object mutations. `[APP]`
-    - `PATCH` (requires role `owner|bookkeeping`):
-      - `200`: patch applied and updated payment returned.
-        - Guarantees:
-          - payment transition/allocation safety rules remain satisfied. `[APP]`
-          - immutable payment record is appended when fields changed. `[APP]`
-      - `400`: validation or transition/allocation safety failure.
-        - Guarantees: no durable partial mutation from failed request path. `[DB+APP]`
-      - `403`: role gate denied for patch.
-        - Guarantees: no object mutations. `[APP]`
-      - `404`: payment not found for this user.
-        - Guarantees: no object mutations. `[APP]`
-
-    - Preconditions:
-      - caller is authenticated (`IsAuthenticated`).
-      - payment must belong to requesting user.
-      - caller role must be `owner|bookkeeping`.
-
-    - Object mutations:
-      - `GET`: none.
-      - `PATCH`:
-        - Creates:
-          - Standard: none.
-          - Audit: `PaymentRecord` when updates occur.
-        - Edits:
-          - Standard: `Payment` fields (direction/method/status/amount/date/reference/notes).
-          - Audit: none.
-        - Deletes: none.
-
-    - Incoming payload (`PATCH`) shape:
-      - `_comment_*` keys in this example are documentation-only (not accepted API fields).
-      - JSON map:
-        {
-          "direction": "inbound|outbound (optional; blocked after allocations exist)",
-          "method": "cash|check|ach|wire|credit_card|other (optional)",
-          "status": "pending|settled|void (optional; transition rules apply)",
-          "amount": "decimal (optional; cannot be below allocated total)",
-          "payment_date": "YYYY-MM-DD (optional)",
-          "reference_number": "string (optional)",
-          "notes": "string (optional)"
-        }
-
-    - Idempotency and retry semantics:
-      - `GET` is read-only and idempotent.
-      - `PATCH` is conditionally idempotent when payload values equal persisted values.
-
-    - Test anchors:
-      - `backend/core/tests/test_payments.py::test_payment_status_transition_validation`
-      - `backend/core/tests/test_payments.py::test_payment_patch_updates_direction_method_status_reference`
-      - `backend/core/tests/test_payments.py::test_payment_records_append_for_status_change_and_allocation`
-    """
+    """Fetch or update a payment."""
     membership = _ensure_membership(request.user)
     try:
-        payment = Payment.objects.select_related("customer", "project").prefetch_related("allocations").get(
+        payment = Payment.objects.select_related(
+            "customer", "project", "invoice", "vendor_bill", "receipt",
+        ).get(
             id=payment_id,
             organization_id=membership.organization_id,
         )
@@ -344,7 +336,6 @@ def payment_detail_view(request, payment_id: int):
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
 
-    has_allocations = payment.allocations.exists()
     previous_status = payment.status
 
     if "status" in data and not Payment.is_transition_allowed(
@@ -352,56 +343,19 @@ def payment_detail_view(request, payment_id: int):
         next_status=data["status"],
     ):
         return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": f"Invalid payment status transition: {payment.status} -> {data['status']}.",
-                    "fields": {"status": ["This transition is not allowed."]},
-                }
-            },
+            {"error": {"code": "validation_error", "message": f"Invalid payment status transition: {payment.status} -> {data['status']}.", "fields": {"status": ["This transition is not allowed."]}}},
             status=400,
         )
 
-    if "direction" in data and data["direction"] != payment.direction and has_allocations:
+    # Direction changes are blocked when a target is linked
+    if "direction" in data and data["direction"] != payment.direction and payment.target_type:
         return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "Cannot change payment direction after allocations exist.",
-                    "fields": {"direction": ["Remove allocations before changing direction."]},
-                }
-            },
+            {"error": {"code": "validation_error", "message": "Cannot change payment direction when linked to a document.", "fields": {"direction": ["Unlink the document before changing direction."]}}},
             status=400,
         )
-
-    if "amount" in data:
-        allocated_total = _all_allocated_total(payment)
-        if Decimal(str(data["amount"])) < allocated_total:
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_error",
-                        "message": "Payment amount cannot be lower than allocated total.",
-                        "fields": {
-                            "amount": [
-                                f"Current allocated total is {allocated_total}. Increase amount or adjust allocations."
-                            ]
-                        },
-                    }
-                },
-                status=400,
-            )
 
     update_fields = ["updated_at"]
-    for field in [
-        "direction",
-        "method",
-        "status",
-        "amount",
-        "payment_date",
-        "reference_number",
-        "notes",
-    ]:
+    for field in ["direction", "method", "status", "amount", "payment_date", "reference_number", "notes"]:
         if field in data:
             setattr(payment, field, data[field])
             update_fields.append(field)
@@ -411,11 +365,12 @@ def payment_detail_view(request, payment_id: int):
             payment.save(update_fields=update_fields)
 
         status_changed = payment.status != previous_status
-        if status_changed and {
-            previous_status,
-            payment.status,
-        } & {Payment.Status.SETTLED}:
-            _recalculate_payment_allocation_targets(payment, changed_by=request.user)
+        if status_changed and {previous_status, payment.status} & {Payment.Status.SETTLED}:
+            _recalculate_payment_target(payment, changed_by=request.user)
+        elif "amount" in data and payment.status == Payment.Status.SETTLED and payment.target_type:
+            # Amount changed on a settled payment — recalculate target balance
+            _recalculate_payment_target(payment, changed_by=request.user)
+
         if len(update_fields) > 1:
             PaymentRecord.record(
                 payment=payment,
@@ -438,308 +393,3 @@ def payment_detail_view(request, payment_id: int):
 
     payment.refresh_from_db()
     return Response({"data": PaymentSerializer(payment).data})
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def payment_allocate_view(request, payment_id: int):
-    """Allocate a settled payment to invoices or vendor bills based on payment direction.
-
-    Contract:
-    - `POST` (requires role `owner|bookkeeping`):
-      - `200`: allocations applied and updated payment returned.
-        - Guarantees:
-          - all allocation rows satisfy direction/target/scope eligibility rules. `[APP]`
-          - target balances/statuses and payment allocation totals are recalculated consistently. `[APP]`
-          - immutable allocation records are appended. `[APP]`
-      - `400`: validation/allocation eligibility failure.
-        - Guarantees: no durable partial mutation from failed request path. `[DB+APP]`
-      - `403`: role gate denied for allocation.
-        - Guarantees: no object mutations. `[APP]`
-      - `404`: payment not found for this user.
-        - Guarantees: no object mutations. `[APP]`
-
-    - Preconditions:
-      - caller is authenticated (`IsAuthenticated`).
-      - payment must belong to requesting user.
-      - payment status must be `settled`.
-      - inbound allocations target invoices; outbound allocations target vendor bills.
-
-    - Object mutations:
-      - `POST`:
-        - Creates:
-          - Standard: `PaymentAllocation` rows.
-          - Audit: `PaymentRecord`, `PaymentAllocationRecord`.
-        - Edits:
-          - Standard: payment allocation totals plus target invoice/vendor-bill balances and statuses.
-          - Audit: none.
-        - Deletes: none.
-
-    - Incoming payload (`POST`) shape:
-      - `_comment_*` keys in this example are documentation-only (not accepted API fields).
-      - JSON map:
-        {
-          "_comment_required": "allocations must include at least 1 row",
-          "allocations": [
-            {
-              "target_type": "invoice|vendor_bill (required; must match payment direction)",
-              "target_id": "integer (required)",
-              "applied_amount": "decimal (required, must be > 0)",
-              "note": "string (optional)"
-            }
-          ]
-        }
-
-    - Idempotency and retry semantics:
-      - `POST` is not idempotent; repeating same payload will stack additional allocations unless rejected by remaining-balance rules.
-      - failed allocation retries do not persist partial writes.
-
-    - Test anchors:
-      - `backend/core/tests/test_payments.py::test_payment_allocation_inbound_partial_updates_invoice_balances`
-      - `backend/core/tests/test_payments.py::test_payment_allocation_outbound_partial_updates_vendor_bill_balances`
-      - `backend/core/tests/test_payments.py::test_payment_allocation_blocks_direction_mismatch_and_overallocation`
-    """
-    membership = _ensure_membership(request.user)
-    try:
-        payment = Payment.objects.select_related("customer", "project").prefetch_related("allocations").get(
-            id=payment_id,
-            organization_id=membership.organization_id,
-        )
-    except Payment.DoesNotExist:
-        return Response(
-            {"error": {"code": "not_found", "message": "Payment not found.", "fields": {}}},
-            status=404,
-        )
-
-    permission_error, _ = _capability_gate(request.user, "payments", "allocate")
-    if permission_error:
-        return Response(permission_error, status=403)
-
-    if payment.status != Payment.Status.SETTLED:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "Only settled payments can be allocated.",
-                    "fields": {"status": ["Set payment status to settled before allocation."]},
-                }
-            },
-            status=400,
-        )
-
-    serializer = PaymentAllocateSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    payload = serializer.validated_data
-    allocations_data = payload.get("allocations", [])
-
-    if not allocations_data:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "At least one allocation row is required.",
-                    "fields": {"allocations": ["Provide at least one allocation."]},
-                }
-            },
-            status=400,
-        )
-
-    fields = {}
-    new_total = MONEY_ZERO
-    resolved_targets = []
-
-    for index, row in enumerate(allocations_data):
-        target_type = row["target_type"]
-        target_id = row["target_id"]
-
-        if _direction_target_mismatch(payment.direction, target_type):
-            fields[f"allocations[{index}].target_type"] = [
-                "target_type does not match payment direction."
-            ]
-            continue
-
-        if target_type == PaymentAllocation.TargetType.INVOICE:
-            target = Invoice.objects.filter(
-                id=target_id,
-                project__organization_id=payment.organization_id,
-            ).first()
-            if not target:
-                fields[f"allocations[{index}].target_id"] = [
-                    "Invoice not found in this organization."
-                ]
-                continue
-            if target.status == Invoice.Status.VOID:
-                fields[f"allocations[{index}].target_id"] = [
-                    "Cannot allocate against a void invoice."
-                ]
-                continue
-            if target.balance_due <= Decimal("0"):
-                fields[f"allocations[{index}].target_id"] = [
-                    "Invoice has no remaining balance due."
-                ]
-                continue
-            resolved_targets.append({"row": row, "invoice": target})
-        elif target_type == PaymentAllocation.TargetType.VENDOR_BILL:
-            target = VendorBill.objects.filter(
-                id=target_id,
-                project__organization_id=payment.organization_id,
-            ).first()
-            if not target:
-                fields[f"allocations[{index}].target_id"] = [
-                    "Vendor bill not found in this organization."
-                ]
-                continue
-            if target.status == VendorBill.Status.VOID:
-                fields[f"allocations[{index}].target_id"] = [
-                    "Cannot allocate against a void vendor bill."
-                ]
-                continue
-            if target.balance_due <= Decimal("0"):
-                fields[f"allocations[{index}].target_id"] = [
-                    "Vendor bill has no remaining balance due."
-                ]
-                continue
-            resolved_targets.append({"row": row, "vendor_bill": target})
-        elif target_type == PaymentAllocation.TargetType.RECEIPT:
-            target = Receipt.objects.filter(
-                id=target_id,
-                project__organization_id=payment.organization_id,
-            ).first()
-            if not target:
-                fields[f"allocations[{index}].target_id"] = [
-                    "Receipt not found in this organization."
-                ]
-                continue
-            if target.balance_due <= Decimal("0"):
-                fields[f"allocations[{index}].target_id"] = [
-                    "Receipt has no remaining balance due."
-                ]
-                continue
-            resolved_targets.append({"row": row, "receipt": target})
-
-        new_total = quantize_money(new_total + Decimal(str(row["applied_amount"])))
-
-    if fields:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "One or more allocations are invalid.",
-                    "fields": fields,
-                }
-            },
-            status=400,
-        )
-
-    with transaction.atomic():
-        # Lock the payment row so concurrent allocation requests serialize
-        # and cannot double-spend the unapplied balance.
-        Payment.objects.select_for_update().get(id=payment.id)
-
-        existing_total = _all_allocated_total(payment)
-        max_allocatable = quantize_money(Decimal(str(payment.amount)) - existing_total)
-        if new_total > max_allocatable:
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_error",
-                        "message": "Allocation amount exceeds unapplied payment balance.",
-                        "fields": {
-                            "allocations": [
-                                f"Requested {new_total}, but only {max_allocatable} remains unapplied."
-                            ]
-                        },
-                    }
-                },
-                status=400,
-            )
-
-        created_allocations = []
-        for entry in resolved_targets:
-            row = entry["row"]
-            invoice = entry.get("invoice")
-            vendor_bill = entry.get("vendor_bill")
-            receipt = entry.get("receipt")
-            allocation = PaymentAllocation.objects.create(
-                payment=payment,
-                target_type=row["target_type"],
-                invoice=invoice,
-                vendor_bill=vendor_bill,
-                receipt=receipt,
-                applied_amount=row["applied_amount"],
-                created_by=request.user,
-            )
-            created_allocations.append({"allocation": allocation, "row": row})
-
-        touched_invoice_ids = [e["invoice"].id for e in resolved_targets if e.get("invoice")]
-        touched_vendor_bill_ids = [e["vendor_bill"].id for e in resolved_targets if e.get("vendor_bill")]
-        touched_receipt_ids = [e["receipt"].id for e in resolved_targets if e.get("receipt")]
-
-        for invoice in Invoice.objects.filter(id__in=touched_invoice_ids):
-            _set_invoice_balance_from_allocations(invoice, changed_by=request.user)
-
-        for vendor_bill in VendorBill.objects.filter(id__in=touched_vendor_bill_ids):
-            _set_vendor_bill_balance_from_allocations(vendor_bill)
-
-        for receipt in Receipt.objects.filter(id__in=touched_receipt_ids):
-            _set_receipt_balance_from_allocations(receipt)
-
-        for entry in created_allocations:
-            allocation = entry["allocation"]
-            target_type = allocation.target_type
-            target_id = allocation.invoice_id or allocation.vendor_bill_id or allocation.receipt_id
-            PaymentAllocationRecord.record(
-                payment=payment,
-                allocation=allocation,
-                event_type=PaymentAllocationRecord.EventType.APPLIED,
-                capture_source=PaymentAllocationRecord.CaptureSource.MANUAL_UI,
-                target_type=target_type,
-                target_object_id=target_id,
-                recorded_by=request.user,
-                note=f"Allocation applied to {target_type} #{target_id}.",
-                metadata={
-                    "payment_id": payment.id,
-                    "payment_allocation_id": allocation.id,
-                    "target_type": target_type,
-                    "target_id": target_id,
-                },
-            )
-        PaymentRecord.record(
-            payment=payment,
-            event_type=PaymentRecord.EventType.ALLOCATION_APPLIED,
-            capture_source=PaymentRecord.CaptureSource.MANUAL_UI,
-            recorded_by=request.user,
-            from_status=payment.status,
-            to_status=payment.status,
-            note=f"Applied {len(resolved_targets)} allocation row(s).",
-            metadata={
-                "allocation_count": len(resolved_targets),
-                "allocations": [
-                    {
-                        "target_type": e["allocation"].target_type,
-                        "target_id": e["allocation"].invoice_id or e["allocation"].vendor_bill_id or e["allocation"].receipt_id,
-                        "applied_amount": str(e["row"]["applied_amount"]),
-                        "payment_allocation_id": e["allocation"].id,
-                    }
-                    for e in created_allocations
-                ],
-            },
-        )
-
-    payment.refresh_from_db()
-    payment = Payment.objects.select_related("customer", "project").prefetch_related("allocations").get(id=payment.id)
-    created_rows = [e["allocation"] for e in created_allocations]
-
-    return Response(
-        {
-            "data": {
-                "payment": PaymentSerializer(payment).data,
-                "created_allocations": PaymentAllocationSerializer(created_rows, many=True).data,
-            },
-            "meta": {
-                "allocated_total": f"{payment.allocated_total:.2f}",
-                "unapplied_amount": f"{payment.unapplied_amount:.2f}",
-            },
-        },
-        status=201,
-    )

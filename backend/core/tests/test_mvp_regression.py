@@ -155,24 +155,13 @@ class MvpRegressionMoneyLoopTests(TestCase):
                 "status": "settled",
                 "amount": "1200.00",
                 "reference_number": "AR-1",
+                "target_type": "invoice",
+                "target_id": invoice_id,
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(inbound_payment.status_code, 201)
-        inbound_payment_id = inbound_payment.json()["data"]["id"]
-
-        inbound_allocate = self.client.post(
-            f"/api/v1/payments/{inbound_payment_id}/allocate/",
-            data={
-                "allocations": [
-                    {"target_type": "invoice", "target_id": invoice_id, "applied_amount": "1200.00"}
-                ]
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(inbound_allocate.status_code, 201)
 
         vendor = Vendor.objects.create(
             name="Tile Vendor",
@@ -213,28 +202,13 @@ class MvpRegressionMoneyLoopTests(TestCase):
                 "status": "settled",
                 "amount": "500.00",
                 "reference_number": "AP-1",
+                "target_type": "vendor_bill",
+                "target_id": vendor_bill_id,
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(outbound_payment.status_code, 201)
-        outbound_payment_id = outbound_payment.json()["data"]["id"]
-
-        outbound_allocate = self.client.post(
-            f"/api/v1/payments/{outbound_payment_id}/allocate/",
-            data={
-                "allocations": [
-                    {
-                        "target_type": "vendor_bill",
-                        "target_id": vendor_bill_id,
-                        "applied_amount": "500.00",
-                    }
-                ]
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(outbound_allocate.status_code, 201)
 
         summary_response = self.client.get(
             f"/api/v1/projects/{self.project.id}/financial-summary/",

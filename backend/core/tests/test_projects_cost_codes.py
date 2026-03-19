@@ -631,39 +631,50 @@ class ProjectFinancialSummaryTests(TestCase):
             created_by=self.user,
         )
 
-        inbound_payment = Payment.objects.create(
+        Payment.objects.create(
             organization=self.org,
             project=self.project,
             direction=Payment.Direction.INBOUND,
             method=Payment.Method.ACH,
             status=Payment.Status.SETTLED,
-            amount="1000.00",
+            amount="800.00",
+            payment_date="2026-02-15",
+            created_by=self.user,
+            target_type=Payment.TargetType.INVOICE,
+            invoice=invoice_a,
+        )
+        # Unlinked inbound payment (no target — e.g. deposit not yet matched)
+        Payment.objects.create(
+            organization=self.org,
+            project=self.project,
+            direction=Payment.Direction.INBOUND,
+            method=Payment.Method.ACH,
+            status=Payment.Status.SETTLED,
+            amount="200.00",
             payment_date="2026-02-15",
             created_by=self.user,
         )
-        outbound_payment = Payment.objects.create(
+        Payment.objects.create(
             organization=self.org,
             project=self.project,
             direction=Payment.Direction.OUTBOUND,
             method=Payment.Method.CHECK,
             status=Payment.Status.SETTLED,
-            amount="700.00",
+            amount="400.00",
             payment_date="2026-02-15",
             created_by=self.user,
-        )
-
-        PaymentAllocation.objects.create(
-            payment=inbound_payment,
-            target_type="invoice",
-            invoice=invoice_a,
-            applied_amount="800.00",
-            created_by=self.user,
-        )
-        PaymentAllocation.objects.create(
-            payment=outbound_payment,
-            target_type="vendor_bill",
+            target_type=Payment.TargetType.VENDOR_BILL,
             vendor_bill=bill_a,
-            applied_amount="400.00",
+        )
+        # Unlinked outbound payment (no target — e.g. advance not yet matched)
+        Payment.objects.create(
+            organization=self.org,
+            project=self.project,
+            direction=Payment.Direction.OUTBOUND,
+            method=Payment.Method.CHECK,
+            status=Payment.Status.SETTLED,
+            amount="300.00",
+            payment_date="2026-02-15",
             created_by=self.user,
         )
 

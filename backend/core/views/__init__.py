@@ -57,7 +57,6 @@ from core.views.accounts_receivable.invoices import (
 )
 from core.views.cash_management.payments import (
     org_payments_view,
-    payment_allocate_view,
     payment_contract_view,
     payment_detail_view,
     project_payments_view,
@@ -84,6 +83,7 @@ from core.views.accounts_payable.vendor_bills import (
     project_vendor_bills_view,
     vendor_bill_contract_view,
     vendor_bill_detail_view,
+    vendor_bill_snapshots_view,
 )
 from core.views.public_signing import (
     public_change_order_request_otp_view,
@@ -169,7 +169,6 @@ __all__ = [
     "org_payments_view",
     "payment_contract_view",
     "payment_detail_view",
-    "payment_allocate_view",
     "vendors_list_create_view",
     "vendor_detail_view",
     "vendors_import_csv_view",
@@ -180,4 +179,5 @@ __all__ = [
     "project_vendor_bills_view",
     "vendor_bill_contract_view",
     "vendor_bill_detail_view",
+    "vendor_bill_snapshots_view",
 ]

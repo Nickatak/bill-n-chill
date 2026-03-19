@@ -52,18 +52,24 @@ class PaymentTests(TestCase):
             created_by=self.other_user,
         )
 
-    def _create_payment(self, *, status="settled", amount="800.00", direction="inbound"):
+    def _create_payment(self, *, status="settled", amount="800.00", direction="inbound",
+                        target_type="", target_id=None):
+        data = {
+            "direction": direction,
+            "method": "ach",
+            "status": status,
+            "amount": amount,
+            "payment_date": "2026-02-13",
+            "reference_number": "PMT-1001",
+            "notes": "Initial payment entry.",
+        }
+        if target_type:
+            data["target_type"] = target_type
+        if target_id:
+            data["target_id"] = target_id
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/payments/",
-            data={
-                "direction": direction,
-                "method": "ach",
-                "status": status,
-                "amount": amount,
-                "payment_date": "2026-02-13",
-                "reference_number": "PMT-1001",
-                "notes": "Initial payment entry.",
-            },
+            data=data,
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -187,6 +193,30 @@ class PaymentTests(TestCase):
         self.assertEqual(record.to_status, Payment.Status.SETTLED)
         self.assertEqual(record.recorded_by_id, self.user.id)
 
+    def test_payment_create_with_target_updates_invoice_balance(self):
+        invoice = self._create_invoice(total="500.00")
+        payment_id = self._create_payment(
+            status="settled", amount="300.00", direction="inbound",
+            target_type="invoice", target_id=invoice.id,
+        )
+        invoice.refresh_from_db()
+        self.assertEqual(str(invoice.balance_due), "200.00")
+        self.assertEqual(invoice.status, Invoice.Status.PARTIALLY_PAID)
+
+        payment = Payment.objects.get(id=payment_id)
+        self.assertEqual(payment.target_type, Payment.TargetType.INVOICE)
+        self.assertEqual(payment.invoice_id, invoice.id)
+
+    def test_payment_create_with_target_updates_vendor_bill_balance(self):
+        bill = self._create_vendor_bill(total="1000.00")
+        self._create_payment(
+            status="settled", amount="400.00", direction="outbound",
+            target_type="vendor_bill", target_id=bill.id,
+        )
+        bill.refresh_from_db()
+        self.assertEqual(str(bill.balance_due), "600.00")
+        self.assertEqual(bill.status, VendorBill.Status.APPROVED)
+
     def test_payment_list_scoped_by_project_and_user(self):
         self._create_payment()
         Payment.objects.create(
@@ -262,108 +292,27 @@ class PaymentTests(TestCase):
         self.assertEqual(payload["status"], "settled")
         self.assertEqual(payload["reference_number"], "WIR-3001")
 
-    def test_payment_allocation_inbound_partial_updates_invoice_balances(self):
-        payment_id = self._create_payment(status="settled", amount="900.00", direction="inbound")
-        invoice_a = self._create_invoice(total="500.00")
-        invoice_b = self._create_invoice(total="600.00")
-
+    def test_payment_blocks_direction_target_mismatch(self):
+        """Inbound payment cannot target a vendor bill."""
+        bill = self._create_vendor_bill(total="400.00")
         response = self.client.post(
-            f"/api/v1/payments/{payment_id}/allocate/",
+            f"/api/v1/projects/{self.project.id}/payments/",
             data={
-                "allocations": [
-                    {"target_type": "invoice", "target_id": invoice_a.id, "applied_amount": "300.00"},
-                    {"target_type": "invoice", "target_id": invoice_b.id, "applied_amount": "500.00"},
-                ]
+                "direction": "inbound",
+                "method": "ach",
+                "amount": "400.00",
+                "payment_date": "2026-02-13",
+                "target_type": "vendor_bill",
+                "target_id": bill.id,
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "validation_error")
 
-        invoice_a.refresh_from_db()
-        invoice_b.refresh_from_db()
-        self.assertEqual(str(invoice_a.balance_due), "200.00")
-        self.assertEqual(invoice_a.status, Invoice.Status.PARTIALLY_PAID)
-        self.assertEqual(str(invoice_b.balance_due), "100.00")
-        self.assertEqual(invoice_b.status, Invoice.Status.PARTIALLY_PAID)
-
-        payload = response.json()
-        self.assertEqual(payload["meta"]["allocated_total"], "800.00")
-        self.assertEqual(payload["meta"]["unapplied_amount"], "100.00")
-        self.assertEqual(len(payload["data"]["created_allocations"]), 2)
-
-    def test_payment_allocation_outbound_partial_updates_vendor_bill_balances(self):
-        payment_id = self._create_payment(status="settled", amount="700.00", direction="outbound")
-        bill_a = self._create_vendor_bill(total="300.00")
-        bill_b = self._create_vendor_bill(total="600.00")
-
-        response = self.client.post(
-            f"/api/v1/payments/{payment_id}/allocate/",
-            data={
-                "allocations": [
-                    {"target_type": "vendor_bill", "target_id": bill_a.id, "applied_amount": "300.00"},
-                    {"target_type": "vendor_bill", "target_id": bill_b.id, "applied_amount": "200.00"},
-                ]
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 201)
-
-        bill_a.refresh_from_db()
-        bill_b.refresh_from_db()
-        self.assertEqual(str(bill_a.balance_due), "0.00")
-        # Document status stays as-is — payment status is derived, not a bill status
-        self.assertEqual(bill_a.status, VendorBill.Status.APPROVED)
-        self.assertEqual(str(bill_b.balance_due), "400.00")
-
-    def test_payment_allocation_blocks_direction_mismatch_and_overallocation(self):
-        inbound_payment_id = self._create_payment(status="settled", amount="400.00", direction="inbound")
-        vendor_bill = self._create_vendor_bill(total="400.00")
-        invoice = self._create_invoice(total="500.00")
-
-        mismatch = self.client.post(
-            f"/api/v1/payments/{inbound_payment_id}/allocate/",
-            data={
-                "allocations": [
-                    {"target_type": "vendor_bill", "target_id": vendor_bill.id, "applied_amount": "100.00"}
-                ]
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(mismatch.status_code, 400)
-        self.assertEqual(mismatch.json()["error"]["code"], "validation_error")
-
-        over = self.client.post(
-            f"/api/v1/payments/{inbound_payment_id}/allocate/",
-            data={
-                "allocations": [
-                    {"target_type": "invoice", "target_id": invoice.id, "applied_amount": "500.00"}
-                ]
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(over.status_code, 400)
-        self.assertEqual(over.json()["error"]["code"], "validation_error")
-
-    def test_payment_allocation_requires_settled_and_reverses_on_void(self):
+    def test_payment_records_append_for_status_change(self):
         payment_id = self._create_payment(status="pending", amount="500.00", direction="inbound")
-        invoice = self._create_invoice(total="500.00")
-
-        blocked = self.client.post(
-            f"/api/v1/payments/{payment_id}/allocate/",
-            data={
-                "allocations": [
-                    {"target_type": "invoice", "target_id": invoice.id, "applied_amount": "200.00"}
-                ]
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(blocked.status_code, 400)
-        self.assertEqual(blocked.json()["error"]["code"], "validation_error")
 
         to_settled = self.client.patch(
             f"/api/v1/payments/{payment_id}/",
@@ -372,118 +321,19 @@ class PaymentTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(to_settled.status_code, 200)
-
-        created = self.client.post(
-            f"/api/v1/payments/{payment_id}/allocate/",
-            data={
-                "allocations": [
-                    {"target_type": "invoice", "target_id": invoice.id, "applied_amount": "200.00"}
-                ]
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(created.status_code, 201)
-        invoice.refresh_from_db()
-        self.assertEqual(str(invoice.balance_due), "300.00")
-
-        to_void = self.client.patch(
-            f"/api/v1/payments/{payment_id}/",
-            data={"status": "void"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(to_void.status_code, 200)
-        invoice.refresh_from_db()
-        self.assertEqual(str(invoice.balance_due), "500.00")
-
-    def test_payment_records_append_for_status_change_and_allocation(self):
-        payment_id = self._create_payment(status="pending", amount="500.00", direction="inbound")
-        invoice = self._create_invoice(total="500.00")
-
-        to_settled = self.client.patch(
-            f"/api/v1/payments/{payment_id}/",
-            data={"status": "settled"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(to_settled.status_code, 200)
-
-        created = self.client.post(
-            f"/api/v1/payments/{payment_id}/allocate/",
-            data={
-                "allocations": [
-                    {"target_type": "invoice", "target_id": invoice.id, "applied_amount": "200.00"}
-                ]
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(created.status_code, 201)
 
         events = list(
             PaymentRecord.objects.filter(payment_id=payment_id).order_by("created_at", "id")
         )
-        self.assertEqual(len(events), 3)
+        self.assertEqual(len(events), 2)
         self.assertEqual(events[0].event_type, PaymentRecord.EventType.CREATED)
         self.assertEqual(events[1].event_type, PaymentRecord.EventType.STATUS_CHANGED)
         self.assertEqual(events[1].from_status, Payment.Status.PENDING)
         self.assertEqual(events[1].to_status, Payment.Status.SETTLED)
-        self.assertEqual(events[2].event_type, PaymentRecord.EventType.ALLOCATION_APPLIED)
-        self.assertEqual(events[2].capture_source, PaymentRecord.CaptureSource.MANUAL_UI)
-        self.assertEqual(events[2].metadata_json["allocation_count"], 1)
-        self.assertEqual(events[2].metadata_json["allocations"][0]["target_type"], "invoice")
-        self.assertEqual(events[2].metadata_json["allocations"][0]["target_id"], invoice.id)
-        self.assertEqual(events[2].metadata_json["allocations"][0]["applied_amount"], "200.00")
-        self.assertIn("payment_allocation_id", events[2].metadata_json["allocations"][0])
-
-        allocation_events = list(
-            PaymentAllocationRecord.objects.filter(payment_id=payment_id).order_by("created_at", "id")
-        )
-        self.assertEqual(len(allocation_events), 1)
-        self.assertEqual(allocation_events[0].event_type, PaymentAllocationRecord.EventType.APPLIED)
-        self.assertEqual(
-            allocation_events[0].capture_source,
-            PaymentAllocationRecord.CaptureSource.MANUAL_UI,
-        )
-        self.assertEqual(allocation_events[0].recorded_by_id, self.user.id)
-        self.assertEqual(allocation_events[0].target_type, PaymentAllocationRecord.TargetType.INVOICE)
-        self.assertEqual(allocation_events[0].target_object_id, invoice.id)
-        self.assertEqual(str(allocation_events[0].applied_amount), "200.00")
-        self.assertEqual(
-            allocation_events[0].snapshot_json["allocation"]["id"],
-            allocation_events[0].payment_allocation_id,
-        )
-        self.assertEqual(allocation_events[0].snapshot_json["allocation"]["invoice_id"], invoice.id)
 
     def test_payment_record_is_immutable(self):
         payment_id = self._create_payment(status="pending", amount="500.00", direction="inbound")
         record = PaymentRecord.objects.filter(payment_id=payment_id).first()
-        self.assertIsNotNone(record)
-
-        record.note = "mutate"
-        with self.assertRaises(ValidationError):
-            record.save()
-        with self.assertRaises(ValidationError):
-            record.delete()
-
-    def test_payment_allocation_record_is_immutable(self):
-        payment_id = self._create_payment(status="settled", amount="500.00", direction="inbound")
-        invoice = self._create_invoice(total="500.00")
-
-        response = self.client.post(
-            f"/api/v1/payments/{payment_id}/allocate/",
-            data={
-                "allocations": [
-                    {"target_type": "invoice", "target_id": invoice.id, "applied_amount": "200.00"}
-                ]
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 201)
-
-        record = PaymentAllocationRecord.objects.filter(payment_id=payment_id).first()
         self.assertIsNotNone(record)
 
         record.note = "mutate"
@@ -519,26 +369,15 @@ class PaymentTests(TestCase):
 
     def test_void_payment_reopens_fully_paid_invoice(self):
         """Voiding a payment that fully paid an invoice should revert the invoice to sent."""
-        payment_id = self._create_payment(status="settled", amount="500.00", direction="inbound")
         invoice = self._create_invoice(total="500.00")
-
-        # Allocate full amount → invoice becomes paid
-        alloc = self.client.post(
-            f"/api/v1/payments/{payment_id}/allocate/",
-            data={
-                "allocations": [
-                    {"target_type": "invoice", "target_id": invoice.id, "applied_amount": "500.00"}
-                ]
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        payment_id = self._create_payment(
+            status="settled", amount="500.00", direction="inbound",
+            target_type="invoice", target_id=invoice.id,
         )
-        self.assertEqual(alloc.status_code, 201)
         invoice.refresh_from_db()
         self.assertEqual(invoice.status, Invoice.Status.PAID)
         self.assertEqual(str(invoice.balance_due), "0.00")
 
-        # Void the payment → invoice should revert to sent with full balance restored
         void_resp = self.client.patch(
             f"/api/v1/payments/{payment_id}/",
             data={"status": "void"},
@@ -552,39 +391,19 @@ class PaymentTests(TestCase):
 
     def test_void_one_of_two_payments_reverts_paid_invoice_to_partially_paid(self):
         """Voiding one of two payments on a fully paid invoice should revert to partially_paid."""
-        payment_a_id = self._create_payment(status="settled", amount="300.00", direction="inbound")
-        payment_b_id = self._create_payment(status="settled", amount="200.00", direction="inbound")
         invoice = self._create_invoice(total="500.00")
-
-        # Allocate both payments → invoice becomes paid
-        alloc_a = self.client.post(
-            f"/api/v1/payments/{payment_a_id}/allocate/",
-            data={
-                "allocations": [
-                    {"target_type": "invoice", "target_id": invoice.id, "applied_amount": "300.00"}
-                ]
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        payment_a_id = self._create_payment(
+            status="settled", amount="300.00", direction="inbound",
+            target_type="invoice", target_id=invoice.id,
         )
-        self.assertEqual(alloc_a.status_code, 201)
-
-        alloc_b = self.client.post(
-            f"/api/v1/payments/{payment_b_id}/allocate/",
-            data={
-                "allocations": [
-                    {"target_type": "invoice", "target_id": invoice.id, "applied_amount": "200.00"}
-                ]
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        self._create_payment(
+            status="settled", amount="200.00", direction="inbound",
+            target_type="invoice", target_id=invoice.id,
         )
-        self.assertEqual(alloc_b.status_code, 201)
         invoice.refresh_from_db()
         self.assertEqual(invoice.status, Invoice.Status.PAID)
         self.assertEqual(str(invoice.balance_due), "0.00")
 
-        # Void payment A → invoice should revert to partially_paid (B still settled)
         void_resp = self.client.patch(
             f"/api/v1/payments/{payment_a_id}/",
             data={"status": "void"},
@@ -598,27 +417,15 @@ class PaymentTests(TestCase):
 
     def test_void_payment_restores_vendor_bill_balance(self):
         """Voiding a payment restores the vendor bill's balance_due without changing document status."""
-        payment_id = self._create_payment(status="settled", amount="1000.00", direction="outbound")
         bill = self._create_vendor_bill(total="1000.00", status="approved")
-
-        # Allocate full amount → balance becomes 0
-        alloc = self.client.post(
-            f"/api/v1/payments/{payment_id}/allocate/",
-            data={
-                "allocations": [
-                    {"target_type": "vendor_bill", "target_id": bill.id, "applied_amount": "1000.00"}
-                ]
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        payment_id = self._create_payment(
+            status="settled", amount="1000.00", direction="outbound",
+            target_type="vendor_bill", target_id=bill.id,
         )
-        self.assertEqual(alloc.status_code, 201)
         bill.refresh_from_db()
-        # Document status stays as approved — payment status is derived
         self.assertEqual(bill.status, VendorBill.Status.APPROVED)
         self.assertEqual(str(bill.balance_due), "0.00")
 
-        # Void the payment → balance restored, document status unchanged
         void_resp = self.client.patch(
             f"/api/v1/payments/{payment_id}/",
             data={"status": "void"},
@@ -633,12 +440,10 @@ class PaymentTests(TestCase):
     def test_user_cannot_manually_transition_paid_invoice_to_sent(self):
         """The paid → sent transition should only be allowed by the system, not by user API calls."""
         invoice = self._create_invoice(total="500.00", status="sent")
-        # Manually set to paid via the model (simulating a completed payment flow)
         invoice.status = Invoice.Status.PAID
         invoice.balance_due = 0
         invoice.save(update_fields=["status", "balance_due", "updated_at"])
 
-        # User tries to manually revert via the invoice detail API
         resp = self.client.patch(
             f"/api/v1/invoices/{invoice.id}/",
             data={"status": "sent"},
@@ -648,3 +453,24 @@ class PaymentTests(TestCase):
         self.assertEqual(resp.status_code, 400)
         self.assertIn("transition", resp.json()["error"]["message"].lower())
 
+    def test_payment_amount_edit_recalculates_target_balance(self):
+        """Changing a settled payment's amount should recalculate the target document's balance."""
+        invoice = self._create_invoice(total="500.00")
+        payment_id = self._create_payment(
+            status="settled", amount="500.00", direction="inbound",
+            target_type="invoice", target_id=invoice.id,
+        )
+        invoice.refresh_from_db()
+        self.assertEqual(str(invoice.balance_due), "0.00")
+
+        # Reduce payment amount
+        resp = self.client.patch(
+            f"/api/v1/payments/{payment_id}/",
+            data={"amount": "300.00"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(resp.status_code, 200)
+        invoice.refresh_from_db()
+        self.assertEqual(str(invoice.balance_due), "200.00")
+        self.assertEqual(invoice.status, Invoice.Status.PARTIALLY_PAID)

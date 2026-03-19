@@ -11,7 +11,6 @@ from core.models.financial_auditing import (
     LeadContactRecord,
     OrganizationMembershipRecord,
     OrganizationRecord,
-    PaymentAllocationRecord,
     PaymentRecord,
     VendorBillSnapshot,
 )
@@ -32,7 +31,7 @@ from core.models.shared_operations import (
     SigningCeremonyRecord,
     Vendor,
 )
-from core.models.cash_management import Payment, PaymentAllocation
+from core.models.cash_management import Payment
 __all__ = [
     "Customer",
     "DocumentAccessSession",
@@ -63,7 +62,6 @@ __all__ = [
     "LeadContactRecord",
     "OrganizationMembershipRecord",
     "OrganizationRecord",
-    "PaymentAllocationRecord",
     "PaymentRecord",
     "SigningCeremonyRecord",
     "Receipt",
@@ -71,5 +69,4 @@ __all__ = [
     "VendorBill",
     "VendorBillLine",
     "Payment",
-    "PaymentAllocation",
 ]

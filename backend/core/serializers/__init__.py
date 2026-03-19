@@ -36,8 +36,6 @@ from core.serializers.invoices import (
     InvoiceWriteSerializer,
 )
 from core.serializers.payments import (
-    PaymentAllocateSerializer,
-    PaymentAllocationSerializer,
     PaymentSerializer,
     PaymentWriteSerializer,
 )
@@ -53,7 +51,7 @@ from core.serializers.projects import (
     QuickJumpSearchSerializer,
 )
 from core.serializers.receipts import ReceiptSerializer, ReceiptWriteSerializer
-from core.serializers.vendor_bills import VendorBillSerializer, VendorBillWriteSerializer
+from core.serializers.vendor_bills import VendorBillSerializer, VendorBillSnapshotSerializer, VendorBillWriteSerializer
 from core.serializers.vendors import VendorSerializer, VendorWriteSerializer
 
 __all__ = [
@@ -83,6 +81,7 @@ __all__ = [
     "VendorSerializer",
     "VendorWriteSerializer",
     "VendorBillSerializer",
+    "VendorBillSnapshotSerializer",
     "VendorBillWriteSerializer",
     "EstimateLineItemSerializer",
     "EstimateSerializer",
@@ -101,8 +100,6 @@ __all__ = [
     "InvoiceStatusEventSerializer",
     "PaymentSerializer",
     "PaymentWriteSerializer",
-    "PaymentAllocationSerializer",
-    "PaymentAllocateSerializer",
     "ReceiptSerializer",
     "ReceiptWriteSerializer",
 ]

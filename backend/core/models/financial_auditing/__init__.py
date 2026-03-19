@@ -6,7 +6,6 @@ from core.models.financial_auditing.invoice_status_event import InvoiceStatusEve
 from core.models.financial_auditing.lead_contact_record import LeadContactRecord
 from core.models.financial_auditing.organization_membership_record import OrganizationMembershipRecord
 from core.models.financial_auditing.organization_record import OrganizationRecord
-from core.models.financial_auditing.payment_allocation_record import PaymentAllocationRecord
 from core.models.financial_auditing.payment_record import PaymentRecord
 from core.models.financial_auditing.vendor_bill_snapshot import VendorBillSnapshot
 
@@ -19,7 +18,6 @@ __all__ = [
     "LeadContactRecord",
     "OrganizationMembershipRecord",
     "OrganizationRecord",
-    "PaymentAllocationRecord",
     "PaymentRecord",
     "VendorBillSnapshot",
 ]

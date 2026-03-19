@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 
-from core.models import Invoice, InvoiceLine, InvoiceStatusEvent, PaymentAllocation
+from core.models import Invoice, InvoiceLine, InvoiceStatusEvent, Payment
 from core.serializers.mixins import resolve_public_actor_customer_id, resolve_public_actor_display
 
 
@@ -47,19 +47,19 @@ class InvoiceLineSerializer(serializers.ModelSerializer):
         ]
 
 
-class InvoiceAllocationSerializer(serializers.ModelSerializer):
-    """Read-only allocation summary surfacing parent payment details."""
+class InvoicePaymentSerializer(serializers.ModelSerializer):
+    """Read-only payment summary for display on invoice detail."""
 
-    payment_date = serializers.DateField(source="payment.payment_date", read_only=True)
-    payment_method = serializers.CharField(source="payment.method", read_only=True)
-    payment_status = serializers.CharField(source="payment.status", read_only=True)
-    payment_reference = serializers.CharField(source="payment.reference_number", read_only=True)
+    applied_amount = serializers.DecimalField(source="amount", max_digits=12, decimal_places=2, read_only=True)
+    payment_date = serializers.DateField(read_only=True)
+    payment_method = serializers.CharField(source="method", read_only=True)
+    payment_status = serializers.CharField(source="status", read_only=True)
+    payment_reference = serializers.CharField(source="reference_number", read_only=True)
 
     class Meta:
-        model = PaymentAllocation
+        model = Payment
         fields = [
             "id",
-            "payment",
             "applied_amount",
             "payment_date",
             "payment_method",
@@ -76,8 +76,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
     customer_display_name = serializers.CharField(source="customer.display_name", read_only=True)
     project_name = serializers.CharField(source="project.name", read_only=True)
     line_items = InvoiceLineSerializer(many=True, read_only=True)
-    allocations = InvoiceAllocationSerializer(
-        source="payment_allocations", many=True, read_only=True,
+    allocations = InvoicePaymentSerializer(
+        source="target_payments", many=True, read_only=True,
     )
     public_ref = serializers.CharField(read_only=True)
 

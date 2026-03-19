@@ -8,7 +8,6 @@ from core.models import (
     Estimate,
     Invoice,
     Payment,
-    PaymentAllocation,
     Project,
     VendorBill,
 )
@@ -100,16 +99,12 @@ def _build_project_financial_summary_data(project: Project, user):
     )
     invoiced_to_date = sum((invoice.total for invoice in invoice_rows), Decimal("0"))
 
-    inbound_alloc_rows = list(
-        PaymentAllocation.objects.filter(
-            invoice__project=project,
-            payment__status=Payment.Status.SETTLED,
-            payment__direction=Payment.Direction.INBOUND,
-        )
-        .select_related("payment", "invoice")
-        .order_by("-created_at", "-id")
-    )
-    paid_to_date = sum((row.applied_amount for row in inbound_alloc_rows), Decimal("0"))
+    inbound_payment_qs = Payment.objects.filter(
+        invoice__project=project,
+        status=Payment.Status.SETTLED,
+        direction=Payment.Direction.INBOUND,
+    ).order_by("-created_at", "-id")
+    paid_to_date = sum((p.amount for p in inbound_payment_qs), Decimal("0"))
 
     vendor_bill_rows = list(
         VendorBill.objects.filter(
@@ -120,16 +115,12 @@ def _build_project_financial_summary_data(project: Project, user):
     )
     ap_total = sum((bill.total for bill in vendor_bill_rows), Decimal("0"))
 
-    outbound_alloc_rows = list(
-        PaymentAllocation.objects.filter(
-            vendor_bill__project=project,
-            payment__status=Payment.Status.SETTLED,
-            payment__direction=Payment.Direction.OUTBOUND,
-        )
-        .select_related("payment", "vendor_bill")
-        .order_by("-created_at", "-id")
-    )
-    ap_paid = sum((row.applied_amount for row in outbound_alloc_rows), Decimal("0"))
+    outbound_payment_qs = Payment.objects.filter(
+        vendor_bill__project=project,
+        status=Payment.Status.SETTLED,
+        direction=Payment.Direction.OUTBOUND,
+    ).order_by("-created_at", "-id")
+    ap_paid = sum((p.amount for p in outbound_payment_qs), Decimal("0"))
 
     ar_outstanding = invoiced_to_date - paid_to_date
     ap_outstanding = ap_total - ap_paid
@@ -198,13 +189,13 @@ def _build_project_financial_summary_data(project: Project, user):
             "total": f"{paid_to_date:.2f}",
             "records": [
                 {
-                    "id": row.id,
-                    "label": f"PAY-{row.payment_id}",
-                    "status": row.payment.status,
-                    "amount": f"{row.applied_amount:.2f}",
-                    "detail_endpoint": f"/api/v1/payments/{row.payment_id}/",
+                    "id": p.id,
+                    "label": f"PAY-{p.id}",
+                    "status": p.status,
+                    "amount": f"{p.amount:.2f}",
+                    "detail_endpoint": f"/api/v1/payments/{p.id}/",
                 }
-                for row in inbound_alloc_rows
+                for p in inbound_payment_qs
             ],
         },
         "ap_vendor_bills": {
@@ -228,13 +219,13 @@ def _build_project_financial_summary_data(project: Project, user):
             "total": f"{ap_paid:.2f}",
             "records": [
                 {
-                    "id": row.id,
-                    "label": f"PAY-{row.payment_id}",
-                    "status": row.payment.status,
-                    "amount": f"{row.applied_amount:.2f}",
-                    "detail_endpoint": f"/api/v1/payments/{row.payment_id}/",
+                    "id": p.id,
+                    "label": f"PAY-{p.id}",
+                    "status": p.status,
+                    "amount": f"{p.amount:.2f}",
+                    "detail_endpoint": f"/api/v1/payments/{p.id}/",
                 }
-                for row in outbound_alloc_rows
+                for p in outbound_payment_qs
             ],
         },
     }

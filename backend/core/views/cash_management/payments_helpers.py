@@ -1,46 +1,27 @@
-"""Domain-specific helpers for payment and allocation views."""
+"""Domain-specific helpers for payment views."""
 
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
 
-from core.models import Invoice, Payment, PaymentAllocation, Receipt, VendorBill
+from core.models import Invoice, Payment, Receipt, VendorBill
 from core.models.financial_auditing.invoice_status_event import InvoiceStatusEvent
 from core.utils.money import MONEY_ZERO, quantize_money
 
 User = get_user_model()
 
 
-def _settled_allocated_total(payment: Payment) -> Decimal:
-    """Return the total amount allocated from a payment's settled allocations only."""
-    return quantize_money(
-        PaymentAllocation.objects.filter(
-            payment=payment,
-            payment__status=Payment.Status.SETTLED,
-        ).aggregate(total=Sum("applied_amount")).get("total")
-        or MONEY_ZERO
-    )
-
-
-def _all_allocated_total(payment: Payment) -> Decimal:
-    """Return the total amount allocated from a payment across all statuses."""
-    return quantize_money(
-        PaymentAllocation.objects.filter(payment=payment).aggregate(total=Sum("applied_amount")).get("total")
-        or MONEY_ZERO
-    )
-
-
-def _set_invoice_balance_from_allocations(invoice: Invoice, *, changed_by: "User"):
-    """Recompute an invoice's balance_due and status from its settled payment allocations."""
+def _set_invoice_balance_from_payments(invoice: Invoice, *, changed_by: "User"):
+    """Recompute an invoice's balance_due and status from its settled payments."""
     previous_status = invoice.status
     previous_balance = invoice.balance_due
 
     applied_total = (
-        PaymentAllocation.objects.filter(
+        Payment.objects.filter(
             invoice=invoice,
-            payment__status=Payment.Status.SETTLED,
-        ).aggregate(total=Sum("applied_amount")).get("total")
+            status=Payment.Status.SETTLED,
+        ).aggregate(total=Sum("amount")).get("total")
         or Decimal("0")
     )
 
@@ -89,18 +70,17 @@ def _set_invoice_balance_from_allocations(invoice: Invoice, *, changed_by: "User
         )
 
 
-def _set_vendor_bill_balance_from_allocations(vendor_bill: VendorBill):
-    """Recompute a vendor bill's balance_due from its settled payment allocations.
+def _set_vendor_bill_balance_from_payments(vendor_bill: VendorBill):
+    """Recompute a vendor bill's balance_due from its settled payments.
 
     Bill document status is NOT changed — payment status (unpaid/partial/paid)
-    is derived from allocation coverage, not stored as a bill status.
-    See ``docs/decisions/ap-model-separation.md``.
+    is derived from payment coverage, not stored as a bill status.
     """
     applied_total = (
-        PaymentAllocation.objects.filter(
+        Payment.objects.filter(
             vendor_bill=vendor_bill,
-            payment__status=Payment.Status.SETTLED,
-        ).aggregate(total=Sum("applied_amount")).get("total")
+            status=Payment.Status.SETTLED,
+        ).aggregate(total=Sum("amount")).get("total")
         or Decimal("0")
     )
 
@@ -109,7 +89,6 @@ def _set_vendor_bill_balance_from_allocations(vendor_bill: VendorBill):
         next_balance = MONEY_ZERO
 
     vendor_bill.balance_due = next_balance
-    # System-driven balance update — bypass transition validation.
     vendor_bill._skip_transition_validation = True
     try:
         vendor_bill.save(update_fields=["balance_due", "updated_at"])
@@ -117,17 +96,13 @@ def _set_vendor_bill_balance_from_allocations(vendor_bill: VendorBill):
         vendor_bill._skip_transition_validation = False
 
 
-def _set_receipt_balance_from_allocations(receipt: Receipt):
-    """Recompute a receipt's balance_due from its settled payment allocations.
-
-    Receipts have no document lifecycle — balance is purely derived from
-    allocation coverage against the receipt amount.
-    """
+def _set_receipt_balance_from_payments(receipt: Receipt):
+    """Recompute a receipt's balance_due from its settled payments."""
     applied_total = (
-        PaymentAllocation.objects.filter(
+        Payment.objects.filter(
             receipt=receipt,
-            payment__status=Payment.Status.SETTLED,
-        ).aggregate(total=Sum("applied_amount")).get("total")
+            status=Payment.Status.SETTLED,
+        ).aggregate(total=Sum("amount")).get("total")
         or Decimal("0")
     )
 
@@ -139,39 +114,24 @@ def _set_receipt_balance_from_allocations(receipt: Receipt):
     receipt.save(update_fields=["balance_due", "updated_at"])
 
 
-def _recalculate_payment_allocation_targets(payment: Payment, *, changed_by: "User"):
-    """Refresh balance_due on all invoices, vendor bills, and receipts linked to a payment."""
-    invoice_ids = set(
-        PaymentAllocation.objects.filter(payment=payment, invoice_id__isnull=False).values_list(
-            "invoice_id", flat=True
-        )
-    )
-    vendor_bill_ids = set(
-        PaymentAllocation.objects.filter(payment=payment, vendor_bill_id__isnull=False).values_list(
-            "vendor_bill_id", flat=True
-        )
-    )
-    receipt_ids = set(
-        PaymentAllocation.objects.filter(payment=payment, receipt_id__isnull=False).values_list(
-            "receipt_id", flat=True
-        )
-    )
-
-    for invoice in Invoice.objects.filter(id__in=invoice_ids):
-        _set_invoice_balance_from_allocations(invoice, changed_by=changed_by)
-
-    for vendor_bill in VendorBill.objects.filter(id__in=vendor_bill_ids):
-        _set_vendor_bill_balance_from_allocations(vendor_bill)
-
-    for receipt in Receipt.objects.filter(id__in=receipt_ids):
-        _set_receipt_balance_from_allocations(receipt)
+def _recalculate_payment_target(payment: Payment, *, changed_by: "User"):
+    """Refresh balance_due on the single document linked to this payment."""
+    if payment.invoice_id:
+        invoice = Invoice.objects.get(id=payment.invoice_id)
+        _set_invoice_balance_from_payments(invoice, changed_by=changed_by)
+    elif payment.vendor_bill_id:
+        vendor_bill = VendorBill.objects.get(id=payment.vendor_bill_id)
+        _set_vendor_bill_balance_from_payments(vendor_bill)
+    elif payment.receipt_id:
+        receipt = Receipt.objects.get(id=payment.receipt_id)
+        _set_receipt_balance_from_payments(receipt)
 
 
-_OUTBOUND_TARGET_TYPES = {PaymentAllocation.TargetType.VENDOR_BILL, PaymentAllocation.TargetType.RECEIPT}
+_OUTBOUND_TARGET_TYPES = {Payment.TargetType.VENDOR_BILL, Payment.TargetType.RECEIPT}
 
 
 def _direction_target_mismatch(direction: str, target_type: str) -> bool:
-    """Return True if the allocation target type is incompatible with the payment direction."""
+    """Return True if the target type is incompatible with the payment direction."""
     if direction == Payment.Direction.INBOUND:
-        return target_type != PaymentAllocation.TargetType.INVOICE
+        return target_type != Payment.TargetType.INVOICE
     return target_type not in _OUTBOUND_TARGET_TYPES

@@ -1,49 +1,18 @@
-"""Payment and payment allocation serializers for read, write, and allocation flows."""
+"""Payment serializers for read and write flows."""
 
 from decimal import Decimal
 
 from rest_framework import serializers
 
-from core.models import Payment, PaymentAllocation
-
-
-class PaymentAllocationSerializer(serializers.ModelSerializer):
-    """Read-only payment allocation with polymorphic target ID resolution."""
-
-    target_id = serializers.SerializerMethodField()
-
-    class Meta:
-        model = PaymentAllocation
-        fields = [
-            "id",
-            "payment",
-            "target_type",
-            "target_id",
-            "invoice",
-            "vendor_bill",
-            "receipt",
-            "applied_amount",
-            "created_at",
-        ]
-        read_only_fields = fields
-
-    def get_target_id(self, obj: PaymentAllocation):
-        """Return the target document ID based on target type."""
-        if obj.target_type == PaymentAllocation.TargetType.INVOICE:
-            return obj.invoice_id
-        if obj.target_type == PaymentAllocation.TargetType.VENDOR_BILL:
-            return obj.vendor_bill_id
-        return obj.receipt_id
+from core.models import Payment
 
 
 class PaymentSerializer(serializers.ModelSerializer):
-    """Read-only payment with nested allocations and computed totals."""
+    """Read-only payment with target document info."""
 
     customer_name = serializers.SerializerMethodField()
     project_name = serializers.SerializerMethodField()
-    allocations = PaymentAllocationSerializer(many=True, read_only=True)
-    allocated_total = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
-    unapplied_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    target_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Payment
@@ -61,25 +30,15 @@ class PaymentSerializer(serializers.ModelSerializer):
             "payment_date",
             "reference_number",
             "notes",
-            "allocated_total",
-            "unapplied_amount",
-            "allocations",
+            "target_type",
+            "target_id",
+            "invoice",
+            "vendor_bill",
+            "receipt",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = [
-            "id",
-            "organization",
-            "customer",
-            "customer_name",
-            "project",
-            "project_name",
-            "created_at",
-            "updated_at",
-            "allocated_total",
-            "unapplied_amount",
-            "allocations",
-        ]
+        read_only_fields = fields
 
     def get_customer_name(self, obj: Payment) -> str:
         """Return customer display name or empty string."""
@@ -88,6 +47,10 @@ class PaymentSerializer(serializers.ModelSerializer):
     def get_project_name(self, obj: Payment) -> str:
         """Return project name or empty string for unassigned payments."""
         return obj.project.name if obj.project_id else ""
+
+    def get_target_id(self, obj: Payment) -> int | None:
+        """Return the linked document ID."""
+        return obj.invoice_id or obj.vendor_bill_id or obj.receipt_id
 
 
 class PaymentWriteSerializer(serializers.Serializer):
@@ -107,21 +70,5 @@ class PaymentWriteSerializer(serializers.Serializer):
     payment_date = serializers.DateField(required=False)
     reference_number = serializers.CharField(max_length=100, required=False, allow_blank=True)
     notes = serializers.CharField(max_length=5000, required=False, allow_blank=True)
-
-
-class PaymentAllocationInputSerializer(serializers.Serializer):
-    """Write serializer for a single allocation entry in an allocate payload."""
-
-    target_type = serializers.ChoiceField(choices=PaymentAllocation.TargetType.choices)
-    target_id = serializers.IntegerField(min_value=1)
-    applied_amount = serializers.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        min_value=Decimal("0.01"),
-    )
-
-
-class PaymentAllocateSerializer(serializers.Serializer):
-    """Write serializer for batch-allocating a payment to invoices or vendor bills."""
-
-    allocations = PaymentAllocationInputSerializer(many=True, required=True)
+    target_type = serializers.ChoiceField(choices=Payment.TargetType.choices, required=False)
+    target_id = serializers.IntegerField(min_value=1, required=False)

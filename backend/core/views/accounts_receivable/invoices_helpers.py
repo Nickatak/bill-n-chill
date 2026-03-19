@@ -12,7 +12,6 @@ from core.models import (
     InvoiceLine,
     InvoiceStatusEvent,
     Payment,
-    PaymentAllocation,
     Project,
 )
 from core.serializers import InvoiceSerializer
@@ -115,10 +114,10 @@ def _apply_invoice_lines_and_totals(invoice, line_items_data, tax_percent, user)
 
     # Recompute balance_due from the new total minus any settled payment allocations.
     applied_total = (
-        PaymentAllocation.objects.filter(
+        Payment.objects.filter(
             invoice=invoice,
-            payment__status=Payment.Status.SETTLED,
-        ).aggregate(total=Sum("applied_amount")).get("total")
+            status=Payment.Status.SETTLED,
+        ).aggregate(total=Sum("amount")).get("total")
         or Decimal("0")
     )
     balance_due = quantize_money(total - applied_total)
@@ -360,10 +359,10 @@ def _handle_invoice_status_transition(
         # Recompute balance_due from settled allocations without overriding
         # the status the user just set.
         applied_total = (
-            PaymentAllocation.objects.filter(
+            Payment.objects.filter(
                 invoice=invoice,
-                payment__status=Payment.Status.SETTLED,
-            ).aggregate(total=Sum("applied_amount")).get("total")
+                status=Payment.Status.SETTLED,
+            ).aggregate(total=Sum("amount")).get("total")
             or Decimal("0")
         )
         invoice.balance_due = max(

@@ -53,8 +53,7 @@ def org_invoices_view(request):
         .prefetch_related(
             "line_items",
             "line_items__cost_code",
-            "payment_allocations",
-            "payment_allocations__payment",
+            "target_payments",
         )
         .order_by("-created_at")
     )

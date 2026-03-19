@@ -1,11 +1,8 @@
-"""Payment and PaymentAllocation models — cash movement records with AR/AP allocation."""
-
-from decimal import Decimal
+"""Payment model — cash movement records linked directly to AR/AP documents."""
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Sum
 
 from core.models.mixins import StatusTransitionMixin
 
@@ -15,20 +12,21 @@ User = get_user_model()
 class Payment(StatusTransitionMixin, models.Model):
     """Recorded money movement at the organization level (AR inbound or AP outbound).
 
+    Each payment targets exactly one document: an invoice (inbound), vendor bill
+    (outbound), or receipt (outbound).  The payment amount is the full amount
+    applied to that document — there is no separate allocation layer.
+
     Business workflow:
-    - Represents a single cash movement entry, independent from specific invoice/bill rows.
+    - `direction` determines valid target type (inbound → invoice, outbound → vendor bill or receipt).
     - `organization` is the owning org (required).
     - `customer` identifies the sender (required for inbound, null for outbound).
     - `project` is optional context.
-    - `direction` determines valid allocation lane (`inbound` to invoices, `outbound` to vendor bills).
-    - Can be partially allocated across multiple targets after settlement.
-    - Allocations can target invoices/bills from any project in the same org.
     - `created_by` captures who created/owns the payment record.
 
     Current policy:
     - Lifecycle control: `user-managed` with transition rules enforced in payment flows.
     - Visibility: `internal-facing` operational ledger object.
-    - Immutable event trail captured via `PaymentRecord` and `PaymentAllocationRecord`.
+    - Immutable event trail captured via `PaymentRecord`.
     """
 
     class Direction(models.TextChoices):
@@ -49,10 +47,11 @@ class Payment(StatusTransitionMixin, models.Model):
         SETTLED = "settled", "Settled"
         VOID = "void", "Void"
 
-    # Transition-map format:
-    # {from_status: {allowed_to_status_1, allowed_to_status_2, ...}}
-    # Example: `pending -> settled` is allowed because
-    # `Status.SETTLED` is in `ALLOWED_STATUS_TRANSITIONS[Status.PENDING]`.
+    class TargetType(models.TextChoices):
+        INVOICE = "invoice", "Invoice"
+        VENDOR_BILL = "vendor_bill", "Vendor Bill"
+        RECEIPT = "receipt", "Receipt"
+
     _status_label = "payment"
 
     ALLOWED_STATUS_TRANSITIONS = {
@@ -82,9 +81,6 @@ class Payment(StatusTransitionMixin, models.Model):
     )
     direction = models.CharField(max_length=16, choices=Direction.choices)
     method = models.CharField(max_length=16, choices=Method.choices)
-    # Default is SETTLED because payments are currently recorded manually
-    # (i.e., money already received). PENDING exists for future gateway/QBO
-    # integration where payments may need to clear before settling.
     status = models.CharField(
         max_length=16,
         choices=Status.choices,
@@ -95,6 +91,36 @@ class Payment(StatusTransitionMixin, models.Model):
     payment_date = models.DateField()
     reference_number = models.CharField(max_length=100, blank=True)
     notes = models.TextField(blank=True)
+
+    # ── Target document (exactly one FK should be set) ───────────────
+    target_type = models.CharField(
+        max_length=16,
+        choices=TargetType.choices,
+        blank=True,
+        default="",
+    )
+    invoice = models.ForeignKey(
+        "Invoice",
+        on_delete=models.PROTECT,
+        related_name="target_payments",
+        null=True,
+        blank=True,
+    )
+    vendor_bill = models.ForeignKey(
+        "VendorBill",
+        on_delete=models.PROTECT,
+        related_name="target_payments",
+        null=True,
+        blank=True,
+    )
+    receipt = models.ForeignKey(
+        "Receipt",
+        on_delete=models.PROTECT,
+        related_name="target_payments",
+        null=True,
+        blank=True,
+    )
+
     created_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -107,23 +133,31 @@ class Payment(StatusTransitionMixin, models.Model):
         ordering = ["-payment_date", "-created_at"]
 
     @property
-    def allocated_total(self) -> Decimal:
-        """Sum of all applied allocation amounts for this payment."""
-        return (
-            self.allocations.aggregate(total=Sum("applied_amount")).get("total")
-            or Decimal("0")
-        )
-
-    @property
-    def unapplied_amount(self) -> Decimal:
-        """Remaining payment amount not yet allocated to invoices or bills."""
-        remainder = Decimal(str(self.amount)) - self.allocated_total
-        return remainder if remainder > Decimal("0") else Decimal("0")
+    def target_id(self) -> int | None:
+        """Return the ID of the linked target document."""
+        return self.invoice_id or self.vendor_bill_id or self.receipt_id
 
     def clean(self):
-        """Validate status transitions before save."""
+        """Validate status transitions and target consistency."""
         errors = {}
         self.validate_status_transition(errors)
+
+        # Ensure exactly one target FK is set when target_type is present
+        fk_count = sum([
+            self.invoice_id is not None,
+            self.vendor_bill_id is not None,
+            self.receipt_id is not None,
+        ])
+        if self.target_type and fk_count != 1:
+            errors["target_type"] = "Exactly one target FK must be set."
+
+        if self.target_type == self.TargetType.INVOICE and not self.invoice_id:
+            errors["invoice"] = "Invoice FK required for target_type 'invoice'."
+        if self.target_type == self.TargetType.VENDOR_BILL and not self.vendor_bill_id:
+            errors["vendor_bill"] = "Vendor bill FK required for target_type 'vendor_bill'."
+        if self.target_type == self.TargetType.RECEIPT and not self.receipt_id:
+            errors["receipt"] = "Receipt FK required for target_type 'receipt'."
+
         if errors:
             raise ValidationError(errors)
 
@@ -147,8 +181,8 @@ class Payment(StatusTransitionMixin, models.Model):
                 "payment_date": self.payment_date.isoformat() if self.payment_date else None,
                 "reference_number": self.reference_number,
                 "notes": self.notes,
-                "allocated_total": str(self.allocated_total),
-                "unapplied_amount": str(self.unapplied_amount),
+                "target_type": self.target_type,
+                "target_id": self.target_id,
             }
         }
 
@@ -160,92 +194,3 @@ class Payment(StatusTransitionMixin, models.Model):
         else:
             label = "Unassigned"
         return f"{label} {self.direction} {self.amount}"
-
-
-class PaymentAllocation(models.Model):
-    """Applied amount from one payment to one invoice, vendor bill, or receipt.
-
-    Business workflow:
-    - Allocation join row attributing part of a payment to a concrete AR/AP target.
-    - Supports split allocations from one payment across multiple targets.
-    - Drives recalculation of target balances and payment unapplied remainder.
-    - Exactly one target FK is expected based on `target_type`.
-    - ``cost_code`` is the authoritative cost attribution for profitability
-      metrics — classified at payment time, not inherited from the document.
-      See ``docs/decisions/ap-model-separation.md``.
-
-    Current policy:
-    - Lifecycle control: `system-managed` via allocation endpoint write paths.
-    - Visibility: `internal-facing` reconciliation artifact.
-    """
-
-    class TargetType(models.TextChoices):
-        INVOICE = "invoice", "Invoice"
-        VENDOR_BILL = "vendor_bill", "Vendor Bill"
-        RECEIPT = "receipt", "Receipt"
-
-    payment = models.ForeignKey(
-        "Payment",
-        on_delete=models.CASCADE,
-        related_name="allocations",
-    )
-    target_type = models.CharField(max_length=16, choices=TargetType.choices)
-    invoice = models.ForeignKey(
-        "Invoice",
-        on_delete=models.CASCADE,
-        related_name="payment_allocations",
-        null=True,
-        blank=True,
-    )
-    vendor_bill = models.ForeignKey(
-        "VendorBill",
-        on_delete=models.CASCADE,
-        related_name="payment_allocations",
-        null=True,
-        blank=True,
-    )
-    receipt = models.ForeignKey(
-        "Receipt",
-        on_delete=models.CASCADE,
-        related_name="payment_allocations",
-        null=True,
-        blank=True,
-    )
-    applied_amount = models.DecimalField(max_digits=12, decimal_places=2)
-    cost_code = models.ForeignKey(
-        "CostCode",
-        on_delete=models.PROTECT,
-        related_name="payment_allocations",
-        null=True,
-        blank=True,
-        help_text="Authoritative cost attribution — classified at payment time for profitability metrics.",
-    )
-    created_by = models.ForeignKey(
-        User,
-        on_delete=models.PROTECT,
-        related_name="payment_allocations",
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["-created_at", "-id"]
-
-    def build_snapshot(self) -> dict:
-        """Point-in-time snapshot for immutable audit records (includes parent payment)."""
-        return {
-            "payment": self.payment.build_snapshot()["payment"],
-            "allocation": {
-                "id": self.id,
-                "target_type": self.target_type,
-                "invoice_id": self.invoice_id,
-                "vendor_bill_id": self.vendor_bill_id,
-                "receipt_id": self.receipt_id,
-                "applied_amount": str(self.applied_amount),
-                "cost_code_id": self.cost_code_id,
-                "created_by_id": self.created_by_id,
-                "created_at": self.created_at.isoformat() if self.created_at else None,
-            },
-        }
-
-    def __str__(self) -> str:
-        return f"Payment {self.payment_id} -> {self.target_type} {self.applied_amount}"

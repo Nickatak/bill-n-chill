@@ -14,7 +14,7 @@ class VendorBillSnapshot(ImmutableModelMixin):
     Business workflow:
     - Captured when a vendor bill transitions into an auditable document state.
     - Stores point-in-time header + line item snapshot for traceability/replay.
-    - Payment status is NOT captured here — it's derived from PaymentAllocations.
+    - Payment status is NOT captured here — it's derived from linked payments.
       See ``docs/decisions/ap-model-separation.md``.
 
     Current policy:
@@ -43,6 +43,7 @@ class VendorBillSnapshot(ImmutableModelMixin):
         choices=CaptureStatus.choices,
     )
     snapshot_json = models.JSONField(default=dict)
+    status_note = models.TextField(blank=True, default="")
     acted_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -61,6 +62,7 @@ class VendorBillSnapshot(ImmutableModelMixin):
         capture_status: str,
         previous_status: str,
         acted_by,
+        status_note="",
     ):
         """Append an immutable snapshot row for a vendor-bill status transition."""
         snapshot = vendor_bill.build_snapshot()
@@ -72,6 +74,7 @@ class VendorBillSnapshot(ImmutableModelMixin):
             vendor_bill=vendor_bill,
             capture_status=capture_status,
             snapshot_json=snapshot,
+            status_note=status_note,
             acted_by=acted_by,
         )
 

@@ -29,7 +29,6 @@ from core.models import (
     OrganizationMembership,
     OrganizationMembershipRecord,
     Payment,
-    PaymentAllocation,
     Project,
     RoleTemplate,
     Vendor,
@@ -348,7 +347,7 @@ class Command(BaseCommand):
         vb.notes = kwargs.get("notes", "")
         vb.created_by = user
         vb.save()
-        # Create a single vendor bill line (no cost code — attribution lives on PaymentAllocation)
+        # Create a single vendor bill line
         VendorBillLine.objects.get_or_create(
             vendor_bill=vb,
             description=kwargs.get("notes", "") or f"Materials — {bill_number}",
@@ -362,6 +361,17 @@ class Command(BaseCommand):
     def _make_payment(self, user, project, direction, ref, method, status, amount, **kwargs):
         today = date.today()
         customer = project.customer if direction == Payment.Direction.INBOUND else None
+        invoice = kwargs.get("invoice")
+        vendor_bill = kwargs.get("vendor_bill")
+        receipt = kwargs.get("receipt")
+        target_type = ""
+        if invoice:
+            target_type = Payment.TargetType.INVOICE
+        elif vendor_bill:
+            target_type = Payment.TargetType.VENDOR_BILL
+        elif receipt:
+            target_type = Payment.TargetType.RECEIPT
+
         p, _ = Payment.objects.get_or_create(
             organization=project.organization, project=project,
             direction=direction, reference_number=ref,
@@ -373,6 +383,10 @@ class Command(BaseCommand):
                 "payment_date": kwargs.get("payment_date", today),
                 "notes": kwargs.get("notes", ""),
                 "created_by": user,
+                "target_type": target_type,
+                "invoice": invoice,
+                "vendor_bill": vendor_bill,
+                "receipt": receipt,
             },
         )
         p.method = method
@@ -381,22 +395,12 @@ class Command(BaseCommand):
         p.payment_date = kwargs.get("payment_date", today)
         p.notes = kwargs.get("notes", "")
         p.created_by = user
+        p.target_type = target_type
+        p.invoice = invoice
+        p.vendor_bill = vendor_bill
+        p.receipt = receipt
         p.save()
         return p
-
-    def _allocate_payment(self, user, payment, invoice=None, vendor_bill=None, amount=None):
-        target_type = (
-            PaymentAllocation.TargetType.INVOICE
-            if invoice
-            else PaymentAllocation.TargetType.VENDOR_BILL
-        )
-        PaymentAllocation.objects.get_or_create(
-            payment=payment,
-            target_type=target_type,
-            invoice=invoice,
-            vendor_bill=vendor_bill,
-            defaults={"applied_amount": amount or payment.amount, "created_by": user},
-        )
 
     # ── Stage: New ───────────────────────────────────────────────────────
 
@@ -601,12 +605,12 @@ class Command(BaseCommand):
             notes="Plumbing bill under review.")
 
         # Payments
-        pay_in = self._make_payment(user, p_completed, Payment.Direction.INBOUND,
-            "AR-001", Payment.Method.ACH, Payment.Status.SETTLED, Decimal("16000.00"))
-        self._allocate_payment(user, pay_in, invoice=inv_paid)
-        pay_out = self._make_payment(user, p_completed, Payment.Direction.OUTBOUND,
-            "AP-001", Payment.Method.CHECK, Payment.Status.SETTLED, Decimal("4500.00"))
-        self._allocate_payment(user, pay_out, vendor_bill=vb_closed)
+        self._make_payment(user, p_completed, Payment.Direction.INBOUND,
+            "AR-001", Payment.Method.ACH, Payment.Status.SETTLED, Decimal("16000.00"),
+            invoice=inv_paid)
+        self._make_payment(user, p_completed, Payment.Direction.OUTBOUND,
+            "AP-001", Payment.Method.CHECK, Payment.Status.SETTLED, Decimal("4500.00"),
+            vendor_bill=vb_closed)
         self._make_payment(user, p_active1, Payment.Direction.INBOUND,
             "AR-002", Payment.Method.CARD, Payment.Status.PENDING, Decimal("3000.00"))
 
@@ -825,16 +829,14 @@ class Command(BaseCommand):
         # Payments — inbound for paid invoices, outbound for paid vendor bills
         pay_num = 1
         for inv in paid_invoices:
-            pay = self._make_payment(user, inv.project, Payment.Direction.INBOUND,
+            self._make_payment(user, inv.project, Payment.Direction.INBOUND,
                 f"AR-{pay_num:03d}", Payment.Method.ACH, Payment.Status.SETTLED,
-                inv.total)
-            self._allocate_payment(user, pay, invoice=inv)
+                inv.total, invoice=inv)
             pay_num += 1
         for vb in paid_vendor_bills:
-            pay = self._make_payment(user, vb.project, Payment.Direction.OUTBOUND,
+            self._make_payment(user, vb.project, Payment.Direction.OUTBOUND,
                 f"AP-{pay_num:03d}", Payment.Method.CHECK, Payment.Status.SETTLED,
-                vb.total)
-            self._allocate_payment(user, pay, vendor_bill=vb)
+                vb.total, vendor_bill=vb)
             pay_num += 1
         # A couple pending payments
         self._make_payment(user, late_projects[3], Payment.Direction.INBOUND,
