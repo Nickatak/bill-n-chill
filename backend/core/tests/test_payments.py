@@ -270,15 +270,13 @@ class PaymentTests(TestCase):
         self.assertEqual(to_void.status_code, 200)
         self.assertEqual(to_void.json()["data"]["status"], "void")
 
-    def test_payment_patch_updates_direction_method_status_reference(self):
-        payment_id = self._create_payment(status="pending", direction="inbound")
+    def test_payment_patch_updates_date_reference_notes(self):
+        payment_id = self._create_payment(status="settled", direction="inbound")
 
         response = self.client.patch(
             f"/api/v1/payments/{payment_id}/",
             data={
-                "direction": "outbound",
-                "method": "wire",
-                "status": "settled",
+                "payment_date": "2026-03-01",
                 "reference_number": "WIR-3001",
                 "notes": "Wire confirmed by bank.",
             },
@@ -287,10 +285,31 @@ class PaymentTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         payload = response.json()["data"]
-        self.assertEqual(payload["direction"], "outbound")
-        self.assertEqual(payload["method"], "wire")
-        self.assertEqual(payload["status"], "settled")
+        self.assertEqual(payload["payment_date"], "2026-03-01")
         self.assertEqual(payload["reference_number"], "WIR-3001")
+        self.assertEqual(payload["notes"], "Wire confirmed by bank.")
+
+    def test_payment_patch_blocks_amount_and_method_changes(self):
+        """Amount and method are immutable — void and recreate instead."""
+        payment_id = self._create_payment(status="settled", direction="inbound")
+
+        amount_change = self.client.patch(
+            f"/api/v1/payments/{payment_id}/",
+            data={"amount": "999.00"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(amount_change.status_code, 400)
+        self.assertIn("locked", amount_change.json()["error"]["fields"]["amount"][0].lower())
+
+        method_change = self.client.patch(
+            f"/api/v1/payments/{payment_id}/",
+            data={"method": "wire"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(method_change.status_code, 400)
+        self.assertIn("locked", method_change.json()["error"]["fields"]["method"][0].lower())
 
     def test_payment_blocks_direction_target_mismatch(self):
         """Inbound payment cannot target a vendor bill."""
@@ -453,8 +472,8 @@ class PaymentTests(TestCase):
         self.assertEqual(resp.status_code, 400)
         self.assertIn("transition", resp.json()["error"]["message"].lower())
 
-    def test_payment_amount_edit_recalculates_target_balance(self):
-        """Changing a settled payment's amount should recalculate the target document's balance."""
+    def test_payment_amount_edit_is_blocked(self):
+        """Amount is immutable after creation — void and recreate instead."""
         invoice = self._create_invoice(total="500.00")
         payment_id = self._create_payment(
             status="settled", amount="500.00", direction="inbound",
@@ -463,14 +482,13 @@ class PaymentTests(TestCase):
         invoice.refresh_from_db()
         self.assertEqual(str(invoice.balance_due), "0.00")
 
-        # Reduce payment amount
         resp = self.client.patch(
             f"/api/v1/payments/{payment_id}/",
             data={"amount": "300.00"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 400)
+        # Balance should be unchanged
         invoice.refresh_from_db()
-        self.assertEqual(str(invoice.balance_due), "200.00")
-        self.assertEqual(invoice.status, Invoice.Status.PARTIALLY_PAID)
+        self.assertEqual(str(invoice.balance_due), "0.00")

@@ -354,8 +354,20 @@ def payment_detail_view(request, payment_id: int):
             status=400,
         )
 
+    # Amount and method are immutable after creation — void and recreate instead
+    if "amount" in data and data["amount"] != payment.amount:
+        return Response(
+            {"error": {"code": "validation_error", "message": "Payment amount cannot be changed. Void this payment and create a new one.", "fields": {"amount": ["Amount is locked after creation."]}}},
+            status=400,
+        )
+    if "method" in data and data["method"] != payment.method:
+        return Response(
+            {"error": {"code": "validation_error", "message": "Payment method cannot be changed. Void this payment and create a new one.", "fields": {"method": ["Method is locked after creation."]}}},
+            status=400,
+        )
+
     update_fields = ["updated_at"]
-    for field in ["direction", "method", "status", "amount", "payment_date", "reference_number", "notes"]:
+    for field in ["direction", "status", "payment_date", "reference_number", "notes"]:
         if field in data:
             setattr(payment, field, data[field])
             update_fields.append(field)
@@ -366,9 +378,6 @@ def payment_detail_view(request, payment_id: int):
 
         status_changed = payment.status != previous_status
         if status_changed and {previous_status, payment.status} & {Payment.Status.SETTLED}:
-            _recalculate_payment_target(payment, changed_by=request.user)
-        elif "amount" in data and payment.status == Payment.Status.SETTLED and payment.target_type:
-            # Amount changed on a settled payment — recalculate target balance
             _recalculate_payment_target(payment, changed_by=request.user)
 
         if len(update_fields) > 1:

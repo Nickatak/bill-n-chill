@@ -479,7 +479,7 @@
 
 .summaryBanner {
   display: flex;
-  justify-content: space-between;
+  gap: var(--space-sm);
   align-items: center;
   padding: var(--space-sm) var(--space-md);
   background: var(--surface);
@@ -489,6 +489,12 @@
   font-weight: 600;
   color: var(--text-secondary);
   margin-bottom: var(--space-sm);
+}
+
+.summaryBannerFilters {
+  display: flex;
+  gap: 4px;
+  align-items: center;
 }
 
 .summaryBannerButton {
@@ -516,6 +522,8 @@
 .summaryBannerAmount {
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
+  margin-left: auto;
+  text-align: right;
 }
 
 /* ── Filter toggle (mobile) ──────────────────────── */
@@ -622,6 +630,113 @@
   margin-top: 6px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+/* ── Payment child cards (desktop — nested under bill rows) ── */
+
+.paymentChildCard {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  padding-left: calc(var(--space-md) + 16px);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.84rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-left: 3px solid var(--border);
+}
+
+.paymentChildCard:hover {
+  background: var(--surface-hover);
+}
+
+.paymentChildCard:last-child {
+  border-bottom: none;
+}
+
+.paymentChildCardSelected {
+  border-left-color: var(--accent);
+  background: var(--surface-secondary);
+}
+
+/* ── Payment child cards (mobile — below bill card) ── */
+
+.mobileBillGroup {
+  display: grid;
+  gap: 0;
+}
+
+.mobilePaymentCard {
+  background: var(--surface-secondary);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  padding: var(--space-sm) var(--space-md);
+  padding-left: calc(var(--space-md) + 12px);
+  cursor: pointer;
+  font-size: 0.84rem;
+  transition: background 0.15s;
+  border-left: 3px solid var(--border);
+}
+
+.mobilePaymentCard:active {
+  background: var(--surface-hover);
+}
+
+.mobileBillGroup .mobileCard {
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.mobileBillGroup .mobileCard:only-child,
+.mobileBillGroup .mobilePaymentCard:last-child {
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.mobileBillGroup .mobileCard:only-child {
+  border-radius: var(--radius-lg);
+}
+
+/* ── Shared payment card layout ──────────────────── */
+
+.paymentChildTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-sm);
+  grid-column: 1 / -1;
+}
+
+.paymentChildIdentity {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.paymentChildMethod {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.paymentChildMeta {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.paymentChildRight {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.paymentChildAmount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* ── Responsive ───────────────────────────────────── */
