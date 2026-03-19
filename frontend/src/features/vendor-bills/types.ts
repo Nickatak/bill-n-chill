@@ -64,6 +64,18 @@ export type VendorBillLineRecord = {
   amount: string;
 };
 
+export type VendorBillSnapshotRecord = {
+  id: number;
+  vendor_bill: number;
+  capture_status: string;
+  status_note: string;
+  acted_by: number;
+  acted_by_email: string;
+  acted_by_display: string;
+  created_at: string;
+  action_type: string;
+};
+
 export type VendorBillLineInput = {
   description: string;
   quantity: string;

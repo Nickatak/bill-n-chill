@@ -19,6 +19,10 @@ import {
   collapseToggleButtonStyles as collapseButtonStyles,
 } from "@/shared/project-list-viewer";
 
+import { useMediaQuery } from "@/shared/hooks/use-media-query";
+import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
+import { MobileLineItemCard } from "@/shared/document-creator/mobile-line-card";
+import mobileCardStyles from "@/shared/document-creator/mobile-line-card.module.css";
 import {
   defaultApiBaseUrl,
   fetchVendorBillPolicyContract,
@@ -40,6 +44,7 @@ import {
   VendorBillPolicyContract,
   VendorBillPayload,
   VendorBillRecord,
+  VendorBillSnapshotRecord,
   VendorBillStatus,
   VendorRecord,
 } from "../types";
@@ -89,6 +94,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const scopedProjectId = scopedProjectIdProp;
   const preferredProjectId = scopedProjectId ?? queryProjectId;
 
+  const isMobile = useMediaQuery("(max-width: 700px)");
   const { token, role, capabilities } = useSharedSessionAuth();
   const { message: formMessage, tone: formTone, setSuccess: setFormSuccess, setError: setFormError, clear: clearFormMessage } = useStatusMessage();
   const [viewerErrorMessage, setViewerErrorMessage] = useState("");
@@ -99,6 +105,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [selectedVendorBillId, setSelectedVendorBillId] = useState("");
+  const [snapshots, setSnapshots] = useState<VendorBillSnapshotRecord[]>([]);
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const {
@@ -156,6 +163,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const [lineItems, setLineItems] = useState<VendorBillLineFormRow[]>([createEmptyVendorBillLineRow()]);
   const [status, setStatus] = useState<string>("received");
   const [viewerNextStatus, setViewerNextStatus] = useState<string>("");
+  const [viewerNote, setViewerNote] = useState<string>("");
 
   const [duplicateCandidates, setDuplicateCandidates] = useState<VendorBillRecord[]>([]);
 
@@ -164,6 +172,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const [isStatusSectionOpen, setIsStatusSectionOpen] = useState(true);
   const [isLineItemsSectionOpen, setIsLineItemsSectionOpen] = useState(false);
   const [isDetailsSectionOpen, setIsDetailsSectionOpen] = useState(false);
+  const [isHistorySectionOpen, setIsHistorySectionOpen] = useState(false);
 
   // Workspace visibility + flash animation
   const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(true);
@@ -395,8 +404,224 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     return styles[`statusPill${value[0].toUpperCase()}${value.slice(1)}`] ?? "";
   }
 
+  /** Renders the collapsible expanded sections for a selected vendor bill (shared between mobile cards and desktop table). */
+  function renderExpandedSections(vendorBill: VendorBillRecord) {
+    return (
+      <div className={styles.expandedSections} onClick={(e) => e.stopPropagation()}>
+        {/* Status & Actions */}
+        <div className={styles.viewerSection}>
+          <button
+            type="button"
+            className={styles.viewerSectionToggle}
+            onClick={(e) => { e.stopPropagation(); setIsStatusSectionOpen((v) => !v); }}
+            aria-expanded={isStatusSectionOpen}
+          >
+            <h4>Status &amp; Actions</h4>
+            <span className={styles.viewerSectionArrow}>&#9660;</span>
+          </button>
+          {isStatusSectionOpen ? (
+            <div className={styles.viewerSectionContent} onClick={(e) => e.stopPropagation()}>
+              {quickStatusOptions.length > 0 ? (
+                <>
+                  <span className={styles.lifecycleFieldLabel}>Next status</span>
+                  <div className={styles.statusPills}>
+                    {quickStatusOptions.map((statusOption) => {
+                      const active = statusOption === viewerNextStatus;
+                      return (
+                        <button
+                          key={`viewer-status-${statusOption}`}
+                          type="button"
+                          className={`${styles.statusPill} ${
+                            active ? statusPillClass(statusOption) : styles.statusPillInactive
+                          } ${active ? styles.statusPillActive : ""}`}
+                          aria-pressed={active}
+                          onClick={() => setViewerNextStatus(statusOption)}
+                        >
+                          {statusDisplayLabel(statusOption)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <p className={styles.viewerHint}>No next statuses available for this bill.</p>
+              )}
+              <label className={styles.statusPickerLabel}>
+                Note
+                <textarea
+                  className={styles.viewerNoteInput}
+                  value={viewerNote}
+                  onChange={(e) => setViewerNote(e.target.value)}
+                  placeholder="Optional note..."
+                  disabled={!canMutateVendorBills}
+                />
+              </label>
+              <div className={styles.viewerStatusActions}>
+                <button
+                  type="button"
+                  className={styles.formPrimaryButton}
+                  onClick={() => void handleUpdateVendorBillStatus()}
+                  disabled={!selectedVendorBillId || !viewerNextStatus || !canMutateVendorBills}
+                >
+                  Update Status
+                </button>
+                <button
+                  type="button"
+                  className={styles.formSecondaryButton}
+                  onClick={() => void handleUpdateVendorBillNote()}
+                  disabled={!selectedVendorBillId || !canMutateVendorBills}
+                >
+                  Update Note
+                </button>
+              </div>
+              {viewerErrorMessage ? (
+                <p className={styles.viewerErrorText} role="alert" aria-live="polite">
+                  {viewerErrorMessage}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
 
+        {/* Line Items */}
+        <div className={styles.viewerSection}>
+          <button
+            type="button"
+            className={styles.viewerSectionToggle}
+            onClick={(e) => { e.stopPropagation(); setIsLineItemsSectionOpen((v) => !v); }}
+            aria-expanded={isLineItemsSectionOpen}
+          >
+            <h4>Line Items ({vendorBill.line_items?.length ?? 0})</h4>
+            <span className={styles.viewerSectionArrow}>&#9660;</span>
+          </button>
+          {isLineItemsSectionOpen ? (
+            <div className={styles.viewerSectionContent} onClick={(e) => e.stopPropagation()}>
+              {vendorBill.line_items && vendorBill.line_items.length > 0 ? (
+                <div className={styles.readOnlyTableWrap}>
+                  <table className={styles.readOnlyTable}>
+                    <thead>
+                      <tr>
+                        <th>Description</th>
+                        <th>Qty</th>
+                        <th>Unit Price</th>
+                        <th>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vendorBill.line_items.map((lineItem, lineIdx) => (
+                        <tr key={lineIdx}>
+                          <td>{lineItem.description || "—"}</td>
+                          <td>{lineItem.quantity}</td>
+                          <td>${lineItem.unit_price}</td>
+                          <td>${lineItem.amount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className={styles.viewerHint}>No line items on this bill.</p>
+              )}
+            </div>
+          ) : null}
+        </div>
 
+        {/* Bill Details */}
+        <div className={styles.viewerSection}>
+          <button
+            type="button"
+            className={styles.viewerSectionToggle}
+            onClick={(e) => { e.stopPropagation(); setIsDetailsSectionOpen((v) => !v); }}
+            aria-expanded={isDetailsSectionOpen}
+          >
+            <h4>Bill Details</h4>
+            <span className={styles.viewerSectionArrow}>&#9660;</span>
+          </button>
+          {isDetailsSectionOpen ? (
+            <div className={styles.viewerSectionContent} onClick={(e) => e.stopPropagation()}>
+              <div className={styles.detailGrid}>
+                <div>
+                  <p className={styles.detailLabel}>Vendor</p>
+                  <p className={styles.detailValue}>{vendorBill.vendor_name}</p>
+                </div>
+                <div>
+                  <p className={styles.detailLabel}>Bill #</p>
+                  <p className={styles.detailValue}>{vendorBill.bill_number}</p>
+                </div>
+                <div>
+                  <p className={styles.detailLabel}>Issue Date</p>
+                  <p className={styles.detailValue}>{formatDateDisplay(vendorBill.issue_date)}</p>
+                </div>
+                <div>
+                  <p className={styles.detailLabel}>Due Date</p>
+                  <p className={styles.detailValue}>{formatDateDisplay(vendorBill.due_date)}</p>
+                </div>
+                <div>
+                  <p className={styles.detailLabel}>Total</p>
+                  <p className={styles.detailValue}>${vendorBill.total}</p>
+                </div>
+                <div>
+                  <p className={styles.detailLabel}>Balance Due</p>
+                  <p className={styles.detailValue}>${vendorBill.balance_due}</p>
+                </div>
+                {vendorBill.notes ? (
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <p className={styles.detailLabel}>Notes</p>
+                    <p className={styles.detailValue}>{vendorBill.notes}</p>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Status History */}
+        {snapshots.length > 0 ? (
+          <div className={styles.viewerSection}>
+            <button
+              type="button"
+              className={styles.viewerSectionToggle}
+              onClick={(e) => { e.stopPropagation(); setIsHistorySectionOpen((v) => !v); }}
+              aria-expanded={isHistorySectionOpen}
+            >
+              <h4>Status History ({snapshots.length})</h4>
+              <span className={styles.viewerSectionArrow}>&#9660;</span>
+            </button>
+            {isHistorySectionOpen ? (
+              <div className={styles.viewerSectionContent} onClick={(e) => e.stopPropagation()}>
+                <div className={styles.readOnlyTableWrap}>
+                  <table className={styles.readOnlyTable}>
+                    <thead>
+                      <tr>
+                        <th>Action</th>
+                        <th>Date</th>
+                        <th>Note</th>
+                        <th>Who</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {snapshots.map((snap) => (
+                        <tr key={snap.id}>
+                          <td>
+                            <span className={`${styles.tableStatusBadge} ${statusBadgeClass(snap.capture_status as VendorBillStatus)}`}>
+                              {snap.action_type === "notate" ? "note" : statusDisplayLabel(snap.capture_status as VendorBillStatus)}
+                            </span>
+                          </td>
+                          <td>{formatDateDisplay(snap.created_at)}</td>
+                          <td>{snap.status_note || "—"}</td>
+                          <td>{snap.acted_by_display || snap.acted_by_email || "Unknown"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
 
   // -------------------------------------------------------------------------
@@ -483,8 +708,11 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       if (preferred) {
         setSelectedVendorBillId(String(preferred.id));
         hydrate(preferred);
+        setViewerNote("");
+        void loadSnapshots(preferred.id);
       } else {
         setSelectedVendorBillId("");
+        setSnapshots([]);
       }
       clearFormMessage();
     } catch {
@@ -539,6 +767,8 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     );
     setSelectedVendorBillId(String(created.id));
     hydrate(created);
+    setViewerNote("");
+    void loadSnapshots(created.id);
     setNewBillNumber("");
     setNewNotes("");
     setNewLineItems([createEmptyVendorBillLineRow()]);
@@ -599,6 +829,23 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     });
   }
 
+  /** Fetches the snapshot (status history) records for a vendor bill. */
+  async function loadSnapshots(vendorBillId: number) {
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/vendor-bills/${vendorBillId}/snapshots/`, {
+        headers: buildAuthHeaders(token),
+      });
+      if (response.ok) {
+        const json = await response.json();
+        setSnapshots(json.data ?? []);
+      } else {
+        setSnapshots([]);
+      }
+    } catch {
+      setSnapshots([]);
+    }
+  }
+
   /** Selects a vendor bill from the list and hydrates the edit form. */
   function handleSelectVendorBill(id: string) {
     setSelectedVendorBillId(id);
@@ -612,6 +859,8 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     if (!selected) return;
 
     hydrate(selected);
+    setViewerNote("");
+    void loadSnapshots(selected.id);
     flashCreator();
   }
 
@@ -727,7 +976,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       const response = await fetch(`${normalizedBaseUrl}/vendor-bills/${vendorBillId}/`, {
         method: "PATCH",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
-        body: JSON.stringify({ status: nextStatus }),
+        body: JSON.stringify({ status: nextStatus, status_note: viewerNote }),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -739,7 +988,9 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       hydrate(updated);
       setViewerErrorMessage("");
       setViewerNextStatus("");
+      setViewerNote("");
       setFormSuccess(`Updated status to ${updated.status}.`);
+      void loadSnapshots(updated.id);
     } catch {
       setViewerErrorMessage("Could not reach vendor bill quick status endpoint.");
     }
@@ -752,6 +1003,33 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       return;
     }
     await handleQuickVendorBillStatus(viewerNextStatus);
+  }
+
+  /** PATCHes only the status_note on the selected vendor bill (records a snapshot without changing status). */
+  async function handleUpdateVendorBillNote() {
+    const vendorBillId = Number(selectedVendorBillId);
+    if (!vendorBillId) return;
+    setViewerErrorMessage("");
+    try {
+      const response = await fetch(`${normalizedBaseUrl}/vendor-bills/${vendorBillId}/`, {
+        method: "PATCH",
+        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        body: JSON.stringify({ status_note: viewerNote }),
+      });
+      const payload: ApiResponse = await response.json();
+      if (!response.ok) {
+        setViewerErrorMessage(readApiErrorMessage(payload, "Note update failed."));
+        return;
+      }
+      const updated = payload.data as VendorBillRecord;
+      setVendorBills((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      hydrate(updated);
+      setViewerNote("");
+      setFormSuccess("Note recorded.");
+      void loadSnapshots(updated.id);
+    } catch {
+      setViewerErrorMessage("Could not reach vendor bill endpoint.");
+    }
   }
 
   /** Copies the selected bill's details into the create form for a "recreate" workflow. */
@@ -845,6 +1123,8 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     const fallbackVendorBill = filteredVendorBills[0];
     setSelectedVendorBillId(String(fallbackVendorBill.id));
     hydrate(fallbackVendorBill);
+    setViewerNote("");
+    void loadSnapshots(fallbackVendorBill.id);
   }, [filteredVendorBills, selectedVendorBillId]);
 
   // Keep the viewer's next-status picker in sync with the selected bill's allowed transitions.
@@ -865,12 +1145,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   return (
     <section className={styles.console}>
-      <p className={styles.inlineHint} style={{ gridColumn: "1 / -1", fontStyle: "italic", opacity: 0.8 }}>
-        This page is a digital transcription tool. A vendor sends you a bill (paper, PDF, email) and you
-        enter a copy here so it becomes a trackable document in your AP workflow. The form captures what
-        the vendor wrote — not your internal cost structure. Payments and cost attribution live on the
-        Accounting page.
-      </p>
       {/* ── Viewer Panel: bill table + inline expansion ──────────── */}
       <div className={styles.viewerPanel}>
         <div className={styles.panelHeader}>
@@ -929,209 +1203,113 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
           </div>
         </div>
 
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Bill</th>
-                <th>Vendor</th>
-                <th>Status</th>
-                <th>Due</th>
-                <th>Total</th>
-                <th>Balance</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredVendorBills.length ? (
-                filteredVendorBills.map((vendorBill) => {
-                  const isSelected = selectedVendorBillId === String(vendorBill.id);
-                  return [
-                    <tr
-                      key={vendorBill.id}
-                      className={isSelected ? styles.rowSelected : ""}
-                      onClick={() => handleSelectVendorBill(String(vendorBill.id))}
-                    >
-                      <td>
-                        <strong>#{vendorBill.id}</strong> {vendorBill.bill_number}
-                      </td>
-                      <td>{vendorBill.vendor_name}</td>
-                      <td>
-                        <span className={`${styles.tableStatusBadge} ${statusBadgeClass(vendorBill.status)}`}>
-                          {statusDisplayLabel(vendorBill.status)}
+        {isMobile ? (
+          /* ── Mobile: card list ── */
+          <div className={styles.billCardList}>
+            {filteredVendorBills.length ? (
+              filteredVendorBills.map((vendorBill) => {
+                const isSelected = selectedVendorBillId === String(vendorBill.id);
+                return (
+                  <div
+                    key={vendorBill.id}
+                    className={`${styles.billCard} ${isSelected ? styles.billCardSelected : ""}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleSelectVendorBill(String(vendorBill.id))}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        handleSelectVendorBill(String(vendorBill.id));
+                      }
+                    }}
+                  >
+                    <div className={styles.billCardTop}>
+                      <div className={styles.billCardIdentity}>
+                        <span className={styles.billCardVendor}>{vendorBill.vendor_name}</span>
+                        <span className={styles.billCardMeta}>
+                          #{vendorBill.id} {vendorBill.bill_number}
+                          {vendorBill.due_date ? ` · Due ${formatDateDisplay(vendorBill.due_date)}` : ""}
                         </span>
-                      </td>
-                      <td>{formatDateDisplay(vendorBill.due_date)}</td>
-                      <td>${vendorBill.total}</td>
-                      <td>${vendorBill.balance_due}</td>
-                    </tr>,
-                    isSelected ? (
-                      <tr key={`expanded-${vendorBill.id}`} className={styles.expandedRow}>
-                        <td colSpan={6}>
-                          <div className={styles.expandedSections}>
-                            {/* Status & Actions */}
-                            <div className={styles.viewerSection}>
-                              <button
-                                type="button"
-                                className={styles.viewerSectionToggle}
-                                onClick={(e) => { e.stopPropagation(); setIsStatusSectionOpen((v) => !v); }}
-                                aria-expanded={isStatusSectionOpen}
-                              >
-                                <h4>Status &amp; Actions</h4>
-                                <span className={styles.viewerSectionArrow}>&#9660;</span>
-                              </button>
-                              {isStatusSectionOpen ? (
-                                <div className={styles.viewerSectionContent} onClick={(e) => e.stopPropagation()}>
-                                  {quickStatusOptions.length > 0 ? (
-                                    <>
-                                      <span className={styles.lifecycleFieldLabel}>Next status</span>
-                                      <div className={styles.statusPills}>
-                                        {quickStatusOptions.map((statusOption) => {
-                                          const active = statusOption === viewerNextStatus;
-                                          return (
-                                            <button
-                                              key={`viewer-status-${statusOption}`}
-                                              type="button"
-                                              className={`${styles.statusPill} ${
-                                                active ? statusPillClass(statusOption) : styles.statusPillInactive
-                                              } ${active ? styles.statusPillActive : ""}`}
-                                              aria-pressed={active}
-                                              onClick={() => setViewerNextStatus(statusOption)}
-                                            >
-                                              {statusDisplayLabel(statusOption)}
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <p className={styles.viewerHint}>No next statuses available for this bill.</p>
-                                  )}
-                                  <div className={styles.viewerStatusActions}>
-                                    <button
-                                      type="button"
-                                      className={styles.formPrimaryButton}
-                                      onClick={() => void handleUpdateVendorBillStatus()}
-                                      disabled={!selectedVendorBillId || !viewerNextStatus || !canMutateVendorBills}
-                                    >
-                                      Update Status
-                                    </button>
-                                  </div>
-                                  {viewerErrorMessage ? (
-                                    <p className={styles.viewerErrorText} role="alert" aria-live="polite">
-                                      {viewerErrorMessage}
-                                    </p>
-                                  ) : null}
-                                </div>
-                              ) : null}
-                            </div>
-
-                            {/* Line Items */}
-                            <div className={styles.viewerSection}>
-                              <button
-                                type="button"
-                                className={styles.viewerSectionToggle}
-                                onClick={(e) => { e.stopPropagation(); setIsLineItemsSectionOpen((v) => !v); }}
-                                aria-expanded={isLineItemsSectionOpen}
-                              >
-                                <h4>Line Items ({vendorBill.line_items?.length ?? 0})</h4>
-                                <span className={styles.viewerSectionArrow}>&#9660;</span>
-                              </button>
-                              {isLineItemsSectionOpen ? (
-                                <div className={styles.viewerSectionContent} onClick={(e) => e.stopPropagation()}>
-                                  {vendorBill.line_items && vendorBill.line_items.length > 0 ? (
-                                    <div className={styles.readOnlyTableWrap}>
-                                      <table className={styles.readOnlyTable}>
-                                        <thead>
-                                          <tr>
-                                            <th>Description</th>
-                                            <th>Qty</th>
-                                            <th>Unit Price</th>
-                                            <th>Amount</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {vendorBill.line_items.map((lineItem, lineIdx) => (
-                                              <tr key={lineIdx}>
-                                                <td>{lineItem.description || "—"}</td>
-                                                <td>{lineItem.quantity}</td>
-                                                <td>${lineItem.unit_price}</td>
-                                                <td>${lineItem.amount}</td>
-                                              </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  ) : (
-                                    <p className={styles.viewerHint}>No line items on this bill.</p>
-                                  )}
-                                </div>
-                              ) : null}
-                            </div>
-
-                            {/* Bill Details */}
-                            <div className={styles.viewerSection}>
-                              <button
-                                type="button"
-                                className={styles.viewerSectionToggle}
-                                onClick={(e) => { e.stopPropagation(); setIsDetailsSectionOpen((v) => !v); }}
-                                aria-expanded={isDetailsSectionOpen}
-                              >
-                                <h4>Bill Details</h4>
-                                <span className={styles.viewerSectionArrow}>&#9660;</span>
-                              </button>
-                              {isDetailsSectionOpen ? (
-                                <div className={styles.viewerSectionContent} onClick={(e) => e.stopPropagation()}>
-                                  <div className={styles.detailGrid}>
-                                    <div>
-                                      <p className={styles.detailLabel}>Vendor</p>
-                                      <p className={styles.detailValue}>{vendorBill.vendor_name}</p>
-                                    </div>
-                                    <div>
-                                      <p className={styles.detailLabel}>Bill #</p>
-                                      <p className={styles.detailValue}>{vendorBill.bill_number}</p>
-                                    </div>
-                                    <div>
-                                      <p className={styles.detailLabel}>Issue Date</p>
-                                      <p className={styles.detailValue}>{formatDateDisplay(vendorBill.issue_date)}</p>
-                                    </div>
-                                    <div>
-                                      <p className={styles.detailLabel}>Due Date</p>
-                                      <p className={styles.detailValue}>{formatDateDisplay(vendorBill.due_date)}</p>
-                                    </div>
-                                    <div>
-                                      <p className={styles.detailLabel}>Total</p>
-                                      <p className={styles.detailValue}>${vendorBill.total}</p>
-                                    </div>
-                                    <div>
-                                      <p className={styles.detailLabel}>Balance Due</p>
-                                      <p className={styles.detailValue}>${vendorBill.balance_due}</p>
-                                    </div>
-                                    {vendorBill.notes ? (
-                                      <div style={{ gridColumn: "1 / -1" }}>
-                                        <p className={styles.detailLabel}>Notes</p>
-                                        <p className={styles.detailValue}>{vendorBill.notes}</p>
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              ) : null}
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : null,
-                  ];
-                })
-              ) : (
+                      </div>
+                      <div className={styles.billCardAmountBlock}>
+                        <span className={styles.billCardAmount}>${vendorBill.total}</span>
+                        {Number(vendorBill.balance_due) > 0 && Number(vendorBill.balance_due) < Number(vendorBill.total) ? (
+                          <span className={styles.billCardBalance}>{`$${vendorBill.balance_due} due`}</span>
+                        ) : Number(vendorBill.balance_due) <= 0 && Number(vendorBill.total) > 0 ? (
+                          <span className={styles.billCardBalancePaid}>Paid</span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className={styles.billCardFooter}>
+                      <span className={`${styles.tableStatusBadge} ${statusBadgeClass(vendorBill.status)}`}>
+                        {statusDisplayLabel(vendorBill.status)}
+                      </span>
+                    </div>
+                    {isSelected ? renderExpandedSections(vendorBill) : null}
+                  </div>
+                );
+              })
+            ) : (
+              <p className={styles.viewerHint}>No bills match the selected status/due filters.</p>
+            )}
+          </div>
+        ) : (
+          /* ── Desktop: table ── */
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
                 <tr>
-                  <td colSpan={6} className={styles.projectEmptyCell}>
-                    No bills match the selected status/due filters.
-                  </td>
+                  <th>Bill</th>
+                  <th>Vendor</th>
+                  <th>Status</th>
+                  <th>Due</th>
+                  <th>Total</th>
+                  <th>Balance</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filteredVendorBills.length ? (
+                  filteredVendorBills.map((vendorBill) => {
+                    const isSelected = selectedVendorBillId === String(vendorBill.id);
+                    return [
+                      <tr
+                        key={vendorBill.id}
+                        className={isSelected ? styles.rowSelected : ""}
+                        onClick={() => handleSelectVendorBill(String(vendorBill.id))}
+                      >
+                        <td>
+                          <strong>#{vendorBill.id}</strong> {vendorBill.bill_number}
+                        </td>
+                        <td>{vendorBill.vendor_name}</td>
+                        <td>
+                          <span className={`${styles.tableStatusBadge} ${statusBadgeClass(vendorBill.status)}`}>
+                            {statusDisplayLabel(vendorBill.status)}
+                          </span>
+                        </td>
+                        <td>{formatDateDisplay(vendorBill.due_date)}</td>
+                        <td>${vendorBill.total}</td>
+                        <td>${vendorBill.balance_due}</td>
+                      </tr>,
+                      isSelected ? (
+                        <tr key={`expanded-${vendorBill.id}`} className={styles.expandedRow}>
+                          <td colSpan={6}>
+                            {renderExpandedSections(vendorBill)}
+                          </td>
+                        </tr>
+                      ) : null,
+                    ];
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={6} className={styles.projectEmptyCell}>
+                      No bills match the selected status/due filters.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* ── Workspace Panel: bill form (create/edit) ─────────────── */}
@@ -1293,122 +1471,191 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
               </label>
             </div>
 
-            {/* Line items table */}
-            <table className={styles.billDocLineTable}>
-              <thead>
-                <tr>
-                  <th className={styles.billDocLineDescHead}>Description</th>
-                  <th className={styles.billDocLineQtyHead}>Qty</th>
-                  <th className={styles.billDocLineAmtHead}>Unit Price</th>
-                  <th className={styles.billDocLineAmtHead}>Amount</th>
-                  <th className={styles.billDocLineActHead} />
-                </tr>
-              </thead>
-              <tbody>
+            {/* Line items */}
+            {isMobile ? (
+              <div className={mobileCardStyles.cardList}>
                 {formLineItems.map((row, index) => (
-                  <tr key={`line-${index}`}>
-                    <td>
+                  <MobileLineItemCard
+                    key={`line-${index}`}
+                    index={index}
+                    readOnly={workspaceIsLocked}
+                    isFirst={index === 0}
+                    isLast={index === formLineItems.length - 1}
+                    onRemove={workspaceIsLocked ? undefined : () => removeFormLineItem(index)}
+                    fields={[
+                      {
+                        label: "Description",
+                        key: "description",
+                        span: "full",
+                        render: () => (
+                          <input
+                            className={mobileCardStyles.fieldInput}
+                            value={row.description}
+                            onChange={(event) => updateFormLineItem(index, { description: event.target.value })}
+                            placeholder="Description"
+                            disabled={workspaceIsLocked}
+                          />
+                        ),
+                      },
+                      {
+                        label: "Qty",
+                        key: "quantity",
+                        render: () => (
+                          <input
+                            className={mobileCardStyles.fieldInput}
+                            value={row.quantity}
+                            onChange={(event) => updateFormLineItem(index, { quantity: event.target.value })}
+                            placeholder="1"
+                            inputMode="decimal"
+                            disabled={workspaceIsLocked}
+                          />
+                        ),
+                      },
+                      {
+                        label: "Unit Price",
+                        key: "unit_price",
+                        render: () => (
+                          <input
+                            className={mobileCardStyles.fieldInput}
+                            value={row.unit_price}
+                            onChange={(event) => updateFormLineItem(index, { unit_price: event.target.value })}
+                            placeholder="0.00"
+                            inputMode="decimal"
+                            disabled={workspaceIsLocked}
+                          />
+                        ),
+                      },
+                      {
+                        label: "Amount",
+                        key: "amount",
+                        align: "right",
+                        render: () => (
+                          <span className={`${mobileCardStyles.fieldStatic} ${mobileCardStyles.fieldStaticRight}`}>
+                            ${((Number(row.quantity) || 0) * (Number(row.unit_price) || 0)).toFixed(2)}
+                          </span>
+                        ),
+                      },
+                    ]}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className={creatorStyles.lineTable}>
+                <div className={`${styles.billLineHeader} ${workspaceIsLocked ? styles.billLineHeaderReadOnly : ""}`}>
+                  <div className={creatorStyles.lineHeaderCell}><span>Description</span></div>
+                  <div className={creatorStyles.lineHeaderCell}><span>Qty</span></div>
+                  <div className={creatorStyles.lineHeaderCell}><span>Unit Price</span></div>
+                  <div className={creatorStyles.lineHeaderCell}><span>Amount</span></div>
+                  {!workspaceIsLocked ? <div className={creatorStyles.lineHeaderCell} /> : null}
+                </div>
+                {formLineItems.map((row, index) => (
+                  <div
+                    key={`line-${index}`}
+                    className={`${styles.billLineRow} ${workspaceIsLocked ? styles.billLineRowReadOnly : ""}`}
+                  >
+                    <div className={creatorStyles.lineCell}>
                       <input
-                        className={styles.billDocLineInput}
+                        className={creatorStyles.lineInput}
                         value={row.description}
                         onChange={(event) => updateFormLineItem(index, { description: event.target.value })}
                         placeholder="Description"
                         disabled={workspaceIsLocked}
                       />
-                    </td>
-                    <td>
+                    </div>
+                    <div className={creatorStyles.lineCell}>
                       <input
-                        className={`${styles.billDocLineInput} ${styles.billDocQtyInput}`}
+                        className={creatorStyles.lineInput}
                         value={row.quantity}
                         onChange={(event) => updateFormLineItem(index, { quantity: event.target.value })}
                         placeholder="1"
                         inputMode="decimal"
                         disabled={workspaceIsLocked}
+                        style={{ textAlign: "right" }}
                       />
-                    </td>
-                    <td>
+                    </div>
+                    <div className={creatorStyles.lineCell}>
                       <input
-                        className={`${styles.billDocLineInput} ${styles.billDocAmtInput}`}
+                        className={creatorStyles.lineInput}
                         value={row.unit_price}
                         onChange={(event) => updateFormLineItem(index, { unit_price: event.target.value })}
                         placeholder="0.00"
                         inputMode="decimal"
                         disabled={workspaceIsLocked}
+                        style={{ textAlign: "right" }}
                       />
-                    </td>
-                    <td className={styles.billDocLineAmtDisplay}>
-                      ${((Number(row.quantity) || 0) * (Number(row.unit_price) || 0)).toFixed(2)}
-                    </td>
-                    <td className={styles.billDocLineActCell}>
-                      {!workspaceIsLocked ? (
+                    </div>
+                    <div className={creatorStyles.lineCell}>
+                      <div className={creatorStyles.amountCell}>
+                        ${((Number(row.quantity) || 0) * (Number(row.unit_price) || 0)).toFixed(2)}
+                      </div>
+                    </div>
+                    {!workspaceIsLocked ? (
+                      <div className={creatorStyles.lineCell}>
                         <button
                           type="button"
-                          className={styles.billDocLineRemove}
+                          className={creatorStyles.removeButton}
                           onClick={() => removeFormLineItem(index)}
                           disabled={formLineItems.length <= 1}
                           aria-label="Remove line"
                         >
-                          ✕
+                          Remove
                         </button>
-                      ) : null}
-                    </td>
-                  </tr>
+                      </div>
+                    ) : null}
+                  </div>
                 ))}
-              </tbody>
-              <tfoot>
-                {!workspaceIsLocked ? (
-                  <tr className={styles.billDocAddLineRow}>
-                    <td colSpan={5}>
-                      <button
-                        type="button"
-                        className={styles.billDocAddLineBtn}
-                        onClick={addFormLineItem}
-                      >
-                        + Add line item
-                      </button>
-                    </td>
-                  </tr>
-                ) : null}
-                <tr className={styles.billDocTotalRow}>
-                  <td colSpan={3} className={styles.billDocTotalLabel}>Subtotal</td>
-                  <td className={styles.billDocTotalValue}>${computedSubtotal.toFixed(2)}</td>
-                  <td />
-                </tr>
-                <tr className={styles.billDocTotalRow}>
-                  <td colSpan={3} className={styles.billDocTotalLabel}>Tax</td>
-                  <td>
-                    <input
-                      className={`${styles.billDocLineInput} ${styles.billDocAmtInput}`}
-                      value={formTaxAmount}
-                      onChange={(event) => setFormTaxAmount(event.target.value)}
-                      inputMode="decimal"
-                      placeholder="0.00"
-                      disabled={workspaceIsLocked}
-                    />
-                  </td>
-                  <td />
-                </tr>
-                <tr className={styles.billDocTotalRow}>
-                  <td colSpan={3} className={styles.billDocTotalLabel}>Shipping / Freight</td>
-                  <td>
-                    <input
-                      className={`${styles.billDocLineInput} ${styles.billDocAmtInput}`}
-                      value={formShippingAmount}
-                      onChange={(event) => setFormShippingAmount(event.target.value)}
-                      inputMode="decimal"
-                      placeholder="0.00"
-                      disabled={workspaceIsLocked}
-                    />
-                  </td>
-                  <td />
-                </tr>
-                <tr className={`${styles.billDocTotalRow} ${styles.billDocGrandTotal}`}>
-                  <td colSpan={3} className={styles.billDocTotalLabel}>Total</td>
-                  <td className={styles.billDocTotalValue}>${computedTotal.toFixed(2)}</td>
-                  <td />
-                </tr>
-              </tfoot>
-            </table>
+              </div>
+            )}
+
+            {/* Add line + summary */}
+            {!workspaceIsLocked ? (
+              <div className={creatorStyles.lineActions}>
+                <button
+                  type="button"
+                  className={creatorStyles.secondaryButton}
+                  onClick={addFormLineItem}
+                >
+                  + Add line item
+                </button>
+              </div>
+            ) : null}
+
+            <div className={creatorStyles.summary}>
+              <div className={creatorStyles.summaryRow}>
+                <span>Subtotal</span>
+                <span>${computedSubtotal.toFixed(2)}</span>
+              </div>
+              <div className={creatorStyles.summaryRow}>
+                <span>Tax</span>
+                <span className={creatorStyles.summaryTaxLine}>
+                  <input
+                    className={`${creatorStyles.summaryTaxInput} ${styles.billSummaryDollarInput}`}
+                    value={formTaxAmount}
+                    onChange={(event) => setFormTaxAmount(event.target.value)}
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    disabled={workspaceIsLocked}
+                  />
+                </span>
+              </div>
+              <div className={creatorStyles.summaryRow}>
+                <span>Shipping / Freight</span>
+                <span className={creatorStyles.summaryTaxLine}>
+                  <input
+                    className={`${creatorStyles.summaryTaxInput} ${styles.billSummaryDollarInput}`}
+                    value={formShippingAmount}
+                    onChange={(event) => setFormShippingAmount(event.target.value)}
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    disabled={workspaceIsLocked}
+                  />
+                </span>
+              </div>
+              <div className={`${creatorStyles.summaryRow} ${creatorStyles.summaryTotal}`}>
+                <span>Total</span>
+                <strong>${computedTotal.toFixed(2)}</strong>
+              </div>
+            </div>
 
             {/* Notes */}
             <div className={styles.billDocNotes}>

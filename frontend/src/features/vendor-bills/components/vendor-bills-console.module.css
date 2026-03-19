@@ -400,6 +400,19 @@
   color: var(--accent-text);
 }
 
+.viewerNoteInput {
+  width: 100%;
+  min-height: 60px;
+  resize: vertical;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-lg);
+  padding: var(--space-sm);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: var(--font-base);
+  font-family: inherit;
+}
+
 .statusPicker {
   display: grid;
   gap: 6px;
@@ -498,6 +511,140 @@
   border-color: var(--status-gray-border);
   background: var(--status-gray-bg);
   color: var(--status-gray-text);
+}
+
+/* ── Mobile bill card list ────────────────────────────────────── */
+
+.billCardList {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.billCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  background: var(--surface-secondary);
+  cursor: pointer;
+  display: grid;
+  gap: 8px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.billCard:active {
+  background: var(--surface-hover);
+}
+
+.billCardSelected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent);
+  background: var(--surface);
+}
+
+/* Pull expanded sections to card edges */
+.billCard .expandedSections {
+  margin: 0 calc(-1 * var(--space-md)) calc(-1 * var(--space-md));
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+  border-top: 1px solid var(--border);
+}
+
+.billCardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.billCardIdentity {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.billCardVendor {
+  font-weight: 700;
+  font-size: 0.94rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.billCardMeta {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.billCardAmountBlock {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.billCardAmount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 1rem;
+  display: block;
+}
+
+.billCardBalance {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.billCardBalancePaid {
+  font-size: 0.78rem;
+  color: var(--status-green-text);
+  font-weight: 600;
+}
+
+.billCardFooter {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+/* ── Bill line item grid columns ──────────────────────────────── */
+
+.billLineHeader,
+.billLineRow {
+  display: grid;
+  grid-template-columns: 1fr 80px 120px 120px 60px;
+  gap: var(--space-sm);
+  align-items: stretch;
+  padding: var(--space-sm) var(--space-md);
+  min-width: 520px;
+}
+
+.billLineHeader {
+  background: var(--table-header-bg);
+  color: var(--table-header-text);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.billLineRow {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.billLineRow:nth-child(even) {
+  background: var(--table-row-alt);
+}
+
+.billLineHeaderReadOnly,
+.billLineRowReadOnly {
+  grid-template-columns: 1fr 80px 120px 120px;
+  min-width: 440px;
+}
+
+.billSummaryDollarInput {
+  width: 80px;
 }
 
 /* ── WYSIWYG Bill Document Form ───────────────────────────────── */
@@ -691,185 +838,6 @@
   opacity: 1;
 }
 
-/* Line items table */
-.billDocLineTable {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.billDocLineDescHead {
-  text-align: left;
-  padding: var(--space-xs) var(--space-sm);
-  font-size: var(--font-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  font-weight: 700;
-  border-bottom: 2px solid var(--border);
-}
-
-.billDocLineQtyHead,
-.billDocLineAmtHead {
-  text-align: right;
-  padding: var(--space-xs) var(--space-sm);
-  font-size: var(--font-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  font-weight: 700;
-  border-bottom: 2px solid var(--border);
-}
-
-.billDocLineQtyHead {
-  width: 64px;
-}
-
-.billDocLineAmtHead {
-  width: 120px;
-}
-
-.billDocLineActHead {
-  border-bottom: 2px solid var(--border);
-  width: 36px;
-}
-
-.billDocLineTable tbody tr {
-  border-bottom: 1px solid var(--table-border);
-}
-
-.billDocLineTable tbody td {
-  padding: 4px var(--space-xs);
-  vertical-align: middle;
-}
-
-.billDocLineInput {
-  width: 100%;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--text-primary);
-  padding: 6px var(--space-sm);
-  font-size: var(--font-base);
-  transition: border-color 100ms ease, background-color 100ms ease;
-}
-
-.billDocLineInput:focus {
-  outline: none;
-  border-color: var(--input-border);
-  background: var(--surface);
-}
-
-.billDocLineInput:disabled {
-  color: var(--text-primary);
-  cursor: default;
-}
-
-.billDocQtyInput {
-  text-align: right;
-  width: 64px;
-}
-
-.billDocAmtInput {
-  text-align: right;
-  width: 120px;
-}
-
-.billDocLineAmtDisplay {
-  text-align: right;
-  padding: 6px var(--space-sm);
-  font-size: var(--font-base);
-  color: var(--text-secondary);
-  white-space: nowrap;
-  width: 120px;
-}
-
-.billDocLineActCell {
-  text-align: center;
-  width: 36px;
-}
-
-.billDocLineRemove {
-  appearance: none;
-  -webkit-appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: var(--font-sm);
-  padding: 4px 6px;
-  border-radius: var(--radius-sm);
-  line-height: 1;
-}
-
-.billDocLineRemove:hover:not(:disabled) {
-  background: var(--tone-error-bg);
-  color: var(--tone-error-text);
-}
-
-.billDocLineRemove:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-/* Add line row */
-.billDocAddLineRow td {
-  padding: 6px var(--space-xs);
-}
-
-.billDocAddLineBtn {
-  appearance: none;
-  -webkit-appearance: none;
-  border: 1px dashed var(--border-accent);
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--text-secondary);
-  padding: 5px var(--space-md);
-  font-size: var(--font-sm);
-  cursor: pointer;
-  transition: color 100ms ease, border-color 100ms ease;
-}
-
-.billDocAddLineBtn:hover {
-  color: var(--accent-text);
-  border-color: var(--accent);
-}
-
-/* Totals footer */
-.billDocTotalRow td {
-  padding: 5px var(--space-sm);
-  font-size: var(--font-sm);
-  vertical-align: middle;
-}
-
-.billDocTotalRow:first-of-type td {
-  padding-top: var(--space-md);
-  border-top: 2px solid var(--border);
-}
-
-.billDocTotalLabel {
-  text-align: right;
-  color: var(--text-secondary);
-  font-size: var(--font-sm);
-  padding-right: var(--space-md) !important;
-}
-
-.billDocTotalValue {
-  text-align: right;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-  width: 140px;
-}
-
-.billDocGrandTotal .billDocTotalLabel {
-  font-weight: 700;
-  color: var(--text-primary);
-  font-size: var(--font-base);
-}
-
-.billDocGrandTotal .billDocTotalValue {
-  font-weight: 700;
-  font-size: var(--font-base);
-}
 
 /* Notes */
 .billDocNotes {
@@ -944,6 +912,86 @@
 
   .submitRow button {
     margin-left: 0;
+  }
+}
+
+@media (max-width: 700px) {
+  /* ── Containment: every grid/flex ancestor must allow shrinking ── */
+  .console,
+  .viewerPanel,
+  .tableWrap,
+  .expandedSections,
+  .viewerSection,
+  .viewerSectionContent,
+  .workspace,
+  .formSection,
+  .allocationsBlock {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .billDocument {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .viewerPanel {
+    padding: 10px;
+  }
+
+  /* Stack bill document header: vendor over bill number */
+  .billDocHeader {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-md);
+  }
+
+  .billDocFrom {
+    flex: none;
+  }
+
+  .billDocBillNum {
+    flex: none;
+    text-align: left;
+  }
+
+  .billDocBillNumInput {
+    text-align: left;
+  }
+
+  /* Date fields: 2-up grid instead of 4-across flex */
+  .billDocDates {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-sm);
+  }
+
+  /* Bill document: tighten padding */
+  .billDocument {
+    padding: var(--space-md);
+    gap: var(--space-md);
+  }
+
+  /* Allocation line table: let it scroll */
+  .allocationLineHeader,
+  .allocationLineRow {
+    min-width: 400px;
+  }
+
+  /* Bill line grid: collapse min-width on mobile (cards handle rendering) */
+  .billLineHeader,
+  .billLineRow {
+    min-width: 0;
+  }
+
+  /* Workspace toolbar: stack context + actions */
+  .workspaceToolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .workspaceToolbarActions {
+    grid-column: 1;
+    grid-row: auto;
   }
 }
 
@@ -1023,14 +1071,14 @@
 }
 
 .formSecondaryButton {
-  border: 1px solid var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
-  color: var(--accent);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
 }
 
 .formSecondaryButton:hover:not(:disabled) {
-  border-color: var(--accent-hover);
-  background: color-mix(in srgb, var(--accent) 20%, var(--surface));
+  border-color: var(--accent);
+  background: var(--surface-hover);
   transform: translateY(-1px);
 }
 
@@ -1208,6 +1256,56 @@
   .detailGrid {
     grid-template-columns: 1fr;
   }
+
+  /* Date fields: single column on small phones */
+  .billDocDates {
+    grid-template-columns: 1fr;
+  }
+
+  /* Touch targets */
+  .filterPill {
+    min-height: 44px;
+    padding: 8px 12px;
+  }
+
+  .filterActionButton {
+    min-height: 44px;
+    padding: 8px 12px;
+  }
+
+  .vendorInput,
+  .billDocBillNumInput,
+  .billDocDateField > input,
+  .billDocNotesInput {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+
+  .vendorOption {
+    min-height: 44px;
+    padding: 10px var(--space-md);
+  }
+
+  .statusPill {
+    width: 100%;
+  }
+
+  .formSecondaryButton,
+  .formDangerButton,
+  .formPrimaryButton,
+  .toolbarActionButton {
+    min-height: 44px;
+    width: 100%;
+  }
+
+  .formActionsRow {
+    flex-direction: column;
+  }
+
+  .viewerSecondaryButton {
+    min-height: 44px;
+    width: 100%;
+  }
 }
 
 /* ── Print ────────────────────────────────────────────────────── */
@@ -1220,10 +1318,6 @@
   .filterPill,
   .viewerStatusActions,
   .viewerSecondaryButton,
-  .billDocAddLineRow,
-  .billDocLineRemove,
-  .billDocLineActHead,
-  .billDocLineActCell,
   .workspaceToolbar,
   .workspaceToolbarActions,
   .toolbarActionButton,

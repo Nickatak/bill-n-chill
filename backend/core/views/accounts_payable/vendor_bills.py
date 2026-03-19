@@ -11,15 +11,17 @@ from rest_framework.response import Response
 from core.models import (
     Vendor,
     VendorBill,
+    VendorBillSnapshot,
 )
 from core.policies import get_vendor_bill_policy_contract
-from core.serializers import VendorBillSerializer, VendorBillWriteSerializer
+from core.serializers import VendorBillSerializer, VendorBillSnapshotSerializer, VendorBillWriteSerializer
 from core.utils.money import quantize_money
 from core.views.accounts_payable.vendor_bills_helpers import (
     DATE_REQUIRED_STATUSES,
     _apply_vendor_bill_lines_and_totals,
     _find_duplicate_vendor_bills,
     _handle_vb_document_save,
+    _handle_vb_status_note,
     _handle_vb_status_transition,
     _prefetch_vendor_bill_qs,
     _vendor_bill_line_apply_error_response,
@@ -386,10 +388,35 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
     previous_status = vendor_bill.status
     next_status = data.get("status", previous_status)
     is_actual_transition = "status" in data and previous_status != next_status
+    status_note = (data.get("status_note", "") or "").strip()
 
     if is_actual_transition:
         return _handle_vb_status_transition(
             request, vendor_bill, data,
             previous_status, next_status,
         )
+    if status_note:
+        return _handle_vb_status_note(request, vendor_bill, data)
     return _handle_vb_document_save(request, vendor_bill, data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def vendor_bill_snapshots_view(request, vendor_bill_id: int):
+    """Return immutable vendor bill status transition history."""
+    membership = _ensure_membership(request.user)
+    try:
+        vendor_bill = VendorBill.objects.get(
+            id=vendor_bill_id,
+            project__organization_id=membership.organization_id,
+        )
+    except VendorBill.DoesNotExist:
+        return Response(
+            {"error": {"code": "not_found", "message": "Vendor bill not found.", "fields": {}}},
+            status=404,
+        )
+
+    snapshots = VendorBillSnapshot.objects.filter(vendor_bill=vendor_bill).select_related(
+        "acted_by",
+    ).order_by("-created_at")
+    return Response({"data": VendorBillSnapshotSerializer(snapshots, many=True).data})
