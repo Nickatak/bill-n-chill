@@ -1,13 +1,13 @@
 # Mobile and Desktop Strategy — Original v1 Approach (Superseded)
 
 Date: 2026-02-28 (original)
-Superseded: 2026-03-11 by `product-direction-refinement.md`
+Superseded: 2026-03-19 by `pwa-mobile-strategy.md`
 
 ## Status: Superseded
 
 This was the original mobile/desktop split strategy shipped with the MVP plan. It assumed creation workflows (estimates, invoices, cost codes) were inherently desktop tasks, with mobile reserved for quick lookups and status checks.
 
-This assumption was invalidated through real-world testing with a contractor. The revised direction is: **every flow must work on mobile.** See `product-direction-refinement.md` § "The entire app must work on mobile" for the rationale and replacement strategy.
+This assumption was invalidated through real-world testing with a contractor. The revised direction is: **every flow must work on mobile.** See `pwa-mobile-strategy.md` for the rationale and replacement strategy.
 
 ## Original Strategy (preserved as-is)
 

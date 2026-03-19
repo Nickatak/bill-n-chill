@@ -110,15 +110,14 @@ Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> M
 ## UX Channel Strategy
 
 - bill-n-chill serves both field and office workflows with one shared backend/API.
-- Mobile-first focus:
-  - Fast capture and updates in the field.
-  - Low-friction forms and minimal required input.
-- Desktop focus:
-  - Detailed creation and review workflows.
-  - Dense tables, filtering, and multi-step financial operations.
-- Design rule:
-  - Optimize mobile for short execution tasks.
-  - Optimize desktop for high-context editing and analysis.
+- **Every flow must work on mobile.** No flow is desktop-only. The ICP (1–10 person GC) works from the job site or the truck — there is no "office workflow." See `docs/decisions/pwa-mobile-strategy.md` for full rationale.
+- Mobile delivery: Progressive Web App (Add to Home Screen). Same codebase, no native build.
+- Desktop gets dense tables, inline editing, and power-user density — responsive doesn't mean dumbed-down.
+- CSS uses desktop-first styles with `max-width` overrides at three breakpoints:
+  - **900px** — tablet / narrow desktop (layout shifts: two-col → single-col, side panels collapse)
+  - **700px** — mobile (major layout changes, nav transforms, padding reduction)
+  - **640px** — small mobile (font sizes, compact forms, fine-tuning for narrow phones)
+- Not every page needs all three tiers. Use the tiers that make sense for the content.
 - Theme rule:
   - Both light and dark modes supported via theme toggle.
   - Public-facing pages force light mode; internal pages support both.

@@ -4,7 +4,7 @@
 
 Payment sync integration is deferred from MVP. The payments feature operates as the primary system of record — users record payments directly in BnC, and the data is pushed downstream to accounting systems.
 
-See `docs/decisions/product-direction-refinement.md` for the strategic context behind these decisions.
+See `docs/decisions/pwa-mobile-strategy.md` for the strategic context behind these decisions.
 
 ## Sync Channels (Planned)
 

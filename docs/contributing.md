@@ -69,6 +69,22 @@ Known examples of this pattern:
 - Secondary action buttons inside status/action cards
 - Filter action buttons inside filter bars
 
+### Responsive Breakpoints
+
+The app uses desktop-first CSS with `max-width` overrides at three standard breakpoints:
+
+| Breakpoint | Role | Typical changes |
+|---|---|---|
+| `900px` | Tablet / narrow desktop | Two-col → single-col, side panels collapse |
+| `700px` | Mobile | Major layout shifts, nav transforms, padding/margin reduction |
+| `640px` | Small mobile | Font size tweaks, compact form fields, fine-tuning |
+
+**Rules:**
+- Use `@media (max-width: Npx)` — not `min-width` — for responsive overrides (desktop-first).
+- Not every page needs all three tiers. Use the ones that make sense for the content.
+- Every flow must be usable at 375px width. No flow is desktop-only.
+- Shared shell components (`mobile-bottom-nav`, `mobile-drawer`, `page-shell`) already handle nav and layout chrome at 700px. Page-level CSS handles content-specific adjustments.
+
 ## Frontend Form Validation
 
 ### No Browser `required` — Use Custom Validation Only
