@@ -1,6 +1,11 @@
-# Product Direction Refinement: Field-First UI + Push-Only Sync
+# Product Direction Refinement: Field-First UI + Push-Only Sync (Superseded)
 
 Date: 2026-03-11
+Superseded: 2026-03-19 by `pwa-mobile-strategy.md`
+
+## Status: Superseded
+
+This document established the field-first mobile strategy and push-only QBO sync direction. Its decisions remain valid and have been carried forward into `pwa-mobile-strategy.md`, which adds PWA as the delivery mechanism, push notifications for status changes, and Web Share API as a replacement for programmatic SMS.
 
 ## Context
 
