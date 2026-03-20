@@ -32,8 +32,7 @@ from core.views.estimating.estimates_helpers import (
     _handle_estimate_status_transition,
     _line_items_signature,
     _next_estimate_family_version,
-    _serialize_estimate,
-    _serialize_estimates,
+    _prefetch_estimate_qs,
 )
 from core.views.helpers import (
     _build_public_decision_note,
@@ -74,11 +73,7 @@ def public_estimate_detail_view(request, public_token):
         - 404: Estimate not found.
     """
     try:
-        estimate = (
-            Estimate.objects.select_related("project__customer", "created_by")
-            .prefetch_related("line_items", "line_items__cost_code")
-            .get(public_token=public_token)
-        )
+        estimate = _prefetch_estimate_qs(Estimate.objects.all()).get(public_token=public_token)
     except Estimate.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Estimate not found.", "fields": {}}},
@@ -129,11 +124,7 @@ def public_estimate_decision_view(request, public_token):
         - 409: Estimate not in ``sent`` status.
     """
     try:
-        estimate = (
-            Estimate.objects.select_related("project__customer", "created_by")
-            .prefetch_related("line_items", "line_items__cost_code")
-            .get(public_token=public_token)
-        )
+        estimate = _prefetch_estimate_qs(Estimate.objects.all()).get(public_token=public_token)
     except Estimate.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Estimate not found.", "fields": {}}},
@@ -222,7 +213,7 @@ def public_estimate_decision_view(request, public_token):
             access_session=ceremony_session,
         )
 
-    serialized = _serialize_estimate(estimate=estimate)
+    serialized = EstimateSerializer(estimate).data
     organization = _resolve_organization_for_public_actor(estimate.created_by)
     serialized["project_context"] = _serialize_public_project_context(estimate.project)
     serialized["organization_context"] = _serialize_public_organization_context(organization, request=request)
@@ -307,19 +298,10 @@ def project_estimates_view(request, project_id):
         )
 
     if request.method == "GET":
-        estimates = (
+        estimates = _prefetch_estimate_qs(
             Estimate.objects.filter(project=project)
-            .prefetch_related("line_items", "line_items__cost_code")
-            .order_by("-version")
-        )
-        return Response(
-            {
-                "data": _serialize_estimates(
-                    estimates=estimates,
-                    project=project,
-                )
-            }
-        )
+        ).order_by("-version")
+        return Response({"data": EstimateSerializer(estimates, many=True).data})
 
     elif request.method == "POST":
         permission_error, _ = _capability_gate(request.user, "estimates", "create")
@@ -390,7 +372,7 @@ def project_estimates_view(request, project_id):
             if _estimate_stored_signature(candidate) == input_signature:
                 return Response(
                     {
-                        "data": _serialize_estimate(estimate=candidate),
+                        "data": EstimateSerializer(candidate).data,
                         "meta": {"deduped": True},
                     },
                     status=200,
@@ -468,13 +450,12 @@ def project_estimates_view(request, project_id):
                 tax_percent=data.get("tax_percent", Decimal("0")),
             )
 
-            apply_error = _apply_estimate_lines_and_totals(
+            if apply_error := _apply_estimate_lines_and_totals(
                 estimate=estimate,
                 line_items_data=line_items,
                 tax_percent=data.get("tax_percent", Decimal("0")),
                 user=request.user,
-            )
-            if apply_error:
+            ):
                 transaction.set_rollback(True)
                 return Response(
                     {
@@ -503,7 +484,7 @@ def project_estimates_view(request, project_id):
                 note=f"Archived because estimate #{estimate.id} superseded this version.",
             )
         return Response(
-            {"data": _serialize_estimate(estimate=estimate)},
+            {"data": EstimateSerializer(estimate).data},
             status=201,
         )
 
@@ -553,7 +534,7 @@ def estimate_detail_view(request, estimate_id):
         )
 
     if request.method == "GET":
-        return Response({"data": _serialize_estimate(estimate=estimate)})
+        return Response({"data": EstimateSerializer(estimate).data})
 
     elif request.method == "PATCH":
         permission_error, _ = _capability_gate(request.user, "estimates", "edit")
@@ -771,7 +752,7 @@ def estimate_clone_version_view(request, estimate_id):
             )
     return Response(
         {
-            "data": _serialize_estimate(estimate=cloned),
+            "data": EstimateSerializer(cloned).data,
             "meta": {"cloned_from": estimate.id},
         },
         status=201,
@@ -913,7 +894,7 @@ def estimate_duplicate_view(request, estimate_id):
         )
     return Response(
         {
-            "data": _serialize_estimate(estimate=duplicated),
+            "data": EstimateSerializer(duplicated).data,
             "meta": {"duplicated_from": estimate.id},
         },
         status=201,

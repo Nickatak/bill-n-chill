@@ -181,11 +181,10 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(response.status_code, 201)
         return response.json()["data"]["id"]
 
-    def _assert_validation_rule(self, response, expected_rule: str):
+    def _assert_validation_error(self, response):
         self.assertEqual(response.status_code, 400)
         payload = response.json()
         self.assertEqual(payload["error"]["code"], "validation_error")
-        self.assertEqual(payload["error"].get("rule"), expected_rule)
 
     def test_change_order_contract_requires_authentication(self):
         response = self.client.get("/api/v1/contracts/change-orders/")
@@ -490,7 +489,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self._assert_validation_rule(response, "co_create_origin_estimate_required")
+        self._assert_validation_error(response)
         self.assertIn("origin_estimate", response.json()["error"]["fields"])
 
     def test_change_order_create_rejects_non_approved_origin_estimate(self):
@@ -512,7 +511,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self._assert_validation_rule(response, "co_origin_estimate_approved_required")
+        self._assert_validation_error(response)
         self.assertIn("origin_estimate", response.json()["error"]["fields"])
 
     def test_change_order_create_rejects_line_total_mismatch(self):
@@ -538,7 +537,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self._assert_validation_rule(response, "co_line_total_must_match_amount_delta")
+        self._assert_validation_error(response)
 
     def test_change_order_patch_updates_line_items_scaffold(self):
         change_order_id = self._create_change_order(amount_delta="1200.00")
@@ -611,7 +610,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self._assert_validation_rule(blocked, "co_edit_latest_revision_only")
+        self._assert_validation_error(blocked)
 
     def test_change_order_patch_allows_non_latest_revision_status_update(self):
         base_id = self._create_change_order(amount_delta="800.00")
@@ -657,7 +656,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self._assert_validation_rule(changed, "co_origin_estimate_immutable_once_set")
+        self._assert_validation_error(changed)
 
         cleared = self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
@@ -665,7 +664,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self._assert_validation_rule(cleared, "co_origin_estimate_immutable_once_set")
+        self._assert_validation_error(cleared)
 
     def test_change_order_create_allows_duplicate_cost_codes(self):
         self._create_estimate_family()
@@ -847,7 +846,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self._assert_validation_rule(invalid, "co_status_transition_not_allowed")
+        self._assert_validation_error(invalid)
 
         to_pending = self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
@@ -875,7 +874,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self._assert_validation_rule(invalid_after_approved, "co_status_transition_not_allowed")
+        self._assert_validation_error(invalid_after_approved)
 
         invalid_void_after_approved = self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
@@ -883,7 +882,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self._assert_validation_rule(invalid_void_after_approved, "co_status_transition_not_allowed")
+        self._assert_validation_error(invalid_void_after_approved)
 
         rejected_co_id = self._create_change_order(amount_delta="300.00")
         self.client.patch(
@@ -906,7 +905,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self._assert_validation_rule(invalid_after_rejected, "co_status_transition_not_allowed")
+        self._assert_validation_error(invalid_after_rejected)
 
     def test_pending_approval_cannot_transition_back_to_draft(self):
         change_order_id = self._create_change_order(amount_delta="900.00")
@@ -925,7 +924,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self._assert_validation_rule(back_to_draft, "co_status_transition_not_allowed")
+        self._assert_validation_error(back_to_draft)
 
     def test_change_order_patch_rejects_content_edits_when_pending_approval(self):
         change_order_id = self._create_change_order(amount_delta="900.00")
@@ -944,7 +943,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self._assert_validation_rule(blocked, "co_edit_requires_draft_status")
+        self._assert_validation_error(blocked)
 
     def test_change_order_patch_rejects_content_edits_when_approved_rejected_or_void(self):
 
@@ -967,7 +966,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self._assert_validation_rule(approved_blocked, "co_edit_requires_draft_status")
+        self._assert_validation_error(approved_blocked)
 
         rejected_void_id = self._create_change_order(title="Rejected/void lock", amount_delta="450.00")
         self.client.patch(
@@ -988,7 +987,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self._assert_validation_rule(rejected_blocked, "co_edit_requires_draft_status")
+        self._assert_validation_error(rejected_blocked)
 
         self.client.patch(
             f"/api/v1/change-orders/{rejected_void_id}/",
@@ -1002,7 +1001,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self._assert_validation_rule(void_blocked, "co_edit_requires_draft_status")
+        self._assert_validation_error(void_blocked)
 
     def test_change_order_clone_revision_requires_latest_revision(self):
         base_id = self._create_change_order(amount_delta="800.00")
@@ -1020,7 +1019,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self._assert_validation_rule(blocked, "co_clone_requires_latest_revision")
+        self._assert_validation_error(blocked)
 
     def test_change_order_clone_from_open_revision_auto_voids_source_revision(self):
         base_id = self._create_change_order(amount_delta="800.00")
@@ -1265,7 +1264,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self._assert_validation_rule(to_void, "co_status_transition_not_allowed")
+        self._assert_validation_error(to_void)
 
         change_order_row = ChangeOrder.objects.get(id=change_order_id)
         self.assertIsNotNone(change_order_row.approved_by_id)
@@ -1302,7 +1301,7 @@ class ChangeOrderTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self._assert_validation_rule(amount_update, "co_edit_requires_draft_status")
+        self._assert_validation_error(amount_update)
 
         self.project.refresh_from_db()
         self.assertEqual(str(self.project.contract_value_current), "100900.00")

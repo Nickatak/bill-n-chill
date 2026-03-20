@@ -22,6 +22,7 @@ from core.serializers import (
 from core.views.helpers import _capability_gate, _ensure_org_membership
 from core.views.shared_operations.projects_helpers import (
     _build_project_financial_summary_data,
+    _prefetch_project_qs,
     _project_accepted_contract_totals_map,
 )
 
@@ -49,7 +50,7 @@ def projects_list_view(request):
     """
     membership = _ensure_org_membership(request.user)
     rows = list(
-        Project.objects.filter(organization_id=membership.organization_id).select_related("customer")
+        _prefetch_project_qs(Project.objects.filter(organization_id=membership.organization_id))
     )
     accepted_totals_by_project = _project_accepted_contract_totals_map(
         project_ids=[row.id for row in rows],
@@ -101,7 +102,7 @@ def project_detail_view(request, project_id):
     """
     membership = _ensure_org_membership(request.user)
     try:
-        project = Project.objects.select_related("customer").get(
+        project = _prefetch_project_qs(Project.objects).get(
             id=project_id,
             organization_id=membership.organization_id,
         )

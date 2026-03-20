@@ -18,7 +18,7 @@ from core.models import (
     SigningCeremonyRecord,
 )
 from core.policies import get_change_order_policy_contract
-from core.serializers import ChangeOrderSerializer, ChangeOrderWriteSerializer
+from core.serializers import ChangeOrderSerializer, ChangeOrderWriteSerializer, EstimateLineItemSerializer
 from core.serializers import ChangeOrderSerializer as _ChangeOrderSerializerForHash
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.utils.request import get_client_ip
@@ -28,17 +28,18 @@ from core.views.change_orders.change_orders_helpers import (
     _handle_co_document_save,
     _handle_co_status_note,
     _handle_co_status_transition,
-    _model_validation_error_payload,
     _next_change_order_family_key,
-    _serialize_public_change_order,
+    _prefetch_change_order_qs,
     _sync_change_order_lines,
     _validate_change_order_lines,
-    _validation_error_payload,
 )
 from core.views.helpers import (
     _build_public_decision_note,
     _capability_gate,
     _ensure_org_membership,
+    _resolve_organization_for_public_actor,
+    _serialize_public_organization_context,
+    _serialize_public_project_context,
     _validate_project_for_user,
 )
 from core.views.public_signing_helpers import get_ceremony_context, validate_ceremony_on_decision
@@ -69,28 +70,46 @@ def public_change_order_detail_view(request, public_token):
         - 404: Change order not found.
     """
     try:
-        change_order = (
-            ChangeOrder.objects.select_related(
-                "project__customer",
-                "origin_estimate",
-                "requested_by",
-                "approved_by",
-            )
-            .prefetch_related(
-                "line_items",
-                "line_items__cost_code",
-                "origin_estimate__line_items",
-                "origin_estimate__line_items__cost_code",
-            )
-            .get(public_token=public_token)
-        )
+        change_order = _prefetch_change_order_qs(
+            ChangeOrder.objects.filter(public_token=public_token)
+        ).prefetch_related(
+            "origin_estimate__line_items",
+            "origin_estimate__line_items__cost_code",
+        ).get()
     except ChangeOrder.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Change order not found.", "fields": {}}},
             status=404,
         )
 
-    serialized = _serialize_public_change_order(change_order, request=request)
+    serialized = ChangeOrderSerializer(change_order).data
+    organization = _resolve_organization_for_public_actor(change_order.requested_by)
+    serialized["project_context"] = _serialize_public_project_context(change_order.project)
+    serialized["organization_context"] = _serialize_public_organization_context(organization, request=request)
+    if change_order.origin_estimate_id:
+        estimate = change_order.origin_estimate
+        serialized["origin_estimate_context"] = {
+            "id": estimate.id,
+            "title": estimate.title,
+            "version": estimate.version,
+            "public_ref": estimate.public_ref,
+            "grand_total": str(estimate.grand_total),
+            "line_items": EstimateLineItemSerializer(
+                estimate.line_items.select_related("cost_code").all(), many=True
+            ).data,
+        }
+        sibling_cos = (
+            ChangeOrder.objects.filter(
+                origin_estimate_id=estimate.id,
+                status__in=["approved", "accepted"],
+            )
+            .exclude(id=change_order.id)
+            .prefetch_related("line_items", "line_items__cost_code")
+            .order_by("created_at", "id")
+        )
+        serialized["approved_sibling_change_orders"] = [
+            ChangeOrderSerializer(co).data for co in sibling_cos
+        ]
     consent_text, consent_version = get_ceremony_context()
     serialized["ceremony_consent_text"] = consent_text
     serialized["ceremony_consent_text_version"] = consent_version
@@ -130,19 +149,9 @@ def public_change_order_decision_view(request, public_token):
         - 409: Change order not in ``pending_approval`` status.
     """
     try:
-        change_order = (
-            ChangeOrder.objects.select_related(
-                "project",
-                "project__customer",
-                "origin_estimate",
-                "requested_by",
-            )
-            .prefetch_related(
-                "line_items",
-                "line_items__cost_code",
-            )
-            .get(public_token=public_token)
-        )
+        change_order = _prefetch_change_order_qs(
+            ChangeOrder.objects.filter(public_token=public_token)
+        ).get()
     except ChangeOrder.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Change order not found.", "fields": {}}},
@@ -150,13 +159,11 @@ def public_change_order_decision_view(request, public_token):
         )
 
     decision = str(request.data.get("decision", "")).strip().lower()
-    next_status = CO_DECISION_TO_STATUS.get(decision)
-    if not next_status:
-        return Response(*_validation_error_payload(
-            message="Invalid public decision for change order.",
-            fields={"decision": ["Use 'approve' or 'reject'."]},
-            rule="co_public_decision_invalid",
-        ))
+    if not (next_status := CO_DECISION_TO_STATUS.get(decision)):
+        return Response(
+            {"error": {"code": "validation_error", "message": "Invalid public decision for change order.", "fields": {"decision": ["Use 'approve' or 'reject'."]}}},
+            status=400,
+        )
 
     if change_order.status != ChangeOrder.Status.PENDING_APPROVAL:
         return Response(
@@ -236,16 +243,40 @@ def public_change_order_decision_view(request, public_token):
             access_session=ceremony_session,
         )
 
-    refreshed = (
-        ChangeOrder.objects.filter(id=change_order.id)
-        .select_related("project__customer", "origin_estimate", "requested_by", "approved_by")
-        .prefetch_related("line_items", "line_items__cost_code")
-        .get()
-    )
+    refreshed = _prefetch_change_order_qs(ChangeOrder.objects.filter(id=change_order.id)).get()
+
+    serialized = ChangeOrderSerializer(refreshed).data
+    organization = _resolve_organization_for_public_actor(refreshed.requested_by)
+    serialized["project_context"] = _serialize_public_project_context(refreshed.project)
+    serialized["organization_context"] = _serialize_public_organization_context(organization, request=request)
+    if refreshed.origin_estimate_id:
+        estimate = refreshed.origin_estimate
+        serialized["origin_estimate_context"] = {
+            "id": estimate.id,
+            "title": estimate.title,
+            "version": estimate.version,
+            "public_ref": estimate.public_ref,
+            "grand_total": str(estimate.grand_total),
+            "line_items": EstimateLineItemSerializer(
+                estimate.line_items.select_related("cost_code").all(), many=True
+            ).data,
+        }
+        sibling_cos = (
+            ChangeOrder.objects.filter(
+                origin_estimate_id=estimate.id,
+                status__in=["approved", "accepted"],
+            )
+            .exclude(id=refreshed.id)
+            .prefetch_related("line_items", "line_items__cost_code")
+            .order_by("created_at", "id")
+        )
+        serialized["approved_sibling_change_orders"] = [
+            ChangeOrderSerializer(co).data for co in sibling_cos
+        ]
 
     return Response(
         {
-            "data": _serialize_public_change_order(refreshed, request=request),
+            "data": serialized,
             "meta": {"applied_financial_delta": str(financial_delta)},
         }
     )
@@ -378,35 +409,31 @@ def project_change_orders_view(request, project_id):
         if "amount_delta" not in data:
             fields["amount_delta"] = ["This field is required."]
         if fields:
-            return Response(*_validation_error_payload(
-                message="Missing required fields for change order creation.",
-                fields=fields,
-                rule="co_create_missing_required_fields",
-            ))
+            return Response(
+                {"error": {"code": "validation_error", "message": "Missing required fields for change order creation.", "fields": fields}},
+                status=400,
+            )
 
         if "origin_estimate" not in data or data["origin_estimate"] is None:
-            return Response(*_validation_error_payload(
-                message="Change orders require an approved origin estimate.",
-                fields={"origin_estimate": ["Select an approved estimate from this project."]},
-                rule="co_create_origin_estimate_required",
-            ))
+            return Response(
+                {"error": {"code": "validation_error", "message": "Change orders require an approved origin estimate.", "fields": {"origin_estimate": ["Select an approved estimate from this project."]}}},
+                status=400,
+            )
         try:
             origin_estimate = Estimate.objects.get(
                 id=data["origin_estimate"],
                 project=project,
             )
         except Estimate.DoesNotExist:
-            return Response(*_validation_error_payload(
-                message="origin_estimate is invalid for this project.",
-                fields={"origin_estimate": ["Use an estimate from this project."]},
-                rule="co_origin_estimate_project_scope",
-            ))
+            return Response(
+                {"error": {"code": "validation_error", "message": "origin_estimate is invalid for this project.", "fields": {"origin_estimate": ["Use an estimate from this project."]}}},
+                status=400,
+            )
         if origin_estimate.status != Estimate.Status.APPROVED:
-            return Response(*_validation_error_payload(
-                message="Change orders require an approved origin estimate.",
-                fields={"origin_estimate": ["Only approved estimates can be used as CO origin."]},
-                rule="co_origin_estimate_approved_required",
-            ))
+            return Response(
+                {"error": {"code": "validation_error", "message": "Change orders require an approved origin estimate.", "fields": {"origin_estimate": ["Only approved estimates can be used as CO origin."]}}},
+                status=400,
+            )
 
         cost_code_map = {}
         line_total_delta = MONEY_ZERO
@@ -416,13 +443,12 @@ def project_change_orders_view(request, project_id):
                 organization_id=organization.id,
             )
             if line_error:
-                return Response(*line_error)
+                return Response(line_error, status=400)
             if line_total_delta != Decimal(str(data["amount_delta"])):
-                return Response(*_validation_error_payload(
-                    message="Line-item total must match change-order amount delta.",
-                    fields={"line_items": ["Sum of line item amount_delta must equal amount_delta."]},
-                    rule="co_line_total_must_match_amount_delta",
-                ))
+                return Response(
+                    {"error": {"code": "validation_error", "message": "Line-item total must match change-order amount delta.", "fields": {"line_items": ["Sum of line item amount_delta must equal amount_delta."]}}},
+                    status=400,
+                )
 
         sender_logo_url = ""
         if organization.logo:
@@ -453,15 +479,12 @@ def project_change_orders_view(request, project_id):
                         cost_code_map=cost_code_map,
                     )
         except ValidationError as exc:
-            return Response(*_model_validation_error_payload(
-                exc=exc,
-                message="Change-order line items are invalid for this project/budget context.",
-            ))
-        created = (
-            ChangeOrder.objects.filter(id=change_order.id)
-            .prefetch_related("line_items", "line_items__cost_code")
-            .get()
-        )
+            fields = exc.message_dict if hasattr(exc, "message_dict") else {"non_field_errors": exc.messages}
+            return Response(
+                {"error": {"code": "validation_error", "message": "Change-order line items are invalid for this project/budget context.", "fields": fields}},
+                status=400,
+            )
+        created = _prefetch_change_order_qs(ChangeOrder.objects.filter(id=change_order.id)).get()
         return Response({"data": ChangeOrderSerializer(created).data}, status=201)
 
 
@@ -504,13 +527,12 @@ def change_order_detail_view(request, change_order_id):
     """
     membership = _ensure_org_membership(request.user)
     try:
-        change_order = ChangeOrder.objects.select_related("project").prefetch_related(
-            "line_items",
-            "line_items__cost_code",
-        ).get(
-            id=change_order_id,
-            project__organization_id=membership.organization_id,
-        )
+        change_order = _prefetch_change_order_qs(
+            ChangeOrder.objects.filter(
+                id=change_order_id,
+                project__organization_id=membership.organization_id,
+            )
+        ).get()
     except ChangeOrder.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Change order not found.", "fields": {}}},
@@ -551,21 +573,16 @@ def change_order_detail_view(request, change_order_id):
             revision_number__gt=change_order.revision_number,
         ).exists()
         if latest_revision_exists and attempted_content_fields:
-            return Response(*_validation_error_payload(
-                message="Only the latest change-order revision can be edited.",
-                fields={"change_order": ["Create or edit the latest revision for this family."]},
-                rule="co_edit_latest_revision_only",
-            ))
+            return Response(
+                {"error": {"code": "validation_error", "message": "Only the latest change-order revision can be edited.", "fields": {"change_order": ["Create or edit the latest revision for this family."]}}},
+                status=400,
+            )
         if change_order.status != ChangeOrder.Status.DRAFT:
             if attempted_content_fields:
-                return Response(*_validation_error_payload(
-                    message="Only draft change orders can edit content fields.",
-                    fields={
-                        field: ["This field is read-only after draft. Clone a new revision to change content."]
-                        for field in attempted_content_fields
-                    },
-                    rule="co_edit_requires_draft_status",
-                ))
+                return Response(
+                    {"error": {"code": "validation_error", "message": "Only draft change orders can edit content fields.", "fields": {field: ["This field is read-only after draft. Clone a new revision to change content."] for field in attempted_content_fields}}},
+                    status=400,
+                )
 
         # --- Concern dispatch ---
         previous_status = change_order.status
@@ -621,11 +638,12 @@ def change_order_clone_revision_view(request, change_order_id):
     """
     membership = _ensure_org_membership(request.user)
     try:
-        change_order = (
-            ChangeOrder.objects.select_related("project", "origin_estimate")
-            .prefetch_related("line_items")
-            .get(id=change_order_id, project__organization_id=membership.organization_id)
-        )
+        change_order = _prefetch_change_order_qs(
+            ChangeOrder.objects.filter(
+                id=change_order_id,
+                project__organization_id=membership.organization_id,
+            )
+        ).get()
     except ChangeOrder.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Change order not found.", "fields": {}}},
@@ -645,11 +663,10 @@ def change_order_clone_revision_view(request, change_order_id):
         .first()
     )
     if latest and latest.id != change_order.id:
-        return Response(*_validation_error_payload(
-            message="Revisions can only be cloned from the latest family version.",
-            fields={"change_order": ["Select the latest revision before cloning."]},
-            rule="co_clone_requires_latest_revision",
-        ))
+        return Response(
+            {"error": {"code": "validation_error", "message": "Revisions can only be cloned from the latest family version.", "fields": {"change_order": ["Select the latest revision before cloning."]}}},
+            status=400,
+        )
 
     next_revision = (latest.revision_number + 1) if latest else (change_order.revision_number + 1)
     organization = membership.organization
@@ -706,9 +723,5 @@ def change_order_clone_revision_view(request, change_order_id):
                 decided_by=request.user,
             )
 
-    created = (
-        ChangeOrder.objects.filter(id=clone.id)
-        .prefetch_related("line_items", "line_items__cost_code")
-        .get()
-    )
+    created = _prefetch_change_order_qs(ChangeOrder.objects.filter(id=clone.id)).get()
     return Response({"data": ChangeOrderSerializer(created).data}, status=201)

@@ -437,13 +437,12 @@ def project_invoices_view(request, project_id: int):
                 created_by=request.user,
             )
 
-            apply_error = _apply_invoice_lines_and_totals(
+            if apply_error := _apply_invoice_lines_and_totals(
                 invoice=invoice,
                 line_items_data=line_items,
                 tax_percent=ingress.tax_percent,
                 user=request.user,
-            )
-            if apply_error:
+            ):
                 transaction.set_rollback(True)
                 payload, status_code = _invoice_line_apply_error_response(apply_error)
                 return Response(payload, status=status_code)
@@ -582,7 +581,9 @@ def invoice_send_view(request, invoice_id: int):
     """
     membership = _ensure_org_membership(request.user)
     try:
-        invoice = Invoice.objects.get(id=invoice_id, project__organization_id=membership.organization_id)
+        invoice = _prefetch_invoice_qs(
+            Invoice.objects.filter(id=invoice_id, project__organization_id=membership.organization_id)
+        ).get()
     except Invoice.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Invoice not found.", "fields": {}}},

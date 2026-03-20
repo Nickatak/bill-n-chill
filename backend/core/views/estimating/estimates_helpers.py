@@ -6,6 +6,7 @@ from typing import Any
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import transaction
+from django.db.models import QuerySet
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -32,6 +33,27 @@ ESTIMATE_DECISION_TO_STATUS: dict[str, str] = {
     "reject": Estimate.Status.REJECTED,
     "rejected": Estimate.Status.REJECTED,
 }
+
+
+# ---------------------------------------------------------------------------
+# Query prefetch
+# ---------------------------------------------------------------------------
+
+
+def _prefetch_estimate_qs(queryset: QuerySet) -> QuerySet:
+    """Apply standard select/prefetch for estimate serialization.
+
+    Prevents N+1 queries when serializing estimates with their
+    related project, customer, creator, line items, and cost codes.
+    """
+    return queryset.select_related(
+        "project",
+        "project__customer",
+        "created_by",
+    ).prefetch_related(
+        "line_items",
+        "line_items__cost_code",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -146,16 +168,6 @@ def _next_estimate_family_version(*, project: Project, title: str) -> int:
         .first()
     )
     return (latest.version + 1) if latest else 1
-
-
-def _serialize_estimate(*, estimate: Estimate) -> dict[str, Any]:
-    """Serialize a single estimate to a dict via ``EstimateSerializer``."""
-    return EstimateSerializer(estimate).data
-
-
-def _serialize_estimates(*, estimates, project: Project) -> list[dict[str, Any]]:
-    """Serialize a queryset of estimates to a list of dicts."""
-    return EstimateSerializer(estimates, many=True).data
 
 
 def _sync_project_contract_baseline_if_unset(*, estimate: Estimate) -> bool:
@@ -336,13 +348,12 @@ def _handle_estimate_document_save(
             estimate.save(update_fields=update_fields)
 
         if "line_items" in data:
-            apply_error = _apply_estimate_lines_and_totals(
+            if apply_error := _apply_estimate_lines_and_totals(
                 estimate=estimate,
                 line_items_data=data["line_items"],
                 tax_percent=data.get("tax_percent", estimate.tax_percent),
                 user=request.user,
-            )
-            if apply_error:
+            ):
                 transaction.set_rollback(True)
                 return Response(
                     {
@@ -374,7 +385,7 @@ def _handle_estimate_document_save(
             )
 
     estimate.refresh_from_db()
-    return Response({"data": _serialize_estimate(estimate=estimate), "email_sent": False})
+    return Response({"data": EstimateSerializer(estimate).data, "email_sent": False})
 
 
 def _handle_estimate_status_transition(
@@ -479,7 +490,7 @@ def _handle_estimate_status_transition(
         )
 
     estimate.refresh_from_db()
-    return Response({"data": _serialize_estimate(estimate=estimate), "email_sent": email_sent})
+    return Response({"data": EstimateSerializer(estimate).data, "email_sent": email_sent})
 
 
 def _handle_estimate_status_note(
@@ -504,4 +515,4 @@ def _handle_estimate_status_note(
         )
 
     estimate.refresh_from_db()
-    return Response({"data": _serialize_estimate(estimate=estimate), "email_sent": False})
+    return Response({"data": EstimateSerializer(estimate).data, "email_sent": False})

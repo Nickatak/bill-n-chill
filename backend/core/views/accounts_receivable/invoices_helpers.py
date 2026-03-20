@@ -1,22 +1,29 @@
 """Domain-specific helpers for invoice views."""
 
+from __future__ import annotations
+
 from decimal import Decimal
 
 from django.conf import settings
+from django.contrib.auth.models import AbstractUser
 from django.db import transaction
 from django.db.models import QuerySet, Sum
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.models import (
     Invoice,
     InvoiceLine,
     InvoiceStatusEvent,
+    Organization,
+    OrganizationMembership,
     Payment,
     Project,
 )
 from core.serializers import InvoiceSerializer
 from core.utils.email import send_document_sent_email
 from core.utils.money import MONEY_ZERO, quantize_money
+from core.views.accounts_receivable.invoice_ingress import InvoicePatchIngress
 from core.views.helpers import (
     _resolve_cost_codes_for_user,
 )
@@ -49,7 +56,7 @@ def _is_billable_invoice_status(status: str) -> bool:
     return status in BILLABLE_INVOICE_STATUSES
 
 
-def _project_billable_invoices_total(*, project: Project, user, exclude_invoice_id: int | None = None) -> Decimal:
+def _project_billable_invoices_total(*, project: Project, user: AbstractUser, exclude_invoice_id: int | None = None) -> Decimal:
     """Sum the totals of all billable invoices for a project, optionally excluding one."""
     query = Invoice.objects.filter(
         project=project,
@@ -60,7 +67,7 @@ def _project_billable_invoices_total(*, project: Project, user, exclude_invoice_
     return quantize_money(query.aggregate(total=Sum("total")).get("total") or MONEY_ZERO)
 
 
-def _next_invoice_number(*, project: Project, user) -> str:
+def _next_invoice_number(*, project: Project, user: AbstractUser) -> str:
     """Generate the next unique sequential invoice number for a project.
 
     Starts from the current count + 1 and increments until a collision-free
@@ -106,7 +113,7 @@ def _calculate_invoice_line_totals(line_items_data: list[dict]) -> tuple[list[di
 
 
 def _apply_invoice_lines_and_totals(
-    invoice: Invoice, line_items_data: list[dict], tax_percent: Decimal, user,
+    invoice: Invoice, line_items_data: list[dict], tax_percent: Decimal, user: AbstractUser,
 ) -> dict | None:
     """Replace an invoice's line items and recompute all totals.
 
@@ -207,7 +214,7 @@ def _invoice_line_apply_error_response(apply_error: dict) -> tuple[dict, int]:
     )
 
 
-def _activate_project_from_invoice_creation(*, invoice: Invoice, actor) -> bool:
+def _activate_project_from_invoice_creation(*, invoice: Invoice, actor: AbstractUser) -> bool:
     """Transition a prospect project to active when a direct invoice is created.
 
     Returns True if the project status was changed, False otherwise.
@@ -229,7 +236,7 @@ def _activate_project_from_invoice_creation(*, invoice: Invoice, actor) -> bool:
 
 
 def _freeze_org_identity_on_invoice(
-    invoice: Invoice, organization, request, update_fields: list[str],
+    invoice: Invoice, organization: Organization, request: Request, update_fields: list[str],
 ) -> None:
     """Stamp org identity fields onto the invoice when leaving draft.
 
@@ -266,7 +273,7 @@ def _freeze_org_identity_on_invoice(
 # ---------------------------------------------------------------------------
 
 
-def _handle_invoice_document_save(request, invoice: Invoice, ingress) -> Response:
+def _handle_invoice_document_save(request: Request, invoice: Invoice, ingress: InvoicePatchIngress) -> Response:
     """Apply field updates, line items, and totals to an invoice (the 'save' concern).
 
     Handles dates, tax_percent, sender fields, terms, footer, notes, line items,
@@ -357,13 +364,12 @@ def _handle_invoice_document_save(request, invoice: Invoice, ingress) -> Respons
             invoice.save(update_fields=update_fields)
 
         if ingress.has_line_items:
-            apply_error = _apply_invoice_lines_and_totals(
+            if apply_error := _apply_invoice_lines_and_totals(
                 invoice=invoice,
                 line_items_data=ingress.line_items,
                 tax_percent=ingress.tax_percent if ingress.has_tax_percent else invoice.tax_percent,
                 user=request.user,
-            )
-            if apply_error:
+            ):
                 transaction.set_rollback(True)
                 payload, status_code = _invoice_line_apply_error_response(apply_error)
                 return Response(payload, status=status_code)
@@ -390,7 +396,7 @@ def _handle_invoice_document_save(request, invoice: Invoice, ingress) -> Respons
 
 
 def _handle_invoice_status_transition(
-    request, invoice: Invoice, ingress, membership,
+    request: Request, invoice: Invoice, ingress: InvoicePatchIngress, membership: OrganizationMembership,
     previous_status: str, next_status: str, is_resend: bool,
 ) -> Response:
     """Handle an invoice status transition: validate, apply, freeze org identity, audit, email.
@@ -482,7 +488,7 @@ def _handle_invoice_status_transition(
     return Response({"data": InvoiceSerializer(invoice).data, "email_sent": email_sent})
 
 
-def _handle_invoice_status_note(request, invoice: Invoice, ingress) -> Response:
+def _handle_invoice_status_note(request: Request, invoice: Invoice, ingress: InvoicePatchIngress) -> Response:
     """Append an audit note to the invoice timeline without changing status.
 
     Called when the PATCH includes a status_note but no actual status change.

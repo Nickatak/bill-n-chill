@@ -4,14 +4,28 @@ from decimal import Decimal
 from typing import Any
 
 from django.contrib.auth import get_user_model
-from django.db.models import Model, Sum
+from django.db.models import Model, QuerySet, Sum
 
-from core.models import Customer, Invoice, OrganizationMembership, Payment, Receipt, VendorBill
+from core.models import Invoice, OrganizationMembership, Payment, Receipt, VendorBill
 from core.models.financial_auditing.invoice_status_event import InvoiceStatusEvent
 from core.utils.money import MONEY_ZERO, quantize_money
-from core.views.helpers import _validate_project_for_user
 
 User = get_user_model()
+
+
+def _prefetch_payment_qs(queryset: QuerySet) -> QuerySet:
+    """Apply standard select/prefetch for payment serialization.
+
+    Prevents N+1 queries when serializing payments with their
+    related customer, project, invoice, vendor bill, and receipt.
+    """
+    return queryset.select_related(
+        "customer",
+        "project",
+        "invoice",
+        "vendor_bill",
+        "receipt",
+    )
 
 
 def _set_invoice_balance_from_payments(invoice: Invoice, *, changed_by: "User") -> None:
@@ -163,28 +177,31 @@ def _direction_target_mismatch(direction: str, target_type: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
+def _target_error(fields: dict[str, list[str]]) -> dict:
+    """Build a standard validation error payload for target resolution failures."""
+    return {"error": {"code": "validation_error", "message": "Invalid payment target.", "fields": fields}}
+
+
 def _resolve_and_link_target(
     data: dict[str, Any],
     payment_kwargs: dict[str, Any],
     membership: OrganizationMembership,
-    fields: dict[str, list[str]],
-) -> Model | None:
+) -> tuple[Model | None, dict | None]:
     """Resolve ``target_type`` + ``target_id`` from payload and populate payment FK kwargs.
 
     Validates that the target document exists, is org-scoped, and is in a
-    linkable status.  Returns the resolved target object or ``None``.
-    Validation errors are appended to ``fields``.
+    linkable status.  Returns ``(target, None)`` on success or
+    ``(None, error_payload)`` on validation failure.
     """
     target_type = data.get("target_type", "")
     target_id = data.get("target_id")
     direction = payment_kwargs.get("direction", "")
 
     if not target_type or not target_id:
-        return None
+        return None, None
 
     if _direction_target_mismatch(direction, target_type):
-        fields["target_type"] = ["target_type does not match payment direction."]
-        return None
+        return None, _target_error({"target_type": ["target_type does not match payment direction."]})
 
     payment_kwargs["target_type"] = target_type
 
@@ -194,16 +211,13 @@ def _resolve_and_link_target(
             project__organization_id=membership.organization_id,
         ).first()
         if not target:
-            fields["target_id"] = ["Invoice not found in this organization."]
-            return None
+            return None, _target_error({"target_id": ["Invoice not found in this organization."]})
         if target.status == Invoice.Status.VOID:
-            fields["target_id"] = ["Cannot link payment to a void invoice."]
-            return None
+            return None, _target_error({"target_id": ["Cannot link payment to a void invoice."]})
         if target.status == Invoice.Status.DRAFT:
-            fields["target_id"] = ["Cannot record payment against a draft invoice. Send it first."]
-            return None
+            return None, _target_error({"target_id": ["Cannot record payment against a draft invoice. Send it first."]})
         payment_kwargs["invoice"] = target
-        return target
+        return target, None
 
     if target_type == Payment.TargetType.VENDOR_BILL:
         target = VendorBill.objects.filter(
@@ -211,13 +225,11 @@ def _resolve_and_link_target(
             project__organization_id=membership.organization_id,
         ).first()
         if not target:
-            fields["target_id"] = ["Vendor bill not found in this organization."]
-            return None
+            return None, _target_error({"target_id": ["Vendor bill not found in this organization."]})
         if target.status == VendorBill.Status.VOID:
-            fields["target_id"] = ["Cannot link payment to a void vendor bill."]
-            return None
+            return None, _target_error({"target_id": ["Cannot link payment to a void vendor bill."]})
         payment_kwargs["vendor_bill"] = target
-        return target
+        return target, None
 
     if target_type == Payment.TargetType.RECEIPT:
         target = Receipt.objects.filter(
@@ -225,13 +237,11 @@ def _resolve_and_link_target(
             project__organization_id=membership.organization_id,
         ).first()
         if not target:
-            fields["target_id"] = ["Receipt not found in this organization."]
-            return None
+            return None, _target_error({"target_id": ["Receipt not found in this organization."]})
         payment_kwargs["receipt"] = target
-        return target
+        return target, None
 
-    fields["target_type"] = ["Invalid target type."]
-    return None
+    return None, _target_error({"target_type": ["Invalid target type."]})
 
 
 def _recalculate_target_balance(

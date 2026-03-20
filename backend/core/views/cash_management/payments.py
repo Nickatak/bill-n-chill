@@ -1,7 +1,5 @@
 """Cash-management payment endpoints."""
 
-from decimal import Decimal
-
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
@@ -24,6 +22,7 @@ from core.views.helpers import (
     _validate_project_for_user,
 )
 from core.views.cash_management.payments_helpers import (
+    _prefetch_payment_qs,
     _recalculate_payment_target,
     _recalculate_target_balance,
     _resolve_and_link_target,
@@ -95,11 +94,9 @@ def org_payments_view(request):
     membership = _ensure_org_membership(request.user)
 
     if request.method == "GET":
-        rows = (
+        rows = _prefetch_payment_qs(
             Payment.objects.filter(organization_id=membership.organization_id)
-            .select_related("customer", "project", "invoice", "vendor_bill", "receipt")
-            .order_by("-payment_date", "-created_at")
-        )
+        ).order_by("-payment_date", "-created_at")
         return Response({"data": PaymentSerializer(rows, many=True).data})
 
     elif request.method == "POST":
@@ -166,13 +163,9 @@ def org_payments_view(request):
             "created_by": request.user,
         }
 
-        target_fields = {}
-        target = _resolve_and_link_target(data, payment_kwargs, membership, target_fields)
-        if target_fields:
-            return Response(
-                {"error": {"code": "validation_error", "message": "Invalid target.", "fields": target_fields}},
-                status=400,
-            )
+        target, target_error = _resolve_and_link_target(data, payment_kwargs, membership)
+        if target_error:
+            return Response(target_error, status=400)
 
         with transaction.atomic():
             payment = Payment.objects.create(**payment_kwargs)
@@ -241,11 +234,9 @@ def project_payments_view(request, project_id):
     membership = _ensure_org_membership(request.user)
 
     if request.method == "GET":
-        rows = (
+        rows = _prefetch_payment_qs(
             Payment.objects.filter(project=project)
-            .select_related("project", "invoice", "vendor_bill", "receipt")
-            .order_by("-payment_date", "-created_at")
-        )
+        ).order_by("-payment_date", "-created_at")
         return Response({"data": PaymentSerializer(rows, many=True).data})
 
     elif request.method == "POST":
@@ -284,13 +275,9 @@ def project_payments_view(request, project_id):
             "created_by": request.user,
         }
 
-        target_fields = {}
-        target = _resolve_and_link_target(data, payment_kwargs, membership, target_fields)
-        if target_fields:
-            return Response(
-                {"error": {"code": "validation_error", "message": "Invalid target.", "fields": target_fields}},
-                status=400,
-            )
+        target, target_error = _resolve_and_link_target(data, payment_kwargs, membership)
+        if target_error:
+            return Response(target_error, status=400)
 
         with transaction.atomic():
             payment = Payment.objects.create(**payment_kwargs)
@@ -349,12 +336,12 @@ def payment_detail_view(request, payment_id):
     """
     membership = _ensure_org_membership(request.user)
     try:
-        payment = Payment.objects.select_related(
-            "customer", "project", "invoice", "vendor_bill", "receipt",
-        ).get(
-            id=payment_id,
-            organization_id=membership.organization_id,
-        )
+        payment = _prefetch_payment_qs(
+            Payment.objects.filter(
+                id=payment_id,
+                organization_id=membership.organization_id,
+            )
+        ).get()
     except Payment.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Payment not found.", "fields": {}}},

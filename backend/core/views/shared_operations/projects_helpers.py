@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Any
 
 from django.contrib.auth.models import AbstractUser
+from django.db.models import QuerySet
 from rest_framework.request import Request
 
 from core.models import (
@@ -15,6 +16,14 @@ from core.models import (
     Project,
     VendorBill,
 )
+
+
+def _prefetch_project_qs(queryset: QuerySet) -> QuerySet:
+    """Apply standard select/prefetch for project serialization.
+
+    Prevents N+1 queries when serializing projects with their related customer.
+    """
+    return queryset.select_related("customer")
 
 
 def _parse_optional_date(value: str) -> tuple[date | None, list[str] | None]:

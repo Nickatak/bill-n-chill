@@ -4,10 +4,9 @@ from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
-from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import F, Sum
+from django.db.models import F, QuerySet, Sum
 from django.utils import timezone
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -21,14 +20,9 @@ from core.models import (
     OrganizationMembership,
     Project,
 )
-from core.serializers import ChangeOrderSerializer, EstimateLineItemSerializer
+from core.serializers import ChangeOrderSerializer
 from core.utils.email import send_document_sent_email
 from core.utils.money import MONEY_ZERO, quantize_money
-from core.views.helpers import (
-    _resolve_organization_for_public_actor,
-    _serialize_public_organization_context,
-    _serialize_public_project_context,
-)
 
 
 # ---------------------------------------------------------------------------
@@ -44,59 +38,44 @@ CO_DECISION_TO_STATUS: dict[str, str] = {
 
 
 # ---------------------------------------------------------------------------
-# Serialization
+# Query helpers
 # ---------------------------------------------------------------------------
 
 
-def _serialize_public_change_order(change_order: ChangeOrder, request: Request | None = None) -> dict[str, Any]:
-    """Serialize a change order with project and organization context for public preview.
+def _prefetch_change_order_qs(queryset: QuerySet) -> QuerySet:
+    """Apply standard select/prefetch for change order serialization.
 
-    Includes origin estimate line items and approved sibling change orders for
-    the contract breakdown section on the public document.
+    Prevents N+1 queries when serializing change orders with their
+    related project, customer, origin estimate, line items, and cost codes.
     """
-    serialized = ChangeOrderSerializer(change_order).data
-    organization = _resolve_organization_for_public_actor(change_order.requested_by)
-    serialized["project_context"] = _serialize_public_project_context(change_order.project)
-    serialized["organization_context"] = _serialize_public_organization_context(organization, request=request)
-    if change_order.origin_estimate_id:
-        estimate = change_order.origin_estimate
-        serialized["origin_estimate_context"] = {
-            "id": estimate.id,
-            "title": estimate.title,
-            "version": estimate.version,
-            "public_ref": estimate.public_ref,
-            "grand_total": str(estimate.grand_total),
-            "line_items": EstimateLineItemSerializer(
-                estimate.line_items.select_related("cost_code").all(), many=True
-            ).data,
-        }
-        # Approved/accepted sibling COs on the same origin estimate (excluding this CO).
-        sibling_cos = (
-            ChangeOrder.objects.filter(
-                origin_estimate_id=estimate.id,
-                status__in=["approved", "accepted"],
-            )
-            .exclude(id=change_order.id)
-            .prefetch_related("line_items", "line_items__cost_code")
-            .order_by("created_at", "id")
-        )
-        serialized["approved_sibling_change_orders"] = [
-            ChangeOrderSerializer(co).data for co in sibling_cos
-        ]
-    return serialized
+    return queryset.select_related(
+        "project",
+        "project__customer",
+        "origin_estimate",
+        "requested_by",
+        "approved_by",
+    ).prefetch_related(
+        "line_items",
+        "line_items__cost_code",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
 
 
 def _validate_change_order_lines(
     *,
     line_items: list[dict],
     organization_id: int,
-) -> tuple[dict[int, CostCode], Decimal, tuple | None]:
+) -> tuple[dict[int, CostCode], Decimal, dict | None]:
     """Validate change-order line items and resolve cost codes.
 
-    Returns ``(cost_code_map, line_total_delta, error_tuple_or_none)``.
+    Returns ``(cost_code_map, line_total_delta, error_or_none)``.
     Each line must specify a ``cost_code`` that belongs to the organization.
-    The error tuple, when present, is ``(body, status_code)`` for
-    ``Response(*error)``.
+    The error dict, when present, is a complete response payload ready for
+    ``Response(error, status=400)``.
     """
     if not line_items:
         return {}, MONEY_ZERO, None
@@ -107,11 +86,7 @@ def _validate_change_order_lines(
         if not cc_id:
             return (
                 {}, MONEY_ZERO,
-                _validation_error_payload(
-                    message="Lines must specify a cost code.",
-                    fields={"line_items": ["Provide cost_code for each line."]},
-                    rule="co_line_requires_cost_code",
-                ),
+                {"error": {"code": "validation_error", "message": "Lines must specify a cost code.", "fields": {"line_items": ["Provide cost_code for each line."]}}},
             )
         cost_code_ids.add(int(cc_id))
 
@@ -127,11 +102,7 @@ def _validate_change_order_lines(
         if len(cost_code_map) != len(cost_code_ids):
             return (
                 {}, MONEY_ZERO,
-                _validation_error_payload(
-                    message="One or more cost_code values are invalid.",
-                    fields={"line_items": ["Use valid cost_code ids."]},
-                    rule="co_line_cost_code_invalid",
-                ),
+                {"error": {"code": "validation_error", "message": "One or more cost_code values are invalid.", "fields": {"line_items": ["Use valid cost_code ids."]}}},
             )
 
     total = MONEY_ZERO
@@ -164,27 +135,6 @@ def _sync_change_order_lines(
         )
 
 
-def _validation_error_payload(
-    *,
-    message: str,
-    fields: dict[str, list[str]],
-    rule: str | None = None,
-) -> tuple[dict, int]:
-    """Build a ``(body, status_code)`` tuple for a 400 validation error.
-
-    Returns the raw payload and HTTP status so the calling view owns
-    ``Response`` construction via ``Response(*result)``.
-    """
-    error = {
-        "code": "validation_error",
-        "message": message,
-        "fields": fields,
-    }
-    if rule:
-        error["rule"] = rule
-    return {"error": error}, 400
-
-
 def _next_change_order_family_key(*, project: Project) -> str:
     """Return the next numeric family key string for change orders in a project.
 
@@ -198,48 +148,6 @@ def _next_change_order_family_key(*, project: Project) -> str:
         if key_str.isdigit():
             numeric_keys.append(int(key_str))
     return str((max(numeric_keys) + 1) if numeric_keys else 1)
-
-
-def _infer_model_validation_rule(*, fields: dict[str, list[str]]) -> str | None:
-    """Infer a domain-specific rule code from Django model ValidationError field names.
-
-    Maps known field combinations to rule codes so the frontend can
-    display targeted guidance without parsing error messages.
-    """
-    field_keys = set(fields.keys())
-    if {"approved_by", "approved_at"} & field_keys:
-        return "co_approval_metadata_invariant"
-    if {"previous_change_order", "family_key", "revision_number"} & field_keys:
-        return "co_revision_chain_invalid"
-    if "status" in field_keys:
-        return "co_status_transition_not_allowed"
-    if "origin_estimate" in field_keys:
-        return "co_origin_estimate_project_scope"
-    if {"cost_code", "line_type"} & field_keys:
-        return "co_line_cost_code_invalid"
-    return None
-
-
-def _model_validation_error_payload(
-    *,
-    exc: ValidationError,
-    message: str,
-) -> tuple[dict, int]:
-    """Convert a Django model ``ValidationError`` into a ``(body, status_code)`` tuple.
-
-    Extracts field-level errors from the exception and infers a rule code
-    for frontend targeting.
-    """
-    fields = {}
-    if hasattr(exc, "message_dict"):
-        fields = exc.message_dict
-    else:
-        fields = {"non_field_errors": exc.messages}
-    return _validation_error_payload(
-        message=message,
-        fields=fields,
-        rule=_infer_model_validation_rule(fields=fields),
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -272,13 +180,12 @@ def _handle_co_document_save(
             organization_id=membership.organization_id,
         )
         if line_error:
-            return Response(*line_error)
+            return Response(line_error, status=400)
         if line_total_delta != next_amount_delta:
-            return Response(*_validation_error_payload(
-                message="Line-item total must match change-order amount delta.",
-                fields={"line_items": ["Sum of line item amount_delta must equal amount_delta."]},
-                rule="co_line_total_must_match_amount_delta",
-            ))
+            return Response(
+                {"error": {"code": "validation_error", "message": "Line-item total must match change-order amount delta.", "fields": {"line_items": ["Sum of line item amount_delta must equal amount_delta."]}}},
+                status=400,
+            )
     else:
         existing_line_total = (
             change_order.line_items.aggregate(total=Sum("amount_delta")).get("total")
@@ -289,32 +196,25 @@ def _handle_co_document_save(
             and existing_line_total != Decimal("0.00")
             and existing_line_total != next_amount_delta
         ):
-            return Response(*_validation_error_payload(
-                message="Existing line items no longer match amount delta.",
-                fields={
-                    "amount_delta": [
-                        "Update line_items with amount_delta so total remains consistent.",
-                    ]
-                },
-                rule="co_line_total_must_match_amount_delta",
-            ))
+            return Response(
+                {"error": {"code": "validation_error", "message": "Existing line items no longer match amount delta.", "fields": {"amount_delta": ["Update line_items with amount_delta so total remains consistent."]}}},
+                status=400,
+            )
 
     # Origin estimate validation
     update_fields = ["updated_at"]
     if "origin_estimate" in data:
         if change_order.origin_estimate_id and data["origin_estimate"] != change_order.origin_estimate_id:
-            return Response(*_validation_error_payload(
-                message="origin_estimate cannot be changed after being set.",
-                fields={"origin_estimate": ["Create a new revision to change estimate linkage."]},
-                rule="co_origin_estimate_immutable_once_set",
-            ))
+            return Response(
+                {"error": {"code": "validation_error", "message": "origin_estimate cannot be changed after being set.", "fields": {"origin_estimate": ["Create a new revision to change estimate linkage."]}}},
+                status=400,
+            )
         if data["origin_estimate"] is None:
             if change_order.origin_estimate_id is not None:
-                return Response(*_validation_error_payload(
-                    message="origin_estimate cannot be cleared once set.",
-                    fields={"origin_estimate": ["Create a new revision to remove estimate linkage."]},
-                    rule="co_origin_estimate_immutable_once_set",
-                ))
+                return Response(
+                    {"error": {"code": "validation_error", "message": "origin_estimate cannot be cleared once set.", "fields": {"origin_estimate": ["Create a new revision to remove estimate linkage."]}}},
+                    status=400,
+                )
         elif change_order.origin_estimate_id is None:
             try:
                 origin_estimate = Estimate.objects.get(
@@ -322,17 +222,15 @@ def _handle_co_document_save(
                     project=change_order.project,
                 )
             except Estimate.DoesNotExist:
-                return Response(*_validation_error_payload(
-                    message="origin_estimate is invalid for this project.",
-                    fields={"origin_estimate": ["Use an estimate from this project."]},
-                    rule="co_origin_estimate_project_scope",
-                ))
+                return Response(
+                    {"error": {"code": "validation_error", "message": "origin_estimate is invalid for this project.", "fields": {"origin_estimate": ["Use an estimate from this project."]}}},
+                    status=400,
+                )
             if origin_estimate.status != Estimate.Status.APPROVED:
-                return Response(*_validation_error_payload(
-                    message="Change orders require an approved origin estimate.",
-                    fields={"origin_estimate": ["Only approved estimates can be used as CO origin."]},
-                    rule="co_origin_estimate_approved_required",
-                ))
+                return Response(
+                    {"error": {"code": "validation_error", "message": "Change orders require an approved origin estimate.", "fields": {"origin_estimate": ["Only approved estimates can be used as CO origin."]}}},
+                    status=400,
+                )
             change_order.origin_estimate = origin_estimate
             update_fields.append("origin_estimate")
 
@@ -367,16 +265,13 @@ def _handle_co_document_save(
                     cost_code_map=cost_code_map,
                 )
     except ValidationError as exc:
-        return Response(*_model_validation_error_payload(
-            exc=exc,
-            message="Change-order line items are invalid for this project/budget context.",
-        ))
+        fields = exc.message_dict if hasattr(exc, "message_dict") else {"non_field_errors": exc.messages}
+        return Response(
+            {"error": {"code": "validation_error", "message": "Change-order line items are invalid for this project/budget context.", "fields": fields}},
+            status=400,
+        )
 
-    refreshed = (
-        ChangeOrder.objects.filter(id=change_order.id)
-        .prefetch_related("line_items", "line_items__cost_code")
-        .get()
-    )
+    refreshed = _prefetch_change_order_qs(ChangeOrder.objects.filter(id=change_order.id)).get()
     return Response({"data": ChangeOrderSerializer(refreshed).data, "email_sent": False})
 
 
@@ -401,11 +296,10 @@ def _handle_co_status_transition(
         current_status=previous_status,
         next_status=next_status,
     ):
-        return Response(*_validation_error_payload(
-            message=f"Invalid change order status transition: {previous_status} -> {next_status}.",
-            fields={"status": ["This transition is not allowed."]},
-            rule="co_status_transition_not_allowed",
-        ))
+        return Response(
+            {"error": {"code": "validation_error", "message": f"Invalid change order status transition: {previous_status} -> {next_status}.", "fields": {"status": ["This transition is not allowed."]}}},
+            status=400,
+        )
 
     # Financial delta
     current_amount_delta = quantize_money(change_order.amount_delta)
@@ -482,10 +376,11 @@ def _handle_co_status_transition(
                     decided_by=request.user,
                 )
     except ValidationError as exc:
-        return Response(*_model_validation_error_payload(
-            exc=exc,
-            message="Change-order line items are invalid for this project/budget context.",
-        ))
+        fields = exc.message_dict if hasattr(exc, "message_dict") else {"non_field_errors": exc.messages}
+        return Response(
+            {"error": {"code": "validation_error", "message": "Change-order line items are invalid for this project/budget context.", "fields": fields}},
+            status=400,
+        )
 
     # Email notification (outside transaction)
     email_sent = False
@@ -501,11 +396,7 @@ def _handle_co_status_transition(
             sender_user=request.user,
         )
 
-    refreshed = (
-        ChangeOrder.objects.filter(id=change_order.id)
-        .prefetch_related("line_items", "line_items__cost_code")
-        .get()
-    )
+    refreshed = _prefetch_change_order_qs(ChangeOrder.objects.filter(id=change_order.id)).get()
     return Response({"data": ChangeOrderSerializer(refreshed).data, "email_sent": email_sent})
 
 
@@ -520,9 +411,5 @@ def _handle_co_status_note(
     frontend PATCH symmetry with estimates/invoices and returns the
     current document unchanged.
     """
-    refreshed = (
-        ChangeOrder.objects.filter(id=change_order.id)
-        .prefetch_related("line_items", "line_items__cost_code")
-        .get()
-    )
+    refreshed = _prefetch_change_order_qs(ChangeOrder.objects.filter(id=change_order.id)).get()
     return Response({"data": ChangeOrderSerializer(refreshed).data, "email_sent": False})

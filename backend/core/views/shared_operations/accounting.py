@@ -51,8 +51,7 @@ def project_accounting_sync_events_view(request, project_id):
         - 403: Missing ``accounting_sync.create`` capability.
         - 404: Project not found.
     """
-    project = _validate_project_for_user(project_id, request.user)
-    if not project:
+    if not (project := _validate_project_for_user(project_id, request.user)):
         return Response(
             {"error": {"code": "not_found", "message": "Project not found.", "fields": {}}},
             status=404,
