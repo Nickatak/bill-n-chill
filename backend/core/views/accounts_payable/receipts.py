@@ -7,7 +7,7 @@ from rest_framework.response import Response
 
 from core.models import Receipt, Store
 from core.serializers import ReceiptSerializer, ReceiptWriteSerializer
-from core.utils.money import MONEY_ZERO, quantize_money
+from core.utils.money import quantize_money, validate_positive_amount
 from core.user_helpers import _ensure_org_membership
 from core.views.accounts_payable.receipts_helpers import _prefetch_receipt_qs
 from core.views.helpers import (
@@ -108,31 +108,13 @@ def project_receipts_view(request, project_id: int):
         data = serializer.validated_data
 
         amount = quantize_money(data["amount"])
-        if amount <= MONEY_ZERO:
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_error",
-                        "message": "Amount must be greater than zero.",
-                        "fields": {"amount": ["Must be greater than zero."]},
-                    }
-                },
-                status=400,
-            )
+        if error := validate_positive_amount(amount):
+            return Response(error, status=400)
 
-        # Find-or-create Store by name (org-scoped, case-insensitive)
         store = None
         store_name = (data.get("store_name") or "").strip()
         if store_name:
-            store, _ = Store.objects.get_or_create(
-                organization_id=project.organization_id,
-                name__iexact=store_name,
-                defaults={
-                    "name": store_name,
-                    "organization_id": project.organization_id,
-                    "created_by": request.user,
-                },
-            )
+            store, _ = Store.get_or_create_by_name(project.organization_id, store_name, request.user)
 
         receipt_date = data.get("receipt_date") or timezone.localdate()
 

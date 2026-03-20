@@ -45,6 +45,24 @@ class Store(models.Model):
             ),
         ]
 
+    @classmethod
+    def get_or_create_by_name(cls, organization_id, name, created_by):
+        """Find or create a Store by name within an org (case-insensitive).
+
+        Returns the standard ``(instance, created)`` tuple from
+        ``get_or_create``. Matching is case-insensitive; the stored
+        name preserves the casing of the first submission.
+        """
+        return cls.objects.get_or_create(
+            organization_id=organization_id,
+            name__iexact=name,
+            defaults={
+                "name": name,
+                "organization_id": organization_id,
+                "created_by": created_by,
+            },
+        )
+
     def __str__(self) -> str:
         return self.name
 

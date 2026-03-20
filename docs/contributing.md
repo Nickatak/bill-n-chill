@@ -8,6 +8,7 @@ Last reviewed: 2026-03-04
   - [Branching](#branching)
   - [Code Quality](#code-quality)
   - [Helper Placement](#helper-placement)
+  - [Walrus Operator for Validation Guards](#walrus-operator-for-validation-guards)
   - [View Docstrings](#view-docstrings)
   - [Commit Style](#commit-style)
   - [Review Focus](#review-focus)
@@ -52,6 +53,23 @@ Last reviewed: 2026-03-04
 - **Constant placement in helper files:** Constants imported by views (e.g., `_VERIFY_ERROR_MAP`) go at the top of the helpers file. Constants only used by a single helper function sit directly above that function. This keeps view-facing exports visible at the top and internal details co-located with their consumers.
 - Cross-domain shared utilities and re-exports live in `views/helpers.py`, which stays slim and acts as a single import point for common operations (RBAC gates, org scoping, pagination, etc.).
 - **Multi-method views use explicit branching.** When a view handles multiple HTTP methods, use `if`/`elif`/`else` — not early returns from the first branch. This keeps the structure consistent whether the view handles 2 or 4 methods, and avoids implicit fall-through that relies on the reader knowing a prior branch already returned.
+
+### Walrus operator for validation guards
+
+When a helper returns an error-or-`None`, use the walrus operator (`:=`) to assign and test in one expression:
+
+```python
+# Preferred
+if error := validate_positive_amount(amount):
+    return Response(error, status=400)
+
+# Instead of
+error = validate_positive_amount(amount)
+if error:
+    return Response(error, status=400)
+```
+
+This only works for single-return helpers. Tuple-returning functions like `_capability_gate` still need the two-line pattern. When designing new validation helpers, prefer the single-return (error-or-`None`) shape so callers can use walrus.
 
 ### Type hints
 - **Helpers: yes.** Helper functions (in `*_helpers.py`, `utils/`, `services/`) should use type hints on parameters and return types — especially for non-obvious signatures like tuple returns, generic model parameters, and `Optional`/union types.

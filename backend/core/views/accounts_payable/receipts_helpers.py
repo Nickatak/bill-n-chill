@@ -1,7 +1,9 @@
 """Helpers for receipt views — shared queries and logic."""
 
+from django.db.models import QuerySet
 
-def _prefetch_receipt_qs(queryset):
+
+def _prefetch_receipt_qs(queryset: QuerySet) -> QuerySet:
     """Eagerly load receipt relations to prevent N+1 query problems.
 
     Without this, serializing a list of receipts would fire separate SQL
