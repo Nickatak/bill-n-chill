@@ -80,14 +80,14 @@ def public_estimate_detail_view(request, public_token):
             status=404,
         )
 
-    serialized = EstimateSerializer(estimate).data
+    estimate_data = EstimateSerializer(estimate).data
     organization = _resolve_organization_for_public_actor(estimate.created_by)
-    serialized["project_context"] = _serialize_public_project_context(estimate.project)
-    serialized["organization_context"] = _serialize_public_organization_context(organization, request=request)
+    estimate_data["project_context"] = _serialize_public_project_context(estimate.project)
+    estimate_data["organization_context"] = _serialize_public_organization_context(organization, request=request)
     consent_text, consent_version = get_ceremony_context()
-    serialized["ceremony_consent_text"] = consent_text
-    serialized["ceremony_consent_text_version"] = consent_version
-    return Response({"data": serialized})
+    estimate_data["ceremony_consent_text"] = consent_text
+    estimate_data["ceremony_consent_text_version"] = consent_version
+    return Response({"data": estimate_data})
 
 
 @api_view(["POST"])
@@ -178,7 +178,7 @@ def public_estimate_decision_view(request, public_token):
         estimate.status = next_status
         estimate.save(update_fields=["status", "updated_at"])
         client_ip = get_client_ip(request)
-        client_ua = request.META.get("HTTP_USER_AGENT", "")
+        user_agent = request.META.get("HTTP_USER_AGENT", "")
         EstimateStatusEvent.record(
             estimate=estimate,
             from_status=previous_status,
@@ -186,7 +186,7 @@ def public_estimate_decision_view(request, public_token):
             note=decision_note,
             changed_by=estimate.created_by,
             ip_address=client_ip,
-            user_agent=client_ua,
+            user_agent=user_agent,
         )
         if estimate.status == Estimate.Status.APPROVED:
             _activate_project_from_estimate_approval(
@@ -206,19 +206,19 @@ def public_estimate_decision_view(request, public_token):
             email_verified=ceremony_session is not None,
             content_hash=content_hash,
             ip_address=client_ip,
-            user_agent=client_ua,
+            user_agent=user_agent,
             consent_text_version=consent_version,
             consent_text_snapshot=consent_text,
             note=str(request.data.get("note", "") or "").strip(),
             access_session=ceremony_session,
         )
 
-    serialized = EstimateSerializer(estimate).data
+    estimate_data = EstimateSerializer(estimate).data
     organization = _resolve_organization_for_public_actor(estimate.created_by)
-    serialized["project_context"] = _serialize_public_project_context(estimate.project)
-    serialized["organization_context"] = _serialize_public_organization_context(organization, request=request)
+    estimate_data["project_context"] = _serialize_public_project_context(estimate.project)
+    estimate_data["organization_context"] = _serialize_public_organization_context(organization, request=request)
 
-    return Response({"data": serialized})
+    return Response({"data": estimate_data})
 
 
 @api_view(["GET"])
@@ -382,8 +382,8 @@ def project_estimates_view(request, project_id):
             project=project,
             title=data.get("title", ""),
         ).order_by("-version", "-id")
-        approved_family_row = same_title_family.filter(status=Estimate.Status.APPROVED).first()
-        if approved_family_row:
+        approved_estimate = same_title_family.filter(status=Estimate.Status.APPROVED).first()
+        if approved_estimate:
             return Response(
                 {
                     "error": {
@@ -395,9 +395,9 @@ def project_estimates_view(request, project_id):
                             ]
                         },
                         "meta": {
-                            "latest_estimate_id": approved_family_row.id,
-                            "latest_version": approved_family_row.version,
-                            "latest_status": approved_family_row.status,
+                            "latest_estimate_id": approved_estimate.id,
+                            "latest_version": approved_estimate.version,
+                            "latest_status": approved_estimate.status,
                             "family_size": same_title_family.count(),
                         },
                     }
@@ -405,7 +405,7 @@ def project_estimates_view(request, project_id):
                 status=409,
             )
         if same_title_family.exists() and not data.get("allow_existing_title_family", False):
-            latest_family_row = same_title_family.first()
+            latest_estimate = same_title_family.first()
             return Response(
                 {
                     "error": {
@@ -417,8 +417,8 @@ def project_estimates_view(request, project_id):
                             ]
                         },
                         "meta": {
-                            "latest_estimate_id": latest_family_row.id if latest_family_row else None,
-                            "latest_version": latest_family_row.version if latest_family_row else None,
+                            "latest_estimate_id": latest_estimate.id if latest_estimate else None,
+                            "latest_version": latest_estimate.version if latest_estimate else None,
                             "family_size": same_title_family.count(),
                         },
                     }
@@ -928,8 +928,8 @@ def estimate_status_events_view(request, estimate_id):
             status=404,
         )
 
-    events = EstimateStatusEvent.objects.filter(estimate=estimate).select_related(
+    status_events = EstimateStatusEvent.objects.filter(estimate=estimate).select_related(
         "changed_by",
         "estimate__project__customer",
     )
-    return Response({"data": EstimateStatusEventSerializer(events, many=True).data})
+    return Response({"data": EstimateStatusEventSerializer(status_events, many=True).data})

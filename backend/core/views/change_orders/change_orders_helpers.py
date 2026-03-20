@@ -81,8 +81,8 @@ def _validate_change_order_lines(
         return {}, MONEY_ZERO, None
 
     cost_code_ids = set()
-    for row in line_items:
-        cc_id = row.get("cost_code")
+    for line_item_data in line_items:
+        cc_id = line_item_data.get("cost_code")
         if not cc_id:
             return (
                 {}, MONEY_ZERO,
@@ -93,8 +93,8 @@ def _validate_change_order_lines(
     cost_code_map = {}
     if cost_code_ids:
         cost_code_map = {
-            row.id: row
-            for row in CostCode.objects.filter(
+            cost_code.id: cost_code
+            for cost_code in CostCode.objects.filter(
                 id__in=cost_code_ids,
                 organization_id=organization_id,
             )
@@ -105,10 +105,10 @@ def _validate_change_order_lines(
                 {"error": {"code": "validation_error", "message": "One or more cost_code values are invalid.", "fields": {"line_items": ["Use valid cost_code ids."]}}},
             )
 
-    total = MONEY_ZERO
-    for row in line_items:
-        total = quantize_money(total + Decimal(str(row["amount_delta"])))
-    return cost_code_map, total, None
+    line_total_delta = MONEY_ZERO
+    for line_item_data in line_items:
+        line_total_delta = quantize_money(line_total_delta + Decimal(str(line_item_data["amount_delta"])))
+    return cost_code_map, line_total_delta, None
 
 
 def _sync_change_order_lines(
@@ -123,15 +123,15 @@ def _sync_change_order_lines(
     resolving cost codes from the pre-validated map.
     """
     ChangeOrderLine.objects.filter(change_order=change_order).delete()
-    for row in line_items:
-        cost_code = cost_code_map.get(int(row["cost_code"])) if row.get("cost_code") else None
+    for line_item_data in line_items:
+        cost_code = cost_code_map.get(int(line_item_data["cost_code"])) if line_item_data.get("cost_code") else None
         ChangeOrderLine.objects.create(
             change_order=change_order,
             cost_code=cost_code,
-            description=row.get("description", ""),
-            adjustment_reason=str(row.get("adjustment_reason", "")).strip(),
-            amount_delta=quantize_money(row["amount_delta"]),
-            days_delta=row.get("days_delta", 0),
+            description=line_item_data.get("description", ""),
+            adjustment_reason=str(line_item_data.get("adjustment_reason", "")).strip(),
+            amount_delta=quantize_money(line_item_data["amount_delta"]),
+            days_delta=line_item_data.get("days_delta", 0),
         )
 
 

@@ -51,7 +51,7 @@ def customers_list_view(request):
         { "data": [{ ... }], "meta": { "page": 1, "total_count": 42, ... } }
     """
     membership = _ensure_org_membership(request.user)
-    rows = (
+    customers = (
         Customer.objects.filter(organization_id=membership.organization_id)
         .annotate(
             project_count=Count(
@@ -69,19 +69,19 @@ def customers_list_view(request):
     )
     query = (request.query_params.get("q") or "").strip()
     if query:
-        rows = rows.filter(
+        customers = customers.filter(
             Q(display_name__icontains=query)
             | Q(phone__icontains=query)
             | Q(email__icontains=query)
             | Q(billing_address__icontains=query)
         )
 
-    rows, meta = _paginate_queryset(rows, request.query_params)
+    customers, meta = _paginate_queryset(customers, request.query_params)
 
-    data = CustomerManageSerializer(rows, many=True).data
-    for row in data:
-        row["has_project"] = row["project_count"] > 0
-        row["has_active_or_on_hold_project"] = row["active_project_count"] > 0
+    data = CustomerManageSerializer(customers, many=True).data
+    for customer_data in data:
+        customer_data["has_project"] = customer_data["project_count"] > 0
+        customer_data["has_active_or_on_hold_project"] = customer_data["active_project_count"] > 0
     return Response({"data": data, "meta": meta})
 
 

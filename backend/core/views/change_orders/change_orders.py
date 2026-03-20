@@ -357,7 +357,7 @@ def project_change_orders_view(request, project_id):
         )
 
     if request.method == "GET":
-        rows = (
+        change_orders = (
             ChangeOrder.objects.filter(project=project)
             .prefetch_related("line_items", "line_items__cost_code")
             .order_by("-created_at", "-revision_number")
@@ -378,7 +378,7 @@ def project_change_orders_view(request, project_id):
         )
         is_latest_revision_map = {pk: True for pk in latest_ids}
         return Response(
-            {"data": ChangeOrderSerializer(rows, many=True, context={"is_latest_revision_map": is_latest_revision_map}).data}
+            {"data": ChangeOrderSerializer(change_orders, many=True, context={"is_latest_revision_map": is_latest_revision_map}).data}
         )
 
     elif request.method == "POST":

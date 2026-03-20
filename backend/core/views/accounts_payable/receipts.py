@@ -37,11 +37,11 @@ def org_receipts_view(request):
         { "data": [ { "id": 1, "store": { ... }, "amount": "47.82", ... }, ... ] }
     """
     membership = _ensure_org_membership(request.user)
-    rows = _prefetch_receipt_qs(
+    receipts = _prefetch_receipt_qs(
         Receipt.objects.filter(project__organization_id=membership.organization_id)
         .order_by("-receipt_date", "-created_at")
     )
-    return Response({"data": ReceiptSerializer(rows, many=True).data})
+    return Response({"data": ReceiptSerializer(receipts, many=True).data})
 
 
 @api_view(["GET", "POST"])
@@ -93,10 +93,10 @@ def project_receipts_view(request, project_id: int):
         )
 
     if request.method == "GET":
-        rows = _prefetch_receipt_qs(
+        receipts = _prefetch_receipt_qs(
             Receipt.objects.filter(project=project).order_by("-receipt_date", "-created_at")
         )
-        return Response({"data": ReceiptSerializer(rows, many=True).data})
+        return Response({"data": ReceiptSerializer(receipts, many=True).data})
 
     else:  # POST
         permission_error, _ = _capability_gate(request.user, "vendor_bills", "create")
@@ -108,8 +108,8 @@ def project_receipts_view(request, project_id: int):
         data = serializer.validated_data
 
         amount = quantize_money(data["amount"])
-        if error := validate_positive_amount(amount):
-            return Response(error, status=400)
+        if amount_error := validate_positive_amount(amount):
+            return Response(amount_error, status=400)
 
         store = None
         store_name = (data.get("store_name") or "").strip()

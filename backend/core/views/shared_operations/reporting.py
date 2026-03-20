@@ -83,7 +83,7 @@ def portfolio_snapshot_view(request):
 
     membership = _ensure_org_membership(request.user)
     today = django_timezone.localdate()
-    project_rows = list(
+    projects = list(
         Project.objects.filter(organization_id=membership.organization_id)
         .select_related("customer")
         .order_by("-created_at", "-id")
@@ -93,7 +93,7 @@ def portfolio_snapshot_view(request):
     ap_total_outstanding = Decimal("0")
     active_projects_count = 0
 
-    for project in project_rows:
+    for project in projects:
         if project.status == Project.Status.ACTIVE:
             active_projects_count += 1
         summary = _build_project_financial_summary_data(
@@ -185,32 +185,32 @@ def change_impact_summary_view(request):
         )
 
     membership = _ensure_org_membership(request.user)
-    approved_rows = ChangeOrder.objects.filter(
+    approved_change_orders = ChangeOrder.objects.filter(
         project__organization_id=membership.organization_id,
         status=ChangeOrder.Status.APPROVED,
     ).select_related("project")
     if date_from:
-        approved_rows = approved_rows.filter(approved_at__date__gte=date_from)
+        approved_change_orders = approved_change_orders.filter(approved_at__date__gte=date_from)
     if date_to:
-        approved_rows = approved_rows.filter(approved_at__date__lte=date_to)
+        approved_change_orders = approved_change_orders.filter(approved_at__date__lte=date_to)
 
     project_map = {}
     total_amount = Decimal("0")
     total_count = 0
-    for row in approved_rows.order_by("project_id", "family_key", "revision_number"):
-        total_amount += row.amount_delta
+    for change_order in approved_change_orders.order_by("project_id", "family_key", "revision_number"):
+        total_amount += change_order.amount_delta
         total_count += 1
         project_bucket = project_map.setdefault(
-            row.project_id,
+            change_order.project_id,
             {
-                "project_id": row.project_id,
-                "project_name": row.project.name,
+                "project_id": change_order.project_id,
+                "project_name": change_order.project.name,
                 "approved_change_order_count": 0,
                 "approved_change_order_total": Decimal("0"),
             },
         )
         project_bucket["approved_change_order_count"] += 1
-        project_bucket["approved_change_order_total"] += row.amount_delta
+        project_bucket["approved_change_order_total"] += change_order.amount_delta
 
     payload = {
         "generated_at": django_timezone.now(),
@@ -220,7 +220,7 @@ def change_impact_summary_view(request):
         },
         "approved_change_order_count": total_count,
         "approved_change_order_total": total_amount,
-        "projects": sorted(project_map.values(), key=lambda row: row["approved_change_order_total"], reverse=True),
+        "projects": sorted(project_map.values(), key=lambda p: p["approved_change_order_total"], reverse=True),
     }
     return Response({"data": ChangeImpactSummarySerializer(payload).data})
 
@@ -263,18 +263,18 @@ def attention_feed_view(request):
         .select_related("project")
         .order_by("due_date", "id")
     )
-    for row in overdue_invoices:
+    for invoice in overdue_invoices:
         items.append(
             {
                 "kind": "overdue_invoice",
                 "severity": "high",
-                "label": f"Invoice {row.invoice_number} overdue",
-                "detail": f"Status {row.status}, balance due {row.balance_due}",
-                "project_id": row.project_id,
-                "project_name": row.project.name,
-                "ui_route": f"/projects/{row.project_id}/invoices",
-                "detail_endpoint": f"/api/v1/invoices/{row.id}/",
-                "due_date": row.due_date,
+                "label": f"Invoice {invoice.invoice_number} overdue",
+                "detail": f"Status {invoice.status}, balance due {invoice.balance_due}",
+                "project_id": invoice.project_id,
+                "project_name": invoice.project.name,
+                "ui_route": f"/projects/{invoice.project_id}/invoices",
+                "detail_endpoint": f"/api/v1/invoices/{invoice.id}/",
+                "due_date": invoice.due_date,
             }
         )
 
@@ -288,18 +288,18 @@ def attention_feed_view(request):
         .select_related("project")
         .order_by("due_date", "id")
     )
-    for row in due_soon_vendor_bills:
+    for vendor_bill in due_soon_vendor_bills:
         items.append(
             {
                 "kind": "vendor_bill_due_soon",
                 "severity": "medium",
-                "label": f"Vendor bill {row.bill_number} due soon",
-                "detail": f"Status {row.status}, balance due {row.balance_due}",
-                "project_id": row.project_id,
-                "project_name": row.project.name,
+                "label": f"Vendor bill {vendor_bill.bill_number} due soon",
+                "detail": f"Status {vendor_bill.status}, balance due {vendor_bill.balance_due}",
+                "project_id": vendor_bill.project_id,
+                "project_name": vendor_bill.project.name,
                 "ui_route": "/vendor-bills",
-                "detail_endpoint": f"/api/v1/vendor-bills/{row.id}/",
-                "due_date": row.due_date,
+                "detail_endpoint": f"/api/v1/vendor-bills/{vendor_bill.id}/",
+                "due_date": vendor_bill.due_date,
             }
         )
 
@@ -311,17 +311,17 @@ def attention_feed_view(request):
         .select_related("project")
         .order_by("-created_at", "-id")
     )
-    for row in pending_change_orders:
+    for change_order in pending_change_orders:
         items.append(
             {
                 "kind": "change_order_pending_approval",
                 "severity": "medium",
-                "label": f"CO-{row.family_key} pending approval",
-                "detail": f"{row.title} | amount delta {row.amount_delta}",
-                "project_id": row.project_id,
-                "project_name": row.project.name,
+                "label": f"CO-{change_order.family_key} pending approval",
+                "detail": f"{change_order.title} | amount delta {change_order.amount_delta}",
+                "project_id": change_order.project_id,
+                "project_name": change_order.project.name,
                 "ui_route": "/change-orders",
-                "detail_endpoint": f"/api/v1/change-orders/{row.id}/",
+                "detail_endpoint": f"/api/v1/change-orders/{change_order.id}/",
                 "due_date": None,
             }
         )
@@ -334,27 +334,27 @@ def attention_feed_view(request):
         .select_related("project")
         .order_by("-payment_date", "-id")
     )
-    for row in problem_payments:
+    for payment in problem_payments:
         items.append(
             {
                 "kind": "payment_problem",
                 "severity": "low",
-                "label": f"Payment #{row.id} {row.status}",
-                "detail": f"{row.direction} {row.amount} via {row.method}",
-                "project_id": row.project_id,
-                "project_name": row.project.name if row.project_id else "",
+                "label": f"Payment #{payment.id} {payment.status}",
+                "detail": f"{payment.direction} {payment.amount} via {payment.method}",
+                "project_id": payment.project_id,
+                "project_name": payment.project.name if payment.project_id else "",
                 "ui_route": "/payments",
-                "detail_endpoint": f"/api/v1/payments/{row.id}/",
+                "detail_endpoint": f"/api/v1/payments/{payment.id}/",
                 "due_date": None,
             }
         )
 
     items = sorted(
         items,
-        key=lambda row: (
-            SEVERITY_RANK.get(row["severity"], 9),
-            row["due_date"] or today,
-            row["project_id"],
+        key=lambda item: (
+            SEVERITY_RANK.get(item["severity"], 9),
+            item["due_date"] or today,
+            item["project_id"],
         ),
     )
     payload = {
@@ -399,114 +399,114 @@ def quick_jump_search_view(request):
     items = []
 
     projects = Project.objects.filter(organization_id=membership.organization_id).select_related("customer")
-    for row in projects:
-        if query_lower in row.name.lower() or query_lower in str(row.id):
+    for project in projects:
+        if query_lower in project.name.lower() or query_lower in str(project.id):
             items.append(
                 {
                     "kind": "project",
-                    "record_id": row.id,
-                    "label": row.name,
-                    "sub_label": f"Project #{row.id} ({row.status})",
-                    "project_id": row.id,
-                    "project_name": row.name,
-                    "ui_href": f"/projects?project={row.id}",
-                    "detail_endpoint": f"/api/v1/projects/{row.id}/",
+                    "record_id": project.id,
+                    "label": project.name,
+                    "sub_label": f"Project #{project.id} ({project.status})",
+                    "project_id": project.id,
+                    "project_name": project.name,
+                    "ui_href": f"/projects?project={project.id}",
+                    "detail_endpoint": f"/api/v1/projects/{project.id}/",
                 }
             )
 
     estimates = Estimate.objects.filter(project__organization_id=membership.organization_id).select_related("project")
-    for row in estimates:
+    for estimate in estimates:
         if (
-            query_lower in (row.title or "").lower()
-            or query_lower in str(row.id)
-            or query_lower in str(row.version)
+            query_lower in (estimate.title or "").lower()
+            or query_lower in str(estimate.id)
+            or query_lower in str(estimate.version)
         ):
             items.append(
                 {
                     "kind": "estimate",
-                    "record_id": row.id,
-                    "label": row.title or f"Estimate #{row.id}",
-                    "sub_label": f"Estimate #{row.id} v{row.version} ({row.status})",
-                    "project_id": row.project_id,
-                    "project_name": row.project.name,
-                    "ui_href": f"/projects/{row.project_id}/estimates?estimate={row.id}",
-                    "detail_endpoint": f"/api/v1/estimates/{row.id}/",
+                    "record_id": estimate.id,
+                    "label": estimate.title or f"Estimate #{estimate.id}",
+                    "sub_label": f"Estimate #{estimate.id} v{estimate.version} ({estimate.status})",
+                    "project_id": estimate.project_id,
+                    "project_name": estimate.project.name,
+                    "ui_href": f"/projects/{estimate.project_id}/estimates?estimate={estimate.id}",
+                    "detail_endpoint": f"/api/v1/estimates/{estimate.id}/",
                 }
             )
 
     change_orders = ChangeOrder.objects.filter(project__organization_id=membership.organization_id).select_related("project")
-    for row in change_orders:
-        candidate = f"co-{row.family_key} v{row.revision_number} {row.title or ''}".lower()
-        if query_lower in candidate or query_lower in str(row.id):
+    for change_order in change_orders:
+        candidate = f"co-{change_order.family_key} v{change_order.revision_number} {change_order.title or ''}".lower()
+        if query_lower in candidate or query_lower in str(change_order.id):
             items.append(
                 {
                     "kind": "change_order",
-                    "record_id": row.id,
-                    "label": f"CO-{row.family_key} v{row.revision_number}",
-                    "sub_label": f"{row.title} ({row.status})",
-                    "project_id": row.project_id,
-                    "project_name": row.project.name,
-                    "ui_href": f"/projects/{row.project_id}/change-orders",
-                    "detail_endpoint": f"/api/v1/change-orders/{row.id}/",
+                    "record_id": change_order.id,
+                    "label": f"CO-{change_order.family_key} v{change_order.revision_number}",
+                    "sub_label": f"{change_order.title} ({change_order.status})",
+                    "project_id": change_order.project_id,
+                    "project_name": change_order.project.name,
+                    "ui_href": f"/projects/{change_order.project_id}/change-orders",
+                    "detail_endpoint": f"/api/v1/change-orders/{change_order.id}/",
                 }
             )
 
     invoices = Invoice.objects.filter(project__organization_id=membership.organization_id).select_related("project")
-    for row in invoices:
-        if query_lower in row.invoice_number.lower() or query_lower in str(row.id):
+    for invoice in invoices:
+        if query_lower in invoice.invoice_number.lower() or query_lower in str(invoice.id):
             items.append(
                 {
                     "kind": "invoice",
-                    "record_id": row.id,
-                    "label": row.invoice_number,
-                    "sub_label": f"Invoice #{row.id} ({row.status})",
-                    "project_id": row.project_id,
-                    "project_name": row.project.name,
-                    "ui_href": f"/invoices?project={row.project_id}",
-                    "detail_endpoint": f"/api/v1/invoices/{row.id}/",
+                    "record_id": invoice.id,
+                    "label": invoice.invoice_number,
+                    "sub_label": f"Invoice #{invoice.id} ({invoice.status})",
+                    "project_id": invoice.project_id,
+                    "project_name": invoice.project.name,
+                    "ui_href": f"/invoices?project={invoice.project_id}",
+                    "detail_endpoint": f"/api/v1/invoices/{invoice.id}/",
                 }
             )
 
     vendor_bills = VendorBill.objects.filter(project__organization_id=membership.organization_id).select_related("project")
-    for row in vendor_bills:
-        if query_lower in row.bill_number.lower() or query_lower in str(row.id):
+    for vendor_bill in vendor_bills:
+        if query_lower in vendor_bill.bill_number.lower() or query_lower in str(vendor_bill.id):
             items.append(
                 {
                     "kind": "vendor_bill",
-                    "record_id": row.id,
-                    "label": row.bill_number,
-                    "sub_label": f"Vendor bill #{row.id} ({row.status})",
-                    "project_id": row.project_id,
-                    "project_name": row.project.name,
-                    "ui_href": f"/vendor-bills?project={row.project_id}",
-                    "detail_endpoint": f"/api/v1/vendor-bills/{row.id}/",
+                    "record_id": vendor_bill.id,
+                    "label": vendor_bill.bill_number,
+                    "sub_label": f"Vendor bill #{vendor_bill.id} ({vendor_bill.status})",
+                    "project_id": vendor_bill.project_id,
+                    "project_name": vendor_bill.project.name,
+                    "ui_href": f"/vendor-bills?project={vendor_bill.project_id}",
+                    "detail_endpoint": f"/api/v1/vendor-bills/{vendor_bill.id}/",
                 }
             )
 
     payments = Payment.objects.filter(organization_id=membership.organization_id).select_related("project")
-    for row in payments:
-        candidate = f"{row.reference_number or ''} {row.id} {row.direction} {row.status}".lower()
+    for payment in payments:
+        candidate = f"{payment.reference_number or ''} {payment.id} {payment.direction} {payment.status}".lower()
         if query_lower in candidate:
             items.append(
                 {
                     "kind": "payment",
-                    "record_id": row.id,
-                    "label": row.reference_number or f"Payment #{row.id}",
-                    "sub_label": f"{row.direction} {row.status} amount {row.amount}",
-                    "project_id": row.project_id,
-                    "project_name": row.project.name if row.project_id else "",
+                    "record_id": payment.id,
+                    "label": payment.reference_number or f"Payment #{payment.id}",
+                    "sub_label": f"{payment.direction} {payment.status} amount {payment.amount}",
+                    "project_id": payment.project_id,
+                    "project_name": payment.project.name if payment.project_id else "",
                     "ui_href": "/payments",
-                    "detail_endpoint": f"/api/v1/payments/{row.id}/",
+                    "detail_endpoint": f"/api/v1/payments/{payment.id}/",
                 }
             )
 
     deduped = {}
-    for row in items:
-        key = (row["kind"], row["record_id"])
-        deduped[key] = row
+    for item in items:
+        key = (item["kind"], item["record_id"])
+        deduped[key] = item
     sorted_items = sorted(
         deduped.values(),
-        key=lambda row: (row["kind"], row["label"].lower(), row["record_id"]),
+        key=lambda item: (item["kind"], item["label"].lower(), item["record_id"]),
     )[:QUICK_JUMP_RESULT_LIMIT]
 
     payload = {
@@ -572,100 +572,100 @@ def project_timeline_events_view(request, project_id):
 
     # --- Workflow events ---
     if category in {"all", "workflow"}:
-        for row in (
+        for event in (
             EstimateStatusEvent.objects.filter(estimate__project=project)
             .select_related("estimate")
             .order_by("-changed_at", "-id")
         ):
             items.append({
-                "timeline_id": f"estimate-event-{row.id}",
+                "timeline_id": f"estimate-event-{event.id}",
                 "category": "workflow",
                 "event_type": "estimate_status",
-                "occurred_at": row.changed_at,
-                "label": f"Estimate {row.from_status or 'new'} → {row.to_status}",
-                "detail": row.note or "",
+                "occurred_at": event.changed_at,
+                "label": f"Estimate {event.from_status or 'new'} → {event.to_status}",
+                "detail": event.note or "",
                 "object_type": "estimate",
-                "object_id": row.estimate_id,
-                "ui_route": f"/projects/{project.id}/estimates?estimate={row.estimate_id}",
+                "object_id": event.estimate_id,
+                "ui_route": f"/projects/{project.id}/estimates?estimate={event.estimate_id}",
             })
 
-        for row in (
+        for event in (
             InvoiceStatusEvent.objects.filter(invoice__project=project)
             .select_related("invoice")
             .order_by("-changed_at", "-id")
         ):
             items.append({
-                "timeline_id": f"invoice-event-{row.id}",
+                "timeline_id": f"invoice-event-{event.id}",
                 "category": "workflow",
                 "event_type": "invoice_status",
-                "occurred_at": row.changed_at,
-                "label": f"Invoice {row.from_status or 'new'} → {row.to_status}",
-                "detail": row.note or "",
+                "occurred_at": event.changed_at,
+                "label": f"Invoice {event.from_status or 'new'} → {event.to_status}",
+                "detail": event.note or "",
                 "object_type": "invoice",
-                "object_id": row.invoice_id,
-                "ui_route": f"/projects/{project.id}/invoices?invoice={row.invoice_id}",
+                "object_id": event.invoice_id,
+                "ui_route": f"/projects/{project.id}/invoices?invoice={event.invoice_id}",
             })
 
-        for row in (
+        for snapshot in (
             ChangeOrderSnapshot.objects.filter(change_order__project=project)
             .select_related("change_order")
             .order_by("-created_at", "-id")
         ):
-            co = row.change_order
+            change_order = snapshot.change_order
             items.append({
-                "timeline_id": f"co-snapshot-{row.id}",
+                "timeline_id": f"co-snapshot-{snapshot.id}",
                 "category": "workflow",
                 "event_type": "change_order_decision",
-                "occurred_at": row.created_at,
-                "label": f"CO {co.family_key} v{co.revision_number} {row.decision_status}",
+                "occurred_at": snapshot.created_at,
+                "label": f"CO {change_order.family_key} v{change_order.revision_number} {snapshot.decision_status}",
                 "detail": "",
                 "object_type": "change_order",
-                "object_id": co.id,
-                "ui_route": f"/projects/{project.id}/change-orders?co={co.id}",
+                "object_id": change_order.id,
+                "ui_route": f"/projects/{project.id}/change-orders?co={change_order.id}",
             })
 
     # --- Financial events ---
     if category in {"all", "financial"}:
-        for row in (
+        for record in (
             PaymentRecord.objects.filter(payment__project=project)
             .select_related("payment")
             .order_by("-created_at", "-id")
         ):
-            pmt = row.payment
-            label_parts = [f"Payment #{pmt.id} {row.event_type}"]
-            if row.from_status and row.to_status:
-                label_parts.append(f"({row.from_status} → {row.to_status})")
+            pmt = record.payment
+            label_parts = [f"Payment #{pmt.id} {record.event_type}"]
+            if record.from_status and record.to_status:
+                label_parts.append(f"({record.from_status} → {record.to_status})")
             items.append({
-                "timeline_id": f"payment-record-{row.id}",
+                "timeline_id": f"payment-record-{record.id}",
                 "category": "financial",
                 "event_type": "payment_record",
-                "occurred_at": row.created_at,
+                "occurred_at": record.created_at,
                 "label": " ".join(label_parts),
-                "detail": row.note or "",
+                "detail": record.note or "",
                 "object_type": "payment",
                 "object_id": pmt.id,
                 "ui_route": "/payments",
             })
 
-        for row in (
+        for snapshot in (
             VendorBillSnapshot.objects.filter(vendor_bill__project=project)
             .select_related("vendor_bill")
             .order_by("-created_at", "-id")
         ):
-            vb = row.vendor_bill
+            vb = snapshot.vendor_bill
             items.append({
-                "timeline_id": f"vb-snapshot-{row.id}",
+                "timeline_id": f"vb-snapshot-{snapshot.id}",
                 "category": "financial",
                 "event_type": "vendor_bill_status",
-                "occurred_at": row.created_at,
-                "label": f"Vendor Bill #{vb.id} {row.capture_status}",
+                "occurred_at": snapshot.created_at,
+                "label": f"Vendor Bill #{vb.id} {snapshot.capture_status}",
                 "detail": "",
                 "object_type": "vendor_bill",
                 "object_id": vb.id,
                 "ui_route": "/bills",
             })
 
-    sorted_items = sorted(items, key=lambda row: row["occurred_at"], reverse=True)
+    sorted_items = sorted(items, key=lambda item: item["occurred_at"], reverse=True)
     payload = {
         "project_id": project.id,
         "project_name": project.name,

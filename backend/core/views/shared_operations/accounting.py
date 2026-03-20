@@ -58,10 +58,10 @@ def project_accounting_sync_events_view(request, project_id):
         )
 
     if request.method == "GET":
-        rows = AccountingSyncEvent.objects.filter(
+        sync_events = AccountingSyncEvent.objects.filter(
             project=project,
         ).order_by("-created_at", "-id")
-        return Response({"data": AccountingSyncEventSerializer(rows, many=True).data})
+        return Response({"data": AccountingSyncEventSerializer(sync_events, many=True).data})
 
     elif request.method == "POST":
         permission_error, _ = _capability_gate(request.user, "accounting_sync", "create")

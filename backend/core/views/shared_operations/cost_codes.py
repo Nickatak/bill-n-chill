@@ -59,8 +59,8 @@ def cost_codes_list_create_view(request):
     scope_filter = _org_scope_filter(request.user)
 
     if request.method == "GET":
-        rows = CostCode.objects.filter(scope_filter).order_by("code", "name")
-        return Response({"data": CostCodeSerializer(rows, many=True).data})
+        cost_codes = CostCode.objects.filter(scope_filter).order_by("code", "name")
+        return Response({"data": CostCodeSerializer(cost_codes, many=True).data})
 
     elif request.method == "POST":
         permission_error, _ = _capability_gate(request.user, "cost_codes", "create")
@@ -123,7 +123,7 @@ def cost_code_detail_view(request, cost_code_id):
 
     scope_filter = _org_scope_filter(request.user)
     try:
-        row = CostCode.objects.get(scope_filter, id=cost_code_id)
+        cost_code = CostCode.objects.get(scope_filter, id=cost_code_id)
     except CostCode.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Cost code not found.", "fields": {}}},
@@ -132,7 +132,7 @@ def cost_code_detail_view(request, cost_code_id):
 
     if "code" in request.data:
         incoming_code = str(request.data.get("code", "")).strip()
-        if incoming_code and incoming_code != row.code:
+        if incoming_code and incoming_code != cost_code.code:
             return Response(
                 {
                     "error": {
@@ -146,10 +146,10 @@ def cost_code_detail_view(request, cost_code_id):
                 status=400,
             )
 
-    serializer = CostCodeSerializer(row, data=request.data, partial=True)
+    serializer = CostCodeSerializer(cost_code, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
     serializer.save()
-    return Response({"data": CostCodeSerializer(row).data})
+    return Response({"data": CostCodeSerializer(cost_code).data})
 
 
 @api_view(["POST"])

@@ -61,22 +61,22 @@ def _prefetch_estimate_qs(queryset: QuerySet) -> QuerySet:
 # ---------------------------------------------------------------------------
 
 
-def _line_items_signature(items: list[dict]) -> list[tuple]:
+def _line_items_signature(line_items_data: list[dict]) -> list[tuple]:
     """Build a normalized signature from raw line-item input dicts.
 
     Returns a list of tuples for structural comparison against stored
     estimates during the duplicate-submit suppression window.
     """
     signature = []
-    for item in items:
+    for line_item in line_items_data:
         signature.append(
             (
-                int(item["cost_code"]),
-                (item.get("description") or "").strip(),
-                str(item.get("quantity", "")),
-                (item.get("unit") or "").strip(),
-                str(item.get("unit_cost", "")),
-                str(item.get("markup_percent", "")),
+                int(line_item["cost_code"]),
+                (line_item.get("description") or "").strip(),
+                str(line_item.get("quantity", "")),
+                (line_item.get("unit") or "").strip(),
+                str(line_item.get("unit_cost", "")),
+                str(line_item.get("markup_percent", "")),
             )
         )
     return signature
@@ -220,20 +220,20 @@ def _calculate_line_totals(
     """
     subtotal = MONEY_ZERO
     markup_total = MONEY_ZERO
-    normalized_items = []
+    computed_line_items = []
 
-    for item in line_items_data:
-        quantity = Decimal(str(item["quantity"]))
-        unit_cost = Decimal(str(item["unit_cost"]))
-        markup_percent = Decimal(str(item.get("markup_percent", 0)))
+    for line_item in line_items_data:
+        quantity = Decimal(str(line_item["quantity"]))
+        unit_cost = Decimal(str(line_item["unit_cost"]))
+        markup_percent = Decimal(str(line_item.get("markup_percent", 0)))
         base_total = quantize_money(quantity * unit_cost)
         line_markup = quantize_money(base_total * (markup_percent / Decimal("100")))
         line_total = quantize_money(base_total + line_markup)
         subtotal = quantize_money(subtotal + base_total)
         markup_total = quantize_money(markup_total + line_markup)
-        normalized_items.append(
+        computed_line_items.append(
             {
-                **item,
+                **line_item,
                 "quantity": quantity,
                 "unit_cost": unit_cost,
                 "markup_percent": markup_percent,
@@ -241,7 +241,7 @@ def _calculate_line_totals(
             }
         )
 
-    return normalized_items, subtotal, markup_total
+    return computed_line_items, subtotal, markup_total
 
 
 def _apply_estimate_lines_and_totals(
@@ -257,8 +257,8 @@ def _apply_estimate_lines_and_totals(
     Returns an error dict (``{"missing_cost_codes": [...]}"``) on
     validation failure, or ``None`` on success.
     """
-    normalized_items, subtotal, markup_total = _calculate_line_totals(line_items_data)
-    code_map, missing = _resolve_cost_codes_for_user(user, normalized_items)
+    computed_line_items, subtotal, markup_total = _calculate_line_totals(line_items_data)
+    code_map, missing = _resolve_cost_codes_for_user(user, computed_line_items)
     if missing:
         return {"missing_cost_codes": missing}
 
@@ -267,24 +267,24 @@ def _apply_estimate_lines_and_totals(
     grand_total = quantize_money(subtotal + markup_total + tax_total)
 
     estimate.line_items.all().delete()
-    new_lines = []
-    for item in normalized_items:
-        description = (item.get("description") or "").strip()
-        unit_value = (item.get("unit") or "ea").strip().lower() or "ea"
+    lines_to_create = []
+    for line_item in computed_line_items:
+        description = (line_item.get("description") or "").strip()
+        unit_value = (line_item.get("unit") or "ea").strip().lower() or "ea"
 
-        new_lines.append(
+        lines_to_create.append(
             EstimateLineItem(
                 estimate=estimate,
-                cost_code=code_map[item["cost_code"]],
+                cost_code=code_map[line_item["cost_code"]],
                 description=description,
-                quantity=item["quantity"],
+                quantity=line_item["quantity"],
                 unit=unit_value,
-                unit_cost=item["unit_cost"],
-                markup_percent=item["markup_percent"],
-                line_total=item["line_total"],
+                unit_cost=line_item["unit_cost"],
+                markup_percent=line_item["markup_percent"],
+                line_total=line_item["line_total"],
             )
         )
-    EstimateLineItem.objects.bulk_create(new_lines)
+    EstimateLineItem.objects.bulk_create(lines_to_create)
 
     estimate.subtotal = subtotal
     estimate.markup_total = markup_total
@@ -366,7 +366,7 @@ def _handle_estimate_document_save(
                     status=400,
                 )
         elif "tax_percent" in data:
-            existing_lines = [
+            current_line_dicts = [
                 {
                     "cost_code": line.cost_code_id,
                     "description": line.description,
@@ -379,7 +379,7 @@ def _handle_estimate_document_save(
             ]
             _apply_estimate_lines_and_totals(
                 estimate=estimate,
-                line_items_data=existing_lines,
+                line_items_data=current_line_dicts,
                 tax_percent=estimate.tax_percent,
                 user=request.user,
             )

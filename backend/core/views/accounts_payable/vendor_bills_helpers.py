@@ -42,15 +42,15 @@ def _find_duplicate_vendor_bills(
         return []
     membership = _ensure_org_membership(user)
 
-    rows = VendorBill.objects.filter(
+    matching_bills = VendorBill.objects.filter(
         project__organization_id=membership.organization_id,
         vendor_id=vendor_id,
         bill_number__iexact=bill_number_norm,
     )
     if exclude_vendor_bill_id:
-        rows = rows.exclude(id=exclude_vendor_bill_id)
+        matching_bills = matching_bills.exclude(id=exclude_vendor_bill_id)
 
-    return list(rows.select_related("vendor", "project").order_by("-created_at", "-id"))
+    return list(matching_bills.select_related("vendor", "project").order_by("-created_at", "-id"))
 
 
 def _calculate_vendor_bill_line_totals(line_items_data: list[dict]) -> tuple[list[dict], Decimal]:
@@ -62,13 +62,13 @@ def _calculate_vendor_bill_line_totals(line_items_data: list[dict]) -> tuple[lis
     """
     subtotal = MONEY_ZERO
     normalized_items = []
-    for item in line_items_data:
-        quantity = Decimal(str(item.get("quantity", 1)))
-        unit_price = quantize_money(Decimal(str(item["unit_price"])))
+    for line_item in line_items_data:
+        quantity = Decimal(str(line_item.get("quantity", 1)))
+        unit_price = quantize_money(Decimal(str(line_item["unit_price"])))
         amount = quantize_money(quantity * unit_price)
         subtotal = quantize_money(subtotal + amount)
         normalized_items.append({
-            **item,
+            **line_item,
             "quantity": quantity,
             "unit_price": unit_price,
             "amount": amount,
@@ -104,17 +104,17 @@ def _apply_vendor_bill_lines_and_totals(
 
     vendor_bill.line_items.all().delete()
     new_lines = []
-    for item in normalized_items:
-        cost_code_id = item.get("cost_code")
+    for line_item in normalized_items:
+        cost_code_id = line_item.get("cost_code")
         cost_code = code_map.get(cost_code_id) if cost_code_id else None
         new_lines.append(
             VendorBillLine(
                 vendor_bill=vendor_bill,
                 cost_code=cost_code,
-                description=item.get("description", ""),
-                quantity=item["quantity"],
-                unit_price=item["unit_price"],
-                amount=item["amount"],  # pre-computed; bulk_create bypasses save()
+                description=line_item.get("description", ""),
+                quantity=line_item["quantity"],
+                unit_price=line_item["unit_price"],
+                amount=line_item["amount"],  # pre-computed; bulk_create bypasses save()
             )
         )
     VendorBillLine.objects.bulk_create(new_lines)
@@ -270,13 +270,13 @@ def _handle_vb_document_save(request: Request, vendor_bill: VendorBill, data: di
     # Date validation
     next_issue_date = data.get("issue_date", vendor_bill.issue_date)
     next_due_date = data.get("due_date", vendor_bill.due_date)
-    if error := _validate_vb_dates(next_status, next_issue_date, next_due_date):
-        return Response(error, status=400)
+    if date_error := _validate_vb_dates(next_status, next_issue_date, next_due_date):
+        return Response(date_error, status=400)
 
     # Line item validation
     line_items = data.get("line_items")
-    if error := _validate_vb_line_items_present(line_items):
-        return Response(error, status=400)
+    if line_items_error := _validate_vb_line_items_present(line_items):
+        return Response(line_items_error, status=400)
     has_line_items = line_items is not None
 
     # Field updates
@@ -318,7 +318,7 @@ def _handle_vb_document_save(request: Request, vendor_bill: VendorBill, data: di
                 payload, status_code = _vendor_bill_line_apply_error_response(apply_error)
                 return Response(payload, status=status_code)
         elif "tax_amount" in data or "shipping_amount" in data:
-            existing_lines = [
+            current_line_dicts = [
                 {
                     "cost_code": line.cost_code_id,
                     "description": line.description,
@@ -327,11 +327,11 @@ def _handle_vb_document_save(request: Request, vendor_bill: VendorBill, data: di
                 }
                 for line in vendor_bill.line_items.all()
             ]
-            if existing_lines:
+            if current_line_dicts:
                 next_tax = quantize_money(data.get("tax_amount", vendor_bill.tax_amount))
                 next_shipping = quantize_money(data.get("shipping_amount", vendor_bill.shipping_amount))
                 _apply_vendor_bill_lines_and_totals(
-                    vendor_bill, existing_lines, next_tax, next_shipping, request.user,
+                    vendor_bill, current_line_dicts, next_tax, next_shipping, request.user,
                 )
 
         # balance_due is now purely driven by payment allocations, not status.
@@ -382,13 +382,13 @@ def _handle_vb_status_transition(
     # Date validation
     next_issue_date = data.get("issue_date", vendor_bill.issue_date)
     next_due_date = data.get("due_date", vendor_bill.due_date)
-    if error := _validate_vb_dates(next_status, next_issue_date, next_due_date):
-        return Response(error, status=400)
+    if date_error := _validate_vb_dates(next_status, next_issue_date, next_due_date):
+        return Response(date_error, status=400)
 
     # Line item validation
     line_items = data.get("line_items")
-    if error := _validate_vb_line_items_present(line_items):
-        return Response(error, status=400)
+    if line_items_error := _validate_vb_line_items_present(line_items):
+        return Response(line_items_error, status=400)
     has_line_items = line_items is not None
 
     # Field updates (dates and other fields that may accompany the transition)
@@ -428,7 +428,7 @@ def _handle_vb_status_transition(
                 payload, status_code = _vendor_bill_line_apply_error_response(apply_error)
                 return Response(payload, status=status_code)
         elif "tax_amount" in data or "shipping_amount" in data:
-            existing_lines = [
+            current_line_dicts = [
                 {
                     "cost_code": line.cost_code_id,
                     "description": line.description,
@@ -437,11 +437,11 @@ def _handle_vb_status_transition(
                 }
                 for line in vendor_bill.line_items.all()
             ]
-            if existing_lines:
+            if current_line_dicts:
                 next_tax = quantize_money(data.get("tax_amount", vendor_bill.tax_amount))
                 next_shipping = quantize_money(data.get("shipping_amount", vendor_bill.shipping_amount))
                 _apply_vendor_bill_lines_and_totals(
-                    vendor_bill, existing_lines, next_tax, next_shipping, request.user,
+                    vendor_bill, current_line_dicts, next_tax, next_shipping, request.user,
                 )
 
         if next_status in SNAPSHOT_CAPTURE_STATUSES:

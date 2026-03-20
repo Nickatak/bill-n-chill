@@ -318,12 +318,12 @@ def organization_memberships_view(request):
         { "data": { "memberships": [{ ... }, ...], "role_policy": { ... } } }
     """
     membership = _ensure_org_membership(request.user)
-    rows = _organization_membership_queryset(membership.organization_id)
+    memberships = _organization_membership_queryset(membership.organization_id)
     return Response(
         {
             "data": {
                 "memberships": OrganizationMembershipSerializer(
-                    rows, many=True, context={"request": request}
+                    memberships, many=True, context={"request": request}
                 ).data,
                 "role_policy": _organization_role_policy(request.user),
             }

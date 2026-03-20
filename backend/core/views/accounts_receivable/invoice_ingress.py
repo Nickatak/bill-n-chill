@@ -49,7 +49,7 @@ def build_invoice_create_ingress(
 ) -> InvoiceCreateIngress:
     """Build an InvoiceCreateIngress from validated request data, applying org defaults for missing fields."""
     line_items = [
-        _normalize_invoice_line_item(item) for item in validated_data.get("line_items", [])
+        _normalize_invoice_line_item(line_item) for line_item in validated_data.get("line_items", [])
     ]
     issue_date = validated_data.get("issue_date") or default_issue_date
     due_date = validated_data.get("due_date") or (issue_date + timedelta(days=default_due_days))
@@ -104,7 +104,7 @@ def build_invoice_patch_ingress(validated_data: dict[str, Any]) -> InvoicePatchI
     """Build an InvoicePatchIngress from validated request data with has_* presence flags."""
     has_line_items = "line_items" in validated_data
     line_items = (
-        [_normalize_invoice_line_item(item) for item in validated_data.get("line_items", [])]
+        [_normalize_invoice_line_item(line_item) for line_item in validated_data.get("line_items", [])]
         if has_line_items
         else []
     )

@@ -74,11 +74,11 @@ def org_vendor_bills_view(request):
         { "data": [ { ... }, ... ] }
     """
     membership = _ensure_org_membership(request.user)
-    rows = _prefetch_vendor_bill_qs(
+    vendor_bills = _prefetch_vendor_bill_qs(
         VendorBill.objects.filter(project__organization_id=membership.organization_id)
         .order_by("-created_at")
     )
-    return Response({"data": VendorBillSerializer(rows, many=True).data})
+    return Response({"data": VendorBillSerializer(vendor_bills, many=True).data})
 
 
 @api_view(["GET", "POST"])
@@ -137,10 +137,10 @@ def project_vendor_bills_view(request, project_id: int):
         )
 
     if request.method == "GET":
-        rows = _prefetch_vendor_bill_qs(
+        vendor_bills = _prefetch_vendor_bill_qs(
             VendorBill.objects.filter(project=project).order_by("-created_at")
         )
-        return Response({"data": VendorBillSerializer(rows, many=True).data})
+        return Response({"data": VendorBillSerializer(vendor_bills, many=True).data})
 
     else:  # POST
         permission_error, _ = _capability_gate(request.user, "vendor_bills", "create")

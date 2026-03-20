@@ -65,11 +65,11 @@ def org_invoices_view(request):
         { "data": [ { ... }, ... ] }
     """
     membership = _ensure_org_membership(request.user)
-    rows = _prefetch_invoice_qs(
+    invoices = _prefetch_invoice_qs(
         Invoice.objects.filter(project__organization_id=membership.organization_id)
         .order_by("-created_at")
     )
-    return Response({"data": InvoiceSerializer(rows, many=True).data})
+    return Response({"data": InvoiceSerializer(invoices, many=True).data})
 
 
 @api_view(["GET"])
@@ -108,14 +108,14 @@ def public_invoice_detail_view(request, public_token: str):
             status=404,
         )
 
-    serialized = InvoiceSerializer(invoice).data
+    invoice_data = InvoiceSerializer(invoice).data
     organization = _resolve_organization_for_public_actor(invoice.created_by)
-    serialized["project_context"] = _serialize_public_project_context(invoice.project)
-    serialized["organization_context"] = _serialize_public_organization_context(organization, request=request)
+    invoice_data["project_context"] = _serialize_public_project_context(invoice.project)
+    invoice_data["organization_context"] = _serialize_public_organization_context(organization, request=request)
     consent_text, consent_version = get_ceremony_context()
-    serialized["ceremony_consent_text"] = consent_text
-    serialized["ceremony_consent_text_version"] = consent_version
-    return Response({"data": serialized})
+    invoice_data["ceremony_consent_text"] = consent_text
+    invoice_data["ceremony_consent_text_version"] = consent_version
+    return Response({"data": invoice_data})
 
 
 @api_view(["POST"])
@@ -217,7 +217,7 @@ def public_invoice_decision_view(request, public_token: str):
 
     consent_text, consent_version = get_ceremony_context()
     client_ip = get_client_ip(request)
-    client_ua = request.META.get("HTTP_USER_AGENT", "")
+    user_agent = request.META.get("HTTP_USER_AGENT", "")
     with transaction.atomic():
         previous_status = invoice.status
         if decision_type == "approve":
@@ -241,7 +241,7 @@ def public_invoice_decision_view(request, public_token: str):
                 note=public_note,
                 changed_by=invoice.created_by,
                 ip_address=client_ip,
-                user_agent=client_ua,
+                user_agent=user_agent,
             )
         else:
             InvoiceStatusEvent.record(
@@ -251,7 +251,7 @@ def public_invoice_decision_view(request, public_token: str):
                 note=public_note,
                 changed_by=invoice.created_by,
                 ip_address=client_ip,
-                user_agent=client_ua,
+                user_agent=user_agent,
             )
 
         content_hash = compute_document_content_hash("invoice", InvoiceSerializer(invoice).data)
@@ -265,7 +265,7 @@ def public_invoice_decision_view(request, public_token: str):
             email_verified=ceremony_session is not None,
             content_hash=content_hash,
             ip_address=client_ip,
-            user_agent=client_ua,
+            user_agent=user_agent,
             consent_text_version=consent_version,
             consent_text_snapshot=consent_text,
             note=str(request.data.get("note", "") or "").strip(),
@@ -275,12 +275,12 @@ def public_invoice_decision_view(request, public_token: str):
     refreshed = _prefetch_invoice_qs(
         Invoice.objects.filter(id=invoice.id)
     ).get()
-    serialized = InvoiceSerializer(refreshed).data
+    invoice_data = InvoiceSerializer(refreshed).data
     organization = _resolve_organization_for_public_actor(refreshed.created_by)
-    serialized["project_context"] = _serialize_public_project_context(refreshed.project)
-    serialized["organization_context"] = _serialize_public_organization_context(organization, request=request)
+    invoice_data["project_context"] = _serialize_public_project_context(refreshed.project)
+    invoice_data["organization_context"] = _serialize_public_organization_context(organization, request=request)
 
-    return Response({"data": serialized, "meta": {"public_decision_applied": decision_type}})
+    return Response({"data": invoice_data, "meta": {"public_decision_applied": decision_type}})
 
 
 @api_view(["GET"])
@@ -364,10 +364,10 @@ def project_invoices_view(request, project_id: int):
         )
 
     if request.method == "GET":
-        rows = _prefetch_invoice_qs(
+        invoices = _prefetch_invoice_qs(
             Invoice.objects.filter(project=project).order_by("-created_at")
         )
-        return Response({"data": InvoiceSerializer(rows, many=True).data})
+        return Response({"data": InvoiceSerializer(invoices, many=True).data})
 
     else:  # POST
         permission_error, _ = _capability_gate(request.user, "invoices", "create")

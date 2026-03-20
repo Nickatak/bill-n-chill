@@ -49,18 +49,18 @@ def projects_list_view(request):
         { "data": [{ ..., "accepted_contract_total": "15000.00" }, ...] }
     """
     membership = _ensure_org_membership(request.user)
-    rows = list(
+    projects = list(
         _prefetch_project_qs(Project.objects.filter(organization_id=membership.organization_id))
     )
     accepted_totals_by_project = _project_accepted_contract_totals_map(
-        project_ids=[row.id for row in rows],
+        project_ids=[project.id for project in projects],
     )
-    serialized_rows = ProjectSerializer(rows, many=True).data
-    for row in serialized_rows:
-        project_id = int(row.get("id"))
+    serialized_projects = ProjectSerializer(projects, many=True).data
+    for project_data in serialized_projects:
+        project_id = int(project_data.get("id"))
         accepted_total = accepted_totals_by_project.get(project_id, Decimal("0"))
-        row["accepted_contract_total"] = f"{accepted_total:.2f}"
-    return Response({"data": serialized_rows})
+        project_data["accepted_contract_total"] = f"{accepted_total:.2f}"
+    return Response({"data": serialized_projects})
 
 
 @api_view(["GET", "PATCH"])
@@ -450,7 +450,7 @@ def project_contract_breakdown_view(request, project_id):
     return Response({
         "data": {
             "active_estimate": estimate_data,
-            "approved_change_orders": [ChangeOrderSerializer(co).data for co in approved_cos],
+            "approved_change_orders": [ChangeOrderSerializer(change_order).data for change_order in approved_cos],
         }
     })
 

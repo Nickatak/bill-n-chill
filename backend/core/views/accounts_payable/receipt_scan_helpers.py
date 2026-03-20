@@ -29,9 +29,9 @@ def _parse_gemini_response(text: str) -> dict:
     """
     cleaned = text.strip()
     if cleaned.startswith("```"):
-        lines = cleaned.split("\n")
-        lines = [line for line in lines if not line.strip().startswith("```")]
-        cleaned = "\n".join(lines).strip()
+        text_lines = cleaned.split("\n")
+        text_lines = [line for line in text_lines if not line.strip().startswith("```")]
+        cleaned = "\n".join(text_lines).strip()
     try:
         return json.loads(cleaned)
     except (json.JSONDecodeError, ValueError):

@@ -95,14 +95,14 @@ def _calculate_invoice_line_totals(line_items_data: list[dict]) -> tuple[list[di
     subtotal = MONEY_ZERO
     normalized_items = []
 
-    for item in line_items_data:
-        quantity = Decimal(str(item["quantity"]))
-        unit_price = Decimal(str(item["unit_price"]))
+    for line_item in line_items_data:
+        quantity = Decimal(str(line_item["quantity"]))
+        unit_price = Decimal(str(line_item["unit_price"]))
         line_total = quantize_money(quantity * unit_price)
         subtotal = quantize_money(subtotal + line_total)
         normalized_items.append(
             {
-                **item,
+                **line_item,
                 "quantity": quantity,
                 "unit_price": unit_price,
                 "line_total": line_total,
@@ -140,24 +140,24 @@ def _apply_invoice_lines_and_totals(
     total = quantize_money(subtotal + tax_total)
 
     invoice.line_items.all().delete()
-    new_lines = []
-    for item in normalized_items:
-        cost_code_id = item.get("cost_code")
+    lines_to_create = []
+    for line_item in normalized_items:
+        cost_code_id = line_item.get("cost_code")
         cost_code = code_map.get(cost_code_id) if cost_code_id else None
 
-        new_lines.append(
+        lines_to_create.append(
             InvoiceLine(
                 invoice=invoice,
                 cost_code=cost_code,
-                description=item["description"],
-                quantity=item["quantity"],
-                unit=item.get("unit", "ea"),
-                unit_price=item["unit_price"],
-                line_total=item["line_total"],
+                description=line_item["description"],
+                quantity=line_item["quantity"],
+                unit=line_item.get("unit", "ea"),
+                unit_price=line_item["unit_price"],
+                line_total=line_item["line_total"],
             )
         )
 
-    InvoiceLine.objects.bulk_create(new_lines)
+    InvoiceLine.objects.bulk_create(lines_to_create)
 
     # Recompute balance_due from the new total minus any settled payment allocations.
     applied_total = (
@@ -374,7 +374,7 @@ def _handle_invoice_document_save(request: Request, invoice: Invoice, ingress: I
                 payload, status_code = _invoice_line_apply_error_response(apply_error)
                 return Response(payload, status=status_code)
         elif ingress.has_tax_percent:
-            existing_lines = [
+            current_line_dicts = [
                 {
                     "cost_code": line.cost_code_id,
                     "description": line.description,
@@ -386,7 +386,7 @@ def _handle_invoice_document_save(request: Request, invoice: Invoice, ingress: I
             ]
             _apply_invoice_lines_and_totals(
                 invoice=invoice,
-                line_items_data=existing_lines,
+                line_items_data=current_line_dicts,
                 tax_percent=invoice.tax_percent,
                 user=request.user,
             )

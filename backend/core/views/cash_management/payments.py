@@ -94,10 +94,10 @@ def org_payments_view(request):
     membership = _ensure_org_membership(request.user)
 
     if request.method == "GET":
-        rows = _prefetch_payment_qs(
+        payments = _prefetch_payment_qs(
             Payment.objects.filter(organization_id=membership.organization_id)
         ).order_by("-payment_date", "-created_at")
-        return Response({"data": PaymentSerializer(rows, many=True).data})
+        return Response({"data": PaymentSerializer(payments, many=True).data})
 
     elif request.method == "POST":
         permission_error, _ = _capability_gate(request.user, "payments", "create")
@@ -234,10 +234,10 @@ def project_payments_view(request, project_id):
     membership = _ensure_org_membership(request.user)
 
     if request.method == "GET":
-        rows = _prefetch_payment_qs(
+        payments = _prefetch_payment_qs(
             Payment.objects.filter(project=project)
         ).order_by("-payment_date", "-created_at")
-        return Response({"data": PaymentSerializer(rows, many=True).data})
+        return Response({"data": PaymentSerializer(payments, many=True).data})
 
     elif request.method == "POST":
         permission_error, _ = _capability_gate(request.user, "payments", "create")

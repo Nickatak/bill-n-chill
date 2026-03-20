@@ -88,9 +88,9 @@ def _project_accepted_contract_totals_map(
         .order_by("project_id", "-created_at", "-id")
     )
     estimate_total_by_project: dict[int, Decimal] = {}
-    for est in approved_estimates:
-        if est.project_id not in estimate_total_by_project:
-            estimate_total_by_project[est.project_id] = est.grand_total
+    for estimate in approved_estimates:
+        if estimate.project_id not in estimate_total_by_project:
+            estimate_total_by_project[estimate.project_id] = estimate.grand_total
 
     # Sum approved CO deltas per project.
     approved_cos = ChangeOrder.objects.filter(
@@ -98,8 +98,8 @@ def _project_accepted_contract_totals_map(
         status=ChangeOrder.Status.APPROVED,
     )
     co_total_by_project: dict[int, Decimal] = {}
-    for co in approved_cos:
-        co_total_by_project[co.project_id] = co_total_by_project.get(co.project_id, Decimal("0")) + co.amount_delta
+    for change_order in approved_cos:
+        co_total_by_project[change_order.project_id] = co_total_by_project.get(change_order.project_id, Decimal("0")) + change_order.amount_delta
 
     totals: dict[int, Decimal] = {}
     for project_id in project_ids:
@@ -124,45 +124,45 @@ def _build_project_financial_summary_data(
         project_ids=[project.id],
     ).get(project.id, Decimal("0"))
 
-    approved_co_rows = list(
+    approved_change_orders = list(
         ChangeOrder.objects.filter(
             project=project,
             status=ChangeOrder.Status.APPROVED,
         ).order_by("-created_at", "-id")
     )
-    approved_change_orders_total = sum((co.amount_delta for co in approved_co_rows), Decimal("0"))
+    approved_change_orders_total = sum((change_order.amount_delta for change_order in approved_change_orders), Decimal("0"))
 
-    invoice_rows = list(
+    invoices = list(
         Invoice.objects.filter(
             project=project,
         )
         .exclude(status=Invoice.Status.VOID)
         .order_by("-created_at", "-id")
     )
-    invoiced_to_date = sum((invoice.total for invoice in invoice_rows), Decimal("0"))
+    invoiced_to_date = sum((invoice.total for invoice in invoices), Decimal("0"))
 
     inbound_payment_qs = Payment.objects.filter(
         invoice__project=project,
         status=Payment.Status.SETTLED,
         direction=Payment.Direction.INBOUND,
     ).order_by("-created_at", "-id")
-    paid_to_date = sum((p.amount for p in inbound_payment_qs), Decimal("0"))
+    paid_to_date = sum((payment.amount for payment in inbound_payment_qs), Decimal("0"))
 
-    vendor_bill_rows = list(
+    vendor_bills = list(
         VendorBill.objects.filter(
             project=project,
         )
         .exclude(status=VendorBill.Status.VOID)
         .order_by("-created_at", "-id")
     )
-    ap_total = sum((bill.total for bill in vendor_bill_rows), Decimal("0"))
+    ap_total = sum((bill.total for bill in vendor_bills), Decimal("0"))
 
     outbound_payment_qs = Payment.objects.filter(
         vendor_bill__project=project,
         status=Payment.Status.SETTLED,
         direction=Payment.Direction.OUTBOUND,
     ).order_by("-created_at", "-id")
-    ap_paid = sum((p.amount for p in outbound_payment_qs), Decimal("0"))
+    ap_paid = sum((payment.amount for payment in outbound_payment_qs), Decimal("0"))
 
     ar_outstanding = invoiced_to_date - paid_to_date
     ap_outstanding = ap_total - ap_paid
@@ -172,24 +172,24 @@ def _build_project_financial_summary_data(
     if ap_outstanding < Decimal("0"):
         ap_outstanding = Decimal("0")
 
-    inbound_payment_rows = list(
+    inbound_payments = list(
         project.payments.filter(
             status=Payment.Status.SETTLED,
             direction=Payment.Direction.INBOUND,
         )
     )
-    inbound_unapplied_credit = sum((payment.amount for payment in inbound_payment_rows), Decimal("0"))
+    inbound_unapplied_credit = sum((payment.amount for payment in inbound_payments), Decimal("0"))
     inbound_unapplied_credit = inbound_unapplied_credit - paid_to_date
     if inbound_unapplied_credit < Decimal("0"):
         inbound_unapplied_credit = Decimal("0")
 
-    outbound_payment_rows = list(
+    outbound_payments = list(
         project.payments.filter(
             status=Payment.Status.SETTLED,
             direction=Payment.Direction.OUTBOUND,
         )
     )
-    outbound_disbursed_total = sum((payment.amount for payment in outbound_payment_rows), Decimal("0"))
+    outbound_disbursed_total = sum((payment.amount for payment in outbound_payments), Decimal("0"))
     outbound_unapplied_credit = outbound_disbursed_total - ap_paid
     if outbound_unapplied_credit < Decimal("0"):
         outbound_unapplied_credit = Decimal("0")
@@ -201,13 +201,13 @@ def _build_project_financial_summary_data(
             "total": f"{approved_change_orders_total:.2f}",
             "records": [
                 {
-                    "id": row.id,
-                    "label": f"CO-{row.family_key}",
-                    "status": row.status,
-                    "amount": f"{row.amount_delta:.2f}",
-                    "detail_endpoint": f"/api/v1/change-orders/{row.id}/",
+                    "id": change_order.id,
+                    "label": f"CO-{change_order.family_key}",
+                    "status": change_order.status,
+                    "amount": f"{change_order.amount_delta:.2f}",
+                    "detail_endpoint": f"/api/v1/change-orders/{change_order.id}/",
                 }
-                for row in approved_co_rows
+                for change_order in approved_change_orders
             ],
         },
         "ar_invoices": {
@@ -216,13 +216,13 @@ def _build_project_financial_summary_data(
             "total": f"{invoiced_to_date:.2f}",
             "records": [
                 {
-                    "id": row.id,
-                    "label": row.invoice_number,
-                    "status": row.status,
-                    "amount": f"{row.total:.2f}",
-                    "detail_endpoint": f"/api/v1/invoices/{row.id}/",
+                    "id": invoice.id,
+                    "label": invoice.invoice_number,
+                    "status": invoice.status,
+                    "amount": f"{invoice.total:.2f}",
+                    "detail_endpoint": f"/api/v1/invoices/{invoice.id}/",
                 }
-                for row in invoice_rows
+                for invoice in invoices
             ],
         },
         "ar_payments": {
@@ -231,13 +231,13 @@ def _build_project_financial_summary_data(
             "total": f"{paid_to_date:.2f}",
             "records": [
                 {
-                    "id": p.id,
-                    "label": f"PAY-{p.id}",
-                    "status": p.status,
-                    "amount": f"{p.amount:.2f}",
-                    "detail_endpoint": f"/api/v1/payments/{p.id}/",
+                    "id": payment.id,
+                    "label": f"PAY-{payment.id}",
+                    "status": payment.status,
+                    "amount": f"{payment.amount:.2f}",
+                    "detail_endpoint": f"/api/v1/payments/{payment.id}/",
                 }
-                for p in inbound_payment_qs
+                for payment in inbound_payment_qs
             ],
         },
         "ap_vendor_bills": {
@@ -246,13 +246,13 @@ def _build_project_financial_summary_data(
             "total": f"{ap_total:.2f}",
             "records": [
                 {
-                    "id": row.id,
-                    "label": row.bill_number,
-                    "status": row.status,
-                    "amount": f"{row.total:.2f}",
-                    "detail_endpoint": f"/api/v1/vendor-bills/{row.id}/",
+                    "id": vendor_bill.id,
+                    "label": vendor_bill.bill_number,
+                    "status": vendor_bill.status,
+                    "amount": f"{vendor_bill.total:.2f}",
+                    "detail_endpoint": f"/api/v1/vendor-bills/{vendor_bill.id}/",
                 }
-                for row in vendor_bill_rows
+                for vendor_bill in vendor_bills
             ],
         },
         "ap_payments": {
@@ -261,13 +261,13 @@ def _build_project_financial_summary_data(
             "total": f"{ap_paid:.2f}",
             "records": [
                 {
-                    "id": p.id,
-                    "label": f"PAY-{p.id}",
-                    "status": p.status,
-                    "amount": f"{p.amount:.2f}",
-                    "detail_endpoint": f"/api/v1/payments/{p.id}/",
+                    "id": payment.id,
+                    "label": f"PAY-{payment.id}",
+                    "status": payment.status,
+                    "amount": f"{payment.amount:.2f}",
+                    "detail_endpoint": f"/api/v1/payments/{payment.id}/",
                 }
-                for p in outbound_payment_qs
+                for payment in outbound_payment_qs
             ],
         },
     }

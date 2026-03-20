@@ -64,19 +64,19 @@ def vendors_list_create_view(request):
     scope_filter = _org_scope_filter(request.user)
 
     if request.method == "GET":
-        rows = Vendor.objects.filter(scope_filter).order_by("name", "id")
+        vendors = Vendor.objects.filter(scope_filter).order_by("name", "id")
         search = request.query_params.get("q", "").strip()
         if search:
-            rows = rows.filter(
+            vendors = vendors.filter(
                 Q(name__icontains=search)
                 | Q(email__icontains=search)
                 | Q(phone__icontains=search)
                 | Q(tax_id_last4__icontains=search)
             )
 
-        rows, meta = _paginate_queryset(rows, request.query_params)
+        vendors, meta = _paginate_queryset(vendors, request.query_params)
 
-        return Response({"data": VendorSerializer(rows, many=True).data, "meta": meta})
+        return Response({"data": VendorSerializer(vendors, many=True).data, "meta": meta})
 
     elif request.method == "POST":
         permission_error, _ = _capability_gate(request.user, "vendors", "create")
