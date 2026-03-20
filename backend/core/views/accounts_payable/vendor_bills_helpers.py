@@ -1,8 +1,13 @@
 """Domain-specific helpers for vendor bill views."""
 
+from __future__ import annotations
+
+import datetime
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import QuerySet
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.models import VendorBill, VendorBillLine, VendorBillSnapshot
@@ -10,15 +15,26 @@ from core.serializers import VendorBillSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import _resolve_cost_codes_for_user
 
+# Statuses that require issue_date and due_date.
+DATE_REQUIRED_STATUSES = {
+    VendorBill.Status.RECEIVED,
+    VendorBill.Status.APPROVED,
+}
+
 
 def _find_duplicate_vendor_bills(
     user,
     *,
     vendor_id: int,
     bill_number: str,
-    exclude_vendor_bill_id=None,
-):
-    """Return same-user vendor bills matching vendor+bill number (case-insensitive)."""
+    exclude_vendor_bill_id: int | None = None,
+) -> list[VendorBill]:
+    """Find existing vendor bills with the same vendor + bill_number (case-insensitive).
+
+    Used for duplicate detection before creating or re-identifying a bill.
+    Returns an empty list early if vendor_id or bill_number is missing.
+    Pass ``exclude_vendor_bill_id`` to omit the bill being edited from results.
+    """
     from core.user_helpers import _ensure_org_membership
 
     bill_number_norm = (bill_number or "").strip()
@@ -37,8 +53,13 @@ def _find_duplicate_vendor_bills(
     return list(rows.select_related("vendor", "project").order_by("-created_at", "-id"))
 
 
-def _calculate_vendor_bill_line_totals(line_items_data):
-    """Compute per-line amounts (quantity × unit_price) and return normalized items with a running subtotal."""
+def _calculate_vendor_bill_line_totals(line_items_data: list[dict]) -> tuple[list[dict], Decimal]:
+    """Compute per-line amounts and return normalized items with a running subtotal.
+
+    Each item gets ``quantity * unit_price`` computed and quantized to 2
+    decimal places. Returns ``(normalized_items, subtotal)`` where each
+    normalized item has ``quantity``, ``unit_price``, and ``amount`` set.
+    """
     subtotal = MONEY_ZERO
     normalized_items = []
     for item in line_items_data:
@@ -55,12 +76,22 @@ def _calculate_vendor_bill_line_totals(line_items_data):
     return normalized_items, subtotal
 
 
-def _apply_vendor_bill_lines_and_totals(vendor_bill, line_items_data, tax_amount, shipping_amount, user):
+def _apply_vendor_bill_lines_and_totals(
+    vendor_bill: VendorBill,
+    line_items_data: list[dict],
+    tax_amount: Decimal,
+    shipping_amount: Decimal,
+    user,
+) -> dict | None:
     """Replace a vendor bill's line items and recompute all totals.
 
-    Returns an error dict on failure, or None on success.
-    Line items are quantity × unit_price transcriptions with optional cost code tags.
-    Total = subtotal (sum of line amounts) + tax + shipping.
+    Callers must wrap this in ``transaction.atomic()`` — the function
+    deletes all existing lines, bulk-creates replacements, and updates
+    totals on the bill. A failure between steps without a transaction
+    would leave the bill in an inconsistent state.
+
+    Returns an error dict (``{"missing_cost_codes": [...]}`` ) on failure,
+    or None on success. Total = subtotal (sum of line amounts) + tax + shipping.
     """
     normalized_items, subtotal = _calculate_vendor_bill_line_totals(line_items_data)
     code_map, missing = _resolve_cost_codes_for_user(user, normalized_items)
@@ -104,8 +135,13 @@ def _apply_vendor_bill_lines_and_totals(vendor_bill, line_items_data, tax_amount
     return None
 
 
-def _vendor_bill_line_apply_error_response(apply_error):
-    """Convert an _apply_vendor_bill_lines_and_totals error dict into a (body, status) HTTP response tuple."""
+def _vendor_bill_line_apply_error_response(apply_error: dict) -> tuple[dict, int]:
+    """Convert an ``_apply_vendor_bill_lines_and_totals`` error dict into an HTTP response tuple.
+
+    Returns ``(body, status_code)`` ready for ``Response(body, status=status_code)``.
+    Currently handles ``missing_cost_codes``; falls back to a generic
+    validation error for any unrecognized error shape.
+    """
     if "missing_cost_codes" in apply_error:
         return (
             {
@@ -129,19 +165,76 @@ def _vendor_bill_line_apply_error_response(apply_error):
     )
 
 
-def _prefetch_vendor_bill_qs(qs):
-    """Apply standard select/prefetch for vendor bill queries."""
-    return qs.select_related("project", "vendor").prefetch_related(
+def _prefetch_vendor_bill_qs(queryset: QuerySet) -> QuerySet:
+    """Eagerly load vendor bill relations to prevent N+1 query problems.
+
+    Without this, serializing a list of vendor bills would fire separate SQL
+    queries for each bill's project, vendor, line items, cost codes, and
+    payments — scaling linearly with the number of rows.
+
+    - select_related: JOINs project + vendor in a single query (FK lookups).
+    - prefetch_related: batches separate queries for reverse-FK line items,
+      their cost codes, and target payments, mapping results back in Python.
+    """
+    return queryset.select_related("project", "vendor").prefetch_related(
         "line_items", "line_items__cost_code",
         "target_payments",
     )
 
 
-# Statuses that require issue_date and due_date.
-DATE_REQUIRED_STATUSES = {
-    VendorBill.Status.RECEIVED,
-    VendorBill.Status.APPROVED,
-}
+def _validate_vb_dates(
+    next_status: str,
+    next_issue_date: datetime.date | None,
+    next_due_date: datetime.date | None,
+) -> dict | None:
+    """Validate date requirements for a vendor bill status.
+
+    Returns an error payload dict if validation fails, or None if valid.
+    Checks: (1) required dates present for certain statuses,
+    (2) due_date >= issue_date when both are set.
+    """
+    if next_status in DATE_REQUIRED_STATUSES:
+        fields = {}
+        if next_issue_date is None:
+            fields["issue_date"] = ["Issue date is required."]
+        if next_due_date is None:
+            fields["due_date"] = ["Due date is required."]
+        if fields:
+            return {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Missing required date fields for the selected status.",
+                    "fields": fields,
+                }
+            }
+    if next_due_date and next_issue_date and next_due_date < next_issue_date:
+        return {
+            "error": {
+                "code": "validation_error",
+                "message": "due_date cannot be before issue_date.",
+                "fields": {"due_date": ["Due date must be on or after issue date."]},
+            }
+        }
+    return None
+
+
+def _validate_vb_line_items_present(line_items: list | None) -> dict | None:
+    """Validate that line items are non-empty when provided.
+
+    Returns an error payload dict if line_items is an empty list,
+    or None if valid (including when line_items is None, meaning
+    no line item update was requested).
+    """
+    if line_items is not None and not line_items:
+        return {
+            "error": {
+                "code": "validation_error",
+                "message": "At least one line item is required.",
+                "fields": {"line_items": ["At least one line item is required."]},
+            }
+        }
+    return None
+
 
 # Statuses that trigger snapshot capture on transition.
 SNAPSHOT_CAPTURE_STATUSES = {
@@ -158,60 +251,33 @@ SNAPSHOT_CAPTURE_STATUSES = {
 # ---------------------------------------------------------------------------
 
 
-def _handle_vb_document_save(request, vendor_bill, data):
+def _handle_vb_document_save(request: Request, vendor_bill: VendorBill, data: dict) -> Response:
     """Apply field updates, line items, and totals to a vendor bill (the 'save' concern).
 
-    Handles vendor, dates, amounts, notes, status echo, line items, and
-    totals recomputation.  Does not perform status transitions or snapshot recording.
+    Does not perform status transitions or snapshot recording — only
+    persists field-level edits and recomputes totals when line items change.
+
+    Flow:
+        1. Validate dates (required fields per status, due >= issue).
+        2. Validate line items non-empty if provided.
+        3. Apply field updates (vendor, dates, notes, status echo).
+        4. If line items provided: delete + recreate lines, recompute totals.
+        5. Else if only tax/shipping changed: recompute totals with existing lines.
+        6. Return serialized bill.
     """
     next_status = data.get("status", vendor_bill.status)
 
     # Date validation
     next_issue_date = data.get("issue_date", vendor_bill.issue_date)
     next_due_date = data.get("due_date", vendor_bill.due_date)
-    if next_status in DATE_REQUIRED_STATUSES:
-        fields = {}
-        if next_issue_date is None:
-            fields["issue_date"] = ["Issue date is required."]
-        if next_due_date is None:
-            fields["due_date"] = ["Due date is required."]
-        if fields:
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_error",
-                        "message": "Missing required date fields for the selected status.",
-                        "fields": fields,
-                    }
-                },
-                status=400,
-            )
-    if next_due_date and next_issue_date and next_due_date < next_issue_date:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "due_date cannot be before issue_date.",
-                    "fields": {"due_date": ["Due date must be on or after issue date."]},
-                }
-            },
-            status=400,
-        )
+    if error := _validate_vb_dates(next_status, next_issue_date, next_due_date):
+        return Response(error, status=400)
 
     # Line item validation
     line_items = data.get("line_items")
+    if error := _validate_vb_line_items_present(line_items):
+        return Response(error, status=400)
     has_line_items = line_items is not None
-    if has_line_items and not line_items:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "At least one line item is required.",
-                    "fields": {"line_items": ["At least one line item is required."]},
-                }
-            },
-            status=400,
-        )
 
     # Field updates
     update_fields = ["updated_at"]
@@ -278,12 +344,25 @@ def _handle_vb_document_save(request, vendor_bill, data):
 
 
 def _handle_vb_status_transition(
-    request, vendor_bill, data, previous_status, next_status,
-):
+    request: Request,
+    vendor_bill: VendorBill,
+    data: dict,
+    previous_status: str,
+    next_status: str,
+) -> Response:
     """Handle a vendor bill status transition: validate, apply, snapshot.
 
     Called when the PATCH includes a real status change (previous != next).
     Document lifecycle only — no payment/balance logic.
+
+    Flow:
+        1. Reject if the transition is not allowed by the state machine.
+        2. Validate dates and line items.
+        3. Apply field updates + new status.
+        4. If line items provided: delete + recreate lines, recompute totals.
+        5. Else if only tax/shipping changed: recompute totals with existing lines.
+        6. Capture an immutable snapshot if the new status is in ``SNAPSHOT_CAPTURE_STATUSES``.
+        7. Return serialized bill.
     """
     if not VendorBill.is_transition_allowed(
         current_status=previous_status,
@@ -303,49 +382,14 @@ def _handle_vb_status_transition(
     # Date validation
     next_issue_date = data.get("issue_date", vendor_bill.issue_date)
     next_due_date = data.get("due_date", vendor_bill.due_date)
-    if next_status in DATE_REQUIRED_STATUSES:
-        fields = {}
-        if next_issue_date is None:
-            fields["issue_date"] = ["Issue date is required."]
-        if next_due_date is None:
-            fields["due_date"] = ["Due date is required."]
-        if fields:
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_error",
-                        "message": "Missing required date fields for the selected status.",
-                        "fields": fields,
-                    }
-                },
-                status=400,
-            )
-    if next_due_date and next_issue_date and next_due_date < next_issue_date:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "due_date cannot be before issue_date.",
-                    "fields": {"due_date": ["Due date must be on or after issue date."]},
-                }
-            },
-            status=400,
-        )
+    if error := _validate_vb_dates(next_status, next_issue_date, next_due_date):
+        return Response(error, status=400)
 
     # Line item validation
     line_items = data.get("line_items")
+    if error := _validate_vb_line_items_present(line_items):
+        return Response(error, status=400)
     has_line_items = line_items is not None
-    if has_line_items and not line_items:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "At least one line item is required.",
-                    "fields": {"line_items": ["At least one line item is required."]},
-                }
-            },
-            status=400,
-        )
 
     # Field updates (dates and other fields that may accompany the transition)
     update_fields = ["updated_at"]
@@ -416,11 +460,17 @@ def _handle_vb_status_transition(
     )
 
 
-def _handle_vb_status_note(request, vendor_bill, data):
+def _handle_vb_status_note(request: Request, vendor_bill: VendorBill, data: dict) -> Response:
     """Append a status note snapshot without changing vendor bill status.
 
-    Called when the PATCH includes a status_note but no actual status change.
-    Records a snapshot with capture_status matching the current status.
+    Called when the PATCH includes a ``status_note`` but no actual status
+    change. Records a snapshot with ``capture_status`` matching the
+    current status — effectively a timestamped note on the bill's timeline.
+
+    Flow:
+        1. Extract and trim the status note text.
+        2. Record a snapshot with current status as both previous and capture.
+        3. Return serialized bill.
     """
     note_text = (data.get("status_note", "") or "").strip()
 
