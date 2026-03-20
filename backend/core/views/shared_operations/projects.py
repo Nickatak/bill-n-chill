@@ -29,7 +29,19 @@ from core.views.shared_operations.projects_helpers import (
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def projects_list_view(request):
-    """List projects visible to the authenticated owner context."""
+    """List all projects for the caller's organization.
+
+    Each project is annotated with its ``accepted_contract_total`` (sum of
+    the latest approved estimate grand total per title family).
+
+    URL: ``GET /api/v1/projects/``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": [{ ..., "accepted_contract_total": "15000.00" }, ...] }
+    """
     membership = _ensure_org_membership(request.user)
     rows = list(
         Project.objects.filter(organization_id=membership.organization_id).select_related("customer")
@@ -47,8 +59,41 @@ def projects_list_view(request):
 
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
-def project_detail_view(request, project_id: int):
-    """Fetch or patch a project profile with terminal-state and transition protections."""
+def project_detail_view(request, project_id):
+    """Fetch or update a project profile.
+
+    GET returns the full project profile with ``accepted_contract_total``.
+    PATCH applies partial updates with guards for terminal-state projects,
+    immutable contract fields, and invalid status transitions.
+
+    Flow (GET):
+        1. Look up project scoped to user's org.
+        2. Compute accepted contract total.
+        3. Return serialized profile.
+
+    Flow (PATCH):
+        1. Capability gate: ``projects.edit``.
+        2. Reject if project is in terminal state (completed/cancelled).
+        3. Reject if attempting to change immutable contract fields.
+        4. Validate status transition if status is being changed.
+        5. Detect changed fields — reject if nothing changed.
+        6. Save and return updated profile.
+
+    URL: ``GET/PATCH /api/v1/projects/<project_id>/``
+
+    Request body (PATCH)::
+
+        { "name": "Updated Name", "status": "active" }
+
+    Success 200::
+
+        { "data": { ..., "accepted_contract_total": "15000.00" } }
+
+    Errors:
+        - 400: Terminal state, immutable field, invalid transition, no changes, or validation error.
+        - 403: Missing ``projects.edit`` capability.
+        - 404: Project not found.
+    """
     membership = _ensure_org_membership(request.user)
     try:
         project = Project.objects.select_related("customer").get(
@@ -69,120 +114,136 @@ def project_detail_view(request, project_id: int):
         payload["accepted_contract_total"] = f"{accepted_total:.2f}"
         return Response({"data": payload})
 
-    permission_error, _ = _capability_gate(request.user, "projects", "edit")
-    if permission_error:
-        return Response(permission_error, status=403)
+    elif request.method == "PATCH":
+        permission_error, _ = _capability_gate(request.user, "projects", "edit")
+        if permission_error:
+            return Response(permission_error, status=403)
 
-    if project.status in {Project.Status.COMPLETED, Project.Status.CANCELLED}:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "Project is in a terminal state and can no longer be edited.",
-                    "fields": {"status": ["Terminal projects are immutable."]},
+        if project.status in {Project.Status.COMPLETED, Project.Status.CANCELLED}:
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "Project is in a terminal state and can no longer be edited.",
+                        "fields": {"status": ["Terminal projects are immutable."]},
+                    }
+                },
+                status=400,
+            )
+
+        immutable_contract_fields = {
+            "contract_value_original": "Original contract value is immutable after project creation.",
+            "contract_value_current": "Current contract value is system-derived and cannot be edited directly.",
+        }
+        blocked_field = next((field for field in immutable_contract_fields if field in request.data), None)
+        if blocked_field:
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": immutable_contract_fields[blocked_field],
+                        "fields": {
+                            blocked_field: [
+                                "This field cannot be changed after project creation."
+                            ]
+                        },
+                    }
+                },
+                status=400,
+            )
+
+        if "status" in request.data:
+            next_status = request.data.get("status")
+            current_status = project.status
+            if next_status != current_status:
+                if not Project.is_transition_allowed(current_status, next_status):
+                    return Response(
+                        {
+                            "error": {
+                                "code": "validation_error",
+                                "message": f"Invalid project status transition: {current_status} -> {next_status}.",
+                                "fields": {"status": ["This transition is not allowed."]},
+                            }
+                        },
+                        status=400,
+                    )
+
+        serializer = ProjectProfileSerializer(project, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        changed_fields = [
+            field_name
+            for field_name, next_value in serializer.validated_data.items()
+            if getattr(project, field_name) != next_value
+        ]
+        if not changed_fields:
+            fields = {"non_field_errors": ["No project changes detected."]}
+            if "status" in request.data and request.data.get("status") == project.status:
+                fields = {
+                    "status": [
+                        f"Project is already {project.status}. Choose a different status or update another field."
+                    ]
                 }
-            },
-            status=400,
-        )
-
-    immutable_contract_fields = {
-        "contract_value_original": "Original contract value is immutable after project creation.",
-        "contract_value_current": "Current contract value is system-derived and cannot be edited directly.",
-    }
-    blocked_field = next((field for field in immutable_contract_fields if field in request.data), None)
-    if blocked_field:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": immutable_contract_fields[blocked_field],
-                    "fields": {
-                        blocked_field: [
-                            "This field cannot be changed after project creation."
-                        ]
-                    },
-                }
-            },
-            status=400,
-        )
-
-    if "status" in request.data:
-        next_status = request.data.get("status")
-        current_status = project.status
-        if next_status != current_status:
-            if not Project.is_transition_allowed(current_status, next_status):
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "No project changes detected.",
+                        "fields": fields,
+                    }
+                },
+                status=400,
+            )
+        try:
+            serializer.save()
+        except DjangoValidationError as exc:
+            if hasattr(exc, "message_dict"):
                 return Response(
                     {
                         "error": {
                             "code": "validation_error",
-                            "message": f"Invalid project status transition: {current_status} -> {next_status}.",
-                            "fields": {"status": ["This transition is not allowed."]},
+                            "message": "Project update failed validation.",
+                            "fields": exc.message_dict,
                         }
                     },
                     status=400,
                 )
-
-    serializer = ProjectProfileSerializer(project, data=request.data, partial=True)
-    serializer.is_valid(raise_exception=True)
-    changed_fields = [
-        field_name
-        for field_name, next_value in serializer.validated_data.items()
-        if getattr(project, field_name) != next_value
-    ]
-    if not changed_fields:
-        fields = {"non_field_errors": ["No project changes detected."]}
-        if "status" in request.data and request.data.get("status") == project.status:
-            fields = {
-                "status": [
-                    f"Project is already {project.status}. Choose a different status or update another field."
-                ]
-            }
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "No project changes detected.",
-                    "fields": fields,
-                }
-            },
-            status=400,
-        )
-    try:
-        serializer.save()
-    except DjangoValidationError as exc:
-        if hasattr(exc, "message_dict"):
             return Response(
                 {
                     "error": {
                         "code": "validation_error",
                         "message": "Project update failed validation.",
-                        "fields": exc.message_dict,
+                        "fields": {"non_field_errors": exc.messages},
                     }
                 },
                 status=400,
             )
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "Project update failed validation.",
-                    "fields": {"non_field_errors": exc.messages},
-                }
-            },
-            status=400,
-        )
-    accepted_total = _project_accepted_contract_totals_map(
-        project_ids=[project.id],
-    ).get(project.id, Decimal("0"))
-    payload = ProjectProfileSerializer(project).data
-    payload["accepted_contract_total"] = f"{accepted_total:.2f}"
-    return Response({"data": payload})
+        accepted_total = _project_accepted_contract_totals_map(
+            project_ids=[project.id],
+        ).get(project.id, Decimal("0"))
+        payload = ProjectProfileSerializer(project).data
+        payload["accepted_contract_total"] = f"{accepted_total:.2f}"
+        return Response({"data": payload})
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def project_financial_summary_view(request, project_id: int):
-    """Return normalized AR/AP/CO financial summary plus traceability for one project."""
+def project_financial_summary_view(request, project_id):
+    """Return normalized AR/AP/CO financial summary with traceability for one project.
+
+    Aggregates contract values, invoiced/paid amounts, outstanding balances,
+    and per-record traceability links.  Used by the project overview page.
+
+    URL: ``GET /api/v1/projects/<project_id>/financial-summary/``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": { "contract_value_original": "...", "invoiced_to_date": "...", "traceability": {...} } }
+
+    Errors:
+        - 404: Project not found.
+    """
     membership = _ensure_org_membership(request.user)
     try:
         project = Project.objects.get(id=project_id, organization_id=membership.organization_id)
@@ -199,8 +260,25 @@ def project_financial_summary_view(request, project_id: int):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def project_accounting_export_view(request, project_id: int):
-    """Export project accounting summary as JSON or CSV (`export_format` query param)."""
+def project_accounting_export_view(request, project_id):
+    """Export project accounting summary as JSON or CSV.
+
+    Accepts ``?export_format=json`` or ``?export_format=csv`` (default: csv).
+    CSV includes summary metrics as rows plus per-record traceability lines.
+
+    URL: ``GET /api/v1/projects/<project_id>/accounting-export/?export_format=csv``
+
+    Request body: (none)
+
+    Success 200 (JSON)::
+
+        { "data": { "project_id": 1, "generated_at": "...", "summary": {...}, "traceability": {...} } }
+
+    Success 200 (CSV): ``text/csv`` attachment with summary + record rows.
+
+    Errors:
+        - 404: Project not found.
+    """
     membership = _ensure_org_membership(request.user)
     try:
         project = Project.objects.get(id=project_id, organization_id=membership.organization_id)
@@ -289,12 +367,23 @@ def project_accounting_export_view(request, project_id: int):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def project_contract_breakdown_view(request, project_id: int):
-    """Return the most recently approved estimate and approved change orders for a project.
+def project_contract_breakdown_view(request, project_id):
+    """Return the active estimate and approved change orders for a project.
 
     Returns the most recently approved estimate with its line items, plus all
-    approved/accepted change orders linked to that estimate with their line items.
-    Single response, no additional fetches required.
+    approved change orders linked to the project with their line items.  If no
+    approved estimate exists, returns nulls.
+
+    URL: ``GET /api/v1/projects/<project_id>/contract-breakdown/``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": { "active_estimate": { ... }, "approved_change_orders": [{ ... }, ...] } }
+
+    Errors:
+        - 404: Project not found.
     """
     membership = _ensure_org_membership(request.user)
     try:
@@ -345,6 +434,13 @@ def project_contract_breakdown_view(request, project_id: int):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def project_audit_events_view(request, project_id: int):
-    """Audit events endpoint — removed. Returns an empty list for backward compatibility."""
+def project_audit_events_view(request, project_id):
+    """Audit events endpoint — removed. Returns an empty list for backward compatibility.
+
+    URL: ``GET /api/v1/projects/<project_id>/audit-events/``
+
+    Success 200::
+
+        { "data": [] }
+    """
     return Response({"data": []})
