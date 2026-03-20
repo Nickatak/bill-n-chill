@@ -24,11 +24,13 @@ from core.views.accounts_receivable.invoice_ingress import (
 from core.views.accounts_receivable.invoices_helpers import (
     _activate_project_from_invoice_creation,
     _apply_invoice_lines_and_totals,
+    _freeze_org_identity_on_invoice,
     _handle_invoice_document_save,
     _handle_invoice_status_note,
     _handle_invoice_status_transition,
     _invoice_line_apply_error_response,
     _next_invoice_number,
+    _prefetch_invoice_qs,
 )
 from core.views.helpers import (
     _build_public_decision_note,
@@ -45,16 +47,26 @@ from core.views.public_signing_helpers import get_ceremony_context, validate_cer
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def org_invoices_view(request):
-    """Org-level invoice list — all invoices across all projects for the accounting page."""
+    """List all invoices across all projects for the authenticated user's org.
+
+    Used by the accounting page to show a unified AR ledger.
+
+    Flow:
+        1. Resolve org membership.
+        2. Query all invoices scoped to the org, ordered by date descending.
+        3. Return serialized list with eagerly loaded relations.
+
+    URL: ``GET /api/v1/invoices/``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": [ { ... }, ... ] }
+    """
     membership = _ensure_org_membership(request.user)
-    rows = (
+    rows = _prefetch_invoice_qs(
         Invoice.objects.filter(project__organization_id=membership.organization_id)
-        .select_related("project", "customer")
-        .prefetch_related(
-            "line_items",
-            "line_items__cost_code",
-            "target_payments",
-        )
         .order_by("-created_at")
     )
     return Response({"data": InvoiceSerializer(rows, many=True).data})
@@ -63,16 +75,33 @@ def org_invoices_view(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def public_invoice_detail_view(request, public_token: str):
-    """Return public invoice detail for share links, including lightweight project context."""
+    """Return public invoice detail for share links, including project context.
+
+    Public (no auth) endpoint used by customer-facing share links. Returns
+    the full invoice with project context, organization identity, and signing
+    ceremony consent text for the decision form.
+
+    Flow:
+        1. Look up the invoice by public token.
+        2. Resolve the organization from the invoice creator.
+        3. Attach project context, organization context, and ceremony consent.
+        4. Return the enriched serialized invoice.
+
+    URL: ``GET /api/v1/public/invoices/<public_token>/``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": { ..., "project_context": { ... }, "organization_context": { ... } } }
+
+    Errors:
+        - 404: Invoice not found for the given token.
+    """
     try:
-        invoice = (
-            Invoice.objects.select_related("project__customer", "created_by")
-            .prefetch_related(
-                "line_items",
-                "line_items__cost_code",
-            )
-            .get(public_token=public_token)
-        )
+        invoice = _prefetch_invoice_qs(
+            Invoice.objects.filter(public_token=public_token)
+        ).get()
     except Invoice.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Invoice not found.", "fields": {}}},
@@ -92,16 +121,44 @@ def public_invoice_detail_view(request, public_token: str):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def public_invoice_decision_view(request, public_token: str):
-    """Apply customer approval/dispute decision to a public invoice share link."""
+    """Apply a customer approval or dispute decision to a public invoice.
+
+    Public (no auth) endpoint for customer decisions on shared invoices.
+    Validates the signing ceremony (OTP verification), records the decision
+    as an audit event, and creates an immutable signing ceremony record.
+
+    Flow:
+        1. Look up the invoice by public token.
+        2. Verify the invoice is in a decision-eligible status (sent or partially paid).
+        3. Parse and validate the decision type (approve/pay or dispute/reject).
+        4. Validate the signing ceremony session (OTP verification).
+        5. Build the public decision note with signer identity.
+        6. Apply the decision atomically: update status (if approved), record
+           audit event, and create signing ceremony record.
+        7. Return the refreshed invoice with project and organization context.
+
+    URL: ``POST /api/v1/public/invoices/<public_token>/decision/``
+
+    Request body::
+
+        {
+            "decision": "string (required — 'approve'/'pay' or 'dispute'/'reject')",
+            "note": "string (optional — customer note)"
+        }
+
+    Success 200::
+
+        { "data": { ... }, "meta": { "public_decision_applied": "approve|dispute" } }
+
+    Errors:
+        - 400: Invalid decision value or disallowed status transition.
+        - 404: Invoice not found for the given token.
+        - 409: Invoice not in a decision-eligible status.
+    """
     try:
-        invoice = (
-            Invoice.objects.select_related("project", "project__customer", "created_by")
-            .prefetch_related(
-                "line_items",
-                "line_items__cost_code",
-            )
-            .get(public_token=public_token)
-        )
+        invoice = _prefetch_invoice_qs(
+            Invoice.objects.filter(public_token=public_token)
+        ).get()
     except Invoice.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Invoice not found.", "fields": {}}},
@@ -215,15 +272,9 @@ def public_invoice_decision_view(request, public_token: str):
             access_session=ceremony_session,
         )
 
-    refreshed = (
+    refreshed = _prefetch_invoice_qs(
         Invoice.objects.filter(id=invoice.id)
-        .select_related("project__customer", "created_by")
-        .prefetch_related(
-            "line_items",
-            "line_items__cost_code",
-        )
-        .get()
-    )
+    ).get()
     serialized = InvoiceSerializer(refreshed).data
     organization = _resolve_organization_for_public_actor(refreshed.created_by)
     serialized["project_context"] = _serialize_public_project_context(refreshed.project)
@@ -235,14 +286,76 @@ def public_invoice_decision_view(request, public_token: str):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def invoice_contract_view(_request):
-    """Return canonical invoice workflow policy for frontend UX guards."""
+    """Return the invoice workflow policy contract for frontend UX guards.
+
+    Read-only endpoint returning the canonical status/transition definitions
+    that the frontend uses to render status dropdowns and transition buttons.
+
+    Flow:
+        1. Return the policy contract payload.
+
+    URL: ``GET /api/v1/contracts/invoices/``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": { "statuses": [...], "transitions": {...}, ... } }
+    """
     return Response({"data": get_invoice_policy_contract()})
 
 
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_invoices_view(request, project_id: int):
-    """Project invoice collection endpoint: `GET` lists invoices, `POST` creates a draft."""
+    """List or create invoices for a project.
+
+    ``GET`` returns all invoices for the project. ``POST`` creates a new
+    draft invoice with line items; applies org defaults for sender identity,
+    terms, and due-date delta.
+
+    Flow (GET):
+        1. Validate the project belongs to the user's org.
+        2. Query all invoices for the project, ordered by date descending.
+        3. Return serialized list with eagerly loaded relations.
+
+    Flow (POST):
+        1. Validate the project belongs to the user's org.
+        2. Gate on ``invoices.create`` capability.
+        3. Normalize the request payload via ingress adapter.
+        4. Validate line items are present and due_date >= issue_date.
+        5. Create the invoice, apply line items, compute totals atomically.
+        6. Record the initial status event and activate prospect projects.
+        7. Return the serialized invoice.
+
+    URL: ``GET|POST /api/v1/projects/<project_id>/invoices/``
+
+    Request body (POST)::
+
+        {
+            "issue_date": "YYYY-MM-DD (optional, defaults to today)",
+            "due_date": "YYYY-MM-DD (optional, defaults to issue_date + org delta)",
+            "sender_name": "string (optional, defaults to org name)",
+            "sender_email": "string (optional)",
+            "sender_address": "string (optional, defaults to org address)",
+            "terms_text": "string (optional, defaults to org terms)",
+            "tax_percent": "decimal (optional, default=0)",
+            "line_items": [ { "cost_code": "int?", "description": "str?", "quantity": "decimal", "unit": "str?", "unit_price": "decimal" } ]
+        }
+
+    Success 200 (GET)::
+
+        { "data": [ { ... }, ... ] }
+
+    Success 201 (POST)::
+
+        { "data": { ... } }
+
+    Errors:
+        - 400: Validation failure (empty line items, bad dates).
+        - 403: Missing ``invoices.create`` capability.
+        - 404: Project not found or not in user's org.
+    """
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -251,125 +364,151 @@ def project_invoices_view(request, project_id: int):
         )
 
     if request.method == "GET":
-        rows = (
-            Invoice.objects.filter(project=project)
-            .select_related("customer")
-            .prefetch_related(
-                "line_items",
-                "line_items__cost_code",
-            )
-            .order_by("-created_at")
+        rows = _prefetch_invoice_qs(
+            Invoice.objects.filter(project=project).order_by("-created_at")
         )
         return Response({"data": InvoiceSerializer(rows, many=True).data})
 
-    permission_error, _ = _capability_gate(request.user, "invoices", "create")
-    if permission_error:
-        return Response(permission_error, status=403)
+    else:  # POST
+        permission_error, _ = _capability_gate(request.user, "invoices", "create")
+        if permission_error:
+            return Response(permission_error, status=403)
 
-    serializer = InvoiceWriteSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    membership = _ensure_org_membership(request.user)
-    organization = membership.organization
-    default_due_days = int(organization.default_invoice_due_delta or 30)
-    default_due_days = max(1, min(default_due_days, 365))
-    ingress = build_invoice_create_ingress(
-        serializer.validated_data,
-        default_issue_date=timezone.localdate(),
-        default_due_days=default_due_days,
-        default_sender_name=(organization.display_name or "").strip(),
-        default_sender_email="",
-        default_sender_address=organization.formatted_billing_address,
-        default_sender_logo_url=request.build_absolute_uri(organization.logo.url) if organization.logo else "",
-        default_terms_text=(organization.invoice_terms_and_conditions or "").strip(),
-        default_footer_text="",
-        default_notes_text="",
-    )
-    line_items = ingress.line_items
-    if not line_items:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "At least one invoice line item is required.",
-                    "fields": {"line_items": ["At least one line item is required."]},
-                }
-            },
-            status=400,
+        serializer = InvoiceWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        organization = project.organization
+        default_due_days = int(organization.default_invoice_due_delta or 30)
+        default_due_days = max(1, min(default_due_days, 365))
+        ingress = build_invoice_create_ingress(
+            serializer.validated_data,
+            default_issue_date=timezone.localdate(),
+            default_due_days=default_due_days,
+            default_sender_name=(organization.display_name or "").strip(),
+            default_sender_email="",
+            default_sender_address=organization.formatted_billing_address,
+            default_sender_logo_url=request.build_absolute_uri(organization.logo.url) if organization.logo else "",
+            default_terms_text=(organization.invoice_terms_and_conditions or "").strip(),
+            default_footer_text="",
+            default_notes_text="",
         )
+        line_items = ingress.line_items
+        if not line_items:
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "At least one invoice line item is required.",
+                        "fields": {"line_items": ["At least one line item is required."]},
+                    }
+                },
+                status=400,
+            )
 
-    issue_date = ingress.issue_date
-    due_date = ingress.due_date
-    if due_date < issue_date:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "due_date cannot be before issue_date.",
-                    "fields": {"due_date": ["Due date must be on or after issue date."]},
-                }
-            },
-            status=400,
-        )
+        issue_date = ingress.issue_date
+        due_date = ingress.due_date
+        if due_date < issue_date:
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "due_date cannot be before issue_date.",
+                        "fields": {"due_date": ["Due date must be on or after issue date."]},
+                    }
+                },
+                status=400,
+            )
 
-    with transaction.atomic():
-        invoice = Invoice.objects.create(
-            project=project,
-            customer=project.customer,
-            invoice_number=_next_invoice_number(project=project, user=request.user),
-            status=Invoice.Status.DRAFT,
-            issue_date=issue_date,
-            due_date=due_date,
-            sender_name=ingress.sender_name,
-            sender_email=ingress.sender_email,
-            sender_address=ingress.sender_address,
-            sender_logo_url=ingress.sender_logo_url,
-            terms_text=ingress.terms_text,
-            footer_text=ingress.footer_text,
-            notes_text=ingress.notes_text,
-            tax_percent=ingress.tax_percent,
-            created_by=request.user,
-        )
+        with transaction.atomic():
+            invoice = Invoice.objects.create(
+                project=project,
+                customer=project.customer,
+                invoice_number=_next_invoice_number(project=project, user=request.user),
+                status=Invoice.Status.DRAFT,
+                issue_date=issue_date,
+                due_date=due_date,
+                sender_name=ingress.sender_name,
+                sender_email=ingress.sender_email,
+                sender_address=ingress.sender_address,
+                sender_logo_url=ingress.sender_logo_url,
+                terms_text=ingress.terms_text,
+                footer_text=ingress.footer_text,
+                notes_text=ingress.notes_text,
+                tax_percent=ingress.tax_percent,
+                created_by=request.user,
+            )
 
-        apply_error = _apply_invoice_lines_and_totals(
-            invoice=invoice,
-            line_items_data=line_items,
-            tax_percent=ingress.tax_percent,
-            user=request.user,
-        )
-        if apply_error:
-            transaction.set_rollback(True)
-            payload, status_code = _invoice_line_apply_error_response(apply_error)
-            return Response(payload, status=status_code)
+            apply_error = _apply_invoice_lines_and_totals(
+                invoice=invoice,
+                line_items_data=line_items,
+                tax_percent=ingress.tax_percent,
+                user=request.user,
+            )
+            if apply_error:
+                transaction.set_rollback(True)
+                payload, status_code = _invoice_line_apply_error_response(apply_error)
+                return Response(payload, status=status_code)
 
-        invoice.refresh_from_db()
-        InvoiceStatusEvent.record(
-            invoice=invoice,
-            from_status=None,
-            to_status=invoice.status,
-            note="Invoice created.",
-            changed_by=request.user,
-        )
-        _activate_project_from_invoice_creation(invoice=invoice, actor=request.user)
-    return Response({"data": InvoiceSerializer(invoice).data}, status=201)
+            invoice.refresh_from_db()
+            InvoiceStatusEvent.record(
+                invoice=invoice,
+                from_status=None,
+                to_status=invoice.status,
+                note="Invoice created.",
+                changed_by=request.user,
+            )
+            _activate_project_from_invoice_creation(invoice=invoice, actor=request.user)
+        return Response({"data": InvoiceSerializer(invoice).data}, status=201)
 
 
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def invoice_detail_view(request, invoice_id: int):
-    """Fetch or update one invoice while enforcing lifecycle and totals rules."""
+    """Fetch or patch an invoice with lifecycle and line item guardrails.
+
+    ``GET`` returns the hydrated invoice. ``PATCH`` applies field updates,
+    line item changes, status transitions, or status notes — dispatching to
+    the appropriate concern handler.
+
+    Flow (GET):
+        1. Validate the invoice belongs to the user's org.
+        2. Return the serialized invoice with eagerly loaded relations.
+
+    Flow (PATCH):
+        1. Validate the invoice belongs to the user's org.
+        2. Gate on ``invoices.edit`` capability.
+        3. Normalize the request payload via ingress adapter.
+        4. Dispatch to concern handler: status transition, status note, or document save.
+
+    URL: ``GET|PATCH /api/v1/invoices/<invoice_id>/``
+
+    Request body (PATCH)::
+
+        {
+            "status": "string (optional — triggers transition if changed)",
+            "status_note": "string (optional — triggers note event)",
+            "issue_date": "YYYY-MM-DD (optional)",
+            "due_date": "YYYY-MM-DD (optional)",
+            "tax_percent": "decimal (optional)",
+            "line_items": [ ... ] (optional)
+        }
+
+    Success 200::
+
+        { "data": { ... }, "email_sent": false }
+
+    Errors:
+        - 400: Validation or transition failure.
+        - 403: Missing capability.
+        - 404: Invoice not found or not in user's org.
+    """
     membership = _ensure_org_membership(request.user)
     try:
-        invoice = (
-            Invoice.objects.select_related("customer")
-            .prefetch_related(
-                "line_items",
-                "line_items__cost_code",
-            )
-            .get(
+        invoice = _prefetch_invoice_qs(
+            Invoice.objects.filter(
                 id=invoice_id,
                 project__organization_id=membership.organization_id,
             )
-        )
+        ).get()
     except Invoice.DoesNotExist:
         return Response(
             {"error": {"code": "not_found", "message": "Invoice not found.", "fields": {}}},
@@ -379,39 +518,68 @@ def invoice_detail_view(request, invoice_id: int):
     if request.method == "GET":
         return Response({"data": InvoiceSerializer(invoice).data})
 
-    permission_error, _ = _capability_gate(request.user, "invoices", "edit")
-    if permission_error:
-        return Response(permission_error, status=403)
+    else:  # PATCH
+        permission_error, _ = _capability_gate(request.user, "invoices", "edit")
+        if permission_error:
+            return Response(permission_error, status=403)
 
-    serializer = InvoiceWriteSerializer(data=request.data, partial=True)
-    serializer.is_valid(raise_exception=True)
-    ingress = build_invoice_patch_ingress(serializer.validated_data)
+        serializer = InvoiceWriteSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        ingress = build_invoice_patch_ingress(serializer.validated_data)
 
-    # --- Concern dispatch ---
-    previous_status = invoice.status
-    next_status = ingress.status if ingress.has_status else previous_status
-    is_actual_transition = ingress.has_status and previous_status != next_status
-    is_resend = (
-        ingress.has_status
-        and previous_status == Invoice.Status.SENT
-        and next_status == Invoice.Status.SENT
-    )
-    note_text = ingress.status_note.strip() if ingress.has_status_note else ""
-
-    if is_actual_transition or is_resend:
-        return _handle_invoice_status_transition(
-            request, invoice, ingress, membership,
-            previous_status, next_status, is_resend,
+        # --- Concern dispatch ---
+        previous_status = invoice.status
+        next_status = ingress.status if ingress.has_status else previous_status
+        is_actual_transition = ingress.has_status and previous_status != next_status
+        is_resend = (
+            ingress.has_status
+            and previous_status == Invoice.Status.SENT
+            and next_status == Invoice.Status.SENT
         )
-    if note_text:
-        return _handle_invoice_status_note(request, invoice, ingress)
-    return _handle_invoice_document_save(request, invoice, ingress)
+        note_text = ingress.status_note.strip() if ingress.has_status_note else ""
+
+        if is_actual_transition or is_resend:
+            return _handle_invoice_status_transition(
+                request, invoice, ingress, membership,
+                previous_status, next_status, is_resend,
+            )
+        elif note_text:
+            return _handle_invoice_status_note(request, invoice, ingress)
+        else:
+            return _handle_invoice_document_save(request, invoice, ingress)
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def invoice_send_view(request, invoice_id: int):
-    """Send an invoice by transitioning to `sent`."""
+    """Send an invoice by transitioning to ``sent`` status.
+
+    Dedicated send endpoint that validates the transition, freezes org
+    identity onto the document when leaving draft, records an audit event,
+    and dispatches the customer notification email.
+
+    Flow:
+        1. Validate the invoice belongs to the user's org.
+        2. Gate on ``invoices.send`` capability.
+        3. Validate the status transition to ``sent`` is allowed.
+        4. Freeze org identity fields onto the invoice (if leaving draft).
+        5. Save status, record audit event.
+        6. Send customer notification email (outside transaction).
+        7. Return the serialized invoice with email delivery status.
+
+    URL: ``POST /api/v1/invoices/<invoice_id>/send/``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": { ... }, "email_sent": true|false }
+
+    Errors:
+        - 400: Status transition to ``sent`` is not allowed.
+        - 403: Missing ``invoices.send`` capability.
+        - 404: Invoice not found or not in user's org.
+    """
     membership = _ensure_org_membership(request.user)
     try:
         invoice = Invoice.objects.get(id=invoice_id, project__organization_id=membership.organization_id)
@@ -444,29 +612,12 @@ def invoice_send_view(request, invoice_id: int):
         previous_status = invoice.status
         invoice.status = Invoice.Status.SENT
 
-        # Freeze org identity and T&C onto the document when leaving draft.
+        # Freeze org identity onto the document when leaving draft.
         update_fields = ["status", "updated_at"]
         if previous_status == Invoice.Status.DRAFT:
-            organization = membership.organization
-            if not (invoice.terms_text or "").strip():
-                org_terms = (organization.invoice_terms_and_conditions or "").strip()
-                if org_terms:
-                    invoice.terms_text = org_terms
-                    update_fields.append("terms_text")
-            if not (invoice.sender_name or "").strip():
-                org_name = (organization.display_name or "").strip()
-                if org_name:
-                    invoice.sender_name = org_name
-                    update_fields.append("sender_name")
-            if not (invoice.sender_address or "").strip():
-                org_address = organization.formatted_billing_address
-                if org_address:
-                    invoice.sender_address = org_address
-                    update_fields.append("sender_address")
-            if not (invoice.sender_logo_url or "").strip():
-                if organization.logo:
-                    invoice.sender_logo_url = request.build_absolute_uri(organization.logo.url)
-                    update_fields.append("sender_logo_url")
+            _freeze_org_identity_on_invoice(
+                invoice, membership.organization, request, update_fields,
+            )
 
         invoice.save(update_fields=update_fields)
         InvoiceStatusEvent.record(
@@ -492,7 +643,24 @@ def invoice_send_view(request, invoice_id: int):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def invoice_status_events_view(request, invoice_id: int):
-    """Return immutable invoice status transition history for one invoice."""
+    """Return the immutable status transition history for an invoice.
+
+    Flow:
+        1. Validate the invoice belongs to the user's org.
+        2. Query all status events ordered by most recent first.
+        3. Return serialized event list.
+
+    URL: ``GET /api/v1/invoices/<invoice_id>/status-events/``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": [ { "from_status": "...", "to_status": "...", ... }, ... ] }
+
+    Errors:
+        - 404: Invoice not found or not in user's org.
+    """
     membership = _ensure_org_membership(request.user)
     try:
         invoice = Invoice.objects.get(id=invoice_id, project__organization_id=membership.organization_id)

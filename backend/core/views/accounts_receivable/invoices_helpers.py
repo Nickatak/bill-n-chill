@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import QuerySet, Sum
 from rest_framework.response import Response
 
 from core.models import (
@@ -21,6 +21,22 @@ from core.views.helpers import (
     _resolve_cost_codes_for_user,
 )
 
+
+def _prefetch_invoice_qs(queryset: QuerySet) -> QuerySet:
+    """Eagerly load invoice relations to prevent N+1 query problems.
+
+    - select_related: JOINs project, customer, project's customer, and
+      created_by in a single query (FK lookups).
+    - prefetch_related: batches second queries for reverse-FK line items
+      (with their cost codes) and target payments.
+    """
+    return queryset.select_related(
+        "project", "customer", "project__customer", "created_by",
+    ).prefetch_related(
+        "line_items", "line_items__cost_code", "target_payments",
+    )
+
+
 BILLABLE_INVOICE_STATUSES = {
     Invoice.Status.SENT,
     Invoice.Status.PARTIALLY_PAID,
@@ -28,12 +44,12 @@ BILLABLE_INVOICE_STATUSES = {
 }
 
 
-def _is_billable_invoice_status(status):
+def _is_billable_invoice_status(status: str) -> bool:
     """Return True if the invoice status counts toward billed totals."""
     return status in BILLABLE_INVOICE_STATUSES
 
 
-def _project_billable_invoices_total(*, project, user, exclude_invoice_id=None):
+def _project_billable_invoices_total(*, project: Project, user, exclude_invoice_id: int | None = None) -> Decimal:
     """Sum the totals of all billable invoices for a project, optionally excluding one."""
     query = Invoice.objects.filter(
         project=project,
@@ -44,8 +60,12 @@ def _project_billable_invoices_total(*, project, user, exclude_invoice_id=None):
     return quantize_money(query.aggregate(total=Sum("total")).get("total") or MONEY_ZERO)
 
 
-def _next_invoice_number(*, project, user):
-    """Generate the next unique sequential invoice number for a project."""
+def _next_invoice_number(*, project: Project, user) -> str:
+    """Generate the next unique sequential invoice number for a project.
+
+    Starts from the current count + 1 and increments until a collision-free
+    candidate is found (handles gaps from deleted invoices).
+    """
     next_number = (
         Invoice.objects.filter(
             project=project,
@@ -59,8 +79,12 @@ def _next_invoice_number(*, project, user):
     return candidate
 
 
-def _calculate_invoice_line_totals(line_items_data):
-    """Compute per-line totals and return normalized items with a running subtotal."""
+def _calculate_invoice_line_totals(line_items_data: list[dict]) -> tuple[list[dict], Decimal]:
+    """Compute per-line totals and return normalized items with a running subtotal.
+
+    Returns ``(normalized_items, subtotal)`` where each item dict has
+    ``quantity``, ``unit_price``, and ``line_total`` as Decimal values.
+    """
     subtotal = MONEY_ZERO
     normalized_items = []
 
@@ -81,8 +105,24 @@ def _calculate_invoice_line_totals(line_items_data):
     return normalized_items, subtotal
 
 
-def _apply_invoice_lines_and_totals(invoice, line_items_data, tax_percent, user):
-    """Replace an invoice's line items and recompute all totals. Returns an error dict on failure."""
+def _apply_invoice_lines_and_totals(
+    invoice: Invoice, line_items_data: list[dict], tax_percent: Decimal, user,
+) -> dict | None:
+    """Replace an invoice's line items and recompute all totals.
+
+    Returns an error dict on cost code resolution failure, else None.
+
+    **Must be called inside a** ``transaction.atomic()`` **block** — performs
+    delete + bulk_create + save.
+
+    Flow:
+        1. Calculate per-line totals and subtotal.
+        2. Resolve cost codes; return error if any are invalid.
+        3. Compute tax and grand total.
+        4. Delete existing lines and bulk-create replacements.
+        5. Recompute balance_due (total minus settled payment allocations).
+        6. Save all totals on the invoice.
+    """
     normalized_items, subtotal = _calculate_invoice_line_totals(line_items_data)
     code_map, missing = _resolve_cost_codes_for_user(user, normalized_items)
     if missing:
@@ -142,7 +182,7 @@ def _apply_invoice_lines_and_totals(invoice, line_items_data, tax_percent, user)
     return None
 
 
-def _invoice_line_apply_error_response(apply_error):
+def _invoice_line_apply_error_response(apply_error: dict) -> tuple[dict, int]:
     """Convert an _apply_invoice_lines_and_totals error dict into a (body, status) HTTP response tuple."""
     if "missing_cost_codes" in apply_error:
         return (
@@ -167,8 +207,16 @@ def _invoice_line_apply_error_response(apply_error):
     )
 
 
-def _activate_project_from_invoice_creation(*, invoice, actor):
-    """Transition a prospect project to active when a direct invoice is created."""
+def _activate_project_from_invoice_creation(*, invoice: Invoice, actor) -> bool:
+    """Transition a prospect project to active when a direct invoice is created.
+
+    Returns True if the project status was changed, False otherwise.
+
+    Flow:
+        1. Check if the project is in prospect status.
+        2. Verify the prospect → active transition is allowed.
+        3. Update the project status to active.
+    """
     project = invoice.project
     if project.status != Project.Status.PROSPECT:
         return False
@@ -180,16 +228,57 @@ def _activate_project_from_invoice_creation(*, invoice, actor):
     return True
 
 
+def _freeze_org_identity_on_invoice(
+    invoice: Invoice, organization, request, update_fields: list[str],
+) -> None:
+    """Stamp org identity fields onto the invoice when leaving draft.
+
+    Fills in any blank sender identity fields (terms, name, address, logo)
+    from the organization defaults. Appends mutated field names to
+    ``update_fields`` for the caller's ``save()`` call.
+
+    Called during draft departure so public pages never fall back to live
+    (potentially changed) org defaults.
+    """
+    if not (invoice.terms_text or "").strip():
+        org_terms = (organization.invoice_terms_and_conditions or "").strip()
+        if org_terms:
+            invoice.terms_text = org_terms
+            update_fields.append("terms_text")
+    if not (invoice.sender_name or "").strip():
+        org_name = (organization.display_name or "").strip()
+        if org_name:
+            invoice.sender_name = org_name
+            update_fields.append("sender_name")
+    if not (invoice.sender_address or "").strip():
+        org_address = organization.formatted_billing_address
+        if org_address:
+            invoice.sender_address = org_address
+            update_fields.append("sender_address")
+    if not (invoice.sender_logo_url or "").strip():
+        if organization.logo:
+            invoice.sender_logo_url = request.build_absolute_uri(organization.logo.url)
+            update_fields.append("sender_logo_url")
+
+
 # ---------------------------------------------------------------------------
 # PATCH concern handlers — called by the thin dispatcher in invoices.py
 # ---------------------------------------------------------------------------
 
 
-def _handle_invoice_document_save(request, invoice, ingress):
+def _handle_invoice_document_save(request, invoice: Invoice, ingress) -> Response:
     """Apply field updates, line items, and totals to an invoice (the 'save' concern).
 
     Handles dates, tax_percent, sender fields, terms, footer, notes, line items,
     and totals recomputation.  Does not modify status or record audit events.
+
+    Flow:
+        1. Cross-validate issue_date / due_date.
+        2. Pre-validate cost codes if line items are present.
+        3. Apply scalar field updates (dates, sender, terms, footer, notes).
+        4. If line items changed, replace lines and recompute totals.
+        5. If only tax_percent changed, recompute totals with existing lines.
+        6. Return the refreshed serialized invoice.
     """
     # Date cross-validation
     next_issue_date = ingress.issue_date if ingress.has_issue_date else invoice.issue_date
@@ -301,13 +390,22 @@ def _handle_invoice_document_save(request, invoice, ingress):
 
 
 def _handle_invoice_status_transition(
-    request, invoice, ingress, membership, previous_status, next_status, is_resend,
-):
+    request, invoice: Invoice, ingress, membership,
+    previous_status: str, next_status: str, is_resend: bool,
+) -> Response:
     """Handle an invoice status transition: validate, apply, freeze org identity, audit, email.
 
     Called when the PATCH includes a real status change (previous != next) or a resend
-    (sent -> sent).  Handles org identity freeze on draft departure, balance
-    recomputation, audit event recording, and email notification.
+    (sent -> sent).
+
+    Flow:
+        1. Validate the transition is allowed (skip for resend).
+        2. Set the new status; freeze org identity if leaving draft.
+        3. Save status fields.
+        4. Recompute balance_due from settled payment allocations.
+        5. Record the audit event.
+        6. Send customer notification email if transitioning to sent (outside transaction).
+        7. Return the refreshed serialized invoice with email delivery status.
     """
     status_note = ingress.status_note.strip() if ingress.has_status_note else ""
 
@@ -333,26 +431,9 @@ def _handle_invoice_status_transition(
         # Freeze org identity onto the document when leaving draft so public
         # pages never fall back to live (potentially changed) org defaults.
         if previous_status == Invoice.Status.DRAFT and next_status != Invoice.Status.DRAFT:
-            organization = membership.organization
-            if not (invoice.terms_text or "").strip():
-                org_terms = (organization.invoice_terms_and_conditions or "").strip()
-                if org_terms:
-                    invoice.terms_text = org_terms
-                    update_fields.append("terms_text")
-            if not (invoice.sender_name or "").strip():
-                org_name = (organization.display_name or "").strip()
-                if org_name:
-                    invoice.sender_name = org_name
-                    update_fields.append("sender_name")
-            if not (invoice.sender_address or "").strip():
-                org_address = organization.formatted_billing_address
-                if org_address:
-                    invoice.sender_address = org_address
-                    update_fields.append("sender_address")
-            if not (invoice.sender_logo_url or "").strip():
-                if organization.logo:
-                    invoice.sender_logo_url = request.build_absolute_uri(organization.logo.url)
-                    update_fields.append("sender_logo_url")
+            _freeze_org_identity_on_invoice(
+                invoice, membership.organization, request, update_fields,
+            )
 
         invoice.save(update_fields=update_fields)
 
@@ -401,10 +482,14 @@ def _handle_invoice_status_transition(
     return Response({"data": InvoiceSerializer(invoice).data, "email_sent": email_sent})
 
 
-def _handle_invoice_status_note(request, invoice, ingress):
+def _handle_invoice_status_note(request, invoice: Invoice, ingress) -> Response:
     """Append an audit note to the invoice timeline without changing status.
 
     Called when the PATCH includes a status_note but no actual status change.
+
+    Flow:
+        1. Record an audit event with from/to set to the current status.
+        2. Return the refreshed serialized invoice.
     """
     note_text = ingress.status_note.strip()
 
