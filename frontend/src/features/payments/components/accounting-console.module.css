@@ -155,6 +155,36 @@
   color: var(--status-gray-text);
 }
 
+/* Invoice status badges */
+
+.statusDraft {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--status-blue-bg);
+  border-color: var(--status-blue-border);
+  color: var(--status-blue-text);
+}
+
+.statusSent {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--status-amber-bg);
+  border-color: var(--status-amber-border);
+  color: var(--status-amber-text);
+}
+
+.statusPartiallyPaid {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--status-violet-bg);
+  border-color: var(--status-violet-border);
+  color: var(--status-violet-text);
+}
+
+.statusPaid {
+  composes: badge from "../../../shared/styles/status.module.css";
+  background: var(--status-emerald-bg);
+  border-color: var(--status-emerald-border);
+  color: var(--status-emerald-text);
+}
+
 /* Payment status badges (reused from payments-console) */
 
 .statusPending {

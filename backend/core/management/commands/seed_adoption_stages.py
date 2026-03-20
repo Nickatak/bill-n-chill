@@ -31,7 +31,9 @@ from core.models import (
     OrganizationMembershipRecord,
     Payment,
     Project,
+    Receipt,
     RoleTemplate,
+    Store,
     Vendor,
     VendorBill,
     VendorBillLine,
@@ -418,6 +420,30 @@ class Command(BaseCommand):
         p.save()
         return p
 
+    def _make_receipt(self, user, project, store_name, amount, **kwargs):
+        today = date.today()
+        org = project.organization
+        store = None
+        if store_name:
+            store, _ = Store.objects.get_or_create(
+                organization=org, name=store_name,
+                defaults={"created_by": user},
+            )
+        balance_due = kwargs.get("balance_due", amount)
+        r, _ = Receipt.objects.get_or_create(
+            project=project, store=store, amount=amount,
+            receipt_date=kwargs.get("receipt_date", today),
+            defaults={
+                "balance_due": balance_due,
+                "notes": kwargs.get("notes", ""),
+                "created_by": user,
+            },
+        )
+        r.balance_due = balance_due
+        r.notes = kwargs.get("notes", "")
+        r.save(update_fields=["balance_due", "notes", "updated_at"])
+        return r
+
     # ── Stage: New ───────────────────────────────────────────────────────
 
     def _seed_new(self):
@@ -620,15 +646,56 @@ class Command(BaseCommand):
             VendorBill.Status.RECEIVED, Decimal("2200.00"), Decimal("2200.00"),
             notes="Plumbing bill under review.")
 
-        # Payments
+        # Payments — varied methods, some missing ref #s
+        # Fully paid invoice: one payment covers it
         self._make_payment(user, p_completed, Payment.Direction.INBOUND,
             "AR-001", Payment.Method.ACH, Payment.Status.SETTLED, Decimal("16000.00"),
             invoice=inv_paid)
+        # Fully paid vendor bill
         self._make_payment(user, p_completed, Payment.Direction.OUTBOUND,
             "AP-001", Payment.Method.CHECK, Payment.Status.SETTLED, Decimal("4500.00"),
             vendor_bill=vb_closed)
+        # Partially paid invoice (INV-003): two payments, $3000 of $5000 covered
+        inv_partial = Invoice.objects.filter(
+            project=p_active1, invoice_number="INV-003").first()
+        if inv_partial:
+            self._make_payment(user, p_active1, Payment.Direction.INBOUND,
+                "AR-003", Payment.Method.CHECK, Payment.Status.SETTLED, Decimal("2000.00"),
+                invoice=inv_partial)
+            self._make_payment(user, p_active1, Payment.Direction.INBOUND,
+                "AR-004", Payment.Method.ZELLE, Payment.Status.SETTLED, Decimal("1000.00"),
+                invoice=inv_partial)
+        # Pending inbound (no target — deposit not yet matched)
         self._make_payment(user, p_active1, Payment.Direction.INBOUND,
-            "AR-002", Payment.Method.CARD, Payment.Status.PENDING, Decimal("3000.00"))
+            "AR-005", Payment.Method.CARD, Payment.Status.PENDING, Decimal("3000.00"))
+        # Voided payment
+        self._make_payment(user, p_active1, Payment.Direction.OUTBOUND,
+            "AP-002", Payment.Method.ACH, Payment.Status.VOID, Decimal("1200.00"))
+        # Payment against a bill — missing ref # (check with no ref)
+        vb_approved = VendorBill.objects.filter(
+            project=p_active1, bill_number="VB-002").first()
+        if vb_approved:
+            self._make_payment(user, p_active1, Payment.Direction.OUTBOUND,
+                "", Payment.Method.CHECK, Payment.Status.SETTLED, Decimal("1800.00"),
+                vendor_bill=vb_approved)
+
+        # Receipts + their payments
+        r1 = self._make_receipt(user, p_active1, "Home Depot",
+            Decimal("347.89"), balance_due=Decimal("0.00"),
+            notes="Lumber and fasteners for framing")
+        self._make_payment(user, p_active1, Payment.Direction.OUTBOUND,
+            "HD-4821", Payment.Method.CARD, Payment.Status.SETTLED, Decimal("347.89"),
+            receipt=r1)
+        r2 = self._make_receipt(user, p_active1, "Lowe's",
+            Decimal("189.50"), balance_due=Decimal("0.00"),
+            notes="Paint and supplies")
+        self._make_payment(user, p_active1, Payment.Direction.OUTBOUND,
+            "", Payment.Method.CASH, Payment.Status.SETTLED, Decimal("189.50"),
+            receipt=r2)
+        # Unpaid receipt
+        self._make_receipt(user, p_active2, "Sherwin-Williams",
+            Decimal("412.00"), balance_due=Decimal("412.00"),
+            notes="Kitchen cabinet paint — pending reimbursement")
 
         # Team members (3 total: owner + PM + worker)
         self._add_team_member(membership, "mid-pm@test.com", "Sarah Chen",
@@ -843,18 +910,71 @@ class Command(BaseCommand):
             vb_num += 1
 
         # Payments — inbound for paid invoices, outbound for paid vendor bills
+        # Rotate methods for variety
+        inbound_methods = [
+            Payment.Method.ACH, Payment.Method.CHECK, Payment.Method.ZELLE,
+            Payment.Method.WIRE, Payment.Method.ACH, Payment.Method.CHECK,
+        ]
         pay_num = 1
-        for inv in paid_invoices:
+        for i, inv in enumerate(paid_invoices):
+            method = inbound_methods[i % len(inbound_methods)]
+            # Leave some check/ACH payments without ref # to trigger "No ref #" indicator
+            ref = f"AR-{pay_num:03d}" if (i % 3 != 2) else ""
             self._make_payment(user, inv.project, Payment.Direction.INBOUND,
-                f"AR-{pay_num:03d}", Payment.Method.ACH, Payment.Status.SETTLED,
+                ref, method, Payment.Status.SETTLED,
                 inv.total, invoice=inv)
             pay_num += 1
-        for vb in paid_vendor_bills:
+
+        outbound_methods = [
+            Payment.Method.CHECK, Payment.Method.ACH, Payment.Method.WIRE,
+            Payment.Method.CHECK, Payment.Method.ACH,
+        ]
+        for i, vb in enumerate(paid_vendor_bills):
+            method = outbound_methods[i % len(outbound_methods)]
+            ref = f"AP-{pay_num:03d}" if (i % 4 != 3) else ""
             self._make_payment(user, vb.project, Payment.Direction.OUTBOUND,
-                f"AP-{pay_num:03d}", Payment.Method.CHECK, Payment.Status.SETTLED,
+                ref, method, Payment.Status.SETTLED,
                 vb.total, vendor_bill=vb)
             pay_num += 1
-        # A couple pending payments
+
+        # Partially paid invoice — two payments covering $6000 of $10000
+        inv_partial = Invoice.objects.filter(
+            project=late_projects[3],
+            status=Invoice.Status.PARTIALLY_PAID,
+        ).first()
+        if inv_partial:
+            self._make_payment(user, late_projects[3], Payment.Direction.INBOUND,
+                f"AR-{pay_num:03d}", Payment.Method.CHECK, Payment.Status.SETTLED,
+                Decimal("4000.00"), invoice=inv_partial)
+            pay_num += 1
+            self._make_payment(user, late_projects[3], Payment.Direction.INBOUND,
+                f"AR-{pay_num:03d}", Payment.Method.ZELLE, Payment.Status.SETTLED,
+                Decimal("2000.00"), invoice=inv_partial)
+            pay_num += 1
+
+        # Vendor bill with two payments (split across methods)
+        vb_received = VendorBill.objects.filter(
+            project=late_projects[5],
+            status=VendorBill.Status.RECEIVED,
+        ).first()
+        if vb_received:
+            half = (vb_received.total / 2).quantize(Decimal("0.01"))
+            self._make_payment(user, late_projects[5], Payment.Direction.OUTBOUND,
+                f"AP-{pay_num:03d}", Payment.Method.ACH, Payment.Status.SETTLED,
+                half, vendor_bill=vb_received)
+            pay_num += 1
+            self._make_payment(user, late_projects[5], Payment.Direction.OUTBOUND,
+                f"AP-{pay_num:03d}", Payment.Method.CHECK, Payment.Status.SETTLED,
+                half, vendor_bill=vb_received)
+            pay_num += 1
+
+        # Voided payment
+        self._make_payment(user, late_projects[7], Payment.Direction.OUTBOUND,
+            f"AP-{pay_num:03d}", Payment.Method.ACH, Payment.Status.VOID,
+            Decimal("1500.00"))
+        pay_num += 1
+
+        # Pending payments
         self._make_payment(user, late_projects[3], Payment.Direction.INBOUND,
             f"AR-{pay_num:03d}", Payment.Method.CARD, Payment.Status.PENDING,
             Decimal("6000.00"))
@@ -862,6 +982,43 @@ class Command(BaseCommand):
         self._make_payment(user, late_projects[4], Payment.Direction.OUTBOUND,
             f"AP-{pay_num:03d}", Payment.Method.WIRE, Payment.Status.PENDING,
             Decimal("6500.00"))
+
+        # Receipts — mix of paid and unpaid
+        r1 = self._make_receipt(user, late_projects[1], "Home Depot",
+            Decimal("523.47"), balance_due=Decimal("0.00"),
+            notes="Framing lumber and hardware")
+        self._make_payment(user, late_projects[1], Payment.Direction.OUTBOUND,
+            "HD-9381", Payment.Method.CARD, Payment.Status.SETTLED,
+            Decimal("523.47"), receipt=r1)
+
+        r2 = self._make_receipt(user, late_projects[3], "Lowe's",
+            Decimal("891.20"), balance_due=Decimal("0.00"),
+            notes="Bathroom fixtures and tile")
+        self._make_payment(user, late_projects[3], Payment.Direction.OUTBOUND,
+            "LW-2847", Payment.Method.CARD, Payment.Status.SETTLED,
+            Decimal("891.20"), receipt=r2)
+
+        r3 = self._make_receipt(user, late_projects[7], "Sherwin-Williams",
+            Decimal("267.50"), balance_due=Decimal("0.00"),
+            notes="Interior paint — 8 gallons")
+        self._make_payment(user, late_projects[7], Payment.Direction.OUTBOUND,
+            "", Payment.Method.CASH, Payment.Status.SETTLED,
+            Decimal("267.50"), receipt=r3)
+
+        r4 = self._make_receipt(user, late_projects[10], "Ferguson Supply",
+            Decimal("1450.00"), balance_due=Decimal("0.00"),
+            notes="HVAC ductwork and fittings")
+        self._make_payment(user, late_projects[10], Payment.Direction.OUTBOUND,
+            "FERG-5519", Payment.Method.ACH, Payment.Status.SETTLED,
+            Decimal("1450.00"), receipt=r4)
+
+        # Unpaid receipts
+        self._make_receipt(user, late_projects[5], "ABC Supply",
+            Decimal("2100.00"), balance_due=Decimal("2100.00"),
+            notes="Roofing materials — pending reimbursement")
+        self._make_receipt(user, late_projects[14], "Grainger",
+            Decimal("378.90"), balance_due=Decimal("378.90"),
+            notes="Electrical tools and supplies")
 
         # Team members (6 total: owner + PM + bookkeeper + 2 workers + viewer)
         self._add_team_member(membership, "late-pm@test.com", "Maria Torres",

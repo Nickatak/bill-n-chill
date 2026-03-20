@@ -54,10 +54,10 @@ type InvoiceListRecord = {
 // ---------------------------------------------------------------------------
 
 const INVOICE_STATUS_CLASS: Record<string, string> = {
-  draft: styles.statusReceived,
-  sent: styles.statusApproved,
-  partially_paid: styles.statusPending,
-  paid: styles.statusSettled,
+  draft: styles.statusDraft,
+  sent: styles.statusSent,
+  partially_paid: styles.statusPartiallyPaid,
+  paid: styles.statusPaid,
   void: styles.statusVoid,
   disputed: styles.statusDisputed,
 };
@@ -266,6 +266,7 @@ export function InvoicesTab({
           payment_date: form.payment_date,
           reference_number: form.reference_number,
           notes: form.notes,
+          customer: inv.customer,
           project: inv.project,
           target_type: "invoice",
           target_id: inv.id,
@@ -379,7 +380,8 @@ export function InvoicesTab({
   // -------------------------------------------------------------------------
 
   const filtered = useMemo(() => {
-    let result = invoices;
+    // Drafts can't accept payments — exclude unconditionally
+    let result = invoices.filter((inv) => inv.status !== "draft");
     if (hideVoided) {
       result = result.filter((inv) => inv.status !== "void");
     }
@@ -400,7 +402,8 @@ export function InvoicesTab({
   }, [invoices, search, hideVoided, filterUnpaid]);
 
   const summary = useMemo(() => {
-    const visible = hideVoided ? invoices.filter((inv) => inv.status !== "void") : invoices;
+    const noDrafts = invoices.filter((inv) => inv.status !== "draft");
+    const visible = hideVoided ? noDrafts.filter((inv) => inv.status !== "void") : noDrafts;
     const unpaid = visible.filter((inv) => inv.status !== "paid");
     const totalOutstanding = unpaid.reduce((sum, inv) => sum + Number(inv.balance_due), 0);
     return { unpaidCount: unpaid.length, totalOutstanding };

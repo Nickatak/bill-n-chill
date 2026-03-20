@@ -73,6 +73,9 @@ def _resolve_and_link_target(data, payment_kwargs, membership, fields):
         if target.status == Invoice.Status.VOID:
             fields["target_id"] = ["Cannot link payment to a void invoice."]
             return None
+        if target.status == Invoice.Status.DRAFT:
+            fields["target_id"] = ["Cannot record payment against a draft invoice. Send it first."]
+            return None
         payment_kwargs["invoice"] = target
         return target
 

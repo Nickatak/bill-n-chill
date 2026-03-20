@@ -311,6 +311,25 @@ class PaymentTests(TestCase):
         self.assertEqual(method_change.status_code, 400)
         self.assertIn("locked", method_change.json()["error"]["fields"]["method"][0].lower())
 
+    def test_payment_blocks_draft_invoice_target(self):
+        """Cannot record payment against a draft invoice."""
+        invoice = self._create_invoice(total="500.00", status="draft")
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/payments/",
+            data={
+                "direction": "inbound",
+                "method": "check",
+                "amount": "500.00",
+                "payment_date": "2026-02-13",
+                "target_type": "invoice",
+                "target_id": invoice.id,
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("draft", response.json()["error"]["fields"]["target_id"][0].lower())
+
     def test_payment_blocks_direction_target_mismatch(self):
         """Inbound payment cannot target a vendor bill."""
         bill = self._create_vendor_bill(total="400.00")
