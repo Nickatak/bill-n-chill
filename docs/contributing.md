@@ -53,6 +53,11 @@ Last reviewed: 2026-03-04
 - Cross-domain shared utilities and re-exports live in `views/helpers.py`, which stays slim and acts as a single import point for common operations (RBAC gates, org scoping, pagination, etc.).
 - **Multi-method views use explicit branching.** When a view handles multiple HTTP methods, use `if`/`elif`/`else` — not early returns from the first branch. This keeps the structure consistent whether the view handles 2 or 4 methods, and avoids implicit fall-through that relies on the reader knowing a prior branch already returned.
 
+### Type hints
+- **Helpers: yes.** Helper functions (in `*_helpers.py`, `utils/`, `services/`) should use type hints on parameters and return types — especially for non-obvious signatures like tuple returns, generic model parameters, and `Optional`/union types.
+- **Views: no.** View function signatures are dictated by the framework (`request` is always `HttpRequest`, path params are typed by the URL conf). Type hints on views are redundant noise.
+- **Models: no.** Django model fields are self-documenting via their field classes. Don't add type hints to model attributes or standard model methods (`save`, `clean`, etc.).
+
 ### View docstrings
 
 Every view function should have a docstring following this structure:

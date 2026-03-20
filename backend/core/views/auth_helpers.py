@@ -8,8 +8,12 @@ Contains:
     - Token verification error mappings.
 """
 
+from collections.abc import Callable
 from datetime import timedelta
+from typing import Any
 
+from django.contrib.auth.models import AbstractUser
+from django.db import models
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
@@ -17,6 +21,7 @@ from rest_framework.response import Response
 from core.models import (
     EmailVerificationToken,
     OrganizationInvite,
+    OrganizationMembership,
     PasswordResetToken,
 )
 from core.user_helpers import _resolve_user_capabilities
@@ -44,7 +49,7 @@ _RESET_ERROR_MAP = {
 # Auth response payload
 # ---------------------------------------------------------------------------
 
-def _build_auth_response_payload(user, membership):
+def _build_auth_response_payload(user: AbstractUser, membership: OrganizationMembership) -> dict[str, Any]:
     """Build the standard auth response payload dict.
 
     Returns the canonical shape shared by login, register, verify-email,
@@ -79,7 +84,7 @@ _INVITE_ERROR_MAP = {
 }
 
 
-def _lookup_valid_invite(token_str):
+def _lookup_valid_invite(token_str: str) -> tuple[OrganizationInvite | None, Response | None]:
     """Look up a valid invite token, returning (invite, error_response).
 
     Domain validation (exists / consumed / expired) lives on the model via
@@ -105,7 +110,12 @@ def _lookup_valid_invite(token_str):
 # Rate-limited token email delivery
 # ---------------------------------------------------------------------------
 
-def _send_rate_limited_token_email(user, token_model, send_fn, **send_kwargs):
+def _send_rate_limited_token_email(
+    user: AbstractUser,
+    token_model: type[models.Model],
+    send_fn: Callable,
+    **send_kwargs: Any,
+) -> int | None:
     """Create a token and send an email, respecting a 60-second rate limit.
 
     Shared pattern used by verification, password reset, and duplicate
@@ -140,7 +150,7 @@ def _send_rate_limited_token_email(user, token_model, send_fn, **send_kwargs):
 # Duplicate registration handling
 # ---------------------------------------------------------------------------
 
-def _send_duplicate_registration_email(user):
+def _send_duplicate_registration_email(user: AbstractUser) -> None:
     """Send a contextual email when someone tries to register with an existing email.
 
     Verified users get a password reset link with a security heads-up.

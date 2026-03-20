@@ -26,7 +26,7 @@ from core.views.public_signing_helpers import (
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-def public_request_otp_view(request, document_type: str, public_token: str):
+def public_request_otp_view(request, document_type, public_token):
     """Request a 6-digit OTP code for public document identity verification.
 
     Resolves the document via ``document_type`` + ``public_token``, extracts the
@@ -113,7 +113,7 @@ def public_request_otp_view(request, document_type: str, public_token: str):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-def public_verify_otp_view(request, document_type: str, public_token: str):
+def public_verify_otp_view(request, document_type, public_token):
     """Verify a 6-digit OTP code and activate a 1-hour signing session.
 
     On success, marks the ``DocumentAccessSession`` as verified and returns a

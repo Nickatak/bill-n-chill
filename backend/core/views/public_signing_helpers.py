@@ -6,6 +6,8 @@ Contains:
     - Ceremony validation and consent context (used by per-document decision views).
 """
 
+from django.db import models
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.models import (
@@ -41,7 +43,9 @@ _DOCUMENT_TYPE_LABELS = {
 # Document resolution
 # ---------------------------------------------------------------------------
 
-def _resolve_document_and_email(document_type, public_token):
+def _resolve_document_and_email(
+    document_type: str, public_token: str,
+) -> tuple[models.Model | None, str, Response | None]:
     """Look up a document by type + public_token and extract the customer email.
 
     Uses ``_DOCUMENT_MODELS`` to map ``document_type`` to the correct model class,
@@ -73,7 +77,7 @@ def _resolve_document_and_email(document_type, public_token):
     return document, customer_email, None
 
 
-def _resolve_document_title(document_type, document):
+def _resolve_document_title(document_type: str, document: models.Model) -> str:
     """Extract a human-readable title from a document for OTP email context.
 
     Used in the OTP email body so the customer knows which document the code
@@ -106,7 +110,9 @@ _VERIFY_ERROR_MAP = {
 # Ceremony validation (called from per-document decision views)
 # ---------------------------------------------------------------------------
 
-def validate_ceremony_on_decision(request, public_token, customer_email):
+def validate_ceremony_on_decision(
+    request: Request, public_token: str, customer_email: str,
+) -> tuple[DocumentAccessSession | None, str, Response | None]:
     """Gate-check called by each ``public_*_decision_view`` before executing
     decision logic.
 
@@ -174,7 +180,7 @@ def validate_ceremony_on_decision(request, public_token, customer_email):
     return session, signer_name, None
 
 
-def get_ceremony_context():
+def get_ceremony_context() -> tuple[str, str]:
     """Return the current consent text and its SHA-256 version hash.
 
     Called by each decision view to snapshot the consent language into the
