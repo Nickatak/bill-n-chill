@@ -2,6 +2,10 @@
 
 from datetime import date
 from decimal import Decimal
+from typing import Any
+
+from django.contrib.auth.models import AbstractUser
+from rest_framework.request import Request
 
 from core.models import (
     ChangeOrder,
@@ -13,8 +17,12 @@ from core.models import (
 )
 
 
-def _parse_optional_date(value: str):
-    """Parse an ISO date string, returning (date, None) on success or (None, errors) on failure."""
+def _parse_optional_date(value: str) -> tuple[date | None, list[str] | None]:
+    """Parse an ISO date string into a ``date`` object.
+
+    Returns ``(date, None)`` on success or ``(None, error_messages)`` on
+    failure.  Empty strings return ``(None, None)`` (no value, no error).
+    """
     if not value:
         return None, None
     try:
@@ -23,8 +31,15 @@ def _parse_optional_date(value: str):
         return None, ["Use YYYY-MM-DD format."]
 
 
-def _date_filter_from_query(request):
-    """Extract and validate date_from/date_to query params. Returns (date_from, date_to, errors)."""
+def _date_filter_from_query(
+    request: Request,
+) -> tuple[date | None, date | None, dict[str, list[str]] | None]:
+    """Extract and validate ``date_from``/``date_to`` query params.
+
+    Returns ``(date_from, date_to, None)`` on success or
+    ``(None, None, field_errors)`` on validation failure.  Also rejects
+    ranges where ``date_to < date_from``.
+    """
     date_from_raw = (request.query_params.get("date_from") or "").strip()
     date_to_raw = (request.query_params.get("date_to") or "").strip()
     date_from, date_from_error = _parse_optional_date(date_from_raw)
@@ -41,8 +56,17 @@ def _date_filter_from_query(request):
     return date_from, date_to, None
 
 
-def _project_accepted_contract_totals_map(*, project_ids):
-    """Return a dict mapping project IDs to their accepted contract total (approved estimate + approved COs)."""
+def _project_accepted_contract_totals_map(
+    *,
+    project_ids: list[int],
+) -> dict[int, Decimal]:
+    """Return a dict mapping project IDs to their accepted contract total.
+
+    For each project, finds the latest approved estimate's grand total and
+    sums all approved change-order deltas.  The accepted contract total is
+    ``estimate_total + co_total``.  Projects with no approved estimate
+    default to zero.
+    """
     if not project_ids:
         return {}
 
@@ -76,8 +100,17 @@ def _project_accepted_contract_totals_map(*, project_ids):
     return totals
 
 
-def _build_project_financial_summary_data(project: Project, user):
-    """Build a complete financial summary dict for a project with AR/AP totals and traceability links."""
+def _build_project_financial_summary_data(
+    project: Project,
+    user: AbstractUser,
+) -> dict[str, Any]:
+    """Build a complete financial summary dict for a single project.
+
+    Aggregates contract values, AR invoiced/paid/outstanding, AP
+    billed/paid/outstanding, unapplied credits in both directions, and
+    per-record traceability links.  Used by the project financial summary
+    endpoint and the portfolio snapshot view.
+    """
     accepted_contract_total = _project_accepted_contract_totals_map(
         project_ids=[project.id],
     ).get(project.id, Decimal("0"))

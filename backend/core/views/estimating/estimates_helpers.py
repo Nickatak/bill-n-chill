@@ -1,9 +1,12 @@
 """Domain-specific helpers for estimate views."""
 
 from decimal import Decimal
+from typing import Any
 
 from django.conf import settings
+from django.contrib.auth.models import AbstractUser
 from django.db import transaction
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.models import (
@@ -19,11 +22,82 @@ from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import _resolve_cost_codes_for_user
 
 
-def _archive_estimate_family(*, project, user, title, exclude_ids, note):
+# ---------------------------------------------------------------------------
+# Constants (imported by views)
+# ---------------------------------------------------------------------------
+
+ESTIMATE_DECISION_TO_STATUS: dict[str, str] = {
+    "approve": Estimate.Status.APPROVED,
+    "approved": Estimate.Status.APPROVED,
+    "reject": Estimate.Status.REJECTED,
+    "rejected": Estimate.Status.REJECTED,
+}
+
+
+# ---------------------------------------------------------------------------
+# Duplicate-suppression signatures
+# ---------------------------------------------------------------------------
+
+
+def _line_items_signature(items: list[dict]) -> list[tuple]:
+    """Build a normalized signature from raw line-item input dicts.
+
+    Returns a list of tuples for structural comparison against stored
+    estimates during the duplicate-submit suppression window.
+    """
+    signature = []
+    for item in items:
+        signature.append(
+            (
+                int(item["cost_code"]),
+                (item.get("description") or "").strip(),
+                str(item.get("quantity", "")),
+                (item.get("unit") or "").strip(),
+                str(item.get("unit_cost", "")),
+                str(item.get("markup_percent", "")),
+            )
+        )
+    return signature
+
+
+def _estimate_stored_signature(estimate: Estimate) -> list[tuple]:
+    """Build a normalized signature from an existing estimate's line items.
+
+    Returns a list of tuples matching the shape of ``_line_items_signature``
+    so the two can be compared for duplicate detection.
+    """
+    return [
+        (
+            item.cost_code_id,
+            (item.description or "").strip(),
+            str(item.quantity),
+            (item.unit or "").strip(),
+            str(item.unit_cost),
+            str(item.markup_percent),
+        )
+        for item in estimate.line_items.all()
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Family and archival helpers
+# ---------------------------------------------------------------------------
+
+
+def _archive_estimate_family(
+    *,
+    project: Project,
+    user: AbstractUser,
+    title: str,
+    exclude_ids: list[int],
+    note: str,
+) -> None:
     """Archive all same-title estimates in a family except the excluded IDs.
 
-    Authorization: caller must have already validated that *project* belongs to the
-    requesting user's organization.
+    Iterates non-archived estimates in the family, checks whether the
+    transition to ``archived`` is allowed, and records an audit event for
+    each one that transitions.  Called after creating a new version to
+    supersede older family members.
     """
     normalized_title = (title or "").strip()
     if not normalized_title:
@@ -55,11 +129,12 @@ def _archive_estimate_family(*, project, user, title, exclude_ids, note):
         )
 
 
-def _next_estimate_family_version(*, project, title):
+def _next_estimate_family_version(*, project: Project, title: str) -> int:
     """Return the next version number for an estimate family identified by title.
 
-    Authorization: caller must have already validated that *project* belongs to the
-    requesting user's organization.
+    Queries the highest existing version for the normalized title within
+    the project and returns ``max_version + 1``, or ``1`` if no prior
+    versions exist.
     """
     normalized_title = (title or "").strip()
     latest = (
@@ -73,18 +148,23 @@ def _next_estimate_family_version(*, project, title):
     return (latest.version + 1) if latest else 1
 
 
-def _serialize_estimate(*, estimate):
-    """Serialize a single estimate."""
+def _serialize_estimate(*, estimate: Estimate) -> dict[str, Any]:
+    """Serialize a single estimate to a dict via ``EstimateSerializer``."""
     return EstimateSerializer(estimate).data
 
 
-def _serialize_estimates(*, estimates, project):
-    """Serialize multiple estimates."""
+def _serialize_estimates(*, estimates, project: Project) -> list[dict[str, Any]]:
+    """Serialize a queryset of estimates to a list of dicts."""
     return EstimateSerializer(estimates, many=True).data
 
 
-def _sync_project_contract_baseline_if_unset(*, estimate):
-    """Set the project's original and current contract values from the estimate if both are zero."""
+def _sync_project_contract_baseline_if_unset(*, estimate: Estimate) -> bool:
+    """Set the project's contract values from the estimate if both are still zero.
+
+    Returns ``True`` if values were updated, ``False`` if they were already
+    set.  Used to bootstrap contract baselines from the first approved
+    estimate.
+    """
     project = estimate.project
     if project.contract_value_original != Decimal("0") or project.contract_value_current != Decimal("0"):
         return False
@@ -94,8 +174,17 @@ def _sync_project_contract_baseline_if_unset(*, estimate):
     return True
 
 
-def _activate_project_from_estimate_approval(*, estimate, actor, note: str):
-    """Transition a prospect or on-hold project to active when its estimate is approved."""
+def _activate_project_from_estimate_approval(
+    *,
+    estimate: Estimate,
+    actor: AbstractUser,
+    note: str,
+) -> bool:
+    """Transition a prospect or on-hold project to active on estimate approval.
+
+    Returns ``True`` if the project was activated, ``False`` if it was
+    already active or the transition is not allowed.
+    """
     project = estimate.project
     if project.status not in (Project.Status.PROSPECT, Project.Status.ON_HOLD):
         return False
@@ -108,8 +197,15 @@ def _activate_project_from_estimate_approval(*, estimate, actor, note: str):
     return True
 
 
-def _calculate_line_totals(line_items_data):
-    """Compute per-line totals with markup and return normalized items, subtotal, and markup total."""
+def _calculate_line_totals(
+    line_items_data: list[dict],
+) -> tuple[list[dict], Decimal, Decimal]:
+    """Compute per-line totals with markup and return normalized items.
+
+    Returns ``(normalized_items, subtotal, markup_total)`` where each
+    normalized item has ``line_total`` added and numeric fields coerced
+    to ``Decimal``.
+    """
     subtotal = MONEY_ZERO
     markup_total = MONEY_ZERO
     normalized_items = []
@@ -136,8 +232,19 @@ def _calculate_line_totals(line_items_data):
     return normalized_items, subtotal, markup_total
 
 
-def _apply_estimate_lines_and_totals(estimate, line_items_data, tax_percent, user):
-    """Replace an estimate's line items and recompute all totals. Returns an error dict on failure."""
+def _apply_estimate_lines_and_totals(
+    estimate: Estimate,
+    line_items_data: list[dict],
+    tax_percent: Decimal,
+    user: AbstractUser,
+) -> dict | None:
+    """Replace an estimate's line items and recompute all totals.
+
+    Deletes existing line items, resolves cost codes for the user,
+    bulk-creates new lines, and updates the estimate's financial totals.
+    Returns an error dict (``{"missing_cost_codes": [...]}"``) on
+    validation failure, or ``None`` on success.
+    """
     normalized_items, subtotal, markup_total = _calculate_line_totals(line_items_data)
     code_map, missing = _resolve_cost_codes_for_user(user, normalized_items)
     if missing:
@@ -190,11 +297,17 @@ def _apply_estimate_lines_and_totals(estimate, line_items_data, tax_percent, use
 # ---------------------------------------------------------------------------
 
 
-def _handle_estimate_document_save(request, estimate, data):
-    """Apply field updates, line items, and totals to an estimate (the 'save' concern).
+def _handle_estimate_document_save(
+    request: Request,
+    estimate: Estimate,
+    data: dict[str, Any],
+) -> Response:
+    """Apply field updates, line items, and totals to an estimate (save concern).
 
     Handles title, valid_through, tax_percent, and line items with totals
-    recomputation.  Does not modify status or record audit events.
+    recomputation.  Does not modify status or record audit events.  If only
+    tax_percent changes without new line items, existing lines are
+    recomputed with the new rate.
     """
     if "line_items" in data and not data["line_items"]:
         return Response(
@@ -265,13 +378,19 @@ def _handle_estimate_document_save(request, estimate, data):
 
 
 def _handle_estimate_status_transition(
-    request, estimate, data, previous_status, next_status, is_resend,
-):
-    """Handle an estimate status transition: validate, apply, freeze org identity, audit, email.
+    request: Request,
+    estimate: Estimate,
+    data: dict[str, Any],
+    previous_status: str,
+    next_status: str,
+    is_resend: bool,
+) -> Response:
+    """Handle an estimate status transition with identity freeze, audit, and email.
 
-    Called when the PATCH includes a real status change (previous != next) or a resend
-    (sent -> sent).  Handles org identity freeze on draft departure, audit event
-    recording, project activation on approval, and email notification on send.
+    Called when the PATCH includes a real status change (previous != next)
+    or a resend (sent -> sent).  Freezes org identity fields onto the
+    document when leaving draft, records an audit event, activates the
+    project on approval, and sends a notification email on send/resend.
     """
     status_note = (data.get("status_note", "") or "").strip()
 
@@ -363,10 +482,15 @@ def _handle_estimate_status_transition(
     return Response({"data": _serialize_estimate(estimate=estimate), "email_sent": email_sent})
 
 
-def _handle_estimate_status_note(request, estimate, data):
+def _handle_estimate_status_note(
+    request: Request,
+    estimate: Estimate,
+    data: dict[str, Any],
+) -> Response:
     """Append an audit note to the estimate timeline without changing status.
 
-    Called when the PATCH includes a status_note but no actual status change.
+    Called when the PATCH includes a ``status_note`` but no actual status
+    transition.  Records a same-status audit event with the note text.
     """
     note_text = (data.get("status_note", "") or "").strip()
 

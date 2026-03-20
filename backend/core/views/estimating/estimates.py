@@ -22,12 +22,15 @@ from core.utils.email import send_document_sent_email
 from core.utils.request import get_client_ip
 from core.utils.signing import compute_document_content_hash
 from core.views.estimating.estimates_helpers import (
+    ESTIMATE_DECISION_TO_STATUS,
     _activate_project_from_estimate_approval,
     _apply_estimate_lines_and_totals,
     _archive_estimate_family,
+    _estimate_stored_signature,
     _handle_estimate_document_save,
     _handle_estimate_status_note,
     _handle_estimate_status_transition,
+    _line_items_signature,
     _next_estimate_family_version,
     _serialize_estimate,
     _serialize_estimates,
@@ -47,8 +50,29 @@ from core.views.public_signing_helpers import get_ceremony_context, validate_cer
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def public_estimate_detail_view(request, public_token: str):
-    """Return public estimate detail for share links, including lightweight project context."""
+def public_estimate_detail_view(request, public_token):
+    """Return public estimate detail for customer share links.
+
+    Loads the estimate by public token with project, customer, and line-item
+    relations.  Enriches the response with lightweight project context,
+    organization context, and signing ceremony consent text.
+
+    Flow:
+        1. Look up estimate by public token.
+        2. Resolve organization from the estimate creator.
+        3. Attach project context, org context, and ceremony consent.
+
+    URL: ``GET /api/v1/public/estimate/<public_token>/detail/``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": { ..., "project_context": {...}, "organization_context": {...} } }
+
+    Errors:
+        - 404: Estimate not found.
+    """
     try:
         estimate = (
             Estimate.objects.select_related("project__customer", "created_by")
@@ -73,8 +97,37 @@ def public_estimate_detail_view(request, public_token: str):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-def public_estimate_decision_view(request, public_token: str):
-    """Apply customer approve/reject decisions through public estimate share links."""
+def public_estimate_decision_view(request, public_token):
+    """Apply a customer approve/reject decision through a public estimate link.
+
+    Validates the decision value, confirms the estimate is in ``sent``
+    status, runs signing ceremony verification, then atomically transitions
+    the estimate, records audit events, and creates a signing ceremony
+    record.  On approval, also activates the parent project if eligible.
+
+    Flow:
+        1. Look up estimate by public token.
+        2. Validate decision (approve/reject) and current status (must be sent).
+        3. Validate signing ceremony (OTP session).
+        4. Transition estimate status + record audit event (atomic).
+        5. On approval, activate project if prospect/on-hold.
+        6. Record signing ceremony with content hash.
+
+    URL: ``POST /api/v1/public/estimate/<public_token>/decision/``
+
+    Request body::
+
+        { "decision": "approve", "note": "Looks good" }
+
+    Success 200::
+
+        { "data": { ..., "project_context": {...}, "organization_context": {...} } }
+
+    Errors:
+        - 400: Invalid decision value.
+        - 404: Estimate not found.
+        - 409: Estimate not in ``sent`` status.
+    """
     try:
         estimate = (
             Estimate.objects.select_related("project__customer", "created_by")
@@ -88,13 +141,7 @@ def public_estimate_decision_view(request, public_token: str):
         )
 
     decision = str(request.data.get("decision", "")).strip().lower()
-    decision_to_status = {
-        "approve": Estimate.Status.APPROVED,
-        "approved": Estimate.Status.APPROVED,
-        "reject": Estimate.Status.REJECTED,
-        "rejected": Estimate.Status.REJECTED,
-    }
-    next_status = decision_to_status.get(decision)
+    next_status = ESTIMATE_DECISION_TO_STATUS.get(decision)
     if not next_status:
         return Response(
             {
@@ -186,42 +233,69 @@ def public_estimate_decision_view(request, public_token: str):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def estimate_contract_view(_request):
-    """Return canonical estimate workflow policy for frontend UX guards.
+    """Return the canonical estimate workflow policy contract.
 
-    Contract:
-    - `GET`:
-      - `200`: estimate policy contract returned.
-        - Guarantees:
-          - statuses/transitions mirror backend model-level transition guards. `[APP]`
-          - no object mutations. `[APP]`
-      - `401`: authentication missing/invalid.
-        - Guarantees: no object mutations. `[APP]`
+    Read-only endpoint that returns status definitions, allowed transitions,
+    and role requirements.  Used by the frontend to gate UI elements without
+    hard-coding business rules.
 
-    - Preconditions:
-      - caller must be authenticated (`IsAuthenticated`).
+    Flow:
+        1. Return the estimate policy contract payload.
 
-    - Object mutations:
-      - `GET`: none.
+    URL: ``GET /api/v1/estimates/contract/``
 
-    - Idempotency and retry semantics:
-      - `GET` is idempotent and read-only.
+    Request body: (none)
 
-    - Test anchors:
-      - `backend/core/tests/test_estimates.py::EstimateTests::test_estimate_contract_requires_authentication`
-      - `backend/core/tests/test_estimates.py::EstimateTests::test_estimate_contract_matches_model_transition_policy`
+    Success 200::
+
+        { "data": { "statuses": [...], "transitions": [...] } }
     """
     return Response({"data": get_estimate_policy_contract()})
 
 
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
-def project_estimates_view(request, project_id: int):
-    """List project estimates or create a new estimate version within a title family.
+def project_estimates_view(request, project_id):
+    """List project estimates or create a new estimate version.
 
-    Contract:
-    - `GET`: user/project-scoped list.
-    - `POST`: requires role `owner|pm`, at least one line item, and valid cost-code scope.
-    - Applies duplicate-submit suppression window and archives superseded family rows after create.
+    GET returns all estimates for the project with line items and cost
+    codes.  POST creates a new estimate within a title family, enforcing
+    duplicate-submit suppression (5-second window), approved-family
+    locking, and same-title-family confirmation.  Archives superseded
+    family members after creation.
+
+    Flow (GET):
+        1. Validate project scope.
+        2. Return all estimates with prefetched line items.
+
+    Flow (POST):
+        1. Capability gate: ``estimates.create``.
+        2. Validate fields, resolve ``valid_through`` default from org settings.
+        3. Reject terms_text override and empty line items.
+        4. Check duplicate-submit suppression window.
+        5. Check approved-family lock and same-title-family confirmation.
+        6. Create estimate, apply line items, record audit event (atomic).
+        7. Archive superseded family members.
+
+    URL: ``GET/POST /api/v1/projects/<project_id>/estimates/``
+
+    Request body (POST)::
+
+        { "title": "Phase 1", "line_items": [...], "tax_percent": "8.25" }
+
+    Success 200 (GET)::
+
+        { "data": [{ ... }, ...] }
+
+    Success 201 (POST)::
+
+        { "data": { ... } }
+
+    Errors:
+        - 400: Validation error (empty lines, terms override, locked family, etc.).
+        - 403: Missing ``estimates.create`` capability.
+        - 404: Project not found.
+        - 409: Approved family locked or unconfirmed title family exists.
     """
     membership = _ensure_org_membership(request.user)
     organization = membership.organization
@@ -247,229 +321,229 @@ def project_estimates_view(request, project_id: int):
             }
         )
 
-    permission_error, _ = _capability_gate(request.user, "estimates", "create")
-    if permission_error:
-        return Response(permission_error, status=403)
+    elif request.method == "POST":
+        permission_error, _ = _capability_gate(request.user, "estimates", "create")
+        if permission_error:
+            return Response(permission_error, status=403)
 
-    serializer = EstimateWriteSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    data = serializer.validated_data
-    resolved_valid_through = data.get("valid_through")
-    if resolved_valid_through is None:
-        validation_delta_days = max(
-            1,
-            min(365, int(organization.default_estimate_valid_delta or 30)),
-        )
-        resolved_valid_through = timezone.localdate() + timedelta(days=validation_delta_days)
-    if "terms_text" in data:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "Estimate terms are managed by organization templates.",
-                    "fields": {
-                        "terms_text": [
-                            "Set estimate terms in Organization settings; per-estimate overrides are disabled."
-                        ]
-                    },
-                }
-            },
-            status=400,
-        )
-    line_items = data.get("line_items", [])
-    if not line_items:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "At least one line item is required.",
-                    "fields": {"line_items": ["At least one line item is required."]},
-                }
-            },
-            status=400,
-        )
-
-    def _line_items_signature(items):
-        signature = []
-        for item in items:
-            signature.append(
-                (
-                    int(item["cost_code"]),
-                    (item.get("description") or "").strip(),
-                    str(item.get("quantity", "")),
-                    (item.get("unit") or "").strip(),
-                    str(item.get("unit_cost", "")),
-                    str(item.get("markup_percent", "")),
-                )
+        serializer = EstimateWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        resolved_valid_through = data.get("valid_through")
+        if resolved_valid_through is None:
+            validation_delta_days = max(
+                1,
+                min(365, int(organization.default_estimate_valid_delta or 30)),
             )
-        return signature
-
-    def _estimate_signature(estimate):
-        return [
-            (
-                item.cost_code_id,
-                (item.description or "").strip(),
-                str(item.quantity),
-                (item.unit or "").strip(),
-                str(item.unit_cost),
-                str(item.markup_percent),
-            )
-            for item in estimate.line_items.all()
-        ]
-
-    input_signature = _line_items_signature(line_items)
-    window_start = timezone.now() - timedelta(seconds=5)
-    recent_estimates = (
-        Estimate.objects.filter(
-            project=project,
-            created_at__gte=window_start,
-        )
-        .prefetch_related("line_items")
-        .order_by("-created_at")
-    )
-    for candidate in recent_estimates:
-        if candidate.title != data.get("title", ""):
-            continue
-        if candidate.status != data.get("status", Estimate.Status.DRAFT):
-            continue
-        if candidate.valid_through != resolved_valid_through:
-            continue
-        candidate_terms_text = (candidate.terms_text or "").strip()
-        incoming_terms_text = (organization.estimate_terms_and_conditions or "").strip()
-        if candidate_terms_text != incoming_terms_text:
-            continue
-        if candidate.tax_percent != data.get("tax_percent", Decimal("0")):
-            continue
-        if _estimate_signature(candidate) == input_signature:
-            return Response(
-                {
-                    "data": _serialize_estimate(estimate=candidate),
-                    "meta": {"deduped": True},
-                },
-                status=200,
-            )
-
-    same_title_family = Estimate.objects.filter(
-        project=project,
-        title=data.get("title", ""),
-    ).order_by("-version", "-id")
-    approved_family_row = same_title_family.filter(status=Estimate.Status.APPROVED).first()
-    if approved_family_row:
-        return Response(
-            {
-                "error": {
-                    "code": "estimate_family_approved_locked",
-                    "message": "This estimate family already has an approved version and is locked. Use a new title or manage scope changes via change orders.",
-                    "fields": {
-                        "title": [
-                            "Approved estimate families cannot create additional draft versions."
-                        ]
-                    },
-                    "meta": {
-                        "latest_estimate_id": approved_family_row.id,
-                        "latest_version": approved_family_row.version,
-                        "latest_status": approved_family_row.status,
-                        "family_size": same_title_family.count(),
-                    },
-                }
-            },
-            status=409,
-        )
-    if same_title_family.exists() and not data.get("allow_existing_title_family", False):
-        latest_family_row = same_title_family.first()
-        return Response(
-            {
-                "error": {
-                    "code": "estimate_family_exists",
-                    "message": "An estimate family with this title already exists. Confirm to create a new version in that family.",
-                    "fields": {
-                        "title": [
-                            "Use explicit confirmation before creating another version in an existing title family."
-                        ]
-                    },
-                    "meta": {
-                        "latest_estimate_id": latest_family_row.id if latest_family_row else None,
-                        "latest_version": latest_family_row.version if latest_family_row else None,
-                        "family_size": same_title_family.count(),
-                    },
-                }
-            },
-            status=409,
-        )
-
-    next_version = _next_estimate_family_version(
-        project=project,
-        title=data.get("title", ""),
-    )
-    terms_text = (organization.estimate_terms_and_conditions or "").strip()
-    sender_logo_url = ""
-    if organization.logo:
-        sender_logo_url = request.build_absolute_uri(organization.logo.url)
-
-    with transaction.atomic():
-        estimate = Estimate.objects.create(
-            project=project,
-            created_by=request.user,
-            version=next_version,
-            status=data.get("status", Estimate.Status.DRAFT),
-            title=data.get("title", ""),
-            valid_through=resolved_valid_through,
-            terms_text=terms_text,
-            sender_name=(organization.display_name or "").strip(),
-            sender_address=organization.formatted_billing_address,
-            sender_logo_url=sender_logo_url,
-            tax_percent=data.get("tax_percent", Decimal("0")),
-        )
-
-        apply_error = _apply_estimate_lines_and_totals(
-            estimate=estimate,
-            line_items_data=line_items,
-            tax_percent=data.get("tax_percent", Decimal("0")),
-            user=request.user,
-        )
-        if apply_error:
-            transaction.set_rollback(True)
+            resolved_valid_through = timezone.localdate() + timedelta(days=validation_delta_days)
+        if "terms_text" in data:
             return Response(
                 {
                     "error": {
                         "code": "validation_error",
-                        "message": "One or more cost codes are invalid for this user.",
-                        "fields": {"cost_code": apply_error["missing_cost_codes"]},
+                        "message": "Estimate terms are managed by organization templates.",
+                        "fields": {
+                            "terms_text": [
+                                "Set estimate terms in Organization settings; per-estimate overrides are disabled."
+                            ]
+                        },
+                    }
+                },
+                status=400,
+            )
+        line_items = data.get("line_items", [])
+        if not line_items:
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "At least one line item is required.",
+                        "fields": {"line_items": ["At least one line item is required."]},
                     }
                 },
                 status=400,
             )
 
-        estimate.refresh_from_db()
-        EstimateStatusEvent.record(
-            estimate=estimate,
-            from_status=None,
-            to_status=estimate.status,
-            note="Estimate created.",
-            changed_by=request.user,
+        input_signature = _line_items_signature(line_items)
+        window_start = timezone.now() - timedelta(seconds=5)
+        recent_estimates = (
+            Estimate.objects.filter(
+                project=project,
+                created_at__gte=window_start,
+            )
+            .prefetch_related("line_items")
+            .order_by("-created_at")
         )
-        _archive_estimate_family(
+        for candidate in recent_estimates:
+            if candidate.title != data.get("title", ""):
+                continue
+            if candidate.status != data.get("status", Estimate.Status.DRAFT):
+                continue
+            if candidate.valid_through != resolved_valid_through:
+                continue
+            candidate_terms_text = (candidate.terms_text or "").strip()
+            incoming_terms_text = (organization.estimate_terms_and_conditions or "").strip()
+            if candidate_terms_text != incoming_terms_text:
+                continue
+            if candidate.tax_percent != data.get("tax_percent", Decimal("0")):
+                continue
+            if _estimate_stored_signature(candidate) == input_signature:
+                return Response(
+                    {
+                        "data": _serialize_estimate(estimate=candidate),
+                        "meta": {"deduped": True},
+                    },
+                    status=200,
+                )
+
+        same_title_family = Estimate.objects.filter(
             project=project,
-            user=request.user,
-            title=estimate.title,
-            exclude_ids=[estimate.id],
-            note=f"Archived because estimate #{estimate.id} superseded this version.",
+            title=data.get("title", ""),
+        ).order_by("-version", "-id")
+        approved_family_row = same_title_family.filter(status=Estimate.Status.APPROVED).first()
+        if approved_family_row:
+            return Response(
+                {
+                    "error": {
+                        "code": "estimate_family_approved_locked",
+                        "message": "This estimate family already has an approved version and is locked. Use a new title or manage scope changes via change orders.",
+                        "fields": {
+                            "title": [
+                                "Approved estimate families cannot create additional draft versions."
+                            ]
+                        },
+                        "meta": {
+                            "latest_estimate_id": approved_family_row.id,
+                            "latest_version": approved_family_row.version,
+                            "latest_status": approved_family_row.status,
+                            "family_size": same_title_family.count(),
+                        },
+                    }
+                },
+                status=409,
+            )
+        if same_title_family.exists() and not data.get("allow_existing_title_family", False):
+            latest_family_row = same_title_family.first()
+            return Response(
+                {
+                    "error": {
+                        "code": "estimate_family_exists",
+                        "message": "An estimate family with this title already exists. Confirm to create a new version in that family.",
+                        "fields": {
+                            "title": [
+                                "Use explicit confirmation before creating another version in an existing title family."
+                            ]
+                        },
+                        "meta": {
+                            "latest_estimate_id": latest_family_row.id if latest_family_row else None,
+                            "latest_version": latest_family_row.version if latest_family_row else None,
+                            "family_size": same_title_family.count(),
+                        },
+                    }
+                },
+                status=409,
+            )
+
+        next_version = _next_estimate_family_version(
+            project=project,
+            title=data.get("title", ""),
         )
-    return Response(
-        {"data": _serialize_estimate(estimate=estimate)},
-        status=201,
-    )
+        terms_text = (organization.estimate_terms_and_conditions or "").strip()
+        sender_logo_url = ""
+        if organization.logo:
+            sender_logo_url = request.build_absolute_uri(organization.logo.url)
+
+        with transaction.atomic():
+            estimate = Estimate.objects.create(
+                project=project,
+                created_by=request.user,
+                version=next_version,
+                status=data.get("status", Estimate.Status.DRAFT),
+                title=data.get("title", ""),
+                valid_through=resolved_valid_through,
+                terms_text=terms_text,
+                sender_name=(organization.display_name or "").strip(),
+                sender_address=organization.formatted_billing_address,
+                sender_logo_url=sender_logo_url,
+                tax_percent=data.get("tax_percent", Decimal("0")),
+            )
+
+            apply_error = _apply_estimate_lines_and_totals(
+                estimate=estimate,
+                line_items_data=line_items,
+                tax_percent=data.get("tax_percent", Decimal("0")),
+                user=request.user,
+            )
+            if apply_error:
+                transaction.set_rollback(True)
+                return Response(
+                    {
+                        "error": {
+                            "code": "validation_error",
+                            "message": "One or more cost codes are invalid for this user.",
+                            "fields": {"cost_code": apply_error["missing_cost_codes"]},
+                        }
+                    },
+                    status=400,
+                )
+
+            estimate.refresh_from_db()
+            EstimateStatusEvent.record(
+                estimate=estimate,
+                from_status=None,
+                to_status=estimate.status,
+                note="Estimate created.",
+                changed_by=request.user,
+            )
+            _archive_estimate_family(
+                project=project,
+                user=request.user,
+                title=estimate.title,
+                exclude_ids=[estimate.id],
+                note=f"Archived because estimate #{estimate.id} superseded this version.",
+            )
+        return Response(
+            {"data": _serialize_estimate(estimate=estimate)},
+            status=201,
+        )
 
 
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
-def estimate_detail_view(request, estimate_id: int):
-    """Fetch or patch one estimate with draft-locking and status-transition enforcement.
+def estimate_detail_view(request, estimate_id):
+    """Fetch or update a single estimate with draft-locking enforcement.
 
-    Contract:
-    - `GET`: returns estimate detail.
-    - `PATCH`: requires role `owner|pm`; non-draft value edits are blocked.
-    - Records immutable status events for workflow transitions.
+    GET returns the estimate detail.  PATCH supports three concern paths:
+    status transitions (with capability gates per target status), status
+    notes (audit-only, no transition), and document saves (field + line-item
+    updates).  Non-draft estimates are locked against value edits.
+
+    Flow (GET):
+        1. Look up estimate scoped to user's org.
+        2. Return serialized estimate.
+
+    Flow (PATCH):
+        1. Capability gate: ``estimates.edit``.
+        2. Additional capability gates for send (``estimates.send``) and
+           approve/void (``estimates.approve``) transitions.
+        3. Reject immutable-field edits (title, terms_text).
+        4. Reject value edits on non-draft estimates (locked).
+        5. Dispatch to status-transition, status-note, or document-save handler.
+
+    URL: ``GET/PATCH /api/v1/estimates/<estimate_id>/``
+
+    Request body (PATCH)::
+
+        { "status": "sent", "status_note": "Sending to client" }
+
+    Success 200::
+
+        { "data": { ... }, "email_sent": false }
+
+    Errors:
+        - 400: Immutable field, locked estimate, invalid transition.
+        - 403: Missing capability for the requested action.
+        - 404: Estimate not found.
     """
     estimate = _validate_estimate_for_user(estimate_id, request.user)
     if not estimate:
@@ -481,98 +555,125 @@ def estimate_detail_view(request, estimate_id: int):
     if request.method == "GET":
         return Response({"data": _serialize_estimate(estimate=estimate)})
 
-    permission_error, _ = _capability_gate(request.user, "estimates", "edit")
-    if permission_error:
-        return Response(permission_error, status=403)
-    serializer = EstimateWriteSerializer(
-        data=request.data,
-        partial=True,
-    )
-    serializer.is_valid(raise_exception=True)
-    data = serializer.validated_data
+    elif request.method == "PATCH":
+        permission_error, _ = _capability_gate(request.user, "estimates", "edit")
+        if permission_error:
+            return Response(permission_error, status=403)
+        serializer = EstimateWriteSerializer(
+            data=request.data,
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
 
-    # Status-transition capability gates
-    if "status" in data:
-        _next = data["status"]
-        if _next in {Estimate.Status.SENT}:
-            _err, _ = _capability_gate(request.user, "estimates", "send")
-            if _err:
-                return Response(_err, status=403)
-        elif _next in {Estimate.Status.APPROVED, Estimate.Status.VOID}:
-            _err, _ = _capability_gate(request.user, "estimates", "approve")
-            if _err:
-                return Response(_err, status=403)
+        # Status-transition capability gates
+        if "status" in data:
+            requested_status = data["status"]
+            if requested_status in {Estimate.Status.SENT}:
+                permission_error, _ = _capability_gate(request.user, "estimates", "send")
+                if permission_error:
+                    return Response(permission_error, status=403)
+            elif requested_status in {Estimate.Status.APPROVED, Estimate.Status.VOID}:
+                permission_error, _ = _capability_gate(request.user, "estimates", "approve")
+                if permission_error:
+                    return Response(permission_error, status=403)
 
-    if "title" in data and data["title"] != estimate.title:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "Estimate title cannot be changed after creation.",
-                    "fields": {"title": ["Create a new estimate if the title needs to change."]},
-                }
-            },
-            status=400,
+        if "title" in data and data["title"] != estimate.title:
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "Estimate title cannot be changed after creation.",
+                        "fields": {"title": ["Create a new estimate if the title needs to change."]},
+                    }
+                },
+                status=400,
+            )
+        if "terms_text" in data:
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "Estimate terms are managed by organization templates.",
+                        "fields": {
+                            "terms_text": [
+                                "Set estimate terms in Organization settings; per-estimate overrides are disabled."
+                            ]
+                        },
+                    }
+                },
+                status=400,
+            )
+        is_locked = estimate.status != Estimate.Status.DRAFT
+        mutating_fields = {"title", "valid_through", "tax_percent", "line_items"}
+        if is_locked and any(field in data for field in mutating_fields):
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "Estimate values are locked after being sent.",
+                        "fields": {
+                            "title": ["Cannot edit non-draft estimate values."],
+                            "valid_through": ["Cannot edit non-draft estimate values."],
+                            "tax_percent": ["Cannot edit non-draft estimate values."],
+                            "line_items": ["Cannot edit non-draft estimate values."],
+                        },
+                    }
+                },
+                status=400,
+            )
+        # --- Concern dispatch ---
+        previous_status = estimate.status
+        next_status = data.get("status", estimate.status)
+        status_changing = "status" in data
+        is_actual_transition = status_changing and previous_status != next_status
+        is_resend = (
+            status_changing
+            and previous_status == Estimate.Status.SENT
+            and next_status == Estimate.Status.SENT
         )
-    if "terms_text" in data:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "Estimate terms are managed by organization templates.",
-                    "fields": {
-                        "terms_text": [
-                            "Set estimate terms in Organization settings; per-estimate overrides are disabled."
-                        ]
-                    },
-                }
-            },
-            status=400,
-        )
-    is_locked = estimate.status != Estimate.Status.DRAFT
-    mutating_fields = {"title", "valid_through", "tax_percent", "line_items"}
-    if is_locked and any(field in data for field in mutating_fields):
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "Estimate values are locked after being sent.",
-                    "fields": {
-                        "title": ["Cannot edit non-draft estimate values."],
-                        "valid_through": ["Cannot edit non-draft estimate values."],
-                        "tax_percent": ["Cannot edit non-draft estimate values."],
-                        "line_items": ["Cannot edit non-draft estimate values."],
-                    },
-                }
-            },
-            status=400,
-        )
-    # --- Concern dispatch ---
-    previous_status = estimate.status
-    next_status = data.get("status", estimate.status)
-    status_changing = "status" in data
-    is_actual_transition = status_changing and previous_status != next_status
-    is_resend = (
-        status_changing
-        and previous_status == Estimate.Status.SENT
-        and next_status == Estimate.Status.SENT
-    )
-    status_note = (data.get("status_note", "") or "").strip()
+        status_note = (data.get("status_note", "") or "").strip()
 
-    if is_actual_transition or is_resend:
-        return _handle_estimate_status_transition(
-            request, estimate, data,
-            previous_status, next_status, is_resend,
-        )
-    if status_note:
-        return _handle_estimate_status_note(request, estimate, data)
-    return _handle_estimate_document_save(request, estimate, data)
+        if is_actual_transition or is_resend:
+            return _handle_estimate_status_transition(
+                request, estimate, data,
+                previous_status, next_status, is_resend,
+            )
+        if status_note:
+            return _handle_estimate_status_note(request, estimate, data)
+        return _handle_estimate_document_save(request, estimate, data)
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def estimate_clone_version_view(request, estimate_id: int):
-    """Create a new draft revision from a prior estimate version in the same title family."""
+def estimate_clone_version_view(request, estimate_id):
+    """Create a new draft revision from a prior estimate in the same title family.
+
+    Clones line items, terms, and tax settings into a new draft version.
+    If the source estimate is in ``sent`` status, it is auto-rejected to
+    prevent two live versions in the same family.
+
+    Flow:
+        1. Look up estimate scoped to user's org.
+        2. Capability gate: ``estimates.create``.
+        3. Validate source status (must be sent, rejected, voided, or archived).
+        4. Compute next family version number.
+        5. Create cloned draft with line items and audit event (atomic).
+        6. Auto-reject source if it was in ``sent`` status.
+
+    URL: ``POST /api/v1/estimates/<estimate_id>/clone-version/``
+
+    Request body: (none)
+
+    Success 201::
+
+        { "data": { ... }, "meta": { "cloned_from": 42 } }
+
+    Errors:
+        - 400: Source estimate in invalid status for cloning.
+        - 403: Missing ``estimates.create`` capability.
+        - 404: Estimate not found.
+    """
     estimate = _validate_estimate_for_user(estimate_id, request.user, prefetch_lines=True)
     if not estimate:
         return Response(
@@ -679,8 +780,36 @@ def estimate_clone_version_view(request, estimate_id: int):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def estimate_duplicate_view(request, estimate_id: int):
-    """Duplicate an estimate into a draft for same or another project/title context."""
+def estimate_duplicate_view(request, estimate_id):
+    """Duplicate an estimate into a new draft under a different project or title.
+
+    Copies line items, terms, and tax settings into a new draft.  The
+    target project and title must differ from the source (use clone-version
+    for same-project same-title revisions).
+
+    Flow:
+        1. Look up estimate scoped to user's org.
+        2. Capability gate: ``estimates.create``.
+        3. Validate target project (if different) and title.
+        4. Reject same-project same-title (use clone-version instead).
+        5. Compute next family version in target context.
+        6. Create duplicated draft with line items and audit event (atomic).
+
+    URL: ``POST /api/v1/estimates/<estimate_id>/duplicate/``
+
+    Request body::
+
+        { "project_id": 5, "title": "Phase 2 Scope" }
+
+    Success 201::
+
+        { "data": { ... }, "meta": { "duplicated_from": 42 } }
+
+    Errors:
+        - 400: Same project + title (use clone-version).
+        - 403: Missing ``estimates.create`` capability.
+        - 404: Estimate or target project not found.
+    """
     estimate = _validate_estimate_for_user(estimate_id, request.user, prefetch_lines=True)
     if not estimate:
         return Response(
@@ -793,8 +922,24 @@ def estimate_duplicate_view(request, estimate_id: int):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def estimate_status_events_view(request, estimate_id: int):
-    """Return immutable estimate status transition history."""
+def estimate_status_events_view(request, estimate_id):
+    """Return the immutable status-transition audit trail for an estimate.
+
+    Flow:
+        1. Look up estimate scoped to user's org.
+        2. Query all status events with related user and project data.
+
+    URL: ``GET /api/v1/estimates/<estimate_id>/status-events/``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": [{ "from_status": "draft", "to_status": "sent", ... }, ...] }
+
+    Errors:
+        - 404: Estimate not found.
+    """
     estimate = _validate_estimate_for_user(estimate_id, request.user)
     if not estimate:
         return Response(
