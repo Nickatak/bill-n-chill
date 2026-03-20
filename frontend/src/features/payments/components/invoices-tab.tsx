@@ -3,9 +3,11 @@
 /**
  * Invoices tab — org-wide invoice browser for the accounting page.
  *
- * Shows all invoices across projects. Rows expand inline to show
- * attached payments and a form to record a new inbound payment against
- * the invoice. Creating a payment auto-allocates it to the invoice.
+ * Invoices render as cards with their payments as child cards below them.
+ * Tap an invoice to record a new inbound payment. Tap a payment to edit it.
+ *
+ * Desktop: dense document list (grid rows) with payment rows nested.
+ * Mobile:  card list with summary banner, collapsible search.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -19,12 +21,11 @@ import { PaginationControls } from "@/shared/components/pagination-controls";
 import styles from "./accounting-console.module.css";
 
 // ---------------------------------------------------------------------------
-// Types (lightweight — only what the tab needs from the org-level endpoint)
+// Types
 // ---------------------------------------------------------------------------
 
 type InvoiceAllocationRecord = {
   id: number;
-  payment: number;
   applied_amount: string;
   payment_date: string;
   payment_method: string;
@@ -79,6 +80,14 @@ const METHOD_LABELS: Record<string, string> = {
 
 const METHOD_OPTIONS = Object.entries(METHOD_LABELS);
 
+const METHODS_EXPECTING_REFERENCE = new Set(["check", "ach", "wire", "card"]);
+
+function hasMissingReference(allocations: InvoiceAllocationRecord[]): boolean {
+  return allocations.some(
+    (a) => !a.payment_reference && METHODS_EXPECTING_REFERENCE.has(a.payment_method),
+  );
+}
+
 function formatMoney(val: string): string {
   const n = Number(val);
   if (Number.isNaN(n)) return val;
@@ -86,10 +95,10 @@ function formatMoney(val: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// New payment form state
+// Form state
 // ---------------------------------------------------------------------------
 
-type NewPaymentForm = {
+type PaymentFormState = {
   amount: string;
   method: string;
   payment_date: string;
@@ -97,7 +106,7 @@ type NewPaymentForm = {
   notes: string;
 };
 
-function defaultPaymentForm(balanceDue: string): NewPaymentForm {
+function defaultNewPaymentForm(balanceDue: string): PaymentFormState {
   const balance = Number(balanceDue);
   return {
     amount: balance > 0 ? balanceDue : "",
@@ -108,14 +117,28 @@ function defaultPaymentForm(balanceDue: string): NewPaymentForm {
   };
 }
 
+function paymentToForm(a: InvoiceAllocationRecord): PaymentFormState {
+  return {
+    amount: a.applied_amount,
+    method: a.payment_method,
+    payment_date: a.payment_date,
+    reference_number: a.payment_reference,
+    notes: "",
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
+type SelectedItem =
+  | { type: "invoice"; invoiceId: string }
+  | { type: "payment"; invoiceId: string; paymentId: number };
+
 export function InvoicesTab({
   token,
   baseUrl,
-  isMobile: _isMobile,
+  isMobile,
 }: {
   token: string;
   baseUrl: string;
@@ -124,10 +147,11 @@ export function InvoicesTab({
   const [invoices, setInvoices] = useState<InvoiceListRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [hideVoided, setHideVoided] = useState(true);
+  const [filterUnpaid, setFilterUnpaid] = useState(true);
 
-  // Expand state
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>("");
-  const [paymentForm, setPaymentForm] = useState<NewPaymentForm | null>(null);
+  const [selected, setSelected] = useState<SelectedItem | null>(null);
+  const [form, setForm] = useState<PaymentFormState | null>(null);
   const [saving, setSaving] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [actionTone, setActionTone] = useState<"success" | "error">("success");
@@ -159,55 +183,70 @@ export function InvoicesTab({
 
   const handleSelectInvoice = useCallback(
     (inv: InvoiceListRecord) => {
-      const id = String(inv.id);
-      if (selectedInvoiceId === id) {
-        setSelectedInvoiceId("");
-        setPaymentForm(null);
+      const invoiceId = String(inv.id);
+      if (selected?.type === "invoice" && selected.invoiceId === invoiceId) {
+        setSelected(null);
+        setForm(null);
         setActionMessage("");
       } else {
-        setSelectedInvoiceId(id);
-        setPaymentForm(defaultPaymentForm(inv.balance_due));
+        setSelected({ type: "invoice", invoiceId });
+        setForm(defaultNewPaymentForm(inv.balance_due));
         setActionMessage("");
       }
     },
-    [selectedInvoiceId],
+    [selected],
   );
 
-  const selectedInvoice = useMemo(
-    () => invoices.find((inv) => String(inv.id) === selectedInvoiceId) ?? null,
-    [invoices, selectedInvoiceId],
+  const handleSelectPayment = useCallback(
+    (invoiceId: string, a: InvoiceAllocationRecord) => {
+      if (selected?.type === "payment" && (selected as { paymentId: number }).paymentId === a.id) {
+        setSelected(null);
+        setForm(null);
+        setActionMessage("");
+      } else {
+        setSelected({ type: "payment", invoiceId, paymentId: a.id });
+        setForm(paymentToForm(a));
+        setActionMessage("");
+      }
+    },
+    [selected],
   );
 
   // -------------------------------------------------------------------------
-  // Record payment
+  // Form field updates
   // -------------------------------------------------------------------------
 
   const updateField = useCallback(
-    (field: keyof NewPaymentForm, value: string) => {
-      setPaymentForm((prev) => (prev ? { ...prev, [field]: value } : prev));
+    (field: keyof PaymentFormState, value: string) => {
+      setForm((prev) => (prev ? { ...prev, [field]: value } : prev));
       setActionMessage("");
     },
     [],
   );
 
-  const handleRecordPayment = useCallback(async () => {
-    if (!paymentForm || !selectedInvoice) return;
+  // -------------------------------------------------------------------------
+  // Create new payment
+  // -------------------------------------------------------------------------
 
-    const amount = Number(paymentForm.amount);
+  const handleRecordPayment = useCallback(async () => {
+    if (!form || selected?.type !== "invoice") return;
+    const inv = invoices.find((i) => String(i.id) === selected.invoiceId);
+    if (!inv) return;
+
+    const amount = Number(form.amount);
     if (!amount || amount <= 0) {
       setActionMessage("Enter a payment amount.");
       setActionTone("error");
       return;
     }
-    if (!paymentForm.payment_date) {
+    if (!form.payment_date) {
       setActionMessage("Payment date is required.");
       setActionTone("error");
       return;
     }
-
-    const balanceDue = Number(selectedInvoice.balance_due);
+    const balanceDue = Number(inv.balance_due);
     if (amount > balanceDue) {
-      setActionMessage(`Amount exceeds balance due (${formatMoney(selectedInvoice.balance_due)}).`);
+      setActionMessage(`Amount exceeds balance due (${formatMoney(inv.balance_due)}).`);
       setActionTone("error");
       return;
     }
@@ -216,163 +255,189 @@ export function InvoicesTab({
     setActionMessage("");
 
     try {
-      // Step 1: Create the inbound payment
-      const createRes = await fetch(`${apiBase}/payments/`, {
+      const res = await fetch(`${apiBase}/payments/`, {
         method: "POST",
         headers: { ...buildAuthHeaders(token), "Content-Type": "application/json" },
         body: JSON.stringify({
           direction: "inbound",
-          method: paymentForm.method,
+          method: form.method,
           status: "settled",
-          amount: paymentForm.amount,
-          payment_date: paymentForm.payment_date,
-          reference_number: paymentForm.reference_number,
-          notes: paymentForm.notes,
-          project: selectedInvoice.project,
+          amount: form.amount,
+          payment_date: form.payment_date,
+          reference_number: form.reference_number,
+          notes: form.notes,
+          project: inv.project,
+          target_type: "invoice",
+          target_id: inv.id,
         }),
       });
-      const createJson = await createRes.json();
+      const json = await res.json();
 
-      if (!createRes.ok) {
-        setActionMessage(createJson.error?.message ?? "Failed to create payment.");
+      if (!res.ok) {
+        setActionMessage(json.error?.message ?? "Failed to create payment.");
         setActionTone("error");
         return;
       }
 
-      const paymentId = createJson.data?.id;
-
-      // Step 2: Allocate to this invoice
-      const allocateRes = await fetch(`${apiBase}/payments/${paymentId}/allocate/`, {
-        method: "POST",
-        headers: { ...buildAuthHeaders(token), "Content-Type": "application/json" },
-        body: JSON.stringify({
-          allocations: [
-            {
-              target_type: "invoice",
-              target_id: selectedInvoice.id,
-              applied_amount: paymentForm.amount,
-            },
-          ],
-        }),
-      });
-      const allocateJson = await allocateRes.json();
-
-      if (!allocateRes.ok) {
-        setActionMessage(allocateJson.error?.message ?? "Payment created but allocation failed.");
-        setActionTone("error");
-        void load();
-        return;
-      }
-
-      // Success — reload invoices to get updated balances and allocations
-      setActionMessage("Payment recorded and applied.");
+      setActionMessage("Payment recorded.");
       setActionTone("success");
       await load();
-
-      // Re-select the invoice and reset the form with updated balance
-      const refreshedInvoice = invoices.find((inv) => inv.id === selectedInvoice.id);
-      if (refreshedInvoice) {
-        setPaymentForm(defaultPaymentForm(refreshedInvoice.balance_due));
-      }
+      setSelected(null);
+      setForm(null);
     } catch {
       setActionMessage("Network error — could not record payment.");
       setActionTone("error");
     } finally {
       setSaving(false);
     }
-  }, [paymentForm, selectedInvoice, apiBase, token, load, invoices]);
+  }, [form, selected, invoices, apiBase, token, load]);
 
   // -------------------------------------------------------------------------
-  // Filtering
+  // Edit existing payment
+  // -------------------------------------------------------------------------
+
+  const handleUpdatePayment = useCallback(async () => {
+    if (!form || selected?.type !== "payment") return;
+    if (!form.payment_date) {
+      setActionMessage("Payment date is required.");
+      setActionTone("error");
+      return;
+    }
+
+    setSaving(true);
+    setActionMessage("");
+
+    try {
+      const res = await fetch(`${apiBase}/payments/${selected.paymentId}/`, {
+        method: "PATCH",
+        headers: { ...buildAuthHeaders(token), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          payment_date: form.payment_date,
+          reference_number: form.reference_number,
+          notes: form.notes,
+        }),
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        setActionMessage(json.error?.message ?? "Failed to update payment.");
+        setActionTone("error");
+        return;
+      }
+
+      setActionMessage("Payment updated.");
+      setActionTone("success");
+      await load();
+      setSelected(null);
+      setForm(null);
+    } catch {
+      setActionMessage("Network error — could not update payment.");
+      setActionTone("error");
+    } finally {
+      setSaving(false);
+    }
+  }, [form, selected, apiBase, token, load]);
+
+  // -------------------------------------------------------------------------
+  // Void payment
+  // -------------------------------------------------------------------------
+
+  const handleVoidPayment = useCallback(async () => {
+    if (selected?.type !== "payment") return;
+    setSaving(true);
+    setActionMessage("");
+
+    try {
+      const res = await fetch(`${apiBase}/payments/${selected.paymentId}/`, {
+        method: "PATCH",
+        headers: { ...buildAuthHeaders(token), "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "void" }),
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        setActionMessage(json.error?.message ?? "Failed to void payment.");
+        setActionTone("error");
+        return;
+      }
+
+      setActionMessage("Payment voided.");
+      setActionTone("success");
+      await load();
+      setSelected(null);
+      setForm(null);
+    } catch {
+      setActionMessage("Network error — could not void payment.");
+      setActionTone("error");
+    } finally {
+      setSaving(false);
+    }
+  }, [selected, apiBase, token, load]);
+
+  // -------------------------------------------------------------------------
+  // Filtering + summary
   // -------------------------------------------------------------------------
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return invoices;
+    let result = invoices;
+    if (hideVoided) {
+      result = result.filter((inv) => inv.status !== "void");
+    }
+    if (filterUnpaid) {
+      result = result.filter((inv) => inv.status !== "paid");
+    }
     const q = search.trim().toLowerCase();
-    return invoices.filter(
-      (inv) =>
-        inv.customer_display_name.toLowerCase().includes(q) ||
-        inv.invoice_number.toLowerCase().includes(q) ||
-        inv.project_name.toLowerCase().includes(q) ||
-        inv.total.includes(q),
-    );
-  }, [invoices, search]);
+    if (q) {
+      result = result.filter(
+        (inv) =>
+          inv.customer_display_name.toLowerCase().includes(q) ||
+          inv.invoice_number.toLowerCase().includes(q) ||
+          inv.project_name.toLowerCase().includes(q) ||
+          inv.total.includes(q),
+      );
+    }
+    return result;
+  }, [invoices, search, hideVoided, filterUnpaid]);
+
+  const summary = useMemo(() => {
+    const visible = hideVoided ? invoices.filter((inv) => inv.status !== "void") : invoices;
+    const unpaid = visible.filter((inv) => inv.status !== "paid");
+    const totalOutstanding = unpaid.reduce((sum, inv) => sum + Number(inv.balance_due), 0);
+    return { unpaidCount: unpaid.length, totalOutstanding };
+  }, [invoices, hideVoided]);
 
   const { page, paginatedItems, totalPages, totalCount, setPage } = useClientPagination(filtered, 25);
 
   // -------------------------------------------------------------------------
-  // Render helpers
+  // Shared form render
   // -------------------------------------------------------------------------
 
-  function renderAllocations(allocations: InvoiceAllocationRecord[]) {
-    if (allocations.length === 0) {
-      return <p className={styles.allocationMeta}>No payments recorded yet.</p>;
-    }
-    return (
-      <div className={styles.allocationList}>
-        {allocations.map((a) => (
-          <div key={a.id} className={styles.allocationRow}>
-            <div>
-              <span className={styles.allocationTarget}>
-                {METHOD_LABELS[a.payment_method] ?? a.payment_method}
-              </span>
-              <span className={styles.allocationMeta}>
-                {" "}{formatDateDisplay(a.payment_date)}
-                {a.payment_reference ? ` · Ref: ${a.payment_reference}` : ""}
-              </span>
-              {" "}
-              {a.payment_status !== "settled" ? <span className={PAYMENT_STATUS_CLASS[a.payment_status] ?? ""}>{a.payment_status}</span> : null}
-            </div>
-            <span className={styles.allocationAmount}>{formatMoney(a.applied_amount)}</span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  function renderExpanded(inv: InvoiceListRecord) {
-    if (!paymentForm) return null;
+  function renderForm(mode: "create" | "edit", inv: InvoiceListRecord) {
+    if (!form) return null;
+    const isCreate = mode === "create";
     const balanceDue = Number(inv.balance_due);
-    const canRecordPayment = balanceDue > 0 && inv.status !== "void";
+    const canCreate = balanceDue > 0 && inv.status !== "void";
+
+    if (isCreate && !canCreate) return null;
 
     return (
       <div className={styles.paymentExpandedSections} onClick={(e) => e.stopPropagation()}>
-        {/* Existing payments */}
         <div className={styles.paymentSection}>
           <h4 className={styles.paymentSectionHeading}>
-            Payments ({inv.allocations.length})
+            {isCreate ? "Record Payment" : "Edit Payment"}
           </h4>
           <div className={styles.paymentSectionContent}>
-            {renderAllocations(inv.allocations)}
-          </div>
-        </div>
-
-        {/* Record new payment */}
-        {canRecordPayment ? (
-          <div className={styles.paymentSection}>
-            <h4 className={styles.paymentSectionHeading}>Record Payment</h4>
-            <div className={styles.paymentSectionContent}>
+            {isCreate ? (
               <div className={styles.paymentFieldGrid}>
                 <label className={styles.paymentField}>
                   Amount
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    max={inv.balance_due}
-                    value={paymentForm.amount}
-                    onChange={(e) => updateField("amount", e.target.value)}
-                    disabled={saving}
-                    placeholder={`Up to ${formatMoney(inv.balance_due)}`}
-                  />
+                  <input type="number" step="0.01" min="0.01" value={form.amount}
+                    onChange={(e) => updateField("amount", e.target.value)} disabled={saving}
+                    placeholder={`Up to ${formatMoney(inv.balance_due)}`} />
                 </label>
                 <label className={styles.paymentField}>
                   Method
-                  <select
-                    value={paymentForm.method}
-                    onChange={(e) => updateField("method", e.target.value)}
-                    disabled={saving}
-                  >
+                  <select value={form.method} onChange={(e) => updateField("method", e.target.value)} disabled={saving}>
                     {METHOD_OPTIONS.map(([value, label]) => (
                       <option key={value} value={value}>{label}</option>
                     ))}
@@ -380,57 +445,200 @@ export function InvoicesTab({
                 </label>
                 <label className={styles.paymentField}>
                   Payment Date
-                  <input
-                    type="date"
-                    value={paymentForm.payment_date}
-                    onChange={(e) => updateField("payment_date", e.target.value)}
-                    disabled={saving}
-                  />
+                  <input type="date" value={form.payment_date}
+                    onChange={(e) => updateField("payment_date", e.target.value)} disabled={saving} />
                 </label>
                 <label className={styles.paymentField}>
                   Reference #
-                  <input
-                    type="text"
-                    value={paymentForm.reference_number}
-                    onChange={(e) => updateField("reference_number", e.target.value)}
-                    disabled={saving}
-                    placeholder="Check #, transaction ID, etc."
-                  />
+                  <input type="text" value={form.reference_number}
+                    onChange={(e) => updateField("reference_number", e.target.value)} disabled={saving}
+                    placeholder="Check #, transaction ID, etc." />
                 </label>
               </div>
-              <label className={styles.paymentFieldFull}>
-                Notes
-                <textarea
-                  value={paymentForm.notes}
-                  onChange={(e) => updateField("notes", e.target.value)}
-                  disabled={saving}
-                  placeholder="Optional notes about this payment."
-                  rows={2}
-                />
-              </label>
-
-              {actionMessage ? (
-                <p
-                  className={actionTone === "error" ? styles.paymentActionError : styles.paymentActionSuccess}
-                  role="status"
-                >
-                  {actionMessage}
-                </p>
-              ) : null}
-
-              <div className={styles.paymentActionRow}>
-                <button
-                  type="button"
-                  className={styles.paymentActionButtonPrimary}
-                  onClick={handleRecordPayment}
-                  disabled={saving}
-                >
-                  {saving ? "Recording..." : "Record Payment"}
-                </button>
+            ) : (
+              <div className={styles.paymentFieldGrid}>
+                <div className={styles.paymentFieldReadOnly}>
+                  <span>Amount</span>
+                  <span className={styles.paymentFieldValue}>{formatMoney(form.amount)}</span>
+                </div>
+                <div className={styles.paymentFieldReadOnly}>
+                  <span>Method</span>
+                  <span className={styles.paymentFieldValue}>{METHOD_LABELS[form.method] ?? form.method}</span>
+                </div>
+                <label className={styles.paymentField}>
+                  Payment Date
+                  <input type="date" value={form.payment_date}
+                    onChange={(e) => updateField("payment_date", e.target.value)} disabled={saving} />
+                </label>
+                <label className={styles.paymentField}>
+                  Reference #
+                  <input type="text" value={form.reference_number}
+                    onChange={(e) => updateField("reference_number", e.target.value)} disabled={saving}
+                    placeholder="Check #, transaction ID, etc." />
+                </label>
               </div>
+            )}
+            <label className={styles.paymentFieldFull}>
+              Notes
+              <textarea value={form.notes} onChange={(e) => updateField("notes", e.target.value)}
+                disabled={saving} placeholder="Optional notes about this payment." rows={2} />
+            </label>
+
+            {actionMessage ? (
+              <p className={actionTone === "error" ? styles.paymentActionError : styles.paymentActionSuccess} role="status">
+                {actionMessage}
+              </p>
+            ) : null}
+
+            <div className={styles.paymentActionRow}>
+              <button type="button" className={styles.paymentActionButtonPrimary}
+                onClick={isCreate ? handleRecordPayment : handleUpdatePayment} disabled={saving}>
+                {saving ? "Saving..." : isCreate ? "Record Payment" : "Save Changes"}
+              </button>
+              {!isCreate ? (
+                <button type="button" className={styles.paymentActionButtonDanger}
+                  onClick={handleVoidPayment} disabled={saving}>
+                  Void Payment
+                </button>
+              ) : null}
             </div>
           </div>
-        ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Payment card render
+  // -------------------------------------------------------------------------
+
+  function renderPaymentCard(a: InvoiceAllocationRecord, invoiceId: string, isNested: boolean) {
+    const isSelected = selected?.type === "payment" && (selected as { paymentId: number }).paymentId === a.id;
+    const inv = invoices.find((i) => String(i.id) === invoiceId);
+    const missingRef = !a.payment_reference && METHODS_EXPECTING_REFERENCE.has(a.payment_method);
+
+    return (
+      <article
+        key={`pay-${a.id}`}
+        className={`${isNested ? styles.paymentChildCard : styles.mobilePaymentCard} ${isSelected ? styles.paymentChildCardSelected : ""}`}
+        onClick={(e) => { e.stopPropagation(); handleSelectPayment(invoiceId, a); }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") { event.preventDefault(); handleSelectPayment(invoiceId, a); }
+        }}
+        role="button" tabIndex={0} aria-pressed={isSelected}
+      >
+        <div className={styles.paymentChildTop}>
+          <div className={styles.paymentChildIdentity}>
+            <span className={styles.paymentChildMethod}>{METHOD_LABELS[a.payment_method] ?? a.payment_method}</span>
+            <span className={styles.paymentChildMeta}>
+              {formatDateDisplay(a.payment_date)}
+              {a.payment_reference ? ` · Ref: ${a.payment_reference}` : ""}
+            </span>
+          </div>
+          <div className={styles.paymentChildRight}>
+            <span className={styles.paymentChildAmount}>{formatMoney(a.applied_amount)}</span>
+            {a.payment_status !== "settled" ? (
+              <span className={PAYMENT_STATUS_CLASS[a.payment_status] ?? ""}>{a.payment_status}</span>
+            ) : null}
+            {missingRef ? (
+              <span className={styles.missingReference} title="No reference # recorded">No ref #</span>
+            ) : null}
+          </div>
+        </div>
+        {isSelected && inv ? renderForm("edit", inv) : null}
+      </article>
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Desktop row render
+  // -------------------------------------------------------------------------
+
+  function renderDesktopGroup(inv: InvoiceListRecord) {
+    const invoiceId = String(inv.id);
+    const isInvSelected = selected?.type === "invoice" && selected.invoiceId === invoiceId;
+
+    return (
+      <div key={inv.id}>
+        <article
+          className={`${styles.paymentRow} ${isInvSelected ? styles.paymentRowSelected : ""}`}
+          onClick={() => handleSelectInvoice(inv)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") { event.preventDefault(); handleSelectInvoice(inv); }
+          }}
+          role="button" tabIndex={0} aria-pressed={isInvSelected}
+        >
+          <div className={styles.documentIdentity}>
+            <div className={styles.documentPrimary}>
+              <span className={INVOICE_STATUS_CLASS[inv.status] ?? ""}>{inv.status}</span>
+              <span>{inv.customer_display_name}</span>
+              <span style={{ color: "var(--text-secondary)", fontWeight: 400 }}>#{inv.invoice_number}</span>
+            </div>
+            <div className={styles.documentSecondary}>
+              <span>{inv.project_name}</span>
+              {inv.due_date ? <span>Due {formatDateDisplay(inv.due_date)}</span> : null}
+              {hasMissingReference(inv.allocations) ? (
+                <span className={styles.missingReference} title="Payment missing reference #">No ref #</span>
+              ) : null}
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div className={styles.documentAmount}>{formatMoney(inv.total)}</div>
+            {Number(inv.balance_due) > 0 && Number(inv.balance_due) < Number(inv.total) ? (
+              <div className={styles.documentBalance}>{formatMoney(inv.balance_due)} due</div>
+            ) : Number(inv.balance_due) <= 0 && Number(inv.total) > 0 ? (
+              <div className={styles.documentBalance}>Paid</div>
+            ) : null}
+          </div>
+          {isInvSelected ? renderForm("create", inv) : null}
+        </article>
+        {inv.allocations.length > 0 ? inv.allocations.map((a) => renderPaymentCard(a, invoiceId, true)) : null}
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Mobile card render
+  // -------------------------------------------------------------------------
+
+  function renderMobileGroup(inv: InvoiceListRecord) {
+    const invoiceId = String(inv.id);
+    const isInvSelected = selected?.type === "invoice" && selected.invoiceId === invoiceId;
+    const isPaid = Number(inv.balance_due) <= 0 && Number(inv.total) > 0;
+    const isPartial = Number(inv.balance_due) > 0 && Number(inv.balance_due) < Number(inv.total);
+
+    return (
+      <div key={inv.id} className={styles.mobileBillGroup}>
+        <article
+          className={`${styles.mobileCard} ${isInvSelected ? styles.mobileCardSelected : ""}`}
+          onClick={() => handleSelectInvoice(inv)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") { event.preventDefault(); handleSelectInvoice(inv); }
+          }}
+          role="button" tabIndex={0} aria-pressed={isInvSelected}
+        >
+          <div className={styles.mobileCardTop}>
+            <div className={styles.mobileCardIdentity}>
+              <span className={styles.mobileCardVendor}>{inv.customer_display_name}</span>
+              <span className={styles.mobileCardProject}>{inv.project_name}</span>
+            </div>
+            <div className={styles.mobileCardAmountBlock}>
+              <span className={styles.mobileCardAmount}>{formatMoney(inv.total)}</span>
+              {isPartial ? (
+                <span className={styles.mobileCardBalanceDue}>{formatMoney(inv.balance_due)} due</span>
+              ) : isPaid ? (
+                <span className={styles.mobileCardBalancePaid}>Paid</span>
+              ) : null}
+            </div>
+          </div>
+          <div className={styles.mobileCardMeta}>
+            <span className={INVOICE_STATUS_CLASS[inv.status] ?? ""}>{inv.status}</span>
+            <span>#{inv.invoice_number}</span>
+            {inv.due_date ? <span>Due {formatDateDisplay(inv.due_date)}</span> : null}
+          </div>
+          {isInvSelected ? renderForm("create", inv) : null}
+        </article>
+        {inv.allocations.length > 0 ? inv.allocations.map((a) => renderPaymentCard(a, invoiceId, false)) : null}
       </div>
     );
   }
@@ -445,65 +653,58 @@ export function InvoicesTab({
 
   return (
     <div>
+      {isMobile ? (
+        <div className={styles.summaryBanner}>
+          <div className={styles.summaryBannerFilters}>
+            <button type="button"
+              className={`${styles.summaryBannerButton} ${filterUnpaid ? styles.summaryBannerButtonActive : ""}`}
+              onClick={() => { setFilterUnpaid((v) => !v); setPage(1); }}>
+              {summary.unpaidCount} unpaid
+            </button>
+            <button type="button"
+              className={`${styles.summaryBannerButton} ${hideVoided ? styles.summaryBannerButtonActive : ""}`}
+              onClick={() => { setHideVoided((v) => !v); setPage(1); }}>
+              Hide voided
+            </button>
+          </div>
+          <span className={styles.summaryBannerAmount}>
+            {formatMoney(String(summary.totalOutstanding))} outstanding
+          </span>
+        </div>
+      ) : null}
+
       <div className={styles.filterBar}>
-        <input
-          type="text"
-          className={styles.searchInput}
-          placeholder="Search invoices..."
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-        />
+        <input type="text" className={styles.searchInput} placeholder="Search invoices..."
+          value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+        {!isMobile ? (
+          <>
+            <button type="button"
+              className={`${styles.filterPill} ${filterUnpaid ? styles.filterPillActive : ""}`}
+              onClick={() => { setFilterUnpaid((v) => !v); setPage(1); }}>
+              Unpaid only
+            </button>
+            <button type="button"
+              className={`${styles.filterPill} ${hideVoided ? styles.filterPillActive : ""}`}
+              onClick={() => { setHideVoided((v) => !v); setPage(1); }}>
+              Hide voided
+            </button>
+          </>
+        ) : null}
       </div>
 
       {filtered.length === 0 ? (
         <p className={styles.emptyState}>No invoices found.</p>
       ) : (
         <>
-          <div className={styles.documentList}>
-            {paginatedItems.map((inv) => {
-              const isSelected = String(inv.id) === selectedInvoiceId;
-              return (
-                <article
-                  key={inv.id}
-                  className={`${styles.paymentRow} ${isSelected ? styles.paymentRowSelected : ""}`}
-                  onClick={() => handleSelectInvoice(inv)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      handleSelectInvoice(inv);
-                    }
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  aria-pressed={isSelected}
-                >
-                  <div className={styles.documentIdentity}>
-                    <div className={styles.documentPrimary}>
-                      <span className={INVOICE_STATUS_CLASS[inv.status] ?? ""}>{inv.status}</span>
-                      <span>{inv.customer_display_name}</span>
-                      <span style={{ color: "var(--text-secondary)", fontWeight: 400 }}>#{inv.invoice_number}</span>
-                    </div>
-                    <div className={styles.documentSecondary}>
-                      <span>{inv.project_name}</span>
-                      {inv.due_date ? <span>Due {formatDateDisplay(inv.due_date)}</span> : null}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div className={styles.documentAmount}>{formatMoney(inv.total)}</div>
-                    {Number(inv.balance_due) > 0 && Number(inv.balance_due) < Number(inv.total) ? (
-                      <div className={styles.documentBalance}>
-                        {formatMoney(inv.balance_due)} due
-                      </div>
-                    ) : Number(inv.balance_due) <= 0 && Number(inv.total) > 0 ? (
-                      <div className={styles.documentBalance}>Paid</div>
-                    ) : null}
-                  </div>
-
-                  {isSelected && selectedInvoice ? renderExpanded(selectedInvoice) : null}
-                </article>
-              );
-            })}
-          </div>
+          {isMobile ? (
+            <div className={styles.mobileCardList}>
+              {paginatedItems.map((inv) => renderMobileGroup(inv))}
+            </div>
+          ) : (
+            <div className={styles.documentList}>
+              {paginatedItems.map((inv) => renderDesktopGroup(inv))}
+            </div>
+          )}
           {totalPages > 1 ? (
             <PaginationControls page={page} totalPages={totalPages} totalCount={totalCount} onPageChange={setPage} />
           ) : null}
