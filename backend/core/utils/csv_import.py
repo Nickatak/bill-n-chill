@@ -8,6 +8,8 @@ is injected via callbacks.
 import csv
 from io import StringIO
 
+from django.db import transaction
+
 
 def process_csv_import(
     *,
@@ -96,55 +98,66 @@ def process_csv_import(
     updated_count = 0
     error_count = 0
 
-    for index, raw_row in enumerate(reader, start=2):
-        # Strip all values up front.
-        row = {k: (v or "").strip() for k, v in raw_row.items()}
+    def _process_rows():
+        nonlocal created_count, updated_count, error_count
 
-        # --- validation callback ---
-        if validate_row_fn:
-            err_msg = validate_row_fn(row)
-            if err_msg:
-                error_count += 1
-                rows_out.append(
-                    _default_row(index, row, "error", err_msg, serialize_row_fn)
-                )
+        for index, raw_row in enumerate(reader, start=2):
+            # Strip all values up front.
+            row = {k: (v or "").strip() for k, v in raw_row.items()}
+
+            # --- validation callback ---
+            if validate_row_fn:
+                err_msg = validate_row_fn(row)
+                if err_msg:
+                    error_count += 1
+                    rows_out.append(
+                        _default_row(index, row, "error", err_msg, serialize_row_fn)
+                    )
+                    continue
+
+            # --- lookup ---
+            existing = lookup_existing_fn(row)
+
+            if existing:
+                if dry_run:
+                    action = "would_update"
+                    msg = f"Would update {entity_name} #{existing.id}."
+                    rows_out.append(
+                        _default_row(index, row, action, msg, serialize_row_fn, existing)
+                    )
+                else:
+                    instance = update_fn(existing, row)
+                    updated_count += 1
+                    action = "updated"
+                    msg = f"Updated {entity_name} #{existing.id}."
+                    rows_out.append(
+                        _default_row(index, row, action, msg, serialize_row_fn, instance)
+                    )
                 continue
 
-        # --- lookup ---
-        existing = lookup_existing_fn(row)
-
-        if existing:
+            # --- create ---
             if dry_run:
-                action = "would_update"
-                msg = f"Would update {entity_name} #{existing.id}."
+                action = "would_create"
+                msg = f"Would create new {entity_name}."
                 rows_out.append(
-                    _default_row(index, row, action, msg, serialize_row_fn, existing)
+                    _default_row(index, row, action, msg, serialize_row_fn)
                 )
             else:
-                instance = update_fn(existing, row)
-                updated_count += 1
-                action = "updated"
-                msg = f"Updated {entity_name} #{existing.id}."
+                instance = create_fn(row)
+                created_count += 1
+                action = "created"
+                msg = f"Created {entity_name}."
                 rows_out.append(
                     _default_row(index, row, action, msg, serialize_row_fn, instance)
                 )
-            continue
 
-        # --- create ---
-        if dry_run:
-            action = "would_create"
-            msg = f"Would create new {entity_name}."
-            rows_out.append(
-                _default_row(index, row, action, msg, serialize_row_fn)
-            )
-        else:
-            instance = create_fn(row)
-            created_count += 1
-            action = "created"
-            msg = f"Created {entity_name}."
-            rows_out.append(
-                _default_row(index, row, action, msg, serialize_row_fn, instance)
-            )
+    # Wrap mutations in a transaction so partial writes don't persist on failure.
+    # Dry-run mode does no writes, so no transaction needed.
+    if dry_run:
+        _process_rows()
+    else:
+        with transaction.atomic():
+            _process_rows()
 
     summary = {
         "entity": entity_name.replace(" ", "_") + "s",

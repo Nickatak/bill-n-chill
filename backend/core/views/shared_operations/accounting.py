@@ -9,65 +9,47 @@ from rest_framework.response import Response
 from core.models import AccountingSyncEvent, AccountingSyncRecord
 from core.serializers import AccountingSyncEventSerializer, AccountingSyncEventWriteSerializer
 from core.views.helpers import _capability_gate, _ensure_org_membership, _validate_project_for_user
-
-
-def _build_accounting_sync_snapshot(sync_event: AccountingSyncEvent) -> dict:
-    """Serialize an accounting sync event into an immutable snapshot dict for audit records."""
-    return {
-        "accounting_sync_event": {
-            "id": sync_event.id,
-            "project_id": sync_event.project_id,
-            "provider": sync_event.provider,
-            "object_type": sync_event.object_type,
-            "object_id": sync_event.object_id,
-            "direction": sync_event.direction,
-            "status": sync_event.status,
-            "external_id": sync_event.external_id,
-            "error_message": sync_event.error_message,
-            "retry_count": sync_event.retry_count,
-            "last_attempt_at": (
-                sync_event.last_attempt_at.isoformat() if sync_event.last_attempt_at else None
-            ),
-        }
-    }
-
-
-def _record_accounting_sync_record(
-    *,
-    sync_event: AccountingSyncEvent,
-    event_type: str,
-    capture_source: str,
-    recorded_by,
-    from_status: str | None = None,
-    to_status: str | None = None,
-    source_reference: str = "",
-    note: str = "",
-    metadata: dict | None = None,
-):
-    """Create an immutable AccountingSyncRecord with a point-in-time snapshot."""
-    AccountingSyncRecord.objects.create(
-        accounting_sync_event=sync_event,
-        event_type=event_type,
-        capture_source=capture_source,
-        source_reference=source_reference,
-        from_status=from_status,
-        to_status=to_status,
-        note=note,
-        snapshot_json=_build_accounting_sync_snapshot(sync_event),
-        metadata_json=metadata or {},
-        recorded_by=recorded_by,
-    )
+from core.views.shared_operations.accounting_helpers import _record_accounting_sync_record
 
 
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
-def project_accounting_sync_events_view(request, project_id: int):
-    """List project accounting sync events or enqueue a new sync event record.
+def project_accounting_sync_events_view(request, project_id):
+    """List project accounting sync events or enqueue a new sync event.
 
-    Contract:
-    - `GET`: project/user-scoped sync event history.
-    - `POST`: requires `accounting_sync.create` capability and core sync identity fields.
-    - Create writes are atomic: sync row plus immutable `AccountingSyncRecord(created)`.
+    GET returns the full sync event history for a project, ordered most
+    recent first.  POST creates a new sync event with an immutable audit
+    record.  Events created with a terminal status (success/failed) get
+    ``last_attempt_at`` set automatically.
+
+    Flow (GET):
+        1. Validate project belongs to user's org.
+        2. Return serialized sync events.
+
+    Flow (POST):
+        1. Validate project belongs to user's org.
+        2. Capability gate: ``accounting_sync.create``.
+        3. Validate required fields (provider, object_type, direction).
+        4. Create sync event + audit record (atomic).
+
+    URL: ``GET/POST /api/v1/projects/<project_id>/accounting-sync-events/``
+
+    Request body (POST)::
+
+        { "provider": "quickbooks", "object_type": "invoice", "direction": "outbound", ... }
+
+    Success 200 (GET)::
+
+        { "data": [{ ... }, ...] }
+
+    Success 201 (POST)::
+
+        { "data": { ... } }
+
+    Errors:
+        - 400: Missing required fields.
+        - 403: Missing ``accounting_sync.create`` capability.
+        - 404: Project not found.
     """
     project = _validate_project_for_user(project_id, request.user)
     if not project:
@@ -82,76 +64,97 @@ def project_accounting_sync_events_view(request, project_id: int):
         ).order_by("-created_at", "-id")
         return Response({"data": AccountingSyncEventSerializer(rows, many=True).data})
 
-    permission_error, _ = _capability_gate(request.user, "accounting_sync", "create")
-    if permission_error:
-        return Response(permission_error, status=403)
+    elif request.method == "POST":
+        permission_error, _ = _capability_gate(request.user, "accounting_sync", "create")
+        if permission_error:
+            return Response(permission_error, status=403)
 
-    serializer = AccountingSyncEventWriteSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    data = serializer.validated_data
+        serializer = AccountingSyncEventWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
 
-    fields = {}
-    if "provider" not in data:
-        fields["provider"] = ["This field is required."]
-    if "object_type" not in data:
-        fields["object_type"] = ["This field is required."]
-    if "direction" not in data:
-        fields["direction"] = ["This field is required."]
-    if fields:
-        return Response(
-            {
-                "error": {
-                    "code": "validation_error",
-                    "message": "Missing required fields for accounting sync event creation.",
-                    "fields": fields,
-                }
-            },
-            status=400,
-        )
+        fields = {}
+        if "provider" not in data:
+            fields["provider"] = ["This field is required."]
+        if "object_type" not in data:
+            fields["object_type"] = ["This field is required."]
+        if "direction" not in data:
+            fields["direction"] = ["This field is required."]
+        if fields:
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": "Missing required fields for accounting sync event creation.",
+                        "fields": fields,
+                    }
+                },
+                status=400,
+            )
 
-    with transaction.atomic():
-        sync_event = AccountingSyncEvent.objects.create(
-            project=project,
-            provider=data["provider"],
-            object_type=data["object_type"],
-            object_id=data.get("object_id"),
-            direction=data["direction"],
-            status=data.get("status", AccountingSyncEvent.Status.QUEUED),
-            external_id=data.get("external_id", ""),
-            error_message=data.get("error_message", ""),
-            created_by=request.user,
-        )
-        if sync_event.status in {AccountingSyncEvent.Status.SUCCESS, AccountingSyncEvent.Status.FAILED}:
-            sync_event.last_attempt_at = timezone.now()
-            sync_event.save(update_fields=["last_attempt_at", "updated_at"])
-        _record_accounting_sync_record(
-            sync_event=sync_event,
-            event_type=AccountingSyncRecord.EventType.CREATED,
-            capture_source=AccountingSyncRecord.CaptureSource.MANUAL_UI,
-            recorded_by=request.user,
-            from_status=None,
-            to_status=sync_event.status,
-            note="Accounting sync event created.",
-            metadata={
-                "provider": sync_event.provider,
-                "object_type": sync_event.object_type,
-                "object_id": sync_event.object_id,
-                "direction": sync_event.direction,
-            },
-        )
+        with transaction.atomic():
+            sync_event = AccountingSyncEvent.objects.create(
+                project=project,
+                provider=data["provider"],
+                object_type=data["object_type"],
+                object_id=data.get("object_id"),
+                direction=data["direction"],
+                status=data.get("status", AccountingSyncEvent.Status.QUEUED),
+                external_id=data.get("external_id", ""),
+                error_message=data.get("error_message", ""),
+                created_by=request.user,
+            )
+            if sync_event.status in {AccountingSyncEvent.Status.SUCCESS, AccountingSyncEvent.Status.FAILED}:
+                sync_event.last_attempt_at = timezone.now()
+                sync_event.save(update_fields=["last_attempt_at", "updated_at"])
+            _record_accounting_sync_record(
+                sync_event=sync_event,
+                event_type=AccountingSyncRecord.EventType.CREATED,
+                capture_source=AccountingSyncRecord.CaptureSource.MANUAL_UI,
+                recorded_by=request.user,
+                from_status=None,
+                to_status=sync_event.status,
+                note="Accounting sync event created.",
+                metadata={
+                    "provider": sync_event.provider,
+                    "object_type": sync_event.object_type,
+                    "object_id": sync_event.object_id,
+                    "direction": sync_event.direction,
+                },
+            )
 
-    return Response({"data": AccountingSyncEventSerializer(sync_event).data}, status=201)
+        return Response({"data": AccountingSyncEventSerializer(sync_event).data}, status=201)
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def accounting_sync_event_retry_view(request, sync_event_id: int):
-    """Retry a failed accounting sync event by moving it back to `queued`.
+def accounting_sync_event_retry_view(request, sync_event_id):
+    """Retry a failed accounting sync event by resetting it to ``queued``.
 
-    Contract:
-    - Requires `accounting_sync.retry` capability.
-    - Successful sync rows are not retryable; already queued rows return no-op meta.
-    - Retry writes are atomic: status fields update plus immutable `AccountingSyncRecord(retried)`.
+    Only failed events can be retried.  Successful events are rejected (400),
+    and already-queued events return a no-op with ``retry_status: already_queued``.
+    The retry is atomic: status fields are updated and an immutable audit record
+    is appended.
+
+    Flow:
+        1. Look up sync event scoped to user's org.
+        2. Capability gate: ``accounting_sync.retry``.
+        3. If already queued, return no-op.
+        4. If successful, reject (400).
+        5. Reset status to queued, increment retry count (atomic) + audit record.
+
+    URL: ``POST /api/v1/accounting-sync-events/<sync_event_id>/retry/``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": { ... }, "meta": { "retry_status": "retried" } }
+
+    Errors:
+        - 400: Event is in ``success`` status (not retryable).
+        - 403: Missing ``accounting_sync.retry`` capability.
+        - 404: Sync event not found.
     """
     membership = _ensure_org_membership(request.user)
     try:
