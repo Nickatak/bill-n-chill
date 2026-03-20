@@ -34,6 +34,7 @@ Last reviewed: 2026-03-04
 
 ## Helper Placement
 
+### Model helpers
 - Model-private helpers:
   - Keep in the same model module.
   - Prefix with `_`.
@@ -43,6 +44,11 @@ Last reviewed: 2026-03-04
   - Do not import private model helpers into views/serializers/services.
 - Promotion rule:
   - If a helper is needed outside its model module, promote it out of the model file.
+
+### View helpers
+- **Views own their flow.** Validation, orchestration, transaction blocks, and response assembly live inline in the view function. Views are not empty shells.
+- **No private helpers or constants in view files.** Reusable functions (`_apply_estimate_lines_and_totals`), shared constants (`_VERIFY_ERROR_MAP`), and logic called by multiple views go in a sibling `*_helpers.py` file (e.g., `estimates.py` → `estimates_helpers.py`). Views import and call helpers; helpers never import from views.
+- Cross-domain shared utilities and re-exports live in `views/helpers.py`, which stays slim and acts as a single import point for common operations (RBAC gates, org scoping, pagination, etc.).
 
 ## Commit Style
 

@@ -49,15 +49,6 @@ type SigningCeremonyProps = {
 
 type Phase = "no_email" | "idle" | "otp_requested" | "ceremony_ready";
 
-// ---------------------------------------------------------------------------
-// API path mapping
-// ---------------------------------------------------------------------------
-
-const DOC_TYPE_TO_API_PATH: Record<string, string> = {
-  estimate: "estimates",
-  change_order: "change-orders",
-  invoice: "invoices",
-};
 
 // ---------------------------------------------------------------------------
 // Component
@@ -73,7 +64,6 @@ export function SigningCeremony({
   onDecision,
   disabled = false,
 }: SigningCeremonyProps) {
-  const apiPath = DOC_TYPE_TO_API_PATH[documentType] || "estimates";
 
   // Phase state machine.
   const [phase, setPhase] = useState<Phase>(customerEmailAvailable ? "idle" : "no_email");
@@ -124,7 +114,7 @@ export function SigningCeremony({
     setMessage("");
 
     try {
-      const response = await fetch(`${API_BASE}/public/${apiPath}/${publicToken}/otp/`, {
+      const response = await fetch(`${API_BASE}/public/${documentType}/${publicToken}/otp/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
@@ -163,7 +153,7 @@ export function SigningCeremony({
     setMessage("");
 
     try {
-      const response = await fetch(`${API_BASE}/public/${apiPath}/${publicToken}/otp/verify/`, {
+      const response = await fetch(`${API_BASE}/public/${documentType}/${publicToken}/otp/verify/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code: otpCode.trim() }),

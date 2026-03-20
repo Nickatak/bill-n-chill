@@ -86,12 +86,8 @@ from core.views.accounts_payable.vendor_bills import (
     vendor_bill_snapshots_view,
 )
 from core.views.public_signing import (
-    public_change_order_request_otp_view,
-    public_change_order_verify_otp_view,
-    public_estimate_request_otp_view,
-    public_estimate_verify_otp_view,
-    public_invoice_request_otp_view,
-    public_invoice_verify_otp_view,
+    public_request_otp_view,
+    public_verify_otp_view,
 )
 from core.views.shared_operations.vendors import vendor_detail_view, vendors_import_csv_view, vendors_list_create_view
 
@@ -141,8 +137,8 @@ __all__ = [
     "estimate_contract_view",
     "public_estimate_detail_view",
     "public_estimate_decision_view",
-    "public_estimate_request_otp_view",
-    "public_estimate_verify_otp_view",
+    "public_request_otp_view",
+    "public_verify_otp_view",
     "estimate_detail_view",
     "estimate_clone_version_view",
     "estimate_duplicate_view",
@@ -153,14 +149,10 @@ __all__ = [
     "change_order_clone_revision_view",
     "public_change_order_detail_view",
     "public_change_order_decision_view",
-    "public_change_order_request_otp_view",
-    "public_change_order_verify_otp_view",
     "project_invoices_view",
     "invoice_contract_view",
     "public_invoice_detail_view",
     "public_invoice_decision_view",
-    "public_invoice_request_otp_view",
-    "public_invoice_verify_otp_view",
     "invoice_detail_view",
     "invoice_send_view",
     "invoice_status_events_view",

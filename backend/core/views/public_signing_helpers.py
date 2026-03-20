@@ -1,12 +1,11 @@
-"""Domain-specific helpers for public document signing views.
+"""Shared helpers for public document signing views.
 
-Shared OTP lifecycle, document resolution, and ceremony validation logic
-used by both the OTP endpoints and the per-document-type decision views.
+Contains:
+    - Document type registry and resolution (used by OTP views in ``public_signing``).
+    - OTP verification error mapping (used by ``public_verify_otp_view``).
+    - Ceremony validation and consent context (used by per-document decision views).
 """
 
-from datetime import timedelta
-
-from django.utils import timezone
 from rest_framework.response import Response
 
 from core.models import (
@@ -15,26 +14,14 @@ from core.models import (
     Estimate,
     Invoice,
 )
-from core.utils.email import send_otp_email
 from core.utils.signing import (
     CEREMONY_CONSENT_TEXT,
     CEREMONY_CONSENT_TEXT_VERSION,
-    mask_email,
 )
 
 
 # ---------------------------------------------------------------------------
-# Document type labels (for email body context)
-# ---------------------------------------------------------------------------
-
-_DOCUMENT_TYPE_LABELS = {
-    "estimate": "Estimate",
-    "change_order": "Change Order",
-    "invoice": "Invoice",
-}
-
-# ---------------------------------------------------------------------------
-# Document resolution
+# Document type registry
 # ---------------------------------------------------------------------------
 
 _DOCUMENT_MODELS = {
@@ -43,11 +30,30 @@ _DOCUMENT_MODELS = {
     "invoice": Invoice,
 }
 
+_DOCUMENT_TYPE_LABELS = {
+    "estimate": "Estimate",
+    "change_order": "Change Order",
+    "invoice": "Invoice",
+}
+
+
+# ---------------------------------------------------------------------------
+# Document resolution
+# ---------------------------------------------------------------------------
 
 def _resolve_document_and_email(document_type, public_token):
     """Look up a document by type + public_token and extract the customer email.
 
-    Returns (document, customer_email_or_empty, error_response_or_none).
+    Uses ``_DOCUMENT_MODELS`` to map ``document_type`` to the correct model class,
+    then fetches the document with ``select_related("project__customer")`` to avoid
+    extra queries when reading the customer email.
+
+    Returns:
+        (document, customer_email, None) on success — ``customer_email`` may be
+        empty if the customer record has no email on file.
+
+        (None, "", Response) on failure — the Response is ready to return from the
+        calling view (400 for invalid type, 404 for missing document).
     """
     model = _DOCUMENT_MODELS.get(document_type)
     if not model:
@@ -68,7 +74,13 @@ def _resolve_document_and_email(document_type, public_token):
 
 
 def _resolve_document_title(document_type, document):
-    """Extract a human-readable title from a document for email context."""
+    """Extract a human-readable title from a document for OTP email context.
+
+    Used in the OTP email body so the customer knows which document the code
+    is for.  Falls back to ``Document #<id>`` for unknown types.
+
+    Examples: ``"Kitchen Remodel"``, ``"CO-3-v2"``, ``"INV-001"``.
+    """
     if document_type == "estimate":
         return document.title or f"Estimate #{document.id}"
     elif document_type == "change_order":
@@ -79,68 +91,7 @@ def _resolve_document_title(document_type, document):
 
 
 # ---------------------------------------------------------------------------
-# OTP request handler
-# ---------------------------------------------------------------------------
-
-def _request_otp_handler(request, document_type, public_token):
-    """Handle a request to send an OTP code for public document verification."""
-    document, customer_email, error = _resolve_document_and_email(document_type, public_token)
-    if error:
-        return error
-
-    if not customer_email:
-        return Response(
-            {"error": {
-                "code": "customer_email_required",
-                "message": "A customer email address is required for identity verification. Please ask your contractor to update your contact information.",
-            }},
-            status=422,
-        )
-
-    # Rate limit: most recent session for this public_token created <60s ago.
-    latest = (
-        DocumentAccessSession.objects
-        .filter(public_token=public_token)
-        .order_by("-created_at")
-        .first()
-    )
-    if latest and (timezone.now() - latest.created_at) < timedelta(seconds=60):
-        wait = 60 - int((timezone.now() - latest.created_at).total_seconds())
-        return Response(
-            {"error": {"code": "rate_limited", "message": f"Please wait {wait} seconds before requesting another code."}},
-            status=429,
-        )
-
-    session = DocumentAccessSession(
-        document_type=document_type,
-        document_id=document.id,
-        public_token=public_token,
-        recipient_email=customer_email,
-    )
-    session.save()
-
-    document_title = _resolve_document_title(document_type, document)
-    # TODO: send_otp_email blocks the request — move to async task (Celery/background)
-    # so Mailgun latency/failures don't hang the customer's browser.
-    send_otp_email(
-        recipient_email=customer_email,
-        code=session.code,
-        document_type_label=_DOCUMENT_TYPE_LABELS.get(document_type, "Document"),
-        document_title=document_title,
-    )
-
-    return Response(
-        {"data": {
-            "otp_required": True,
-            "email_hint": mask_email(customer_email),
-            "expires_in": 600,
-        }},
-        status=200,
-    )
-
-
-# ---------------------------------------------------------------------------
-# OTP verification handler
+# OTP verification error mapping
 # ---------------------------------------------------------------------------
 
 _VERIFY_ERROR_MAP = {
@@ -151,44 +102,33 @@ _VERIFY_ERROR_MAP = {
 }
 
 
-def _verify_otp_handler(request, document_type, public_token):
-    """Handle OTP code verification for a public document session."""
-    code = (request.data.get("code") or "").strip()
-    if not code:
-        return Response(
-            {"error": {"code": "validation_error", "message": "code is required."}},
-            status=400,
-        )
-
-    session, error_code = DocumentAccessSession.lookup_for_verification(public_token, code)
-    if error_code:
-        status, code_val, message = _VERIFY_ERROR_MAP[error_code]
-        return Response({"error": {"code": code_val, "message": message}}, status=status)
-
-    # Activate the session.
-    session.verified_at = timezone.now()
-    from core.models.shared_operations.document_access_session import SESSION_EXPIRY_MINUTES
-    session.session_expires_at = timezone.now() + timedelta(minutes=SESSION_EXPIRY_MINUTES)
-    session.save(update_fields=["verified_at", "session_expires_at"])
-
-    return Response(
-        {"data": {
-            "session_token": session.session_token,
-            "expires_in": 3600,
-        }},
-        status=200,
-    )
-
-
 # ---------------------------------------------------------------------------
-# Ceremony validation (called from existing decision views)
+# Ceremony validation (called from per-document decision views)
 # ---------------------------------------------------------------------------
 
 def validate_ceremony_on_decision(request, public_token, customer_email):
-    """Validate OTP session and ceremony data before allowing a public decision.
+    """Gate-check called by each ``public_*_decision_view`` before executing
+    decision logic.
 
-    Returns (session, signer_name, error_response_or_none).
-    Called from each public_*_decision_view before executing decision logic.
+    Validates, in order:
+        1. **Customer email exists** — the project must have a customer with an
+           email on file (422 if missing).
+        2. **Session token present** — the request body must include
+           ``session_token`` (403 if missing).
+        3. **Session valid** — the token must resolve to a verified, non-expired
+           ``DocumentAccessSession`` via ``lookup_valid_session`` (403 if invalid
+           or expired).
+        4. **Signer name** — ``signer_name`` must be a non-empty string (400).
+        5. **Consent accepted** — ``consent_accepted`` must be exactly ``True``
+           (400).  This maps to the customer checking the consent checkbox in
+           the signing ceremony UI.
+
+    Returns:
+        (session, signer_name, None) on success — the caller uses ``session``
+        to link the ``SigningCeremonyRecord`` and ``signer_name`` for the audit
+        trail.
+
+        (None, "", Response) on failure — the Response is ready to return.
     """
     if not customer_email:
         return None, "", Response(
@@ -235,5 +175,11 @@ def validate_ceremony_on_decision(request, public_token, customer_email):
 
 
 def get_ceremony_context():
-    """Return the current consent text and version for use by decision views."""
+    """Return the current consent text and its SHA-256 version hash.
+
+    Called by each decision view to snapshot the consent language into the
+    ``SigningCeremonyRecord``.  If the consent text changes, the version hash
+    changes with it, so historical records reflect exactly what the customer
+    agreed to at signing time.
+    """
     return CEREMONY_CONSENT_TEXT, CEREMONY_CONSENT_TEXT_VERSION

@@ -315,7 +315,7 @@ class OtpViewFlowTests(TestCase):
 
     def test_request_otp_returns_email_hint(self):
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/",
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
@@ -328,7 +328,7 @@ class OtpViewFlowTests(TestCase):
         self.customer.email = ""
         self.customer.save(update_fields=["email"])
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/",
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 422)
@@ -336,11 +336,11 @@ class OtpViewFlowTests(TestCase):
 
     def test_request_otp_rate_limit_within_60s(self):
         self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/",
             content_type="application/json",
         )
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/",
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 429)
@@ -348,14 +348,14 @@ class OtpViewFlowTests(TestCase):
 
     def test_request_otp_invalid_document_returns_404(self):
         response = self.client.post(
-            "/api/v1/public/estimates/nonexistent_token/otp/",
+            "/api/v1/public/estimate/nonexistent_token/otp/",
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 404)
 
     def test_verify_otp_valid_code_returns_session_token(self):
         self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/",
             content_type="application/json",
         )
         session = DocumentAccessSession.objects.filter(
@@ -363,7 +363,7 @@ class OtpViewFlowTests(TestCase):
         ).first()
 
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/verify/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/verify/",
             data={"code": session.code},
             content_type="application/json",
         )
@@ -374,11 +374,11 @@ class OtpViewFlowTests(TestCase):
 
     def test_verify_otp_wrong_code_returns_404(self):
         self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/",
             content_type="application/json",
         )
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/verify/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/verify/",
             data={"code": "000000"},
             content_type="application/json",
         )
@@ -386,7 +386,7 @@ class OtpViewFlowTests(TestCase):
 
     def test_verify_otp_expired_code_returns_410(self):
         self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/",
             content_type="application/json",
         )
         session = DocumentAccessSession.objects.filter(
@@ -396,7 +396,7 @@ class OtpViewFlowTests(TestCase):
         session.save(update_fields=["expires_at"])
 
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/verify/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/verify/",
             data={"code": session.code},
             content_type="application/json",
         )
@@ -404,7 +404,7 @@ class OtpViewFlowTests(TestCase):
 
     def test_verify_otp_already_verified_returns_409(self):
         self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/",
             content_type="application/json",
         )
         session = DocumentAccessSession.objects.filter(
@@ -412,13 +412,13 @@ class OtpViewFlowTests(TestCase):
         ).first()
         # Verify once.
         self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/verify/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/verify/",
             data={"code": session.code},
             content_type="application/json",
         )
         # Try again.
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/verify/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/verify/",
             data={"code": session.code},
             content_type="application/json",
         )
@@ -426,7 +426,7 @@ class OtpViewFlowTests(TestCase):
 
     def test_verify_otp_missing_code_returns_400(self):
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/verify/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/verify/",
             data={},
             content_type="application/json",
         )
@@ -486,7 +486,7 @@ class CeremonyDecisionValidationTests(TestCase):
             email=self.customer.email,
         )
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
             data=self._ceremony_payload(session),
             content_type="application/json",
         )
@@ -501,7 +501,7 @@ class CeremonyDecisionValidationTests(TestCase):
             email=self.customer.email,
         )
         self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
             data=self._ceremony_payload(session),
             content_type="application/json",
         )
@@ -519,7 +519,7 @@ class CeremonyDecisionValidationTests(TestCase):
 
     def test_decision_without_session_token_returns_403(self):
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
             data={
                 "decision": "approve",
                 "signer_name": "Jane Owner",
@@ -538,7 +538,7 @@ class CeremonyDecisionValidationTests(TestCase):
             email=self.customer.email,
         )
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
             data=self._ceremony_payload(session, signer_name=""),
             content_type="application/json",
         )
@@ -553,7 +553,7 @@ class CeremonyDecisionValidationTests(TestCase):
             email=self.customer.email,
         )
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
             data=self._ceremony_payload(session, consent_accepted=False),
             content_type="application/json",
         )
@@ -561,7 +561,7 @@ class CeremonyDecisionValidationTests(TestCase):
 
     def test_decision_with_invalid_session_returns_403(self):
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
             data={
                 "decision": "approve",
                 "session_token": "invalid_token",
@@ -583,7 +583,7 @@ class CeremonyDecisionValidationTests(TestCase):
         session.save(update_fields=["session_expires_at"])
 
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
             data=self._ceremony_payload(session),
             content_type="application/json",
         )
@@ -594,7 +594,7 @@ class CeremonyDecisionValidationTests(TestCase):
         self.customer.save(update_fields=["email"])
 
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
             data={
                 "decision": "approve",
                 "session_token": "anything",
@@ -659,7 +659,7 @@ class PublicSigningEdgeCaseTests(TestCase):
             email=self.customer.email,
         )
         response_1 = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
             data=self._ceremony_payload(session_1),
             content_type="application/json",
         )
@@ -674,7 +674,7 @@ class PublicSigningEdgeCaseTests(TestCase):
             email=self.customer.email,
         )
         response_2 = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
             data=self._ceremony_payload(session_2),
             content_type="application/json",
         )
@@ -698,7 +698,7 @@ class PublicSigningEdgeCaseTests(TestCase):
         )
         # Use session_a's token against estimate_b's endpoint.
         response = self.client.post(
-            f"/api/v1/public/estimates/{estimate_b.public_token}/decision/",
+            f"/api/v1/public/estimate/{estimate_b.public_token}/decision/",
             data=self._ceremony_payload(session_a),
             content_type="application/json",
         )
@@ -708,7 +708,7 @@ class PublicSigningEdgeCaseTests(TestCase):
         """After max failed attempts, requesting a new OTP and verifying it works."""
         # Request first OTP.
         self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/",
             content_type="application/json",
         )
         session = DocumentAccessSession.objects.filter(
@@ -721,7 +721,7 @@ class PublicSigningEdgeCaseTests(TestCase):
 
         # Verify should fail with max_attempts.
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/verify/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/verify/",
             data={"code": session.code},
             content_type="application/json",
         )
@@ -734,7 +734,7 @@ class PublicSigningEdgeCaseTests(TestCase):
 
         # Request new OTP.
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/",
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
@@ -747,7 +747,7 @@ class PublicSigningEdgeCaseTests(TestCase):
 
         # Verify the new OTP — fresh counter should allow it.
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/verify/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/verify/",
             data={"code": new_session.code},
             content_type="application/json",
         )
@@ -763,7 +763,7 @@ class PublicSigningEdgeCaseTests(TestCase):
             email=self.customer.email,
         )
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
             data=self._ceremony_payload(session, decision="reject"),
             content_type="application/json",
         )
@@ -780,7 +780,7 @@ class PublicSigningEdgeCaseTests(TestCase):
     def test_empty_whitespace_otp_code_returns_400(self):
         """Submitting a whitespace-only OTP code returns 400 validation_error."""
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/verify/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/verify/",
             data={"code": "   "},
             content_type="application/json",
         )
@@ -803,7 +803,7 @@ class PublicSigningEdgeCaseTests(TestCase):
             email=self.customer.email,
         )
         response = self.client.post(
-            f"/api/v1/public/estimates/{draft_estimate.public_token}/decision/",
+            f"/api/v1/public/estimate/{draft_estimate.public_token}/decision/",
             data=self._ceremony_payload(session),
             content_type="application/json",
         )
@@ -813,7 +813,7 @@ class PublicSigningEdgeCaseTests(TestCase):
     def test_max_attempts_blocks_correct_code(self):
         """Even the correct OTP code is rejected after max failed attempts."""
         self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/",
             content_type="application/json",
         )
         session = DocumentAccessSession.objects.filter(
@@ -826,7 +826,7 @@ class PublicSigningEdgeCaseTests(TestCase):
 
         # Submit the correct code — should still be rejected.
         response = self.client.post(
-            f"/api/v1/public/estimates/{self.estimate.public_token}/otp/verify/",
+            f"/api/v1/public/estimate/{self.estimate.public_token}/otp/verify/",
             data={"code": session.code},
             content_type="application/json",
         )
