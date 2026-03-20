@@ -14,7 +14,7 @@ from core.views.helpers import (
     _capability_gate,
 )
 from core.views.shared_operations.cost_codes_helpers import (
-    _cost_code_scope_filter,
+    _org_scope_filter,
     _duplicate_code_error_response,
 )
 
@@ -28,7 +28,7 @@ def cost_codes_list_create_view(request):
     - `GET`: organization/user-scoped list.
     - `POST`: requires role `owner|pm`.
     """
-    scope_filter = _cost_code_scope_filter(request.user)
+    scope_filter = _org_scope_filter(request.user)
     if request.method == "GET":
         rows = CostCode.objects.filter(scope_filter).order_by("code", "name")
 
@@ -67,7 +67,7 @@ def cost_code_detail_view(request, cost_code_id: int):
     if permission_error:
         return Response(permission_error, status=403)
 
-    scope_filter = _cost_code_scope_filter(request.user)
+    scope_filter = _org_scope_filter(request.user)
     try:
         row = CostCode.objects.get(scope_filter, id=cost_code_id)
     except CostCode.DoesNotExist:
@@ -106,7 +106,7 @@ def cost_codes_import_csv_view(request):
     if permission_error:
         return Response(permission_error, status=403)
 
-    scope_filter = _cost_code_scope_filter(request.user)
+    scope_filter = _org_scope_filter(request.user)
     membership = _ensure_org_membership(request.user)
     csv_text = request.data.get("csv_text", "")
     dry_run = _parse_request_bool(request.data.get("dry_run", True), default=True)

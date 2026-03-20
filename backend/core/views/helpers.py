@@ -1,8 +1,16 @@
-"""Cross-domain shared helpers and re-exports for the view layer."""
+"""Cross-domain shared helpers and re-exports for the view layer.
+
+This module is the single import point for utilities used across multiple
+domain view files.  It re-exports RBAC and membership helpers so domain
+views can import from one place, and provides shared validation, pagination,
+serialization, and query-building functions.
+"""
 
 import re
+from typing import Any
 
-from django.db.models import Q
+from django.contrib.auth.models import AbstractUser
+from django.db.models import Q, QuerySet
 from rest_framework.response import Response
 
 from core.models import (
@@ -16,8 +24,18 @@ from core.rbac import _capability_gate  # noqa: F401 — re-exported for view mo
 from core.user_helpers import _ensure_org_membership  # noqa: F401 — re-exported for view modules
 
 
-def _validate_project_for_user(project_id: int, user):
-    """Look up a project by ID, scoped to the user's organization. Returns None if not found."""
+# ---------------------------------------------------------------------------
+# Entity validation (org-scoped lookups)
+# ---------------------------------------------------------------------------
+
+
+def _validate_project_for_user(project_id: int, user: AbstractUser) -> Project | None:
+    """Look up a project by ID, scoped to the user's organization.
+
+    Uses ``select_related("customer")`` so the caller can access customer
+    fields without an extra query.  Returns ``None`` if the project doesn't
+    exist or doesn't belong to the user's org.
+    """
     membership = _ensure_org_membership(user)
     try:
         return Project.objects.select_related("customer").get(
@@ -28,23 +46,42 @@ def _validate_project_for_user(project_id: int, user):
         return None
 
 
-def _validate_estimate_for_user(estimate_id: int, user, *, prefetch_lines=False):
-    """Look up an estimate by ID, authorized via its project's org scope. Returns None if not found.
+def _validate_estimate_for_user(
+    estimate_id: int,
+    user: AbstractUser,
+    *,
+    prefetch_lines: bool = False,
+) -> Estimate | None:
+    """Look up an estimate by ID, authorized via its project's org scope.
 
-    The estimate is accessible if its project belongs to the requesting user's organization.
+    The estimate is accessible if its project belongs to the requesting user's
+    organization.  Optionally prefetches line items and their cost codes for
+    views that need the full estimate detail (clone, duplicate, detail).
+
+    Returns ``None`` if not found or not authorized.
     """
     membership = _ensure_org_membership(user)
-    qs = Estimate.objects.select_related("project", "project__customer").filter(
+    estimate_qs = Estimate.objects.select_related("project", "project__customer").filter(
         id=estimate_id,
         project__organization_id=membership.organization_id,
     )
     if prefetch_lines:
-        qs = qs.prefetch_related("line_items", "line_items__cost_code")
-    return qs.first()
+        estimate_qs = estimate_qs.prefetch_related("line_items", "line_items__cost_code")
+    return estimate_qs.first()
 
 
-def _resolve_organization_for_public_actor(actor_user):
-    """Resolve the primary organization for a public-facing actor user."""
+# ---------------------------------------------------------------------------
+# Public-facing context serialization
+# ---------------------------------------------------------------------------
+
+
+def _resolve_organization_for_public_actor(actor_user: AbstractUser) -> Organization | None:
+    """Resolve the primary organization for a public-facing actor user.
+
+    Used by public detail/decision views to look up branding context (logo,
+    name, terms) from the document creator's org.  Falls back to ownership
+    lookup if no active membership exists (shouldn't happen in practice).
+    """
     if not actor_user:
         return None
     membership = (
@@ -61,8 +98,16 @@ def _resolve_organization_for_public_actor(actor_user):
     return Organization.objects.filter(created_by=actor_user).order_by("id").first()
 
 
-def _serialize_public_organization_context(organization: Organization | None, request=None) -> dict:
-    """Serialize organization branding fields for public-facing document contexts."""
+def _serialize_public_organization_context(
+    organization: Organization | None,
+    request: Any = None,
+) -> dict[str, str]:
+    """Serialize organization branding fields for public-facing document contexts.
+
+    Returns display name, logo URL, billing address, help email, and per-document-type
+    terms and conditions.  If ``request`` is provided, the logo URL is built as an
+    absolute URI; otherwise falls back to the relative path.
+    """
     if not organization:
         return {
             "display_name": "",
@@ -89,8 +134,12 @@ def _serialize_public_organization_context(organization: Organization | None, re
     }
 
 
-def _serialize_public_project_context(project: Project) -> dict:
-    """Serialize project and customer fields for public-facing document contexts."""
+def _serialize_public_project_context(project: Project) -> dict[str, Any]:
+    """Serialize project and customer fields for public-facing document contexts.
+
+    Provides the minimal project + customer info needed by public estimate,
+    change order, and invoice preview pages (name, status, customer contact).
+    """
     customer = project.customer
     return {
         "id": project.id,
@@ -103,11 +152,23 @@ def _serialize_public_project_context(project: Project) -> dict:
     }
 
 
-def _paginate_queryset(queryset, query_params, *, default_page_size: int = 25, max_page_size: int = 100):
+# ---------------------------------------------------------------------------
+# Pagination and request parsing
+# ---------------------------------------------------------------------------
+
+
+def _paginate_queryset(
+    queryset: QuerySet,
+    query_params: dict[str, Any],
+    *,
+    default_page_size: int = 25,
+    max_page_size: int = 100,
+) -> tuple[QuerySet, dict[str, int]]:
     """Apply page/page_size pagination to a queryset.
 
-    Returns ``(sliced_queryset, meta_dict)`` where *meta_dict* contains
-    ``page``, ``page_size``, ``total_count``, and ``total_pages``.
+    Reads ``page`` and ``page_size`` from ``query_params``, clamping to valid
+    ranges.  Returns ``(sliced_queryset, meta_dict)`` where ``meta_dict``
+    contains ``page``, ``page_size``, ``total_count``, and ``total_pages``.
     """
     total_count = queryset.count()
     try:
@@ -128,8 +189,12 @@ def _paginate_queryset(queryset, query_params, *, default_page_size: int = 25, m
     }
 
 
-def _parse_request_bool(raw_value, *, default: bool = True) -> bool:
-    """Coerce a loosely-typed request value to a boolean."""
+def _parse_request_bool(raw_value: Any, *, default: bool = True) -> bool:
+    """Coerce a loosely-typed request value to a boolean.
+
+    Handles strings (``"true"``/``"false"``/``"1"``/``"0"``/``"yes"``/``"no"``),
+    ints, bools, and ``None``.  Returns ``default`` for empty or unrecognized values.
+    """
     if raw_value is None:
         return default
     if isinstance(raw_value, bool):
@@ -148,12 +213,16 @@ def _parse_request_bool(raw_value, *, default: bool = True) -> bool:
 
 
 def _normalized_phone(value: str) -> str:
-    """Strip a phone string to digits only (for duplicate-detection comparisons)."""
+    """Strip a phone string to digits only (for duplicate-detection comparisons).
+
+    Used by customer intake to detect duplicate phone numbers regardless of
+    formatting differences (dashes, spaces, parens, etc.).
+    """
     return re.sub(r"\D", "", value or "")
 
 
 # ---------------------------------------------------------------------------
-# Shared cross-domain helpers (deduplicated from per-domain *_helpers.py)
+# Shared cross-domain helpers
 # ---------------------------------------------------------------------------
 
 
@@ -164,7 +233,12 @@ def _build_public_decision_note(
     decider_name: str,
     decider_email: str,
 ) -> str:
-    """Build a human-readable note for a public-link decision (approve/reject/dispute)."""
+    """Build a human-readable note for a public-link decision (approve/reject/dispute).
+
+    Combines the action, actor identity, and optional customer note into a single
+    string stored on status events and audit records.  Falls back to "anonymous
+    customer" if neither name nor email is available.
+    """
     actor_parts = [part for part in [decider_name.strip(), decider_email.strip()] if part]
     actor_label = " / ".join(actor_parts) if actor_parts else "anonymous customer"
     note_value = note.strip()
@@ -173,40 +247,52 @@ def _build_public_decision_note(
     return f"{action_label} via public link by {actor_label}."
 
 
-def _cost_code_scope_filter(user) -> Q:
-    """Build a Q filter for cost codes visible to the given user's organization."""
+def _org_scope_filter(user: AbstractUser) -> Q:
+    """Build a Q filter scoped to the given user's organization.
+
+    Used for entity queries (cost codes, vendors, etc.) that need to be
+    restricted to the user's org without a full model lookup.
+    """
     membership = _ensure_org_membership(user)
     return Q(organization_id=membership.organization_id)
 
 
-def _vendor_scope_filter(user) -> Q:
-    """Build a Q filter for vendors visible to the given user's organization."""
-    membership = _ensure_org_membership(user)
-    return Q(organization_id=membership.organization_id)
-
-
-def _resolve_cost_codes_for_user(user, line_items_data, *, cost_code_key="cost_code"):
+def _resolve_cost_codes_for_user(
+    user: AbstractUser,
+    line_items_data: list[dict[str, Any]],
+    *,
+    cost_code_key: str = "cost_code",
+) -> tuple[dict[int, CostCode], list[int]]:
     """Resolve and validate cost code IDs from line item data for the user's org scope.
 
-    Returns ``(code_map, missing_ids)``.  *cost_code_key* defaults to ``"cost_code"``
-    and items where the key is absent/falsy are silently skipped.
+    Extracts cost code IDs from ``line_items_data`` using ``cost_code_key``,
+    fetches the matching ``CostCode`` records scoped to the user's org, and
+    identifies any IDs that don't exist or aren't in scope.
+
+    Returns ``(cost_code_map, missing_ids)`` where ``cost_code_map`` is
+    ``{id: CostCode}`` and ``missing_ids`` lists IDs that couldn't be resolved.
+    Items where the key is absent or falsy are silently skipped.
     """
-    ids = [item[cost_code_key] for item in line_items_data if item.get(cost_code_key)]
-    if not ids:
+    cost_code_ids = [item[cost_code_key] for item in line_items_data if item.get(cost_code_key)]
+    if not cost_code_ids:
         return {}, []
 
     membership = _ensure_org_membership(user)
-    codes = CostCode.objects.filter(
-        id__in=ids,
+    cost_codes = CostCode.objects.filter(
+        id__in=cost_code_ids,
         organization_id=membership.organization_id,
     )
-    code_map = {code.id: code for code in codes}
-    missing = [cost_code_id for cost_code_id in ids if cost_code_id not in code_map]
-    return code_map, missing
+    cost_code_map = {code.id: code for code in cost_codes}
+    missing_ids = [cid for cid in cost_code_ids if cid not in cost_code_map]
+    return cost_code_map, missing_ids
 
 
-def _not_found_response(message: str = "Not found."):
-    """Return a standard 404 error response."""
+def _not_found_response(message: str = "Not found.") -> Response:
+    """Return a standard 404 error response.
+
+    Convenience wrapper so views don't repeat the error envelope structure
+    for simple not-found cases.
+    """
     return Response(
         {"error": {"code": "not_found", "message": message, "fields": {}}},
         status=404,

@@ -16,7 +16,7 @@ from core.views.helpers import (
 )
 from core.views.shared_operations.vendors_helpers import (
     _find_duplicate_vendors,
-    _vendor_scope_filter,
+    _org_scope_filter,
 )
 
 
@@ -24,7 +24,7 @@ from core.views.shared_operations.vendors_helpers import (
 @permission_classes([IsAuthenticated])
 def vendors_list_create_view(request):
     """List scoped vendors or create a vendor with duplicate-detection guardrails."""
-    scope_filter = _vendor_scope_filter(request.user)
+    scope_filter = _org_scope_filter(request.user)
     if request.method == "GET":
         rows = Vendor.objects.filter(scope_filter).order_by("name", "id")
         search = request.query_params.get("q", "").strip()
@@ -118,7 +118,7 @@ def vendors_list_create_view(request):
 @permission_classes([IsAuthenticated])
 def vendor_detail_view(request, vendor_id: int):
     """Fetch or patch one vendor with duplicate checks on identity-changing updates."""
-    scope_filter = _vendor_scope_filter(request.user)
+    scope_filter = _org_scope_filter(request.user)
     try:
         vendor = Vendor.objects.get(scope_filter, id=vendor_id)
     except Vendor.DoesNotExist:
@@ -205,7 +205,7 @@ def vendors_import_csv_view(request):
     csv_text = request.data.get("csv_text", "")
     dry_run = _parse_request_bool(request.data.get("dry_run", True), default=True)
     membership = _ensure_org_membership(request.user)
-    scope_filter = _vendor_scope_filter(request.user)
+    scope_filter = _org_scope_filter(request.user)
 
     def validate_row(row):
         if not row.get("name"):

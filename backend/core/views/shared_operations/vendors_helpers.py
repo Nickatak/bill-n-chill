@@ -3,12 +3,12 @@
 from django.db.models import Q
 
 from core.models import Vendor
-from core.views.helpers import _vendor_scope_filter  # noqa: F401 — re-exported for vendors.py
+from core.views.helpers import _org_scope_filter  # noqa: F401 — re-exported for vendors.py
 
 
 def _find_duplicate_vendors(user, *, name: str, email: str, exclude_vendor_id=None):
     """Find existing vendors matching by name or email for duplicate detection."""
-    rows = Vendor.objects.filter(_vendor_scope_filter(user))
+    rows = Vendor.objects.filter(_org_scope_filter(user))
     if exclude_vendor_id:
         rows = rows.exclude(id=exclude_vendor_id)
 

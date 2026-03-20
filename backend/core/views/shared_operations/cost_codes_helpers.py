@@ -2,7 +2,7 @@
 
 from rest_framework.response import Response
 
-from core.views.helpers import _cost_code_scope_filter  # noqa: F401 — re-exported for cost_codes.py
+from core.views.helpers import _org_scope_filter  # noqa: F401 — re-exported for cost_codes.py
 
 
 def _duplicate_code_error_response():
