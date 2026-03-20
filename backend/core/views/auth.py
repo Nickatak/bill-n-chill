@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from core.models import EmailVerificationToken, ImpersonationToken, OrganizationInvite, OrganizationMembership, OrganizationMembershipRecord, PasswordResetToken
 from core.serializers import LoginSerializer, RegisterSerializer
 from core.utils.email import send_password_reset_email, send_verification_email
-from core.user_helpers import _ensure_membership, _resolve_user_capabilities
+from core.user_helpers import _ensure_org_membership, _resolve_user_capabilities
 
 User = get_user_model()
 
@@ -182,7 +182,7 @@ def login_view(request):
             status=403,
         )
 
-    membership = _ensure_membership(user)
+    membership = _ensure_org_membership(user)
 
     return Response({"data": _build_auth_response_payload(user, membership)})
 
@@ -291,7 +291,7 @@ def register_view(request):
     try:
         with transaction.atomic():
             user = User.objects.create_user(username=email, email=email, password=password, is_active=False)
-            _ensure_membership(user)
+            _ensure_org_membership(user)
             token_obj = EmailVerificationToken(user=user, email=email)
             token_obj.save()
     except IntegrityError:
@@ -337,7 +337,7 @@ def me_view(request):
       - `backend/core/tests/test_health_auth.py::test_me_self_heals_legacy_user_missing_membership`
     """
     user = request.user
-    membership = _ensure_membership(user)
+    membership = _ensure_org_membership(user)
     payload = _build_auth_response_payload(user, membership)
 
     # When accessed via an impersonation token, include metadata so the
@@ -645,7 +645,7 @@ def verify_email_view(request):
         user.is_active = True
         user.save(update_fields=["is_active"])
 
-    membership = _ensure_membership(user)
+    membership = _ensure_org_membership(user)
     return Response({"data": _build_auth_response_payload(user, membership)})
 
 
@@ -880,7 +880,7 @@ def reset_password_view(request):
         user.set_password(new_password)
         user.save(update_fields=["password"])
 
-    membership = _ensure_membership(user)
+    membership = _ensure_org_membership(user)
     return Response({"data": _build_auth_response_payload(user, membership)})
 
 
@@ -946,7 +946,7 @@ def impersonate_start_view(request):
     imp_token = ImpersonationToken(user=target_user, impersonated_by=request.user)
     imp_token.save()
 
-    membership = _ensure_membership(target_user)
+    membership = _ensure_org_membership(target_user)
     payload = _build_auth_response_payload(target_user, membership)
     # Override the token with the impersonation token key.
     payload["token"] = imp_token.key

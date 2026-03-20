@@ -43,12 +43,12 @@ User = get_user_model()
 def _bootstrap_org(user):
     """Bootstrap an organization for a test user and return it.
 
-    Calls _ensure_membership to create the org + membership, then returns
+    Calls _ensure_org_membership to create the org + membership, then returns
     the organization. Use this in test setUp to get the org for Customer/Project creation.
     """
-    from core.user_helpers import _ensure_membership
+    from core.user_helpers import _ensure_org_membership
 
-    membership = _ensure_membership(user)
+    membership = _ensure_org_membership(user)
     return membership.organization
 
 

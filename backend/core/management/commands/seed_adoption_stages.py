@@ -38,7 +38,7 @@ from core.models import (
     VendorBill,
     VendorBillLine,
 )
-from core.user_helpers import _ensure_membership
+from core.user_helpers import _ensure_org_membership
 
 User = get_user_model()
 
@@ -59,7 +59,7 @@ class Command(BaseCommand):
         user.set_password(PASSWORD)
         user.save(update_fields=["username", "password"])
         token, _ = Token.objects.get_or_create(user=user)
-        membership = _ensure_membership(user)
+        membership = _ensure_org_membership(user)
         org = membership.organization
         if not org.onboarding_completed:
             org.onboarding_completed = True
@@ -68,7 +68,7 @@ class Command(BaseCommand):
 
     def _cost_codes(self, user):
         """Return two cost codes for estimate line seeding."""
-        membership = _ensure_membership(user)
+        membership = _ensure_org_membership(user)
         codes = list(
             CostCode.objects.filter(organization=membership.organization, is_active=True)
             .order_by("code")[:2]
@@ -124,7 +124,7 @@ class Command(BaseCommand):
         return membership
 
     def _make_customer(self, user, name, **kwargs):
-        membership = _ensure_membership(user)
+        membership = _ensure_org_membership(user)
         c, _ = Customer.objects.get_or_create(
             organization=membership.organization, created_by=user, display_name=name,
             defaults={
@@ -142,7 +142,7 @@ class Command(BaseCommand):
         return c
 
     def _make_project(self, user, customer, name, status, **kwargs):
-        membership = _ensure_membership(user)
+        membership = _ensure_org_membership(user)
         p, _ = Project.objects.get_or_create(
             organization=membership.organization, created_by=user, customer=customer, name=name,
             defaults={

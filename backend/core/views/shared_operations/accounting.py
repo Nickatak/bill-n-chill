@@ -8,7 +8,7 @@ from rest_framework.response import Response
 
 from core.models import AccountingSyncEvent, AccountingSyncRecord
 from core.serializers import AccountingSyncEventSerializer, AccountingSyncEventWriteSerializer
-from core.views.helpers import _capability_gate, _ensure_membership, _validate_project_for_user
+from core.views.helpers import _capability_gate, _ensure_org_membership, _validate_project_for_user
 
 
 def _build_accounting_sync_snapshot(sync_event: AccountingSyncEvent) -> dict:
@@ -153,7 +153,7 @@ def accounting_sync_event_retry_view(request, sync_event_id: int):
     - Successful sync rows are not retryable; already queued rows return no-op meta.
     - Retry writes are atomic: status fields update plus immutable `AccountingSyncRecord(retried)`.
     """
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     try:
         sync_event = AccountingSyncEvent.objects.get(
             id=sync_event_id,

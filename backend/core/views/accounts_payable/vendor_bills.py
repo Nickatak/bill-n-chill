@@ -28,7 +28,7 @@ from core.views.accounts_payable.vendor_bills_helpers import (
 )
 from core.views.helpers import (
     _capability_gate,
-    _ensure_membership,
+    _ensure_org_membership,
     _validate_project_for_user,
 )
 
@@ -63,7 +63,7 @@ def vendor_bill_contract_view(_request):
 @permission_classes([IsAuthenticated])
 def org_vendor_bills_view(request):
     """Org-level vendor bill list — all bills across all projects for the accounting page."""
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     rows = _prefetch_vendor_bill_qs(
         VendorBill.objects.filter(project__organization_id=membership.organization_id)
         .order_by("-created_at")
@@ -171,7 +171,7 @@ def project_vendor_bills_view(request, project_id: int):
             status=400,
         )
 
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     vendor = Vendor.objects.filter(
         organization_id=membership.organization_id, id=data["vendor"],
     ).first()
@@ -294,7 +294,7 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
       - `404`: vendor bill not found for this user.
       - `409`: duplicate non-void vendor bill would result from identity change.
     """
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     try:
         vendor_bill = VendorBill.objects.select_related("project", "vendor").get(
             id=vendor_bill_id,
@@ -404,7 +404,7 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
 @permission_classes([IsAuthenticated])
 def vendor_bill_snapshots_view(request, vendor_bill_id: int):
     """Return immutable vendor bill status transition history."""
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     try:
         vendor_bill = VendorBill.objects.get(
             id=vendor_bill_id,

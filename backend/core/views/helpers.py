@@ -13,12 +13,12 @@ from core.models import (
     Project,
 )
 from core.rbac import _capability_gate  # noqa: F401 — re-exported for view modules
-from core.user_helpers import _ensure_membership  # noqa: F401 — re-exported for view modules
+from core.user_helpers import _ensure_org_membership  # noqa: F401 — re-exported for view modules
 
 
 def _validate_project_for_user(project_id: int, user):
     """Look up a project by ID, scoped to the user's organization. Returns None if not found."""
-    membership = _ensure_membership(user)
+    membership = _ensure_org_membership(user)
     try:
         return Project.objects.select_related("customer").get(
             id=project_id,
@@ -33,7 +33,7 @@ def _validate_estimate_for_user(estimate_id: int, user, *, prefetch_lines=False)
 
     The estimate is accessible if its project belongs to the requesting user's organization.
     """
-    membership = _ensure_membership(user)
+    membership = _ensure_org_membership(user)
     qs = Estimate.objects.select_related("project", "project__customer").filter(
         id=estimate_id,
         project__organization_id=membership.organization_id,
@@ -175,13 +175,13 @@ def _build_public_decision_note(
 
 def _cost_code_scope_filter(user) -> Q:
     """Build a Q filter for cost codes visible to the given user's organization."""
-    membership = _ensure_membership(user)
+    membership = _ensure_org_membership(user)
     return Q(organization_id=membership.organization_id)
 
 
 def _vendor_scope_filter(user) -> Q:
     """Build a Q filter for vendors visible to the given user's organization."""
-    membership = _ensure_membership(user)
+    membership = _ensure_org_membership(user)
     return Q(organization_id=membership.organization_id)
 
 
@@ -195,7 +195,7 @@ def _resolve_cost_codes_for_user(user, line_items_data, *, cost_code_key="cost_c
     if not ids:
         return {}, []
 
-    membership = _ensure_membership(user)
+    membership = _ensure_org_membership(user)
     codes = CostCode.objects.filter(
         id__in=ids,
         organization_id=membership.organization_id,

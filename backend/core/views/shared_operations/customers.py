@@ -18,7 +18,7 @@ from core.serializers import (
     CustomerSerializer,
     ProjectSerializer,
 )
-from core.views.helpers import _capability_gate, _ensure_membership, _paginate_queryset, _parse_request_bool
+from core.views.helpers import _capability_gate, _ensure_org_membership, _paginate_queryset, _parse_request_bool
 from core.views.shared_operations.customers_helpers import (
     _build_customer_duplicate_candidate,
     _build_intake_payload,
@@ -36,7 +36,7 @@ ALLOWED_PROJECT_CREATE_STATUSES = {
 @permission_classes([IsAuthenticated])
 def customers_list_view(request):
     """List organization-scoped customers with optional free-text filtering."""
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     rows = (
         Customer.objects.filter(organization_id=membership.organization_id)
         .annotate(
@@ -82,7 +82,7 @@ def customer_detail_view(request, customer_id: int):
         are transitioned to `cancelled` in the same transaction.
     - `DELETE`: intentionally unsupported (`405`); archive via `PATCH is_archived`.
     """
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     customer = (
         Customer.objects.filter(id=customer_id, organization_id=membership.organization_id)
         .annotate(
@@ -201,7 +201,7 @@ def customer_project_create_view(request, customer_id: int):
       - `status`: `prospect`
       - `initial_contract_value`: `0`
     """
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     customer = Customer.objects.filter(id=customer_id, organization_id=membership.organization_id).first()
     if customer is None:
         return Response(
@@ -314,7 +314,7 @@ def quick_add_customer_intake_view(request):
     if permission_error:
         return Response(permission_error, status=403)
 
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     initial_contract_value = request.data.get("initial_contract_value", None)
     if initial_contract_value == "":
         initial_contract_value = None

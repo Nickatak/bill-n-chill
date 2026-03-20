@@ -28,7 +28,7 @@ from core.serializers import (
     ProjectTimelineSerializer,
     QuickJumpSearchSerializer,
 )
-from core.views.helpers import _ensure_membership
+from core.views.helpers import _ensure_org_membership
 from core.views.shared_operations.projects_helpers import (
     _build_project_financial_summary_data,
     _date_filter_from_query,
@@ -52,7 +52,7 @@ def portfolio_snapshot_view(request):
             status=400,
         )
 
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     today = django_timezone.localdate()
     project_rows = list(
         Project.objects.filter(organization_id=membership.organization_id)
@@ -133,7 +133,7 @@ def change_impact_summary_view(request):
             status=400,
         )
 
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     approved_rows = ChangeOrder.objects.filter(
         project__organization_id=membership.organization_id,
         status=ChangeOrder.Status.APPROVED,
@@ -178,7 +178,7 @@ def change_impact_summary_view(request):
 @permission_classes([IsAuthenticated])
 def attention_feed_view(request):
     """Return prioritized operational attention items (overdue, pending, and problem states)."""
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     today = django_timezone.localdate()
     due_soon_window_days = 7
     due_soon_date = today + timedelta(days=due_soon_window_days)
@@ -305,7 +305,7 @@ def quick_jump_search_view(request):
     if len(query) < 2:
         return Response({"data": QuickJumpSearchSerializer({"query": query, "item_count": 0, "items": []}).data})
 
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     query_lower = query.lower()
     items = []
 
@@ -437,7 +437,7 @@ def project_timeline_events_view(request, project_id: int):
     - Workflow: EstimateStatusEvent, InvoiceStatusEvent, ChangeOrderSnapshot
     - Financial: PaymentRecord, VendorBillSnapshot
     """
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     try:
         project = Project.objects.get(id=project_id, organization_id=membership.organization_id)
     except Project.DoesNotExist:

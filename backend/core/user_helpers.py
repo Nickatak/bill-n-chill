@@ -64,10 +64,10 @@ def _resolve_user_capabilities(user, *, membership=None) -> dict:
     3. Per-membership capability_flags_json overrides (merged additively)
 
     Pass an already-fetched ``membership`` to skip the internal
-    ``_ensure_membership`` lookup when the caller already has one.
+    ``_ensure_org_membership`` lookup when the caller already has one.
     """
     if membership is None:
-        membership = _ensure_membership(user)
+        membership = _ensure_org_membership(user)
     if not membership:
         return {}
     # Ensure role_template is prefetched if assigned
@@ -102,7 +102,7 @@ def _resolve_user_capabilities(user, *, membership=None) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _ensure_membership(user):
+def _ensure_org_membership(user):
     """Return the user's active OrganizationMembership, bootstrapping one if absent.
 
     If the user has no active membership, this function atomically creates:

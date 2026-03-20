@@ -32,7 +32,7 @@ Flow A returns a uniform "check your email" response regardless of whether the e
 
 - `transaction.atomic():`
   - `User.objects.create_user()`
-  - [`_ensure_membership(user)`](../../backend/core/user_helpers.py#L134)
+  - [`_ensure_org_membership(user)`](../../backend/core/user_helpers.py#L134)
     - [`OrganizationMembership.objects.filter(user=…).first()`](../../backend/core/models/shared_operations/organization_membership.py#L9)
     - *── organization ──*
     - [`Organization.derive_name(user)`](../../backend/core/models/shared_operations/organization.py#L74)
@@ -105,7 +105,7 @@ User clicks the verification link in their email. This is their first login — 
 
 *── membership (self-heal if needed) ──*
 
-- [`_ensure_membership(user)`](../../backend/core/user_helpers.py#L134)
+- [`_ensure_org_membership(user)`](../../backend/core/user_helpers.py#L134)
 
 *── auth response ──*
 
@@ -339,7 +339,7 @@ Flow B is unchanged by email verification — the invite token proves email owne
 
 *── membership (self-heal if needed) ──*
 
-- [`_ensure_membership(user)`](../../backend/core/user_helpers.py#L134)
+- [`_ensure_org_membership(user)`](../../backend/core/user_helpers.py#L134)
   - [`OrganizationMembership.objects.filter(user=…).first()`](../../backend/core/models/shared_operations/organization_membership.py#L9)
 
 *── auth response ──*
@@ -378,7 +378,7 @@ Flow B is unchanged by email verification — the invite token proves email owne
 
 *── membership ──*
 
-- [`_ensure_membership(user)`](../../backend/core/user_helpers.py#L134)
+- [`_ensure_org_membership(user)`](../../backend/core/user_helpers.py#L134)
 
 *── auth response ──*
 
@@ -423,7 +423,7 @@ Flow B is unchanged by email verification — the invite token proves email owne
 - View function (e.g. `estimates_view`)
   - [`_capability_gate(request.user, resource, action)`](../../backend/core/rbac.py#L18)
     - [`_resolve_user_capabilities(user)`](../../backend/core/user_helpers.py#L58)
-      - [`_ensure_membership(user)`](../../backend/core/user_helpers.py#L134)
+      - [`_ensure_org_membership(user)`](../../backend/core/user_helpers.py#L134)
         - [`OrganizationMembership.objects.filter(user=…).first()`](../../backend/core/models/shared_operations/organization_membership.py#L9)
       - [`RoleTemplate`](../../backend/core/models/shared_operations/role_template.py#L9) lookup (FK or system fallback)
       - merge `membership.capability_flags_json` overrides

@@ -37,7 +37,7 @@ Bill n' Chill uses **DRF token authentication** with a **capability-based RBAC**
 |---|---|---|
 | Backend | [`views/auth.py`](../backend/core/views/auth.py) | Login, register, me, verify-invite, accept-invite |
 | Backend | [`views/helpers.py`](../backend/core/views/helpers.py) | Cross-domain shared helpers, org scoping, re-exports RBAC gates |
-| Backend | [`user_helpers.py`](../backend/core/user_helpers.py) | `_resolve_user_role`, `_resolve_user_capabilities`, `_ensure_membership` |
+| Backend | [`user_helpers.py`](../backend/core/user_helpers.py) | `_resolve_user_role`, `_resolve_user_capabilities`, `_ensure_org_membership` |
 | Backend | [`rbac.py`](../backend/core/rbac.py) | `_capability_gate` (enforcement) |
 | Backend | [`models/shared_operations/organization_invite.py`](../backend/core/models/shared_operations/organization_invite.py) | OrganizationInvite model |
 | Frontend | [`features/session/client-session.ts`](../frontend/src/features/session/client-session.ts) | Session persistence (localStorage read/write/clear) |
@@ -68,7 +68,7 @@ Request:  { "email": "...", "password": "..." }
 Response: { "data": { "token": "...", "user": { "id", "email", "role" }, "organization": { "id", "display_name" }, "capabilities": { ... } } }
 ```
 
-Calls [`_ensure_membership()`](#self-healing-bootstrap) to self-heal users missing an org.
+Calls [`_ensure_org_membership()`](#self-healing-bootstrap) to self-heal users missing an org.
 
 ### `POST /auth/register/`
 
@@ -136,7 +136,7 @@ Three flows converge on the `/register` page. The frontend determines which flow
 1. User visits `/register` with no `?token=` param.
 2. Frontend shows standard registration form (email + password).
 3. `POST /auth/register/` — no `invite_token` in body.
-4. Backend creates user, calls [`_ensure_membership()`](#self-healing-bootstrap) which creates a new org + owner membership.
+4. Backend creates user, calls [`_ensure_org_membership()`](#self-healing-bootstrap) which creates a new org + owner membership.
 5. Frontend saves session, redirects to app.
 
 ### Flow B: Invited New User
@@ -383,7 +383,7 @@ No `delete` action exists anywhere in the system. Everything is status-driven.
 
 ## Self-Healing Bootstrap
 
-[`_ensure_membership(user)`](../backend/core/user_helpers.py#L107) in [`user_helpers.py`](../backend/core/user_helpers.py) is called during [login](#post-authlogin) and [`/me/`](#get-authme) to handle users who lack an active org membership.
+[`_ensure_org_membership(user)`](../backend/core/user_helpers.py#L107) in [`user_helpers.py`](../backend/core/user_helpers.py) is called during [login](#post-authlogin) and [`/me/`](#get-authme) to handle users who lack an active org membership.
 
 When triggered:
 1. Creates a new `Organization` with defaults derived from the user's email via [`Organization.derive_name()`](../backend/core/models/shared_operations/organization.py#L63) and [`build_org_defaults()`](../backend/core/utils/organization_defaults.py#L20).
@@ -408,5 +408,5 @@ Normal registration ([Flow A](#flow-a-standard-registration-no-invite)) also goe
   - Email-bound: only the invited email can consume the token.
   - [Flow C](#flow-c-invited-existing-user-org-switch) requires password confirmation to prevent silent org-switching.
 - **Email enumeration:** Registration currently reveals whether an email is taken (standard Django behavior). Deferred.
-- **Org scoping:** All data queries filter by `organization_id=membership.organization_id` (direct org scoping via `_ensure_membership()`), ensuring users can only access data belonging to their org. This is the primary data isolation boundary.
+- **Org scoping:** All data queries filter by `organization_id=membership.organization_id` (direct org scoping via `_ensure_org_membership()`), ensuring users can only access data belonging to their org. This is the primary data isolation boundary.
 - **Optimistic auth:** The frontend [auth gate](#auth-gate) optimistically shows the authorized UI while [`/me/`](#get-authme) verification is in flight. Only hard 401/403 triggers logout. Transient errors (network, 5xx) preserve the session to avoid login-screen flicker.

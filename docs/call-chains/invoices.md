@@ -66,7 +66,7 @@
 
 - [`_validate_project_for_user(project_id, user)`](../../backend/core/views/helpers.py)
 - [`_capability_gate(user, "invoices", "create")`](../../backend/core/rbac.py)
-- [`_ensure_membership(user)`](../../backend/core/user_helpers.py)
+- [`_ensure_org_membership(user)`](../../backend/core/user_helpers.py)
 - [`InvoiceWriteSerializer.is_valid()`](../../backend/core/serializers/invoices.py#L111)
 - [`build_invoice_create_ingress(validated_data, defaults…)`](../../backend/core/views/accounts_receivable/invoice_ingress.py#L37)
   - Applies org defaults for sender identity, T&C, due date delta
@@ -123,7 +123,7 @@ All: `fetch PATCH /api/v1/invoices/{invoiceId}/`
 
 *── auth + lookup ──*
 
-- [`_ensure_membership(user)`](../../backend/core/user_helpers.py)
+- [`_ensure_org_membership(user)`](../../backend/core/user_helpers.py)
 - `Invoice.objects.get(id=invoice_id, project__organization_id=membership.organization_id)` — org-scoped
 - [`_capability_gate(user, "invoices", "edit")`](../../backend/core/rbac.py)
 
@@ -173,7 +173,7 @@ All: `fetch PATCH /api/v1/invoices/{invoiceId}/`
 
 *── validation ──*
 
-- [`_ensure_membership(user)`](../../backend/core/user_helpers.py)
+- [`_ensure_org_membership(user)`](../../backend/core/user_helpers.py)
 - Org-scoped lookup: `Invoice.objects.get(id, project__organization_id=membership.organization_id)`
 - [`_capability_gate(user, "invoices", "send")`](../../backend/core/rbac.py)
 - `Invoice.ALLOWED_STATUS_TRANSITIONS` — validates current → SENT is allowed
@@ -276,7 +276,7 @@ All: `fetch PATCH /api/v1/invoices/{invoiceId}/`
 
 `BACKEND` — [`invoice_status_events_view`](../../backend/core/views/accounts_receivable/invoices.py#L690)
 
-- [`_ensure_membership(user)`](../../backend/core/user_helpers.py)
+- [`_ensure_org_membership(user)`](../../backend/core/user_helpers.py)
 - Org-scoped lookup
 - `InvoiceStatusEvent.objects.filter(invoice=invoice)`
 - [`InvoiceStatusEventSerializer`](../../backend/core/serializers/invoices.py#L129) — computes `action_type` from from/to/note

@@ -31,7 +31,7 @@ End-to-end function call order for each customer action. All backend view functi
 
 *── org scoping ──*
 
-- [`_ensure_membership(request.user)`](../../backend/core/views/helpers.py) → `membership`
+- [`_ensure_org_membership(request.user)`](../../backend/core/views/helpers.py) → `membership`
 - `Customer.objects.filter(organization_id=membership.organization_id).annotate(project_count, active_project_count)`
 
 *── search filter ──*
@@ -65,7 +65,7 @@ End-to-end function call order for each customer action. All backend view functi
 
 *── org scoping ──*
 
-- [`_ensure_membership(request.user)`](../../backend/core/views/helpers.py) → `membership`
+- [`_ensure_org_membership(request.user)`](../../backend/core/views/helpers.py) → `membership`
 - `Customer.objects.filter(id=…, organization_id=membership.organization_id).first()`
 
 *── capability gate ──*
@@ -107,7 +107,7 @@ End-to-end function call order for each customer action. All backend view functi
 
 *── org scoping ──*
 
-- [`_ensure_membership(request.user)`](../../backend/core/views/helpers.py) → `membership`
+- [`_ensure_org_membership(request.user)`](../../backend/core/views/helpers.py) → `membership`
 - `Customer.objects.filter(id=…, organization_id=membership.organization_id).first()`
 
 *── capability gate ──*
@@ -168,7 +168,7 @@ End-to-end function call order for each customer action. All backend view functi
 *── duplicate detection ──*
 
 - [`_find_duplicate_customers(user, phone=…, email=…)`](../../backend/core/views/shared_operations/customers_helpers.py#L10)
-  - [`_ensure_membership(user)`](../../backend/core/views/helpers.py) → `membership`
+  - [`_ensure_org_membership(user)`](../../backend/core/views/helpers.py) → `membership`
   - `Customer.objects.filter(organization_id=membership.organization_id)`
   - direct match by phone/email
   - [`_normalized_phone()`](../../backend/core/views/helpers.py#L114) secondary pass

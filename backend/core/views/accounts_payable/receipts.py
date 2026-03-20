@@ -12,7 +12,7 @@ from core.views.helpers import (
     _capability_gate,
     _validate_project_for_user,
 )
-from core.user_helpers import _ensure_membership
+from core.user_helpers import _ensure_org_membership
 
 
 def _prefetch_receipt_qs(qs):
@@ -26,7 +26,7 @@ def _prefetch_receipt_qs(qs):
 @permission_classes([IsAuthenticated])
 def org_receipts_view(request):
     """Org-level receipt list — all receipts across all projects for the accounting page."""
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     rows = _prefetch_receipt_qs(
         Receipt.objects.filter(project__organization_id=membership.organization_id)
         .order_by("-receipt_date", "-created_at")
@@ -90,7 +90,7 @@ def project_receipts_view(request, project_id: int):
     store = None
     store_name = (data.get("store_name") or "").strip()
     if store_name:
-        membership = _ensure_membership(request.user)
+        membership = _ensure_org_membership(request.user)
         store, _ = Store.objects.get_or_create(
             organization_id=membership.organization_id,
             name__iexact=store_name,

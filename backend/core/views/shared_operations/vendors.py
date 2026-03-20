@@ -9,7 +9,7 @@ from core.models import Vendor
 from core.serializers import VendorSerializer, VendorWriteSerializer
 from core.utils.csv_import import CsvImportError, process_csv_import
 from core.views.helpers import (
-    _ensure_membership,
+    _ensure_org_membership,
     _paginate_queryset,
     _parse_request_bool,
     _capability_gate,
@@ -44,7 +44,7 @@ def vendors_list_create_view(request):
     if permission_error:
         return Response(permission_error, status=403)
 
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     serializer = VendorWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
@@ -204,7 +204,7 @@ def vendors_import_csv_view(request):
 
     csv_text = request.data.get("csv_text", "")
     dry_run = _parse_request_bool(request.data.get("dry_run", True), default=True)
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     scope_filter = _vendor_scope_filter(request.user)
 
     def validate_row(row):

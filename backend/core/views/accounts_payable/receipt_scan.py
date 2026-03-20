@@ -9,6 +9,9 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from core.user_helpers import _ensure_org_membership
+from core.views.helpers import _capability_gate
+
 logger = logging.getLogger(__name__)
 
 # Maximum image size: 5 MB (Gemini accepts up to 20 MB, but no need for huge files).
@@ -54,6 +57,14 @@ def receipt_scan_view(request):
     Returns ``{"data": {"store_name": "...", "amount": "...", "receipt_date": "..."}}``
     with empty strings for any fields that could not be extracted.
     """
+    membership = _ensure_org_membership(request.user)
+    if not membership:
+        return Response({"error": {"code": "forbidden", "message": "No active membership."}}, status=403)
+
+    permission_error, _ = _capability_gate(request.user, "vendor_bills", "create")
+    if permission_error:
+        return Response(permission_error, status=403)
+
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
         return Response(

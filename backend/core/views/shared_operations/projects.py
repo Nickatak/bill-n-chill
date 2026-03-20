@@ -19,7 +19,7 @@ from core.serializers import (
     ProjectProfileSerializer,
     ProjectSerializer,
 )
-from core.views.helpers import _capability_gate, _ensure_membership
+from core.views.helpers import _capability_gate, _ensure_org_membership
 from core.views.shared_operations.projects_helpers import (
     _build_project_financial_summary_data,
     _project_accepted_contract_totals_map,
@@ -30,7 +30,7 @@ from core.views.shared_operations.projects_helpers import (
 @permission_classes([IsAuthenticated])
 def projects_list_view(request):
     """List projects visible to the authenticated owner context."""
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     rows = list(
         Project.objects.filter(organization_id=membership.organization_id).select_related("customer")
     )
@@ -49,7 +49,7 @@ def projects_list_view(request):
 @permission_classes([IsAuthenticated])
 def project_detail_view(request, project_id: int):
     """Fetch or patch a project profile with terminal-state and transition protections."""
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     try:
         project = Project.objects.select_related("customer").get(
             id=project_id,
@@ -183,7 +183,7 @@ def project_detail_view(request, project_id: int):
 @permission_classes([IsAuthenticated])
 def project_financial_summary_view(request, project_id: int):
     """Return normalized AR/AP/CO financial summary plus traceability for one project."""
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     try:
         project = Project.objects.get(id=project_id, organization_id=membership.organization_id)
     except Project.DoesNotExist:
@@ -201,7 +201,7 @@ def project_financial_summary_view(request, project_id: int):
 @permission_classes([IsAuthenticated])
 def project_accounting_export_view(request, project_id: int):
     """Export project accounting summary as JSON or CSV (`export_format` query param)."""
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     try:
         project = Project.objects.get(id=project_id, organization_id=membership.organization_id)
     except Project.DoesNotExist:
@@ -296,7 +296,7 @@ def project_contract_breakdown_view(request, project_id: int):
     approved/accepted change orders linked to that estimate with their line items.
     Single response, no additional fetches required.
     """
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     try:
         project = Project.objects.get(id=project_id, organization_id=membership.organization_id)
     except Project.DoesNotExist:

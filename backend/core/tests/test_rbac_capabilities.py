@@ -4,7 +4,7 @@ from core.user_helpers import (
     RBAC_ROLE_OWNER,
     _resolve_user_role,
     _resolve_user_capabilities,
-    _ensure_membership,
+    _ensure_org_membership,
 )
 
 
@@ -95,13 +95,13 @@ class ResolveUserCapabilitiesTests(TestCase):
             email="orphan@example.com",
             password="secret123",
         )
-        # resolve_user_capabilities bootstraps membership via _ensure_membership
+        # resolve_user_capabilities bootstraps membership via _ensure_org_membership
         caps = _resolve_user_capabilities(orphan)
         # Bootstrapped users get owner role
         self.assertIn("create", caps.get("estimates", []))
 
     def test_inactive_membership_bootstraps_via_ensure(self):
-        # OneToOneField means _ensure_membership can't create a second
+        # OneToOneField means _ensure_org_membership can't create a second
         # membership — it will find no ACTIVE one and bootstrap a new org+membership.
         # But since user already has a membership row, this would fail the unique
         # constraint. So we test a user with NO membership at all.
@@ -572,7 +572,7 @@ class CostCodeSeedDefaultsTests(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# _ensure_membership
+# _ensure_org_membership
 # ---------------------------------------------------------------------------
 
 
@@ -588,14 +588,14 @@ class EnsurePrimaryMembershipTests(TestCase):
             organization=org, user=user,
             role="pm", status=OrganizationMembership.Status.ACTIVE,
         )
-        result = _ensure_membership(user)
+        result = _ensure_org_membership(user)
         self.assertEqual(result.id, existing.id)
 
     def test_bootstraps_org_and_membership_for_new_user(self):
         fresh = User.objects.create_user(
             username="fresh-boot", email="fresh-boot@example.com", password="secret123",
         )
-        membership = _ensure_membership(fresh)
+        membership = _ensure_org_membership(fresh)
         self.assertIsNotNone(membership)
         self.assertEqual(membership.role, RBAC_ROLE_OWNER)
         self.assertEqual(membership.status, OrganizationMembership.Status.ACTIVE)
@@ -606,7 +606,7 @@ class EnsurePrimaryMembershipTests(TestCase):
         fresh = User.objects.create_user(
             username="audit-boot", email="audit-boot@example.com", password="secret123",
         )
-        membership = _ensure_membership(fresh)
+        membership = _ensure_org_membership(fresh)
         org_records = OrganizationRecord.objects.filter(organization=membership.organization)
         self.assertTrue(org_records.exists())
         self.assertEqual(
@@ -622,7 +622,7 @@ class EnsurePrimaryMembershipTests(TestCase):
         fresh = User.objects.create_user(
             username="costcode-boot", email="costcode-boot@example.com", password="secret123",
         )
-        membership = _ensure_membership(fresh)
+        membership = _ensure_org_membership(fresh)
         cost_codes = CostCode.objects.filter(organization=membership.organization)
         self.assertGreater(cost_codes.count(), 0)
 
@@ -630,6 +630,6 @@ class EnsurePrimaryMembershipTests(TestCase):
         fresh = User.objects.create_user(
             username="idem-boot", email="idem-boot@example.com", password="secret123",
         )
-        first = _ensure_membership(fresh)
-        second = _ensure_membership(fresh)
+        first = _ensure_org_membership(fresh)
+        second = _ensure_org_membership(fresh)
         self.assertEqual(first.id, second.id)

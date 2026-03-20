@@ -33,7 +33,7 @@ from core.views.accounts_receivable.invoices_helpers import (
 from core.views.helpers import (
     _build_public_decision_note,
     _capability_gate,
-    _ensure_membership,
+    _ensure_org_membership,
     _resolve_organization_for_public_actor,
     _serialize_public_organization_context,
     _serialize_public_project_context,
@@ -46,7 +46,7 @@ from core.views.public_signing_helpers import get_ceremony_context, validate_cer
 @permission_classes([IsAuthenticated])
 def org_invoices_view(request):
     """Org-level invoice list — all invoices across all projects for the accounting page."""
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     rows = (
         Invoice.objects.filter(project__organization_id=membership.organization_id)
         .select_related("project", "customer")
@@ -268,7 +268,7 @@ def project_invoices_view(request, project_id: int):
 
     serializer = InvoiceWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     organization = membership.organization
     default_due_days = int(organization.default_invoice_due_delta or 30)
     default_due_days = max(1, min(default_due_days, 365))
@@ -357,7 +357,7 @@ def project_invoices_view(request, project_id: int):
 @permission_classes([IsAuthenticated])
 def invoice_detail_view(request, invoice_id: int):
     """Fetch or update one invoice while enforcing lifecycle and totals rules."""
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     try:
         invoice = (
             Invoice.objects.select_related("customer")
@@ -412,7 +412,7 @@ def invoice_detail_view(request, invoice_id: int):
 @permission_classes([IsAuthenticated])
 def invoice_send_view(request, invoice_id: int):
     """Send an invoice by transitioning to `sent`."""
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     try:
         invoice = Invoice.objects.get(id=invoice_id, project__organization_id=membership.organization_id)
     except Invoice.DoesNotExist:
@@ -493,7 +493,7 @@ def invoice_send_view(request, invoice_id: int):
 @permission_classes([IsAuthenticated])
 def invoice_status_events_view(request, invoice_id: int):
     """Return immutable invoice status transition history for one invoice."""
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     try:
         invoice = Invoice.objects.get(id=invoice_id, project__organization_id=membership.organization_id)
     except Invoice.DoesNotExist:

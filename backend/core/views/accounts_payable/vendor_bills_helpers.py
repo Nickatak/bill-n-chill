@@ -19,12 +19,12 @@ def _find_duplicate_vendor_bills(
     exclude_vendor_bill_id=None,
 ):
     """Return same-user vendor bills matching vendor+bill number (case-insensitive)."""
-    from core.user_helpers import _ensure_membership
+    from core.user_helpers import _ensure_org_membership
 
     bill_number_norm = (bill_number or "").strip()
     if not vendor_id or not bill_number_norm:
         return []
-    membership = _ensure_membership(user)
+    membership = _ensure_org_membership(user)
 
     rows = VendorBill.objects.filter(
         project__organization_id=membership.organization_id,

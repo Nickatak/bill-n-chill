@@ -35,7 +35,7 @@ from core.views.estimating.estimates_helpers import (
 from core.views.helpers import (
     _build_public_decision_note,
     _capability_gate,
-    _ensure_membership,
+    _ensure_org_membership,
     _resolve_organization_for_public_actor,
     _serialize_public_organization_context,
     _serialize_public_project_context,
@@ -223,7 +223,7 @@ def project_estimates_view(request, project_id: int):
     - `POST`: requires role `owner|pm`, at least one line item, and valid cost-code scope.
     - Applies duplicate-submit suppression window and archives superseded family rows after create.
     """
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     organization = membership.organization
     project = _validate_project_for_user(project_id, request.user)
     if not project:
@@ -610,7 +610,7 @@ def estimate_clone_version_view(request, estimate_id: int):
         title=estimate.title,
     )
 
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     organization = membership.organization
     sender_logo_url = ""
     if organization.logo:
@@ -734,7 +734,7 @@ def estimate_duplicate_view(request, estimate_id: int):
         title=target_title,
     )
 
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     organization = membership.organization
     sender_logo_url = ""
     if organization.logo:

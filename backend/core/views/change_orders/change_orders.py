@@ -39,7 +39,7 @@ from core.views.change_orders.change_orders_helpers import (
 from core.views.helpers import (
     _build_public_decision_note,
     _capability_gate,
-    _ensure_membership,
+    _ensure_org_membership,
     _validate_project_for_user,
 )
 from core.views.public_signing_helpers import get_ceremony_context, validate_ceremony_on_decision
@@ -250,7 +250,7 @@ def project_change_orders_view(request, project_id: int):
     - `POST`: requires role `owner|pm`, approved origin estimate, and valid line totals.
     - Create writes are atomic: change-order row, optional lines.
     """
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -290,7 +290,7 @@ def project_change_orders_view(request, project_id: int):
     serializer = ChangeOrderWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     organization = membership.organization
     incoming_line_items = data.get("line_items", [])
     origin_estimate = None
@@ -409,7 +409,7 @@ def change_order_detail_view(request, change_order_id: int):
     - Enforces transition rules, line/amount consistency, and origin-estimate immutability policy.
     - Atomic update path may propagate financial deltas to project and append immutable snapshot rows.
     """
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     try:
         change_order = ChangeOrder.objects.select_related("project").prefetch_related(
             "line_items",
@@ -505,7 +505,7 @@ def change_order_clone_revision_view(request, change_order_id: int):
     - Source must be latest family revision.
     - Clone writes are atomic: cloned row, cloned lines.
     """
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     try:
         change_order = (
             ChangeOrder.objects.select_related("project", "origin_estimate")

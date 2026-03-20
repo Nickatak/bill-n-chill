@@ -23,7 +23,7 @@ from core.serializers import (
 )
 from core.views.helpers import (
     _capability_gate,
-    _ensure_membership,
+    _ensure_org_membership,
     _validate_project_for_user,
 )
 from core.views.cash_management.payments_helpers import (
@@ -125,7 +125,7 @@ def org_payments_view(request):
 
     POST accepts optional target_type + target_id to link directly to a document.
     """
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
 
     if request.method == "GET":
         rows = (
@@ -238,7 +238,7 @@ def project_payments_view(request, project_id: int):
             status=404,
         )
 
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
 
     if request.method == "GET":
         rows = (
@@ -314,7 +314,7 @@ def project_payments_view(request, project_id: int):
 @permission_classes([IsAuthenticated])
 def payment_detail_view(request, payment_id: int):
     """Fetch or update a payment."""
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     try:
         payment = Payment.objects.select_related(
             "customer", "project", "invoice", "vendor_bill", "receipt",

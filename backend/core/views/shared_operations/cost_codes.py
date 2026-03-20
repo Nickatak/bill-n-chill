@@ -9,7 +9,7 @@ from core.models import CostCode
 from core.serializers import CostCodeSerializer
 from core.utils.csv_import import CsvImportError, process_csv_import
 from core.views.helpers import (
-    _ensure_membership,
+    _ensure_org_membership,
     _parse_request_bool,
     _capability_gate,
 )
@@ -40,7 +40,7 @@ def cost_codes_list_create_view(request):
 
     serializer = CostCodeSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     incoming_code = str(serializer.validated_data.get("code", "")).strip()
     if CostCode.objects.filter(
         organization_id=membership.organization_id,
@@ -107,7 +107,7 @@ def cost_codes_import_csv_view(request):
         return Response(permission_error, status=403)
 
     scope_filter = _cost_code_scope_filter(request.user)
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     csv_text = request.data.get("csv_text", "")
     dry_run = _parse_request_bool(request.data.get("dry_run", True), default=True)
 

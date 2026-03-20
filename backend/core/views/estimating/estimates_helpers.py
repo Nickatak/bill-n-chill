@@ -13,7 +13,7 @@ from core.models import (
     Project,
 )
 from core.serializers import EstimateSerializer
-from core.user_helpers import _ensure_membership
+from core.user_helpers import _ensure_org_membership
 from core.utils.email import send_document_sent_email
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import _resolve_cost_codes_for_user
@@ -304,7 +304,7 @@ def _handle_estimate_status_transition(
         # Freeze org identity onto the document when leaving draft so public
         # pages never fall back to live (potentially changed) org defaults.
         if previous_status == Estimate.Status.DRAFT and next_status != Estimate.Status.DRAFT:
-            membership = _ensure_membership(request.user)
+            membership = _ensure_org_membership(request.user)
             organization = membership.organization
             if not (estimate.terms_text or "").strip():
                 org_terms = (organization.estimate_terms_and_conditions or "").strip()

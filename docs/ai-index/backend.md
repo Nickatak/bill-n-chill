@@ -888,7 +888,7 @@ _Authentication and registration views with invite-flow support._
 - `from core.models import EmailVerificationToken, ImpersonationToken, OrganizationInvite, OrganizationMembership, OrganizationMembershipRecord, PasswordResetToken`
 - `from core.serializers import LoginSerializer, RegisterSerializer`
 - `from core.utils.email import send_password_reset_email, send_verification_email`
-- `from core.user_helpers import _ensure_membership, _resolve_user_capabilities`
+- `from core.user_helpers import _ensure_org_membership, _resolve_user_capabilities`
 
 - `_build_auth_response_payload(user, membership)` — Build the standard auth response payload dict.
 - `_lookup_valid_invite(token_str)` — Look up a valid invite token, returning (invite, error_response).
@@ -914,7 +914,7 @@ _Cross-domain shared helpers and re-exports for the view layer._
 **Depends on:**
 - `from core.models import CostCode, Estimate, Organization, OrganizationMembership, Project`
 - `from core.rbac import _capability_gate`
-- `from core.user_helpers import _ensure_membership`
+- `from core.user_helpers import _ensure_org_membership`
 
 - `_validate_project_for_user(project_id: int, user)` — Look up a project by ID, scoped to the user's organization.
 - `_validate_estimate_for_user(estimate_id: int, user, prefetch_lines)` — Look up an estimate by ID, authorized via its project's org scope.
@@ -966,7 +966,7 @@ _Shared operational accounting sync endpoints._
 **Depends on:**
 - `from core.models import AccountingSyncEvent, AccountingSyncRecord`
 - `from core.serializers import AccountingSyncEventSerializer, AccountingSyncEventWriteSerializer`
-- `from core.views.helpers import _capability_gate, _ensure_membership, _validate_project_for_user`
+- `from core.views.helpers import _capability_gate, _ensure_org_membership, _validate_project_for_user`
 
 - `_build_accounting_sync_snapshot(sync_event: AccountingSyncEvent)` — Serialize an accounting sync event into an immutable snapshot dict for audit records.
 - `_record_accounting_sync_record(sync_event: AccountingSyncEvent, event_type: str, capture_source: str, recorded_by, from_status: str | None, to_status: str | None, source_reference: str, note: str, metadata: dict | None)` — Create an immutable AccountingSyncRecord with a point-in-time snapshot.
@@ -980,7 +980,7 @@ _Shared operational cost-code endpoints._
 - `from core.models import CostCode`
 - `from core.serializers import CostCodeSerializer`
 - `from core.utils.csv_import import CsvImportError, process_csv_import`
-- `from core.views.helpers import _ensure_membership, _parse_request_bool, _capability_gate`
+- `from core.views.helpers import _ensure_org_membership, _parse_request_bool, _capability_gate`
 - `from core.views.shared_operations.cost_codes_helpers import _cost_code_scope_filter, _duplicate_code_error_response`
 
 - `cost_codes_list_create_view()` `@api_view(['GET', 'POST'])` `@permission_classes([IsAuthenticated])` — List organization-scoped cost codes or create a new cost code.
@@ -1001,7 +1001,7 @@ _Shared customer-intake endpoints._
 **Depends on:**
 - `from core.models import Customer, CustomerRecord, LeadContactRecord, Project`
 - `from core.serializers import CustomerIntakeQuickAddSerializer, CustomerProjectCreateSerializer, CustomerManageSerializer, CustomerSerializer, ProjectSerializer`
-- `from core.views.helpers import _capability_gate, _ensure_membership, _paginate_queryset`
+- `from core.views.helpers import _capability_gate, _ensure_org_membership, _paginate_queryset`
 - `from core.views.shared_operations.customers_helpers import _build_customer_duplicate_candidate, _build_intake_payload, _find_duplicate_customers, build_intake_snapshot`
 
 - `customers_list_view()` `@api_view(['GET'])` `@permission_classes([IsAuthenticated])` — List organization-scoped customers with optional free-text filtering.
@@ -1014,7 +1014,7 @@ _Domain-specific helpers for customer intake views._
 
 **Depends on:**
 - `from core.models import Customer`
-- `from core.views.helpers import _ensure_membership, _normalized_phone`
+- `from core.views.helpers import _ensure_org_membership, _normalized_phone`
 
 - `_find_duplicate_customers(user, phone: str, email: str)` — Find existing customers matching by phone or email for duplicate detection.
 - `_build_customer_duplicate_candidate(customer: Customer)` — Serialize a customer into a lightweight duplicate-candidate dict.
@@ -1028,7 +1028,7 @@ _Organization invite management endpoints (create, list, revoke)._
 - `from core.models import OrganizationInvite, RoleTemplate`
 - `from core.serializers.organization_management import OrganizationInviteCreateSerializer, OrganizationInviteSerializer`
 - `from core.rbac import _capability_gate`
-- `from core.user_helpers import _ensure_membership`
+- `from core.user_helpers import _ensure_org_membership`
 
 - `organization_invites_view()` `@api_view(['GET', 'POST'])` `@permission_classes([IsAuthenticated])` — List or create organization invites.
 - `organization_invite_detail_view(invite_id: int)` `@api_view(['DELETE'])` `@permission_classes([IsAuthenticated])` — Revoke (delete) a pending organization invite.
@@ -1040,7 +1040,7 @@ _Organization profile and RBAC membership management endpoints._
 - `from core.models import OrganizationMembership, OrganizationMembershipRecord, OrganizationRecord`
 - `from core.serializers.organization_management import OrganizationMembershipSerializer, OrganizationMembershipUpdateSerializer, OrganizationProfileSerializer, OrganizationProfileUpdateSerializer`
 - `from core.rbac import _capability_gate`
-- `from core.user_helpers import _ensure_membership`
+- `from core.user_helpers import _ensure_org_membership`
 - `from core.views.shared_operations.organization_management_helpers import _is_last_active_owner, _organization_membership_queryset, _organization_role_policy`
 
 - `organization_profile_view()` `@api_view(['GET', 'PATCH'])` `@permission_classes([IsAuthenticated])` — Fetch or patch organization profile for the caller's active membership org.
@@ -1066,7 +1066,7 @@ _Project CRUD and detail endpoints._
 **Depends on:**
 - `from core.models import ChangeOrder, Estimate, Project`
 - `from core.serializers import ChangeOrderSerializer, EstimateLineItemSerializer, ProjectFinancialSummarySerializer, ProjectProfileSerializer, ProjectSerializer`
-- `from core.views.helpers import _capability_gate, _ensure_membership`
+- `from core.views.helpers import _capability_gate, _ensure_org_membership`
 - `from core.views.shared_operations.projects_helpers import _build_project_financial_summary_data, _project_accepted_contract_totals_map`
 
 - `projects_list_view()` `@api_view(['GET'])` `@permission_classes([IsAuthenticated])` — List projects visible to the authenticated owner context.
@@ -1093,7 +1093,7 @@ _Cross-project reporting and dashboard endpoints._
 **Depends on:**
 - `from core.models import ChangeOrder, ChangeOrderSnapshot, Estimate, EstimateStatusEvent, Invoice, InvoiceStatusEvent, Payment, PaymentRecord, Project, VendorBill, VendorBillSnapshot`
 - `from core.serializers import AttentionFeedSerializer, ChangeImpactSummarySerializer, PortfolioSnapshotSerializer, ProjectTimelineSerializer, QuickJumpSearchSerializer`
-- `from core.views.helpers import _ensure_membership`
+- `from core.views.helpers import _ensure_org_membership`
 - `from core.views.shared_operations.projects_helpers import _build_project_financial_summary_data, _date_filter_from_query`
 
 - `portfolio_snapshot_view()` `@api_view(['GET'])` `@permission_classes([IsAuthenticated])` — Return portfolio-level snapshot metrics with optional date filtering.
@@ -1109,7 +1109,7 @@ _Shared operational vendor endpoints._
 - `from core.models import Vendor`
 - `from core.serializers import VendorSerializer, VendorWriteSerializer`
 - `from core.utils.csv_import import CsvImportError, process_csv_import`
-- `from core.views.helpers import _ensure_membership, _paginate_queryset, _parse_request_bool, _capability_gate`
+- `from core.views.helpers import _ensure_org_membership, _paginate_queryset, _parse_request_bool, _capability_gate`
 - `from core.views.shared_operations.vendors_helpers import _find_duplicate_vendors, _vendor_scope_filter`
 
 - `vendors_list_create_view()` `@api_view(['GET', 'POST'])` `@permission_classes([IsAuthenticated])` — List scoped vendors or create a vendor with duplicate-detection guardrails.
@@ -1138,7 +1138,7 @@ _Estimate authoring and public sharing endpoints._
 - `from core.models import SigningCeremonyRecord`
 - `from core.utils.request import get_client_ip`
 - `from core.utils.signing import compute_document_content_hash`
-- `from core.views.helpers import _build_public_decision_note, _capability_gate, _ensure_membership, _resolve_organization_for_public_actor, _serialize_public_organization_context, _serialize_public_project_context, _validate_estimate_for_user, _validate_project_for_user`
+- `from core.views.helpers import _build_public_decision_note, _capability_gate, _ensure_org_membership, _resolve_organization_for_public_actor, _serialize_public_organization_context, _serialize_public_project_context, _validate_estimate_for_user, _validate_project_for_user`
 - `from core.utils.email import send_document_sent_email`
 - `from core.views.public_signing_helpers import get_ceremony_context, validate_ceremony_on_decision`
 
@@ -1157,7 +1157,7 @@ _Domain-specific helpers for estimate views._
 **Depends on:**
 - `from core.models import Estimate, EstimateLineItem, EstimateStatusEvent, Project`
 - `from core.serializers import EstimateSerializer`
-- `from core.user_helpers import _ensure_membership`
+- `from core.user_helpers import _ensure_org_membership`
 - `from core.utils.money import MONEY_ZERO, quantize_money`
 - `from core.views.helpers import _resolve_cost_codes_for_user`
 
@@ -1186,7 +1186,7 @@ _Change-order creation, revision, and lifecycle endpoints._
 - `from core.serializers import ChangeOrderSerializer`
 - `from core.utils.request import get_client_ip`
 - `from core.utils.signing import compute_document_content_hash`
-- `from core.views.helpers import _build_public_decision_note, _capability_gate, _ensure_membership, _validate_project_for_user`
+- `from core.views.helpers import _build_public_decision_note, _capability_gate, _ensure_org_membership, _validate_project_for_user`
 - `from core.views.public_signing_helpers import get_ceremony_context, validate_ceremony_on_decision`
 
 - `public_change_order_detail_view(public_token: str)` `@api_view(['GET'])` `@permission_classes([AllowAny])` — Return public change-order detail for share links.
@@ -1242,7 +1242,7 @@ _Accounts receivable invoice endpoints and state transitions._
 - `from core.models import SigningCeremonyRecord`
 - `from core.utils.request import get_client_ip`
 - `from core.utils.signing import compute_document_content_hash`
-- `from core.views.helpers import _build_public_decision_note, _capability_gate, _ensure_membership, _resolve_cost_codes_for_user, _resolve_organization_for_public_actor, _serialize_public_organization_context, _serialize_public_project_context, _validate_project_for_user`
+- `from core.views.helpers import _build_public_decision_note, _capability_gate, _ensure_org_membership, _resolve_cost_codes_for_user, _resolve_organization_for_public_actor, _serialize_public_organization_context, _serialize_public_project_context, _validate_project_for_user`
 - `from core.views.public_signing_helpers import get_ceremony_context, validate_ceremony_on_decision`
 
 - `public_invoice_detail_view(public_token: str)` `@api_view(['GET'])` `@permission_classes([AllowAny])` — Return public invoice detail for share links, including lightweight project context.
@@ -1280,7 +1280,7 @@ _Accounts payable vendor-bill endpoints and line item lifecycle._
 - `from core.serializers import VendorBillSerializer, VendorBillWriteSerializer`
 - `from core.utils.money import MONEY_ZERO, quantize_money`
 - `from core.views.accounts_payable.vendor_bills_helpers import _apply_vendor_bill_lines_and_totals, _find_duplicate_vendor_bills, _vendor_bill_line_apply_error_response, _vendor_scope_filter`
-- `from core.views.helpers import _capability_gate, _ensure_membership, _validate_project_for_user`
+- `from core.views.helpers import _capability_gate, _ensure_org_membership, _validate_project_for_user`
 
 - `_prefetch_vendor_bill_qs(qs)` — Apply standard select/prefetch for vendor bill queries.
 - `vendor_bill_contract_view(_request)` `@api_view(['GET'])` `@permission_classes([IsAuthenticated])` — Return canonical vendor-bill workflow policy for frontend UX guards.
@@ -1310,7 +1310,7 @@ _Cash-management payment and allocation endpoints._
 - `from core.policies import get_payment_policy_contract`
 - `from core.serializers import PaymentAllocateSerializer, PaymentAllocationSerializer, PaymentSerializer, PaymentWriteSerializer`
 - `from core.utils.money import MONEY_ZERO, quantize_money`
-- `from core.views.helpers import _capability_gate, _ensure_membership, _validate_project_for_user`
+- `from core.views.helpers import _capability_gate, _ensure_org_membership, _validate_project_for_user`
 - `from core.views.cash_management.payments_helpers import _all_allocated_total, _direction_target_mismatch, _recalculate_payment_allocation_targets, _set_invoice_balance_from_allocations, _set_vendor_bill_balance_from_allocations`
 
 - `payment_contract_view(_request)` `@api_view(['GET'])` `@permission_classes([IsAuthenticated])` — Return canonical payment workflow policy for frontend UX guards.
@@ -1420,7 +1420,7 @@ _User-centric resolution and lifecycle helpers._
 
 - `_resolve_user_role(user)` — Return the canonical role slug for a user from their active membership.
 - `_resolve_user_capabilities(user, membership)` — Resolve the effective capability flags for a user.
-- `_ensure_membership(user)` — Return the user's active OrganizationMembership, bootstrapping one if absent.
+- `_ensure_org_membership(user)` — Return the user's active OrganizationMembership, bootstrapping one if absent.
 
 ## Management Commands
 
@@ -1469,7 +1469,7 @@ _Seed four demo accounts representing different adoption stages of the platform.
 
 **Depends on:**
 - `from core.models import ChangeOrder, CostCode, Customer, Estimate, EstimateLineItem, EstimateStatusEvent, Invoice, InvoiceLine, OrganizationMembership, OrganizationMembershipRecord, Payment, PaymentAllocation, Project, RoleTemplate, Vendor, VendorBill, VendorBillLine`
-- `from core.user_helpers import _ensure_membership`
+- `from core.user_helpers import _ensure_org_membership`
 
 **class Command(BaseCommand)**
 - `_get_or_create_user(email)`
@@ -2147,7 +2147,7 @@ _Tests for public document signing — OTP verification, signing ceremony, and c
 **Depends on:**
 - `from core.tests.common import *`
 - `from core.rbac import _capability_gate`
-- `from core.user_helpers import RBAC_ROLE_OWNER, _resolve_user_role, _resolve_user_capabilities, _ensure_membership`
+- `from core.user_helpers import RBAC_ROLE_OWNER, _resolve_user_role, _resolve_user_capabilities, _ensure_org_membership`
 
 **class ResolveUserCapabilitiesTests(TestCase)**
 > Tests for _resolve_user_capabilities resolution chain.

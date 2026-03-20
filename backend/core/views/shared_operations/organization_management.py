@@ -13,7 +13,7 @@ from core.serializers.organization_management import (
     OrganizationProfileUpdateSerializer,
 )
 from core.rbac import _capability_gate
-from core.user_helpers import _ensure_membership
+from core.user_helpers import _ensure_org_membership
 from core.views.shared_operations.organization_management_helpers import (
     _is_last_active_owner,
     _organization_membership_queryset,
@@ -25,7 +25,7 @@ from core.views.shared_operations.organization_management_helpers import (
 @permission_classes([IsAuthenticated])
 def organization_profile_view(request):
     """Fetch or patch organization profile for the caller's active membership org."""
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     organization = membership.organization
 
     if request.method == "GET":
@@ -145,7 +145,7 @@ def complete_onboarding_view(request):
     One-way flag — once set to True it stays True. No RBAC gate because
     any authenticated member completing onboarding benefits the whole org.
     """
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     org = membership.organization
     if not org.onboarding_completed:
         org.onboarding_completed = True
@@ -170,7 +170,7 @@ def organization_logo_upload_view(request):
     if permission_error:
         return Response(permission_error, status=403)
 
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     organization = membership.organization
 
     logo_file = request.FILES.get("logo")
@@ -236,7 +236,7 @@ def organization_logo_upload_view(request):
 @permission_classes([IsAuthenticated])
 def organization_memberships_view(request):
     """List memberships for caller's active organization scope."""
-    membership = _ensure_membership(request.user)
+    membership = _ensure_org_membership(request.user)
     rows = _organization_membership_queryset(membership.organization_id)
     return Response(
         {
@@ -258,7 +258,7 @@ def organization_membership_detail_view(request, membership_id: int):
     if permission_error:
         return Response(permission_error, status=403)
 
-    viewer_membership = _ensure_membership(request.user)
+    viewer_membership = _ensure_org_membership(request.user)
     try:
         membership = _organization_membership_queryset(viewer_membership.organization_id).get(
             id=membership_id
