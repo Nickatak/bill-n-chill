@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import shell from "@/shared/shell/page-shell.module.css";
 import styles from "./page.module.css";
 import { PageCard, PageShell } from "@/shared/shell";
-import { OnboardingChecklist } from "@/features/onboarding";
+import { DismissGuideButton, OnboardingChecklist } from "@/features/onboarding";
 
 export const metadata: Metadata = {
   title: "Get Started",
@@ -13,7 +13,10 @@ export default function OnboardingPage() {
   return (
     <PageShell narrow>
       <header className={shell.hero}>
-        <div className={shell.heroTop}>
+        <div className={shell.heroTop} style={{ position: "relative" }}>
+          <div style={{ position: "absolute", top: 0, right: 0 }}>
+            <DismissGuideButton />
+          </div>
           <p className={shell.eyebrow}>Get Started</p>
           <h1 className={shell.title}>Set up your first project in minutes</h1>
           <p className={shell.copy}>

@@ -233,38 +233,6 @@ describe("OnboardingChecklist", () => {
     expect(dynamicLink).toBeTruthy();
   });
 
-  it("calls complete-onboarding API and navigates on Dismiss Guide", async () => {
-    setupEmptyProgress();
-    mockLoadClientSession.mockReturnValue({
-      organization: { id: 1, name: "Test Co", onboardingCompleted: false },
-    });
-    // Mock the dismiss POST as well as progress probes
-    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
-      if (opts?.method === "POST" && url.includes("/complete-onboarding/")) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
-    });
-
-    render(<OnboardingChecklist />);
-
-    await waitFor(() => {
-      expect(screen.queryByText("Checking progress\u2026")).not.toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText("Dismiss Guide"));
-
-    await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/customers");
-    });
-
-    expect(mockSaveClientSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        organization: expect.objectContaining({ onboardingCompleted: true }),
-      }),
-    );
-  });
-
   it("renders the guide arrow overlay", async () => {
     setupEmptyProgress();
     render(<OnboardingChecklist />);

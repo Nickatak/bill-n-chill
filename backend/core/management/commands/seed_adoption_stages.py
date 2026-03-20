@@ -49,7 +49,7 @@ class Command(BaseCommand):
 
     # ── Helpers ──────────────────────────────────────────────────────────
 
-    def _get_or_create_user(self, email):
+    def _get_or_create_user(self, email, *, onboarding_completed=True):
         user, _ = User.objects.get_or_create(
             email=email,
             defaults={"username": email},
@@ -61,8 +61,8 @@ class Command(BaseCommand):
         token, _ = Token.objects.get_or_create(user=user)
         membership = _ensure_org_membership(user)
         org = membership.organization
-        if not org.onboarding_completed:
-            org.onboarding_completed = True
+        if org.onboarding_completed != onboarding_completed:
+            org.onboarding_completed = onboarding_completed
             org.save(update_fields=["onboarding_completed"])
         return user, token, membership
 
@@ -448,7 +448,7 @@ class Command(BaseCommand):
 
     def _seed_new(self):
         """Fresh signup. Org + cost codes bootstrapped, nothing else."""
-        user, token, membership = self._get_or_create_user("new@test.com")
+        user, token, membership = self._get_or_create_user("new@test.com", onboarding_completed=False)
         self.stdout.write(self.style.SUCCESS("  new@test.com — empty workspace"))
         return user, token
 

@@ -1,0 +1,16 @@
+.button {
+  padding: var(--space-xs) var(--space-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.button:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
