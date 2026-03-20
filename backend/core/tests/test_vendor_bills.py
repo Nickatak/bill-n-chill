@@ -91,7 +91,7 @@ class VendorBillTests(TestCase):
                 "due_date": "2026-03-15",
                 "notes": "Initial AP intake.",
                 "line_items": [
-                    {"description": "Initial AP intake", "amount": total}
+                    {"description": "Initial AP intake", "unit_price": total}
                 ],
             },
             content_type="application/json",
@@ -125,14 +125,14 @@ class VendorBillTests(TestCase):
         self.assertIn("void", received_transitions)
 
         approved_transitions = payload["allowed_status_transitions"]["approved"]
-        self.assertIn("disputed", approved_transitions)
         self.assertIn("closed", approved_transitions)
         self.assertIn("void", approved_transitions)
+        self.assertNotIn("disputed", approved_transitions)
 
         # Terminal statuses
         self.assertIn("closed", payload["terminal_statuses"])
         self.assertIn("void", payload["terminal_statuses"])
-        self.assertTrue(str(payload["policy_version"]).startswith("2026-03-16.vendor_bills."))
+        self.assertTrue(str(payload["policy_version"]).startswith("2026-03-18.vendor_bills."))
 
     def test_vendor_bill_create_and_project_list(self):
         """Bills are created in received status with description+amount line items."""
@@ -145,7 +145,7 @@ class VendorBillTests(TestCase):
                 "due_date": "2026-03-15",
                 "notes": "Tile package.",
                 "line_items": [
-                    {"description": "Tile package", "amount": "1250.00"}
+                    {"description": "Tile package", "unit_price": "1250.00"}
                 ],
             },
             content_type="application/json",
@@ -181,7 +181,7 @@ class VendorBillTests(TestCase):
                 "vendor": self.vendor.id,
                 "bill_number": "B-2003",
                 "line_items": [
-                    {"description": "Materials", "amount": "1250.00"}
+                    {"description": "Materials", "unit_price": "1250.00"}
                 ],
             },
             content_type="application/json",
@@ -237,7 +237,7 @@ class VendorBillTests(TestCase):
                 "issue_date": "2026-02-13",
                 "due_date": "2026-03-15",
                 "line_items": [
-                    {"description": "Duplicate test", "amount": "500.00"}
+                    {"description": "Duplicate test", "unit_price": "500.00"}
                 ],
             },
             content_type="application/json",
@@ -270,7 +270,7 @@ class VendorBillTests(TestCase):
                 "issue_date": "2026-02-13",
                 "due_date": "2026-03-15",
                 "line_items": [
-                    {"description": "Duplicate test", "amount": "500.00"}
+                    {"description": "Duplicate test", "unit_price": "500.00"}
                 ],
             },
             content_type="application/json",
@@ -283,10 +283,10 @@ class VendorBillTests(TestCase):
         """Walk through the full document lifecycle: received → approved."""
         vendor_bill_id = self._create_vendor_bill(total="900.00")
 
-        # received → disputed (invalid, must be approved first)
+        # received → closed (invalid — must be approved first)
         invalid = self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "disputed"},
+            data={"status": "closed"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -299,7 +299,7 @@ class VendorBillTests(TestCase):
             data={
                 "status": "approved",
                 "line_items": [
-                    {"cost_code": self.cost_code.id, "description": "Materials", "amount": "900.00"}
+                    {"cost_code": self.cost_code.id, "description": "Materials", "unit_price": "900.00"}
                 ],
             },
             content_type="application/json",
@@ -315,18 +315,10 @@ class VendorBillTests(TestCase):
         self.assertEqual(payload["line_items"][0]["cost_code"], self.cost_code.id)
 
     def test_vendor_bill_disputed_and_closed_transitions(self):
-        """Approved bills can be disputed; disputed bills can be closed or re-approved."""
+        """Received bills can be disputed; disputed bills can be approved or voided."""
         vendor_bill_id = self._create_vendor_bill(total="500.00")
 
-        # Walk to approved
-        self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "approved"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-
-        # approved → disputed
+        # received → disputed
         disputed = self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
             data={"status": "disputed"},
@@ -336,7 +328,7 @@ class VendorBillTests(TestCase):
         self.assertEqual(disputed.status_code, 200)
         self.assertEqual(disputed.json()["data"]["status"], "disputed")
 
-        # disputed → approved (re-approve after resolving dispute)
+        # disputed → approved (resolve dispute)
         re_approved = self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
             data={"status": "approved"},
@@ -416,7 +408,7 @@ class VendorBillTests(TestCase):
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
             data={
                 "line_items": [
-                    {"cost_code": other_code.id, "description": "Invalid org code", "amount": "50.00"}
+                    {"cost_code": other_code.id, "description": "Invalid org code", "unit_price": "50.00"}
                 ]
             },
             content_type="application/json",
@@ -435,7 +427,7 @@ class VendorBillTests(TestCase):
             data={
                 "status": "approved",
                 "line_items": [
-                    {"cost_code": self.cost_code.id, "description": "Materials", "amount": "300.00"}
+                    {"cost_code": self.cost_code.id, "description": "Materials", "unit_price": "300.00"}
                 ],
             },
             content_type="application/json",
@@ -466,7 +458,7 @@ class VendorBillTests(TestCase):
             data={
                 "status": "approved",
                 "line_items": [
-                    {"cost_code": self.cost_code.id, "description": "Materials", "amount": "200.00"}
+                    {"cost_code": self.cost_code.id, "description": "Materials", "unit_price": "200.00"}
                 ],
             },
             content_type="application/json",

@@ -55,10 +55,6 @@ vi.mock("@/features/payments", () => ({
 
 vi.stubGlobal("fetch", mockFetch);
 
-// jsdom doesn't implement HTMLDialogElement methods
-HTMLDialogElement.prototype.showModal = HTMLDialogElement.prototype.showModal || vi.fn();
-HTMLDialogElement.prototype.close = HTMLDialogElement.prototype.close || vi.fn();
-
 import { VendorBillsConsole } from "../components/vendor-bills-console";
 import type { VendorBillPolicyContract } from "../types";
 

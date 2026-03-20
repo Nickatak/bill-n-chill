@@ -177,7 +177,7 @@ class MvpRegressionMoneyLoopTests(TestCase):
                 "issue_date": "2026-02-13",
                 "due_date": "2026-03-15",
                 "line_items": [
-                    {"description": "Tile materials", "amount": "500.00"}
+                    {"description": "Tile materials", "unit_price": "500.00"}
                 ],
             },
             content_type="application/json",
