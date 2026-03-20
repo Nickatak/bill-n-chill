@@ -144,11 +144,108 @@ def _recalculate_payment_target(payment: Payment, *, changed_by: "User") -> None
         _set_receipt_balance_from_payments(receipt)
 
 
-_OUTBOUND_TARGET_TYPES = {Payment.TargetType.VENDOR_BILL, Payment.TargetType.RECEIPT}
+_OUTBOUND_TARGET_TYPES: set[str] = {Payment.TargetType.VENDOR_BILL, Payment.TargetType.RECEIPT}
 
 
 def _direction_target_mismatch(direction: str, target_type: str) -> bool:
-    """Return True if the target type is incompatible with the payment direction."""
+    """Return True if the target type is incompatible with the payment direction.
+
+    Inbound payments can only target invoices.  Outbound payments can
+    target vendor bills or receipts.
+    """
     if direction == Payment.Direction.INBOUND:
         return target_type != Payment.TargetType.INVOICE
     return target_type not in _OUTBOUND_TARGET_TYPES
+
+
+# ---------------------------------------------------------------------------
+# Target resolution and balance recalculation (imported by views)
+# ---------------------------------------------------------------------------
+
+
+def _resolve_and_link_target(
+    data: dict[str, Any],
+    payment_kwargs: dict[str, Any],
+    membership: OrganizationMembership,
+    fields: dict[str, list[str]],
+) -> Model | None:
+    """Resolve ``target_type`` + ``target_id`` from payload and populate payment FK kwargs.
+
+    Validates that the target document exists, is org-scoped, and is in a
+    linkable status.  Returns the resolved target object or ``None``.
+    Validation errors are appended to ``fields``.
+    """
+    target_type = data.get("target_type", "")
+    target_id = data.get("target_id")
+    direction = payment_kwargs.get("direction", "")
+
+    if not target_type or not target_id:
+        return None
+
+    if _direction_target_mismatch(direction, target_type):
+        fields["target_type"] = ["target_type does not match payment direction."]
+        return None
+
+    payment_kwargs["target_type"] = target_type
+
+    if target_type == Payment.TargetType.INVOICE:
+        target = Invoice.objects.filter(
+            id=target_id,
+            project__organization_id=membership.organization_id,
+        ).first()
+        if not target:
+            fields["target_id"] = ["Invoice not found in this organization."]
+            return None
+        if target.status == Invoice.Status.VOID:
+            fields["target_id"] = ["Cannot link payment to a void invoice."]
+            return None
+        if target.status == Invoice.Status.DRAFT:
+            fields["target_id"] = ["Cannot record payment against a draft invoice. Send it first."]
+            return None
+        payment_kwargs["invoice"] = target
+        return target
+
+    if target_type == Payment.TargetType.VENDOR_BILL:
+        target = VendorBill.objects.filter(
+            id=target_id,
+            project__organization_id=membership.organization_id,
+        ).first()
+        if not target:
+            fields["target_id"] = ["Vendor bill not found in this organization."]
+            return None
+        if target.status == VendorBill.Status.VOID:
+            fields["target_id"] = ["Cannot link payment to a void vendor bill."]
+            return None
+        payment_kwargs["vendor_bill"] = target
+        return target
+
+    if target_type == Payment.TargetType.RECEIPT:
+        target = Receipt.objects.filter(
+            id=target_id,
+            project__organization_id=membership.organization_id,
+        ).first()
+        if not target:
+            fields["target_id"] = ["Receipt not found in this organization."]
+            return None
+        payment_kwargs["receipt"] = target
+        return target
+
+    fields["target_type"] = ["Invalid target type."]
+    return None
+
+
+def _recalculate_target_balance(
+    target: Model,
+    target_type: str,
+    changed_by: "User",
+) -> None:
+    """Recalculate the balance on a resolved target after payment creation.
+
+    Dispatches to the appropriate balance helper based on target type.
+    """
+    if target_type == Payment.TargetType.INVOICE:
+        _set_invoice_balance_from_payments(target, changed_by=changed_by)
+    elif target_type == Payment.TargetType.VENDOR_BILL:
+        _set_vendor_bill_balance_from_payments(target)
+    elif target_type == Payment.TargetType.RECEIPT:
+        _set_receipt_balance_from_payments(target)

@@ -10,11 +10,8 @@ from rest_framework.response import Response
 
 from core.models import (
     Customer,
-    Invoice,
     Payment,
     PaymentRecord,
-    Receipt,
-    VendorBill,
 )
 from core.policies import get_payment_policy_contract
 from core.serializers import (
@@ -27,103 +24,73 @@ from core.views.helpers import (
     _validate_project_for_user,
 )
 from core.views.cash_management.payments_helpers import (
-    _direction_target_mismatch,
     _recalculate_payment_target,
-    _set_invoice_balance_from_payments,
-    _set_receipt_balance_from_payments,
-    _set_vendor_bill_balance_from_payments,
+    _recalculate_target_balance,
+    _resolve_and_link_target,
 )
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def payment_contract_view(_request):
-    """Return canonical payment workflow policy for frontend UX guards."""
-    return Response({"data": get_payment_policy_contract()})
+    """Return the canonical payment workflow policy contract.
 
+    Read-only endpoint that returns status definitions, allowed transitions,
+    direction/method enums, and target type rules.
 
-def _resolve_and_link_target(data, payment_kwargs, membership, fields):
-    """Resolve target_type + target_id from payload, populate payment FK kwargs.
+    Flow:
+        1. Return the payment policy contract payload.
 
-    Returns the resolved target object or None.  Validation errors are
-    appended to ``fields`` dict.
+    URL: ``GET /api/v1/payments/contract/``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": { "statuses": [...], "transitions": [...] } }
     """
-    target_type = data.get("target_type", "")
-    target_id = data.get("target_id")
-    direction = payment_kwargs.get("direction", "")
-
-    if not target_type or not target_id:
-        # Target is optional at creation (unlinked payment)
-        return None
-
-    if _direction_target_mismatch(direction, target_type):
-        fields["target_type"] = ["target_type does not match payment direction."]
-        return None
-
-    payment_kwargs["target_type"] = target_type
-
-    if target_type == Payment.TargetType.INVOICE:
-        target = Invoice.objects.filter(
-            id=target_id,
-            project__organization_id=membership.organization_id,
-        ).first()
-        if not target:
-            fields["target_id"] = ["Invoice not found in this organization."]
-            return None
-        if target.status == Invoice.Status.VOID:
-            fields["target_id"] = ["Cannot link payment to a void invoice."]
-            return None
-        if target.status == Invoice.Status.DRAFT:
-            fields["target_id"] = ["Cannot record payment against a draft invoice. Send it first."]
-            return None
-        payment_kwargs["invoice"] = target
-        return target
-
-    if target_type == Payment.TargetType.VENDOR_BILL:
-        target = VendorBill.objects.filter(
-            id=target_id,
-            project__organization_id=membership.organization_id,
-        ).first()
-        if not target:
-            fields["target_id"] = ["Vendor bill not found in this organization."]
-            return None
-        if target.status == VendorBill.Status.VOID:
-            fields["target_id"] = ["Cannot link payment to a void vendor bill."]
-            return None
-        payment_kwargs["vendor_bill"] = target
-        return target
-
-    if target_type == Payment.TargetType.RECEIPT:
-        target = Receipt.objects.filter(
-            id=target_id,
-            project__organization_id=membership.organization_id,
-        ).first()
-        if not target:
-            fields["target_id"] = ["Receipt not found in this organization."]
-            return None
-        payment_kwargs["receipt"] = target
-        return target
-
-    fields["target_type"] = ["Invalid target type."]
-    return None
-
-
-def _recalculate_target_balance(target, target_type, changed_by):
-    """Recalculate the balance on a resolved target after payment creation."""
-    if target_type == Payment.TargetType.INVOICE:
-        _set_invoice_balance_from_payments(target, changed_by=changed_by)
-    elif target_type == Payment.TargetType.VENDOR_BILL:
-        _set_vendor_bill_balance_from_payments(target)
-    elif target_type == Payment.TargetType.RECEIPT:
-        _set_receipt_balance_from_payments(target)
+    return Response({"data": get_payment_policy_contract()})
 
 
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def org_payments_view(request):
-    """Org-level payment endpoint: GET lists all payments, POST creates a payment.
+    """List all org payments or create a new payment.
 
-    POST accepts optional target_type + target_id to link directly to a document.
+    GET returns all payments for the organization.  POST creates a
+    payment with required direction, method, and amount.  Optionally
+    links to a target document (invoice, vendor bill, or receipt) via
+    ``target_type`` + ``target_id``.  Inbound payments require a customer.
+
+    Flow (GET):
+        1. Return all org payments with related objects.
+
+    Flow (POST):
+        1. Capability gate: ``payments.create``.
+        2. Validate required fields (direction, method, amount).
+        3. Resolve customer (required for inbound) and optional project.
+        4. Resolve and validate optional target document.
+        5. Create payment + audit record (atomic).
+        6. Recalculate target balance if settled.
+
+    URL: ``GET/POST /api/v1/payments/``
+
+    Request body (POST)::
+
+        { "direction": "inbound", "method": "check", "amount": "1500.00", "customer": 5 }
+
+    Success 200 (GET)::
+
+        { "data": [{ ... }, ...] }
+
+    Success 201 (POST)::
+
+        { "data": { ... } }
+
+    Errors:
+        - 400: Missing required fields or invalid target.
+        - 403: Missing ``payments.create`` capability.
+        - 404: Customer or project not found.
     """
     membership = _ensure_org_membership(request.user)
 
@@ -135,102 +102,135 @@ def org_payments_view(request):
         )
         return Response({"data": PaymentSerializer(rows, many=True).data})
 
-    permission_error, _ = _capability_gate(request.user, "payments", "create")
-    if permission_error:
-        return Response(permission_error, status=403)
+    elif request.method == "POST":
+        permission_error, _ = _capability_gate(request.user, "payments", "create")
+        if permission_error:
+            return Response(permission_error, status=403)
 
-    serializer = PaymentWriteSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    data = serializer.validated_data
+        serializer = PaymentWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
 
-    fields = {}
-    if "direction" not in data:
-        fields["direction"] = ["This field is required."]
-    if "method" not in data:
-        fields["method"] = ["This field is required."]
-    if "amount" not in data:
-        fields["amount"] = ["This field is required."]
-    if fields:
-        return Response(
-            {"error": {"code": "validation_error", "message": "Missing required fields.", "fields": fields}},
-            status=400,
-        )
-
-    # Resolve customer
-    customer = None
-    customer_id = data.get("customer")
-    direction = data["direction"]
-    if customer_id:
-        customer = Customer.objects.filter(
-            id=customer_id, organization_id=membership.organization_id,
-        ).first()
-        if not customer:
+        fields = {}
+        if "direction" not in data:
+            fields["direction"] = ["This field is required."]
+        if "method" not in data:
+            fields["method"] = ["This field is required."]
+        if "amount" not in data:
+            fields["amount"] = ["This field is required."]
+        if fields:
             return Response(
-                {"error": {"code": "not_found", "message": "Customer not found.", "fields": {}}},
-                status=404,
-            )
-    elif direction == Payment.Direction.INBOUND:
-        return Response(
-            {"error": {"code": "validation_error", "message": "Customer is required for inbound payments.", "fields": {"customer": ["This field is required for inbound payments."]}}},
-            status=400,
-        )
-
-    # Resolve optional project
-    project = None
-    project_id = data.get("project")
-    if project_id:
-        project = _validate_project_for_user(project_id, request.user)
-        if not project:
-            return Response(
-                {"error": {"code": "not_found", "message": "Project not found.", "fields": {}}},
-                status=404,
+                {"error": {"code": "validation_error", "message": "Missing required fields.", "fields": fields}},
+                status=400,
             )
 
-    payment_kwargs = {
-        "organization_id": membership.organization_id,
-        "customer": customer,
-        "project": project,
-        "direction": data["direction"],
-        "method": data["method"],
-        "status": data.get("status", Payment.Status.SETTLED),
-        "amount": data["amount"],
-        "payment_date": data.get("payment_date") or timezone.localdate(),
-        "reference_number": data.get("reference_number", ""),
-        "notes": data.get("notes", ""),
-        "created_by": request.user,
-    }
+        customer = None
+        customer_id = data.get("customer")
+        direction = data["direction"]
+        if customer_id:
+            customer = Customer.objects.filter(
+                id=customer_id, organization_id=membership.organization_id,
+            ).first()
+            if not customer:
+                return Response(
+                    {"error": {"code": "not_found", "message": "Customer not found.", "fields": {}}},
+                    status=404,
+                )
+        elif direction == Payment.Direction.INBOUND:
+            return Response(
+                {"error": {"code": "validation_error", "message": "Customer is required for inbound payments.", "fields": {"customer": ["This field is required for inbound payments."]}}},
+                status=400,
+            )
 
-    # Resolve target document
-    target_fields = {}
-    target = _resolve_and_link_target(data, payment_kwargs, membership, target_fields)
-    if target_fields:
-        return Response(
-            {"error": {"code": "validation_error", "message": "Invalid target.", "fields": target_fields}},
-            status=400,
-        )
+        project = None
+        project_id = data.get("project")
+        if project_id:
+            project = _validate_project_for_user(project_id, request.user)
+            if not project:
+                return Response(
+                    {"error": {"code": "not_found", "message": "Project not found.", "fields": {}}},
+                    status=404,
+                )
 
-    with transaction.atomic():
-        payment = Payment.objects.create(**payment_kwargs)
-        PaymentRecord.record(
-            payment=payment,
-            event_type=PaymentRecord.EventType.CREATED,
-            capture_source=PaymentRecord.CaptureSource.MANUAL_UI,
-            recorded_by=request.user,
-            from_status=None,
-            to_status=payment.status,
-            note="Payment created.",
-            metadata={"direction": payment.direction, "method": payment.method},
-        )
-        if target and payment.status == Payment.Status.SETTLED:
-            _recalculate_target_balance(target, payment.target_type, request.user)
+        payment_kwargs = {
+            "organization_id": membership.organization_id,
+            "customer": customer,
+            "project": project,
+            "direction": data["direction"],
+            "method": data["method"],
+            "status": data.get("status", Payment.Status.SETTLED),
+            "amount": data["amount"],
+            "payment_date": data.get("payment_date") or timezone.localdate(),
+            "reference_number": data.get("reference_number", ""),
+            "notes": data.get("notes", ""),
+            "created_by": request.user,
+        }
 
-    return Response({"data": PaymentSerializer(payment).data}, status=201)
+        target_fields = {}
+        target = _resolve_and_link_target(data, payment_kwargs, membership, target_fields)
+        if target_fields:
+            return Response(
+                {"error": {"code": "validation_error", "message": "Invalid target.", "fields": target_fields}},
+                status=400,
+            )
+
+        with transaction.atomic():
+            payment = Payment.objects.create(**payment_kwargs)
+            PaymentRecord.record(
+                payment=payment,
+                event_type=PaymentRecord.EventType.CREATED,
+                capture_source=PaymentRecord.CaptureSource.MANUAL_UI,
+                recorded_by=request.user,
+                from_status=None,
+                to_status=payment.status,
+                note="Payment created.",
+                metadata={"direction": payment.direction, "method": payment.method},
+            )
+            if target and payment.status == Payment.Status.SETTLED:
+                _recalculate_target_balance(target, payment.target_type, request.user)
+
+        return Response({"data": PaymentSerializer(payment).data}, status=201)
 
 
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
-def project_payments_view(request, project_id: int):
-    """Project-scoped payment endpoint: GET lists project payments, POST creates attached to project."""
+def project_payments_view(request, project_id):
+    """List project payments or create a new payment linked to the project.
+
+    GET returns all payments for the project.  POST creates a payment
+    pre-linked to the project with auto-resolved customer for inbound
+    direction.  Supports optional target document linking.
+
+    Flow (GET):
+        1. Validate project scope.
+        2. Return project payments with related objects.
+
+    Flow (POST):
+        1. Capability gate: ``payments.create``.
+        2. Validate required fields (direction, method, amount).
+        3. Resolve optional target document.
+        4. Create payment + audit record (atomic).
+        5. Recalculate target balance if settled.
+
+    URL: ``GET/POST /api/v1/projects/<project_id>/payments/``
+
+    Request body (POST)::
+
+        { "direction": "inbound", "method": "check", "amount": "1500.00" }
+
+    Success 200 (GET)::
+
+        { "data": [{ ... }, ...] }
+
+    Success 201 (POST)::
+
+        { "data": { ... } }
+
+    Errors:
+        - 400: Missing required fields or invalid target.
+        - 403: Missing ``payments.create`` capability.
+        - 404: Project not found.
+    """
     project = _validate_project_for_user(project_id, request.user)
     if not project:
         return Response(
@@ -248,72 +248,105 @@ def project_payments_view(request, project_id: int):
         )
         return Response({"data": PaymentSerializer(rows, many=True).data})
 
-    permission_error, _ = _capability_gate(request.user, "payments", "create")
-    if permission_error:
-        return Response(permission_error, status=403)
+    elif request.method == "POST":
+        permission_error, _ = _capability_gate(request.user, "payments", "create")
+        if permission_error:
+            return Response(permission_error, status=403)
 
-    serializer = PaymentWriteSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    data = serializer.validated_data
+        serializer = PaymentWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
 
-    fields = {}
-    if "direction" not in data:
-        fields["direction"] = ["This field is required."]
-    if "method" not in data:
-        fields["method"] = ["This field is required."]
-    if "amount" not in data:
-        fields["amount"] = ["This field is required."]
-    if fields:
-        return Response(
-            {"error": {"code": "validation_error", "message": "Missing required fields.", "fields": fields}},
-            status=400,
-        )
+        fields = {}
+        if "direction" not in data:
+            fields["direction"] = ["This field is required."]
+        if "method" not in data:
+            fields["method"] = ["This field is required."]
+        if "amount" not in data:
+            fields["amount"] = ["This field is required."]
+        if fields:
+            return Response(
+                {"error": {"code": "validation_error", "message": "Missing required fields.", "fields": fields}},
+                status=400,
+            )
 
-    payment_kwargs = {
-        "organization_id": project.organization_id,
-        "customer": project.customer if data.get("direction") == Payment.Direction.INBOUND else None,
-        "project": project,
-        "direction": data["direction"],
-        "method": data["method"],
-        "status": data.get("status", Payment.Status.SETTLED),
-        "amount": data["amount"],
-        "payment_date": data.get("payment_date") or timezone.localdate(),
-        "reference_number": data.get("reference_number", ""),
-        "notes": data.get("notes", ""),
-        "created_by": request.user,
-    }
+        payment_kwargs = {
+            "organization_id": project.organization_id,
+            "customer": project.customer if data.get("direction") == Payment.Direction.INBOUND else None,
+            "project": project,
+            "direction": data["direction"],
+            "method": data["method"],
+            "status": data.get("status", Payment.Status.SETTLED),
+            "amount": data["amount"],
+            "payment_date": data.get("payment_date") or timezone.localdate(),
+            "reference_number": data.get("reference_number", ""),
+            "notes": data.get("notes", ""),
+            "created_by": request.user,
+        }
 
-    # Resolve target document
-    target_fields = {}
-    target = _resolve_and_link_target(data, payment_kwargs, membership, target_fields)
-    if target_fields:
-        return Response(
-            {"error": {"code": "validation_error", "message": "Invalid target.", "fields": target_fields}},
-            status=400,
-        )
+        target_fields = {}
+        target = _resolve_and_link_target(data, payment_kwargs, membership, target_fields)
+        if target_fields:
+            return Response(
+                {"error": {"code": "validation_error", "message": "Invalid target.", "fields": target_fields}},
+                status=400,
+            )
 
-    with transaction.atomic():
-        payment = Payment.objects.create(**payment_kwargs)
-        PaymentRecord.record(
-            payment=payment,
-            event_type=PaymentRecord.EventType.CREATED,
-            capture_source=PaymentRecord.CaptureSource.MANUAL_UI,
-            recorded_by=request.user,
-            from_status=None,
-            to_status=payment.status,
-            note="Payment created.",
-            metadata={"direction": payment.direction, "method": payment.method},
-        )
-        if target and payment.status == Payment.Status.SETTLED:
-            _recalculate_target_balance(target, payment.target_type, request.user)
+        with transaction.atomic():
+            payment = Payment.objects.create(**payment_kwargs)
+            PaymentRecord.record(
+                payment=payment,
+                event_type=PaymentRecord.EventType.CREATED,
+                capture_source=PaymentRecord.CaptureSource.MANUAL_UI,
+                recorded_by=request.user,
+                from_status=None,
+                to_status=payment.status,
+                note="Payment created.",
+                metadata={"direction": payment.direction, "method": payment.method},
+            )
+            if target and payment.status == Payment.Status.SETTLED:
+                _recalculate_target_balance(target, payment.target_type, request.user)
 
-    return Response({"data": PaymentSerializer(payment).data}, status=201)
+        return Response({"data": PaymentSerializer(payment).data}, status=201)
 
 
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
-def payment_detail_view(request, payment_id: int):
-    """Fetch or update a payment."""
+def payment_detail_view(request, payment_id):
+    """Fetch or update a single payment.
+
+    GET returns the payment detail.  PATCH applies partial updates with
+    guards for immutable fields (amount, method), direction changes on
+    linked payments, and status transition validation.  Balance
+    recalculation is triggered when settled status changes.
+
+    Flow (GET):
+        1. Look up payment scoped to user's org.
+        2. Return serialized payment.
+
+    Flow (PATCH):
+        1. Capability gate: ``payments.edit``.
+        2. Validate status transition.
+        3. Reject direction change on linked payments.
+        4. Reject amount/method changes (immutable — void and recreate).
+        5. Apply field updates + audit record (atomic).
+        6. Recalculate target balance if settled status changed.
+
+    URL: ``GET/PATCH /api/v1/payments/<payment_id>/``
+
+    Request body (PATCH)::
+
+        { "status": "void", "notes": "Duplicate entry" }
+
+    Success 200::
+
+        { "data": { ... } }
+
+    Errors:
+        - 400: Invalid transition, immutable field change, or direction change on linked payment.
+        - 403: Missing ``payments.edit`` capability.
+        - 404: Payment not found.
+    """
     membership = _ensure_org_membership(request.user)
     try:
         payment = Payment.objects.select_related(
@@ -331,77 +364,76 @@ def payment_detail_view(request, payment_id: int):
     if request.method == "GET":
         return Response({"data": PaymentSerializer(payment).data})
 
-    permission_error, _ = _capability_gate(request.user, "payments", "edit")
-    if permission_error:
-        return Response(permission_error, status=403)
+    elif request.method == "PATCH":
+        permission_error, _ = _capability_gate(request.user, "payments", "edit")
+        if permission_error:
+            return Response(permission_error, status=403)
 
-    serializer = PaymentWriteSerializer(data=request.data, partial=True)
-    serializer.is_valid(raise_exception=True)
-    data = serializer.validated_data
+        serializer = PaymentWriteSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
 
-    previous_status = payment.status
+        previous_status = payment.status
 
-    if "status" in data and not Payment.is_transition_allowed(
-        current_status=payment.status,
-        next_status=data["status"],
-    ):
-        return Response(
-            {"error": {"code": "validation_error", "message": f"Invalid payment status transition: {payment.status} -> {data['status']}.", "fields": {"status": ["This transition is not allowed."]}}},
-            status=400,
-        )
-
-    # Direction changes are blocked when a target is linked
-    if "direction" in data and data["direction"] != payment.direction and payment.target_type:
-        return Response(
-            {"error": {"code": "validation_error", "message": "Cannot change payment direction when linked to a document.", "fields": {"direction": ["Unlink the document before changing direction."]}}},
-            status=400,
-        )
-
-    # Amount and method are immutable after creation — void and recreate instead
-    if "amount" in data and data["amount"] != payment.amount:
-        return Response(
-            {"error": {"code": "validation_error", "message": "Payment amount cannot be changed. Void this payment and create a new one.", "fields": {"amount": ["Amount is locked after creation."]}}},
-            status=400,
-        )
-    if "method" in data and data["method"] != payment.method:
-        return Response(
-            {"error": {"code": "validation_error", "message": "Payment method cannot be changed. Void this payment and create a new one.", "fields": {"method": ["Method is locked after creation."]}}},
-            status=400,
-        )
-
-    update_fields = ["updated_at"]
-    for field in ["direction", "status", "payment_date", "reference_number", "notes"]:
-        if field in data:
-            setattr(payment, field, data[field])
-            update_fields.append(field)
-
-    with transaction.atomic():
-        if len(update_fields) > 1:
-            payment.save(update_fields=update_fields)
-
-        status_changed = payment.status != previous_status
-        if status_changed and {previous_status, payment.status} & {Payment.Status.SETTLED}:
-            _recalculate_payment_target(payment, changed_by=request.user)
-
-        if len(update_fields) > 1:
-            PaymentRecord.record(
-                payment=payment,
-                event_type=(
-                    PaymentRecord.EventType.STATUS_CHANGED
-                    if status_changed
-                    else PaymentRecord.EventType.UPDATED
-                ),
-                capture_source=PaymentRecord.CaptureSource.MANUAL_UI,
-                recorded_by=request.user,
-                from_status=previous_status,
-                to_status=payment.status,
-                note="Payment updated.",
-                metadata={
-                    "direction": payment.direction,
-                    "method": payment.method,
-                    "status_changed": status_changed,
-                },
+        if "status" in data and not Payment.is_transition_allowed(
+            current_status=payment.status,
+            next_status=data["status"],
+        ):
+            return Response(
+                {"error": {"code": "validation_error", "message": f"Invalid payment status transition: {payment.status} -> {data['status']}.", "fields": {"status": ["This transition is not allowed."]}}},
+                status=400,
             )
 
-    payment.refresh_from_db()
-    return Response({"data": PaymentSerializer(payment).data})
+        if "direction" in data and data["direction"] != payment.direction and payment.target_type:
+            return Response(
+                {"error": {"code": "validation_error", "message": "Cannot change payment direction when linked to a document.", "fields": {"direction": ["Unlink the document before changing direction."]}}},
+                status=400,
+            )
+
+        if "amount" in data and data["amount"] != payment.amount:
+            return Response(
+                {"error": {"code": "validation_error", "message": "Payment amount cannot be changed. Void this payment and create a new one.", "fields": {"amount": ["Amount is locked after creation."]}}},
+                status=400,
+            )
+        if "method" in data and data["method"] != payment.method:
+            return Response(
+                {"error": {"code": "validation_error", "message": "Payment method cannot be changed. Void this payment and create a new one.", "fields": {"method": ["Method is locked after creation."]}}},
+                status=400,
+            )
+
+        update_fields = ["updated_at"]
+        for field in ["direction", "status", "payment_date", "reference_number", "notes"]:
+            if field in data:
+                setattr(payment, field, data[field])
+                update_fields.append(field)
+
+        with transaction.atomic():
+            if len(update_fields) > 1:
+                payment.save(update_fields=update_fields)
+
+            status_changed = payment.status != previous_status
+            if status_changed and {previous_status, payment.status} & {Payment.Status.SETTLED}:
+                _recalculate_payment_target(payment, changed_by=request.user)
+
+            if len(update_fields) > 1:
+                PaymentRecord.record(
+                    payment=payment,
+                    event_type=(
+                        PaymentRecord.EventType.STATUS_CHANGED
+                        if status_changed
+                        else PaymentRecord.EventType.UPDATED
+                    ),
+                    capture_source=PaymentRecord.CaptureSource.MANUAL_UI,
+                    recorded_by=request.user,
+                    from_status=previous_status,
+                    to_status=payment.status,
+                    note="Payment updated.",
+                    metadata={
+                        "direction": payment.direction,
+                        "method": payment.method,
+                        "status_changed": status_changed,
+                    },
+                )
+
+        payment.refresh_from_db()
+        return Response({"data": PaymentSerializer(payment).data})
