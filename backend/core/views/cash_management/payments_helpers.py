@@ -1,19 +1,27 @@
 """Domain-specific helpers for payment views."""
 
 from decimal import Decimal
+from typing import Any
 
 from django.contrib.auth import get_user_model
-from django.db.models import Sum
+from django.db.models import Model, Sum
 
-from core.models import Invoice, Payment, Receipt, VendorBill
+from core.models import Customer, Invoice, OrganizationMembership, Payment, Receipt, VendorBill
 from core.models.financial_auditing.invoice_status_event import InvoiceStatusEvent
 from core.utils.money import MONEY_ZERO, quantize_money
+from core.views.helpers import _validate_project_for_user
 
 User = get_user_model()
 
 
-def _set_invoice_balance_from_payments(invoice: Invoice, *, changed_by: "User"):
-    """Recompute an invoice's balance_due and status from its settled payments."""
+def _set_invoice_balance_from_payments(invoice: Invoice, *, changed_by: "User") -> None:
+    """Recompute an invoice's balance_due and status from its settled payments.
+
+    Sums all settled payments linked to the invoice, updates balance_due,
+    and transitions status (paid/partially_paid/sent) as needed.  Bypasses
+    model transition validation since balance-driven status changes are
+    system-initiated.  Records an audit event when status changes.
+    """
     previous_status = invoice.status
     previous_balance = invoice.balance_due
 
@@ -70,11 +78,12 @@ def _set_invoice_balance_from_payments(invoice: Invoice, *, changed_by: "User"):
         )
 
 
-def _set_vendor_bill_balance_from_payments(vendor_bill: VendorBill):
+def _set_vendor_bill_balance_from_payments(vendor_bill: VendorBill) -> None:
     """Recompute a vendor bill's balance_due from its settled payments.
 
-    Bill document status is NOT changed — payment status (unpaid/partial/paid)
-    is derived from payment coverage, not stored as a bill status.
+    Sums all settled payments linked to the bill and updates balance_due.
+    Bill document status is NOT changed — payment coverage is derived at
+    read time, not stored as a bill status field.
     """
     applied_total = (
         Payment.objects.filter(
@@ -96,8 +105,12 @@ def _set_vendor_bill_balance_from_payments(vendor_bill: VendorBill):
         vendor_bill._skip_transition_validation = False
 
 
-def _set_receipt_balance_from_payments(receipt: Receipt):
-    """Recompute a receipt's balance_due from its settled payments."""
+def _set_receipt_balance_from_payments(receipt: Receipt) -> None:
+    """Recompute a receipt's balance_due from its settled payments.
+
+    Sums all settled payments linked to the receipt and updates
+    balance_due.  Floors at zero to prevent negative balances.
+    """
     applied_total = (
         Payment.objects.filter(
             receipt=receipt,
@@ -114,8 +127,12 @@ def _set_receipt_balance_from_payments(receipt: Receipt):
     receipt.save(update_fields=["balance_due", "updated_at"])
 
 
-def _recalculate_payment_target(payment: Payment, *, changed_by: "User"):
-    """Refresh balance_due on the single document linked to this payment."""
+def _recalculate_payment_target(payment: Payment, *, changed_by: "User") -> None:
+    """Refresh balance_due on the single document linked to this payment.
+
+    Dispatches to the appropriate balance recomputation helper based on
+    which FK is set (invoice, vendor_bill, or receipt).
+    """
     if payment.invoice_id:
         invoice = Invoice.objects.get(id=payment.invoice_id)
         _set_invoice_balance_from_payments(invoice, changed_by=changed_by)

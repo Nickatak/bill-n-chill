@@ -2,8 +2,6 @@
 
 from decimal import Decimal
 
-from decimal import Decimal
-
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F, OuterRef, Subquery
@@ -26,6 +24,7 @@ from core.utils.money import MONEY_ZERO, quantize_money
 from core.utils.request import get_client_ip
 from core.utils.signing import compute_document_content_hash
 from core.views.change_orders.change_orders_helpers import (
+    CO_DECISION_TO_STATUS,
     _handle_co_document_save,
     _handle_co_status_note,
     _handle_co_status_transition,
@@ -47,8 +46,28 @@ from core.views.public_signing_helpers import get_ceremony_context, validate_cer
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def public_change_order_detail_view(request, public_token: str):
-    """Return public change-order detail for share links."""
+def public_change_order_detail_view(request, public_token):
+    """Return public change-order detail for customer share links.
+
+    Loads the change order by public token with project, customer,
+    estimate, and line-item relations.  Enriches the response with
+    project context, organization context, and signing ceremony consent.
+
+    Flow:
+        1. Look up change order by public token.
+        2. Serialize with public context and ceremony consent text.
+
+    URL: ``GET /api/v1/public/change-order/<public_token>/detail/``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": { ..., "project_context": {...}, "ceremony_consent_text": "..." } }
+
+    Errors:
+        - 404: Change order not found.
+    """
     try:
         change_order = (
             ChangeOrder.objects.select_related(
@@ -80,8 +99,36 @@ def public_change_order_detail_view(request, public_token: str):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-def public_change_order_decision_view(request, public_token: str):
-    """Apply a customer decision to a public change-order share link."""
+def public_change_order_decision_view(request, public_token):
+    """Apply a customer approve/reject decision through a public change-order link.
+
+    Validates the decision, confirms the CO is in ``pending_approval``
+    status, runs signing ceremony verification, then atomically
+    transitions the status, propagates financial deltas to the project
+    contract value, and records audit snapshots and signing ceremony.
+
+    Flow:
+        1. Look up change order by public token.
+        2. Validate decision (approve/reject) and current status.
+        3. Validate signing ceremony (OTP session).
+        4. Transition status, propagate financials, record snapshot (atomic).
+        5. Record signing ceremony with content hash.
+
+    URL: ``POST /api/v1/public/change-order/<public_token>/decision/``
+
+    Request body::
+
+        { "decision": "approve", "note": "Approved scope addition" }
+
+    Success 200::
+
+        { "data": { ... }, "meta": { "applied_financial_delta": "5000.00" } }
+
+    Errors:
+        - 400: Invalid decision value.
+        - 404: Change order not found.
+        - 409: Change order not in ``pending_approval`` status.
+    """
     try:
         change_order = (
             ChangeOrder.objects.select_related(
@@ -103,13 +150,7 @@ def public_change_order_decision_view(request, public_token: str):
         )
 
     decision = str(request.data.get("decision", "")).strip().lower()
-    decision_to_status = {
-        "approve": ChangeOrder.Status.APPROVED,
-        "approved": ChangeOrder.Status.APPROVED,
-        "reject": ChangeOrder.Status.REJECTED,
-        "rejected": ChangeOrder.Status.REJECTED,
-    }
-    next_status = decision_to_status.get(decision)
+    next_status = CO_DECISION_TO_STATUS.get(decision)
     if not next_status:
         return Response(*_validation_error_payload(
             message="Invalid public decision for change order.",
@@ -213,42 +254,68 @@ def public_change_order_decision_view(request, public_token: str):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def change_order_contract_view(_request):
-    """Return canonical change-order workflow policy for frontend UX guards.
+    """Return the canonical change-order workflow policy contract.
 
-    Contract:
-    - `GET`:
-      - `200`: change-order policy contract returned.
-        - Guarantees:
-          - statuses/transitions mirror backend model-level transition guards. `[APP]`
-          - no object mutations. `[APP]`
-      - `401`: authentication missing/invalid.
-        - Guarantees: no object mutations. `[APP]`
+    Read-only endpoint that returns status definitions, allowed transitions,
+    and role requirements.  Used by the frontend to gate UI elements without
+    hard-coding business rules.
 
-    - Preconditions:
-      - caller must be authenticated (`IsAuthenticated`).
+    Flow:
+        1. Return the change-order policy contract payload.
 
-    - Object mutations:
-      - `GET`: none.
+    URL: ``GET /api/v1/change-orders/contract/``
 
-    - Idempotency and retry semantics:
-      - `GET` is idempotent and read-only.
+    Request body: (none)
 
-    - Test anchors:
-      - `backend/core/tests/test_change_orders.py::ChangeOrderTests::test_change_order_contract_requires_authentication`
-      - `backend/core/tests/test_change_orders.py::ChangeOrderTests::test_change_order_contract_matches_model_transition_policy`
+    Success 200::
+
+        { "data": { "statuses": [...], "transitions": [...] } }
     """
     return Response({"data": get_change_order_policy_contract()})
 
 
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
-def project_change_orders_view(request, project_id: int):
+def project_change_orders_view(request, project_id):
     """List project change orders or create a new family revision-1 draft.
 
-    Contract:
-    - `GET`: project/user-scoped list with line items.
-    - `POST`: requires role `owner|pm`, approved origin estimate, and valid line totals.
-    - Create writes are atomic: change-order row, optional lines.
+    GET returns all change orders for the project with line items and a
+    latest-revision map for frontend UI gating.  POST creates a new
+    change-order family (revision 1) requiring an approved origin
+    estimate, valid line totals matching the amount delta, and atomic
+    creation of the CO row plus optional line items.
+
+    Flow (GET):
+        1. Validate project scope.
+        2. Query all COs with line items.
+        3. Compute latest-revision map via subquery.
+        4. Return serialized list with revision context.
+
+    Flow (POST):
+        1. Capability gate: ``change_orders.create``.
+        2. Validate required fields (title, amount_delta, origin_estimate).
+        3. Validate origin estimate exists, is project-scoped, and approved.
+        4. Validate line items and amount consistency.
+        5. Create change order + lines (atomic).
+
+    URL: ``GET/POST /api/v1/projects/<project_id>/change-orders/``
+
+    Request body (POST)::
+
+        { "title": "Scope Addition", "amount_delta": "5000.00", "origin_estimate": 42, "line_items": [...] }
+
+    Success 200 (GET)::
+
+        { "data": [{ ... }, ...] }
+
+    Success 201 (POST)::
+
+        { "data": { ... } }
+
+    Errors:
+        - 400: Validation error (missing fields, invalid estimate, line mismatch).
+        - 403: Missing ``change_orders.create`` capability.
+        - 404: Project not found.
     """
     membership = _ensure_org_membership(request.user)
     project = _validate_project_for_user(project_id, request.user)
@@ -283,131 +350,157 @@ def project_change_orders_view(request, project_id: int):
             {"data": ChangeOrderSerializer(rows, many=True, context={"is_latest_revision_map": is_latest_revision_map}).data}
         )
 
-    permission_error, _ = _capability_gate(request.user, "change_orders", "create")
-    if permission_error:
-        return Response(permission_error, status=403)
+    elif request.method == "POST":
+        permission_error, _ = _capability_gate(request.user, "change_orders", "create")
+        if permission_error:
+            return Response(permission_error, status=403)
 
-    serializer = ChangeOrderWriteSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    data = serializer.validated_data
-    membership = _ensure_org_membership(request.user)
-    organization = membership.organization
-    incoming_line_items = data.get("line_items", [])
-    origin_estimate = None
-    reason_text = (
-        str(data["reason"]).strip()
-        if "reason" in data
-        else ""
-    )
-    terms_text = (
-        str(data["terms_text"]).strip()
-        if "terms_text" in data
-        else (organization.change_order_terms_and_conditions or "").strip()
-    )
-
-    fields = {}
-    if "title" not in data:
-        fields["title"] = ["This field is required."]
-    if "amount_delta" not in data:
-        fields["amount_delta"] = ["This field is required."]
-    if fields:
-        return Response(*_validation_error_payload(
-            message="Missing required fields for change order creation.",
-            fields=fields,
-            rule="co_create_missing_required_fields",
-        ))
-
-    if "origin_estimate" not in data or data["origin_estimate"] is None:
-        return Response(*_validation_error_payload(
-            message="Change orders require an approved origin estimate.",
-            fields={"origin_estimate": ["Select an approved estimate from this project."]},
-            rule="co_create_origin_estimate_required",
-        ))
-    try:
-        origin_estimate = Estimate.objects.get(
-            id=data["origin_estimate"],
-            project=project,
+        serializer = ChangeOrderWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        organization = membership.organization
+        incoming_line_items = data.get("line_items", [])
+        origin_estimate = None
+        reason_text = (
+            str(data["reason"]).strip()
+            if "reason" in data
+            else ""
         )
-    except Estimate.DoesNotExist:
-        return Response(*_validation_error_payload(
-            message="origin_estimate is invalid for this project.",
-            fields={"origin_estimate": ["Use an estimate from this project."]},
-            rule="co_origin_estimate_project_scope",
-        ))
-    if origin_estimate.status != Estimate.Status.APPROVED:
-        return Response(*_validation_error_payload(
-            message="Change orders require an approved origin estimate.",
-            fields={"origin_estimate": ["Only approved estimates can be used as CO origin."]},
-            rule="co_origin_estimate_approved_required",
-        ))
-
-    cost_code_map = {}
-    line_total_delta = MONEY_ZERO
-    if incoming_line_items:
-        cost_code_map, line_total_delta, line_error = _validate_change_order_lines(
-            line_items=incoming_line_items,
-            organization_id=organization.id,
+        terms_text = (
+            str(data["terms_text"]).strip()
+            if "terms_text" in data
+            else (organization.change_order_terms_and_conditions or "").strip()
         )
-        if line_error:
-            return Response(*line_error)
-        if line_total_delta != Decimal(str(data["amount_delta"])):
+
+        fields = {}
+        if "title" not in data:
+            fields["title"] = ["This field is required."]
+        if "amount_delta" not in data:
+            fields["amount_delta"] = ["This field is required."]
+        if fields:
             return Response(*_validation_error_payload(
-                message="Line-item total must match change-order amount delta.",
-                fields={"line_items": ["Sum of line item amount_delta must equal amount_delta."]},
-                rule="co_line_total_must_match_amount_delta",
+                message="Missing required fields for change order creation.",
+                fields=fields,
+                rule="co_create_missing_required_fields",
             ))
 
-    sender_logo_url = ""
-    if organization.logo:
-        sender_logo_url = request.build_absolute_uri(organization.logo.url)
-
-    try:
-        with transaction.atomic():
-            change_order = ChangeOrder.objects.create(
+        if "origin_estimate" not in data or data["origin_estimate"] is None:
+            return Response(*_validation_error_payload(
+                message="Change orders require an approved origin estimate.",
+                fields={"origin_estimate": ["Select an approved estimate from this project."]},
+                rule="co_create_origin_estimate_required",
+            ))
+        try:
+            origin_estimate = Estimate.objects.get(
+                id=data["origin_estimate"],
                 project=project,
-                family_key=_next_change_order_family_key(project=project),
-                revision_number=1,
-                title=data["title"],
-                status=ChangeOrder.Status.DRAFT,
-                amount_delta=data["amount_delta"],
-                days_delta=data.get("days_delta", 0),
-                reason=reason_text,
-                terms_text=terms_text,
-                sender_name=(organization.display_name or "").strip(),
-                sender_address=organization.formatted_billing_address,
-                sender_logo_url=sender_logo_url,
-                origin_estimate=origin_estimate,
-                requested_by=request.user,
             )
-            if incoming_line_items:
-                _sync_change_order_lines(
-                    change_order=change_order,
-                    line_items=incoming_line_items,
-                    cost_code_map=cost_code_map,
+        except Estimate.DoesNotExist:
+            return Response(*_validation_error_payload(
+                message="origin_estimate is invalid for this project.",
+                fields={"origin_estimate": ["Use an estimate from this project."]},
+                rule="co_origin_estimate_project_scope",
+            ))
+        if origin_estimate.status != Estimate.Status.APPROVED:
+            return Response(*_validation_error_payload(
+                message="Change orders require an approved origin estimate.",
+                fields={"origin_estimate": ["Only approved estimates can be used as CO origin."]},
+                rule="co_origin_estimate_approved_required",
+            ))
+
+        cost_code_map = {}
+        line_total_delta = MONEY_ZERO
+        if incoming_line_items:
+            cost_code_map, line_total_delta, line_error = _validate_change_order_lines(
+                line_items=incoming_line_items,
+                organization_id=organization.id,
+            )
+            if line_error:
+                return Response(*line_error)
+            if line_total_delta != Decimal(str(data["amount_delta"])):
+                return Response(*_validation_error_payload(
+                    message="Line-item total must match change-order amount delta.",
+                    fields={"line_items": ["Sum of line item amount_delta must equal amount_delta."]},
+                    rule="co_line_total_must_match_amount_delta",
+                ))
+
+        sender_logo_url = ""
+        if organization.logo:
+            sender_logo_url = request.build_absolute_uri(organization.logo.url)
+
+        try:
+            with transaction.atomic():
+                change_order = ChangeOrder.objects.create(
+                    project=project,
+                    family_key=_next_change_order_family_key(project=project),
+                    revision_number=1,
+                    title=data["title"],
+                    status=ChangeOrder.Status.DRAFT,
+                    amount_delta=data["amount_delta"],
+                    days_delta=data.get("days_delta", 0),
+                    reason=reason_text,
+                    terms_text=terms_text,
+                    sender_name=(organization.display_name or "").strip(),
+                    sender_address=organization.formatted_billing_address,
+                    sender_logo_url=sender_logo_url,
+                    origin_estimate=origin_estimate,
+                    requested_by=request.user,
                 )
-    except ValidationError as exc:
-        return Response(*_model_validation_error_payload(
-            exc=exc,
-            message="Change-order line items are invalid for this project/budget context.",
-        ))
-    created = (
-        ChangeOrder.objects.filter(id=change_order.id)
-        .prefetch_related("line_items", "line_items__cost_code")
-        .get()
-    )
-    return Response({"data": ChangeOrderSerializer(created).data}, status=201)
+                if incoming_line_items:
+                    _sync_change_order_lines(
+                        change_order=change_order,
+                        line_items=incoming_line_items,
+                        cost_code_map=cost_code_map,
+                    )
+        except ValidationError as exc:
+            return Response(*_model_validation_error_payload(
+                exc=exc,
+                message="Change-order line items are invalid for this project/budget context.",
+            ))
+        created = (
+            ChangeOrder.objects.filter(id=change_order.id)
+            .prefetch_related("line_items", "line_items__cost_code")
+            .get()
+        )
+        return Response({"data": ChangeOrderSerializer(created).data}, status=201)
 
 
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
-def change_order_detail_view(request, change_order_id: int):
-    """Fetch or update a change order with strict revision and status semantics.
+def change_order_detail_view(request, change_order_id):
+    """Fetch or update a change order with revision and status enforcement.
 
-    Contract:
-    - `GET`: returns change-order detail.
-    - `PATCH`: requires role `owner|pm`; only latest revision can be edited.
-    - Enforces transition rules, line/amount consistency, and origin-estimate immutability policy.
-    - Atomic update path may propagate financial deltas to project and append immutable snapshot rows.
+    GET returns the change-order detail.  PATCH supports three concern
+    paths: status transitions (with capability gates and financial
+    propagation), status notes (no-op for COs), and document saves
+    (content field + line-item updates).  Only the latest revision can
+    be edited, and only drafts allow content changes.
+
+    Flow (GET):
+        1. Look up change order scoped to user's org.
+        2. Return serialized change order.
+
+    Flow (PATCH):
+        1. Capability gate: ``change_orders.edit``.
+        2. Additional gates for send (``change_orders.send``) and
+           approve/void (``change_orders.approve``).
+        3. Reject edits on non-latest revisions and non-draft content edits.
+        4. Dispatch to status-transition, status-note, or document-save handler.
+
+    URL: ``GET/PATCH /api/v1/change-orders/<change_order_id>/``
+
+    Request body (PATCH)::
+
+        { "status": "pending_approval" }
+
+    Success 200::
+
+        { "data": { ... }, "email_sent": false }
+
+    Errors:
+        - 400: Non-latest revision, non-draft content edit, invalid transition.
+        - 403: Missing capability for the requested action.
+        - 404: Change order not found.
     """
     membership = _ensure_org_membership(request.user)
     try:
@@ -427,83 +520,104 @@ def change_order_detail_view(request, change_order_id: int):
     if request.method == "GET":
         return Response({"data": ChangeOrderSerializer(change_order).data})
 
-    permission_error, _ = _capability_gate(request.user, "change_orders", "edit")
-    if permission_error:
-        return Response(permission_error, status=403)
+    elif request.method == "PATCH":
+        permission_error, _ = _capability_gate(request.user, "change_orders", "edit")
+        if permission_error:
+            return Response(permission_error, status=403)
 
-    serializer = ChangeOrderWriteSerializer(data=request.data, partial=True)
-    serializer.is_valid(raise_exception=True)
-    data = serializer.validated_data
+        serializer = ChangeOrderWriteSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
 
-    # Status-transition capability gates
-    if "status" in data:
-        _next = data["status"]
-        if _next == ChangeOrder.Status.PENDING_APPROVAL:
-            _err, _ = _capability_gate(request.user, "change_orders", "send")
-            if _err:
-                return Response(_err, status=403)
-        elif _next in {ChangeOrder.Status.APPROVED, ChangeOrder.Status.VOID}:
-            _err, _ = _capability_gate(request.user, "change_orders", "approve")
-            if _err:
-                return Response(_err, status=403)
+        # Status-transition capability gates
+        if "status" in data:
+            requested_status = data["status"]
+            if requested_status == ChangeOrder.Status.PENDING_APPROVAL:
+                permission_error, _ = _capability_gate(request.user, "change_orders", "send")
+                if permission_error:
+                    return Response(permission_error, status=403)
+            elif requested_status in {ChangeOrder.Status.APPROVED, ChangeOrder.Status.VOID}:
+                permission_error, _ = _capability_gate(request.user, "change_orders", "approve")
+                if permission_error:
+                    return Response(permission_error, status=403)
 
-    incoming_line_items = data.get("line_items", None)
-    content_fields = {"title", "reason", "amount_delta", "days_delta", "origin_estimate", "line_items"}
-    attempted_content_fields = sorted(field for field in content_fields if field in data)
+        incoming_line_items = data.get("line_items", None)
+        content_fields = {"title", "reason", "amount_delta", "days_delta", "origin_estimate", "line_items"}
+        attempted_content_fields = sorted(field for field in content_fields if field in data)
 
-    latest_revision_exists = ChangeOrder.objects.filter(
-        project=change_order.project,
-        family_key=change_order.family_key,
-        revision_number__gt=change_order.revision_number,
-    ).exists()
-    if latest_revision_exists and attempted_content_fields:
-        return Response(*_validation_error_payload(
-            message="Only the latest change-order revision can be edited.",
-            fields={"change_order": ["Create or edit the latest revision for this family."]},
-            rule="co_edit_latest_revision_only",
-        ))
-    if change_order.status != ChangeOrder.Status.DRAFT:
-        if attempted_content_fields:
+        latest_revision_exists = ChangeOrder.objects.filter(
+            project=change_order.project,
+            family_key=change_order.family_key,
+            revision_number__gt=change_order.revision_number,
+        ).exists()
+        if latest_revision_exists and attempted_content_fields:
             return Response(*_validation_error_payload(
-                message="Only draft change orders can edit content fields.",
-                fields={
-                    field: ["This field is read-only after draft. Clone a new revision to change content."]
-                    for field in attempted_content_fields
-                },
-                rule="co_edit_requires_draft_status",
+                message="Only the latest change-order revision can be edited.",
+                fields={"change_order": ["Create or edit the latest revision for this family."]},
+                rule="co_edit_latest_revision_only",
             ))
+        if change_order.status != ChangeOrder.Status.DRAFT:
+            if attempted_content_fields:
+                return Response(*_validation_error_payload(
+                    message="Only draft change orders can edit content fields.",
+                    fields={
+                        field: ["This field is read-only after draft. Clone a new revision to change content."]
+                        for field in attempted_content_fields
+                    },
+                    rule="co_edit_requires_draft_status",
+                ))
 
-    # --- Concern dispatch ---
-    previous_status = change_order.status
-    next_status = data.get("status", previous_status)
-    status_changing = "status" in data
-    is_actual_transition = status_changing and previous_status != next_status
-    is_resend = (
-        status_changing
-        and previous_status == ChangeOrder.Status.PENDING_APPROVAL
-        and next_status == ChangeOrder.Status.PENDING_APPROVAL
-    )
-    status_note = (data.get("status_note", "") or "").strip()
-
-    if is_actual_transition or is_resend:
-        return _handle_co_status_transition(
-            request, change_order, data, membership,
-            previous_status, next_status, is_resend,
+        # --- Concern dispatch ---
+        previous_status = change_order.status
+        next_status = data.get("status", previous_status)
+        status_changing = "status" in data
+        is_actual_transition = status_changing and previous_status != next_status
+        is_resend = (
+            status_changing
+            and previous_status == ChangeOrder.Status.PENDING_APPROVAL
+            and next_status == ChangeOrder.Status.PENDING_APPROVAL
         )
-    if status_note:
-        return _handle_co_status_note(request, change_order, data)
-    return _handle_co_document_save(request, change_order, data, membership)
+        status_note = (data.get("status_note", "") or "").strip()
+
+        if is_actual_transition or is_resend:
+            return _handle_co_status_transition(
+                request, change_order, data, membership,
+                previous_status, next_status, is_resend,
+            )
+        if status_note:
+            return _handle_co_status_note(request, change_order, data)
+        return _handle_co_document_save(request, change_order, data, membership)
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def change_order_clone_revision_view(request, change_order_id: int):
-    """Clone the latest change-order revision into a new draft revision in the same family.
+def change_order_clone_revision_view(request, change_order_id):
+    """Clone the latest change-order revision into a new draft in the same family.
 
-    Contract:
-    - Requires role `owner|pm`.
-    - Source must be latest family revision.
-    - Clone writes are atomic: cloned row, cloned lines.
+    Copies title, amounts, reason, terms, origin estimate, and line items
+    into a new draft revision.  The source must be the latest family
+    revision.  If the source is in draft or pending_approval status, it
+    is auto-voided to prevent two live revisions.
+
+    Flow:
+        1. Look up change order scoped to user's org.
+        2. Capability gate: ``change_orders.create``.
+        3. Validate source is the latest family revision.
+        4. Create cloned draft with line items (atomic).
+        5. Auto-void source if it was draft or pending_approval.
+
+    URL: ``POST /api/v1/change-orders/<change_order_id>/clone-revision/``
+
+    Request body: (none)
+
+    Success 201::
+
+        { "data": { ... } }
+
+    Errors:
+        - 400: Source is not the latest family revision.
+        - 403: Missing ``change_orders.create`` capability.
+        - 404: Change order not found.
     """
     membership = _ensure_org_membership(request.user)
     try:

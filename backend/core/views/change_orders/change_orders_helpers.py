@@ -1,12 +1,15 @@
 """Domain-specific helpers for change-order views."""
 
 from decimal import Decimal
+from typing import Any
 
 from django.conf import settings
+from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F, Sum
 from django.utils import timezone
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.models import (
@@ -15,6 +18,7 @@ from core.models import (
     ChangeOrderSnapshot,
     CostCode,
     Estimate,
+    OrganizationMembership,
     Project,
 )
 from core.serializers import ChangeOrderSerializer, EstimateLineItemSerializer
@@ -27,7 +31,24 @@ from core.views.helpers import (
 )
 
 
-def _serialize_public_change_order(change_order, request=None) -> dict:
+# ---------------------------------------------------------------------------
+# Constants (imported by views)
+# ---------------------------------------------------------------------------
+
+CO_DECISION_TO_STATUS: dict[str, str] = {
+    "approve": ChangeOrder.Status.APPROVED,
+    "approved": ChangeOrder.Status.APPROVED,
+    "reject": ChangeOrder.Status.REJECTED,
+    "rejected": ChangeOrder.Status.REJECTED,
+}
+
+
+# ---------------------------------------------------------------------------
+# Serialization
+# ---------------------------------------------------------------------------
+
+
+def _serialize_public_change_order(change_order: ChangeOrder, request: Request | None = None) -> dict[str, Any]:
     """Serialize a change order with project and organization context for public preview.
 
     Includes origin estimate line items and approved sibling change orders for
@@ -65,10 +86,17 @@ def _serialize_public_change_order(change_order, request=None) -> dict:
     return serialized
 
 
-def _validate_change_order_lines(*, line_items, organization_id):
-    """Validate change order line items. Returns (cost_code_map, total, error_response).
+def _validate_change_order_lines(
+    *,
+    line_items: list[dict],
+    organization_id: int,
+) -> tuple[dict[int, CostCode], Decimal, tuple | None]:
+    """Validate change-order line items and resolve cost codes.
 
-    Each line requires a valid cost_code in the organization.
+    Returns ``(cost_code_map, line_total_delta, error_tuple_or_none)``.
+    Each line must specify a ``cost_code`` that belongs to the organization.
+    The error tuple, when present, is ``(body, status_code)`` for
+    ``Response(*error)``.
     """
     if not line_items:
         return {}, MONEY_ZERO, None
@@ -112,8 +140,17 @@ def _validate_change_order_lines(*, line_items, organization_id):
     return cost_code_map, total, None
 
 
-def _sync_change_order_lines(*, change_order, line_items, cost_code_map):
-    """Replace all line items on a change order with the provided set."""
+def _sync_change_order_lines(
+    *,
+    change_order: ChangeOrder,
+    line_items: list[dict],
+    cost_code_map: dict[int, CostCode],
+) -> None:
+    """Replace all line items on a change order with the provided set.
+
+    Deletes existing lines and creates new ones from the input dicts,
+    resolving cost codes from the pre-validated map.
+    """
     ChangeOrderLine.objects.filter(change_order=change_order).delete()
     for row in line_items:
         cost_code = cost_code_map.get(int(row["cost_code"])) if row.get("cost_code") else None
@@ -127,10 +164,16 @@ def _sync_change_order_lines(*, change_order, line_items, cost_code_map):
         )
 
 
-def _validation_error_payload(*, message: str, fields: dict, rule: str | None = None):
-    """Build a (body, status_code) tuple for a 400 validation error.
+def _validation_error_payload(
+    *,
+    message: str,
+    fields: dict[str, list[str]],
+    rule: str | None = None,
+) -> tuple[dict, int]:
+    """Build a ``(body, status_code)`` tuple for a 400 validation error.
 
-    Returns the raw payload and HTTP status so the calling view owns Response construction.
+    Returns the raw payload and HTTP status so the calling view owns
+    ``Response`` construction via ``Response(*result)``.
     """
     error = {
         "code": "validation_error",
@@ -142,8 +185,12 @@ def _validation_error_payload(*, message: str, fields: dict, rule: str | None = 
     return {"error": error}, 400
 
 
-def _next_change_order_family_key(*, project):
-    """Return the next numeric family key string for change orders in a project."""
+def _next_change_order_family_key(*, project: Project) -> str:
+    """Return the next numeric family key string for change orders in a project.
+
+    Scans existing family keys, extracts numeric ones, and returns
+    ``str(max + 1)`` or ``"1"`` if none exist.
+    """
     existing_keys = ChangeOrder.objects.filter(project=project).values_list("family_key", flat=True)
     numeric_keys = []
     for key in existing_keys:
@@ -153,8 +200,12 @@ def _next_change_order_family_key(*, project):
     return str((max(numeric_keys) + 1) if numeric_keys else 1)
 
 
-def _infer_model_validation_rule(*, fields: dict) -> str | None:
-    """Infer a domain-specific rule code from Django model ValidationError field names."""
+def _infer_model_validation_rule(*, fields: dict[str, list[str]]) -> str | None:
+    """Infer a domain-specific rule code from Django model ValidationError field names.
+
+    Maps known field combinations to rule codes so the frontend can
+    display targeted guidance without parsing error messages.
+    """
     field_keys = set(fields.keys())
     if {"approved_by", "approved_at"} & field_keys:
         return "co_approval_metadata_invariant"
@@ -169,10 +220,15 @@ def _infer_model_validation_rule(*, fields: dict) -> str | None:
     return None
 
 
-def _model_validation_error_payload(*, exc: ValidationError, message: str):
-    """Convert a Django model ValidationError into a (body, status_code) tuple.
+def _model_validation_error_payload(
+    *,
+    exc: ValidationError,
+    message: str,
+) -> tuple[dict, int]:
+    """Convert a Django model ``ValidationError`` into a ``(body, status_code)`` tuple.
 
-    Returns the raw payload and HTTP status so the calling view owns Response construction.
+    Extracts field-level errors from the exception and infers a rule code
+    for frontend targeting.
     """
     fields = {}
     if hasattr(exc, "message_dict"):
@@ -191,12 +247,18 @@ def _model_validation_error_payload(*, exc: ValidationError, message: str):
 # ---------------------------------------------------------------------------
 
 
-def _handle_co_document_save(request, change_order, data, membership):
-    """Apply content field updates and line items to a change order (the 'save' concern).
+def _handle_co_document_save(
+    request: Request,
+    change_order: ChangeOrder,
+    data: dict[str, Any],
+    membership: OrganizationMembership,
+) -> Response:
+    """Apply content field updates and line items to a change order (save concern).
 
-    Handles title, reason, terms_text, amount_delta, days_delta, origin_estimate,
-    and line items with amount consistency validation.  Does not perform status
-    transitions, financial propagation, or snapshot recording.
+    Handles title, reason, terms_text, amount_delta, days_delta,
+    origin_estimate, and line items with amount consistency validation.
+    Enforces origin-estimate immutability and line/amount-delta agreement.
+    Does not perform status transitions or snapshot recording.
     """
     current_amount_delta = quantize_money(change_order.amount_delta)
     next_amount_delta = quantize_money(data.get("amount_delta", current_amount_delta))
@@ -319,14 +381,21 @@ def _handle_co_document_save(request, change_order, data, membership):
 
 
 def _handle_co_status_transition(
-    request, change_order, data, membership, previous_status, next_status, is_resend,
-):
-    """Handle a change order status transition: validate, apply, propagate financials, audit, email.
+    request: Request,
+    change_order: ChangeOrder,
+    data: dict[str, Any],
+    membership: OrganizationMembership,
+    previous_status: str,
+    next_status: str,
+    is_resend: bool,
+) -> Response:
+    """Handle a change-order status transition with financials, audit, and email.
 
-    Called when the PATCH includes a real status change (previous != next) or a
-    pending-approval resend.  Handles org identity freeze on draft departure,
-    financial delta propagation to the project, approval metadata, snapshot
-    recording, and email notification.
+    Called when the PATCH includes a real status change or a
+    pending-approval resend.  Freezes org identity on draft departure,
+    propagates financial deltas to the project contract value, manages
+    approval metadata, records immutable snapshots, and sends email
+    notifications on send/resend.
     """
     if not is_resend and not ChangeOrder.is_transition_allowed(
         current_status=previous_status,
@@ -440,11 +509,16 @@ def _handle_co_status_transition(
     return Response({"data": ChangeOrderSerializer(refreshed).data, "email_sent": email_sent})
 
 
-def _handle_co_status_note(request, change_order, data):
-    """Return current change order state for note-only requests.
+def _handle_co_status_note(
+    request: Request,
+    change_order: ChangeOrder,
+    data: dict[str, Any],
+) -> Response:
+    """Return current change-order state for note-only requests.
 
     Change orders do not store timeline notes — this handler exists for
-    frontend call symmetry and returns the current document unchanged.
+    frontend PATCH symmetry with estimates/invoices and returns the
+    current document unchanged.
     """
     refreshed = (
         ChangeOrder.objects.filter(id=change_order.id)
