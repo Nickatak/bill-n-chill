@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SessionAuthorizationProvider } from "@/shared/session/session-authorization";
+import { ServiceWorkerRegistration } from "@/shared/pwa";
 import "./globals.css";
 import { AuthGate, AppToolbar, ImpersonationBanner, MobileBottomNav, MobileDrawer, PrintableProvider, WorkflowShell } from "@/shared/shell";
 
@@ -19,7 +20,22 @@ export const metadata: Metadata = {
     default: "Bill n Chill",
     template: "%s | Bill n Chill",
   },
-  description: "Bill n Chill operations workspace",
+  description: "Construction billing and payment management",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Bill n Chill",
+  },
+  icons: {
+    icon: "/favicon.png",
+    apple: "/icons/apple-touch-icon.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#374b6e",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -30,6 +46,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        <ServiceWorkerRegistration />
         <SessionAuthorizationProvider>
           <PrintableProvider>
             <AppToolbar />
