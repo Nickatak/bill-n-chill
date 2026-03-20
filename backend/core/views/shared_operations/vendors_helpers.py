@@ -1,13 +1,25 @@
 """Domain-specific helpers for vendor views."""
 
+from django.contrib.auth.models import AbstractUser
 from django.db.models import Q
 
 from core.models import Vendor
 from core.views.helpers import _org_scope_filter  # noqa: F401 — re-exported for vendors.py
 
 
-def _find_duplicate_vendors(user, *, name: str, email: str, exclude_vendor_id=None):
-    """Find existing vendors matching by name or email for duplicate detection."""
+def _find_duplicate_vendors(
+    user: AbstractUser,
+    *,
+    name: str,
+    email: str,
+    exclude_vendor_id: int | None = None,
+) -> list[Vendor]:
+    """Find org-scoped vendors matching by name or email for duplicate detection.
+
+    Builds a case-insensitive OR query across name and email fields.
+    Used by create and update views to warn before introducing duplicates.
+    Optionally excludes one vendor (the one being edited) from results.
+    """
     rows = Vendor.objects.filter(_org_scope_filter(user))
     if exclude_vendor_id:
         rows = rows.exclude(id=exclude_vendor_id)

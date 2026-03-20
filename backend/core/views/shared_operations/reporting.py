@@ -33,12 +33,41 @@ from core.views.shared_operations.projects_helpers import (
     _build_project_financial_summary_data,
     _date_filter_from_query,
 )
+from core.views.shared_operations.reporting_helpers import (
+    DUE_SOON_WINDOW_DAYS,
+    QUICK_JUMP_RESULT_LIMIT,
+    SEVERITY_RANK,
+    VALID_TIMELINE_CATEGORIES,
+)
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def portfolio_snapshot_view(request):
-    """Return portfolio-level snapshot metrics with optional date filtering."""
+    """Return portfolio-level financial snapshot across all projects.
+
+    Aggregates AR/AP outstanding totals, active project counts, and overdue
+    document counts.  Supports optional ``date_from``/``date_to`` query
+    params that filter overdue-document windows by issue date.
+
+    Flow:
+        1. Validate optional date filters.
+        2. Load all org projects and compute per-project financial summaries.
+        3. Accumulate portfolio-wide AR/AP outstanding totals.
+        4. Count overdue invoices and vendor bills (optionally date-filtered).
+        5. Return serialized snapshot.
+
+    URL: ``GET /api/v1/reports/portfolio/``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": { "active_projects_count": 5, "ar_total_outstanding": "12000.00", ... } }
+
+    Errors:
+        - 400: Invalid date filter format.
+    """
     date_from, date_to, filter_error = _date_filter_from_query(request)
     if filter_error:
         return Response(
@@ -119,7 +148,29 @@ def portfolio_snapshot_view(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def change_impact_summary_view(request):
-    """Return approved change-order impact totals, grouped by project, with date filters."""
+    """Return approved change-order impact totals grouped by project.
+
+    Aggregates approved change-order deltas across the organization,
+    optionally filtered by approval date range.  Projects are sorted by
+    total impact descending.
+
+    Flow:
+        1. Validate optional date filters.
+        2. Query approved change orders, optionally filtered by approval date.
+        3. Group by project and accumulate totals.
+        4. Return serialized summary sorted by impact.
+
+    URL: ``GET /api/v1/reports/change-impact/``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": { "approved_change_order_count": 8, "approved_change_order_total": "45000.00", "projects": [...] } }
+
+    Errors:
+        - 400: Invalid date filter format.
+    """
     date_from, date_to, filter_error = _date_filter_from_query(request)
     if filter_error:
         return Response(
@@ -177,11 +228,30 @@ def change_impact_summary_view(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def attention_feed_view(request):
-    """Return prioritized operational attention items (overdue, pending, and problem states)."""
+    """Return prioritized operational attention items requiring action.
+
+    Scans for overdue invoices, soon-due vendor bills, pending change orders,
+    and voided payments.  Items are ranked by severity (high -> medium -> low),
+    then by due date and project.
+
+    Flow:
+        1. Query overdue invoices (high severity).
+        2. Query vendor bills due within ``DUE_SOON_WINDOW_DAYS`` (medium severity).
+        3. Query pending-approval change orders (medium severity).
+        4. Query voided payments (low severity).
+        5. Sort by severity rank, due date, and project.
+
+    URL: ``GET /api/v1/reports/attention-feed/``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": { "item_count": 12, "items": [{ "kind": "overdue_invoice", "severity": "high", ... }, ...] } }
+    """
     membership = _ensure_org_membership(request.user)
     today = django_timezone.localdate()
-    due_soon_window_days = 7
-    due_soon_date = today + timedelta(days=due_soon_window_days)
+    due_soon_date = today + timedelta(days=DUE_SOON_WINDOW_DAYS)
     items = []
 
     overdue_invoices = (
@@ -279,18 +349,17 @@ def attention_feed_view(request):
             }
         )
 
-    severity_rank = {"high": 0, "medium": 1, "low": 2}
     items = sorted(
         items,
         key=lambda row: (
-            severity_rank.get(row["severity"], 9),
+            SEVERITY_RANK.get(row["severity"], 9),
             row["due_date"] or today,
             row["project_id"],
         ),
     )
     payload = {
         "generated_at": django_timezone.now(),
-        "due_soon_window_days": due_soon_window_days,
+        "due_soon_window_days": DUE_SOON_WINDOW_DAYS,
         "item_count": len(items),
         "items": items,
     }
@@ -300,7 +369,27 @@ def attention_feed_view(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def quick_jump_search_view(request):
-    """Search key entities by lightweight text query for fast navigation jump points."""
+    """Search key entities by text query for fast navigation jump points.
+
+    Performs a lightweight in-memory search across projects, estimates,
+    change orders, invoices, vendor bills, and payments.  Requires a
+    minimum 2-character query.  Results are deduped, sorted, and capped
+    at ``QUICK_JUMP_RESULT_LIMIT`` items.
+
+    Flow:
+        1. Validate minimum query length (2 characters).
+        2. Search each entity type for case-insensitive text matches.
+        3. Deduplicate results by (kind, record_id).
+        4. Sort and cap at result limit.
+
+    URL: ``GET /api/v1/search/quick-jump/?q=<query>``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": { "query": "INV", "item_count": 3, "items": [{ "kind": "invoice", ... }, ...] } }
+    """
     query = (request.query_params.get("q") or "").strip()
     if len(query) < 2:
         return Response({"data": QuickJumpSearchSerializer({"query": query, "item_count": 0, "items": []}).data})
@@ -418,7 +507,7 @@ def quick_jump_search_view(request):
     sorted_items = sorted(
         deduped.values(),
         key=lambda row: (row["kind"], row["label"].lower(), row["record_id"]),
-    )[:40]
+    )[:QUICK_JUMP_RESULT_LIMIT]
 
     payload = {
         "query": query,
@@ -430,12 +519,32 @@ def quick_jump_search_view(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def project_timeline_events_view(request, project_id: int):
-    """Return merged project timeline events by category (`all|financial|workflow`).
+def project_timeline_events_view(request, project_id):
+    """Return merged project timeline events filtered by category.
 
-    Queries all project-scoped audit models:
-    - Workflow: EstimateStatusEvent, InvoiceStatusEvent, ChangeOrderSnapshot
-    - Financial: PaymentRecord, VendorBillSnapshot
+    Queries all project-scoped audit models and merges them into a
+    unified timeline.  Supports category filtering: ``all`` (default),
+    ``financial`` (payments, vendor bill snapshots), or ``workflow``
+    (estimate/invoice status events, change order snapshots).
+
+    Flow:
+        1. Look up project scoped to user's org.
+        2. Validate category filter.
+        3. Query workflow events if category allows.
+        4. Query financial events if category allows.
+        5. Sort all items by timestamp descending.
+
+    URL: ``GET /api/v1/projects/<project_id>/timeline/?category=all``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": { "project_id": 1, "category": "all", "item_count": 25, "items": [...] } }
+
+    Errors:
+        - 400: Invalid category filter.
+        - 404: Project not found.
     """
     membership = _ensure_org_membership(request.user)
     try:
@@ -447,7 +556,7 @@ def project_timeline_events_view(request, project_id: int):
         )
 
     category = (request.query_params.get("category") or "all").strip().lower()
-    if category not in {"all", "financial", "workflow"}:
+    if category not in VALID_TIMELINE_CATEGORIES:
         return Response(
             {
                 "error": {
