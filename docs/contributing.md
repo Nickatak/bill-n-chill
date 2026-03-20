@@ -49,7 +49,9 @@ Last reviewed: 2026-03-04
 ### View helpers
 - **Views own their flow.** Validation, orchestration, transaction blocks, and response assembly live inline in the view function. Views are not empty shells.
 - **No private helpers or constants in view files.** Reusable functions (`_apply_estimate_lines_and_totals`), shared constants (`_VERIFY_ERROR_MAP`), and logic called by multiple views go in a sibling `*_helpers.py` file (e.g., `estimates.py` → `estimates_helpers.py`). Views import and call helpers; helpers never import from views.
+- **Constant placement in helper files:** Constants imported by views (e.g., `_VERIFY_ERROR_MAP`) go at the top of the helpers file. Constants only used by a single helper function sit directly above that function. This keeps view-facing exports visible at the top and internal details co-located with their consumers.
 - Cross-domain shared utilities and re-exports live in `views/helpers.py`, which stays slim and acts as a single import point for common operations (RBAC gates, org scoping, pagination, etc.).
+- **Multi-method views use explicit branching.** When a view handles multiple HTTP methods, use `if`/`elif`/`else` — not early returns from the first branch. This keeps the structure consistent whether the view handles 2 or 4 methods, and avoids implicit fall-through that relies on the reader knowing a prior branch already returned.
 
 ### View docstrings
 
