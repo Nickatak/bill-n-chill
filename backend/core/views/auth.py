@@ -3,102 +3,31 @@
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.utils import timezone
-from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import EmailVerificationToken, ImpersonationToken, OrganizationInvite, OrganizationMembership, OrganizationMembershipRecord, PasswordResetToken
+from core.models import (
+    EmailVerificationToken,
+    ImpersonationToken,
+    OrganizationInvite,
+    OrganizationMembership,
+    OrganizationMembershipRecord,
+    PasswordResetToken,
+)
 from core.serializers import LoginSerializer, RegisterSerializer
+from core.user_helpers import _ensure_org_membership
 from core.utils.email import send_password_reset_email, send_verification_email
-from core.user_helpers import _ensure_org_membership, _resolve_user_capabilities
+from core.views.auth_helpers import (
+    _RESET_ERROR_MAP,
+    _VERIFY_ERROR_MAP,
+    _build_auth_response_payload,
+    _lookup_valid_invite,
+    _send_duplicate_registration_email,
+    _send_rate_limited_token_email,
+)
 
 User = get_user_model()
-
-
-# ── helpers ──
-
-
-def _build_auth_response_payload(user, membership):
-    """Build the standard auth response payload dict."""
-    return {
-        "token": Token.objects.get_or_create(user=user)[0].key,
-        "user": {
-            "id": user.id,
-            "email": user.email,
-            "role": membership.role,
-            "is_superuser": user.is_superuser,
-        },
-        "organization": {
-            "id": membership.organization_id,
-            "display_name": membership.organization.display_name,
-            "onboarding_completed": membership.organization.onboarding_completed,
-        },
-        "capabilities": _resolve_user_capabilities(user, membership=membership),
-    }
-
-
-_INVITE_ERROR_MAP = {
-    "not_found": (404, "not_found", "Invite not found."),
-    "consumed": (410, "consumed", "This invite has already been used."),
-    "expired": (410, "expired", "This invite has expired. Ask the org admin to send a new one."),
-}
-
-
-def _lookup_valid_invite(token_str):
-    """Look up a valid invite token, returning (invite, error_response).
-
-    Domain validation (exists / consumed / expired) lives on the model via
-    OrganizationInvite.lookup_valid(). This helper maps those results to
-    HTTP responses for view consumption.
-    """
-    if not token_str:
-        return None, Response(
-            {"error": {"code": "validation_error", "message": "invite_token is required.", "fields": {}}},
-            status=400,
-        )
-    invite, error_code = OrganizationInvite.lookup_valid(token_str)
-    if error_code:
-        status, code, message = _INVITE_ERROR_MAP[error_code]
-        return None, Response(
-            {"error": {"code": code, "message": message, "fields": {}}},
-            status=status,
-        )
-    return invite, None
-
-
-def _send_duplicate_registration_email(user):
-    """Send a contextual email when someone tries to register with an existing email.
-
-    Verified users get a password reset link with a security heads-up.
-    Unverified users get a fresh verification email (respecting rate limits).
-    Best-effort: failures are silently swallowed to preserve anti-enumeration.
-    """
-    from datetime import timedelta
-
-    try:
-        if user.is_active:
-            # Verified user — send password reset with security alert.
-            # Rate limit: most recent reset token must be >60s old.
-            latest = PasswordResetToken.objects.filter(user=user).order_by("-created_at").first()
-            if latest and (timezone.now() - latest.created_at) < timedelta(seconds=60):
-                return
-            PasswordResetToken.objects.filter(user=user, consumed_at__isnull=True).delete()
-            token_obj = PasswordResetToken(user=user, email=user.email)
-            token_obj.save()
-            send_password_reset_email(user, token_obj, is_security_alert=True)
-        else:
-            # Unverified user — re-send verification email.
-            # Rate limit: most recent verification token must be >60s old.
-            latest = EmailVerificationToken.objects.filter(user=user).order_by("-created_at").first()
-            if latest and (timezone.now() - latest.created_at) < timedelta(seconds=60):
-                return
-            EmailVerificationToken.objects.filter(user=user, consumed_at__isnull=True).delete()
-            token_obj = EmailVerificationToken(user=user, email=user.email)
-            token_obj.save()
-            send_verification_email(user, token_obj)
-    except Exception:
-        pass  # Best-effort — never leak information via error responses.
 
 
 # ── views ──
@@ -109,22 +38,13 @@ def _send_duplicate_registration_email(user):
 def health_view(_request):
     """Health probe endpoint used by infra and local readiness checks.
 
-    Contract:
-    - `GET`:
-      - `200`: service liveness payload returned.
-        - Guarantees: no object mutations. `[APP]`
+    URL: ``GET /api/v1/health/``
 
-    - Preconditions:
-      - none (`AllowAny`).
+    Request body: (none)
 
-    - Object mutations:
-      - `GET`: none.
+    Success 200::
 
-    - Idempotency and retry semantics:
-      - `GET` is read-only and idempotent.
-
-    - Test anchors:
-      - `backend/core/tests/test_health_auth.py::test_health_endpoint_returns_ok_payload`
+        { "data": { "status": "ok" } }
     """
     return Response({"data": {"status": "ok"}})
 
@@ -132,44 +52,30 @@ def health_view(_request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def login_view(request):
-    """Login endpoint: authenticate credentials and return token + role/org context.
+    """Authenticate credentials and return token + role/org context.
 
-    Contract:
-    - `POST`:
-      - `200`: authenticated auth payload returned.
-        - Guarantees:
-          - response includes token, user identity, effective role, and organization context. `[APP]`
-          - existing token is reused or a new token is created for the authenticated user. `[APP]`
-      - `400`: credentials payload invalid.
-        - Guarantees: no durable mutations from failed credential validation. `[APP]`
+    Unverified users (``is_active=False``) are blocked with a 403.  Legacy users
+    missing an org/membership get one auto-created via ``_ensure_org_membership``.
 
-    - Preconditions:
-      - none (`AllowAny`).
+    Flow:
+        1. Validate email + password via ``LoginSerializer``.
+        2. Reject unverified users (403).
+        3. Ensure org membership exists (self-heal for legacy users).
+        4. Return auth payload (token, user, org, capabilities).
 
-    - Object mutations:
-      - `POST`:
-        - Creates:
-          - Standard: token when missing; organization/membership records when self-healing legacy users.
-          - Audit: none.
-        - Edits:
-          - Standard: none.
-          - Audit: none.
-        - Deletes: none.
+    URL: ``POST /api/v1/auth/login/``
 
-    - Incoming payload (`POST`) shape:
-      - JSON map:
-        {
-          "email": "string (required)",
-          "password": "string (required)"
-        }
+    Request body::
 
-    - Idempotency and retry semantics:
-      - `POST` is conditionally idempotent for existing users with existing token (same token reused).
-      - `POST` is retry-safe for valid credentials (retries return authenticated context).
+        { "email": "string", "password": "string" }
 
-    - Test anchors:
-      - `backend/core/tests/test_health_auth.py::test_login_returns_token_and_me_works_with_token`
-      - `backend/core/tests/test_health_auth.py::test_login_self_heals_legacy_user_missing_membership`
+    Success 200::
+
+        { "data": { "token": "...", "user": {...}, "organization": {...}, "capabilities": {...} } }
+
+    Errors:
+        - 400: Invalid or missing credentials.
+        - 403: Email not yet verified.
     """
     serializer = LoginSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -190,39 +96,50 @@ def login_view(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def register_view(request):
-    """Registration endpoint with email verification.
+    """Register a new user account, with optional invite-based fast-track.
 
-    Supports two flows:
-    - Flow A (no invite_token): Creates user + org + sends verification email.
-      Returns a uniform "check your email" response regardless of whether the
-      email already exists (prevents enumeration). No auth token returned.
-    - Flow B (with invite_token): Invited registration — creates user, joins
-      invited org with invited role, consumes invite token. Returns auth token
-      immediately (invite proves email ownership, no verification needed).
+    Two flows depending on whether ``invite_token`` is provided:
 
-    Contract:
-    - `POST`:
-      - `200` (Flow A): "check your email" message returned. Same response for
-        new and existing emails (anti-enumeration).
-      - `201` (Flow B): user created and authenticated context returned.
-      - `400`: registration payload invalid or invite email mismatch.
-      - `404`: invite token not found.
-      - `410`: invite token expired or already consumed.
+    - **Flow A** (no invite): Creates inactive user + org, sends verification
+      email.  Always returns the same 200 regardless of whether the email
+      already exists (anti-enumeration).  Existing verified users get a
+      password-reset security alert; unverified users get a re-send.
+    - **Flow B** (with invite): Creates active user in the invited org with
+      the invited role, consumes the invite token.  Returns auth payload
+      immediately (invite proves email ownership).
 
-    - Preconditions:
-      - none (`AllowAny`).
+    Flow (A):
+        1. Validate email + password via ``RegisterSerializer``.
+        2. If email exists, send contextual email (password reset or re-verify).
+        3. Otherwise create inactive user + org + verification token.
+        4. Send verification email (outside transaction — mail failure won't rollback).
+        5. Return uniform "check your email" response.
 
-    - Incoming payload (`POST`) shape:
-      - JSON map:
-        {
-          "email": "string (required)",
-          "password": "string (required)",
-          "invite_token": "string (optional)"
-        }
+    Flow (B):
+        1. Validate email + password, look up invite token.
+        2. Verify email matches the invite.
+        3. Create user + membership in invited org (atomic).
+        4. Consume invite token.
+        5. Return auth payload (201).
 
-    - Test anchors:
-      - `backend/core/tests/test_email_verification.py::RegisterFlowAVerificationTests`
-      - `backend/core/tests/test_invites.py::test_register_with_invite_token_flow_b`
+    URL: ``POST /api/v1/auth/register/``
+
+    Request body::
+
+        { "email": "string", "password": "string", "invite_token": "string (optional)" }
+
+    Success 200 (Flow A)::
+
+        { "data": { "message": "Check your email to verify your account." } }
+
+    Success 201 (Flow B)::
+
+        { "data": { "token": "...", "user": {...}, "organization": {...}, "capabilities": {...} } }
+
+    Errors:
+        - 400: Invalid payload or invite email mismatch.
+        - 404: Invite token not found.
+        - 410: Invite token expired or already consumed.
     """
     serializer = RegisterSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -305,36 +222,26 @@ def register_view(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def me_view(request):
-    """Current-session profile endpoint with resolved role and organization scope.
+    """Return the current user's profile with resolved role and org context.
 
-    Contract:
-    - `GET`:
-      - `200`: authenticated user profile returned.
-        - Guarantees: profile payload includes resolved role and organization context. `[APP]`
-      - `401`: authentication missing/invalid.
-        - Guarantees: no object mutations. `[APP]`
+    If the request is authenticated via an ``ImpersonationToken``, the response
+    includes an ``impersonation`` block so the frontend can show the banner.
 
-    - Preconditions:
-      - caller must be authenticated (`IsAuthenticated`).
+    Flow:
+        1. Ensure org membership exists (self-heal for legacy users).
+        2. Build standard auth payload.
+        3. If impersonating, attach impersonation metadata.
 
-    - Object mutations:
-      - `GET`:
-        - Creates:
-          - Standard: organization/membership records when self-healing legacy users.
-          - Audit: none.
-        - Edits:
-          - Standard: none.
-          - Audit: none.
-        - Deletes: none.
+    URL: ``GET /api/v1/auth/me/``
 
-    - Idempotency and retry semantics:
-      - `GET` is idempotent for established users.
-      - first access by legacy users may self-heal missing organization/membership records.
+    Request body: (none)
 
-    - Test anchors:
-      - `backend/core/tests/test_health_auth.py::test_me_endpoint_rejects_unauthenticated_request`
-      - `backend/core/tests/test_health_auth.py::test_login_returns_token_and_me_works_with_token`
-      - `backend/core/tests/test_health_auth.py::test_me_self_heals_legacy_user_missing_membership`
+    Success 200::
+
+        { "data": { "token": "...", "user": {...}, "organization": {...}, "capabilities": {...} } }
+
+    Errors:
+        - 401: Not authenticated.
     """
     user = request.user
     membership = _ensure_org_membership(user)
@@ -357,28 +264,20 @@ def check_invite_by_email_view(request):
     """Check if a pending invite exists for the given email.
 
     Used by the register page to auto-detect pending invites when a user
-    navigates to /register directly (without an invite link). Returns the
-    invite token so the frontend can switch to Flow B.
+    navigates to ``/register`` directly (without an invite link).  Returns the
+    invite token so the frontend can switch to Flow B registration.
 
-    Contract:
-    - `GET`:
-      - `200`: pending invite found — returns org name, role, and invite token.
-      - `400`: email query param missing.
-      - `404`: no pending invite for this email.
+    URL: ``GET /api/v1/auth/check-invite/?email=...``
 
-    - Preconditions:
-      - none (`AllowAny`).
+    Request body: (none — email passed as query param)
 
-    - Object mutations:
-      - `GET`: none (read-only).
+    Success 200::
 
-    - Security:
-      - Leaks org name to anyone who guesses an invited email. Accepted
-        tradeoff: requires exact email + 24h expiry window. See
-        docs/meta/invite-registration-race.md.
+        { "data": { "organization_name": "...", "role": "...", "invite_token": "..." } }
 
-    - Test anchors:
-      - `backend/core/tests/test_invites.py::test_check_invite_by_email_*`
+    Errors:
+        - 400: Missing ``email`` query param.
+        - 404: No pending invite for this email.
     """
     email = (request.query_params.get("email") or "").strip()
     if not email:
@@ -419,21 +318,21 @@ def check_invite_by_email_view(request):
 def verify_invite_view(request, token):
     """Verify an invite token and return context for the registration page.
 
-    Contract:
-    - `GET`:
-      - `200`: invite is valid — returns org name, email, role, and whether the
-        email belongs to an existing user (determines Flow B vs Flow C on frontend).
-      - `404`: token not found.
-      - `410`: token expired or already consumed.
+    Returns org name, invited email, role, and whether the email already has
+    an account (determines Flow B vs Flow C on the frontend).
 
-    - Preconditions:
-      - none (`AllowAny`).
+    URL: ``GET /api/v1/auth/verify-invite/<token>/``
 
-    - Object mutations:
-      - `GET`: none (read-only verification).
+    Request body: (none)
 
-    - Test anchors:
-      - `backend/core/tests/test_invites.py::test_verify_invite_*`
+    Success 200::
+
+        { "data": { "organization_name": "...", "email": "...", "role": "...", "is_existing_user": true } }
+
+    Errors:
+        - 400: Missing token.
+        - 404: Token not found.
+        - 410: Token expired or already consumed.
     """
     invite, error_response = _lookup_valid_invite(token)
     if error_response:
@@ -456,36 +355,37 @@ def verify_invite_view(request, token):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def accept_invite_view(request):
-    """Accept invite as existing user (Flow C). Requires password confirmation.
+    """Accept an invite as an existing user (Flow C).
 
-    Moves the existing user's membership from their current org to the invited org.
-    This is a destructive operation (loses access to current org) and requires the
-    user's password as confirmation.
+    Moves the user's membership from their current org to the invited org.
+    This is destructive (loses access to current org) so the user's password
+    is required as confirmation.  If the user is already in the target org,
+    the invite is consumed idempotently.
 
-    Contract:
-    - `POST`:
-      - `200`: membership moved, auth context returned.
-        - Guarantees:
-          - user's membership now points to the invited org. `[APP]`
-          - invite token is consumed. `[APP]`
-          - audit record created for the membership change. `[APP]`
-      - `400`: missing fields.
-      - `401`: invalid password.
-      - `404`: invite not found or no user for invite email.
-      - `410`: invite expired or consumed.
+    Flow:
+        1. Validate invite token and password.
+        2. Look up active user by invite email.
+        3. Confirm password.
+        4. If already in target org, consume invite and return (idempotent).
+        5. Move membership to invited org (atomic) + audit record.
+        6. Consume invite token.
+        7. Return auth payload.
 
-    - Preconditions:
-      - none (`AllowAny`).
+    URL: ``POST /api/v1/auth/accept-invite/``
 
-    - Incoming payload (`POST`) shape:
-      - JSON map:
-        {
-          "invite_token": "string (required)",
-          "password": "string (required)"
-        }
+    Request body::
 
-    - Test anchors:
-      - `backend/core/tests/test_invites.py::test_accept_invite_*`
+        { "invite_token": "string", "password": "string" }
+
+    Success 200::
+
+        { "data": { "token": "...", "user": {...}, "organization": {...}, "capabilities": {...} } }
+
+    Errors:
+        - 400: Missing ``invite_token`` or ``password``.
+        - 401: Invalid password.
+        - 404: Invite not found or no account for invite email.
+        - 410: Invite expired or already consumed.
     """
     invite_token = (request.data.get("invite_token") or "").strip()
     password = (request.data.get("password") or "").strip()
@@ -589,41 +489,35 @@ def accept_invite_view(request):
     return Response({"data": _build_auth_response_payload(user, membership)})
 
 
-_VERIFY_ERROR_MAP = {
-    "not_found": (404, "not_found", "Invalid verification link."),
-    "consumed": (410, "consumed", "This link is no longer active. If you\u2019ve already verified, sign in instead."),
-    "expired": (410, "expired", "This verification link has expired. Request a new one."),
-}
-
-
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def verify_email_view(request):
-    """Consume a verification token and authenticate the user.
+    """Consume an email verification token and authenticate the user.
 
-    The verification link is the user's first login — clicking it both
-    verifies email ownership and returns an auth payload.
+    This is the user's first login — the verification link both confirms
+    email ownership and returns a full auth payload.
 
-    Contract:
-    - `POST`:
-      - `200`: token consumed, auth payload returned.
-      - `400`: token field missing.
-      - `404`: token not found.
-      - `410`: token expired or already consumed.
+    Flow:
+        1. Validate the ``token`` field from the request body.
+        2. Look up the verification token via ``EmailVerificationToken.lookup_valid``.
+        3. Mark token consumed and activate the user (atomic).
+        4. Ensure org membership exists.
+        5. Return auth payload.
 
-    - Preconditions:
-      - none (`AllowAny`).
+    URL: ``POST /api/v1/auth/verify-email/``
 
-    - Object mutations:
-      - `POST`:
-        - Creates: auth token (if missing), organization/membership (if missing).
-        - Edits: `consumed_at` set on verification token.
+    Request body::
 
-    - Incoming payload (`POST`) shape:
-      - JSON map: { "token": "string (required)" }
+        { "token": "string" }
 
-    - Test anchors:
-      - `backend/core/tests/test_email_verification.py::VerifyEmailTests`
+    Success 200::
+
+        { "data": { "token": "...", "user": {...}, "organization": {...}, "capabilities": {...} } }
+
+    Errors:
+        - 400: Missing ``token``.
+        - 404: Token not found.
+        - 410: Token expired or already consumed.
     """
     token_str = (request.data.get("token") or "").strip()
     if not token_str:
@@ -652,30 +546,31 @@ def verify_email_view(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def resend_verification_view(request):
-    """Resend a verification email. Anti-enumeration: always returns 200.
+    """Resend a verification email (or password reset if already verified).
 
-    Rate-limited: if the most recent token was created less than 60 seconds
-    ago, returns 429.
+    Anti-enumeration: always returns 200 for valid requests regardless of
+    whether the email exists.  If the user is already verified, sends a
+    password reset link instead (they don't need verification).
 
-    Contract:
-    - `POST`:
-      - `200`: always (anti-enumeration). Email sent if applicable.
-      - `400`: email field missing.
-      - `429`: rate limited (last token <60s old).
+    Flow:
+        1. Validate the ``email`` field.
+        2. Look up user — if not found, return 200 (anti-enumeration).
+        3. If already verified, send a rate-limited password reset email.
+        4. If unverified, send a rate-limited verification email.
 
-    - Preconditions:
-      - none (`AllowAny`).
+    URL: ``POST /api/v1/auth/resend-verification/``
 
-    - Object mutations:
-      - `POST`:
-        - Creates: new `EmailVerificationToken`, `EmailRecord`.
-        - Edits: none.
+    Request body::
 
-    - Incoming payload (`POST`) shape:
-      - JSON map: { "email": "string (required)" }
+        { "email": "string" }
 
-    - Test anchors:
-      - `backend/core/tests/test_email_verification.py::ResendVerificationTests`
+    Success 200::
+
+        { "data": { "message": "If that email is registered, a verification link has been sent." } }
+
+    Errors:
+        - 400: Missing ``email``.
+        - 429: Rate limited (last token <60s old).
     """
     email = (request.data.get("email") or "").strip().lower()
     if not email:
@@ -691,42 +586,26 @@ def resend_verification_view(request):
     except User.DoesNotExist:
         return Response(_RESEND_OK, status=200)
 
-    from datetime import timedelta
-
     # Already verified — send a password reset email instead.
     if user.is_active:
-        latest_token = (
-            PasswordResetToken.objects.filter(user=user).order_by("-created_at").first()
+        wait_seconds = _send_rate_limited_token_email(
+            user, PasswordResetToken, send_password_reset_email,
         )
-        if latest_token and (timezone.now() - latest_token.created_at) < timedelta(seconds=60):
-            wait_seconds = 60 - int((timezone.now() - latest_token.created_at).total_seconds())
+        if wait_seconds is not None:
             return Response(
                 {"error": {"code": "rate_limited", "message": f"Please wait {wait_seconds} seconds before requesting another email."}},
                 status=429,
             )
-        PasswordResetToken.objects.filter(user=user, consumed_at__isnull=True).delete()
-        token_obj = PasswordResetToken(user=user, email=user.email)
-        token_obj.save()
-        send_password_reset_email(user, token_obj)
         return Response(_RESEND_OK, status=200)
 
-    # Rate limit: most recent token must be >60s old.
-    latest_token = (
-        EmailVerificationToken.objects.filter(user=user).order_by("-created_at").first()
+    wait_seconds = _send_rate_limited_token_email(
+        user, EmailVerificationToken, send_verification_email,
     )
-    if latest_token and (timezone.now() - latest_token.created_at) < timedelta(seconds=60):
-        wait_seconds = 60 - int((timezone.now() - latest_token.created_at).total_seconds())
+    if wait_seconds is not None:
         return Response(
             {"error": {"code": "rate_limited", "message": f"Please wait {wait_seconds} seconds before requesting another email."}},
             status=429,
         )
-
-    # Delete any previous unconsumed tokens so only the latest link works.
-    EmailVerificationToken.objects.filter(user=user, consumed_at__isnull=True).delete()
-
-    token_obj = EmailVerificationToken(user=user, email=user.email)
-    token_obj.save()
-    send_verification_email(user, token_obj)
 
     return Response(_RESEND_OK, status=200)
 
@@ -734,30 +613,31 @@ def resend_verification_view(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def forgot_password_view(request):
-    """Request a password reset email. Anti-enumeration: always returns 200.
+    """Request a password reset email (or verification if not yet verified).
 
-    Rate-limited: if the most recent reset token was created less than
-    60 seconds ago, returns 429.
+    Anti-enumeration: always returns 200 for valid requests regardless of
+    whether the email exists.  If the user hasn't verified their email yet,
+    sends a verification link instead (they need that first).
 
-    Contract:
-    - `POST`:
-      - `200`: always (anti-enumeration). Email sent if applicable.
-      - `400`: email field missing.
-      - `429`: rate limited (last token <60s old).
+    Flow:
+        1. Validate the ``email`` field.
+        2. Look up user — if not found, return 200 (anti-enumeration).
+        3. If unverified, send a rate-limited verification email.
+        4. If verified, send a rate-limited password reset email.
 
-    - Preconditions:
-      - none (`AllowAny`).
+    URL: ``POST /api/v1/auth/forgot-password/``
 
-    - Object mutations:
-      - `POST`:
-        - Creates: new `PasswordResetToken`, `EmailRecord`.
-        - Deletes: previous unconsumed `PasswordResetToken` for the user.
+    Request body::
 
-    - Incoming payload (`POST`) shape:
-      - JSON map: { "email": "string (required)" }
+        { "email": "string" }
 
-    - Test anchors:
-      - `backend/core/tests/test_password_reset.py::ForgotPasswordTests`
+    Success 200::
+
+        { "data": { "message": "If that email is registered, a password reset link has been sent." } }
+
+    Errors:
+        - 400: Missing ``email``.
+        - 429: Rate limited (last token <60s old).
     """
     email = (request.data.get("email") or "").strip().lower()
     if not email:
@@ -773,51 +653,28 @@ def forgot_password_view(request):
     except User.DoesNotExist:
         return Response(_FORGOT_OK, status=200)
 
-    from datetime import timedelta
-
     # Unverified users can't reset passwords — send a verification email instead.
     if not user.is_active:
-        latest_token = (
-            EmailVerificationToken.objects.filter(user=user).order_by("-created_at").first()
+        wait_seconds = _send_rate_limited_token_email(
+            user, EmailVerificationToken, send_verification_email,
         )
-        if latest_token and (timezone.now() - latest_token.created_at) < timedelta(seconds=60):
-            wait_seconds = 60 - int((timezone.now() - latest_token.created_at).total_seconds())
+        if wait_seconds is not None:
             return Response(
                 {"error": {"code": "rate_limited", "message": f"Please wait {wait_seconds} seconds before requesting another email."}},
                 status=429,
             )
-        EmailVerificationToken.objects.filter(user=user, consumed_at__isnull=True).delete()
-        token_obj = EmailVerificationToken(user=user, email=user.email)
-        token_obj.save()
-        send_verification_email(user, token_obj)
         return Response(_FORGOT_OK, status=200)
 
-    # Rate limit: most recent token must be >60s old.
-    latest_token = (
-        PasswordResetToken.objects.filter(user=user).order_by("-created_at").first()
+    wait_seconds = _send_rate_limited_token_email(
+        user, PasswordResetToken, send_password_reset_email,
     )
-    if latest_token and (timezone.now() - latest_token.created_at) < timedelta(seconds=60):
-        wait_seconds = 60 - int((timezone.now() - latest_token.created_at).total_seconds())
+    if wait_seconds is not None:
         return Response(
             {"error": {"code": "rate_limited", "message": f"Please wait {wait_seconds} seconds before requesting another email."}},
             status=429,
         )
 
-    # Delete any previous unconsumed tokens so only the latest link works.
-    PasswordResetToken.objects.filter(user=user, consumed_at__isnull=True).delete()
-
-    token_obj = PasswordResetToken(user=user, email=user.email)
-    token_obj.save()
-    send_password_reset_email(user, token_obj)
-
     return Response(_FORGOT_OK, status=200)
-
-
-_RESET_ERROR_MAP = {
-    "not_found": (404, "not_found", "Invalid password reset link."),
-    "consumed": (410, "consumed", "This reset link has already been used."),
-    "expired": (410, "expired", "This reset link has expired. Request a new one."),
-}
 
 
 @api_view(["POST"])
@@ -825,28 +682,30 @@ _RESET_ERROR_MAP = {
 def reset_password_view(request):
     """Consume a password reset token and set a new password.
 
-    On success, returns an auth payload so the user is automatically
-    logged in after resetting their password.
+    On success the user is automatically logged in — returns the same auth
+    payload as login so the frontend can set the session immediately.
 
-    Contract:
-    - `POST`:
-      - `200`: password reset, auth payload returned.
-      - `400`: token or new_password field missing, or password too short.
-      - `404`: token not found.
-      - `410`: token expired or already consumed.
+    Flow:
+        1. Validate ``token`` and ``new_password`` fields (min 8 chars).
+        2. Look up the reset token via ``PasswordResetToken.lookup_valid``.
+        3. Mark token consumed and update user password (atomic).
+        4. Ensure org membership exists.
+        5. Return auth payload.
 
-    - Preconditions:
-      - none (`AllowAny`).
+    URL: ``POST /api/v1/auth/reset-password/``
 
-    - Object mutations:
-      - `POST`:
-        - Edits: `consumed_at` set on reset token, user password updated.
+    Request body::
 
-    - Incoming payload (`POST`) shape:
-      - JSON map: { "token": "string (required)", "new_password": "string (required)" }
+        { "token": "string", "new_password": "string" }
 
-    - Test anchors:
-      - `backend/core/tests/test_password_reset.py::ResetPasswordTests`
+    Success 200::
+
+        { "data": { "token": "...", "user": {...}, "organization": {...}, "capabilities": {...} } }
+
+    Errors:
+        - 400: Missing ``token`` or ``new_password``, or password < 8 characters.
+        - 404: Token not found.
+        - 410: Token expired or already consumed.
     """
     token_str = (request.data.get("token") or "").strip()
     new_password = (request.data.get("new_password") or "").strip()
@@ -890,28 +749,33 @@ def reset_password_view(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def impersonate_start_view(request):
-    """Start an impersonation session for a target user.
+    """Start an impersonation session for a target user (superuser-only).
 
-    Superuser-only. Creates an ImpersonationToken that lets the caller
-    make requests as the target user. Returns the same auth payload
-    shape as login so the frontend can swap sessions seamlessly.
+    Creates an ``ImpersonationToken`` and returns the target user's auth payload
+    so the frontend can swap sessions seamlessly.  Any existing impersonation
+    tokens for the calling superuser are cleaned up first.
 
-    Contract:
-    - `POST`:
-      - `200`: impersonation token + target user auth payload returned.
-      - `400`: user_id missing.
-      - `403`: caller is not a superuser, or target is a superuser.
-      - `404`: target user not found.
+    Flow:
+        1. Verify caller is superuser.
+        2. Look up target user (must be active, non-superuser).
+        3. Delete any prior impersonation tokens for this superuser.
+        4. Create new ``ImpersonationToken``.
+        5. Return target user's auth payload with impersonation metadata.
 
-    - Preconditions:
-      - caller must be authenticated and ``is_superuser=True``.
+    URL: ``POST /api/v1/auth/impersonate/start/``
 
-    - Object mutations:
-      - `POST`:
-        - Creates: ``ImpersonationToken``.
+    Request body::
 
-    - Incoming payload (`POST`) shape:
-      - JSON map: { "user_id": int (required) }
+        { "user_id": 123 }
+
+    Success 200::
+
+        { "data": { "token": "...", "user": {...}, "organization": {...}, "impersonation": { "active": true, "real_email": "..." } } }
+
+    Errors:
+        - 400: Missing ``user_id``.
+        - 403: Caller is not a superuser, or target is a superuser.
+        - 404: Target user not found.
     """
     if not request.user.is_superuser:
         return Response(
@@ -963,20 +827,19 @@ def impersonate_start_view(request):
 def impersonate_exit_view(request):
     """End the current impersonation session.
 
-    Deletes the impersonation token. The frontend should discard the
-    impersonation token and restore the original superuser session.
+    Deletes the ``ImpersonationToken``.  The frontend should discard the
+    token and restore the original superuser session.
 
-    Contract:
-    - `POST`:
-      - `200`: impersonation session ended.
-      - `400`: not currently impersonating.
+    URL: ``POST /api/v1/auth/impersonate/exit/``
 
-    - Preconditions:
-      - caller must be authenticated via an impersonation token.
+    Request body: (none)
 
-    - Object mutations:
-      - `POST`:
-        - Deletes: the current ``ImpersonationToken``.
+    Success 200::
+
+        { "data": { "message": "Impersonation session ended." } }
+
+    Errors:
+        - 400: Not currently impersonating (request wasn't via an impersonation token).
     """
     if not isinstance(request.auth, ImpersonationToken):
         return Response(
@@ -991,21 +854,21 @@ def impersonate_exit_view(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def impersonate_users_view(request):
-    """List users available for impersonation.
+    """List users available for impersonation (superuser-only).
 
-    Superuser-only. Returns all active non-superuser users with their
-    org context, so the frontend can render a user picker.
+    Returns all active non-superuser users with their org context so the
+    frontend can render a user picker.
 
-    Contract:
-    - `GET`:
-      - `200`: list of impersonatable users returned.
-      - `403`: caller is not a superuser.
+    URL: ``GET /api/v1/auth/impersonate/users/``
 
-    - Preconditions:
-      - caller must be authenticated and ``is_superuser=True``.
+    Request body: (none)
 
-    - Object mutations:
-      - `GET`: none.
+    Success 200::
+
+        { "data": [{ "id": 1, "email": "...", "organization": {...}, "role": "..." }, ...] }
+
+    Errors:
+        - 403: Caller is not a superuser.
     """
     if not request.user.is_superuser:
         return Response(
