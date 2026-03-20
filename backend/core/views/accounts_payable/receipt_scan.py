@@ -1,6 +1,5 @@
 """Receipt image scanning — best-effort field extraction via Gemini Vision."""
 
-import json
 import logging
 import os
 
@@ -10,38 +9,15 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.user_helpers import _ensure_org_membership
+from core.views.accounts_payable.receipt_scan_helpers import (
+    ALLOWED_CONTENT_TYPES,
+    EXTRACTION_PROMPT,
+    MAX_IMAGE_BYTES,
+    _parse_gemini_response,
+)
 from core.views.helpers import _capability_gate
 
 logger = logging.getLogger(__name__)
-
-# Maximum image size: 5 MB (Gemini accepts up to 20 MB, but no need for huge files).
-MAX_IMAGE_BYTES = 5 * 1024 * 1024
-ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic"}
-
-EXTRACTION_PROMPT = """Look at this receipt image and extract the following fields.
-Return ONLY a JSON object with these keys — no markdown, no explanation:
-
-{
-  "store_name": "the store or business name, or empty string if unreadable",
-  "amount": "the total amount as a decimal string like '47.82', or empty string if unreadable",
-  "receipt_date": "the date in YYYY-MM-DD format, or empty string if unreadable"
-}
-
-If you cannot read a field, use an empty string for that field. Do not guess."""
-
-
-def _parse_gemini_response(text: str) -> dict:
-    """Extract JSON from Gemini response, handling markdown code fences."""
-    cleaned = text.strip()
-    if cleaned.startswith("```"):
-        # Strip ```json ... ``` wrapping
-        lines = cleaned.split("\n")
-        lines = [line for line in lines if not line.strip().startswith("```")]
-        cleaned = "\n".join(lines).strip()
-    try:
-        return json.loads(cleaned)
-    except (json.JSONDecodeError, ValueError):
-        return {}
 
 
 @api_view(["POST"])
@@ -50,12 +26,31 @@ def _parse_gemini_response(text: str) -> dict:
 def receipt_scan_view(request):
     """Accept a receipt image and return best-effort extracted fields.
 
-    This endpoint does NOT create any records — it only returns suggested
-    field values for the frontend to prefill the receipt form.
+    Sends the image to Gemini Vision for OCR extraction. Does NOT create
+    any records — only returns suggested values for the frontend to
+    prefill the receipt form.
 
-    Expects multipart form data with an ``image`` file field.
-    Returns ``{"data": {"store_name": "...", "amount": "...", "receipt_date": "..."}}``
-    with empty strings for any fields that could not be extracted.
+    Flow:
+        1. Validate org membership and ``vendor_bills.create`` capability.
+        2. Check that the Gemini API key is configured (503 if not).
+        3. Validate the uploaded image (presence, content type, size).
+        4. Send the image + extraction prompt to Gemini Vision.
+        5. Parse the response (stripping markdown fences if present).
+        6. Return extracted fields, with empty strings for anything unreadable.
+           On Gemini failure, gracefully return all-empty fields.
+
+    URL: ``POST /api/v1/receipts/scan/``
+
+    Request body: multipart form data with an ``image`` file field.
+
+    Success 200::
+
+        { "data": { "store_name": "...", "amount": "...", "receipt_date": "..." } }
+
+    Errors:
+        - 400: No image provided, unsupported type, or exceeds 5 MB.
+        - 403: No active membership or missing ``vendor_bills.create`` capability.
+        - 503: Gemini API key not configured.
     """
     membership = _ensure_org_membership(request.user)
     if not membership:

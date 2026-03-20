@@ -8,18 +8,12 @@ from rest_framework.response import Response
 from core.models import Receipt, Store
 from core.serializers import ReceiptSerializer, ReceiptWriteSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
+from core.user_helpers import _ensure_org_membership
+from core.views.accounts_payable.receipts_helpers import _prefetch_receipt_qs
 from core.views.helpers import (
     _capability_gate,
     _validate_project_for_user,
 )
-from core.user_helpers import _ensure_org_membership
-
-
-def _prefetch_receipt_qs(qs):
-    """Apply standard select/prefetch for receipt queries."""
-    return qs.select_related("project", "store").prefetch_related(
-        "target_payments",
-    )
 
 
 @api_view(["GET"])
@@ -90,13 +84,12 @@ def project_receipts_view(request, project_id: int):
     store = None
     store_name = (data.get("store_name") or "").strip()
     if store_name:
-        membership = _ensure_org_membership(request.user)
         store, _ = Store.objects.get_or_create(
-            organization_id=membership.organization_id,
+            organization_id=project.organization_id,
             name__iexact=store_name,
             defaults={
                 "name": store_name,
-                "organization_id": membership.organization_id,
+                "organization_id": project.organization_id,
                 "created_by": request.user,
             },
         )

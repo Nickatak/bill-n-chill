@@ -8,6 +8,7 @@ Last reviewed: 2026-03-04
   - [Branching](#branching)
   - [Code Quality](#code-quality)
   - [Helper Placement](#helper-placement)
+  - [View Docstrings](#view-docstrings)
   - [Commit Style](#commit-style)
   - [Review Focus](#review-focus)
 - [RBAC Patterns](#rbac-patterns)
@@ -49,6 +50,43 @@ Last reviewed: 2026-03-04
 - **Views own their flow.** Validation, orchestration, transaction blocks, and response assembly live inline in the view function. Views are not empty shells.
 - **No private helpers or constants in view files.** Reusable functions (`_apply_estimate_lines_and_totals`), shared constants (`_VERIFY_ERROR_MAP`), and logic called by multiple views go in a sibling `*_helpers.py` file (e.g., `estimates.py` → `estimates_helpers.py`). Views import and call helpers; helpers never import from views.
 - Cross-domain shared utilities and re-exports live in `views/helpers.py`, which stays slim and acts as a single import point for common operations (RBAC gates, org scoping, pagination, etc.).
+
+### View docstrings
+
+Every view function should have a docstring following this structure:
+
+```python
+def some_view(request, ...):
+    """One-line summary of what this endpoint does.
+
+    Brief context paragraph — what the endpoint is for, any non-obvious
+    behavior (e.g. "does NOT create records", side-effects, graceful
+    degradation).
+
+    Flow:
+        1. First step (e.g. validate membership / capability gate).
+        2. Next step.
+        3. ...
+
+    URL: ``METHOD /api/v1/path/to/endpoint/``
+
+    Request body: description or (none).
+
+    Success NNN::
+
+        { "data": { ... } }
+
+    Errors:
+        - 400: When and why.
+        - 403: When and why.
+        - 404: When and why.
+    """
+```
+
+- **Flow** is a numbered list of the view's steps in execution order. It should read like a recipe — someone unfamiliar with the code should be able to follow the logic without reading the implementation.
+- **URL** uses reStructuredText double-backtick literals.
+- **Success** uses the `::` literal-block syntax with an indented JSON example.
+- **Errors** lists each status code with a short condition. Omit codes that don't apply.
 
 ## Commit Style
 
