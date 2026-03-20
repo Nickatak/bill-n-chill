@@ -34,6 +34,11 @@ def projects_list_view(request):
     Each project is annotated with its ``accepted_contract_total`` (sum of
     the latest approved estimate grand total per title family).
 
+    Flow:
+        1. Scope to user's org, load customer relations.
+        2. Compute accepted contract totals across all projects in one batch.
+        3. Merge totals into serialized output.
+
     URL: ``GET /api/v1/projects/``
 
     Request body: (none)
@@ -233,6 +238,11 @@ def project_financial_summary_view(request, project_id):
     Aggregates contract values, invoiced/paid amounts, outstanding balances,
     and per-record traceability links.  Used by the project overview page.
 
+    Flow:
+        1. Look up project scoped to user's org.
+        2. Build financial summary via ``_build_project_financial_summary_data``.
+        3. Serialize and return.
+
     URL: ``GET /api/v1/projects/<project_id>/financial-summary/``
 
     Request body: (none)
@@ -265,6 +275,12 @@ def project_accounting_export_view(request, project_id):
 
     Accepts ``?export_format=json`` or ``?export_format=csv`` (default: csv).
     CSV includes summary metrics as rows plus per-record traceability lines.
+
+    Flow:
+        1. Look up project scoped to user's org.
+        2. Build and serialize financial summary.
+        3. If ``export_format=json``, return structured JSON response.
+        4. Otherwise build CSV with summary metric rows + traceability record rows.
 
     URL: ``GET /api/v1/projects/<project_id>/accounting-export/?export_format=csv``
 
@@ -373,6 +389,12 @@ def project_contract_breakdown_view(request, project_id):
     Returns the most recently approved estimate with its line items, plus all
     approved change orders linked to the project with their line items.  If no
     approved estimate exists, returns nulls.
+
+    Flow:
+        1. Look up project scoped to user's org.
+        2. Find the most recently approved estimate (if any).
+        3. Fetch all approved change orders for the project.
+        4. Return combined payload.
 
     URL: ``GET /api/v1/projects/<project_id>/contract-breakdown/``
 

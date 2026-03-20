@@ -183,6 +183,10 @@ def complete_onboarding_view(request):
     One-way flag — once set to ``True`` it stays ``True``.  No RBAC gate
     because any authenticated member completing onboarding benefits the org.
 
+    Flow:
+        1. Look up org via membership.
+        2. If not already completed, set flag and save.
+
     URL: ``POST /api/v1/organization/complete-onboarding/``
 
     Request body: (none)
@@ -299,6 +303,11 @@ def organization_memberships_view(request):
 
     Returns all memberships ordered hierarchically (active owners first),
     plus the role policy for frontend UI gating.
+
+    Flow:
+        1. Look up org via membership.
+        2. Fetch ordered membership queryset.
+        3. Return serialized memberships + role policy.
 
     URL: ``GET /api/v1/organization/memberships/``
 

@@ -38,6 +38,9 @@ User = get_user_model()
 def health_view(_request):
     """Health probe endpoint used by infra and local readiness checks.
 
+    Flow:
+        1. Return static OK payload.
+
     URL: ``GET /api/v1/health/``
 
     Request body: (none)
@@ -267,6 +270,11 @@ def check_invite_by_email_view(request):
     navigates to ``/register`` directly (without an invite link).  Returns the
     invite token so the frontend can switch to Flow B registration.
 
+    Flow:
+        1. Validate ``email`` query param.
+        2. Look up unconsumed, unexpired invite for this email.
+        3. Return org name, role, and invite token (or 404).
+
     URL: ``GET /api/v1/auth/check-invite/?email=...``
 
     Request body: (none — email passed as query param)
@@ -320,6 +328,11 @@ def verify_invite_view(request, token):
 
     Returns org name, invited email, role, and whether the email already has
     an account (determines Flow B vs Flow C on the frontend).
+
+    Flow:
+        1. Look up invite via ``_lookup_valid_invite``.
+        2. Check if a user already exists for the invited email.
+        3. Return invite context with ``is_existing_user`` flag.
 
     URL: ``GET /api/v1/auth/verify-invite/<token>/``
 
@@ -830,6 +843,10 @@ def impersonate_exit_view(request):
     Deletes the ``ImpersonationToken``.  The frontend should discard the
     token and restore the original superuser session.
 
+    Flow:
+        1. Verify request is authenticated via an impersonation token.
+        2. Delete the token.
+
     URL: ``POST /api/v1/auth/impersonate/exit/``
 
     Request body: (none)
@@ -858,6 +875,11 @@ def impersonate_users_view(request):
 
     Returns all active non-superuser users with their org context so the
     frontend can render a user picker.
+
+    Flow:
+        1. Verify caller is superuser.
+        2. Fetch all active non-superuser users with their memberships.
+        3. Return user list with org context.
 
     URL: ``GET /api/v1/auth/impersonate/users/``
 
