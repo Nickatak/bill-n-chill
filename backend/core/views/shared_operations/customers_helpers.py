@@ -1,14 +1,46 @@
 """Domain-specific helpers for customer intake views."""
 
+from datetime import datetime
+from typing import Any
+
+from django.contrib.auth.models import AbstractUser
 from django.db.models import Q
 from django.utils import timezone
 
-from core.models import Customer
+from core.models import Customer, Project
 from core.views.helpers import _ensure_org_membership, _normalized_phone
 
 
-def _find_duplicate_customers(user, *, phone: str, email: str):
-    """Find existing customers matching by phone or email for duplicate detection."""
+# ---------------------------------------------------------------------------
+# Constants (imported by views)
+# ---------------------------------------------------------------------------
+
+ALLOWED_PROJECT_CREATE_STATUSES = {
+    Project.Status.PROSPECT,
+    Project.Status.ACTIVE,
+}
+
+
+# ---------------------------------------------------------------------------
+# Duplicate detection
+# ---------------------------------------------------------------------------
+
+
+def _find_duplicate_customers(
+    user: AbstractUser,
+    *,
+    phone: str,
+    email: str,
+) -> list[Customer]:
+    """Find existing customers matching by phone or email for duplicate detection.
+
+    Performs a two-pass search within the user's org:
+        1. Direct DB filter on exact phone and case-insensitive email.
+        2. Normalized phone comparison (digits-only) to catch formatting
+           differences like ``555-0100`` vs ``5550100``.
+
+    Returns a deduplicated list of matching customers.
+    """
     membership = _ensure_org_membership(user)
     customers = Customer.objects.filter(organization_id=membership.organization_id)
     phone_norm = _normalized_phone(phone)
@@ -32,8 +64,12 @@ def _find_duplicate_customers(user, *, phone: str, email: str):
     return list(deduped.values())
 
 
-def _build_customer_duplicate_candidate(customer: Customer) -> dict:
-    """Serialize a customer into a lightweight duplicate-candidate dict."""
+def _build_customer_duplicate_candidate(customer: Customer) -> dict[str, Any]:
+    """Serialize a customer into a lightweight duplicate-candidate dict.
+
+    Used by the quick-add intake flow to present duplicate matches to the
+    frontend so the user can choose ``use_existing`` or cancel.
+    """
     return {
         "id": customer.id,
         "display_name": customer.display_name,
@@ -45,16 +81,25 @@ def _build_customer_duplicate_candidate(customer: Customer) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Intake payload builders
+# ---------------------------------------------------------------------------
+
+
 def _build_intake_payload(
     *,
-    payload: dict,
+    payload: dict[str, Any],
     intake_record_id: int | None,
-    created_at,
+    created_at: datetime | None,
     converted_customer_id: int | None = None,
     converted_project_id: int | None = None,
-    converted_at=None,
-) -> dict:
-    """Build the customer_intake sub-dict for a LeadContactRecord snapshot."""
+    converted_at: datetime | None = None,
+) -> dict[str, Any]:
+    """Build the ``customer_intake`` sub-dict for a ``LeadContactRecord`` snapshot.
+
+    Assembles the intake fields, conversion state, and timestamps into the
+    shape expected by the frontend intake display and the audit snapshot.
+    """
     return {
         "id": intake_record_id,
         "full_name": payload.get("full_name", ""),
@@ -79,13 +124,18 @@ def _build_intake_payload(
 
 def build_intake_snapshot(
     *,
-    payload: dict,
+    payload: dict[str, Any],
     intake_record_id: int | None = None,
     converted_customer_id: int | None = None,
     converted_project_id: int | None = None,
-    converted_at=None,
-) -> dict:
-    """Build the snapshot_json dict for a LeadContactRecord."""
+    converted_at: datetime | None = None,
+) -> dict[str, Any]:
+    """Build the ``snapshot_json`` dict for a ``LeadContactRecord``.
+
+    Wraps ``_build_intake_payload`` with a ``customer_intake`` key and
+    auto-sets ``created_at`` to now.  Used by both the initial intake
+    creation and the conversion record.
+    """
     return {
         "customer_intake": _build_intake_payload(
             payload=payload,

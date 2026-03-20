@@ -20,22 +20,36 @@ from core.serializers import (
 )
 from core.views.helpers import _capability_gate, _ensure_org_membership, _paginate_queryset, _parse_request_bool
 from core.views.shared_operations.customers_helpers import (
+    ALLOWED_PROJECT_CREATE_STATUSES,
     _build_customer_duplicate_candidate,
     _build_intake_payload,
     _find_duplicate_customers,
     build_intake_snapshot,
 )
 
-ALLOWED_PROJECT_CREATE_STATUSES = {
-    Project.Status.PROSPECT,
-    Project.Status.ACTIVE,
-}
-
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def customers_list_view(request):
-    """List organization-scoped customers with optional free-text filtering."""
+    """List organization-scoped customers with optional free-text search and pagination.
+
+    Annotates each customer with ``project_count`` (non-prospect) and
+    ``active_project_count`` for frontend display.  Supports ``?q=`` search
+    across display name, phone, email, and billing address.
+
+    Flow:
+        1. Scope to user's org with project count annotations.
+        2. Apply optional ``?q=`` filter.
+        3. Paginate and return.
+
+    URL: ``GET /api/v1/customers/?q=...&page=1&page_size=25``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": [{ ... }], "meta": { "page": 1, "total_count": 42, ... } }
+    """
     membership = _ensure_org_membership(request.user)
     rows = (
         Customer.objects.filter(organization_id=membership.organization_id)
@@ -73,14 +87,40 @@ def customers_list_view(request):
 
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
-def customer_detail_view(request, customer_id: int):
+def customer_detail_view(request, customer_id):
     """Fetch or update a customer with immutable record capture on writes.
 
-    Contract:
-    - `PATCH`: appends `CustomerRecord(updated)` in-transaction.
-      - When `is_archived` changes `false -> true`, all `prospect` projects for that customer
-        are transitioned to `cancelled` in the same transaction.
-    - `DELETE`: intentionally unsupported (`405`); archive via `PATCH is_archived`.
+    PATCH appends a ``CustomerRecord(updated)`` in-transaction.  When
+    ``is_archived`` transitions from false to true, all prospect-status
+    projects for that customer are auto-cancelled in the same transaction.
+    Active/on-hold projects block archival entirely (enforced by
+    ``Customer.clean()``).
+
+    Flow (GET):
+        1. Look up customer scoped to user's org with project annotations.
+        2. Return serialized customer with computed flags.
+
+    Flow (PATCH):
+        1. Capability gate: ``customers.edit``.
+        2. Partial update via serializer (with ``Customer.clean()`` safety net).
+        3. If archiving, cancel any prospect projects.
+        4. Append ``CustomerRecord`` audit row.
+        5. Re-fetch with fresh annotations and return.
+
+    URL: ``GET/PATCH /api/v1/customers/<customer_id>/``
+
+    Request body (PATCH)::
+
+        { "display_name": "...", "is_archived": true }
+
+    Success 200::
+
+        { "data": { ... } }
+
+    Errors:
+        - 400: Validation error (e.g., archiving customer with active projects).
+        - 403: Missing ``customers.edit`` capability.
+        - 404: Customer not found.
     """
     membership = _ensure_org_membership(request.user)
     customer = (
@@ -117,89 +157,108 @@ def customer_detail_view(request, customer_id: int):
         payload["has_active_or_on_hold_project"] = payload["active_project_count"] > 0
         return Response({"data": payload})
 
-    permission_error, _ = _capability_gate(request.user, "customers", "edit")
-    if permission_error:
-        return Response(permission_error, status=403)
+    elif request.method == "PATCH":
+        permission_error, _ = _capability_gate(request.user, "customers", "edit")
+        if permission_error:
+            return Response(permission_error, status=403)
 
-    with transaction.atomic():
-        previous_is_archived = customer.is_archived
-        serializer = CustomerManageSerializer(customer, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        # save() → full_clean() → Customer.clean(), which raises
-        # DjangoValidationError if archiving a customer with active/on-hold
-        # projects.  Frontend disables the toggle in that case, but this is
-        # the backend safety net.
-        try:
-            serializer.save()
-        except DjangoValidationError as exc:
-            if hasattr(exc, "message_dict"):
-                return Response(exc.message_dict, status=400)
-            return Response({"non_field_errors": exc.messages}, status=400)
+        with transaction.atomic():
+            previous_is_archived = customer.is_archived
+            serializer = CustomerManageSerializer(customer, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            # save() → full_clean() → Customer.clean(), which raises
+            # DjangoValidationError if archiving a customer with active/on-hold
+            # projects.  Frontend disables the toggle in that case, but this is
+            # the backend safety net.
+            try:
+                serializer.save()
+            except DjangoValidationError as exc:
+                if hasattr(exc, "message_dict"):
+                    return Response(exc.message_dict, status=400)
+                return Response({"non_field_errors": exc.messages}, status=400)
 
-        # Archive cascade: when a customer is archived, auto-cancel any
-        # prospect-status projects.  Active/on-hold projects block archival
-        # entirely (enforced by Customer.clean() above).
-        cancelled_prospect_project_count = 0
-        if not previous_is_archived and customer.is_archived:
-            cancelled_prospect_project_count = customer.projects.filter(
-                status=Project.Status.PROSPECT
-            ).update(status=Project.Status.CANCELLED, updated_at=timezone.now())
+            # Archive cascade: when a customer is archived, auto-cancel any
+            # prospect-status projects.  Active/on-hold projects block archival
+            # entirely (enforced by Customer.clean() above).
+            cancelled_prospect_project_count = 0
+            if not previous_is_archived and customer.is_archived:
+                cancelled_prospect_project_count = customer.projects.filter(
+                    status=Project.Status.PROSPECT
+                ).update(status=Project.Status.CANCELLED, updated_at=timezone.now())
 
-        CustomerRecord.record(
-            customer=customer,
-            event_type=CustomerRecord.EventType.UPDATED,
-            capture_source=CustomerRecord.CaptureSource.MANUAL_UI,
-            recorded_by=request.user,
-            note=(
-                "Customer archive state changed."
+            CustomerRecord.record(
+                customer=customer,
+                event_type=CustomerRecord.EventType.UPDATED,
+                capture_source=CustomerRecord.CaptureSource.MANUAL_UI,
+                recorded_by=request.user,
+                note=(
+                    "Customer archive state changed."
+                    if customer.is_archived != previous_is_archived
+                    else "Customer updated."
+                ),
+                metadata={
+                    "from_is_archived": previous_is_archived,
+                    "to_is_archived": customer.is_archived,
+                    "cancelled_prospect_project_count": cancelled_prospect_project_count,
+                }
                 if customer.is_archived != previous_is_archived
-                else "Customer updated."
-            ),
-            metadata={
-                "from_is_archived": previous_is_archived,
-                "to_is_archived": customer.is_archived,
-                "cancelled_prospect_project_count": cancelled_prospect_project_count,
-            }
-            if customer.is_archived != previous_is_archived
-            else {},
-        )
+                else {},
+            )
 
-    # Re-fetch with fresh annotations — project_count / active_project_count
-    # are DB-computed and may have changed after the prospect cancellation.
-    annotated_customer = (
-        Customer.objects.filter(id=customer.id, organization_id=membership.organization_id)
-        .annotate(
-            project_count=Count(
-                "projects",
-                filter=~Q(projects__status=Project.Status.PROSPECT),
-                distinct=True,
-            ),
-            active_project_count=Count(
-                "projects",
-                filter=Q(projects__status__in=[Project.Status.ACTIVE, Project.Status.ON_HOLD]),
-                distinct=True,
-            ),
+        # Re-fetch with fresh annotations — project_count / active_project_count
+        # are DB-computed and may have changed after the prospect cancellation.
+        annotated_customer = (
+            Customer.objects.filter(id=customer.id, organization_id=membership.organization_id)
+            .annotate(
+                project_count=Count(
+                    "projects",
+                    filter=~Q(projects__status=Project.Status.PROSPECT),
+                    distinct=True,
+                ),
+                active_project_count=Count(
+                    "projects",
+                    filter=Q(projects__status__in=[Project.Status.ACTIVE, Project.Status.ON_HOLD]),
+                    distinct=True,
+                ),
+            )
+            .first()
         )
-        .first()
-    )
-    payload = CustomerManageSerializer(annotated_customer).data
-    payload["has_project"] = payload["project_count"] > 0
-    payload["has_active_or_on_hold_project"] = payload["active_project_count"] > 0
-    return Response({"data": payload})
+        payload = CustomerManageSerializer(annotated_customer).data
+        payload["has_project"] = payload["project_count"] > 0
+        payload["has_active_or_on_hold_project"] = payload["active_project_count"] > 0
+        return Response({"data": payload})
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def customer_project_create_view(request, customer_id: int):
+def customer_project_create_view(request, customer_id):
     """Create a new project directly from a customer context.
 
-    Contract:
-    - Customer must be visible to the caller's organization scope.
-    - Defaults:
-      - `name`: `<customer display name> Project`
-      - `site_address`: customer billing address
-      - `status`: `prospect`
-      - `initial_contract_value`: `0`
+    Defaults project name to ``<customer name> Project``, site address to
+    the customer's billing address, status to prospect, and contract value
+    to zero.  Optionally accepts ``status: active`` to skip the prospect stage.
+
+    Flow:
+        1. Look up customer scoped to user's org.
+        2. Capability gate: ``projects.create``.
+        3. Validate and apply defaults.
+        4. Create project + ``CustomerRecord`` audit row (atomic).
+        5. If requested status is active, transition immediately.
+
+    URL: ``POST /api/v1/customers/<customer_id>/projects/``
+
+    Request body::
+
+        { "name": "Kitchen Remodel", "site_address": "...", "status": "prospect" }
+
+    Success 201::
+
+        { "data": { "project": { ... }, "customer": { ... } } }
+
+    Errors:
+        - 400: Validation error (missing site address, invalid status).
+        - 403: Missing ``projects.create`` capability.
+        - 404: Customer not found.
     """
     membership = _ensure_org_membership(request.user)
     customer = Customer.objects.filter(id=customer_id, organization_id=membership.organization_id).first()
@@ -302,13 +361,42 @@ def customer_project_create_view(request, customer_id: int):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def quick_add_customer_intake_view(request):
-    """Create customer-first intake rows with immutable provenance and optional project creation.
+    """Create a customer via quick-add intake with duplicate detection and optional project.
 
-    Contract:
-    - Supports duplicate resolutions: `use_existing|create_anyway`.
-    - Duplicate detection and persistence are customer-first.
-    - Intake provenance is captured as immutable `LeadContactRecord`.
-    - Optional project creation is performed in the same request when `create_project=true`.
+    Supports duplicate resolution: when duplicates are detected, returns a 409
+    with candidates.  The frontend can re-submit with ``duplicate_resolution:
+    use_existing`` and a ``duplicate_target_id`` to link to an existing customer.
+    Intake provenance is captured as an immutable ``LeadContactRecord``.
+    Optional project creation happens in the same transaction.
+
+    Flow:
+        1. Capability gate: ``customers.create``.
+        2. Validate intake fields via serializer.
+        3. If ``create_project``, validate project fields (address, name, status).
+        4. Run duplicate detection on phone/email.
+        5. If duplicates found and no resolution provided, return 409 with candidates.
+        6. If ``use_existing``, validate ``duplicate_target_id``.
+        7. Create or select customer + ``LeadContactRecord`` + optional project (atomic).
+        8. Return intake payload with customer, project, and resolution metadata.
+
+    URL: ``POST /api/v1/customers/quick-add/``
+
+    Request body::
+
+        {
+            "full_name": "Jane Doe", "phone": "555-1234", "email": "jane@example.com",
+            "project_address": "123 Main St", "create_project": true,
+            "project_name": "Kitchen Remodel", "project_status": "prospect"
+        }
+
+    Success 201::
+
+        { "data": { "customer_intake": {...}, "customer": {...}, "project": {...} }, "meta": {...} }
+
+    Errors:
+        - 400: Validation error (missing fields, invalid status, bad duplicate_target_id).
+        - 403: Missing ``customers.create`` capability.
+        - 409: Duplicate detected — includes candidates and allowed resolutions.
     """
     permission_error, _ = _capability_gate(request.user, "customers", "create")
     if permission_error:
