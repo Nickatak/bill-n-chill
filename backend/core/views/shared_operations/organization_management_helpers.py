@@ -1,17 +1,39 @@
 """Domain-specific helpers for organization management views."""
 
-from django.db.models import Case, Value, When
+from typing import Any
+
+from django.contrib.auth.models import AbstractUser
+from django.db.models import Case, QuerySet, Value, When
 
 from core.models import OrganizationMembership
 from core.user_helpers import _resolve_user_capabilities, _resolve_user_role
+
+
+# ---------------------------------------------------------------------------
+# Constants (imported by views)
+# ---------------------------------------------------------------------------
+
+LOGO_MAX_SIZE_BYTES = 2 * 1024 * 1024  # 2 MB
+LOGO_ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 # Hierarchical role ordering: owner first, viewer last.
 _ROLE_HIERARCHY = ["owner", "pm", "bookkeeping", "worker", "viewer"]
 _ROLE_ORDER_WHENS = [When(role=slug, then=Value(i)) for i, slug in enumerate(_ROLE_HIERARCHY)]
 
 
-def _organization_role_policy(user) -> dict:
-    """Build the role policy dict describing the user's effective permissions for the org console."""
+# ---------------------------------------------------------------------------
+# Role policy
+# ---------------------------------------------------------------------------
+
+
+def _organization_role_policy(user: AbstractUser) -> dict[str, Any]:
+    """Build the role policy dict describing the user's effective permissions.
+
+    Returns a dict consumed by the frontend org console to gate UI elements
+    (edit buttons, role dropdowns, invite controls).  Includes the user's
+    effective role, per-section edit flags, and the full list of assignable
+    roles and statuses.
+    """
     effective_role = _resolve_user_role(user)
     caps = _resolve_user_capabilities(user)
     can_edit_identity = "edit" in caps.get("org_identity", [])
@@ -30,11 +52,18 @@ def _organization_role_policy(user) -> dict:
     }
 
 
-def _organization_membership_queryset(organization_id: int):
-    """Return the ordered membership queryset for an organization with user relations loaded.
+# ---------------------------------------------------------------------------
+# Membership queries
+# ---------------------------------------------------------------------------
 
-    Ordering: active before disabled, then hierarchical role order
-    (owner → pm → bookkeeping → worker → viewer), then user_id tiebreaker.
+
+def _organization_membership_queryset(organization_id: int) -> QuerySet:
+    """Return the ordered membership queryset for an organization.
+
+    Loads the related ``user`` and annotates with ``role_order`` for
+    hierarchical sorting: active before disabled, then role hierarchy
+    (owner -> pm -> bookkeeping -> worker -> viewer), then ``user_id``
+    tiebreaker.
     """
     return (
         OrganizationMembership.objects.select_related("user")
@@ -44,8 +73,19 @@ def _organization_membership_queryset(organization_id: int):
     )
 
 
-def _is_last_active_owner(membership: OrganizationMembership, *, next_role: str, next_status: str) -> bool:
-    """Return True if changing this membership would leave the organization with no active owner."""
+def _is_last_active_owner(
+    membership: OrganizationMembership,
+    *,
+    next_role: str,
+    next_status: str,
+) -> bool:
+    """Return True if changing this membership would leave the org with no active owner.
+
+    Checks whether the membership is currently an active owner, whether the
+    proposed change would remove that status, and whether any other active
+    owners exist.  Used as a guard in ``organization_membership_detail_view``
+    to prevent orphaning an organization.
+    """
     is_owner_now = membership.role == OrganizationMembership.Role.OWNER
     is_active_now = membership.status == OrganizationMembership.Status.ACTIVE
     remains_active_owner = (
