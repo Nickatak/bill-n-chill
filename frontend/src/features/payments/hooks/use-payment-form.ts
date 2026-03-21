@@ -1,9 +1,8 @@
 /**
  * Payment form field state and lifecycle helpers.
  *
- * Owns every editable field in the Record Payment / Edit Payment form,
- * including the optional inline allocation disclosure fields. Provides
- * `resetToCreate()` to clear all fields back to defaults and
+ * Owns every editable field in the Record Payment / Edit Payment form.
+ * Provides `resetToCreate()` to clear all fields back to defaults and
  * `hydrateFromPayment()` to populate fields from an existing record.
  *
  * Consumer: PaymentsConsole (composed alongside usePaymentData and
@@ -18,9 +17,7 @@
  * - formPaymentDate     — date input (defaults to today)
  * - formReferenceNumber — optional reference / check number
  * - formNotes           — optional notes textarea
- * - showAllocation      — disclosure toggle for inline allocation
- * - allocTargetId       — selected invoice id for allocation
- * - allocAmount         — dollar amount for allocation
+ * - targetId            — required target document id (invoice/bill/receipt)
  *
  * ## Functions
  *
@@ -58,10 +55,8 @@ export function usePaymentForm(initialMethod: PaymentMethod = "check") {
   const [formReferenceNumber, setFormReferenceNumber] = useState("");
   const [formNotes, setFormNotes] = useState("");
 
-  // Allocation disclosure (inline on create form)
-  const [showAllocation, setShowAllocation] = useState(false);
-  const [allocTargetId, setAllocTargetId] = useState("");
-  const [allocAmount, setAllocAmount] = useState("");
+  // Target document (required — every payment must allocate to a document)
+  const [targetId, setTargetId] = useState("");
 
   // --- Functions ---
 
@@ -74,9 +69,7 @@ export function usePaymentForm(initialMethod: PaymentMethod = "check") {
     setFormPaymentDate(todayDateInput());
     setFormReferenceNumber("");
     setFormNotes("");
-    setShowAllocation(false);
-    setAllocTargetId("");
-    setAllocAmount("");
+    setTargetId("");
   }
 
   /** Populate form fields from an existing payment record (edit mode). */
@@ -88,9 +81,7 @@ export function usePaymentForm(initialMethod: PaymentMethod = "check") {
     setFormPaymentDate(payment.payment_date);
     setFormReferenceNumber(payment.reference_number);
     setFormNotes(payment.notes);
-    setShowAllocation(false);
-    setAllocTargetId("");
-    setAllocAmount("");
+    setTargetId("");
   }
 
   // --- Return bag ---
@@ -104,9 +95,7 @@ export function usePaymentForm(initialMethod: PaymentMethod = "check") {
     formPaymentDate,
     formReferenceNumber,
     formNotes,
-    showAllocation,
-    allocTargetId,
-    allocAmount,
+    targetId,
 
     // Setters
     setWorkspaceMode,
@@ -116,9 +105,7 @@ export function usePaymentForm(initialMethod: PaymentMethod = "check") {
     setFormPaymentDate,
     setFormReferenceNumber,
     setFormNotes,
-    setShowAllocation,
-    setAllocTargetId,
-    setAllocAmount,
+    setTargetId,
 
     // Helpers
     resetToCreate,

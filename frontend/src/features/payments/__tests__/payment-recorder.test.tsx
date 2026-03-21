@@ -14,7 +14,7 @@ vi.mock("@/shared/session/use-shared-session", () => ({
     authMessage: "Using shared session for nick@test.com (owner).",
     role: "owner",
     organization: null,
-    capabilities: { payments: ["view", "create", "edit", "allocate"] },
+    capabilities: { payments: ["view", "create", "edit"] },
   })),
 }));
 
@@ -47,9 +47,8 @@ function makePayment(overrides: Record<string, unknown> = {}) {
     payment_date: "2026-03-01",
     reference_number: "REF-001",
     notes: "",
-    allocated_total: "3000.00",
-    unapplied_amount: "2000.00",
-    allocations: [],
+    target_type: "invoice",
+    target_id: 100,
     created_at: "2026-03-01T10:00:00Z",
     updated_at: "2026-03-01T10:00:00Z",
     ...overrides,
@@ -183,13 +182,13 @@ describe("PaymentRecorder", () => {
     expect(screen.getAllByText("#REF-002").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("shows detail card for selected payment", async () => {
+  it("shows detail card with target info for selected payment", async () => {
     setupPaymentFetch({
       payments: [makePayment({
         id: 1,
         amount: "5000.00",
-        allocated_total: "3000.00",
-        unapplied_amount: "2000.00",
+        target_type: "invoice",
+        target_id: 100,
       })],
     });
     renderRecorder();
@@ -200,24 +199,23 @@ describe("PaymentRecorder", () => {
 
     // Amounts appear in both list and detail card — use getAllByText
     expect(screen.getAllByText("$5000.00").length).toBeGreaterThanOrEqual(1);
-    // Detail card metrics: Allocated and Unapplied
-    expect(screen.getByText("Allocated")).toBeInTheDocument();
-    expect(screen.getByText("Unapplied")).toBeInTheDocument();
-    expect(screen.getAllByText("$3000.00").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("$2000.00").length).toBeGreaterThanOrEqual(1);
+    // Detail card shows target document
+    expect(screen.getByText("Target")).toBeInTheDocument();
+    expect(screen.getByText("Invoice #100")).toBeInTheDocument();
   });
 
-  it("creates a new payment via POST", async () => {
+  it("creates a new payment via POST with required target", async () => {
     setupPaymentFetch({ payments: [] });
     renderRecorder();
 
     await waitFor(() => {
-      // "Record Payment" appears as h3 title AND submit button — use role query for the button
-      expect(screen.getByRole("button", { name: "Record Payment" })).toBeInTheDocument();
+      // Target selector should render with "Select invoice" placeholder
+      expect(screen.getByRole("option", { name: "Select invoice" })).toBeInTheDocument();
     });
 
-    // Workspace should be in create mode
-    expect(screen.getByText("New")).toBeInTheDocument();
+    // Select a target invoice
+    const targetSelect = screen.getByRole("option", { name: "Select invoice" }).closest("select")!;
+    fireEvent.change(targetSelect, { target: { value: "100" } });
 
     // Set up the POST response
     mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
@@ -238,7 +236,7 @@ describe("PaymentRecorder", () => {
     fireEvent.click(screen.getByRole("button", { name: "Record Payment" }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Created payment #42/)).toBeInTheDocument();
+      expect(screen.getByText(/Recorded payment #42/)).toBeInTheDocument();
     });
   });
 
@@ -305,41 +303,6 @@ describe("PaymentRecorder", () => {
     expect(screen.getByRole("button", { name: "Void" })).toBeInTheDocument();
   });
 
-  it("shows existing allocations on detail card", async () => {
-    setupPaymentFetch({
-      payments: [makePayment({
-        allocations: [
-          { id: 1, payment: 1, target_type: "invoice", target_id: 100, applied_amount: "3000.00" },
-        ],
-      })],
-    });
-    renderRecorder();
-
-    await waitFor(() => {
-      expect(screen.getByText("Allocations")).toBeInTheDocument();
-    });
-
-    expect(screen.getByText("Invoice #100")).toBeInTheDocument();
-    // $3000.00 appears as both detail metric and allocation row amount
-    expect(screen.getAllByText("$3000.00").length).toBeGreaterThanOrEqual(2);
-  });
-
-  it("shows allocation form for settled payments with unapplied balance", async () => {
-    setupPaymentFetch({
-      payments: [makePayment({
-        status: "settled",
-        unapplied_amount: "2000.00",
-      })],
-    });
-    renderRecorder();
-
-    await waitFor(() => {
-      expect(screen.getByText("Allocate to Invoice")).toBeInTheDocument();
-    });
-
-    expect(screen.getByRole("button", { name: "Allocate" })).toBeInTheDocument();
-  });
-
   it("shows read-only notice for viewers without create/edit", async () => {
     const { useSharedSessionAuth } = await import("@/shared/session/use-shared-session");
     vi.mocked(useSharedSessionAuth).mockReturnValueOnce({
@@ -358,17 +321,42 @@ describe("PaymentRecorder", () => {
     renderRecorder();
 
     await waitFor(() => {
-      expect(screen.getByText(/can view payments but cannot create, edit, or allocate/)).toBeInTheDocument();
+      expect(screen.getByText(/can view payments but cannot create or edit/)).toBeInTheDocument();
     });
   });
 
-  it("shows inline allocation option on create when targets available", async () => {
+  it("shows required target selector on create when targets available", async () => {
     setupPaymentFetch({ payments: [] });
     renderRecorder();
 
     await waitFor(() => {
-      expect(screen.getByRole("option", { name: "None" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "Select invoice" })).toBeInTheDocument();
     });
+
+    // Target options from allocationTargets prop
+    expect(screen.getByRole("option", { name: /Invoice #100/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Invoice #101/ })).toBeInTheDocument();
+  });
+
+  it("shows guidance message when no allocation targets exist", async () => {
+    setupPaymentFetch({ payments: [] });
+    renderRecorder({ allocationTargets: [] });
+
+    await waitFor(() => {
+      expect(screen.getByText("Create an invoice first to record payments.")).toBeInTheDocument();
+    });
+  });
+
+  it("disables submit button when no target is selected", async () => {
+    setupPaymentFetch({ payments: [] });
+    renderRecorder();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Record Payment" })).toBeInTheDocument();
+    });
+
+    // No target selected — button should be disabled
+    expect(screen.getByRole("button", { name: "Record Payment" })).toBeDisabled();
   });
 
   it("hides heading and copy when hideHeader is true", async () => {
@@ -452,8 +440,12 @@ describe("PaymentRecorder", () => {
     renderRecorder();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Record Payment" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "Select invoice" })).toBeInTheDocument();
     });
+
+    // Select a target so submit is enabled
+    const targetSelect = screen.getByRole("option", { name: "Select invoice" }).closest("select")!;
+    fireEvent.change(targetSelect, { target: { value: "100" } });
 
     mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
       if (opts?.method === "POST") {
@@ -478,8 +470,12 @@ describe("PaymentRecorder", () => {
     renderRecorder();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Record Payment" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "Select invoice" })).toBeInTheDocument();
     });
+
+    // Select a target so submit is enabled
+    const targetSelect = screen.getByRole("option", { name: "Select invoice" }).closest("select")!;
+    fireEvent.change(targetSelect, { target: { value: "100" } });
 
     mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
       if (opts?.method === "POST") {

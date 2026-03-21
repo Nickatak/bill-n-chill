@@ -21,18 +21,6 @@ export type AllocationTarget = {
   balanceDue: string;
 };
 
-export type PaymentAllocationRecord = {
-  id: number;
-  payment: number;
-  target_type: PaymentAllocationTargetType;
-  target_id: number;
-  invoice: number | null;
-  vendor_bill: number | null;
-  receipt: number | null;
-  applied_amount: string;
-  created_at: string;
-};
-
 export type CustomerRecord = {
   id: number;
   display_name: string;
@@ -52,9 +40,8 @@ export type PaymentRecord = {
   payment_date: string;
   reference_number: string;
   notes: string;
-  allocated_total: string;
-  unapplied_amount: string;
-  allocations: PaymentAllocationRecord[];
+  target_type: PaymentAllocationTargetType | "";
+  target_id: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -73,11 +60,6 @@ export type VendorBillRecord = {
   status: string;
   total: string;
   balance_due: string;
-};
-
-export type PaymentAllocateResult = {
-  payment: PaymentRecord;
-  created_allocations: PaymentAllocationRecord[];
 };
 
 export type PaymentPolicyContract = {
@@ -103,12 +85,7 @@ export type ApiResponse = {
     | PaymentRecord
     | PaymentPolicyContract
     | InvoiceRecord[]
-    | VendorBillRecord[]
-    | PaymentAllocateResult;
-  meta?: {
-    allocated_total?: string;
-    unapplied_amount?: string;
-  };
+    | VendorBillRecord[];
   error?: {
     code?: string;
     message?: string;

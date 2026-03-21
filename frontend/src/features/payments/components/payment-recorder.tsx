@@ -7,6 +7,10 @@
  * Bills page. Receives projectId and allocation targets from the parent
  * console so it doesn't duplicate project selection or target fetching.
  *
+ * Every payment must allocate to exactly one document. The target selector
+ * is required on create — the form is disabled when no allocation targets
+ * exist for the project.
+ *
  * Parent: QuickEntryTabs
  *
  * Layout: payment list → selected detail card → create/edit workspace.
@@ -26,7 +30,6 @@ import { canDo } from "@/shared/session/rbac";
 import type {
   AllocationTarget,
   ApiResponse,
-  PaymentAllocateResult,
   PaymentAllocationTargetType,
   PaymentMethod,
   PaymentPolicyContract,
@@ -131,14 +134,12 @@ export function PaymentRecorder({
   const [formReferenceNumber, setFormReferenceNumber] = useState("");
   const [formNotes, setFormNotes] = useState("");
 
-  // Allocation (inline on create, or in detail card for existing)
+  // Target document (required — every payment must allocate to a document)
   const [allocTargetId, setAllocTargetId] = useState("");
-  const [allocAmount, setAllocAmount] = useState("");
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const canCreatePayments = canDo(capabilities, "payments", "create");
   const canEditPayments = canDo(capabilities, "payments", "edit");
-  const canAllocatePayments = canDo(capabilities, "payments", "allocate");
 
   const directionLabel = direction === "inbound" ? "Inbound" : "Outbound";
   const targetLabel = direction === "inbound" ? "Invoice" : "Bill";
@@ -180,7 +181,6 @@ export function PaymentRecorder({
     setFormReferenceNumber("");
     setFormNotes("");
     setAllocTargetId("");
-    setAllocAmount("");
   }
 
   function hydrateFromPayment(payment: PaymentRecord) {
@@ -193,7 +193,6 @@ export function PaymentRecorder({
     setFormReferenceNumber(payment.reference_number);
     setFormNotes(payment.notes);
     setAllocTargetId("");
-    setAllocAmount("");
   }
 
   function setMessage(msg: string, tone: "info" | "success" | "error" = "info") {
@@ -288,6 +287,10 @@ export function PaymentRecorder({
       setMessage("No project selected.", "error");
       return;
     }
+    if (!allocTargetId) {
+      setMessage(`Select a ${targetLabel.toLowerCase()} to allocate this payment to.`, "error");
+      return;
+    }
 
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/payments/`, {
@@ -300,6 +303,8 @@ export function PaymentRecorder({
           payment_date: formPaymentDate,
           reference_number: formReferenceNumber,
           notes: formNotes,
+          target_type: allocationTargetType,
+          target_id: Number(allocTargetId),
         }),
       });
       const payload: ApiResponse = await response.json();
@@ -308,54 +313,12 @@ export function PaymentRecorder({
         return;
       }
 
-      let created = payload.data as PaymentRecord;
-
-      // One-step allocate if user filled in the optional allocation
-      const wantAllocate = allocTargetId && allocAmount && allocAmount !== "0.00";
-      if (wantAllocate && canAllocatePayments) {
-        try {
-          const allocResponse = await fetch(`${normalizedBaseUrl}/payments/${created.id}/allocate/`, {
-            method: "POST",
-            headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
-            body: JSON.stringify({
-              allocations: [{
-                target_type: allocationTargetType,
-                target_id: Number(allocTargetId),
-                applied_amount: allocAmount,
-              }],
-            }),
-          });
-          const allocPayload: ApiResponse = await allocResponse.json();
-          if (allocResponse.ok) {
-            const result = allocPayload.data as PaymentAllocateResult;
-            created = result.payment;
-            onPaymentsChanged?.();
-          } else {
-            setPayments((current) => [created, ...current]);
-            setSelectedPaymentId(String(created.id));
-            hydrateFromPayment(created);
-            setMessage(
-              `Created payment #${created.id}, but allocation failed: ${allocPayload.error?.message ?? "unknown error"}.`,
-              "error",
-            );
-            return;
-          }
-        } catch {
-          setPayments((current) => [created, ...current]);
-          setSelectedPaymentId(String(created.id));
-          hydrateFromPayment(created);
-          setMessage(`Created payment #${created.id}, but could not reach allocation endpoint.`, "error");
-          return;
-        }
-      }
-
+      const created = payload.data as PaymentRecord;
       setPayments((current) => [created, ...current]);
       setSelectedPaymentId(String(created.id));
       hydrateFromPayment(created);
-      setMessage(
-        wantAllocate ? `Created and allocated payment #${created.id}.` : `Created payment #${created.id}.`,
-        "success",
-      );
+      setMessage(`Recorded payment #${created.id}.`, "success");
+      onPaymentsChanged?.();
     } catch {
       setMessage("Could not reach payment create endpoint.", "error");
     }
@@ -428,53 +391,6 @@ export function PaymentRecorder({
     }
   }
 
-  async function handleAllocate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!canAllocatePayments) {
-      setMessage(`Role ${role} does not have payment allocation permission.`, "error");
-      return;
-    }
-    const paymentId = Number(selectedPaymentId);
-    const targetId = Number(allocTargetId);
-    if (!paymentId || !targetId) {
-      setMessage("Select a payment and target first.", "error");
-      return;
-    }
-
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/payments/${paymentId}/allocate/`, {
-        method: "POST",
-        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
-        body: JSON.stringify({
-          allocations: [{
-            target_type: allocationTargetType,
-            target_id: targetId,
-            applied_amount: allocAmount,
-          }],
-        }),
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setMessage(payload.error?.message ?? "Create allocation failed.", "error");
-        return;
-      }
-
-      const result = payload.data as PaymentAllocateResult;
-      const updatedPayment = result.payment;
-      setPayments((current) => current.map((p) => (p.id === updatedPayment.id ? updatedPayment : p)));
-      setSelectedPaymentId(String(updatedPayment.id));
-      hydrateFromPayment(updatedPayment);
-      setAllocAmount("");
-      setMessage(
-        `Allocated. Unapplied: ${updatedPayment.unapplied_amount}.`,
-        "success",
-      );
-      onPaymentsChanged?.();
-    } catch {
-      setMessage("Could not reach payment allocation endpoint.", "error");
-    }
-  }
-
   // ── Effects ───────────────────────────────────────────────
 
   useEffect(() => {
@@ -506,7 +422,7 @@ export function PaymentRecorder({
 
       {!canCreatePayments && !canEditPayments ? (
         <p className={styles.readOnlyNotice}>
-          Role <strong>{role}</strong> can view payments but cannot create, edit, or allocate.
+          Role <strong>{role}</strong> can view payments but cannot create or edit.
         </p>
       ) : null}
 
@@ -579,14 +495,6 @@ export function PaymentRecorder({
               <span className={styles.metricValue}>${selectedPayment.amount}</span>
             </div>
             <div className={styles.metric}>
-              <span className={styles.metricLabel}>Allocated</span>
-              <span className={styles.metricValue}>${selectedPayment.allocated_total}</span>
-            </div>
-            <div className={styles.metric}>
-              <span className={styles.metricLabel}>Unapplied</span>
-              <span className={styles.metricValue}>${selectedPayment.unapplied_amount}</span>
-            </div>
-            <div className={styles.metric}>
               <span className={styles.metricLabel}>Method</span>
               <span className={styles.metricValue}>{selectedPayment.method}</span>
             </div>
@@ -594,6 +502,14 @@ export function PaymentRecorder({
               <span className={styles.metricLabel}>Date</span>
               <span className={styles.metricValue}>{formatDateDisplay(selectedPayment.payment_date)}</span>
             </div>
+            {selectedPayment.target_type ? (
+              <div className={styles.metric}>
+                <span className={styles.metricLabel}>Target</span>
+                <span className={styles.metricValue}>
+                  {selectedPayment.target_type === "invoice" ? "Invoice" : selectedPayment.target_type === "vendor_bill" ? "Vendor Bill" : "Receipt"} #{selectedPayment.target_id}
+                </span>
+              </div>
+            ) : null}
             {selectedPayment.reference_number ? (
               <div className={styles.metric}>
                 <span className={styles.metricLabel}>Reference</span>
@@ -616,62 +532,6 @@ export function PaymentRecorder({
                 </button>
               ))}
             </div>
-          ) : null}
-
-          {/* Existing allocations */}
-          {selectedPayment.allocations.length > 0 ? (
-            <>
-              <span className={styles.sectionLabel}>Allocations</span>
-              <div className={styles.allocationList}>
-                {selectedPayment.allocations.map((alloc) => (
-                  <div key={alloc.id} className={styles.allocationRow}>
-                    <span className={styles.allocationTarget}>
-                      {alloc.target_type === "invoice" ? "Invoice" : "Bill"} #{alloc.target_id}
-                    </span>
-                    <span className={styles.allocationAmount}>${alloc.applied_amount}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : null}
-
-          {/* Allocate form (only for settled payments with targets) */}
-          {selectedPayment.status === "settled" &&
-           payableTargets.length > 0 &&
-           canAllocatePayments &&
-           Number(selectedPayment.unapplied_amount) > 0 ? (
-            <>
-              <span className={styles.sectionLabel}>Allocate to {targetLabel}</span>
-              <form className={styles.allocationForm} onSubmit={handleAllocate}>
-                <div className={styles.field}>
-                  <span className={styles.fieldLabel}>Target</span>
-                  <select value={allocTargetId} onChange={(e) => setAllocTargetId(e.target.value)} required>
-                    <option value="">Select {targetLabel.toLowerCase()}</option>
-                    {payableTargets.map((target) => (
-                      <option key={target.id} value={target.id}>
-                        {target.label} (due ${target.balanceDue})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className={styles.field}>
-                  <span className={styles.fieldLabel}>Amount</span>
-                  <input
-                    value={allocAmount}
-                    onChange={(e) => setAllocAmount(e.target.value)}
-                    placeholder="0.00"
-                    required
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className={styles.primaryButton}
-                  disabled={!allocTargetId || !allocAmount || allocAmount === "0.00"}
-                >
-                  Allocate
-                </button>
-              </form>
-            </>
           ) : null}
         </div>
       ) : null}
@@ -732,14 +592,14 @@ export function PaymentRecorder({
           </div>
         </div>
 
-        {/* Inline allocation on create */}
-        {workspaceMode === "create" && payableTargets.length > 0 ? (
-          <>
+        {/* Target document (required for create) */}
+        {workspaceMode === "create" ? (
+          payableTargets.length > 0 ? (
             <div className={styles.fieldGrid}>
               <div className={styles.field}>
                 <span className={styles.fieldLabel}>{targetLabel}</span>
-                <select value={allocTargetId} onChange={(e) => setAllocTargetId(e.target.value)}>
-                  <option value="">None</option>
+                <select value={allocTargetId} onChange={(e) => setAllocTargetId(e.target.value)} required>
+                  <option value="">Select {targetLabel.toLowerCase()}</option>
                   {payableTargets.map((target) => (
                     <option key={target.id} value={target.id}>
                       {target.label} (due ${target.balanceDue})
@@ -748,41 +608,41 @@ export function PaymentRecorder({
                 </select>
               </div>
               {allocTargetId ? (
-                <>
-                  <div className={styles.quickAmountRow}>
-                    {(() => {
-                      const target = payableTargets.find((t) => String(t.id) === allocTargetId);
-                      if (!target) return null;
-                      const full = target.balanceDue;
-                      const half = (Number(full) / 2).toFixed(2);
-                      return (
-                        <>
-                          <button
-                            type="button"
-                            className={styles.quickAmountButton}
-                            onClick={() => { setFormAmount(full); setAllocAmount(full); }}
-                          >
-                            Full (${full})
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.quickAmountButton}
-                            onClick={() => { setFormAmount(half); setAllocAmount(half); }}
-                          >
-                            50% (${half})
-                          </button>
-                        </>
-                      );
-                    })()}
-                  </div>
-                  <div className={styles.field}>
-                    <span className={styles.fieldLabel}>Allocation Amount</span>
-                    <input value={allocAmount} onChange={(e) => setAllocAmount(e.target.value)} placeholder="0.00" />
-                  </div>
-                </>
+                <div className={styles.quickAmountRow}>
+                  {(() => {
+                    const target = payableTargets.find((t) => String(t.id) === allocTargetId);
+                    if (!target) return null;
+                    const full = target.balanceDue;
+                    const half = (Number(full) / 2).toFixed(2);
+                    return (
+                      <>
+                        <button
+                          type="button"
+                          className={styles.quickAmountButton}
+                          onClick={() => setFormAmount(full)}
+                        >
+                          Full (${full})
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.quickAmountButton}
+                          onClick={() => setFormAmount(half)}
+                        >
+                          50% (${half})
+                        </button>
+                      </>
+                    );
+                  })()}
+                </div>
               ) : null}
             </div>
-          </>
+          ) : (
+            <p className={styles.emptyState}>
+              {direction === "inbound"
+                ? "Create an invoice first to record payments."
+                : "Create a vendor bill first to record payments."}
+            </p>
+          )
         ) : null}
 
         <button
@@ -790,15 +650,11 @@ export function PaymentRecorder({
           className={styles.primaryButton}
           disabled={
             workspaceMode === "create"
-              ? !projectId || !canCreatePayments
+              ? !projectId || !canCreatePayments || !allocTargetId
               : !selectedPaymentId || !canEditPayments
           }
         >
-          {workspaceMode === "create"
-            ? allocTargetId && allocAmount
-              ? "Record & Allocate"
-              : "Record Payment"
-            : "Save Changes"}
+          {workspaceMode === "create" ? "Record Payment" : "Save Changes"}
         </button>
       </form>
     </section>

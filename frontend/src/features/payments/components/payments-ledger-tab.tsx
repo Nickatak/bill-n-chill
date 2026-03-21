@@ -3,13 +3,12 @@
 /**
  * Payments ledger tab — org-wide view of all payments (inbound + outbound).
  *
- * Shows a compact list of all payments with direction, status, and allocation info.
+ * Shows a compact list of all payments with direction, status, and target info.
  * Filterable by direction and status. Rows expand inline for editing.
  *
  * Edit policy:
  * - Freely editable: amount, method, date, reference_number, notes, project
  * - Read-only (void + re-enter to change): customer, direction
- * - Amount cannot shrink below allocated_total
  * - Every save creates an immutable PaymentRecord snapshot
  */
 
@@ -21,7 +20,7 @@ import { formatDateDisplay } from "@/shared/date-format";
 import { useClientPagination } from "@/shared/hooks/use-client-pagination";
 import { PaginationControls } from "@/shared/components/pagination-controls";
 
-import type { PaymentRecord, PaymentAllocationRecord } from "../types";
+import type { PaymentRecord } from "../types";
 import styles from "./accounting-console.module.css";
 
 // ---------------------------------------------------------------------------
@@ -206,17 +205,6 @@ export function PaymentsLedgerTab({
       return;
     }
 
-    // Client-side: amount must not be below allocated_total
-    const newAmount = Number(editForm.amount);
-    const allocatedTotal = Number(selectedPayment.allocated_total);
-    if (newAmount < allocatedTotal) {
-      setActionMessage(
-        `Amount cannot be less than allocated total (${formatMoney(selectedPayment.allocated_total)}).`,
-      );
-      setActionTone("error");
-      return;
-    }
-
     setSaving(true);
     setActionMessage("");
     try {
@@ -327,24 +315,6 @@ export function PaymentsLedgerTab({
   // -------------------------------------------------------------------------
   // Render helpers
   // -------------------------------------------------------------------------
-
-  function renderAllocations(allocations: PaymentAllocationRecord[]) {
-    if (allocations.length === 0) {
-      return <p className={styles.allocationMeta}>No allocations yet.</p>;
-    }
-    return (
-      <div className={styles.allocationList}>
-        {allocations.map((a) => (
-          <div key={a.id} className={styles.allocationRow}>
-            <span className={styles.allocationTarget}>
-              {ALLOCATION_TARGET_LABELS[a.target_type] ?? a.target_type} #{a.target_id}
-            </span>
-            <span className={styles.allocationAmount}>{formatMoney(a.applied_amount)}</span>
-          </div>
-        ))}
-      </div>
-    );
-  }
 
   function renderExpandedPayment(p: PaymentRecord) {
     if (!editForm) return null;
@@ -475,21 +445,17 @@ export function PaymentsLedgerTab({
           </div>
         </div>
 
-        {/* Allocations (read-only) */}
-        <div className={styles.paymentSection}>
-          <h4 className={styles.paymentSectionHeading}>
-            Allocations ({p.allocations.length})
-          </h4>
-          <div className={styles.paymentSectionContent}>
-            {renderAllocations(p.allocations)}
-            {Number(p.allocated_total) > 0 ? (
-              <div className={styles.allocationRow} style={{ fontWeight: 700 }}>
-                <span>Total allocated</span>
-                <span className={styles.allocationAmount}>{formatMoney(p.allocated_total)}</span>
-              </div>
-            ) : null}
+        {/* Target document */}
+        {p.target_type ? (
+          <div className={styles.paymentSection}>
+            <h4 className={styles.paymentSectionHeading}>Target Document</h4>
+            <div className={styles.paymentSectionContent}>
+              <p className={styles.allocationMeta}>
+                {ALLOCATION_TARGET_LABELS[p.target_type] ?? p.target_type} #{p.target_id}
+              </p>
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
     );
   }
@@ -574,11 +540,6 @@ export function PaymentsLedgerTab({
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div className={styles.documentAmount}>{formatMoney(p.amount)}</div>
-                    {Number(p.unapplied_amount) > 0 ? (
-                      <div className={styles.documentBalance}>
-                        {formatMoney(p.unapplied_amount)} unapplied
-                      </div>
-                    ) : null}
                   </div>
 
                   {isSelected && selectedPayment ? renderExpandedPayment(selectedPayment) : null}

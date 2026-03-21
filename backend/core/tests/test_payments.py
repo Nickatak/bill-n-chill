@@ -54,6 +54,18 @@ class PaymentTests(TestCase):
 
     def _create_payment(self, *, status="settled", amount="800.00", direction="inbound",
                         target_type="", target_id=None):
+        """Create a payment via the API.  Auto-creates a target document when
+        ``target_type``/``target_id`` are not provided (inbound → invoice,
+        outbound → vendor bill)."""
+        if not target_type or not target_id:
+            if direction == "inbound":
+                target = self._create_invoice(total=amount)
+                target_type = "invoice"
+                target_id = target.id
+            else:
+                target = self._create_vendor_bill(total=amount)
+                target_type = "vendor_bill"
+                target_id = target.id
         data = {
             "direction": direction,
             "method": "ach",
@@ -62,11 +74,9 @@ class PaymentTests(TestCase):
             "payment_date": "2026-02-13",
             "reference_number": "PMT-1001",
             "notes": "Initial payment entry.",
+            "target_type": target_type,
+            "target_id": target_id,
         }
-        if target_type:
-            data["target_type"] = target_type
-        if target_id:
-            data["target_id"] = target_id
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/payments/",
             data=data,
@@ -157,6 +167,7 @@ class PaymentTests(TestCase):
         self.assertTrue(str(payload["policy_version"]).startswith("2026-03-05.payments."))
 
     def test_payment_create_and_project_list(self):
+        invoice = self._create_invoice(total="1200.00")
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/payments/",
             data={
@@ -166,6 +177,8 @@ class PaymentTests(TestCase):
                 "payment_date": "2026-02-13",
                 "reference_number": "DEP-2001",
                 "notes": "Deposit recorded.",
+                "target_type": "invoice",
+                "target_id": invoice.id,
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -348,6 +361,22 @@ class PaymentTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["error"]["code"], "validation_error")
+
+    def test_payment_requires_target_document(self):
+        """Every payment must allocate to a document — reject freestanding payments."""
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/payments/",
+            data={
+                "direction": "inbound",
+                "method": "ach",
+                "amount": "500.00",
+                "payment_date": "2026-02-13",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("target_type", response.json()["error"]["fields"])
 
     def test_payment_records_append_for_status_change(self):
         payment_id = self._create_payment(status="pending", amount="500.00", direction="inbound")

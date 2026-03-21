@@ -57,9 +57,9 @@ def org_payments_view(request):
     """List all org payments or create a new payment.
 
     GET returns all payments for the organization.  POST creates a
-    payment with required direction, method, and amount.  Optionally
-    links to a target document (invoice, vendor bill, or receipt) via
-    ``target_type`` + ``target_id``.  Inbound payments require a customer.
+    payment with required direction, method, amount, and target document
+    (``target_type`` + ``target_id``).  Every payment must allocate to
+    exactly one document.  Inbound payments require a customer.
 
     Flow (GET):
         1. Return all org payments with related objects.
@@ -68,7 +68,7 @@ def org_payments_view(request):
         1. Capability gate: ``payments.create``.
         2. Validate required fields (direction, method, amount).
         3. Resolve customer (required for inbound) and optional project.
-        4. Resolve and validate optional target document.
+        4. Resolve and validate required target document.
         5. Create payment + audit record (atomic).
         6. Recalculate target balance if settled.
 
@@ -192,7 +192,7 @@ def project_payments_view(request, project_id):
 
     GET returns all payments for the project.  POST creates a payment
     pre-linked to the project with auto-resolved customer for inbound
-    direction.  Supports optional target document linking.
+    direction.  Requires target document (``target_type`` + ``target_id``).
 
     Flow (GET):
         1. Validate project scope.
@@ -201,7 +201,7 @@ def project_payments_view(request, project_id):
     Flow (POST):
         1. Capability gate: ``payments.create``.
         2. Validate required fields (direction, method, amount).
-        3. Resolve optional target document.
+        3. Resolve and validate required target document.
         4. Create payment + audit record (atomic).
         5. Recalculate target balance if settled.
 

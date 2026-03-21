@@ -189,16 +189,17 @@ def _resolve_and_link_target(
 ) -> tuple[Model | None, dict | None]:
     """Resolve ``target_type`` + ``target_id`` from payload and populate payment FK kwargs.
 
-    Validates that the target document exists, is org-scoped, and is in a
-    linkable status.  Returns ``(target, None)`` on success or
-    ``(None, error_payload)`` on validation failure.
+    Both fields are required — every payment must allocate to exactly one
+    document (invoice, vendor bill, or receipt).  Validates that the target
+    exists, is org-scoped, and is in a linkable status.  Returns
+    ``(target, None)`` on success or ``(None, error_payload)`` on failure.
     """
     target_type = data.get("target_type", "")
     target_id = data.get("target_id")
     direction = payment_kwargs.get("direction", "")
 
     if not target_type or not target_id:
-        return None, None
+        return None, _target_error({"target_type": ["target_type and target_id are required. Every payment must allocate to a document."]})
 
     if _direction_target_mismatch(direction, target_type):
         return None, _target_error({"target_type": ["target_type does not match payment direction."]})
