@@ -241,40 +241,53 @@ Once a page clears both (tests written + manual pass), it's frozen.
 - [x] Whitespace-only search treated as empty
 - [x] Exposes normalized search needle
 
-### Invoices Tab (`InvoicesTab`) — zero coverage
+### Invoices Tab (`InvoicesTab`)
 
-- [ ] Fetches and displays org-wide invoices on mount
-- [ ] Renders invoice cards with status, total, balance due
-- [ ] Shows nested payment allocations under each invoice
-- [ ] Inline payment recording on invoice click
-- [ ] Search filters invoices
-- [ ] Pagination controls work
-- [ ] Empty state when no invoices exist
+- [x] Loading state then renders invoices on mount
+- [x] Empty state when no invoices match filters
+- [x] Excludes draft invoices from list
+- [x] Renders nested payment allocations under invoice
+- [x] Hides voided invoices by default, shows when toggled
+- [x] Filters to unpaid only by default, shows paid when toggled
+- [x] Search filters by customer name
+- [x] Opens payment form on invoice click, records payment via POST (inbound, target_type: invoice)
+- [x] Validates amount required before recording
+- [x] Validates amount does not exceed balance due
+- [x] Opens edit form on payment allocation click
+- [x] Saves payment edit via PATCH
+- [x] Voids payment via PATCH (status: void)
+- [x] Shows API error on payment create failure
+- [x] Shows network error on payment create fetch rejection
+- [x] Missing reference warning for check/ach/wire/card without ref #
+- [ ] Pagination controls (needs 25+ invoices to trigger)
 
-### Bills Tab (`BillsTab`) — zero coverage
+### Bills Tab (`BillsTab`)
 
-- [ ] Fetches and displays org-wide vendor bills on mount
-- [ ] Renders bill cards with status, amount
-- [ ] Shows nested payment allocations under each bill
-- [ ] Inline payment recording on bill click
-- [ ] Search filters bills
-- [ ] Pagination controls work
-- [ ] Empty state when no bills exist
-- [ ] Missing reference warning (methods expecting reference #)
+- [x] Loading state then renders bills on mount
+- [x] Empty state when no bills match filters
+- [x] Renders nested payment allocations under bill
+- [x] Hides voided/closed bills by default, shows when toggled
+- [x] Filters to unpaid only by default, shows paid when toggled
+- [x] Search filters by vendor name
+- [x] Opens payment form on bill click, records payment via POST (outbound, target_type: vendor_bill)
+- [x] Validates amount required before recording
+- [x] Shows API error on payment create failure
+- [x] Shows network error on payment create fetch rejection
+- [x] Missing reference warning for payments without ref #
+- [ ] Pagination controls (needs 25+ bills to trigger)
 
-### Receipts Tab (`ReceiptsTab`) — zero coverage
+### Receipts Tab (`ReceiptsTab`)
 
-- [ ] Fetches and displays org-wide receipts on mount
-- [ ] Renders receipt cards with store, amount, balance due
-- [ ] Shows nested payment allocations under each receipt
-- [ ] Inline payment recording on receipt click
-- [ ] Search filters receipts
-- [ ] Pagination controls work
-- [ ] Empty state when no receipts exist
-
-### Recommended New Tests
-
-The three sub-tabs (InvoicesTab, BillsTab, ReceiptsTab) are the major gap — each is a self-contained component with its own fetch, render, inline payment forms, search, and pagination. These are complex and testing them properly requires mocking multiple API endpoints per tab. Recommend tackling one at a time.
+- [x] Loading state then renders receipts on mount
+- [x] Empty state when no receipts match filters
+- [x] Renders nested payment allocations under receipt
+- [x] Unpaid filter off by default, filters when toggled
+- [x] Search filters by store name
+- [x] Opens payment form on receipt click, records payment via POST (outbound, target_type: receipt)
+- [x] Validates amount required before recording
+- [x] Shows API error on payment create failure
+- [x] Shows network error on payment create fetch rejection
+- [ ] Pagination controls (needs 25+ receipts to trigger)
 
 ## Organization (`/ops/organization`)
 
