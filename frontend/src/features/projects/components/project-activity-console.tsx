@@ -56,7 +56,7 @@ function eventTypeBadgeClass(eventType: string): string {
 }
 
 export function ProjectActivityConsole({ projectId }: ProjectActivityConsoleProps) {
-  const { token } = useSharedSessionAuth();
+  const { token: authToken } = useSharedSessionAuth();
   const [category, setCategory] = useState<TimelineCategory>("all");
   const [timeline, setTimeline] = useState<ProjectTimeline | null>(null);
   const [loading, setLoading] = useState(false);
@@ -65,13 +65,13 @@ export function ProjectActivityConsole({ projectId }: ProjectActivityConsoleProp
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
 
   async function loadTimeline(cat: TimelineCategory) {
-    if (!token) return;
+    if (!authToken) return;
     setLoading(true);
     setError("");
     try {
       const response = await fetch(
         `${normalizedBaseUrl}/projects/${projectId}/timeline/?category=${cat}`,
-        { headers: buildAuthHeaders(token) },
+        { headers: buildAuthHeaders(authToken) },
       );
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -87,11 +87,11 @@ export function ProjectActivityConsole({ projectId }: ProjectActivityConsoleProp
   }
 
   useEffect(() => {
-    if (token) {
+    if (authToken) {
       void loadTimeline(category);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, projectId, category]);
+  }, [authToken, projectId, category]);
 
   function renderItem(item: ProjectTimelineItem) {
     const badgeLabel = EVENT_TYPE_LABELS[item.event_type] ?? item.event_type;

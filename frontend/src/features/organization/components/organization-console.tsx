@@ -92,9 +92,9 @@ function extractErrorMessage(payload: ApiResponse | null, fallback: string): str
 }
 
 export function OrganizationConsole() {
-  const { token, role, capabilities } = useSharedSessionAuth();
+  const { token: authToken, role, capabilities } = useSharedSessionAuth();
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
-  const hasSession = Boolean(token);
+  const hasSession = Boolean(authToken);
 
   const [activeTab, setActiveTab] = useState<OrgTab>("business");
   const [errorMessage, setErrorMessage] = useState("");
@@ -130,13 +130,13 @@ export function OrganizationConsole() {
       try {
         const [profileRes, membershipsRes, invitesRes] = await Promise.all([
           fetch(`${normalizedBaseUrl}/organization/`, {
-            headers: buildAuthHeaders(token),
+            headers: buildAuthHeaders(authToken),
           }),
           fetch(`${normalizedBaseUrl}/organization/memberships/`, {
-            headers: buildAuthHeaders(token),
+            headers: buildAuthHeaders(authToken),
           }),
           fetch(`${normalizedBaseUrl}/organization/invites/`, {
-            headers: buildAuthHeaders(token),
+            headers: buildAuthHeaders(authToken),
           }).catch(() => null),
         ]);
 
@@ -192,7 +192,7 @@ export function OrganizationConsole() {
 
     loadData();
     return () => { ignore = true; };
-  }, [hasSession, normalizedBaseUrl, token]);
+  }, [hasSession, normalizedBaseUrl, authToken]);
 
   function handleProfileUpdate(updatedProfile: OrganizationProfile, updatedPolicy?: OrganizationRolePolicy) {
     setProfile(updatedProfile);
@@ -238,7 +238,7 @@ export function OrganizationConsole() {
           <div className={styles.tabContent}>
             {activeTab === "business" ? (
               <BusinessProfileTab
-                token={token}
+                authToken={authToken}
                 profile={profile}
                 canEdit={canEditProfile}
                 onProfileUpdate={handleProfileUpdate}
@@ -248,7 +248,7 @@ export function OrganizationConsole() {
 
             {activeTab === "team" ? (
               <TeamTab
-                token={token}
+                authToken={authToken}
                 memberships={memberships}
                 invites={invites}
                 rolePolicy={rolePolicy}
@@ -265,7 +265,7 @@ export function OrganizationConsole() {
 
             {activeTab === "documents" ? (
               <DocumentSettingsTab
-                token={token}
+                authToken={authToken}
                 profile={profile}
                 canEdit={canEditProfile}
                 onProfileUpdate={handleProfileUpdate}

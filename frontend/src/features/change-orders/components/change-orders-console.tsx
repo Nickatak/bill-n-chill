@@ -115,7 +115,7 @@ export function ChangeOrdersConsole({
   initialOriginEstimateId: initialOriginEstimateIdProp = null,
 }: ChangeOrdersConsoleProps) {
   const isMobile = useMediaQuery("(max-width: 700px)");
-  const { token, role, capabilities } = useSharedSessionAuth();
+  const { token: authToken, role, capabilities } = useSharedSessionAuth();
   const scopedProjectId = scopedProjectIdProp;
   const initialOriginEstimateId = initialOriginEstimateIdProp;
 
@@ -124,7 +124,7 @@ export function ChangeOrdersConsole({
   // -------------------------------------------------------------------------
 
   const projectData = useChangeOrderProjectData({
-    authToken: token,
+    authToken,
     scopedProjectId,
     initialOriginEstimateId,
   });
@@ -138,7 +138,7 @@ export function ChangeOrdersConsole({
       fallbackLabels: CHANGE_ORDER_STATUS_LABELS_FALLBACK,
       fallbackTransitions: CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK,
       baseUrl: apiBaseUrl,
-      token,
+      authToken,
     });
 
   const viewer = useChangeOrderViewer({
@@ -202,7 +202,7 @@ export function ChangeOrdersConsole({
 
   /** Effect: Bootstrap — fetch projects and cascade into all data loads. */
   useEffect(() => {
-    if (!token) {
+    if (!authToken) {
       return;
     }
     const run = window.setTimeout(() => {
@@ -223,7 +223,7 @@ export function ChangeOrdersConsole({
     }, 0);
     return () => window.clearTimeout(run);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectData.loadProjects, token]);
+  }, [projectData.loadProjects, authToken]);
 
   /** Effect: Sync newTermsText when org defaults load. */
   useEffect(() => {
@@ -339,7 +339,7 @@ export function ChangeOrdersConsole({
         `${apiBaseUrl}/projects/${projectId}/change-orders/`,
         {
           method: "POST",
-          headers: buildAuthHeaders(token, { contentType: "application/json" }),
+          headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
           body: JSON.stringify({
             title: form.newTitle,
             reason: form.newReason,
@@ -399,7 +399,7 @@ export function ChangeOrdersConsole({
     try {
       const response = await fetch(`${apiBaseUrl}/change-orders/${changeOrderId}/clone-revision/`, {
         method: "POST",
-        headers: buildAuthHeaders(token),
+        headers: buildAuthHeaders(authToken),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -451,7 +451,7 @@ export function ChangeOrdersConsole({
         `${apiBaseUrl}/change-orders/${changeOrderId}/`,
         {
           method: "PATCH",
-          headers: buildAuthHeaders(token, { contentType: "application/json" }),
+          headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
           body: JSON.stringify({
             title: form.editTitle,
             reason: form.editReason,
@@ -515,7 +515,7 @@ export function ChangeOrdersConsole({
         `${apiBaseUrl}/change-orders/${viewer.selectedViewerChangeOrder.id}/`,
         {
           method: "PATCH",
-          headers: buildAuthHeaders(token, { contentType: "application/json" }),
+          headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
           body: JSON.stringify({ status: form.quickStatus, status_note: form.quickStatusNote }),
         },
       );
@@ -577,7 +577,7 @@ export function ChangeOrdersConsole({
         `${apiBaseUrl}/change-orders/${viewer.selectedViewerChangeOrder.id}/`,
         {
           method: "PATCH",
-          headers: buildAuthHeaders(token, { contentType: "application/json" }),
+          headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
           body: JSON.stringify({ status_note: form.quickStatusNote }),
         },
       );

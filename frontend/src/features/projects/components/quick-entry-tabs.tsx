@@ -19,7 +19,7 @@ type QuickEntryTab = "payment" | "receipt";
 
 type QuickEntryTabsProps = {
   projectId: number;
-  token: string;
+  authToken: string;
   allocationTargets: AllocationTarget[];
   onPaymentsChanged?: () => void;
   onReceiptCreated?: () => void;
@@ -27,7 +27,7 @@ type QuickEntryTabsProps = {
 
 export function QuickEntryTabs({
   projectId,
-  token,
+  authToken,
   allocationTargets,
   onPaymentsChanged,
   onReceiptCreated,
@@ -68,7 +68,7 @@ export function QuickEntryTabs({
         ) : (
           <QuickReceipt
             projectId={projectId}
-            token={token}
+            authToken={authToken}
             onReceiptCreated={onReceiptCreated}
           />
         )}

@@ -38,7 +38,7 @@ export type {
  * the business-workflow hook. The returned object is the single source of
  * truth for every quick-add UI component.
  */
-export function useQuickAddController({ token, baseAuthMessage, onCustomerCreated }: UseQuickAddControllerArgs) {
+export function useQuickAddController({ authToken, baseAuthMessage, onCustomerCreated }: UseQuickAddControllerArgs) {
   const fullNameRef = useRef<HTMLInputElement>(null);
   const normalizedBaseUrl = useMemo(() => normalizeApiBaseUrl(defaultApiBaseUrl), []);
 
@@ -61,12 +61,12 @@ export function useQuickAddController({ token, baseAuthMessage, onCustomerCreate
   // --- Composed hooks ---
 
   const authMessage = useQuickAddAuthStatus({
-    token,
+    authToken,
     baseAuthMessage,
   });
 
   const workflow = useQuickAddBusinessWorkflow({
-    token,
+    authToken,
     normalizedBaseUrl,
     fullNameRef,
     fullName,

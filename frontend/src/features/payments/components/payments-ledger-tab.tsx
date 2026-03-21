@@ -74,9 +74,9 @@ const ALLOCATION_TARGET_LABELS: Record<string, string> = {
 };
 
 function formatMoney(val: string): string {
-  const n = Number(val);
-  if (Number.isNaN(n)) return val;
-  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const parsed = Number(val);
+  if (Number.isNaN(parsed)) return val;
+  return `$${parsed.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -119,10 +119,10 @@ function editFormHasChanges(form: EditFormState, original: PaymentRecord): boole
 // ---------------------------------------------------------------------------
 
 export function PaymentsLedgerTab({
-  token,
+  authToken,
   baseUrl,
 }: {
-  token: string;
+  authToken: string;
   baseUrl: string;
 }) {
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
@@ -144,7 +144,7 @@ export function PaymentsLedgerTab({
     setLoading(true);
     try {
       const res = await fetch(`${apiBase}/payments/`, {
-        headers: buildAuthHeaders(token),
+        headers: buildAuthHeaders(authToken),
       });
       if (res.ok) {
         const json = await res.json();
@@ -153,7 +153,7 @@ export function PaymentsLedgerTab({
     } finally {
       setLoading(false);
     }
-  }, [apiBase, token]);
+  }, [apiBase, authToken]);
 
   useEffect(() => {
     void load();
@@ -231,7 +231,7 @@ export function PaymentsLedgerTab({
 
       const res = await fetch(`${apiBase}/payments/${selectedPayment.id}/`, {
         method: "PATCH",
-        headers: { ...buildAuthHeaders(token), "Content-Type": "application/json" },
+        headers: { ...buildAuthHeaders(authToken), "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -254,7 +254,7 @@ export function PaymentsLedgerTab({
     } finally {
       setSaving(false);
     }
-  }, [editForm, selectedPayment, apiBase, token]);
+  }, [editForm, selectedPayment, apiBase, authToken]);
 
   const handleCancel = useCallback(() => {
     if (selectedPayment) {
@@ -272,7 +272,7 @@ export function PaymentsLedgerTab({
     try {
       const res = await fetch(`${apiBase}/payments/${selectedPayment.id}/`, {
         method: "PATCH",
-        headers: { ...buildAuthHeaders(token), "Content-Type": "application/json" },
+        headers: { ...buildAuthHeaders(authToken), "Content-Type": "application/json" },
         body: JSON.stringify({ status: "void" }),
       });
       const json = await res.json();
@@ -294,7 +294,7 @@ export function PaymentsLedgerTab({
     } finally {
       setSaving(false);
     }
-  }, [selectedPayment, apiBase, token]);
+  }, [selectedPayment, apiBase, authToken]);
 
   // -------------------------------------------------------------------------
   // Filtering
@@ -309,14 +309,14 @@ export function PaymentsLedgerTab({
       result = result.filter((p) => p.status === statusFilter);
     }
     if (search.trim()) {
-      const q = search.trim().toLowerCase();
+      const searchNeedle = search.trim().toLowerCase();
       result = result.filter(
         (p) =>
-          p.customer_name.toLowerCase().includes(q) ||
-          p.project_name.toLowerCase().includes(q) ||
-          p.reference_number.toLowerCase().includes(q) ||
-          p.amount.includes(q) ||
-          (METHOD_LABELS[p.method] ?? p.method).toLowerCase().includes(q),
+          p.customer_name.toLowerCase().includes(searchNeedle) ||
+          p.project_name.toLowerCase().includes(searchNeedle) ||
+          p.reference_number.toLowerCase().includes(searchNeedle) ||
+          p.amount.includes(searchNeedle) ||
+          (METHOD_LABELS[p.method] ?? p.method).toLowerCase().includes(searchNeedle),
       );
     }
     return result;

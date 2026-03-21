@@ -18,13 +18,13 @@ export { defaultApiBaseUrl, normalizeApiBaseUrl } from "@/shared/api/base";
  */
 export async function fetchInvoicePolicyContract({
   baseUrl,
-  token,
+  authToken,
 }: {
   baseUrl: string;
-  token: string;
+  authToken: string;
 }) {
   const response = await fetch(`${normalizeApiBaseUrl(baseUrl)}/contracts/invoices/`, {
-    headers: buildAuthHeaders(token),
+    headers: buildAuthHeaders(authToken),
   });
   return response;
 }

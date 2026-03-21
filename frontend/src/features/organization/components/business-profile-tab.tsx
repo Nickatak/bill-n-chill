@@ -20,7 +20,7 @@ import type {
 import styles from "./organization-console.module.css";
 
 type BusinessProfileTabProps = {
-  token: string;
+  authToken: string;
   profile: OrganizationProfile;
   canEdit: boolean;
   onProfileUpdate: (profile: OrganizationProfile, rolePolicy?: OrganizationRolePolicy) => void;
@@ -34,7 +34,7 @@ function extractErrorMessage(payload: ApiResponse | null, fallback: string): str
 }
 
 export function BusinessProfileTab({
-  token,
+  authToken,
   profile,
   canEdit,
   onProfileUpdate,
@@ -84,7 +84,7 @@ export function BusinessProfileTab({
     try {
       const response = await fetch(`${normalizedBaseUrl}/organization/logo/`, {
         method: "POST",
-        headers: buildAuthHeaders(token),
+        headers: buildAuthHeaders(authToken),
         body: formData,
       });
       const body: ApiResponse = await response.json();
@@ -130,7 +130,7 @@ export function BusinessProfileTab({
     try {
       const response = await fetch(`${normalizedBaseUrl}/organization/`, {
         method: "PATCH",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify(payload),
       });
       const body: ApiResponse = await response.json();

@@ -103,11 +103,11 @@ export function invoiceNextActionHint(status: string): string {
 }
 
 /** Predict the next sequential invoice number (INV-XXXX) for pre-filling the workspace. */
-export function nextInvoiceNumberPreview(rows: InvoiceRecord[]): string {
+export function nextInvoiceNumberPreview(invoices: InvoiceRecord[]): string {
   const usedNumbers = new Set<number>();
   let digitWidth = 4;
-  for (const row of rows) {
-    const match = row.invoice_number.match(/^INV-(\d+)$/i);
+  for (const invoice of invoices) {
+    const match = invoice.invoice_number.match(/^INV-(\d+)$/i);
     if (!match) {
       continue;
     }

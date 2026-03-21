@@ -9,7 +9,7 @@
 "use client";
 
 type UseQuickAddAuthStatusArgs = {
-  token: string;
+  authToken: string;
   baseAuthMessage: string;
 };
 
@@ -22,7 +22,7 @@ type UseQuickAddAuthStatusArgs = {
  * surfaces the base message so the user knows they need to sign in.
  */
 export function useQuickAddAuthStatus({
-  token,
+  authToken,
   baseAuthMessage,
 }: UseQuickAddAuthStatusArgs): string {
   // Shared-session banners are informational only — suppress them so the
@@ -31,7 +31,7 @@ export function useQuickAddAuthStatus({
     ? ""
     : baseAuthMessage;
 
-  if (!token) {
+  if (!authToken) {
     return effectiveBaseMessage;
   }
 

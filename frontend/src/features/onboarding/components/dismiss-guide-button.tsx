@@ -8,14 +8,14 @@ import { defaultApiBaseUrl } from "@/shared/api/base";
 import styles from "./dismiss-guide-button.module.css";
 
 export function DismissGuideButton() {
-  const { token } = useSharedSessionAuth();
+  const { token: authToken } = useSharedSessionAuth();
   const router = useRouter();
 
   async function handleDismiss() {
     try {
       await fetch(`${defaultApiBaseUrl}/organization/complete-onboarding/`, {
         method: "POST",
-        headers: buildAuthHeaders(token),
+        headers: buildAuthHeaders(authToken),
       });
     } catch {
       // Best-effort — navigate anyway so the user isn't stuck.

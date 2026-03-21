@@ -25,7 +25,7 @@ describe("QuickEntryTabs", () => {
   });
 
   it("renders payment tab by default", () => {
-    render(<QuickEntryTabs projectId={1} token="test-token" allocationTargets={[]} />);
+    render(<QuickEntryTabs projectId={1} authToken="test-token" allocationTargets={[]} />);
 
     expect(screen.getByTestId("payment-recorder")).toBeInTheDocument();
     expect(screen.queryByTestId("quick-receipt")).not.toBeInTheDocument();
@@ -34,7 +34,7 @@ describe("QuickEntryTabs", () => {
   });
 
   it("switches to receipt tab on click", () => {
-    render(<QuickEntryTabs projectId={1} token="test-token" allocationTargets={[]} />);
+    render(<QuickEntryTabs projectId={1} authToken="test-token" allocationTargets={[]} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Expense Receipt" }));
 
@@ -45,7 +45,7 @@ describe("QuickEntryTabs", () => {
   });
 
   it("switches back to payment tab from receipt", () => {
-    render(<QuickEntryTabs projectId={1} token="test-token" allocationTargets={[]} />);
+    render(<QuickEntryTabs projectId={1} authToken="test-token" allocationTargets={[]} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Expense Receipt" }));
     fireEvent.click(screen.getByRole("button", { name: "Customer Payment" }));

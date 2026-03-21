@@ -18,16 +18,16 @@ export { defaultApiBaseUrl, normalizeApiBaseUrl } from "@/shared/api/base";
  */
 export async function postQuickAddCustomerIntake({
   baseUrl,
-  token,
+  authToken,
   body,
 }: {
   baseUrl: string;
-  token: string;
+  authToken: string;
   body: Record<string, unknown>;
 }) {
   const response = await fetch(`${normalizeApiBaseUrl(baseUrl)}/customers/quick-add/`, {
     method: "POST",
-    headers: buildAuthHeaders(token, { contentType: "application/json" }),
+    headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
     body: JSON.stringify(body),
   });
   return response;

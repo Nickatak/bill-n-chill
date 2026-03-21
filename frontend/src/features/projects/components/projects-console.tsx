@@ -78,7 +78,7 @@ import type { ProjectStatusValue } from "../utils/project-helpers";
 /** Renders the main project dashboard with list, financial map, and profile editor. */
 export function ProjectsConsole() {
   const searchParams = useSearchParams();
-  const { token, authMessage } = useSharedSessionAuth();
+  const { token: authToken, authMessage } = useSharedSessionAuth();
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const {
@@ -214,7 +214,7 @@ export function ProjectsConsole() {
   async function loadProjects() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/`, {
-        headers: buildAuthHeaders(token),
+        headers: buildAuthHeaders(authToken),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -264,7 +264,7 @@ export function ProjectsConsole() {
     }
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/financial-summary/`, {
-        headers: buildAuthHeaders(token),
+        headers: buildAuthHeaders(authToken),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -281,7 +281,7 @@ export function ProjectsConsole() {
   async function loadEstimateStatusCounts(projectId: number) {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
-        headers: buildAuthHeaders(token),
+        headers: buildAuthHeaders(authToken),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -315,7 +315,7 @@ export function ProjectsConsole() {
   async function loadChangeOrderStatusCounts(projectId: number) {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/change-orders/`, {
-        headers: buildAuthHeaders(token),
+        headers: buildAuthHeaders(authToken),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -345,7 +345,7 @@ export function ProjectsConsole() {
   async function loadBillStatusCounts(projectId: number) {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/vendor-bills/`, {
-        headers: buildAuthHeaders(token),
+        headers: buildAuthHeaders(authToken),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -375,7 +375,7 @@ export function ProjectsConsole() {
   async function loadInvoiceStatusCounts(projectId: number) {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/invoices/`, {
-        headers: buildAuthHeaders(token),
+        headers: buildAuthHeaders(authToken),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -405,7 +405,7 @@ export function ProjectsConsole() {
   async function loadInvoiceAllocationTargets(projectId: number) {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/invoices/`, {
-        headers: buildAuthHeaders(token),
+        headers: buildAuthHeaders(authToken),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -434,16 +434,16 @@ export function ProjectsConsole() {
 
   // Fetch the full project list whenever auth or URL scope changes.
   useEffect(() => {
-    if (!token) {
+    if (!authToken) {
       return;
     }
     void loadProjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, scopedProjectId, scopedCustomerId]);
+  }, [authToken, scopedProjectId, scopedCustomerId]);
 
   // Re-load financials and scope-control counts when a different project is selected.
   useEffect(() => {
-    if (!token || !selectedProjectId) {
+    if (!authToken || !selectedProjectId) {
       return;
     }
     const projectId = Number(selectedProjectId);
@@ -457,7 +457,7 @@ export function ProjectsConsole() {
     void loadInvoiceStatusCounts(projectId);
     void loadInvoiceAllocationTargets(projectId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProjectId, token]);
+  }, [selectedProjectId, authToken]);
 
   // If the selected project is no longer visible after filtering, fall back to the first visible one.
   useEffect(() => {
@@ -548,7 +548,7 @@ export function ProjectsConsole() {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/`, {
         method: "PATCH",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({
           name: projectName,
           status: projectStatus,
@@ -788,7 +788,7 @@ export function ProjectsConsole() {
             <div className={styles.paymentRecorderSection}>
               <QuickEntryTabs
                 projectId={selectedProject.id}
-                token={token ?? ""}
+                authToken={authToken ?? ""}
                 allocationTargets={invoiceAllocationTargets}
                 onPaymentsChanged={() => {
                   void loadFinancialSummary();

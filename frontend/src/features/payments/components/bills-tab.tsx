@@ -63,9 +63,9 @@ function hasMissingReference(allocations: VendorBillAllocationRecord[]): boolean
 }
 
 function formatMoney(val: string): string {
-  const n = Number(val);
-  if (Number.isNaN(n)) return val;
-  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const parsed = Number(val);
+  if (Number.isNaN(parsed)) return val;
+  return `$${parsed.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -110,11 +110,11 @@ type SelectedItem =
   | { type: "payment"; billId: string; paymentId: number };
 
 export function BillsTab({
-  token,
+  authToken,
   baseUrl,
   isMobile,
 }: {
-  token: string;
+  authToken: string;
   baseUrl: string;
   isMobile: boolean;
 }) {
@@ -137,7 +137,7 @@ export function BillsTab({
     setLoading(true);
     try {
       const res = await fetch(`${apiBase}/vendor-bills/`, {
-        headers: buildAuthHeaders(token),
+        headers: buildAuthHeaders(authToken),
       });
       if (res.ok) {
         const json = await res.json();
@@ -146,7 +146,7 @@ export function BillsTab({
     } finally {
       setLoading(false);
     }
-  }, [apiBase, token]);
+  }, [apiBase, authToken]);
 
   useEffect(() => {
     void load();
@@ -233,7 +233,7 @@ export function BillsTab({
     try {
       const res = await fetch(`${apiBase}/payments/`, {
         method: "POST",
-        headers: { ...buildAuthHeaders(token), "Content-Type": "application/json" },
+        headers: { ...buildAuthHeaders(authToken), "Content-Type": "application/json" },
         body: JSON.stringify({
           direction: "outbound",
           method: form.method,
@@ -266,7 +266,7 @@ export function BillsTab({
     } finally {
       setSaving(false);
     }
-  }, [form, selected, bills, apiBase, token, load]);
+  }, [form, selected, bills, apiBase, authToken, load]);
 
   // -------------------------------------------------------------------------
   // Edit existing payment
@@ -287,7 +287,7 @@ export function BillsTab({
     try {
       const res = await fetch(`${apiBase}/payments/${selected.paymentId}/`, {
         method: "PATCH",
-        headers: { ...buildAuthHeaders(token), "Content-Type": "application/json" },
+        headers: { ...buildAuthHeaders(authToken), "Content-Type": "application/json" },
         body: JSON.stringify({
           payment_date: form.payment_date,
           reference_number: form.reference_number,
@@ -313,7 +313,7 @@ export function BillsTab({
     } finally {
       setSaving(false);
     }
-  }, [form, selected, apiBase, token, load]);
+  }, [form, selected, apiBase, authToken, load]);
 
   // -------------------------------------------------------------------------
   // Void payment
@@ -328,7 +328,7 @@ export function BillsTab({
     try {
       const res = await fetch(`${apiBase}/payments/${selected.paymentId}/`, {
         method: "PATCH",
-        headers: { ...buildAuthHeaders(token), "Content-Type": "application/json" },
+        headers: { ...buildAuthHeaders(authToken), "Content-Type": "application/json" },
         body: JSON.stringify({ status: "void" }),
       });
       const json = await res.json();
@@ -350,7 +350,7 @@ export function BillsTab({
     } finally {
       setSaving(false);
     }
-  }, [selected, apiBase, token, load]);
+  }, [selected, apiBase, authToken, load]);
 
   // -------------------------------------------------------------------------
   // Filtering + summary
@@ -364,14 +364,14 @@ export function BillsTab({
     if (filterUnpaid) {
       result = result.filter((b) => b.payment_status !== "paid");
     }
-    const q = search.trim().toLowerCase();
-    if (q) {
+    const searchNeedle = search.trim().toLowerCase();
+    if (searchNeedle) {
       result = result.filter(
         (b) =>
-          b.vendor_name.toLowerCase().includes(q) ||
-          b.bill_number.toLowerCase().includes(q) ||
-          b.project_name.toLowerCase().includes(q) ||
-          b.total.includes(q),
+          b.vendor_name.toLowerCase().includes(searchNeedle) ||
+          b.bill_number.toLowerCase().includes(searchNeedle) ||
+          b.project_name.toLowerCase().includes(searchNeedle) ||
+          b.total.includes(searchNeedle),
       );
     }
     return result;

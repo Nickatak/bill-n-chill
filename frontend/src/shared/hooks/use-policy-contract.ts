@@ -36,7 +36,7 @@ export type NormalizedPolicy = {
 
 export type UsePolicyContractConfig<TContract extends PolicyContractBase> = {
   /** API fetch function — must return a Response. */
-  fetchContract: (params: { baseUrl: string; token: string }) => Promise<Response>;
+  fetchContract: (params: { baseUrl: string; authToken: string }) => Promise<Response>;
   /** Fallback statuses used before the contract loads and as merge base. */
   fallbackStatuses: string[];
   /** Fallback labels merged under contract labels. */
@@ -46,7 +46,7 @@ export type UsePolicyContractConfig<TContract extends PolicyContractBase> = {
   /** API base URL (normalized). */
   baseUrl: string;
   /** Auth token. */
-  token: string;
+  authToken: string;
   /**
    * Called after a successful contract load with the raw contract and the
    * normalized base policy. Use this for domain-specific state updates
@@ -70,7 +70,7 @@ export function usePolicyContract<TContract extends PolicyContractBase>(
     fallbackLabels,
     fallbackTransitions,
     baseUrl,
-    token,
+    authToken,
   } = config;
 
   const [policy, setPolicy] = useState<NormalizedPolicy>({
@@ -94,7 +94,7 @@ export function usePolicyContract<TContract extends PolicyContractBase>(
 
   const loadPolicy = useCallback(async () => {
     try {
-      const response = await fetchContract({ baseUrl, token });
+      const response = await fetchContract({ baseUrl, authToken });
       const payload = await response.json();
       if (!response.ok || !payload.data || Array.isArray(payload.data)) {
         return;
@@ -136,7 +136,7 @@ export function usePolicyContract<TContract extends PolicyContractBase>(
     } catch {
       // Policy load is best-effort; static fallback remains active.
     }
-  }, [fetchContract, baseUrl, token]);
+  }, [fetchContract, baseUrl, authToken]);
 
   useEffect(() => {
     loadPolicy();

@@ -148,7 +148,7 @@ type InvoicesConsoleProps = {
 
 export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
   const isMobile = useMediaQuery("(max-width: 700px)");
-  const { token, authMessage, role, capabilities } = useSharedSessionAuth();
+  const { token: authToken, authMessage, role, capabilities } = useSharedSessionAuth();
   const canMutateInvoices = canDo(capabilities, "invoices", "create");
   const canSendInvoices = canDo(capabilities, "invoices", "send");
   const canEditInvoiceWorkspace = canMutateInvoices;
@@ -206,7 +206,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
   );
 
   const invoiceData = useInvoiceData({
-    authToken: token,
+    authToken,
     scopedProjectId,
     issueDate: formFields.issueDate,
     status: statusSetters,
@@ -248,7 +248,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     fallbackLabels: INVOICE_STATUS_LABELS_FALLBACK,
     fallbackTransitions: INVOICE_ALLOWED_STATUS_TRANSITIONS_FALLBACK,
     baseUrl: apiBaseUrl,
-    token,
+    authToken,
     onLoaded(contract) {
       const candidateFilters =
         Array.isArray(contract.default_status_filters) && contract.default_status_filters.length
@@ -288,7 +288,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
 
   // Auto-select first invoice after data load — keep selectedInvoiceId in sync.
   useEffect(() => {
-    if (!token || !scopedProjectId) {
+    if (!authToken || !scopedProjectId) {
       setSelectedInvoiceId("");
       return;
     }
@@ -298,7 +298,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       }
       return invoiceData.invoices[0] ? String(invoiceData.invoices[0].id) : "";
     });
-  }, [invoiceData.invoices, scopedProjectId, token]);
+  }, [invoiceData.invoices, scopedProjectId, authToken]);
 
   // Pre-select the most likely next status when the selected invoice changes.
   const selectedInvoice = useMemo(
@@ -590,7 +590,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
         const updatePayload = invoiceCreatorAdapter.toUpdatePayload(invoiceDraftFormState, currentDraft);
         const response = await fetch(`${apiBaseUrl}/invoices/${formFields.editingDraftInvoiceId}/`, {
           method: "PATCH",
-          headers: buildAuthHeaders(token, { contentType: "application/json" }),
+          headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
           body: JSON.stringify(updatePayload),
         });
         const payload: ApiResponse = await response.json();
@@ -620,7 +620,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       const createPayload = invoiceCreatorAdapter.toCreatePayload(invoiceDraftFormState);
       const response = await fetch(`${apiBaseUrl}/projects/${scopedProjectId}/invoices/`, {
         method: "POST",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify(createPayload),
       });
       const payload: ApiResponse = await response.json();
@@ -672,7 +672,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       }
       const response = await fetch(`${apiBaseUrl}/invoices/${invoiceId}/`, {
         method: "PATCH",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify(patchPayload),
       });
       const payload: ApiResponse = await response.json();
@@ -722,7 +722,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     try {
       const response = await fetch(`${apiBaseUrl}/invoices/${invoiceId}/`, {
         method: "PATCH",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({
           status_note: statusNote,
         }),
@@ -783,7 +783,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       const createPayload = invoiceCreatorAdapter.toCreatePayload(duplicateFormState);
       const response = await fetch(`${apiBaseUrl}/projects/${scopedProjectId}/invoices/`, {
         method: "POST",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify(createPayload),
       });
       const payload: ApiResponse = await response.json();
@@ -827,7 +827,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
 
   return (
     <section className={styles.console}>
-      {!token ? <p className={styles.authNotice}>{authMessage}</p> : null}
+      {!authToken ? <p className={styles.authNotice}>{authMessage}</p> : null}
 
       {statusMessage && !statusMessageAtCreator && !statusMessageAtToolbar ? (
         <p
@@ -843,7 +843,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
         </p>
       ) : null}
 
-      {token ? (
+      {authToken ? (
         <>
           {!canMutateInvoices ? (
             <p className={styles.readOnlyNotice}>Role `{role}` can view invoices but cannot create, update, or send.</p>

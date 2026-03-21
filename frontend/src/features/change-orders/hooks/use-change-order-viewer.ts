@@ -71,8 +71,8 @@ type UseChangeOrderViewerOptions = {
 // ---------------------------------------------------------------------------
 
 /** Sort change orders by created_at, then family_key, then revision_number, then id. */
-export function sortChangeOrdersForViewer(rows: ChangeOrderRecord[]): ChangeOrderRecord[] {
-  return [...rows].sort((left, right) => {
+export function sortChangeOrdersForViewer(changeOrders: ChangeOrderRecord[]): ChangeOrderRecord[] {
+  return [...changeOrders].sort((left, right) => {
     const leftCreatedAt = Date.parse(left.created_at);
     const rightCreatedAt = Date.parse(right.created_at);
     if (Number.isFinite(leftCreatedAt) && Number.isFinite(rightCreatedAt)) {

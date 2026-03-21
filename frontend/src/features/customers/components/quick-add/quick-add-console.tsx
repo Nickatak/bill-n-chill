@@ -25,8 +25,8 @@ type QuickAddConsoleProps = {
 /** Orchestrates the quick-add customer workflow, combining auth, form, and duplicate resolution. */
 export function QuickAddConsole({ onCustomerCreated, onBrowseCustomer }: QuickAddConsoleProps) {
   // Composition owner: bridges shared-session auth into the controller before child workflows run.
-  const { token, authMessage: baseAuthMessage } = useSharedSessionAuth();
-  const controllerApi = useQuickAddController({ token, baseAuthMessage, onCustomerCreated });
+  const { token: authToken, authMessage: baseAuthMessage } = useSharedSessionAuth();
+  const controllerApi = useQuickAddController({ authToken, baseAuthMessage, onCustomerCreated });
   const statusMessage = controllerApi.conversionMessage || controllerApi.leadMessage;
   const statusTone = controllerApi.conversionMessage
     ? controllerApi.conversionMessageTone

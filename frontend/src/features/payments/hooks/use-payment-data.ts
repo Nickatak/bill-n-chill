@@ -128,7 +128,7 @@ export function usePaymentData(
 
   const loadPaymentPolicy = useCallback(async () => {
     try {
-      const response = await fetchPaymentPolicyContract({ baseUrl: apiBaseUrl, token: authToken });
+      const response = await fetchPaymentPolicyContract({ baseUrl: apiBaseUrl, authToken });
       const payload: ApiResponse = await response.json();
       if (!response.ok || !payload.data || Array.isArray(payload.data)) return;
 

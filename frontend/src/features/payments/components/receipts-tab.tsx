@@ -82,9 +82,9 @@ function hasMissingReference(allocations: ReceiptAllocationRecord[]): boolean {
 }
 
 function formatMoney(val: string): string {
-  const n = Number(val);
-  if (Number.isNaN(n)) return val;
-  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const parsed = Number(val);
+  if (Number.isNaN(parsed)) return val;
+  return `$${parsed.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -129,11 +129,11 @@ type SelectedItem =
   | { type: "payment"; receiptId: string; paymentId: number };
 
 export function ReceiptsTab({
-  token,
+  authToken,
   baseUrl,
   isMobile,
 }: {
-  token: string;
+  authToken: string;
   baseUrl: string;
   isMobile: boolean;
 }) {
@@ -154,7 +154,7 @@ export function ReceiptsTab({
     setLoading(true);
     try {
       const res = await fetch(`${apiBase}/receipts/`, {
-        headers: buildAuthHeaders(token),
+        headers: buildAuthHeaders(authToken),
       });
       if (res.ok) {
         const json = await res.json();
@@ -163,7 +163,7 @@ export function ReceiptsTab({
     } finally {
       setLoading(false);
     }
-  }, [apiBase, token]);
+  }, [apiBase, authToken]);
 
   useEffect(() => {
     void load();
@@ -245,7 +245,7 @@ export function ReceiptsTab({
     try {
       const res = await fetch(`${apiBase}/payments/`, {
         method: "POST",
-        headers: { ...buildAuthHeaders(token), "Content-Type": "application/json" },
+        headers: { ...buildAuthHeaders(authToken), "Content-Type": "application/json" },
         body: JSON.stringify({
           direction: "outbound",
           method: form.method,
@@ -278,7 +278,7 @@ export function ReceiptsTab({
     } finally {
       setSaving(false);
     }
-  }, [form, selected, receipts, apiBase, token, load]);
+  }, [form, selected, receipts, apiBase, authToken, load]);
 
   // -------------------------------------------------------------------------
   // Edit / Void
@@ -298,7 +298,7 @@ export function ReceiptsTab({
     try {
       const res = await fetch(`${apiBase}/payments/${selected.paymentId}/`, {
         method: "PATCH",
-        headers: { ...buildAuthHeaders(token), "Content-Type": "application/json" },
+        headers: { ...buildAuthHeaders(authToken), "Content-Type": "application/json" },
         body: JSON.stringify({
           payment_date: form.payment_date,
           reference_number: form.reference_number,
@@ -324,7 +324,7 @@ export function ReceiptsTab({
     } finally {
       setSaving(false);
     }
-  }, [form, selected, apiBase, token, load]);
+  }, [form, selected, apiBase, authToken, load]);
 
   const handleVoidPayment = useCallback(async () => {
     if (selected?.type !== "payment") return;
@@ -334,7 +334,7 @@ export function ReceiptsTab({
     try {
       const res = await fetch(`${apiBase}/payments/${selected.paymentId}/`, {
         method: "PATCH",
-        headers: { ...buildAuthHeaders(token), "Content-Type": "application/json" },
+        headers: { ...buildAuthHeaders(authToken), "Content-Type": "application/json" },
         body: JSON.stringify({ status: "void" }),
       });
       const json = await res.json();
@@ -356,7 +356,7 @@ export function ReceiptsTab({
     } finally {
       setSaving(false);
     }
-  }, [selected, apiBase, token, load]);
+  }, [selected, apiBase, authToken, load]);
 
   // -------------------------------------------------------------------------
   // Filtering + summary
@@ -367,14 +367,14 @@ export function ReceiptsTab({
     if (filterUnpaid) {
       result = result.filter((r) => Number(r.balance_due) > 0);
     }
-    const q = search.trim().toLowerCase();
-    if (q) {
+    const searchNeedle = search.trim().toLowerCase();
+    if (searchNeedle) {
       result = result.filter(
         (r) =>
-          r.store_name.toLowerCase().includes(q) ||
-          r.project_name.toLowerCase().includes(q) ||
-          r.amount.includes(q) ||
-          r.notes.toLowerCase().includes(q),
+          r.store_name.toLowerCase().includes(searchNeedle) ||
+          r.project_name.toLowerCase().includes(searchNeedle) ||
+          r.amount.includes(searchNeedle) ||
+          r.notes.toLowerCase().includes(searchNeedle),
       );
     }
     return result;

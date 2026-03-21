@@ -99,7 +99,7 @@ export function PaymentRecorder({
   createOnly = false,
   hideWorkspaceTitle = false,
 }: PaymentRecorderProps) {
-  const { token, role, capabilities } = useSharedSessionAuth();
+  const { token: authToken, role, capabilities } = useSharedSessionAuth();
   const [statusMessage, setStatusMessage] = useState("");
   const [statusTone, setStatusTone] = useState<"info" | "success" | "error">("info");
 
@@ -205,7 +205,7 @@ export function PaymentRecorder({
 
   async function loadPaymentPolicy() {
     try {
-      const response = await fetchPaymentPolicyContract({ baseUrl: normalizedBaseUrl, token });
+      const response = await fetchPaymentPolicyContract({ baseUrl: normalizedBaseUrl, authToken });
       const payload: ApiResponse = await response.json();
       if (!response.ok || !payload.data || Array.isArray(payload.data)) return;
 
@@ -241,7 +241,7 @@ export function PaymentRecorder({
     if (!projectId) return;
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/payments/`, {
-        headers: buildAuthHeaders(token),
+        headers: buildAuthHeaders(authToken),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -292,7 +292,7 @@ export function PaymentRecorder({
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/payments/`, {
         method: "POST",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({
           direction,
           method: formMethod,
@@ -316,7 +316,7 @@ export function PaymentRecorder({
         try {
           const allocResponse = await fetch(`${normalizedBaseUrl}/payments/${created.id}/allocate/`, {
             method: "POST",
-            headers: buildAuthHeaders(token, { contentType: "application/json" }),
+            headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
             body: JSON.stringify({
               allocations: [{
                 target_type: allocationTargetType,
@@ -375,7 +375,7 @@ export function PaymentRecorder({
     try {
       const response = await fetch(`${normalizedBaseUrl}/payments/${paymentId}/`, {
         method: "PATCH",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({
           direction,
           method: formMethod,
@@ -411,7 +411,7 @@ export function PaymentRecorder({
     try {
       const response = await fetch(`${normalizedBaseUrl}/payments/${paymentId}/`, {
         method: "PATCH",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({ status: nextStatus }),
       });
       const payload: ApiResponse = await response.json();
@@ -444,7 +444,7 @@ export function PaymentRecorder({
     try {
       const response = await fetch(`${normalizedBaseUrl}/payments/${paymentId}/allocate/`, {
         method: "POST",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({
           allocations: [{
             target_type: allocationTargetType,
@@ -478,16 +478,16 @@ export function PaymentRecorder({
   // ── Effects ───────────────────────────────────────────────
 
   useEffect(() => {
-    if (!token) return;
+    if (!authToken) return;
     void loadPaymentPolicy();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [authToken]);
 
   useEffect(() => {
-    if (!token || !projectId) return;
+    if (!authToken || !projectId) return;
     void loadPayments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, projectId]);
+  }, [authToken, projectId]);
 
   // ── Render ────────────────────────────────────────────────
 

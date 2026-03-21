@@ -30,7 +30,7 @@ import {
 import { validateLeadFields } from "./quick-add-validation";
 
 type UseQuickAddBusinessWorkflowArgs = {
-  token: string;
+  authToken: string;
   normalizedBaseUrl: string;
   fullNameRef: RefObject<HTMLInputElement | null>;
   fullName: string;
@@ -61,7 +61,7 @@ type UseQuickAddBusinessWorkflowArgs = {
  * so the controller can surface them to the form.
  */
 export function useQuickAddBusinessWorkflow({
-  token,
+  authToken,
   normalizedBaseUrl,
   fullNameRef,
   fullName,
@@ -131,7 +131,7 @@ export function useQuickAddBusinessWorkflow({
   ) {
     const response = await postQuickAddCustomerIntake({
       baseUrl: normalizedBaseUrl,
-      token,
+      authToken,
       body: {
         ...body,
         create_project: submission.intent === "customer_and_project",
@@ -255,7 +255,7 @@ export function useQuickAddBusinessWorkflow({
     setConversionMessage("");
     setConversionMessageTone("neutral");
 
-    if (!token) {
+    if (!authToken) {
       setLeadMessage("No shared session token found. Go to / and sign in.");
       setLeadMessageTone("error");
       return;

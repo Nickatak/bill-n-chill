@@ -91,9 +91,9 @@ function hasMissingReference(allocations: InvoiceAllocationRecord[]): boolean {
 }
 
 function formatMoney(val: string): string {
-  const n = Number(val);
-  if (Number.isNaN(n)) return val;
-  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const parsed = Number(val);
+  if (Number.isNaN(parsed)) return val;
+  return `$${parsed.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -138,11 +138,11 @@ type SelectedItem =
   | { type: "payment"; invoiceId: string; paymentId: number };
 
 export function InvoicesTab({
-  token,
+  authToken,
   baseUrl,
   isMobile,
 }: {
-  token: string;
+  authToken: string;
   baseUrl: string;
   isMobile: boolean;
 }) {
@@ -164,7 +164,7 @@ export function InvoicesTab({
     setLoading(true);
     try {
       const res = await fetch(`${apiBase}/invoices/`, {
-        headers: buildAuthHeaders(token),
+        headers: buildAuthHeaders(authToken),
       });
       if (res.ok) {
         const json = await res.json();
@@ -173,7 +173,7 @@ export function InvoicesTab({
     } finally {
       setLoading(false);
     }
-  }, [apiBase, token]);
+  }, [apiBase, authToken]);
 
   useEffect(() => {
     void load();
@@ -259,7 +259,7 @@ export function InvoicesTab({
     try {
       const res = await fetch(`${apiBase}/payments/`, {
         method: "POST",
-        headers: { ...buildAuthHeaders(token), "Content-Type": "application/json" },
+        headers: { ...buildAuthHeaders(authToken), "Content-Type": "application/json" },
         body: JSON.stringify({
           direction: "inbound",
           method: form.method,
@@ -293,7 +293,7 @@ export function InvoicesTab({
     } finally {
       setSaving(false);
     }
-  }, [form, selected, invoices, apiBase, token, load]);
+  }, [form, selected, invoices, apiBase, authToken, load]);
 
   // -------------------------------------------------------------------------
   // Edit existing payment
@@ -313,7 +313,7 @@ export function InvoicesTab({
     try {
       const res = await fetch(`${apiBase}/payments/${selected.paymentId}/`, {
         method: "PATCH",
-        headers: { ...buildAuthHeaders(token), "Content-Type": "application/json" },
+        headers: { ...buildAuthHeaders(authToken), "Content-Type": "application/json" },
         body: JSON.stringify({
           payment_date: form.payment_date,
           reference_number: form.reference_number,
@@ -339,7 +339,7 @@ export function InvoicesTab({
     } finally {
       setSaving(false);
     }
-  }, [form, selected, apiBase, token, load]);
+  }, [form, selected, apiBase, authToken, load]);
 
   // -------------------------------------------------------------------------
   // Void payment
@@ -353,7 +353,7 @@ export function InvoicesTab({
     try {
       const res = await fetch(`${apiBase}/payments/${selected.paymentId}/`, {
         method: "PATCH",
-        headers: { ...buildAuthHeaders(token), "Content-Type": "application/json" },
+        headers: { ...buildAuthHeaders(authToken), "Content-Type": "application/json" },
         body: JSON.stringify({ status: "void" }),
       });
       const json = await res.json();
@@ -375,7 +375,7 @@ export function InvoicesTab({
     } finally {
       setSaving(false);
     }
-  }, [selected, apiBase, token, load]);
+  }, [selected, apiBase, authToken, load]);
 
   // -------------------------------------------------------------------------
   // Filtering + summary
@@ -390,14 +390,14 @@ export function InvoicesTab({
     if (filterUnpaid) {
       result = result.filter((inv) => inv.status !== "paid");
     }
-    const q = search.trim().toLowerCase();
-    if (q) {
+    const searchNeedle = search.trim().toLowerCase();
+    if (searchNeedle) {
       result = result.filter(
         (inv) =>
-          inv.customer_display_name.toLowerCase().includes(q) ||
-          inv.invoice_number.toLowerCase().includes(q) ||
-          inv.project_name.toLowerCase().includes(q) ||
-          inv.total.includes(q),
+          inv.customer_display_name.toLowerCase().includes(searchNeedle) ||
+          inv.invoice_number.toLowerCase().includes(searchNeedle) ||
+          inv.project_name.toLowerCase().includes(searchNeedle) ||
+          inv.total.includes(searchNeedle),
       );
     }
     return result;

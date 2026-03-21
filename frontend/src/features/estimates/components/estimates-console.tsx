@@ -172,7 +172,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const router = useRouter();
   const searchParams = useSearchParams();
   const isMobile = useMediaQuery("(max-width: 700px)");
-  const { token, role, capabilities } = useSharedSessionAuth();
+  const { token: authToken, role, capabilities } = useSharedSessionAuth();
   const canMutateEstimates = canDo(capabilities, "estimates", "create");
   const canSendEstimates = canDo(capabilities, "estimates", "send");
   const canApproveEstimates = canDo(capabilities, "estimates", "approve");
@@ -244,7 +244,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     fallbackLabels: ESTIMATE_STATUS_LABELS_FALLBACK,
     fallbackTransitions: ESTIMATE_ALLOWED_STATUS_TRANSITIONS_FALLBACK,
     baseUrl: apiBaseUrl,
-    token,
+    authToken,
     onLoaded(contract, base) {
       // Domain-specific: quick-action map and filter reconciliation.
       const quickActionMap = {
@@ -441,7 +441,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     try {
       const response = await fetch(`${apiBaseUrl}/estimates/${sourceEstimate.id}/clone-version/`, {
         method: "POST",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({}),
       });
       const payload: ApiResponse = await response.json();
@@ -565,13 +565,13 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     try {
       const [projectsRes, codesRes, organizationRes] = await Promise.all([
         fetch(`${apiBaseUrl}/projects/`, {
-          headers: buildAuthHeaders(token),
+          headers: buildAuthHeaders(authToken),
         }),
         fetch(`${apiBaseUrl}/cost-codes/`, {
-          headers: buildAuthHeaders(token),
+          headers: buildAuthHeaders(authToken),
         }),
         fetch(`${apiBaseUrl}/organization/`, {
-          headers: buildAuthHeaders(token),
+          headers: buildAuthHeaders(authToken),
         }),
       ]);
 
@@ -624,7 +624,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     } catch {
       setActionMessage("Could not reach project and cost-code endpoints.");
     }
-  }, [apiBaseUrl, scopedProjectId, token, formFields]);
+  }, [apiBaseUrl, scopedProjectId, authToken, formFields]);
 
   const loadEstimates = useCallback(async (options?: LoadEstimatesOptions) => {
     const projectId = Number(selectedProjectId);
@@ -646,7 +646,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
     try {
       const response = await fetch(`${apiBaseUrl}/projects/${projectId}/estimates/`, {
-        headers: buildAuthHeaders(token),
+        headers: buildAuthHeaders(authToken),
       });
       const payload: ApiResponse = await response.json();
 
@@ -693,24 +693,24 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     apiBaseUrl,
     scopedEstimateId,
     selectedProjectId,
-    token,
+    authToken,
   ]);
 
   // Fetch projects, cost codes, and organization defaults on auth.
   useEffect(() => {
-    if (!token) {
+    if (!authToken) {
       return;
     }
     void loadDependencies();
-  }, [loadDependencies, token]);
+  }, [loadDependencies, authToken]);
 
   // Reload estimates when the selected project changes.
   useEffect(() => {
-    if (!token || !selectedProjectId) {
+    if (!authToken || !selectedProjectId) {
       return;
     }
     void loadEstimates();
-  }, [loadEstimates, selectedProjectId, token]);
+  }, [loadEstimates, selectedProjectId, authToken]);
 
   // Sync scoped project ID from props into local state when projects load.
   useEffect(() => {
@@ -835,7 +835,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     try {
       const response = await fetch(`${apiBaseUrl}/projects/${projectId}/estimates/`, {
         method: "POST",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({
           title,
           allow_existing_title_family: allowExistingTitleFamily,
@@ -938,7 +938,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       try {
         const response = await fetch(`${apiBaseUrl}/estimates/${selectedEstimate.id}/`, {
           method: "PATCH",
-          headers: buildAuthHeaders(token, { contentType: "application/json" }),
+          headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
           body: JSON.stringify({
             title: trimmedTitle,
             valid_through: formFields.validThrough || null,
@@ -1040,7 +1040,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     try {
       const response = await fetch(`${apiBaseUrl}/estimates/${estimateId}/duplicate/`, {
         method: "POST",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({
           title: formFields.duplicateTitle.trim(),
         }),
@@ -1082,7 +1082,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     try {
       const response = await fetch(`${apiBaseUrl}/estimates/${estimateId}/`, {
         method: "PATCH",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({ status: selectedStatus, status_note: statusNote }),
       });
       const payload: ApiResponse = await response.json();
@@ -1128,7 +1128,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     try {
       const response = await fetch(`${apiBaseUrl}/estimates/${estimateId}/`, {
         method: "PATCH",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({ status_note: statusNote }),
       });
       const payload: ApiResponse = await response.json();
@@ -1167,7 +1167,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
       try {
         const response = await fetch(`${apiBaseUrl}/estimates/${estimateId}/status-events/`, {
-          headers: buildAuthHeaders(token),
+          headers: buildAuthHeaders(authToken),
         });
         const payload: ApiResponse = await response.json();
         if (!response.ok) {
@@ -1184,16 +1184,16 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         }
       }
     },
-    [apiBaseUrl, selectedEstimateId, token],
+    [apiBaseUrl, selectedEstimateId, authToken],
   );
 
   // Load status events whenever the selected estimate changes.
   useEffect(() => {
-    if (!token || !selectedEstimateId) {
+    if (!authToken || !selectedEstimateId) {
       return;
     }
     void loadStatusEvents({ quiet: true });
-  }, [loadStatusEvents, selectedEstimateId, token]);
+  }, [loadStatusEvents, selectedEstimateId, authToken]);
 
   // -------------------------------------------------------------------------
   // Render

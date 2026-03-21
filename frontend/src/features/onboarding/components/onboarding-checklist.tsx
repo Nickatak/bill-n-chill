@@ -193,7 +193,7 @@ const TAB_KEY = "onboarding:workflow-tab";
 export const ORG_VISITED_KEY = "onboarding:org-visited";
 
 export function OnboardingChecklist() {
-  const { token } = useSharedSessionAuth();
+  const { token: authToken } = useSharedSessionAuth();
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [firstProjectId, setFirstProjectId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -213,7 +213,7 @@ export function OnboardingChecklist() {
   const steps = activeTab === "individual" ? INDIVIDUAL_STEPS : REMODELER_STEPS;
 
   const checkProgress = useCallback(async () => {
-    if (!token) return;
+    if (!authToken) return;
 
     const completed = new Set<string>();
 
@@ -235,7 +235,7 @@ export function OnboardingChecklist() {
       checks.map(async ({ key, endpoint }) => {
         try {
           const response = await fetch(`${defaultApiBaseUrl}${endpoint}`, {
-            headers: buildAuthHeaders(token),
+            headers: buildAuthHeaders(authToken),
           });
           const payload = await response.json();
           if (response.ok && Array.isArray(payload.data) && payload.data.length > 0) {
@@ -254,15 +254,15 @@ export function OnboardingChecklist() {
 
     setCompletedSteps(completed);
     setLoading(false);
-  }, [token]);
+  }, [authToken]);
 
   useEffect(() => {
-    if (!token) {
+    if (!authToken) {
       setLoading(false); // eslint-disable-line react-hooks/set-state-in-effect -- early return guard
       return;
     }
     void checkProgress();
-  }, [checkProgress, token]);
+  }, [checkProgress, authToken]);
 
   const requiredSteps = steps.filter((s) => !s.optional);
   const completedCount = requiredSteps.filter((s) => completedSteps.has(s.key)).length;

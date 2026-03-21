@@ -57,7 +57,7 @@ function severityClass(severity: AttentionFeedItem["severity"]): string {
 }
 
 export function DashboardConsole() {
-  const { token, authMessage } = useSharedSessionAuth();
+  const { token: authToken, authMessage } = useSharedSessionAuth();
   const [portfolio, setPortfolio] = useState<PortfolioSnapshot | null>(null);
   const [attentionFeed, setAttentionFeed] = useState<AttentionFeed | null>(null);
   const [changeImpact, setChangeImpact] = useState<ChangeImpactSummary | null>(null);
@@ -66,11 +66,11 @@ export function DashboardConsole() {
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
 
   useEffect(() => {
-    if (!token) return;
+    if (!authToken) return;
 
     async function loadDashboard() {
       setLoading(true);
-      const headers = buildAuthHeaders(token);
+      const headers = buildAuthHeaders(authToken);
 
       const [portfolioRes, attentionRes, changeImpactRes] = await Promise.allSettled([
         fetch(`${normalizedBaseUrl}/reports/portfolio/`, { headers }),
@@ -96,7 +96,7 @@ export function DashboardConsole() {
 
     void loadDashboard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [authToken]);
 
   if (authMessage.startsWith("No shared session")) {
     return <p className={styles.authMessage}>{authMessage}</p>;

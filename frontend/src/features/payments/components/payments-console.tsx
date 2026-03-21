@@ -129,7 +129,7 @@ function statusBadgeClass(status: string): string {
 // ---------------------------------------------------------------------------
 
 export function PaymentsConsole() {
-  const { token, authMessage, role, capabilities } = useSharedSessionAuth();
+  const { token: authToken, authMessage, role, capabilities } = useSharedSessionAuth();
   const canCreatePayments = canDo(capabilities, "payments", "create");
   const canEditPayments = canDo(capabilities, "payments", "edit");
   const canAllocatePayments = canDo(capabilities, "payments", "allocate");
@@ -148,7 +148,7 @@ export function PaymentsConsole() {
   // Hooks
   // -------------------------------------------------------------------------
 
-  const data = usePaymentData(token, scopedCustomerId, scopedProjectId);
+  const data = usePaymentData(authToken, scopedCustomerId, scopedProjectId);
   const form = usePaymentForm();
   const filters = usePaymentFilters(data.allPayments);
 
@@ -354,7 +354,7 @@ export function PaymentsConsole() {
       const projectId = Number(selectedProjectId) || null;
       const response = await fetch(`${apiBaseUrl}/payments/`, {
         method: "POST",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({
           direction: DIRECTION,
           method: formMethod,
@@ -380,7 +380,7 @@ export function PaymentsConsole() {
         try {
           const allocResponse = await fetch(`${apiBaseUrl}/payments/${created.id}/allocate/`, {
             method: "POST",
-            headers: buildAuthHeaders(token, { contentType: "application/json" }),
+            headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
             body: JSON.stringify({
               allocations: [{
                 target_type: "invoice",
@@ -438,7 +438,7 @@ export function PaymentsConsole() {
     try {
       const response = await fetch(`${apiBaseUrl}/payments/${paymentId}/`, {
         method: "PATCH",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({
           direction: DIRECTION,
           method: formMethod,
@@ -474,7 +474,7 @@ export function PaymentsConsole() {
     try {
       const response = await fetch(`${apiBaseUrl}/payments/${paymentId}/`, {
         method: "PATCH",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({ status: nextStatus }),
       });
       const payload: ApiResponse = await response.json();
@@ -507,7 +507,7 @@ export function PaymentsConsole() {
     try {
       const response = await fetch(`${apiBaseUrl}/payments/${paymentId}/allocate/`, {
         method: "POST",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({
           allocations: [{
             target_type: "invoice",
@@ -541,7 +541,7 @@ export function PaymentsConsole() {
 
   return (
     <section className={styles.console}>
-      {!token ? <p className={styles.authNotice}>{authMessage}</p> : null}
+      {!authToken ? <p className={styles.authNotice}>{authMessage}</p> : null}
 
       {statusMessage ? (
         <p className={`${styles.statusBanner} ${
@@ -551,7 +551,7 @@ export function PaymentsConsole() {
         </p>
       ) : null}
 
-      {token ? (
+      {authToken ? (
         <>
           {!canMutatePayments ? (
             <p className={styles.readOnlyNotice}>

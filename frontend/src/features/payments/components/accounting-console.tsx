@@ -44,11 +44,11 @@ const TABS: Array<{ key: AccountingTab; label: string }> = [
 ];
 
 export function AccountingConsole() {
-  const { token } = useSharedSessionAuth();
+  const { token: authToken } = useSharedSessionAuth();
   const [activeTab, setActiveTab] = useState<AccountingTab>("invoices");
   const isMobile = useMediaQuery("(max-width: 700px)");
 
-  if (!token) {
+  if (!authToken) {
     return <p className={styles.authNotice}>Sign in to view accounting data.</p>;
   }
 
@@ -69,13 +69,13 @@ export function AccountingConsole() {
 
       <div className={styles.tabContent}>
         {activeTab === "invoices" ? (
-          <InvoicesTab token={token} baseUrl={defaultApiBaseUrl} isMobile={isMobile} />
+          <InvoicesTab authToken={authToken} baseUrl={defaultApiBaseUrl} isMobile={isMobile} />
         ) : null}
         {activeTab === "bills" ? (
-          <BillsTab token={token} baseUrl={defaultApiBaseUrl} isMobile={isMobile} />
+          <BillsTab authToken={authToken} baseUrl={defaultApiBaseUrl} isMobile={isMobile} />
         ) : null}
         {activeTab === "receipts" ? (
-          <ReceiptsTab token={token} baseUrl={defaultApiBaseUrl} isMobile={isMobile} />
+          <ReceiptsTab authToken={authToken} baseUrl={defaultApiBaseUrl} isMobile={isMobile} />
         ) : null}
       </div>
     </div>

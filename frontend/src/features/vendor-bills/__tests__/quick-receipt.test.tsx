@@ -25,7 +25,7 @@ import { QuickReceipt } from "../components/quick-receipt";
 
 function renderReceipt(props: Partial<React.ComponentProps<typeof QuickReceipt>> = {}) {
   return render(
-    <QuickReceipt projectId={1} token="test-token" {...props} />,
+    <QuickReceipt projectId={1} authToken="test-token" {...props} />,
   );
 }
 

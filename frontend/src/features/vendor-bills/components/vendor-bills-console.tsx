@@ -157,7 +157,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const preferredProjectId = scopedProjectId ?? queryProjectId;
 
   const isMobile = useMediaQuery("(max-width: 700px)");
-  const { token, role, capabilities } = useSharedSessionAuth();
+  const { token: authToken, role, capabilities } = useSharedSessionAuth();
   const { message: formMessage, tone: formTone, setSuccess: setFormSuccess, setError: setFormError, clear: clearFormMessage } = useStatusMessage();
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -177,7 +177,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     fallbackLabels: VENDOR_BILL_STATUS_LABELS_FALLBACK,
     fallbackTransitions: VENDOR_BILL_ALLOWED_STATUS_TRANSITIONS_FALLBACK,
     baseUrl: apiBaseUrl,
-    token,
+    authToken,
     onLoaded(contract) {
       setBillStatusFilters((current) => {
         const retained = current.filter((s) => contract.statuses.includes(s));
@@ -217,7 +217,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   });
 
   const viewer = useVendorBillViewer({
-    authToken: token,
+    authToken,
   });
 
   // -------------------------------------------------------------------------
@@ -553,10 +553,10 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     try {
       const [projectsResponse, vendorsResponse] = await Promise.all([
         fetch(`${apiBaseUrl}/projects/`, {
-          headers: buildAuthHeaders(token),
+          headers: buildAuthHeaders(authToken),
         }),
         fetch(`${apiBaseUrl}/vendors/`, {
-          headers: buildAuthHeaders(token),
+          headers: buildAuthHeaders(authToken),
         }),
       ]);
 
@@ -609,7 +609,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
     try {
       const response = await fetch(`${apiBaseUrl}/projects/${projectId}/vendor-bills/`, {
-        headers: buildAuthHeaders(token),
+        headers: buildAuthHeaders(authToken),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -650,7 +650,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       `${apiBaseUrl}/projects/${payloadBody.projectId}/vendor-bills/`,
       {
         method: "POST",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({
           vendor: payloadBody.vendor,
           bill_number: payloadBody.bill_number,
@@ -814,7 +814,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     try {
       const response = await fetch(`${apiBaseUrl}/vendor-bills/${vendorBillId}/`, {
         method: "PATCH",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({
           vendor,
           bill_number: billForm.billNumber,
@@ -874,7 +874,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     try {
       const response = await fetch(`${apiBaseUrl}/vendor-bills/${vendorBillId}/`, {
         method: "PATCH",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({ status: nextStatus, status_note: viewerNote }),
       });
       const payload: ApiResponse = await response.json();
@@ -912,7 +912,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     try {
       const response = await fetch(`${apiBaseUrl}/vendor-bills/${vendorBillId}/`, {
         method: "PATCH",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({ status_note: viewerNote }),
       });
       const payload: ApiResponse = await response.json();
@@ -955,7 +955,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   // Bootstrap: load project/vendor lists once authenticated.
   useEffect(() => {
-    if (!token) {
+    if (!authToken) {
       return;
     }
     const timer = window.setTimeout(() => {
@@ -963,7 +963,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }, 0);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [authToken]);
 
   // Ensure date fields have sensible defaults on mount.
   useEffect(() => {
@@ -973,7 +973,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   // Reload vendor bills whenever the selected project changes.
   useEffect(() => {
-    if (!token || !selectedProjectId) {
+    if (!authToken || !selectedProjectId) {
       return;
     }
     const timer = window.setTimeout(() => {
@@ -981,7 +981,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }, 0);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, selectedProjectId]);
+  }, [authToken, selectedProjectId]);
 
   // If the selected bill is no longer visible after filter changes, fall back to the first match.
   useEffect(() => {

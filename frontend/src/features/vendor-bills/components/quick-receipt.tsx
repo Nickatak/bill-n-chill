@@ -33,11 +33,11 @@ type ScanResult = {
 
 type QuickReceiptProps = {
   projectId: number;
-  token: string;
+  authToken: string;
   onReceiptCreated?: () => void;
 };
 
-export function QuickReceipt({ projectId, token, onReceiptCreated }: QuickReceiptProps) {
+export function QuickReceipt({ projectId, authToken, onReceiptCreated }: QuickReceiptProps) {
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -65,7 +65,7 @@ export function QuickReceipt({ projectId, token, onReceiptCreated }: QuickReceip
 
       const response = await fetch(`${normalizedBaseUrl}/receipts/scan/`, {
         method: "POST",
-        headers: buildAuthHeaders(token),
+        headers: buildAuthHeaders(authToken),
         body: formData,
       });
       const payload: { data?: ScanResult; error?: { message?: string } } = await response.json();
@@ -122,7 +122,7 @@ export function QuickReceipt({ projectId, token, onReceiptCreated }: QuickReceip
         `${normalizedBaseUrl}/projects/${projectId}/receipts/`,
         {
           method: "POST",
-          headers: buildAuthHeaders(token, { contentType: "application/json" }),
+          headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
           body: JSON.stringify(body),
         },
       );

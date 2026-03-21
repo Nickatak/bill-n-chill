@@ -20,7 +20,7 @@ import type {
 import styles from "./organization-console.module.css";
 
 type DocumentSettingsTabProps = {
-  token: string;
+  authToken: string;
   profile: OrganizationProfile;
   canEdit: boolean;
   onProfileUpdate: (profile: OrganizationProfile, rolePolicy?: OrganizationRolePolicy) => void;
@@ -43,7 +43,7 @@ function extractErrorMessage(payload: ApiResponse | null, fallback: string): str
 
 /** Editable form for org-level document defaults (help email, due/valid days, T&Cs per doc type). */
 export function DocumentSettingsTab({
-  token,
+  authToken,
   profile,
   canEdit,
   onProfileUpdate,
@@ -105,7 +105,7 @@ export function DocumentSettingsTab({
     try {
       const response = await fetch(`${normalizedBaseUrl}/organization/`, {
         method: "PATCH",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify(payload),
       });
       const body: ApiResponse = await response.json();

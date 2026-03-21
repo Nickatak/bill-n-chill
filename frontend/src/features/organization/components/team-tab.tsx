@@ -28,7 +28,7 @@ type MembershipDraft = {
 };
 
 type TeamTabProps = {
-  token: string;
+  authToken: string;
   memberships: OrganizationMembershipRecord[];
   invites: OrganizationInviteRecord[];
   rolePolicy: OrganizationRolePolicy | null;
@@ -72,7 +72,7 @@ function buildInviteLink(inviteToken: string): string {
 }
 
 export function TeamTab({
-  token,
+  authToken,
   memberships,
   invites,
   canManageMemberships,
@@ -132,7 +132,7 @@ export function TeamTab({
         `${normalizedBaseUrl}/organization/memberships/${row.id}/`,
         {
           method: "PATCH",
-          headers: buildAuthHeaders(token, { contentType: "application/json" }),
+          headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
           body: JSON.stringify(patchPayload),
         },
       );
@@ -174,7 +174,7 @@ export function TeamTab({
     try {
       const response = await fetch(`${normalizedBaseUrl}/organization/invites/`, {
         method: "POST",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({ email: inviteEmailDraft.trim(), role: inviteRoleDraft }),
       });
       const body = await response.json();
@@ -204,7 +204,7 @@ export function TeamTab({
     try {
       const response = await fetch(`${normalizedBaseUrl}/organization/invites/${inviteId}/`, {
         method: "DELETE",
-        headers: buildAuthHeaders(token),
+        headers: buildAuthHeaders(authToken),
       });
       if (!response.ok && response.status !== 204) {
         const body = await response.json().catch(() => null);
