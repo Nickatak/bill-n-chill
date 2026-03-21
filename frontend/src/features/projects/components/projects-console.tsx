@@ -61,8 +61,8 @@ import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import styles from "./projects-console.module.css";
-import { type AllocationTarget } from "@/features/payments";
-import { QuickEntryTabs } from "./quick-entry-tabs";
+import { PaymentRecorder, type AllocationTarget } from "@/features/payments";
+import { QuickReceipt } from "@/features/vendor-bills/components/quick-receipt";
 import { ProjectListViewer } from "@/shared/project-list-viewer";
 import { ApiResponse, ProjectFinancialSummary, ProjectRecord } from "../types";
 import {
@@ -114,6 +114,7 @@ export function ProjectsConsole() {
   } | null>(null);
   const [acceptedEstimateTotal, setAcceptedEstimateTotal] = useState("--");
   const [invoiceAllocationTargets, setInvoiceAllocationTargets] = useState<AllocationTarget[]>([]);
+  const [toolbarPanel, setToolbarPanel] = useState<"payment" | "receipt" | null>(null);
   const [isProjectEditOpen, setIsProjectEditOpen] = useState(false);
   const projectEditFormRef = useRef<HTMLFormElement | null>(null);
 
@@ -139,6 +140,8 @@ export function ProjectsConsole() {
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;
   const isSelectedProjectTerminal =
     selectedProject?.status === "completed" || selectedProject?.status === "cancelled";
+  const hasApprovedEstimate = (estimateStatusCounts?.approved ?? 0) > 0;
+  const hasPayableInvoices = invoiceAllocationTargets.length > 0;
   const computedProfileStatuses = selectedProject
     ? allowedProfileStatuses(selectedProject.status as ProjectStatusValue)
     : [];
@@ -512,6 +515,7 @@ export function ProjectsConsole() {
     }
     setSelectedProjectId(String(project.id));
     setIsProjectEditOpen(false);
+    setToolbarPanel(null);
     hydrateForm(selected);
 
     // Clear stale financial data so it re-loads for the new project.
@@ -571,7 +575,7 @@ export function ProjectsConsole() {
   }
 
   return (
-    <section>
+    <section className={styles.pageRoot}>
       {authMessage.startsWith("No shared session") ? <p>{authMessage}</p> : null}
 
       {projects.length === 0 ? (
@@ -787,18 +791,68 @@ export function ProjectsConsole() {
 
               </nav>
 
+              <div className={styles.actionToolbar} role="toolbar" aria-label="Project actions">
+                <Link
+                  href={`/projects/${selectedProject.id}/invoices?action=deposit`}
+                  className={`${styles.toolbarAction} ${styles.toolbarActionLaunch} ${!hasApprovedEstimate ? styles.toolbarActionDisabled : ""}`}
+                  aria-disabled={!hasApprovedEstimate}
+                  tabIndex={!hasApprovedEstimate ? -1 : undefined}
+                  onClick={(e) => { if (!hasApprovedEstimate) e.preventDefault(); }}
+                >
+                  Invoice Deposit
+                </Link>
+                <Link
+                  href={`/projects/${selectedProject.id}/invoices?action=from-estimate`}
+                  className={`${styles.toolbarAction} ${styles.toolbarActionLaunch} ${!hasApprovedEstimate ? styles.toolbarActionDisabled : ""}`}
+                  aria-disabled={!hasApprovedEstimate}
+                  tabIndex={!hasApprovedEstimate ? -1 : undefined}
+                  onClick={(e) => { if (!hasApprovedEstimate) e.preventDefault(); }}
+                >
+                  Invoice from Estimate + COs
+                </Link>
+                <button
+                  type="button"
+                  className={`${styles.toolbarAction} ${toolbarPanel === "payment" ? styles.toolbarActionActive : ""}`}
+                  disabled={!hasPayableInvoices}
+                  onClick={() => setToolbarPanel(toolbarPanel === "payment" ? null : "payment")}
+                >
+                  Record Payment
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.toolbarAction} ${toolbarPanel === "receipt" ? styles.toolbarActionActive : ""}`}
+                  onClick={() => setToolbarPanel(toolbarPanel === "receipt" ? null : "receipt")}
+                >
+                  Log Receipt
+                </button>
+              </div>
+
             </div>
 
             <div className={styles.paymentRecorderSection}>
-              <QuickEntryTabs
-                projectId={selectedProject.id}
-                authToken={authToken ?? ""}
-                allocationTargets={invoiceAllocationTargets}
-                onPaymentsChanged={() => {
-                  void loadFinancialSummary();
-                  void loadInvoiceAllocationTargets(selectedProject.id);
-                }}
-              />
+              {toolbarPanel === "payment" ? (
+                <PaymentRecorder
+                  projectId={selectedProject.id}
+                  direction="inbound"
+                  allocationTargets={invoiceAllocationTargets}
+                  hideHeader
+                  createOnly
+                  hideWorkspaceTitle
+                  onPaymentsChanged={() => {
+                    void loadFinancialSummary();
+                    void loadInvoiceAllocationTargets(selectedProject.id);
+                  }}
+                />
+              ) : toolbarPanel === "receipt" ? (
+                <QuickReceipt
+                  projectId={selectedProject.id}
+                  authToken={authToken ?? ""}
+                />
+              ) : (
+                <p className={styles.toolbarPanelPrompt}>
+                  Select an action from the toolbar to get started.
+                </p>
+              )}
             </div>
 
             <div className={styles.metricsPanel}>

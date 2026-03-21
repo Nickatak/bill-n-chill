@@ -1,3 +1,8 @@
+.pageRoot {
+  display: grid;
+  gap: var(--space-lg);
+}
+
 .emptyState {
   border: 1px dashed var(--border);
   border-radius: 10px;
@@ -455,14 +460,97 @@
   }
 }
 
-/* -- Payment recorder section -- */
+/* ── Action toolbar ────────────────────────────────────── */
+
+.actionToolbar {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.toolbarAction {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--text-primary);
+  background: var(--surface);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.toolbarAction:hover:not(:disabled):not(.toolbarActionDisabled) {
+  border-color: var(--accent);
+  color: var(--accent-text);
+  transform: translateY(-1px);
+}
+
+.toolbarActionActive {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.toolbarActionActive:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--text-on-accent);
+}
+
+.toolbarActionLaunch {
+  border-style: dashed;
+}
+
+.toolbarActionDisabled,
+.toolbarAction:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* -- Right panel section -- */
 
 .paymentRecorderSection {
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: var(--space-lg);
   background: var(--surface-secondary);
-  align-self: start;
   min-width: 0;
   overflow: hidden;
+}
+
+.toolbarPanelPrompt {
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+  text-align: center;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: var(--space-lg) var(--space-md);
+}
+
+@media (max-width: 640px) {
+  .actionToolbar {
+    flex-direction: column;
+  }
+
+  .toolbarAction {
+    min-height: 44px;
+    display: grid;
+    place-items: center;
+  }
 }
