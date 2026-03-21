@@ -107,7 +107,7 @@ class CustomersManagementTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         row = response.json()["data"][0]
-        self.assertEqual(row["project_count"], 0)
+        self.assertEqual(row["projects_count"], 0)
         self.assertEqual(row["has_project"], False)
 
     def test_customer_patch_updates_record(self):

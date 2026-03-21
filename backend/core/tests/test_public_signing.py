@@ -210,7 +210,7 @@ class SigningUtilitiesTests(TestCase):
             "tax_percent": "8.25",
             "terms_text": "Net 30",
             "line_items": [
-                {"description": "Demo", "quantity": "2", "unit_cost": "500", "markup_percent": "10", "cost_code": 1, "unit": "day"},
+                {"description": "Demo", "quantity": "2", "unit_price": "500", "markup_percent": "10", "cost_code": 1, "unit": "day"},
             ],
         }
         hash1 = compute_document_content_hash("estimate", data)

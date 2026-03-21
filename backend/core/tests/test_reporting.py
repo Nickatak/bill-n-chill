@@ -161,7 +161,7 @@ class ChangeImpactSummaryTests(ReportingTestBase):
         response = self.client.get("/api/v1/reports/change-impact/", **self._auth())
         self.assertEqual(response.status_code, 200)
         data = response.json()["data"]
-        self.assertEqual(data["approved_change_order_count"], 0)
+        self.assertEqual(data["approved_change_orders_count"], 0)
         self.assertEqual(len(data["projects"]), 0)
 
     def test_counts_approved_change_orders(self):
@@ -187,7 +187,7 @@ class ChangeImpactSummaryTests(ReportingTestBase):
         )
         response = self.client.get("/api/v1/reports/change-impact/", **self._auth())
         data = response.json()["data"]
-        self.assertEqual(data["approved_change_order_count"], 1)
+        self.assertEqual(data["approved_change_orders_count"], 1)
         self.assertEqual(len(data["projects"]), 1)
         self.assertEqual(data["projects"][0]["project_name"], "Alpha Project")
 
@@ -219,7 +219,7 @@ class ChangeImpactSummaryTests(ReportingTestBase):
         )
         response = self.client.get("/api/v1/reports/change-impact/", **self._auth())
         data = response.json()["data"]
-        self.assertEqual(data["approved_change_order_count"], 0)
+        self.assertEqual(data["approved_change_orders_count"], 0)
 
 
 class AttentionFeedTests(ReportingTestBase):

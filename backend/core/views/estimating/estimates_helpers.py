@@ -75,7 +75,7 @@ def _line_items_signature(line_items_data: list[dict]) -> list[tuple]:
                 (line_item.get("description") or "").strip(),
                 str(line_item.get("quantity", "")),
                 (line_item.get("unit") or "").strip(),
-                str(line_item.get("unit_cost", "")),
+                str(line_item.get("unit_price", "")),
                 str(line_item.get("markup_percent", "")),
             )
         )
@@ -94,7 +94,7 @@ def _estimate_stored_signature(estimate: Estimate) -> list[tuple]:
             (item.description or "").strip(),
             str(item.quantity),
             (item.unit or "").strip(),
-            str(item.unit_cost),
+            str(item.unit_price),
             str(item.markup_percent),
         )
         for item in estimate.line_items.all()
@@ -224,9 +224,9 @@ def _calculate_line_totals(
 
     for line_item in line_items_data:
         quantity = Decimal(str(line_item["quantity"]))
-        unit_cost = Decimal(str(line_item["unit_cost"]))
+        unit_price = Decimal(str(line_item["unit_price"]))
         markup_percent = Decimal(str(line_item.get("markup_percent", 0)))
-        base_total = quantize_money(quantity * unit_cost)
+        base_total = quantize_money(quantity * unit_price)
         line_markup = quantize_money(base_total * (markup_percent / Decimal("100")))
         line_total = quantize_money(base_total + line_markup)
         subtotal = quantize_money(subtotal + base_total)
@@ -235,7 +235,7 @@ def _calculate_line_totals(
             {
                 **line_item,
                 "quantity": quantity,
-                "unit_cost": unit_cost,
+                "unit_price": unit_price,
                 "markup_percent": markup_percent,
                 "line_total": line_total,
             }
@@ -258,7 +258,7 @@ def _apply_estimate_lines_and_totals(
     validation failure, or ``None`` on success.
     """
     computed_line_items, subtotal, markup_total = _calculate_line_totals(line_items_data)
-    code_map, missing = _resolve_cost_codes_for_user(user, computed_line_items)
+    cost_code_map, missing = _resolve_cost_codes_for_user(user, computed_line_items)
     if missing:
         return {"missing_cost_codes": missing}
 
@@ -275,11 +275,11 @@ def _apply_estimate_lines_and_totals(
         lines_to_create.append(
             EstimateLineItem(
                 estimate=estimate,
-                cost_code=code_map[line_item["cost_code"]],
+                cost_code=cost_code_map[line_item["cost_code"]],
                 description=description,
                 quantity=line_item["quantity"],
                 unit=unit_value,
-                unit_cost=line_item["unit_cost"],
+                unit_price=line_item["unit_price"],
                 markup_percent=line_item["markup_percent"],
                 line_total=line_item["line_total"],
             )
@@ -372,7 +372,7 @@ def _handle_estimate_document_save(
                     "description": line.description,
                     "quantity": line.quantity,
                     "unit": line.unit,
-                    "unit_cost": line.unit_cost,
+                    "unit_price": line.unit_price,
                     "markup_percent": line.markup_percent,
                 }
                 for line in estimate.line_items.all()

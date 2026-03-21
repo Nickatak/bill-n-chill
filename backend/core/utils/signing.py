@@ -38,7 +38,7 @@ CEREMONY_CONSENT_TEXT_VERSION = compute_consent_text_version(CEREMONY_CONSENT_TE
 # updated_at, created_at, id) are excluded so the hash represents
 # the document content the signer reviewed.
 
-_ESTIMATE_LINE_FIELDS = ("description", "quantity", "unit_cost", "markup_percent", "cost_code", "unit")
+_ESTIMATE_LINE_FIELDS = ("description", "quantity", "unit_price", "markup_percent", "cost_code", "unit")
 _CHANGE_ORDER_LINE_FIELDS = ("description", "amount_delta", "days_delta", "cost_code", "adjustment_reason")
 _INVOICE_LINE_FIELDS = ("description", "quantity", "unit_price", "cost_code", "unit")
 

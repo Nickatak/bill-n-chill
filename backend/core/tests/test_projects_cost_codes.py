@@ -939,8 +939,8 @@ class ReportingPackTests(TestCase):
         )
         self.assertEqual(all_rows.status_code, 200)
         all_data = all_rows.json()["data"]
-        self.assertEqual(all_data["approved_change_order_count"], 2)
-        self.assertEqual(all_data["approved_change_order_total"], "800.00")
+        self.assertEqual(all_data["approved_change_orders_count"], 2)
+        self.assertEqual(all_data["approved_change_orders_total"], "800.00")
         self.assertEqual(len(all_data["projects"]), 1)
 
         filtered = self.client.get(
@@ -949,8 +949,8 @@ class ReportingPackTests(TestCase):
         )
         self.assertEqual(filtered.status_code, 200)
         filtered_data = filtered.json()["data"]
-        self.assertEqual(filtered_data["approved_change_order_count"], 1)
-        self.assertEqual(filtered_data["approved_change_order_total"], "500.00")
+        self.assertEqual(filtered_data["approved_change_orders_count"], 1)
+        self.assertEqual(filtered_data["approved_change_orders_total"], "500.00")
 
     def test_reporting_endpoints_validate_dates_and_scope_to_user(self):
         invalid = self.client.get(
@@ -1002,7 +1002,7 @@ class ReportingPackTests(TestCase):
         )
         self.assertEqual(scoped.status_code, 200)
         scoped_data = scoped.json()["data"]
-        self.assertEqual(scoped_data["approved_change_order_total"], "0.00")
+        self.assertEqual(scoped_data["approved_change_orders_total"], "0.00")
 
     def test_attention_feed_returns_actionable_items(self):
         today = timezone.localdate()

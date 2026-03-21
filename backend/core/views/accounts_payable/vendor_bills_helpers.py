@@ -94,7 +94,7 @@ def _apply_vendor_bill_lines_and_totals(
     or None on success. Total = subtotal (sum of line amounts) + tax + shipping.
     """
     normalized_items, subtotal = _calculate_vendor_bill_line_totals(line_items_data)
-    code_map, missing = _resolve_cost_codes_for_user(user, normalized_items)
+    cost_code_map, missing = _resolve_cost_codes_for_user(user, normalized_items)
     if missing:
         return {"missing_cost_codes": missing}
 
@@ -106,7 +106,7 @@ def _apply_vendor_bill_lines_and_totals(
     new_lines = []
     for line_item in normalized_items:
         cost_code_id = line_item.get("cost_code")
-        cost_code = code_map.get(cost_code_id) if cost_code_id else None
+        cost_code = cost_code_map.get(cost_code_id) if cost_code_id else None
         new_lines.append(
             VendorBillLine(
                 vendor_bill=vendor_bill,

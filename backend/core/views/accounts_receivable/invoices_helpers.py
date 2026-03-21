@@ -131,7 +131,7 @@ def _apply_invoice_lines_and_totals(
         6. Save all totals on the invoice.
     """
     normalized_items, subtotal = _calculate_invoice_line_totals(line_items_data)
-    code_map, missing = _resolve_cost_codes_for_user(user, normalized_items)
+    cost_code_map, missing = _resolve_cost_codes_for_user(user, normalized_items)
     if missing:
         return {"missing_cost_codes": missing}
 
@@ -143,7 +143,7 @@ def _apply_invoice_lines_and_totals(
     lines_to_create = []
     for line_item in normalized_items:
         cost_code_id = line_item.get("cost_code")
-        cost_code = code_map.get(cost_code_id) if cost_code_id else None
+        cost_code = cost_code_map.get(cost_code_id) if cost_code_id else None
 
         lines_to_create.append(
             InvoiceLine(

@@ -51,7 +51,7 @@ class MvpRegressionMoneyLoopTests(TestCase):
                         "description": "Demo",
                         "quantity": "1",
                         "unit": "ea",
-                        "unit_cost": "200.00",
+                        "unit_price": "200.00",
                         "markup_percent": "0",
                     },
                     {
@@ -59,7 +59,7 @@ class MvpRegressionMoneyLoopTests(TestCase):
                         "description": "Tile",
                         "quantity": "1",
                         "unit": "ea",
-                        "unit_cost": "800.00",
+                        "unit_price": "800.00",
                         "markup_percent": "0",
                     },
                 ],

@@ -112,7 +112,7 @@ class ChangeOrderTests(TestCase):
                         "description": "Seed line",
                         "quantity": "1",
                         "unit": "ea",
-                        "unit_cost": "1000",
+                        "unit_price": "1000",
                         "markup_percent": "0",
                     }
                 ],

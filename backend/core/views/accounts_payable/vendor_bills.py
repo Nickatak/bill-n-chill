@@ -356,9 +356,9 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
         if "status" in data:
             next_status = data["status"]
             if next_status == VendorBill.Status.APPROVED:
-                err, _ = _capability_gate(request.user, "vendor_bills", "approve")
-                if err:
-                    return Response(err, status=403)
+                permission_error, _ = _capability_gate(request.user, "vendor_bills", "approve")
+                if permission_error:
+                    return Response(permission_error, status=403)
 
         next_vendor_id = data.get("vendor", vendor_bill.vendor_id)
         next_bill_number = data.get("bill_number", vendor_bill.bill_number)

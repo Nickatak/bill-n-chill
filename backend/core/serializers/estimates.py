@@ -30,7 +30,7 @@ class EstimateLineItemSerializer(serializers.ModelSerializer):
             "description",
             "quantity",
             "unit",
-            "unit_cost",
+            "unit_price",
             "markup_percent",
             "line_total",
             "created_at",
@@ -141,7 +141,7 @@ class EstimateLineItemInputSerializer(serializers.Serializer):
     description = serializers.CharField(max_length=255)
     quantity = serializers.DecimalField(max_digits=12, decimal_places=2)
     unit = serializers.CharField(max_length=30, required=False, default="ea")
-    unit_cost = serializers.DecimalField(max_digits=12, decimal_places=2)
+    unit_price = serializers.DecimalField(max_digits=12, decimal_places=2)
     markup_percent = serializers.DecimalField(
         max_digits=6, decimal_places=2, required=False, default=Decimal("0")
     )

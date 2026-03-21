@@ -33,8 +33,8 @@ from core.views.shared_operations.customers_helpers import (
 def customers_list_view(request):
     """List organization-scoped customers with optional free-text search and pagination.
 
-    Annotates each customer with ``project_count`` (non-prospect) and
-    ``active_project_count`` for frontend display.  Supports ``?q=`` search
+    Annotates each customer with ``projects_count`` (non-prospect) and
+    ``active_projects_count`` for frontend display.  Supports ``?q=`` search
     across display name, phone, email, and billing address.
 
     Flow:
@@ -54,12 +54,12 @@ def customers_list_view(request):
     customers = (
         Customer.objects.filter(organization_id=membership.organization_id)
         .annotate(
-            project_count=Count(
+            projects_count=Count(
                 "projects",
                 filter=~Q(projects__status=Project.Status.PROSPECT),
                 distinct=True,
             ),
-            active_project_count=Count(
+            active_projects_count=Count(
                 "projects",
                 filter=Q(projects__status__in=[Project.Status.ACTIVE, Project.Status.ON_HOLD]),
                 distinct=True,
@@ -76,13 +76,13 @@ def customers_list_view(request):
             | Q(billing_address__icontains=query)
         )
 
-    customers, meta = _paginate_queryset(customers, request.query_params)
+    customers, pagination = _paginate_queryset(customers, request.query_params)
 
     data = CustomerManageSerializer(customers, many=True).data
     for customer_data in data:
-        customer_data["has_project"] = customer_data["project_count"] > 0
-        customer_data["has_active_or_on_hold_project"] = customer_data["active_project_count"] > 0
-    return Response({"data": data, "meta": meta})
+        customer_data["has_project"] = customer_data["projects_count"] > 0
+        customer_data["has_active_or_on_hold_project"] = customer_data["active_projects_count"] > 0
+    return Response({"data": data, "pagination_metadata": pagination})
 
 
 @api_view(["GET", "PATCH"])
@@ -126,12 +126,12 @@ def customer_detail_view(request, customer_id):
     customer = (
         Customer.objects.filter(id=customer_id, organization_id=membership.organization_id)
         .annotate(
-            project_count=Count(
+            projects_count=Count(
                 "projects",
                 filter=~Q(projects__status=Project.Status.PROSPECT),
                 distinct=True,
             ),
-            active_project_count=Count(
+            active_projects_count=Count(
                 "projects",
                 filter=Q(projects__status__in=[Project.Status.ACTIVE, Project.Status.ON_HOLD]),
                 distinct=True,
@@ -153,8 +153,8 @@ def customer_detail_view(request, customer_id):
 
     if request.method == "GET":
         payload = CustomerManageSerializer(customer).data
-        payload["has_project"] = payload["project_count"] > 0
-        payload["has_active_or_on_hold_project"] = payload["active_project_count"] > 0
+        payload["has_project"] = payload["projects_count"] > 0
+        payload["has_active_or_on_hold_project"] = payload["active_projects_count"] > 0
         return Response({"data": payload})
 
     elif request.method == "PATCH":
@@ -180,9 +180,9 @@ def customer_detail_view(request, customer_id):
             # Archive cascade: when a customer is archived, auto-cancel any
             # prospect-status projects.  Active/on-hold projects block archival
             # entirely (enforced by Customer.clean() above).
-            cancelled_prospect_project_count = 0
+            cancelled_prospect_projects_count = 0
             if not previous_is_archived and customer.is_archived:
-                cancelled_prospect_project_count = customer.projects.filter(
+                cancelled_prospect_projects_count = customer.projects.filter(
                     status=Project.Status.PROSPECT
                 ).update(status=Project.Status.CANCELLED, updated_at=timezone.now())
 
@@ -199,23 +199,23 @@ def customer_detail_view(request, customer_id):
                 metadata={
                     "from_is_archived": previous_is_archived,
                     "to_is_archived": customer.is_archived,
-                    "cancelled_prospect_project_count": cancelled_prospect_project_count,
+                    "cancelled_prospect_projects_count": cancelled_prospect_projects_count,
                 }
                 if customer.is_archived != previous_is_archived
                 else {},
             )
 
-        # Re-fetch with fresh annotations — project_count / active_project_count
+        # Re-fetch with fresh annotations — projects_count / active_projects_count
         # are DB-computed and may have changed after the prospect cancellation.
         annotated_customer = (
             Customer.objects.filter(id=customer.id, organization_id=membership.organization_id)
             .annotate(
-                project_count=Count(
+                projects_count=Count(
                     "projects",
                     filter=~Q(projects__status=Project.Status.PROSPECT),
                     distinct=True,
                 ),
-                active_project_count=Count(
+                active_projects_count=Count(
                     "projects",
                     filter=Q(projects__status__in=[Project.Status.ACTIVE, Project.Status.ON_HOLD]),
                     distinct=True,
@@ -224,8 +224,8 @@ def customer_detail_view(request, customer_id):
             .first()
         )
         payload = CustomerManageSerializer(annotated_customer).data
-        payload["has_project"] = payload["project_count"] > 0
-        payload["has_active_or_on_hold_project"] = payload["active_project_count"] > 0
+        payload["has_project"] = payload["projects_count"] > 0
+        payload["has_active_or_on_hold_project"] = payload["active_projects_count"] > 0
         return Response({"data": payload})
 
 

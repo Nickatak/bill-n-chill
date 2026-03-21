@@ -74,9 +74,9 @@ def vendors_list_create_view(request):
                 | Q(tax_id_last4__icontains=search)
             )
 
-        vendors, meta = _paginate_queryset(vendors, request.query_params)
+        vendors, pagination = _paginate_queryset(vendors, request.query_params)
 
-        return Response({"data": VendorSerializer(vendors, many=True).data, "meta": meta})
+        return Response({"data": VendorSerializer(vendors, many=True).data, "pagination_metadata": pagination})
 
     elif request.method == "POST":
         permission_error, _ = _capability_gate(request.user, "vendors", "create")

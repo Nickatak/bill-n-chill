@@ -200,18 +200,18 @@ class Command(BaseCommand):
                 defaults={
                     "quantity": Decimal("1.00"),
                     "unit": "ea",
-                    "unit_cost": line_total,
+                    "unit_price": line_total,
                     "markup_percent": Decimal("0.00"),
                     "line_total": line_total,
                 },
             )
             line.quantity = Decimal("1.00")
             line.unit = "ea"
-            line.unit_cost = line_total
+            line.unit_price = line_total
             line.markup_percent = Decimal("0.00")
             line.line_total = line_total
             line.save(update_fields=[
-                "quantity", "unit", "unit_cost", "markup_percent", "line_total", "updated_at",
+                "quantity", "unit", "unit_price", "markup_percent", "line_total", "updated_at",
             ])
             keep_ids.append(line.id)
         EstimateLineItem.objects.filter(estimate=estimate).exclude(id__in=keep_ids).delete()

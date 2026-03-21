@@ -83,8 +83,8 @@ class CustomerIntakeQuickAddSerializer(serializers.Serializer):
 class CustomerManageSerializer(serializers.ModelSerializer):
     """Read/write customer representation for the management console."""
 
-    project_count = serializers.IntegerField(read_only=True)
-    active_project_count = serializers.IntegerField(read_only=True)
+    projects_count = serializers.IntegerField(read_only=True)
+    active_projects_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Customer
@@ -95,15 +95,15 @@ class CustomerManageSerializer(serializers.ModelSerializer):
             "phone",
             "billing_address",
             "is_archived",
-            "project_count",
-            "active_project_count",
+            "projects_count",
+            "active_projects_count",
             "created_at",
             "updated_at",
         ]
         read_only_fields = [
             "id",
-            "project_count",
-            "active_project_count",
+            "projects_count",
+            "active_projects_count",
             "created_at",
             "updated_at",
         ]

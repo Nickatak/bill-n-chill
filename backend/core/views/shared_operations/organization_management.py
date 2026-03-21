@@ -129,14 +129,14 @@ def organization_profile_view(request):
             "estimate_terms_and_conditions": {"attr": "estimate_terms_and_conditions", "strip": True},
             "change_order_terms_and_conditions": {"attr": "change_order_terms_and_conditions", "strip": True},
         }
-        for field_name, opts in _string_fields.items():
+        for field_name, field_config in _string_fields.items():
             if field_name not in incoming:
                 continue
-            value = str(incoming.get(field_name) or "").strip() if opts.get("strip") else str(incoming.get(field_name) or "")
-            if value != getattr(organization, opts["attr"]):
-                setattr(organization, opts["attr"], value)
+            value = str(incoming.get(field_name) or "").strip() if field_config.get("strip") else str(incoming.get(field_name) or "")
+            if value != getattr(organization, field_config["attr"]):
+                setattr(organization, field_config["attr"], value)
                 changed_fields.append(field_name)
-                update_fields.append(opts["attr"])
+                update_fields.append(field_config["attr"])
 
         # Integer fields
         _int_fields = {

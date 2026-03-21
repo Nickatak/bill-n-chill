@@ -719,7 +719,7 @@ def estimate_clone_version_view(request, estimate_id):
                 "description": line.description,
                 "quantity": line.quantity,
                 "unit": line.unit,
-                "unit_cost": line.unit_cost,
+                "unit_price": line.unit_price,
                 "markup_percent": line.markup_percent,
             }
             for line in estimate.line_items.all()
@@ -871,7 +871,7 @@ def estimate_duplicate_view(request, estimate_id):
                 "description": line.description,
                 "quantity": line.quantity,
                 "unit": line.unit,
-                "unit_cost": line.unit_cost,
+                "unit_price": line.unit_price,
                 "markup_percent": line.markup_percent,
             }
             for line in estimate.line_items.all()

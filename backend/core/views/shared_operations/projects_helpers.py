@@ -97,15 +97,15 @@ def _project_accepted_contract_totals_map(
         project_id__in=project_ids,
         status=ChangeOrder.Status.APPROVED,
     )
-    co_total_by_project: dict[int, Decimal] = {}
+    change_order_total_by_project: dict[int, Decimal] = {}
     for change_order in approved_cos:
-        co_total_by_project[change_order.project_id] = co_total_by_project.get(change_order.project_id, Decimal("0")) + change_order.amount_delta
+        change_order_total_by_project[change_order.project_id] = change_order_total_by_project.get(change_order.project_id, Decimal("0")) + change_order.amount_delta
 
     totals: dict[int, Decimal] = {}
     for project_id in project_ids:
-        est_total = estimate_total_by_project.get(project_id, Decimal("0"))
-        co_total = co_total_by_project.get(project_id, Decimal("0"))
-        totals[project_id] = est_total + co_total
+        estimate_total = estimate_total_by_project.get(project_id, Decimal("0"))
+        change_order_total = change_order_total_by_project.get(project_id, Decimal("0"))
+        totals[project_id] = estimate_total + change_order_total
     return totals
 
 

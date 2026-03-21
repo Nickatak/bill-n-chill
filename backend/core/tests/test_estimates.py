@@ -109,7 +109,7 @@ class EstimateTests(TestCase):
             description="Demo and prep",
             quantity="2",
             unit="day",
-            unit_cost="500",
+            unit_price="500",
             markup_percent="10",
             line_total="1100",
         )
@@ -148,7 +148,7 @@ class EstimateTests(TestCase):
             description="Demo and prep",
             quantity="2",
             unit="day",
-            unit_cost="500",
+            unit_price="500",
             markup_percent="10",
             line_total="1100",
         )
@@ -272,7 +272,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "2",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "10",
                     }
                 ],
@@ -299,7 +299,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -329,7 +329,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -360,7 +360,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -385,7 +385,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -407,7 +407,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -440,7 +440,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -481,7 +481,7 @@ class EstimateTests(TestCase):
                         "description": "Tiny taxable line",
                         "quantity": "1",
                         "unit": "ea",
-                        "unit_cost": "0.05",
+                        "unit_price": "0.05",
                         "markup_percent": "0.00",
                     }
                 ],
@@ -505,7 +505,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -525,7 +525,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -547,7 +547,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -569,7 +569,7 @@ class EstimateTests(TestCase):
                         "description": "Prep and haul",
                         "quantity": "2",
                         "unit": "day",
-                        "unit_cost": "450",
+                        "unit_price": "450",
                         "markup_percent": "0",
                     }
                 ],
@@ -599,7 +599,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -619,7 +619,7 @@ class EstimateTests(TestCase):
                         "description": "Second version attempt without confirmation",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "600",
+                        "unit_price": "600",
                         "markup_percent": "0",
                     }
                 ],
@@ -641,7 +641,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -679,7 +679,7 @@ class EstimateTests(TestCase):
                         "description": "Follow-up draft should be blocked",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "600",
+                        "unit_price": "600",
                         "markup_percent": "0",
                     }
                 ],
@@ -702,7 +702,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -749,7 +749,7 @@ class EstimateTests(TestCase):
                         "description": "Demo line",
                         "quantity": "1",
                         "unit": "ea",
-                        "unit_cost": "100.00",
+                        "unit_price": "100.00",
                         "markup_percent": "0.00",
                     }
                 ],
@@ -772,7 +772,7 @@ class EstimateTests(TestCase):
                         "description": "Demo line",
                         "quantity": "1",
                         "unit": "ea",
-                        "unit_cost": "100.00",
+                        "unit_price": "100.00",
                         "markup_percent": "0.00",
                     }
                 ],
@@ -792,7 +792,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -835,7 +835,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -883,7 +883,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -929,7 +929,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -999,7 +999,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -1064,7 +1064,7 @@ class EstimateTests(TestCase):
                         "description": "Activation scope",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -1105,7 +1105,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -1146,7 +1146,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -1179,7 +1179,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -1227,7 +1227,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -1271,7 +1271,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -1322,7 +1322,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -1367,7 +1367,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -1420,7 +1420,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -1454,7 +1454,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -1493,7 +1493,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -1532,7 +1532,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],
@@ -1565,7 +1565,7 @@ class EstimateTests(TestCase):
                         "description": "Demo and prep",
                         "quantity": "1",
                         "unit": "day",
-                        "unit_cost": "500",
+                        "unit_price": "500",
                         "markup_percent": "0",
                     }
                 ],

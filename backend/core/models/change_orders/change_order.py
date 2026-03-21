@@ -233,16 +233,16 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
 
         def _line_snapshot(row):
             if row.cost_code_id:
-                cc_id = row.cost_code_id
-                cc_code = row.cost_code.code
-                cc_name = row.cost_code.name
+                cost_code_id = row.cost_code_id
+                cost_code_code = row.cost_code.code
+                cost_code_name = row.cost_code.name
             else:
-                cc_id = cc_code = cc_name = None
+                cost_code_id = cost_code_code = cost_code_name = None
             return {
                 "change_order_line_id": row.id,
-                "cost_code_id": cc_id,
-                "cost_code_code": cc_code,
-                "cost_code_name": cc_name,
+                "cost_code_id": cost_code_id,
+                "cost_code_code": cost_code_code,
+                "cost_code_name": cost_code_name,
                 "description": row.description,
                 "adjustment_reason": row.adjustment_reason,
                 "amount_delta": str(row.amount_delta),

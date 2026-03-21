@@ -123,8 +123,8 @@ class ChangeImpactProjectSerializer(serializers.Serializer):
 
     project_id = serializers.IntegerField()
     project_name = serializers.CharField()
-    approved_change_order_count = serializers.IntegerField()
-    approved_change_order_total = serializers.DecimalField(max_digits=12, decimal_places=2)
+    approved_change_orders_count = serializers.IntegerField()
+    approved_change_orders_total = serializers.DecimalField(max_digits=12, decimal_places=2)
 
 
 class ChangeImpactSummarySerializer(serializers.Serializer):
@@ -132,8 +132,8 @@ class ChangeImpactSummarySerializer(serializers.Serializer):
 
     generated_at = serializers.DateTimeField()
     date_filter = serializers.JSONField()
-    approved_change_order_count = serializers.IntegerField()
-    approved_change_order_total = serializers.DecimalField(max_digits=12, decimal_places=2)
+    approved_change_orders_count = serializers.IntegerField()
+    approved_change_orders_total = serializers.DecimalField(max_digits=12, decimal_places=2)
     projects = ChangeImpactProjectSerializer(many=True)
 
 

@@ -35,11 +35,11 @@ def _organization_role_policy(user: AbstractUser) -> dict[str, Any]:
     roles and statuses.
     """
     effective_role = _resolve_user_role(user)
-    caps = _resolve_user_capabilities(user)
-    can_edit_identity = "edit" in caps.get("org_identity", [])
-    can_edit_presets = "edit" in caps.get("org_presets", [])
-    can_manage_memberships = "edit_role" in caps.get("users", [])
-    can_invite = "invite" in caps.get("users", [])
+    capabilities = _resolve_user_capabilities(user)
+    can_edit_identity = "edit" in capabilities.get("org_identity", [])
+    can_edit_presets = "edit" in capabilities.get("org_presets", [])
+    can_manage_memberships = "edit_role" in capabilities.get("users", [])
+    can_invite = "invite" in capabilities.get("users", [])
     return {
         "effective_role": effective_role,
         "can_edit_identity": can_edit_identity,

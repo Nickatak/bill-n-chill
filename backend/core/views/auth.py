@@ -904,22 +904,22 @@ def impersonate_users_view(request):
     )
 
     memberships_by_user = {}
-    for m in OrganizationMembership.objects.select_related("organization").filter(user__in=users):
-        memberships_by_user.setdefault(m.user_id, m)
+    for membership in OrganizationMembership.objects.select_related("organization").filter(user__in=users):
+        memberships_by_user.setdefault(membership.user_id, membership)
 
     result = []
     for user in users:
-        entry = {
+        membership_entry = {
             "id": user.id,
             "email": user.email,
         }
         membership = memberships_by_user.get(user.id)
         if membership:
-            entry["organization"] = {
+            membership_entry["organization"] = {
                 "id": membership.organization_id,
                 "display_name": membership.organization.display_name,
             }
-            entry["role"] = membership.role
-        result.append(entry)
+            membership_entry["role"] = membership.role
+        result.append(membership_entry)
 
     return Response({"data": result})

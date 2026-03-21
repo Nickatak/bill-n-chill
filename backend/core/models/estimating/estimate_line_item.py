@@ -7,7 +7,7 @@ class EstimateLineItem(models.Model):
     """Customer-facing priced scope row inside an estimate version.
 
     Business workflow:
-    - Captures quantity/unit/cost/markup for proposed work.
+    - Captures quantity/unit/price/markup for proposed work.
     - Uses cost codes for internal consistency and reporting.
 
     Current policy:
@@ -28,7 +28,7 @@ class EstimateLineItem(models.Model):
     description = models.CharField(max_length=255)
     quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     unit = models.CharField(max_length=30, default="ea")
-    unit_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     markup_percent = models.DecimalField(max_digits=6, decimal_places=2, default=0)
     line_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)

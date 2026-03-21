@@ -166,7 +166,7 @@ def change_impact_summary_view(request):
 
     Success 200::
 
-        { "data": { "approved_change_order_count": 8, "approved_change_order_total": "45000.00", "projects": [...] } }
+        { "data": { "approved_change_orders_count": 8, "approved_change_orders_total": "45000.00", "projects": [...] } }
 
     Errors:
         - 400: Invalid date filter format.
@@ -205,12 +205,12 @@ def change_impact_summary_view(request):
             {
                 "project_id": change_order.project_id,
                 "project_name": change_order.project.name,
-                "approved_change_order_count": 0,
-                "approved_change_order_total": Decimal("0"),
+                "approved_change_orders_count": 0,
+                "approved_change_orders_total": Decimal("0"),
             },
         )
-        project_bucket["approved_change_order_count"] += 1
-        project_bucket["approved_change_order_total"] += change_order.amount_delta
+        project_bucket["approved_change_orders_count"] += 1
+        project_bucket["approved_change_orders_total"] += change_order.amount_delta
 
     payload = {
         "generated_at": django_timezone.now(),
@@ -218,9 +218,9 @@ def change_impact_summary_view(request):
             "date_from": date_from.isoformat() if date_from else "",
             "date_to": date_to.isoformat() if date_to else "",
         },
-        "approved_change_order_count": total_count,
-        "approved_change_order_total": total_amount,
-        "projects": sorted(project_map.values(), key=lambda p: p["approved_change_order_total"], reverse=True),
+        "approved_change_orders_count": total_count,
+        "approved_change_orders_total": total_amount,
+        "projects": sorted(project_map.values(), key=lambda p: p["approved_change_orders_total"], reverse=True),
     }
     return Response({"data": ChangeImpactSummarySerializer(payload).data})
 
@@ -631,8 +631,8 @@ def project_timeline_events_view(request, project_id):
             .select_related("payment")
             .order_by("-created_at", "-id")
         ):
-            pmt = record.payment
-            label_parts = [f"Payment #{pmt.id} {record.event_type}"]
+            payment = record.payment
+            label_parts = [f"Payment #{payment.id} {record.event_type}"]
             if record.from_status and record.to_status:
                 label_parts.append(f"({record.from_status} → {record.to_status})")
             items.append({
@@ -643,7 +643,7 @@ def project_timeline_events_view(request, project_id):
                 "label": " ".join(label_parts),
                 "detail": record.note or "",
                 "object_type": "payment",
-                "object_id": pmt.id,
+                "object_id": payment.id,
                 "ui_route": "/payments",
             })
 
@@ -652,16 +652,16 @@ def project_timeline_events_view(request, project_id):
             .select_related("vendor_bill")
             .order_by("-created_at", "-id")
         ):
-            vb = snapshot.vendor_bill
+            vendor_bill = snapshot.vendor_bill
             items.append({
                 "timeline_id": f"vb-snapshot-{snapshot.id}",
                 "category": "financial",
                 "event_type": "vendor_bill_status",
                 "occurred_at": snapshot.created_at,
-                "label": f"Vendor Bill #{vb.id} {snapshot.capture_status}",
+                "label": f"Vendor Bill #{vendor_bill.id} {snapshot.capture_status}",
                 "detail": "",
                 "object_type": "vendor_bill",
-                "object_id": vb.id,
+                "object_id": vendor_bill.id,
                 "ui_route": "/bills",
             })
 
