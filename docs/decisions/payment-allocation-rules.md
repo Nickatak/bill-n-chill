@@ -22,8 +22,10 @@ This created two problems:
 - **Inbound payments** must allocate to one invoice.
 - **Outbound payments** must allocate to one vendor bill.
 - If a contractor receives a deposit before any invoice exists, they create a
-  deposit invoice first. This produces a real business artifact and keeps the
-  data model clean.
+  deposit invoice first. This is standard practice in construction accounting —
+  the deposit is invoiced, not just recorded. The project action toolbar
+  ([project-action-toolbar.md](project-action-toolbar.md)) provides a one-click
+  "Invoice Deposit" action to minimize friction.
 
 ### 2. No split payments
 
