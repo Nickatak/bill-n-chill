@@ -77,7 +77,7 @@ describe("AccountingConsole", () => {
       token: "",
       email: "",
       authMessage: "",
-      role: "",
+      role: "viewer",
       organization: null,
       capabilities: {},
       isSuperuser: false,

@@ -486,7 +486,7 @@ class CeremonyDecisionValidationTests(TestCase):
             email=self.customer.email,
         )
         response = self.client.post(
-            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
             data=self._ceremony_payload(session),
             content_type="application/json",
         )
@@ -501,7 +501,7 @@ class CeremonyDecisionValidationTests(TestCase):
             email=self.customer.email,
         )
         self.client.post(
-            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
             data=self._ceremony_payload(session),
             content_type="application/json",
         )
@@ -519,7 +519,7 @@ class CeremonyDecisionValidationTests(TestCase):
 
     def test_decision_without_session_token_returns_403(self):
         response = self.client.post(
-            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
             data={
                 "decision": "approve",
                 "signer_name": "Jane Owner",
@@ -538,7 +538,7 @@ class CeremonyDecisionValidationTests(TestCase):
             email=self.customer.email,
         )
         response = self.client.post(
-            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
             data=self._ceremony_payload(session, signer_name=""),
             content_type="application/json",
         )
@@ -553,7 +553,7 @@ class CeremonyDecisionValidationTests(TestCase):
             email=self.customer.email,
         )
         response = self.client.post(
-            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
             data=self._ceremony_payload(session, consent_accepted=False),
             content_type="application/json",
         )
@@ -561,7 +561,7 @@ class CeremonyDecisionValidationTests(TestCase):
 
     def test_decision_with_invalid_session_returns_403(self):
         response = self.client.post(
-            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
             data={
                 "decision": "approve",
                 "session_token": "invalid_token",
@@ -583,7 +583,7 @@ class CeremonyDecisionValidationTests(TestCase):
         session.save(update_fields=["session_expires_at"])
 
         response = self.client.post(
-            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
             data=self._ceremony_payload(session),
             content_type="application/json",
         )
@@ -594,7 +594,7 @@ class CeremonyDecisionValidationTests(TestCase):
         self.customer.save(update_fields=["email"])
 
         response = self.client.post(
-            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
             data={
                 "decision": "approve",
                 "session_token": "anything",
@@ -659,7 +659,7 @@ class PublicSigningEdgeCaseTests(TestCase):
             email=self.customer.email,
         )
         response_1 = self.client.post(
-            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
             data=self._ceremony_payload(session_1),
             content_type="application/json",
         )
@@ -674,7 +674,7 @@ class PublicSigningEdgeCaseTests(TestCase):
             email=self.customer.email,
         )
         response_2 = self.client.post(
-            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
             data=self._ceremony_payload(session_2),
             content_type="application/json",
         )
@@ -698,7 +698,7 @@ class PublicSigningEdgeCaseTests(TestCase):
         )
         # Use session_a's token against estimate_b's endpoint.
         response = self.client.post(
-            f"/api/v1/public/estimate/{estimate_b.public_token}/decision/",
+            f"/api/v1/public/estimates/{estimate_b.public_token}/decision/",
             data=self._ceremony_payload(session_a),
             content_type="application/json",
         )
@@ -763,7 +763,7 @@ class PublicSigningEdgeCaseTests(TestCase):
             email=self.customer.email,
         )
         response = self.client.post(
-            f"/api/v1/public/estimate/{self.estimate.public_token}/decision/",
+            f"/api/v1/public/estimates/{self.estimate.public_token}/decision/",
             data=self._ceremony_payload(session, decision="reject"),
             content_type="application/json",
         )
@@ -803,7 +803,7 @@ class PublicSigningEdgeCaseTests(TestCase):
             email=self.customer.email,
         )
         response = self.client.post(
-            f"/api/v1/public/estimate/{draft_estimate.public_token}/decision/",
+            f"/api/v1/public/estimates/{draft_estimate.public_token}/decision/",
             data=self._ceremony_payload(session),
             content_type="application/json",
         )
