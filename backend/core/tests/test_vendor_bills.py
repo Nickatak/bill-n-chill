@@ -277,7 +277,6 @@ class VendorBillTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(allowed.status_code, 201)
-        self.assertFalse(allowed.json()["meta"]["duplicate_override_used"])
 
     def test_vendor_bill_document_lifecycle_transitions(self):
         """Walk through the full document lifecycle: received → approved."""

@@ -116,8 +116,6 @@ export type ApiResponse = {
     | VendorBillPolicyContract
     | {
         duplicate_candidates?: VendorBillRecord[];
-        allowed_resolutions?: string[];
       };
-  meta?: { duplicate_override_used?: boolean };
   error?: { code?: string; message?: string };
 };

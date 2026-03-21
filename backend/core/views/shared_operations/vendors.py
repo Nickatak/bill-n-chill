@@ -27,8 +27,8 @@ def vendors_list_create_view(request):
 
     GET returns a paginated, searchable vendor list filtered by text query
     across name, email, phone, and tax ID.  POST creates a vendor with
-    duplicate-detection guardrails — if a name/email match is found the
-    caller must explicitly acknowledge via ``duplicate_override``.
+    duplicate-detection guardrails — if an exact name match is found the
+    request is rejected (no override path).
 
     Flow (GET):
         1. Scope to user's org.
@@ -46,7 +46,7 @@ def vendors_list_create_view(request):
 
     Request body (POST)::
 
-        { "name": "Acme Supply", "email": "info@acme.com", "duplicate_override": false }
+        { "name": "Acme Supply", "email": "info@acme.com" }
 
     Success 200 (GET)::
 
@@ -54,7 +54,7 @@ def vendors_list_create_view(request):
 
     Success 201 (POST)::
 
-        { "data": { ... }, "meta": { "duplicate_override_used": false } }
+        { "data": { ... } }
 
     Errors:
         - 400: Missing name or inactive-on-create.
@@ -112,23 +112,21 @@ def vendors_list_create_view(request):
                 status=400,
             )
 
-        duplicates = _find_duplicate_vendors(
-            request.user,
-            name=data["name"],
-            email=data.get("email", ""),
-        )
-        duplicate_override = data.get("duplicate_override", False)
-        if duplicates and not duplicate_override:
+        duplicates = _find_duplicate_vendors(request.user, name=data["name"])
+        if duplicates:
             return Response(
                 {
                     "error": {
                         "code": "duplicate_detected",
-                        "message": "Possible duplicate vendors found by name/email.",
+                        "message": (
+                            "A vendor with this name already exists. "
+                            "To distinguish them, add a location or qualifier "
+                            '(e.g. "ABC Plumbing — Westside").'
+                        ),
                         "fields": {},
                     },
                     "data": {
                         "duplicate_candidates": VendorSerializer(duplicates, many=True).data,
-                        "allowed_resolutions": ["create_anyway"],
                     },
                 },
                 status=409,
@@ -145,10 +143,7 @@ def vendors_list_create_view(request):
             created_by=request.user,
         )
         return Response(
-            {
-                "data": VendorSerializer(vendor).data,
-                "meta": {"duplicate_override_used": bool(duplicates and duplicate_override)},
-            },
+            {"data": VendorSerializer(vendor).data},
             status=201,
         )
 
@@ -159,9 +154,8 @@ def vendor_detail_view(request, vendor_id):
     """Fetch or update a single vendor profile.
 
     GET returns the vendor.  PATCH applies partial updates with
-    duplicate-detection guardrails on identity fields (name, email).
-    If a match is found the caller must acknowledge via
-    ``duplicate_override``.
+    duplicate-detection guardrails on vendor name.  If an exact name
+    match is found the request is rejected (no override path).
 
     Flow (GET):
         1. Look up vendor scoped to user's org.
@@ -178,11 +172,11 @@ def vendor_detail_view(request, vendor_id):
 
     Request body (PATCH)::
 
-        { "name": "Acme Supply Co", "duplicate_override": false }
+        { "name": "Acme Supply Co" }
 
     Success 200::
 
-        { "data": { ... }, "meta": { "duplicate_override_used": false } }
+        { "data": { ... } }
 
     Errors:
         - 403: Missing ``vendors.edit`` capability.
@@ -211,25 +205,25 @@ def vendor_detail_view(request, vendor_id):
         data = serializer.validated_data
 
         next_name = data.get("name", vendor.name)
-        next_email = data.get("email", vendor.email)
         duplicates = _find_duplicate_vendors(
             request.user,
             name=next_name,
-            email=next_email,
             exclude_vendor_id=vendor.id,
         )
-        duplicate_override = data.get("duplicate_override", False)
-        if duplicates and not duplicate_override:
+        if duplicates:
             return Response(
                 {
                     "error": {
                         "code": "duplicate_detected",
-                        "message": "Possible duplicate vendors found by name/email.",
+                        "message": (
+                            "A vendor with this name already exists. "
+                            "To distinguish them, add a location or qualifier "
+                            '(e.g. "ABC Plumbing — Westside").'
+                        ),
                         "fields": {},
                     },
                     "data": {
                         "duplicate_candidates": VendorSerializer(duplicates, many=True).data,
-                        "allowed_resolutions": ["create_anyway"],
                     },
                 },
                 status=409,
@@ -258,12 +252,7 @@ def vendor_detail_view(request, vendor_id):
         if len(update_fields) > 1:
             vendor.save(update_fields=update_fields)
 
-        return Response(
-            {
-                "data": VendorSerializer(vendor).data,
-                "meta": {"duplicate_override_used": bool(duplicates and duplicate_override)},
-            }
-        )
+        return Response({"data": VendorSerializer(vendor).data})
 
 
 @api_view(["POST"])

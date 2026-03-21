@@ -33,8 +33,6 @@ class VendorWriteSerializer(serializers.Serializer):
     tax_id_last4 = serializers.CharField(max_length=4, required=False, allow_blank=True)
     notes = serializers.CharField(max_length=5000, required=False, allow_blank=True)
     is_active = serializers.BooleanField(required=False)
-    duplicate_override = serializers.BooleanField(required=False, default=False)
-
     def validate_tax_id_last4(self, value):
         if value and not value.isdigit():
             raise serializers.ValidationError("tax_id_last4 must contain digits only.")

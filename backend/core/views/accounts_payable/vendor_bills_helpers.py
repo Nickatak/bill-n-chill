@@ -339,7 +339,7 @@ def _handle_vb_document_save(request: Request, vendor_bill: VendorBill, data: di
 
     vendor_bill = _prefetch_vendor_bill_qs(VendorBill.objects.filter(id=vendor_bill.id)).get()
     return Response(
-        {"data": VendorBillSerializer(vendor_bill).data, "meta": {"duplicate_override_used": False}}
+        {"data": VendorBillSerializer(vendor_bill).data}
     )
 
 
@@ -456,7 +456,7 @@ def _handle_vb_status_transition(
 
     vendor_bill = _prefetch_vendor_bill_qs(VendorBill.objects.filter(id=vendor_bill.id)).get()
     return Response(
-        {"data": VendorBillSerializer(vendor_bill).data, "meta": {"duplicate_override_used": False}}
+        {"data": VendorBillSerializer(vendor_bill).data}
     )
 
 
@@ -485,5 +485,5 @@ def _handle_vb_status_note(request: Request, vendor_bill: VendorBill, data: dict
 
     vendor_bill = _prefetch_vendor_bill_qs(VendorBill.objects.filter(id=vendor_bill.id)).get()
     return Response(
-        {"data": VendorBillSerializer(vendor_bill).data, "meta": {"duplicate_override_used": False}}
+        {"data": VendorBillSerializer(vendor_bill).data}
     )

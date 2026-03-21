@@ -129,7 +129,7 @@ class VendorTests(TestCase):
         self.assertIn(shared_vendor.id, returned_ids)
         self.assertNotIn(isolated_vendor.id, returned_ids)
 
-    def test_vendor_duplicate_warning_on_create_by_name_or_email(self):
+    def test_vendor_duplicate_blocked_on_create_by_name(self):
         Vendor.objects.create(
             name="Tile House",
             email="billing@tilehouse.example.com",
@@ -148,9 +148,17 @@ class VendorTests(TestCase):
         )
         self.assertEqual(duplicate_by_name.status_code, 409)
         self.assertEqual(duplicate_by_name.json()["error"]["code"], "duplicate_detected")
-        self.assertEqual(Vendor.objects.filter(created_by=self.user).count(), 1)
+        self.assertEqual(Vendor.objects.filter(organization=self.org).count(), 1)
 
-        duplicate_by_email = self.client.post(
+    def test_vendor_different_name_same_email_allowed(self):
+        Vendor.objects.create(
+            name="Tile House",
+            email="billing@tilehouse.example.com",
+            created_by=self.user,
+            organization=self.org,
+        )
+
+        response = self.client.post(
             "/api/v1/vendors/",
             data={
                 "name": "Different Name",
@@ -159,10 +167,9 @@ class VendorTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(duplicate_by_email.status_code, 409)
-        self.assertEqual(duplicate_by_email.json()["error"]["code"], "duplicate_detected")
+        self.assertEqual(response.status_code, 201)
 
-    def test_vendor_duplicate_override_allows_create(self):
+    def test_vendor_duplicate_name_has_no_override(self):
         Vendor.objects.create(
             name="Concrete Co",
             email="ap@concrete.example.com",
@@ -175,20 +182,15 @@ class VendorTests(TestCase):
             data={
                 "name": "Concrete Co",
                 "email": "ap2@concrete.example.com",
-                "duplicate_override": True,
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(
-            Vendor.objects.filter(created_by=self.user, name__iexact="Concrete Co").count(),
-            2,
-        )
-        self.assertTrue(response.json()["meta"]["duplicate_override_used"])
+        self.assertEqual(response.status_code, 409)
+        self.assertNotIn("allowed_resolutions", response.json().get("data", {}))
 
-    def test_vendor_patch_duplicate_warning_and_override(self):
-        first = Vendor.objects.create(
+    def test_vendor_patch_duplicate_name_blocked(self):
+        Vendor.objects.create(
             name="Framing Team",
             email="frame@example.com",
             created_by=self.user,
@@ -209,22 +211,8 @@ class VendorTests(TestCase):
         )
         self.assertEqual(blocked.status_code, 409)
         self.assertEqual(blocked.json()["error"]["code"], "duplicate_detected")
-
-        allowed = self.client.patch(
-            f"/api/v1/vendors/{second.id}/",
-            data={"name": "Framing Team", "duplicate_override": True},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(allowed.status_code, 200)
         second.refresh_from_db()
-        self.assertEqual(second.name, "Framing Team")
-
-        first_response = self.client.get(
-            f"/api/v1/vendors/{first.id}/",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second.name, "Drywall Team")
 
     def test_vendor_patch_updates_fields(self):
         vendor = Vendor.objects.create(

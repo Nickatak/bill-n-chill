@@ -2318,9 +2318,10 @@ _Tests for reporting and dashboard endpoints._
 - `test_vendor_list_scoped_by_user()`
 - `test_vendor_list_includes_global_canonical_vendors()`
 - `test_vendor_list_includes_rows_created_by_other_user_in_same_org()`
-- `test_vendor_duplicate_warning_on_create_by_name_or_email()`
-- `test_vendor_duplicate_override_allows_create()`
-- `test_vendor_patch_duplicate_warning_and_override()`
+- `test_vendor_duplicate_blocked_on_create_by_name()`
+- `test_vendor_different_name_same_email_allowed()`
+- `test_vendor_duplicate_name_has_no_override()`
+- `test_vendor_patch_duplicate_name_blocked()`
 - `test_vendor_patch_updates_fields()`
 - `test_vendor_create_accepts_retail_vendor_type()`
 - `test_vendor_create_rejects_inactive_state()`

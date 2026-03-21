@@ -71,7 +71,7 @@ This section is the canonical glossary for bill-n-chill. For model fields and li
 | --- | --- | --- | --- | --- |
 | Auth Token | Credential used for authenticated API requests after login/register. | DRF `Token` | `POST /api/v1/auth/login/`, `POST /api/v1/auth/register/`, `GET /api/v1/auth/me/` | Sent as `Authorization: Token <token>`. |
 | Tenant | Isolated organization/workspace boundary in the SaaS system. | `Organization`, `OrganizationMembership` | Auth responses include organization context. | A tenant is the company boundary, not an individual user. |
-| Duplicate Resolution | Explicit operator decision when intake/vendor duplicate candidates are detected. | Intake/vendor workflows | `POST /api/v1/customers/quick-add/` (`use_existing`, `create_anyway`) | `merge_existing` is not part of current customer quick-add contract. |
+| Duplicate Resolution | Explicit operator decision when intake duplicate candidates are detected. | Intake workflows | `POST /api/v1/customers/quick-add/` (`use_existing`) | Customers support `use_existing` only. Vendors and vendor bills block duplicates outright (no override path). |
 | Customer | Client/owner entity for project relationship and billing context. | `Customer` + `CustomerRecord` | `GET/PATCH /api/v1/customers/{id}/` | One customer can have multiple projects. |
 | Project | Primary container for estimating, change orders, billing, AP, and payments. | `Project` | `GET/PATCH /api/v1/projects/{id}/`, `GET /api/v1/projects/{id}/financial-summary/` | Lifecycle status gates workflow readiness. |
 | Project Profile | Editable baseline project fields used after shell creation. | `Project` | `GET /api/v1/projects/`, `GET/PATCH /api/v1/projects/{id}/` | Includes status and planned dates. |

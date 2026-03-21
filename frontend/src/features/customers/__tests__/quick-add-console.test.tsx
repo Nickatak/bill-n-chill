@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -134,7 +134,7 @@ function duplicateResponse() {
               created_at: "2025-06-01T12:00:00Z",
             },
           ],
-          allowed_resolutions: ["use_existing", "create_anyway"],
+          allowed_resolutions: ["use_existing"],
         },
       }),
   };
@@ -310,6 +310,115 @@ describe("QuickAddConsole", () => {
     await waitFor(() => {
       expect(screen.getByText(/unexpected UI error/)).toBeInTheDocument();
     });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Optional quick-add fields (contract value, notes, status pills)
+  // ---------------------------------------------------------------------------
+
+  it("sends optional fields in POST body when filled", async () => {
+    mockFetch.mockResolvedValueOnce(successWithProjectResponse());
+
+    render(<QuickAddConsole />);
+    fillCustomerFields("Jane Doe", "5551234567");
+    fillProjectFields("123 Main St", "Jane Doe Project");
+
+    // Open the optional details section (jsdom needs explicit open attribute)
+    const details = screen.getByText("Optional details").closest("details")!;
+    details.setAttribute("open", "");
+
+    // Fill ballpark and notes
+    const ballparkInput = details.querySelector<HTMLInputElement>("input[name='initial_contract_value']")!;
+    fireEvent.change(ballparkInput, { target: { value: "25000" } });
+    const notesTextarea = details.querySelector<HTMLTextAreaElement>("textarea[name='notes']")!;
+    fireEvent.change(notesTextarea, { target: { value: "Kitchen remodel, budget flexible" } });
+
+    // Switch status pill to Active
+    fireEvent.click(within(details).getByRole("button", { name: "Active" }));
+
+    clickSubmit(/save customer \+ start project/i);
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledOnce();
+    });
+
+    const [, fetchOptions] = mockFetch.mock.calls[0];
+    const body = JSON.parse(fetchOptions.body);
+    expect(body.initial_contract_value).toBe("25000");
+    expect(body.notes).toBe("Kitchen remodel, budget flexible");
+    expect(body.project_status).toBe("active");
+  });
+
+  it("sends correct defaults for optional fields when left empty", async () => {
+    mockFetch.mockResolvedValueOnce(successResponse());
+
+    render(<QuickAddConsole />);
+    fillCustomerFields("Jane Doe", "5551234567");
+    clickSubmit(/save customer only/i);
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledOnce();
+    });
+
+    const [, fetchOptions] = mockFetch.mock.calls[0];
+    const body = JSON.parse(fetchOptions.body);
+    expect(body.initial_contract_value).toBeNull();
+    expect(body.notes).toBe("");
+    expect(body.project_status).toBe("prospect");
+  });
+
+  it("status pill toggle sends the selected value to the API", async () => {
+    mockFetch.mockResolvedValueOnce(successWithProjectResponse());
+
+    render(<QuickAddConsole />);
+    fillCustomerFields("Jane Doe", "5551234567");
+    fillProjectFields("123 Main St", "Jane Doe Project");
+
+    // Open optional details (jsdom needs explicit open attribute) — default is "Prospect"
+    const details = screen.getByText("Optional details").closest("details")!;
+    details.setAttribute("open", "");
+
+    const pillGroup = details.querySelector("[role='group']")!;
+    const buttons = Array.from(pillGroup.querySelectorAll<HTMLButtonElement>("button"));
+    const prospectButton = buttons.find((b) => b.textContent === "Prospect")!;
+    const activeButton = buttons.find((b) => b.textContent === "Active")!;
+    expect(prospectButton.getAttribute("aria-pressed")).toBe("true");
+    expect(activeButton.getAttribute("aria-pressed")).toBe("false");
+
+    // Toggle to Active
+    fireEvent.click(activeButton);
+    expect(activeButton.getAttribute("aria-pressed")).toBe("true");
+    expect(prospectButton.getAttribute("aria-pressed")).toBe("false");
+
+    clickSubmit(/save customer \+ start project/i);
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledOnce();
+    });
+
+    const [, fetchOptions] = mockFetch.mock.calls[0];
+    const body = JSON.parse(fetchOptions.body);
+    expect(body.project_status).toBe("active");
+  });
+
+  // ---------------------------------------------------------------------------
+  // POST body safety
+  // ---------------------------------------------------------------------------
+
+  it("does not send is_archived in quick-add POST body", async () => {
+    mockFetch.mockResolvedValueOnce(successResponse());
+
+    render(<QuickAddConsole />);
+    fillCustomerFields("Jane Doe", "5551234567");
+    clickSubmit(/save customer only/i);
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledOnce();
+    });
+
+    const [, fetchOptions] = mockFetch.mock.calls[0];
+    const body = JSON.parse(fetchOptions.body);
+    expect(body).not.toHaveProperty("is_archived");
   });
 
   it("calls onCustomerCreated callback after success", async () => {

@@ -266,7 +266,7 @@ export function VendorsConsole() {
 
             {form.duplicateCandidates.length > 0 ? (
               <section className={styles.duplicateCard}>
-                <p className={styles.duplicateTitle}>Duplicate candidates</p>
+                <p className={styles.duplicateTitle}>Existing vendor with this name</p>
                 <ul className={styles.duplicateList}>
                   {form.duplicateCandidates.map((candidate) => (
                     <li key={candidate.id}>
@@ -274,11 +274,6 @@ export function VendorsConsole() {
                     </li>
                   ))}
                 </ul>
-                {form.pendingCreatePayload ? (
-                  <button type="button" className={styles.primaryButton} onClick={form.handleCreateAnyway}>
-                    Create Anyway
-                  </button>
-                ) : null}
               </section>
             ) : null}
           </section>
@@ -349,19 +344,6 @@ export function VendorsConsole() {
                   </select>
                 </label>
               ) : null}
-              <label className={styles.overrideRow}>
-                <input
-                  type="checkbox"
-                  checked={form.duplicateOverrideOnSave}
-                  onChange={(event) => form.setDuplicateOverrideOnSave(event.target.checked)}
-                />
-                <span className={styles.overrideBody}>
-                  <strong className={styles.overrideTitle}>Allow duplicate vendor identity</strong>
-                  <span className={styles.overrideHint}>
-                    Bypass duplicate name/email warning for intentional save/create.
-                  </span>
-                </span>
-              </label>
               <div className={styles.formActions}>
                 <button type="submit" className={styles.primaryButton} disabled={!canMutateVendors}>
                   {form.selectedVendor ? "Save Vendor" : "Create Vendor"}

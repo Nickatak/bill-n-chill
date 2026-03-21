@@ -299,8 +299,7 @@ export function useQuickAddBusinessWorkflow({
    * Resolve a previously detected duplicate by replaying the parked
    * submission with the chosen resolution strategy.
    *
-   * Supports "create_anyway" (ignore the duplicate) or merge/link
-   * strategies that require a target customer ID.
+   * Supports "use_existing" resolution which requires a target customer ID.
    */
   async function resolveDuplicate(resolution: DuplicateResolution, targetId?: number) {
     if (!pendingSubmission) {

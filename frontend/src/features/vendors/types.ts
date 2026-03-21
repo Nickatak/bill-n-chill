@@ -45,8 +45,6 @@ export type ApiResponse = {
     | VendorCsvImportResult
     | {
         duplicate_candidates?: VendorRecord[];
-        allowed_resolutions?: string[];
       };
-  meta?: { duplicate_override_used?: boolean };
   error?: { code?: string; message?: string };
 };

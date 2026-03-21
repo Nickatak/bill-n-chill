@@ -367,13 +367,12 @@ If duplicates are detected and no resolution is provided:
 - response body includes:
   - `error.code = "duplicate_detected"`
   - `data.duplicate_candidates[]`
-  - `data.allowed_resolutions = ["use_existing", "create_anyway"]`
+  - `data.allowed_resolutions = ["use_existing"]`
 
 Resolution fields accepted by `POST /api/v1/customers/quick-add/`:
 
 - `duplicate_resolution`:
   - `use_existing`: return selected existing customer without creating a new one
-  - `create_anyway`: create new customer despite duplicates
 - `duplicate_target_id`:
   - required for `use_existing`
 
@@ -826,13 +825,10 @@ INV-02 extends invoice billing actions with a scope guard based on approved proj
     - `tax_id_last4` (optional; digits only)
     - `notes` (optional)
     - `is_active` (optional; default `true`)
-  - Duplicate warning behavior:
-    - checks duplicates by exact name/email within active organization scope
-    - if duplicates are found and `duplicate_override != true`:
-      - returns `409` with `error.code = "duplicate_detected"`
-      - returns `data.duplicate_candidates[]`
-      - returns `data.allowed_resolutions = ["create_anyway"]`
-    - set `duplicate_override = true` to create anyway
+  - Duplicate detection:
+    - checks for exact name match (case-insensitive) within active organization scope
+    - if a duplicate is found, returns `409` with `error.code = "duplicate_detected"` and `data.duplicate_candidates[]`
+    - no override path — user must differentiate the name (e.g. add a location qualifier)
 
 - `GET /api/v1/vendors/{vendor_id}/`
   - Auth required
@@ -847,9 +843,9 @@ INV-02 extends invoice billing actions with a scope guard based on approved proj
     - `tax_id_last4`
     - `notes`
     - `is_active`
-  - Duplicate warning behavior:
-    - same name/email duplicate check as create (excluding current vendor)
-    - accepts `duplicate_override = true` to persist intentional duplicates
+  - Duplicate detection:
+    - same name duplicate check as create (excluding current vendor)
+    - no override path — returns `409` if name matches an existing vendor
 
 - `POST /api/v1/vendors/import-csv/`
   - Auth required
@@ -883,13 +879,10 @@ INV-02 extends invoice billing actions with a scope guard based on approved proj
   - Validation:
     - `vendor` must belong to current user
     - `due_date` must be on/after `issue_date`
-  - Duplicate warning behavior:
-    - checks duplicates by `vendor + bill_number` (case-insensitive bill number) within current user scope
-    - if duplicates are found and `duplicate_override != true`:
-      - returns `409` with `error.code = "duplicate_detected"`
-      - returns `data.duplicate_candidates[]`
-      - returns `data.allowed_resolutions = ["create_anyway"]`
-    - set `duplicate_override = true` to create anyway
+  - Duplicate detection:
+    - checks duplicates by `vendor + bill_number` (case-insensitive bill number) within current org scope
+    - non-void duplicates return `409` with `error.code = "duplicate_detected"` and `data.duplicate_candidates[]`
+    - no override path — void the existing bill first, then re-create
 
 - `GET /api/v1/vendor-bills/{vendor_bill_id}/`
   - Auth required
@@ -915,9 +908,9 @@ INV-02 extends invoice billing actions with a scope guard based on approved proj
   - Balance behavior:
     - `status = paid` forces `balance_due = 0`
     - non-paid statuses keep `balance_due = total`
-  - Duplicate warning behavior:
+  - Duplicate detection:
     - same `vendor + bill_number` check as create (excluding current bill)
-    - accepts `duplicate_override = true` to persist intentional duplicates
+    - no override path — returns `409` if a non-void duplicate exists
 
 ## Payment Recording (PAY-01)
 

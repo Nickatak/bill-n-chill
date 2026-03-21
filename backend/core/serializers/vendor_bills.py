@@ -180,4 +180,3 @@ class VendorBillWriteSerializer(serializers.Serializer):
     notes = serializers.CharField(max_length=5000, required=False, allow_blank=True)
     status_note = serializers.CharField(max_length=5000, required=False, allow_blank=True)
     line_items = VendorBillLineInputSerializer(many=True, required=False)
-    duplicate_override = serializers.BooleanField(required=False, default=False)

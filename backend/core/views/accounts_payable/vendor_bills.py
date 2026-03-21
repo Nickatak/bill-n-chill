@@ -123,7 +123,7 @@ def project_vendor_bills_view(request, project_id: int):
 
     Success 201 (POST)::
 
-        { "data": { ... }, "meta": { "duplicate_override_used": false } }
+        { "data": { ... } }
 
     Errors:
         - 400: Validation failure (missing fields, bad dates, empty line items).
@@ -285,7 +285,6 @@ def project_vendor_bills_view(request, project_id: int):
                 "data": VendorBillSerializer(
                     _prefetch_vendor_bill_qs(VendorBill.objects.filter(id=vendor_bill.id)).get()
                 ).data,
-                "meta": {"duplicate_override_used": False},
             },
             status=201,
         )
@@ -323,7 +322,7 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
 
     Success 200::
 
-        { "data": { ... }, "meta": { "duplicate_override_used": false } }
+        { "data": { ... } }
 
     Errors:
         - 400: Validation or transition failure.
