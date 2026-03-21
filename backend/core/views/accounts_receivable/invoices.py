@@ -35,6 +35,7 @@ from core.views.accounts_receivable.invoices_helpers import (
 from core.views.helpers import (
     _build_public_decision_note,
     _capability_gate,
+    _check_project_accepts_document,
     _ensure_org_membership,
     _resolve_organization_for_public_actor,
     _serialize_public_organization_context,
@@ -322,6 +323,7 @@ def project_invoices_view(request, project_id: int):
     Flow (POST):
         1. Validate the project belongs to the user's org.
         2. Gate on ``invoices.create`` capability.
+        2b. Reject if project is cancelled (terminal guard).
         3. Normalize the request payload via ingress adapter.
         4. Validate line items are present and due_date >= issue_date.
         5. Create the invoice, apply line items, compute totals atomically.
@@ -373,6 +375,10 @@ def project_invoices_view(request, project_id: int):
         permission_error, _ = _capability_gate(request.user, "invoices", "create")
         if permission_error:
             return Response(permission_error, status=403)
+
+        terminal_error = _check_project_accepts_document(project, "invoices")
+        if terminal_error:
+            return terminal_error
 
         serializer = InvoiceWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

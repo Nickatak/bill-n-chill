@@ -265,7 +265,7 @@ export function CustomersConsole() {
               onProjectStatusChange={projectCreator.setProjectStatus}
               onSubmit={projectCreator.handleCreate}
               readOnly={!canMutateProjects}
-              formMessage={listFetch.statusMessage}
+              formMessage={projectCreator.formMessage}
             />
           </section>
         </div>

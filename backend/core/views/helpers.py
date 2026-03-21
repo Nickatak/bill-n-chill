@@ -287,6 +287,50 @@ def _resolve_cost_codes_for_user(
     return cost_code_map, missing_ids
 
 
+def _check_project_accepts_document(
+    project: Project,
+    document_type: str,
+) -> Response | None:
+    """Guard against creating new documents on terminal-status projects.
+
+    Rules:
+    - **Cancelled** projects block all new documents (estimates, change orders,
+      invoices, vendor bills).  Payments are NOT routed through this guard.
+    - **Completed** projects block estimates and change orders but allow
+      invoices and vendor bills (final retainage / late sub bills are common).
+
+    Returns an error ``Response`` if the project status forbids creation,
+    or ``None`` if the creation is allowed.
+    """
+    status = project.status
+
+    if status == Project.Status.CANCELLED:
+        return Response(
+            {
+                "error": {
+                    "code": "project_terminal",
+                    "message": f"Cannot create {document_type} on a cancelled project.",
+                    "fields": {},
+                }
+            },
+            status=400,
+        )
+
+    if status == Project.Status.COMPLETED and document_type in ("estimates", "change orders"):
+        return Response(
+            {
+                "error": {
+                    "code": "project_terminal",
+                    "message": f"Cannot create {document_type} on a completed project.",
+                    "fields": {},
+                }
+            },
+            status=400,
+        )
+
+    return None
+
+
 def _not_found_response(message: str = "Not found.") -> Response:
     """Return a standard 404 error response.
 

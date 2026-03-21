@@ -109,6 +109,7 @@ export function useChangeOrderProjectData({
 
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [selectedProjectName, setSelectedProjectName] = useState("");
+  const [selectedProjectStatus, setSelectedProjectStatus] = useState("");
   const [selectedProjectCustomerEmail, setSelectedProjectCustomerEmail] = useState("");
   const [changeOrders, setChangeOrders] = useState<ChangeOrderRecord[]>([]);
   const [projectEstimates, setProjectEstimates] = useState<OriginEstimateRecord[]>([]);
@@ -338,7 +339,7 @@ export function useChangeOrderProjectData({
         setFeedback(readChangeOrderApiError(payload, "Could not load projects."), "error");
         return;
       }
-      const rows = (payload.data as Array<{ id: number; name: string; customer_email?: string }>) ?? [];
+      const rows = (payload.data as Array<{ id: number; name: string; status?: string; customer_email?: string }>) ?? [];
       callbacks.onProjectSwitch();
       if (rows[0]) {
         const scopedMatch = scopedProjectId
@@ -351,6 +352,7 @@ export function useChangeOrderProjectData({
             : "";
         setSelectedProjectId(String(nextProject.id));
         setSelectedProjectName(nextProject.name || "");
+        setSelectedProjectStatus(nextProject.status || "");
         setSelectedProjectCustomerEmail(nextProject.customer_email || "");
         await Promise.all([
           loadProjectEstimates(nextProject.id),
@@ -370,6 +372,7 @@ export function useChangeOrderProjectData({
       } else {
         setSelectedProjectId("");
         setSelectedProjectName("");
+        setSelectedProjectStatus("");
         setSelectedProjectCustomerEmail("");
         setOriginEstimateOriginalTotals({});
         setProjectEstimates([]);
@@ -411,6 +414,7 @@ export function useChangeOrderProjectData({
     // State
     selectedProjectId,
     selectedProjectName,
+    selectedProjectStatus,
     selectedProjectCustomerEmail,
     changeOrders,
     projectEstimates,

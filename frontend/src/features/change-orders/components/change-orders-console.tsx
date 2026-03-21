@@ -154,6 +154,9 @@ export function ChangeOrdersConsole({
     capabilities,
   });
 
+  const isProjectTerminal =
+    projectData.selectedProjectStatus === "completed" || projectData.selectedProjectStatus === "cancelled";
+
   const { ref: createCreatorRef, flash: flashCreate } = useCreatorFlash();
   const { ref: editCreatorRef, flash: flashEdit } = useCreatorFlash();
   const { setPrintable } = usePrintable();
@@ -308,6 +311,7 @@ export function ChangeOrdersConsole({
 
   /** Reset the workspace to a fresh "new change order" draft. */
   function handleStartNewChangeOrder() {
+    if (isProjectTerminal) return;
     form.hydrateEditForm(undefined);
     form.resetCreateForm(projectData.selectedProjectName, defaultChangeOrderTerms);
     projectData.setFeedback("Ready for a new change order draft.", "info");
@@ -317,6 +321,10 @@ export function ChangeOrdersConsole({
   /** Handle form submission for creating a new change order draft. */
   async function handleCreateChangeOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isProjectTerminal) {
+      projectData.setFeedback("Cannot create change orders on a cancelled or completed project.", "error");
+      return;
+    }
     if (!viewer.canMutateChangeOrders) {
       projectData.setFeedback(`Role ${role} is read-only for change order mutations.`, "error");
       return;
@@ -759,7 +767,7 @@ export function ChangeOrdersConsole({
         newLineDeltaTotal={form.newLineDeltaTotal}
         newLineDaysTotal={form.newLineDaysTotal}
         costCodes={projectData.costCodes}
-        isCreateSubmitDisabled={viewer.isCreateSubmitDisabled}
+        isCreateSubmitDisabled={viewer.isCreateSubmitDisabled || isProjectTerminal}
         onCreateSubmit={handleCreateChangeOrder}
         onAddNewLine={addNewLine}
         onRemoveNewLine={removeNewLine}

@@ -36,6 +36,7 @@ from core.views.change_orders.change_orders_helpers import (
 from core.views.helpers import (
     _build_public_decision_note,
     _capability_gate,
+    _check_project_accepts_document,
     _ensure_org_membership,
     _resolve_organization_for_public_actor,
     _serialize_public_organization_context,
@@ -324,6 +325,7 @@ def project_change_orders_view(request, project_id):
 
     Flow (POST):
         1. Capability gate: ``change_orders.create``.
+        1b. Reject if project is cancelled or completed (terminal guard).
         2. Validate required fields (title, amount_delta, origin_estimate).
         3. Validate origin estimate exists, is project-scoped, and approved.
         4. Validate line items and amount consistency.
@@ -385,6 +387,10 @@ def project_change_orders_view(request, project_id):
         permission_error, _ = _capability_gate(request.user, "change_orders", "create")
         if permission_error:
             return Response(permission_error, status=403)
+
+        terminal_error = _check_project_accepts_document(project, "change orders")
+        if terminal_error:
+            return terminal_error
 
         serializer = ChangeOrderWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

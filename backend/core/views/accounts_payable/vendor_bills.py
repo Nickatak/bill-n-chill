@@ -26,6 +26,7 @@ from core.views.accounts_payable.vendor_bills_helpers import (
 )
 from core.views.helpers import (
     _capability_gate,
+    _check_project_accepts_document,
     _ensure_org_membership,
     _validate_project_for_user,
 )
@@ -93,6 +94,7 @@ def project_vendor_bills_view(request, project_id: int):
     Flow (POST):
         1. Validate the project belongs to the user's org.
         2. Gate on ``vendor_bills.create`` capability.
+        2b. Reject if project is cancelled (terminal guard).
         3. Validate required fields (vendor, bill_number) and line items.
         4. Verify vendor belongs to the user's org.
         5. Validate date invariants (due_date >= issue_date).
@@ -146,6 +148,10 @@ def project_vendor_bills_view(request, project_id: int):
         permission_error, _ = _capability_gate(request.user, "vendor_bills", "create")
         if permission_error:
             return Response(permission_error, status=403)
+
+        terminal_error = _check_project_accepts_document(project, "vendor bills")
+        if terminal_error:
+            return terminal_error
 
         serializer = VendorBillWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

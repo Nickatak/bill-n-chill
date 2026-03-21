@@ -262,10 +262,11 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   const selectedProject =
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;
+  const isProjectCancelled = selectedProject?.status === "cancelled";
   const selectedVendorBill =
     vendorBills.find((vendorBill) => String(vendorBill.id) === selectedVendorBillId) ?? null;
   const workspaceIsLockedByStatus = selectedVendorBill ? selectedVendorBill.status !== "received" : false;
-  const workspaceIsLocked = !canMutateVendorBills || workspaceIsLockedByStatus;
+  const workspaceIsLocked = !canMutateVendorBills || isProjectCancelled || workspaceIsLockedByStatus;
   const workspaceBadgeLabel = !selectedVendorBill
     ? "CREATING"
     : workspaceIsLocked

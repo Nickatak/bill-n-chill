@@ -77,6 +77,7 @@ export function useProjectCreator({
   const [projectName, setProjectName] = useState("");
   const [projectSiteAddress, setProjectSiteAddress] = useState("");
   const [projectStatus, setProjectStatus] = useState<ProjectStatusValue>("prospect");
+  const [formMessage, setFormMessage] = useState("");
 
   const customer =
     customerId === null
@@ -91,6 +92,7 @@ export function useProjectCreator({
     setProjectName(`${target.display_name} Project`);
     setProjectSiteAddress(target.billing_address ?? "");
     setProjectStatus("prospect");
+    setFormMessage("");
     setIsOpen(true);
   }
 
@@ -104,23 +106,23 @@ export function useProjectCreator({
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canMutate) {
-      setStatusMessage("Your role is read-only for project creation.");
+      setFormMessage("Your role is read-only for project creation.");
       return;
     }
     if (!customerId) {
-      setStatusMessage("Select a customer first.");
+      setFormMessage("Select a customer first.");
       return;
     }
     if (!projectName.trim()) {
-      setStatusMessage("Project name is required.");
+      setFormMessage("Project name is required.");
       return;
     }
     if (!projectSiteAddress.trim()) {
-      setStatusMessage("Site address is required.");
+      setFormMessage("Site address is required.");
       return;
     }
 
-    setStatusMessage("");
+    setFormMessage("");
     try {
       const response = await fetch(`${apiBaseUrl}/customers/${customerId}/projects/`, {
         method: "POST",
@@ -136,7 +138,7 @@ export function useProjectCreator({
         const fieldMessage = payload.error?.fields
           ? Object.values(payload.error.fields).flat()[0]
           : undefined;
-        setStatusMessage(
+        setFormMessage(
           payload.error?.message ?? fieldMessage ?? "Could not create project for this customer.",
         );
         return;
@@ -144,7 +146,7 @@ export function useProjectCreator({
 
       const createdProject = payload.data?.project;
       if (!createdProject) {
-        setStatusMessage("Project created, but response payload was incomplete.");
+        setFormMessage("Project created, but response payload was incomplete.");
         close();
         return;
       }
@@ -153,7 +155,7 @@ export function useProjectCreator({
       setStatusMessage(`Created project #${createdProject.id}. Opening project workspace...`);
       router.push(`/projects?project=${createdProject.id}`);
     } catch {
-      setStatusMessage("Could not reach customer project creation endpoint.");
+      setFormMessage("Could not reach customer project creation endpoint.");
     }
   }
 
@@ -166,6 +168,7 @@ export function useProjectCreator({
     projectName,
     projectSiteAddress,
     projectStatus,
+    formMessage,
     backdropDismiss,
 
     // Setters

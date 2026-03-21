@@ -403,10 +403,12 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     return totals;
   }, [invoiceData.invoices]);
 
+  const selectedProject = invoiceData.projects.find((project) => String(project.id) === selectedProjectId) ?? null;
+  const isProjectCancelled = selectedProject?.status === "cancelled";
   const nextDraftInvoiceNumber = useMemo(() => nextInvoiceNumberPreview(invoiceData.invoices), [invoiceData.invoices]);
   const workspaceInvoiceNumber = workspaceSourceInvoice?.invoice_number ?? nextDraftInvoiceNumber;
   const workspaceIsLockedByStatus = workspaceSourceInvoice ? workspaceSourceInvoice.status !== "draft" : false;
-  const workspaceIsLocked = !canEditInvoiceWorkspace || workspaceIsLockedByStatus;
+  const workspaceIsLocked = !canEditInvoiceWorkspace || isProjectCancelled || workspaceIsLockedByStatus;
   const workspaceBadgeLabel = !workspaceSourceInvoice
     ? "CREATING"
     : workspaceIsLocked
@@ -437,7 +439,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
   // Document adapter & branding
   // -------------------------------------------------------------------------
 
-  const selectedProject = invoiceData.projects.find((project) => String(project.id) === selectedProjectId) ?? null;
   const organizationBranding = useMemo(
     () => resolveOrganizationBranding(invoiceData.organizationInvoiceDefaults),
     [invoiceData.organizationInvoiceDefaults],

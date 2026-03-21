@@ -330,8 +330,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;
   const selectedEstimate =
     estimates.find((estimate) => String(estimate.id) === selectedEstimateId) ?? null;
+  const isProjectTerminal =
+    selectedProject?.status === "completed" || selectedProject?.status === "cancelled";
   const isEditingDraft = Boolean(selectedEstimate && selectedEstimate.status === "draft");
-  const isReadOnly = !canMutateEstimates || Boolean(selectedEstimate && selectedEstimate.status !== "draft");
+  const isReadOnly = !canMutateEstimates || isProjectTerminal || Boolean(selectedEstimate && selectedEstimate.status !== "draft");
   const statusClasses: Record<string, string> = {
     draft: styles.statusDraft,
     sent: styles.statusSent,
@@ -812,8 +814,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   }
 
   const canCreateEstimate = useMemo(
-    () => canMutateEstimates && Boolean(selectedProjectId) && lineItems.length > 0,
-    [canMutateEstimates, lineItems.length, selectedProjectId],
+    () => canMutateEstimates && !isProjectTerminal && Boolean(selectedProjectId) && lineItems.length > 0,
+    [canMutateEstimates, isProjectTerminal, lineItems.length, selectedProjectId],
   );
 
   // -------------------------------------------------------------------------

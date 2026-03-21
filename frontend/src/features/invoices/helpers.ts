@@ -117,7 +117,7 @@ export function nextInvoiceNumberPreview(invoices: InvoiceRecord[]): string {
       digitWidth = Math.max(digitWidth, match[1].length);
     }
   }
-  let nextNumber = rows.length + 1;
+  let nextNumber = invoices.length + 1;
   while (usedNumbers.has(nextNumber)) {
     nextNumber += 1;
   }

@@ -282,13 +282,15 @@ export function CustomersList({
                                       #{project.id} {project.name}
                                     </span>
                                   </Link>
-                                  <Link
-                                    href={`/projects?project=${project.id}`}
-                                    className={styles.projectQuickLink}
-                                    title="Record a payment for this project"
-                                  >
-                                    Enter Payment
-                                  </Link>
+                                  {project.status !== "cancelled" && project.status !== "completed" ? (
+                                    <Link
+                                      href={`/projects?project=${project.id}`}
+                                      className={styles.projectQuickLink}
+                                      title="Record a payment for this project"
+                                    >
+                                      Enter Payment
+                                    </Link>
+                                  ) : null}
                                 </div>
                               ))}
                             </div>

@@ -37,6 +37,7 @@ from core.views.estimating.estimates_helpers import (
 from core.views.helpers import (
     _build_public_decision_note,
     _capability_gate,
+    _check_project_accepts_document,
     _ensure_org_membership,
     _resolve_organization_for_public_actor,
     _serialize_public_organization_context,
@@ -261,6 +262,7 @@ def project_estimates_view(request, project_id):
 
     Flow (POST):
         1. Capability gate: ``estimates.create``.
+        1b. Reject if project is cancelled or completed (terminal guard).
         2. Validate fields, resolve ``valid_through`` default from org settings.
         3. Reject terms_text override and empty line items.
         4. Check duplicate-submit suppression window.
@@ -307,6 +309,10 @@ def project_estimates_view(request, project_id):
         permission_error, _ = _capability_gate(request.user, "estimates", "create")
         if permission_error:
             return Response(permission_error, status=403)
+
+        terminal_error = _check_project_accepts_document(project, "estimates")
+        if terminal_error:
+            return terminal_error
 
         serializer = EstimateWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
