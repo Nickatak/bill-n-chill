@@ -199,7 +199,7 @@ def customer_detail_view(request, customer_id):
                 metadata={
                     "from_is_archived": previous_is_archived,
                     "to_is_archived": customer.is_archived,
-                    "cancelled_prospect_projects_count": cancelled_prospect_projects_count,
+                    "cancelled_prospect_project_count": cancelled_prospect_projects_count,
                 }
                 if customer.is_archived != previous_is_archived
                 else {},

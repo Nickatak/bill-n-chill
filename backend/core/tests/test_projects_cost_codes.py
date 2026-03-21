@@ -1356,6 +1356,17 @@ class RoleHardeningTests(TestCase):
             status=Project.Status.ACTIVE,
             created_by=self.bookkeeping_user,
         )
+        self.bookkeeping_invoice = Invoice.objects.create(
+            project=self.bookkeeping_project,
+            customer=self.bookkeeping_customer,
+            invoice_number="BK-001",
+            status=Invoice.Status.SENT,
+            issue_date="2026-02-01",
+            due_date="2026-02-28",
+            total="75.00",
+            balance_due="75.00",
+            created_by=self.bookkeeping_user,
+        )
 
     def test_auth_me_returns_effective_role(self):
         response = self.client.get(
@@ -1411,6 +1422,8 @@ class RoleHardeningTests(TestCase):
                 "status": "pending",
                 "amount": "75.00",
                 "payment_date": "2026-02-01",
+                "target_type": "invoice",
+                "target_id": self.bookkeeping_invoice.id,
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.bookkeeping_token.key}",
