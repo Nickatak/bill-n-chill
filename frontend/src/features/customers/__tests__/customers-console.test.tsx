@@ -23,15 +23,10 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+const mockUseSharedSessionAuth = vi.hoisted(() => vi.fn());
+
 vi.mock("@/shared/session/use-shared-session", () => ({
-  useSharedSessionAuth: vi.fn(() => ({
-    token: "test-token",
-    email: "nick@test.com",
-    authMessage: "Using shared session for nick@test.com (owner).",
-    role: "owner",
-    organization: null,
-    capabilities: { customers: ["view", "create"], projects: ["view", "create"] },
-  })),
+  useSharedSessionAuth: mockUseSharedSessionAuth,
 }));
 
 vi.mock("@/shared/phone-format", () => ({
@@ -44,6 +39,25 @@ Element.prototype.scrollIntoView = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
 import { CustomersConsole } from "../components/customers-console";
+
+// ---------------------------------------------------------------------------
+// Session defaults
+// ---------------------------------------------------------------------------
+
+const DEFAULT_SESSION = {
+  token: "test-token",
+  email: "nick@test.com",
+  authMessage: "Using shared session for nick@test.com (owner).",
+  role: "owner",
+  organization: null,
+  capabilities: { customers: ["view", "create"], projects: ["view", "create"] },
+};
+
+const VIEW_ONLY_SESSION = {
+  ...DEFAULT_SESSION,
+  role: "viewer",
+  capabilities: { customers: ["view"], projects: ["view"] },
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -112,6 +126,7 @@ describe("CustomersConsole", () => {
   beforeEach(() => {
     mockFetch.mockReset();
     mockPush.mockClear();
+    mockUseSharedSessionAuth.mockReturnValue(DEFAULT_SESSION);
   });
 
   afterEach(() => {
@@ -630,6 +645,156 @@ describe("CustomersConsole", () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Archive toggle guard
+  // ---------------------------------------------------------------------------
+
+  it("disables archive checkbox when customer has active/on-hold project", async () => {
+    setupDefaultFetch();
+    render(<CustomersConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    });
+
+    // Jane Doe has has_active_or_on_hold_project: true, is_archived: false
+    fireEvent.click(screen.getByText("Jane Doe"));
+    expect(screen.getByText("Edit Customer")).toBeInTheDocument();
+
+    const archiveCheckbox = screen.getByRole("checkbox");
+    expect(archiveCheckbox).toBeDisabled();
+    expect(screen.getByText("Archive is blocked while this customer has active or on-hold projects.")).toBeInTheDocument();
+  });
+
+  it("enables archive checkbox when customer has no active/on-hold projects", async () => {
+    setupDefaultFetch();
+    render(<CustomersConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Bob Smith")).toBeInTheDocument();
+    });
+
+    // Bob Smith has has_active_or_on_hold_project: false
+    fireEvent.click(screen.getByText("Bob Smith"));
+    expect(screen.getByText("Edit Customer")).toBeInTheDocument();
+
+    const archiveCheckbox = screen.getByRole("checkbox");
+    expect(archiveCheckbox).not.toBeDisabled();
+    expect(screen.queryByText("Archive is blocked while this customer has active or on-hold projects.")).not.toBeInTheDocument();
+  });
+
+  it("allows un-archiving even when customer has active/on-hold projects", async () => {
+    const archivedWithActiveProject = {
+      ...CUSTOMER_ROWS[0],
+      id: 5,
+      display_name: "Archived Active",
+      is_archived: true,
+      has_active_or_on_hold_project: true,
+    };
+    setupDefaultFetch({ customers: [archivedWithActiveProject] });
+    render(<CustomersConsole />);
+
+    // Default activity filter is "active" — switch to "All" to see archived customer
+    await waitFor(() => {
+      expect(screen.queryByText("Archived Active")).not.toBeInTheDocument();
+    });
+    const allButtons = screen.getAllByRole("button", { name: "All" });
+    fireEvent.click(allButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText("Archived Active")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Archived Active"));
+    expect(screen.getByText("Edit Customer")).toBeInTheDocument();
+
+    // archiveToggleBlocked = hasActiveOrOnHoldProject && !isArchived
+    // Since isArchived=true, the guard does NOT block — un-archiving is allowed
+    const archiveCheckbox = screen.getByRole("checkbox");
+    expect(archiveCheckbox).not.toBeDisabled();
+    expect(archiveCheckbox).toBeChecked();
+  });
+
+  it("shows prospect cancellation warning when archive is toggled on", async () => {
+    setupDefaultFetch();
+    render(<CustomersConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Bob Smith")).toBeInTheDocument();
+    });
+
+    // Bob Smith has no active projects — archive toggle is enabled
+    fireEvent.click(screen.getByText("Bob Smith"));
+    expect(screen.getByText("Edit Customer")).toBeInTheDocument();
+
+    const archiveCheckbox = screen.getByRole("checkbox");
+    expect(archiveCheckbox).not.toBeChecked();
+
+    // No warning before toggling
+    expect(screen.queryByText(/automatically cancel/)).not.toBeInTheDocument();
+
+    // Toggle archive on
+    fireEvent.click(archiveCheckbox);
+
+    expect(screen.getByText(/automatically cancel this customer/)).toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Read-only mode (viewer/worker roles)
+  // ---------------------------------------------------------------------------
+
+  it("disables Save Customer button when user lacks create capability", async () => {
+    mockUseSharedSessionAuth.mockReturnValue(VIEW_ONLY_SESSION);
+    setupDefaultFetch();
+    render(<CustomersConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Jane Doe"));
+    expect(screen.getByText("Edit Customer")).toBeInTheDocument();
+
+    expect(screen.getByRole("button", { name: "Save Customer" })).toBeDisabled();
+  });
+
+  it("shows read-only message when viewer attempts to save customer edit", async () => {
+    mockUseSharedSessionAuth.mockReturnValue(VIEW_ONLY_SESSION);
+    setupDefaultFetch();
+    render(<CustomersConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Bob Smith")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Bob Smith"));
+
+    // Force-submit the form (button is disabled but the hook guard is what we're testing)
+    const form = screen.getByText("Edit Customer").closest("form")!;
+    fireEvent.submit(form);
+
+    await waitFor(() => {
+      expect(screen.getByText("Your role is read-only for customer mutations.")).toBeInTheDocument();
+    });
+  });
+
+  it("disables Create Project button when user lacks project create capability", async () => {
+    mockUseSharedSessionAuth.mockReturnValue(VIEW_ONLY_SESSION);
+    setupDefaultFetch();
+    render(<CustomersConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /add new project for jane doe/i }),
+    );
+    const dialog = screen.getByRole("dialog", { name: /create project/i });
+
+    expect(within(dialog).getByRole("button", { name: "Create Project" })).toBeDisabled();
+  });
+
+  // ---------------------------------------------------------------------------
   // Empty-field validation
   // ---------------------------------------------------------------------------
 
@@ -653,5 +818,90 @@ describe("CustomersConsole", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Create Project" }));
 
     expect(screen.getAllByText("Site address is required.").length).toBeGreaterThanOrEqual(1);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Empty state messages
+  // ---------------------------------------------------------------------------
+
+  it("shows search-no-results message when API returns empty for a query", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/customers/")) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: [],
+              meta: { page: 1, total_pages: 1, total_count: 0 },
+            }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
+    });
+
+    render(<CustomersConsole />);
+
+    // Type a search query
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/search by name/i)).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText(/search by name/i), {
+      target: { value: "nonexistent" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("No customers matched your search.")).toBeInTheDocument();
+    });
+  });
+
+  it("shows first-time message when no customers exist and no search query", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/customers/")) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: [],
+              meta: { page: 1, total_pages: 1, total_count: 0 },
+            }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
+    });
+
+    render(<CustomersConsole />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("No customers yet. Use the Quick Add form above to create your first one."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows filter-mismatch message when all customers are filtered out", async () => {
+    const allArchived = [
+      {
+        id: 3,
+        display_name: "Archived Corp",
+        phone: "",
+        email: "",
+        billing_address: "",
+        is_archived: true,
+        projects_count: 0,
+        active_projects_count: 0,
+        has_project: false,
+        has_active_or_on_hold_project: false,
+        created_at: "2025-06-01T10:00:00Z",
+      },
+    ];
+
+    setupDefaultFetch({ customers: allArchived });
+    render(<CustomersConsole />);
+
+    // Default activity filter is "active", so archived-only list is fully filtered out
+    await waitFor(() => {
+      expect(screen.getByText("No customers match the current filters.")).toBeInTheDocument();
+    });
   });
 });
