@@ -289,6 +289,28 @@ describe("EstimatesConsole", () => {
     ).toBeInTheDocument();
   });
 
+  // -------------------------------------------------------------------------
+  // Terminal project guards
+  // -------------------------------------------------------------------------
+
+  it("shows read-only workspace when project is cancelled", async () => {
+    setupDefaultFetch({ projects: [makeProject({ status: "cancelled" })] });
+    render(<EstimatesConsole scopedProjectId={7} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("READ-ONLY")).toBeInTheDocument();
+    }, { timeout: 3000 });
+  });
+
+  it("shows read-only workspace when project is completed", async () => {
+    setupDefaultFetch({ projects: [makeProject({ status: "completed" })] });
+    render(<EstimatesConsole scopedProjectId={7} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("READ-ONLY")).toBeInTheDocument();
+    }, { timeout: 3000 });
+  });
+
   it("does not show no-email warning when Sent is selected and customer has email", async () => {
     setupDefaultFetch({
       projects: [makeProject({ customer_email: "jane@example.com" })],

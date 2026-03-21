@@ -252,6 +252,33 @@ describe("ChangeOrdersConsole", () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  // Terminal project guards
+  // -------------------------------------------------------------------------
+
+  it("does not render create button when project is cancelled", async () => {
+    setupDefaultFetch({ projects: [makeProject({ status: "cancelled" })] });
+    render(<ChangeOrdersConsole scopedProjectId={7} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Change Orders for/)).toBeTruthy();
+    }, { timeout: 3000 });
+
+    // Terminal projects: "Create Change Order" submit button should not appear
+    expect(screen.queryByRole("button", { name: /Create Change Order/i })).not.toBeInTheDocument();
+  });
+
+  it("does not render create button when project is completed", async () => {
+    setupDefaultFetch({ projects: [makeProject({ status: "completed" })] });
+    render(<ChangeOrdersConsole scopedProjectId={7} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Change Orders for/)).toBeTruthy();
+    }, { timeout: 3000 });
+
+    expect(screen.queryByRole("button", { name: /Create Change Order/i })).not.toBeInTheDocument();
+  });
+
   it("shows empty state when no change orders exist for the origin estimate", async () => {
     setupDefaultFetch({ changeOrders: [] });
     render(<ChangeOrdersConsole scopedProjectId={7} />);

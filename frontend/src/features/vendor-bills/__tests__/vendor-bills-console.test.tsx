@@ -262,6 +262,29 @@ describe("VendorBillsConsole", () => {
     }, { timeout: 3000 });
   });
 
+  // -------------------------------------------------------------------------
+  // Terminal project guards
+  // -------------------------------------------------------------------------
+
+  it("shows read-only workspace when project is cancelled", async () => {
+    setupDefaultFetch({ projects: [makeProject({ status: "cancelled" })] });
+    render(<VendorBillsConsole scopedProjectId={7} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("READ-ONLY")).toBeInTheDocument();
+    }, { timeout: 3000 });
+  });
+
+  it("does not lock workspace when project is completed (vendor bills allowed)", async () => {
+    setupDefaultFetch({ projects: [makeProject({ status: "completed" })] });
+    render(<VendorBillsConsole scopedProjectId={7} />);
+
+    // Completed projects still allow vendor bills — workspace should show CREATING, not READ-ONLY
+    await waitFor(() => {
+      expect(screen.getByText("CREATING")).toBeInTheDocument();
+    }, { timeout: 3000 });
+  });
+
   it("displays bill data in the viewer table", async () => {
     setupDefaultFetch({
       vendorBills: [

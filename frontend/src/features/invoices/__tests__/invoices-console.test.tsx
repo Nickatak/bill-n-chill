@@ -140,6 +140,18 @@ function setupDefaultFetch(overrides: {
           }),
       });
     }
+    if (url.includes("/cost-codes")) {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ data: [] }),
+      });
+    }
+    if (url.includes("/contract-breakdown")) {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ data: { original_budget: "0", approved_cos: "0", current_contract: "0", invoiced: "0", remaining: "0" } }),
+      });
+    }
     if (url.includes("/projects")) {
       return Promise.resolve({
         ok: true,
@@ -228,6 +240,33 @@ describe("InvoicesConsole", () => {
     await waitFor(() =>
       expect(screen.getByPlaceholderText("Search invoices...")).toBeTruthy(),
     );
+  });
+
+  // -------------------------------------------------------------------------
+  // Terminal project guards
+  // -------------------------------------------------------------------------
+
+  it("renders viewer but does not show new-draft action when project is cancelled", async () => {
+    setupDefaultFetch({ projects: [makeProject({ status: "cancelled" })] });
+    render(<InvoicesConsole scopedProjectId={7} />);
+
+    // Viewer loads with project data
+    await waitFor(() => {
+      expect(screen.getByText(/Invoices for: Kitchen Remodel/)).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    // "New Draft" button should not be available on a cancelled project
+    expect(screen.queryByRole("button", { name: /New Draft/i })).not.toBeInTheDocument();
+  });
+
+  it("shows workspace as normal when project is completed (invoices allowed)", async () => {
+    setupDefaultFetch({ projects: [makeProject({ status: "completed" })] });
+    render(<InvoicesConsole scopedProjectId={7} />);
+
+    // Completed projects still allow invoices — workspace should function normally
+    await waitFor(() => {
+      expect(screen.getByText("Creating")).toBeInTheDocument();
+    }, { timeout: 3000 });
   });
 
   it("fetches invoices for the scoped project on mount", async () => {
