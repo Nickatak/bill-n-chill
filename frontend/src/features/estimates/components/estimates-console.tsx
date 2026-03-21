@@ -395,12 +395,12 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       : "Viewing";
   const workspaceBadgeLabel = !selectedEstimate
     ? "CREATING"
-    : isEditingDraft
+    : isEditingDraft && !isReadOnly
       ? "EDITING"
       : "READ-ONLY";
   const workspaceBadgeClass = !selectedEstimate
     ? styles.statusDraft
-    : isEditingDraft
+    : isEditingDraft && !isReadOnly
       ? styles.statusDraft
       : statusClasses[selectedEstimate.status] ?? styles.statusArchived;
 
@@ -519,7 +519,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     formFields.setConfirmedFamilyTitleKey("");
     loadEstimateIntoForm(estimate);
     formFields.setDuplicateTitle(`${estimate.title || "Estimate"} Copy`);
-  }, [loadEstimateIntoForm, formFields]);
+  }, [loadEstimateIntoForm]);
 
   // Keep the ref in sync so async callbacks always see the latest selection.
   useEffect(() => {
@@ -540,7 +540,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setStatusEvents([]);
     formFields.resetFormFields();
     duplicateDialogRef.current?.close();
-  }, [formFields]);
+  }, [formFields.resetFormFields]);
 
   /** Reset the composer to a blank draft. */
   function startNewEstimate() {
@@ -626,7 +626,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     } catch {
       setActionMessage("Could not reach project and cost-code endpoints.");
     }
-  }, [apiBaseUrl, scopedProjectId, authToken, formFields]);
+  }, [apiBaseUrl, scopedProjectId, authToken]);
 
   const loadEstimates = useCallback(async (options?: LoadEstimatesOptions) => {
     const projectId = Number(selectedProjectId);
