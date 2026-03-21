@@ -7,6 +7,7 @@
  */
 import type { ReactNode } from "react";
 import { joinClassNames } from "../utils/class-names";
+import { OnboardingBanner } from "./onboarding-banner";
 import shell from "./page-shell.module.css";
 
 type PageShellProps = {
@@ -32,6 +33,7 @@ export function PageShell({ children, narrow = false, className = "", mainClassN
   return (
     <div className={joinClassNames(shell.page, className)}>
       <main className={joinClassNames(shell.main, narrow && shell.mainNarrow, mainClassName)}>
+        <OnboardingBanner />
         {children}
       </main>
     </div>

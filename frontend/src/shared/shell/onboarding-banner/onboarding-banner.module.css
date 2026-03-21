@@ -1,41 +1,43 @@
-.onboardingBanner {
+/* Onboarding banner — persistent "Get Started" prompt for new users. */
+
+.banner {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-sm);
   border: 1px solid var(--accent-border);
-  border-radius: var(--radius-xl);
-  padding: 12px 15px;
+  border-radius: var(--radius-lg);
+  padding: 8px 12px;
   background: var(--accent-lighter);
 }
 
-.bannerText {
+.text {
   flex: 1;
+  font-size: var(--font-sm);
+  font-weight: 600;
   color: var(--text-primary);
-  font-size: var(--font-base);
 }
 
-.bannerLink {
+.link {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   border: 1px solid var(--accent-border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--accent);
   color: var(--text-on-accent);
   text-decoration: none;
-  padding: 7px 14px;
+  padding: 5px 12px;
   font-size: var(--font-sm);
   font-weight: 700;
-  transition: transform 140ms ease, box-shadow 140ms ease;
+  transition: border-color 140ms ease;
 }
 
-.bannerLink:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 12px rgba(59, 130, 246, 0.2);
+.link:hover {
+  border-color: var(--accent-text);
 }
 
 @media print {
-  .onboardingBanner {
+  .banner {
     display: none;
   }
 }

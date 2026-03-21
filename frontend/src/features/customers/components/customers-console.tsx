@@ -61,7 +61,7 @@
 
 import { canDo } from "@/shared/session/rbac";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
-import Link from "next/link";
+
 import { useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -80,10 +80,10 @@ import styles from "./customers-console.module.css";
 
 /** Root console component for customer CRUD, filtering, and project creation. */
 export function CustomersConsole() {
-  const { token: authToken, capabilities, organization } = useSharedSessionAuth();
+  const { token: authToken, capabilities } = useSharedSessionAuth();
   const canMutateCustomers = canDo(capabilities, "customers", "create");
   const canMutateProjects = canDo(capabilities, "projects", "create");
-  const showOnboarding = organization != null && organization.onboardingCompleted !== true;
+
 
   const listFetch = useCustomerListFetch(authToken);
   const filters = useCustomerFilters(listFetch.customerRows);
@@ -126,17 +126,6 @@ export function CustomersConsole() {
 
   return (
     <section className={styles.section}>
-      {showOnboarding ? (
-        <div className={styles.onboardingBanner}>
-          <span className={styles.onboardingBannerText}>
-            New here? Follow the getting started guide to set up your workspace.
-          </span>
-          <Link href="/onboarding" className={styles.onboardingBannerLink}>
-            Get Started
-          </Link>
-        </div>
-      ) : null}
-
       {/* Quick Add intake form */}
       <div className={styles.quickAddSection}>
         <div className={styles.quickAddHeader}>

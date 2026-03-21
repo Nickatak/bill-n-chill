@@ -1,28 +1,14 @@
 "use client";
 
 import { DashboardConsole } from "@/features/dashboard";
-import { useSessionAuthorization } from "@/shared/session/session-authorization";
-import Link from "next/link";
+
 import shell from "@/shared/shell/page-shell.module.css";
 import { PageCard, PageShell } from "@/shared/shell";
-import styles from "./dashboard-route-content.module.css";
 
 /** Dashboard route content — portfolio overview for authenticated users. */
 export function DashboardRouteContent() {
-  const { organization } = useSessionAuthorization();
-
   return (
     <PageShell>
-      {organization && !organization.onboardingCompleted && (
-        <div className={styles.onboardingBanner}>
-          <span className={styles.bannerText}>
-            New here? Follow the getting started guide to set up your workspace.
-          </span>
-          <Link href="/onboarding" className={styles.bannerLink}>
-            Get Started
-          </Link>
-        </div>
-      )}
       <header className={shell.hero}>
         <div className={shell.heroTop}>
           <p className={shell.eyebrow}>Dashboard</p>

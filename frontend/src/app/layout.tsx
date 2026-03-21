@@ -3,7 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { SessionAuthorizationProvider } from "@/shared/session/session-authorization";
 import { ServiceWorkerRegistration } from "@/shared/pwa";
 import "./globals.css";
-import { AuthGate, AppToolbar, ImpersonationBanner, MobileBottomNav, MobileDrawer, PrintableProvider, WorkflowShell } from "@/shared/shell";
+import { AuthGate, AppToolbar, ImpersonationBanner, MobileBottomNav, PrintableProvider, WorkflowShell } from "@/shared/shell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -51,7 +51,7 @@ export default function RootLayout({
           <PrintableProvider>
             <AppToolbar />
             <ImpersonationBanner />
-            <MobileDrawer />
+
             <WorkflowShell />
             <AuthGate>{children}</AuthGate>
             <MobileBottomNav />
