@@ -28,6 +28,7 @@ from core.views.helpers import (
     _capability_gate,
     _check_project_accepts_document,
     _ensure_org_membership,
+    _promote_prospect_to_active,
     _validate_project_for_user,
 )
 
@@ -279,6 +280,8 @@ def project_vendor_bills_view(request, project_id: int):
             vendor_bill.refresh_from_db()
             vendor_bill.balance_due = vendor_bill.total
             vendor_bill.save(update_fields=["balance_due", "updated_at"])
+
+            _promote_prospect_to_active(project)
 
         return Response(
             {

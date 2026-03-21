@@ -25,6 +25,7 @@ from core.utils.email import send_document_sent_email
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.accounts_receivable.invoice_ingress import InvoicePatchIngress
 from core.views.helpers import (
+    _promote_prospect_to_active,
     _resolve_cost_codes_for_user,
 )
 
@@ -469,6 +470,9 @@ def _handle_invoice_status_transition(
             note=event_note,
             changed_by=request.user,
         )
+
+        if next_status == Invoice.Status.SENT:
+            _promote_prospect_to_active(invoice.project)
 
     # Email notification (outside transaction)
     email_sent = False

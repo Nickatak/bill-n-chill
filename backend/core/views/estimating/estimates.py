@@ -23,7 +23,6 @@ from core.utils.request import get_client_ip
 from core.utils.signing import compute_document_content_hash
 from core.views.estimating.estimates_helpers import (
     ESTIMATE_DECISION_TO_STATUS,
-    _activate_project_from_estimate_approval,
     _apply_estimate_lines_and_totals,
     _archive_estimate_family,
     _estimate_stored_signature,
@@ -39,6 +38,7 @@ from core.views.helpers import (
     _capability_gate,
     _check_project_accepts_document,
     _ensure_org_membership,
+    _promote_prospect_to_active,
     _resolve_organization_for_public_actor,
     _serialize_public_organization_context,
     _serialize_public_project_context,
@@ -190,11 +190,7 @@ def public_estimate_decision_view(request, public_token):
             user_agent=user_agent,
         )
         if estimate.status == Estimate.Status.APPROVED:
-            _activate_project_from_estimate_approval(
-                estimate=estimate,
-                actor=estimate.created_by,
-                note=f"Project moved to active after public approval of estimate #{estimate.id}.",
-            )
+            _promote_prospect_to_active(estimate.project)
 
         content_hash = compute_document_content_hash("estimate", EstimateSerializer(estimate).data)
         SigningCeremonyRecord.record(

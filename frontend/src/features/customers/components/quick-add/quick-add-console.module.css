@@ -57,29 +57,22 @@
 }
 
 .currencyInput {
+  position: relative;
   display: flex;
   align-items: center;
-  border: 1px solid var(--input-border);
-  border-radius: 10px;
-  background: var(--input-bg);
-  overflow: hidden;
 }
 
 .currencyPrefix {
-  padding: 10px 0 10px 11px;
+  position: absolute;
+  left: 11px;
   color: var(--text-muted);
   font-size: 0.94rem;
   user-select: none;
-  flex-shrink: 0;
+  pointer-events: none;
 }
 
 .currencyInput input {
-  border: none;
-  border-radius: 0;
-  padding: 10px 11px 10px 4px;
-  background: transparent;
-  flex: 1;
-  min-width: 0;
+  padding-left: 24px;
 }
 
 .errorText {
@@ -469,9 +462,6 @@
     font-size: 1rem;
   }
 
-  .currencyInput {
-    min-height: 44px;
-  }
 
   .actionPrimary,
   .actionSecondary {

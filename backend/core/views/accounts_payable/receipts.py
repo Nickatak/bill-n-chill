@@ -12,6 +12,7 @@ from core.user_helpers import _ensure_org_membership
 from core.views.accounts_payable.receipts_helpers import _prefetch_receipt_qs
 from core.views.helpers import (
     _capability_gate,
+    _promote_prospect_to_active,
     _validate_project_for_user,
 )
 
@@ -127,6 +128,8 @@ def project_receipts_view(request, project_id: int):
             notes=data.get("notes", ""),
             created_by=request.user,
         )
+
+        _promote_prospect_to_active(project)
 
         return Response(
             {"data": ReceiptSerializer(_prefetch_receipt_qs(Receipt.objects.filter(id=receipt.id)).get()).data},

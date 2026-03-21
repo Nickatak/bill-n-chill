@@ -140,6 +140,7 @@ export function ProjectsConsole() {
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;
   const isSelectedProjectTerminal =
     selectedProject?.status === "completed" || selectedProject?.status === "cancelled";
+  const isSelectedProjectProspect = selectedProject?.status === "prospect";
   const hasApprovedEstimate = (estimateStatusCounts?.approved ?? 0) > 0;
   const hasPayableInvoices = invoiceAllocationTargets.length > 0;
   const computedProfileStatuses = selectedProject
@@ -813,7 +814,7 @@ export function ProjectsConsole() {
                 <button
                   type="button"
                   className={`${styles.toolbarAction} ${toolbarPanel === "payment" ? styles.toolbarActionActive : ""}`}
-                  disabled={!hasPayableInvoices}
+                  disabled={!hasPayableInvoices || isSelectedProjectProspect}
                   onClick={() => setToolbarPanel(toolbarPanel === "payment" ? null : "payment")}
                 >
                   Record Payment

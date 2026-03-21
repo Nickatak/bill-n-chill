@@ -20,7 +20,7 @@ from core.serializers import EstimateSerializer
 from core.user_helpers import _ensure_org_membership
 from core.utils.email import send_document_sent_email
 from core.utils.money import MONEY_ZERO, quantize_money
-from core.views.helpers import _resolve_cost_codes_for_user
+from core.views.helpers import _promote_prospect_to_active, _resolve_cost_codes_for_user
 
 
 # ---------------------------------------------------------------------------
@@ -185,28 +185,6 @@ def _sync_project_contract_baseline_if_unset(*, estimate: Estimate) -> bool:
     project.save(update_fields=["contract_value_original", "contract_value_current", "updated_at"])
     return True
 
-
-def _activate_project_from_estimate_approval(
-    *,
-    estimate: Estimate,
-    actor: AbstractUser,
-    note: str,
-) -> bool:
-    """Transition a prospect or on-hold project to active on estimate approval.
-
-    Returns ``True`` if the project was activated, ``False`` if it was
-    already active or the transition is not allowed.
-    """
-    project = estimate.project
-    if project.status not in (Project.Status.PROSPECT, Project.Status.ON_HOLD):
-        return False
-    if not Project.is_transition_allowed(project.status, Project.Status.ACTIVE):
-        return False
-
-    previous_status = project.status
-    project.status = Project.Status.ACTIVE
-    project.save(update_fields=["status", "updated_at"])
-    return True
 
 
 def _calculate_line_totals(
@@ -468,12 +446,8 @@ def _handle_estimate_status_transition(
             changed_by=request.user,
         )
 
-        if next_status == Estimate.Status.APPROVED:
-            _activate_project_from_estimate_approval(
-                estimate=estimate,
-                actor=request.user,
-                note=f"Project moved to active after approval of estimate #{estimate.id}.",
-            )
+        if next_status in (Estimate.Status.SENT, Estimate.Status.APPROVED):
+            _promote_prospect_to_active(estimate.project)
 
     # Email notification (outside transaction)
     email_sent = False

@@ -71,6 +71,28 @@ def _validate_estimate_for_user(
 
 
 # ---------------------------------------------------------------------------
+# Project auto-promotion
+# ---------------------------------------------------------------------------
+
+
+def _promote_prospect_to_active(project: Project) -> bool:
+    """Silently promote a prospect project to active.
+
+    Called when a financial commitment is made: sending an estimate or
+    invoice, creating a vendor bill, or creating a receipt.  Any of these
+    actions imply the project is no longer speculative.
+
+    Returns ``True`` if the project was promoted, ``False`` if it was
+    already past prospect status.
+    """
+    if project.status != Project.Status.PROSPECT:
+        return False
+    project.status = Project.Status.ACTIVE
+    project.save(update_fields=["status", "updated_at"])
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Public-facing context serialization
 # ---------------------------------------------------------------------------
 
