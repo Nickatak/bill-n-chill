@@ -780,4 +780,129 @@ describe("ProjectsConsole", () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // Status change via PATCH
+  // ---------------------------------------------------------------------------
+
+  it("sends selected status in PATCH body when status pill is changed", async () => {
+    setupDefaultFetch({
+      projects: [makeProject({ id: 1, name: "Kitchen Remodel", status: "active" })],
+    });
+    render(<ProjectsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Kitchen Remodel")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Edit Project"));
+
+    // Switch status to on_hold
+    fireEvent.click(screen.getByRole("button", { name: "on hold" }));
+
+    // Mock the PATCH
+    mockFetch.mockImplementation((_url: string, opts?: RequestInit) => {
+      if (opts?.method === "PATCH") {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: makeProject({ name: "Kitchen Remodel", status: "on_hold" }),
+            }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Project #1 saved/)).toBeInTheDocument();
+    });
+
+    // Verify the PATCH body included the new status
+    const patchCall = mockFetch.mock.calls.find(
+      (call: unknown[]) => (call[1] as RequestInit)?.method === "PATCH",
+    );
+    expect(patchCall).toBeTruthy();
+    const patchBody = JSON.parse((patchCall![1] as RequestInit).body as string);
+    expect(patchBody.status).toBe("on_hold");
+  });
+
+  // ---------------------------------------------------------------------------
+  // Search empty state
+  // ---------------------------------------------------------------------------
+
+  it("shows empty message when search matches no projects", async () => {
+    setupDefaultFetch({
+      projects: [
+        makeProject({ id: 1, name: "Kitchen Remodel" }),
+        makeProject({ id: 2, name: "Deck Build", status: "prospect" }),
+      ],
+    });
+    render(<ProjectsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Deck Build/)).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("Search projects"), {
+      target: { value: "zzzznonexistent" },
+    });
+
+    // Project cards should vanish from the list, empty message should appear
+    expect(screen.queryByText(/Deck Build/)).not.toBeInTheDocument();
+    expect(screen.getByText("No projects match your filters.")).toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Load failure
+  // ---------------------------------------------------------------------------
+
+  it("shows empty state on project fetch network failure", async () => {
+    mockFetch.mockImplementation(() => Promise.reject(new Error("Network error")));
+    render(<ProjectsConsole />);
+
+    // The component silently catches the error — empty project list is the feedback
+    await waitFor(() => {
+      expect(screen.getByText(/No projects yet/)).toBeInTheDocument();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Stale financial data clearing on project switch
+  // ---------------------------------------------------------------------------
+
+  it("resets financial metrics to placeholders when switching projects", async () => {
+    // Set up two projects. Financial summary only resolves for project 1 initially.
+    setupDefaultFetch({
+      projects: [
+        makeProject({ id: 1, name: "Kitchen Remodel" }),
+        makeProject({ id: 2, name: "Deck Build", status: "prospect" }),
+      ],
+    });
+    render(<ProjectsConsole />);
+
+    // Wait for project 1 financials to load
+    await waitFor(() => {
+      expect(screen.getByText("$25,000.00")).toBeInTheDocument();
+    });
+
+    // Now make financial summary hang (never resolve) to simulate loading state
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/financial-summary/")) {
+        return new Promise(() => {}); // never resolves
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
+    });
+
+    // Switch to project 2
+    fireEvent.click(screen.getByText(/Deck Build/));
+
+    // Financial metrics should reset to "--" placeholders while new data loads
+    await waitFor(() => {
+      const placeholders = screen.getAllByText("--");
+      expect(placeholders.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
 });
