@@ -98,6 +98,13 @@
   transform: translateY(0);
 }
 
+.terminalHint {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  padding: var(--space-xs) var(--space-sm);
+}
+
 /* ── Workflow pipeline ──────────────────────────────────── */
 
 .pipeline {

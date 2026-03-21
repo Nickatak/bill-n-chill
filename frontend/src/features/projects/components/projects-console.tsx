@@ -624,7 +624,11 @@ export function ProjectsConsole() {
                     >
                       {isProjectEditOpen ? "Close Edit" : "Edit Project"}
                     </button>
-                  ) : null}
+                  ) : (
+                    <span className={styles.terminalHint}>
+                      {selectedProject?.status === "completed" ? "Completed" : "Cancelled"} — no longer editable
+                    </span>
+                  )}
                 </div>
                 {isProjectEditOpen && !isSelectedProjectTerminal ? (
                   <form ref={projectEditFormRef} className={styles.projectEditForm} onSubmit={handleSaveProject}>
