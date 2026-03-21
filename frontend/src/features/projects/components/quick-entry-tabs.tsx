@@ -6,6 +6,8 @@
  * Offers two tabs — "Customer Payment" (inbound payment recorder) and
  * "Expense Receipt" (standalone receipt form) — so users can record
  * cash-in or expense receipts without leaving the project hub.
+ *
+ * Parent: ProjectsConsole
  */
 
 import { useState } from "react";

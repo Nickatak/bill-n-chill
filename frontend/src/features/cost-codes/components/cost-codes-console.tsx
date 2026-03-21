@@ -1,33 +1,70 @@
 "use client";
 
 /**
- * Cost code management console. Supports browsing, searching, creating, and editing
- * individual cost codes as well as bulk CSV import with dry-run preview. Cost codes
- * are the shared coding standard for estimates, budgets, and downstream reporting.
+ * Cost code management console — root component for the /cost-codes page.
+ *
+ * Pure orchestrator — composes hooks for list fetching, form CRUD,
+ * filtering, and CSV import. Owns no domain state itself.
+ *
+ * Parent: app/cost-codes/page.tsx
+ *
+ * ## Page layout
+ *
+ * ┌─────────────────────────────────────────────────────┐
+ * │ Header (title + stat pills)                         │
+ * ├─────────────────────────────────────────────────────┤
+ * │ Status banner (conditional)                         │
+ * ├──────────────────────┬──────────────────────────────┤
+ * │ Existing Codes       │ Create/Edit Form             │
+ * │   ├── Search input   │   ├── Code (locked in edit)  │
+ * │   ├── Filter pills   │   ├── Name                   │
+ * │   ├── Code list      │   ├── Status toggle (edit)   │
+ * │   └── Pagination     │   └── Submit / Cancel        │
+ * │                      ├──────────────────────────────┤
+ * │                      │ CSV Import (collapsible)     │
+ * │                      │   ├── Textarea               │
+ * │                      │   ├── Preview / Apply        │
+ * │                      │   └── Result summary         │
+ * └──────────────────────┴──────────────────────────────┘
+ *
+ * ## Hook dependency graph
+ *
+ * useApiList (shared — owns list data, selection, status messaging)
+ *   ├── useCostCodeFilters  (reads costCodes)
+ *   ├── useCostCodeForm     (reads + writes costCodes, reads selectedId)
+ *   └── useCsvImport        (calls refreshCostCodes after apply)
+ * useClientPagination       (reads filteredRows)
+ *
+ * ## Orchestration (in JSX)
+ *
+ * - useApiList's onSuccess hydrates the form or switches to create mode
+ *   depending on whether items were returned. Uses form functions via
+ *   closure (safe because useApiList stores onSuccess in a ref).
+ * - List row clicks go through form.handleSelect.
+ * - Form submit dispatches to form.handleCreate or form.handleSave
+ *   based on form.formMode.
  */
 
-import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { canDo } from "@/shared/session/rbac";
-import { FormEvent, useMemo, useState } from "react";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
-import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useApiList } from "@/shared/hooks/use-api-list";
 import { useClientPagination } from "@/shared/hooks/use-client-pagination";
 import { PaginationControls } from "@/shared/components/pagination-controls";
-import styles from "./cost-codes-console.module.css";
-import { ApiResponse, CostCode, CsvImportResult } from "../types";
 
-type VisibilityFilter = "active" | "all";
-type FormMode = "create" | "edit";
+import { useCostCodeForm } from "../hooks/use-cost-code-form";
+import { useCostCodeFilters } from "../hooks/use-cost-code-filters";
+import { useCsvImport } from "../hooks/use-csv-import";
+import type { CostCode } from "../types";
+import styles from "./cost-codes-console.module.css";
 
 /** Full CRUD console for cost codes with search, visibility filter, and CSV import. */
 export function CostCodesConsole() {
-  const { token, authMessage, capabilities } = useSharedSessionAuth();
+  const { token: authToken, authMessage, capabilities } = useSharedSessionAuth();
   const canMutateCostCodes = canDo(capabilities, "cost_codes", "create");
 
   const {
-    items: rows,
-    setItems: setRows,
+    items: costCodes,
+    setItems: setCostCodes,
     selectedId,
     setSelectedId,
     refresh: refreshCostCodes,
@@ -40,179 +77,42 @@ export function CostCodesConsole() {
     },
   } = useApiList<CostCode>({
     endpoint: "/cost-codes/",
-    token,
+    token: authToken,
     autoSelect: true,
     onSuccess(items) {
       if (!items.length) {
-        switchToCreate();
+        form.switchToCreate();
         return;
       }
-      // Hydrate form synchronously so the edit panel renders immediately.
-      // For initial load, selectedId is "" so we fall through to items[0].
-      // For reloads (e.g. CSV import), re-select the previously-selected item.
       const preferred = items.find((row) => String(row.id) === selectedId) ?? items[0];
-      hydrate(preferred);
+      form.hydrate(preferred);
     },
   });
-  const [searchTerm, setSearchTerm] = useState("");
-  const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("active");
 
-  const [formMode, setFormMode] = useState<FormMode>("create");
-  const [code, setCode] = useState("");
-  const [name, setName] = useState("");
-  const [isActive, setIsActive] = useState(true);
+  const form = useCostCodeForm({
+    authToken,
+    canMutate: canMutateCostCodes,
+    costCodes,
+    setCostCodes,
+    selectedId,
+    setSelectedId,
+    status: { setNeutral: setNeutralStatus, setSuccess: setSuccessStatus, setError: setErrorStatus },
+  });
 
-  const [importCsvText, setImportCsvText] = useState("code,name\n");
-  const [importResult, setImportResult] = useState<CsvImportResult | null>(null);
-  const [importExpanded, setImportExpanded] = useState(false);
+  const filters = useCostCodeFilters(costCodes);
 
-  const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
-  const orderedRows = useMemo(
-    () => [...rows].sort((left, right) => left.code.localeCompare(right.code)),
-    [rows],
-  );
-  const filteredRows = useMemo(() => {
-    const needle = searchTerm.trim().toLowerCase();
-    return orderedRows.filter((row) => {
-      if (visibilityFilter === "active" && !row.is_active) {
-        return false;
-      }
-      if (!needle) {
-        return true;
-      }
-      const haystack = `${row.code} ${row.name} ${row.id}`.toLowerCase();
-      return haystack.includes(needle);
-    });
-  }, [orderedRows, searchTerm, visibilityFilter]);
+  const csvImport = useCsvImport({
+    authToken,
+    canMutate: canMutateCostCodes,
+    status: { setNeutral: setNeutralStatus, setSuccess: setSuccessStatus, setError: setErrorStatus },
+    refreshCostCodes,
+  });
+
   const { paginatedItems: pageRows, page, totalPages, totalCount, setPage } =
-    useClientPagination(filteredRows, 25);
-  const includeArchived = visibilityFilter === "all";
-  const activeRowCount = rows.filter((row) => row.is_active).length;
-  const archivedRowCount = rows.length - activeRowCount;
-  const selectedCostCode = rows.find((row) => String(row.id) === selectedId) ?? null;
-  const isEditing = formMode === "edit" && selectedCostCode;
+    useClientPagination(filters.filteredRows, 25);
 
-  /** Populate the form fields from a cost code record and switch to edit mode. */
-  function hydrate(item: CostCode) {
-    setCode(item.code);
-    setName(item.name);
-    setIsActive(item.is_active);
-    setFormMode("edit");
-  }
-
-  /** Clear the form and switch to create mode. */
-  function switchToCreate() {
-    setSelectedId("");
-    setCode("");
-    setName("");
-    setIsActive(true);
-    setFormMode("create");
-  }
-
-  /** Select a cost code row and populate the edit form. */
-  function handleSelect(id: string) {
-    setSelectedId(id);
-    const item = rows.find((row) => String(row.id) === id);
-    if (item) {
-      hydrate(item);
-    }
-  }
-
-  /** POST a new cost code and select it on success. */
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!canMutateCostCodes) {
-      setErrorStatus("Your role is read-only for cost code mutations.");
-      return;
-    }
-    setNeutralStatus("Creating cost code...");
-
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/cost-codes/`, {
-        method: "POST",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
-        body: JSON.stringify({
-          code: code.trim(),
-          name: name.trim(),
-          is_active: true,
-        }),
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setErrorStatus(payload.error?.message ?? "Create failed. Check values and uniqueness.");
-        return;
-      }
-      const created = payload.data as CostCode;
-      setRows((current) => [...current, created]);
-      setSelectedId(String(created.id));
-      hydrate(created);
-      setSuccessStatus(`Created cost code #${created.id} (${created.code} - ${created.name}).`);
-    } catch {
-      setErrorStatus("Could not reach cost code create endpoint.");
-    }
-  }
-
-  /** PATCH the selected cost code with edited name and active status. */
-  async function handleSave(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!canMutateCostCodes) {
-      setErrorStatus("Your role is read-only for cost code mutations.");
-      return;
-    }
-    const id = Number(selectedId);
-    if (!id) {
-      setErrorStatus("Select a cost code first.");
-      return;
-    }
-
-    setNeutralStatus("Saving cost code...");
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/cost-codes/${id}/`, {
-        method: "PATCH",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
-        body: JSON.stringify({ code: code.trim(), name: name.trim(), is_active: isActive }),
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setErrorStatus(payload.error?.message ?? "Save failed. Check values and uniqueness.");
-        return;
-      }
-      const updated = payload.data as CostCode;
-      setRows((current) => current.map((row) => (row.id === updated.id ? updated : row)));
-      hydrate(updated);
-      setSuccessStatus(`Saved cost code #${updated.id} (${updated.code} - ${updated.name}).`);
-    } catch {
-      setErrorStatus("Could not reach cost code detail endpoint.");
-    }
-  }
-
-  /** Run a CSV import (preview or apply) and reload cost codes on successful apply. */
-  async function runCsvImport(dryRun: boolean) {
-    setNeutralStatus(dryRun ? "Previewing CSV import..." : "Applying CSV import...");
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/cost-codes/import-csv/`, {
-        method: "POST",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
-        body: JSON.stringify({ csv_text: importCsvText, dry_run: dryRun }),
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setErrorStatus(payload.error?.message ?? "CSV import failed.");
-        return;
-      }
-
-      const result = payload.data as CsvImportResult;
-      setImportResult(result);
-      if (!dryRun) {
-        await refreshCostCodes();
-      }
-      setSuccessStatus(
-        `${dryRun ? "Previewed" : "Applied"} ${result.total_rows} row(s): create ${result.created_count}, update ${result.updated_count}, errors ${result.error_count}.`,
-      );
-    } catch {
-      setErrorStatus("Could not reach cost code CSV import endpoint.");
-    }
-  }
+  const selectedCostCode = costCodes.find((row) => String(row.id) === selectedId) ?? null;
+  const isEditing = form.formMode === "edit" && selectedCostCode;
 
   return (
     <section className={styles.console}>
@@ -221,13 +121,13 @@ export function CostCodesConsole() {
           <h2 className={styles.headerTitle}>Cost Codes</h2>
         </div>
         <div className={styles.headerStats}>
-          <span className={styles.headerStatPill}>Total {rows.length}</span>
-          <span className={`${styles.headerStatPill} ${styles.headerStatActive}`}>Active {activeRowCount}</span>
-          <span className={styles.headerStatPill}>Archived {archivedRowCount}</span>
+          <span className={styles.headerStatPill}>Total {costCodes.length}</span>
+          <span className={`${styles.headerStatPill} ${styles.headerStatActive}`}>Active {filters.activeCount}</span>
+          <span className={styles.headerStatPill}>Archived {filters.archivedCount}</span>
         </div>
       </div>
 
-      {!token ? <p className={styles.authNotice}>{authMessage}</p> : null}
+      {!authToken ? <p className={styles.authNotice}>{authMessage}</p> : null}
 
       {statusMessage ? (
         <p
@@ -243,40 +143,40 @@ export function CostCodesConsole() {
         </p>
       ) : null}
 
-      {token ? (
+      {authToken ? (
         <div className={styles.layout}>
           <section className={`${styles.panel} ${styles.existingPanel}`}>
             <div className={styles.panelHeader}>
               <h3 className={styles.panelTitle}>Existing Codes</h3>
-              <span className={styles.countBadge}>{filteredRows.length}</span>
+              <span className={styles.countBadge}>{filters.filteredRows.length}</span>
             </div>
 
             <div className={styles.filterRow}>
               <input
                 className={styles.searchInput}
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
+                value={filters.searchTerm}
+                onChange={(event) => filters.setSearchTerm(event.target.value)}
                 placeholder="Search by code or name"
                 aria-label="Search cost codes"
               />
               <div className={styles.filterPills} role="group" aria-label="Cost code visibility filter">
                 <button
                   type="button"
-                  className={`${styles.filterPill} ${!includeArchived ? styles.filterPillActive : ""}`}
-                  onClick={() => setVisibilityFilter("active")}
-                  aria-pressed={!includeArchived}
+                  className={`${styles.filterPill} ${!filters.includeArchived ? styles.filterPillActive : ""}`}
+                  onClick={() => filters.setVisibilityFilter("active")}
+                  aria-pressed={!filters.includeArchived}
                 >
                   Active
-                  <span className={styles.filterPillCount}>{activeRowCount}</span>
+                  <span className={styles.filterPillCount}>{filters.activeCount}</span>
                 </button>
                 <button
                   type="button"
-                  className={`${styles.filterPill} ${includeArchived ? styles.filterPillActive : ""}`}
-                  onClick={() => setVisibilityFilter("all")}
-                  aria-pressed={includeArchived}
+                  className={`${styles.filterPill} ${filters.includeArchived ? styles.filterPillActive : ""}`}
+                  onClick={() => filters.setVisibilityFilter("all")}
+                  aria-pressed={filters.includeArchived}
                 >
                   All
-                  <span className={styles.filterPillCount}>{rows.length}</span>
+                  <span className={styles.filterPillCount}>{costCodes.length}</span>
                 </button>
               </div>
             </div>
@@ -290,7 +190,7 @@ export function CostCodesConsole() {
                     className={`${styles.listItem} ${
                       String(row.id) === selectedId ? styles.listItemSelected : ""
                     }`}
-                    onClick={() => handleSelect(String(row.id))}
+                    onClick={() => form.handleSelect(String(row.id))}
                   >
                     <span className={styles.itemTop}>
                       <span className={styles.itemCode}>{row.code}</span>
@@ -324,18 +224,18 @@ export function CostCodesConsole() {
                   {isEditing ? `Edit: ${selectedCostCode.code}` : "New Cost Code"}
                 </h3>
                 {isEditing ? (
-                  <button type="button" className={styles.newButton} onClick={switchToCreate}>
+                  <button type="button" className={styles.newButton} onClick={form.switchToCreate}>
                     + New
                   </button>
                 ) : null}
               </div>
 
-              <form className={styles.form} onSubmit={isEditing ? handleSave : handleCreate}>
+              <form className={styles.form} onSubmit={isEditing ? form.handleSave : form.handleCreate}>
                 <label className={styles.field}>
                   Code{isEditing ? " (locked)" : ""}
                   <input
-                    value={code}
-                    onChange={(event) => setCode(event.target.value)}
+                    value={form.code}
+                    onChange={(event) => form.setCode(event.target.value)}
                     disabled={!!isEditing}
                     aria-readonly={!!isEditing || undefined}
                     required
@@ -343,7 +243,7 @@ export function CostCodesConsole() {
                 </label>
                 <label className={styles.field}>
                   Name
-                  <input value={name} onChange={(event) => setName(event.target.value)} required />
+                  <input value={form.name} onChange={(event) => form.setName(event.target.value)} required />
                 </label>
                 {isEditing ? (
                   <div className={styles.field}>
@@ -351,15 +251,15 @@ export function CostCodesConsole() {
                     <div className={styles.segmentRow}>
                       <button
                         type="button"
-                        className={`${styles.segmentButton} ${isActive ? styles.segmentButtonActive : ""}`}
-                        onClick={() => setIsActive(true)}
+                        className={`${styles.segmentButton} ${form.isActive ? styles.segmentButtonActive : ""}`}
+                        onClick={() => form.setIsActive(true)}
                       >
                         Active
                       </button>
                       <button
                         type="button"
-                        className={`${styles.segmentButton} ${!isActive ? styles.segmentButtonInactive : ""}`}
-                        onClick={() => setIsActive(false)}
+                        className={`${styles.segmentButton} ${!form.isActive ? styles.segmentButtonInactive : ""}`}
+                        onClick={() => form.setIsActive(false)}
                       >
                         Archived
                       </button>
@@ -371,7 +271,7 @@ export function CostCodesConsole() {
                     {isEditing ? "Save" : "Create"}
                   </button>
                   {isEditing ? (
-                    <button type="button" className={styles.secondaryButton} onClick={switchToCreate}>
+                    <button type="button" className={styles.secondaryButton} onClick={form.switchToCreate}>
                       Cancel
                     </button>
                   ) : null}
@@ -383,19 +283,19 @@ export function CostCodesConsole() {
               <button
                 type="button"
                 className={styles.importToggle}
-                onClick={() => setImportExpanded((current) => !current)}
-                aria-expanded={importExpanded}
+                onClick={() => csvImport.setIsExpanded((current) => !current)}
+                aria-expanded={csvImport.isExpanded}
               >
                 <h3 className={styles.panelTitle}>CSV Import</h3>
-                <span className={styles.importToggleArrow}>{importExpanded ? "▲" : "▼"}</span>
+                <span className={styles.importToggleArrow}>{csvImport.isExpanded ? "▲" : "▼"}</span>
               </button>
-              {importExpanded ? (
+              {csvImport.isExpanded ? (
                 <>
                   <label className={styles.field}>
                     CSV text
                     <textarea
-                      value={importCsvText}
-                      onChange={(event) => setImportCsvText(event.target.value)}
+                      value={csvImport.csvText}
+                      onChange={(event) => csvImport.setCsvText(event.target.value)}
                       rows={8}
                     />
                   </label>
@@ -403,7 +303,7 @@ export function CostCodesConsole() {
                     <button
                       type="button"
                       className={styles.secondaryButton}
-                      onClick={() => void runCsvImport(true)}
+                      onClick={() => void csvImport.runImport(true)}
                       disabled={!canMutateCostCodes}
                     >
                       Preview
@@ -411,20 +311,20 @@ export function CostCodesConsole() {
                     <button
                       type="button"
                       className={styles.primaryButton}
-                      onClick={() => void runCsvImport(false)}
+                      onClick={() => void csvImport.runImport(false)}
                       disabled={!canMutateCostCodes}
                     >
                       Apply
                     </button>
                   </div>
-                  {importResult ? (
+                  {csvImport.importResult ? (
                     <div className={styles.importResult}>
                       <p className={styles.importHint}>
-                        Rows: {importResult.total_rows} | Create: {importResult.created_count} | Update: {" "}
-                        {importResult.updated_count} | Errors: {importResult.error_count}
+                        Rows: {csvImport.importResult.total_rows} | Create: {csvImport.importResult.created_count} | Update: {" "}
+                        {csvImport.importResult.updated_count} | Errors: {csvImport.importResult.error_count}
                       </p>
                       <ul className={styles.resultRows}>
-                        {importResult.rows.map((row) => (
+                        {csvImport.importResult.rows.map((row) => (
                           <li
                             key={`${row.row_number}-${row.code ?? "none"}-${row.status}`}
                             className={`${styles.resultRow} ${

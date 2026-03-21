@@ -1,19 +1,24 @@
 "use client";
 
 /**
- * Duplicate resolution UI shown during quick-add when existing customer matches are detected.
+ * Duplicate resolution UI shown during quick-add when existing customer
+ * matches are detected.
  *
  * Intent-aware:
- * - customer_and_project: lets user pick an existing customer to attach the project to.
- * - customer_only: shows a link to the existing customer (no creation action needed).
+ * - customer_and_project: lets user pick an existing customer to attach
+ *   the project to.
+ * - customer_only: shows a link to the existing customer (no creation
+ *   action needed).
+ *
+ * Parent: QuickAddConsole
  */
 
 import { KeyboardEvent } from "react";
 import Link from "next/link";
 
-import { CustomerIntakePayload, DuplicateCustomerCandidate } from "../types";
-import { DuplicateResolution, SubmitIntent } from "../hooks/quick-add-controller.types";
-import { formatCreatedAt, matchedFields } from "../utils/duplicate-matching";
+import { CustomerIntakePayload, DuplicateCustomerCandidate } from "../../types";
+import { DuplicateResolution, SubmitIntent } from "../../hooks/quick-add-controller.types";
+import { formatCreatedAt, matchedFields } from "../../utils/duplicate-matching";
 import styles from "./quick-add-console.module.css";
 
 type DuplicateResolutionPanelProps = {

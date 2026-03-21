@@ -1,4 +1,35 @@
+/**
+ * Project creation modal lifecycle hook.
+ *
+ * Owns the create-project modal state: open/close, form fields, POST
+ * mutation, and navigation to the new project workspace on success.
+ * Pre-fills project name and site address from the selected customer.
+ *
+ * Consumer: CustomersConsole (composed alongside useCustomerListFetch).
+ *
+ * ## State (useState)
+ *
+ * - customerId         — ID of the customer the project is being created for
+ * - isOpen             — modal visibility flag
+ * - projectName        — editable project name (pre-filled from customer)
+ * - projectSiteAddress — editable site address (pre-filled from billing address)
+ * - projectStatus      — "prospect" | "active"
+ *
+ * ## Functions
+ *
+ * - open(customer)
+ *     Pre-fills form from the CustomerRow and shows the modal.
+ *
+ * - close()
+ *     Hides the modal.
+ *
+ * - handleCreate(event)
+ *     POSTs the project, then navigates to the project workspace.
+ */
+
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
+import { apiBaseUrl } from "@/shared/api/base";
+import { useBackdropDismiss } from "@/shared/hooks/use-backdrop-dismiss";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -19,21 +50,27 @@ type ProjectCreateApiResponse = {
 };
 
 type UseProjectCreatorOptions = {
-  token: string;
-  normalizedBaseUrl: string;
+  authToken: string;
   canMutate: boolean;
-  rows: CustomerRow[];
+  customerRows: CustomerRow[];
   setStatusMessage: (message: string) => void;
 };
 
+/**
+ * Manage the create-project modal lifecycle: open, populate, POST, navigate.
+ *
+ * @param options - Auth token, RBAC flag, and list state handles from the console.
+ * @returns Modal state, form fields + setters, and lifecycle helpers.
+ */
 export function useProjectCreator({
-  token,
-  normalizedBaseUrl,
+  authToken,
   canMutate,
-  rows,
+  customerRows,
   setStatusMessage,
 }: UseProjectCreatorOptions) {
   const router = useRouter();
+
+  // --- State ---
 
   const [customerId, setCustomerId] = useState<number | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -44,7 +81,9 @@ export function useProjectCreator({
   const customer =
     customerId === null
       ? null
-      : rows.find((entry) => entry.id === customerId) ?? null;
+      : customerRows.find((entry) => entry.id === customerId) ?? null;
+
+  // --- Functions ---
 
   /** Open the project creation modal, pre-filling name and address from the customer. */
   function open(target: CustomerRow) {
@@ -58,6 +97,8 @@ export function useProjectCreator({
   function close() {
     setIsOpen(false);
   }
+
+  const backdropDismiss = useBackdropDismiss(close);
 
   /** POST a new project under the selected customer, then navigate to its workspace. */
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
@@ -81,9 +122,9 @@ export function useProjectCreator({
 
     setStatusMessage("");
     try {
-      const response = await fetch(`${normalizedBaseUrl}/customers/${customerId}/projects/`, {
+      const response = await fetch(`${apiBaseUrl}/customers/${customerId}/projects/`, {
         method: "POST",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
+        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({
           name: projectName,
           site_address: projectSiteAddress,
@@ -116,15 +157,23 @@ export function useProjectCreator({
     }
   }
 
+  // --- Return bag ---
+
   return {
+    // State
     isOpen,
     customer,
     projectName,
-    setProjectName,
     projectSiteAddress,
-    setProjectSiteAddress,
     projectStatus,
+    backdropDismiss,
+
+    // Setters
+    setProjectName,
+    setProjectSiteAddress,
     setProjectStatus,
+
+    // Helpers
     open,
     close,
     handleCreate,

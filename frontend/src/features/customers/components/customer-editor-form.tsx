@@ -2,7 +2,9 @@
 
 /**
  * Controlled form for editing an existing customer's profile fields (name, contact info,
- * archive status). Rendered inside a modal dialog from CustomersConsole.
+ * archive status). Rendered inside a modal dialog.
+ *
+ * Parent: CustomersConsole (modal)
  */
 
 import { FormEventHandler } from "react";

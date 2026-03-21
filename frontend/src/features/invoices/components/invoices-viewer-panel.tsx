@@ -6,7 +6,7 @@
  * line items, contract breakdown). All data and handlers are received
  * via props — no hooks or side effects live here.
  *
- * Extracted from invoices-console.tsx to reduce component size.
+ * Parent: InvoicesConsole
  */
 
 import Link from "next/link";
@@ -84,7 +84,7 @@ type ContractBreakdownEstimateLine = {
   description: string;
   quantity: string;
   unit: string;
-  unit_cost: string;
+  unit_price: string;
   markup_percent: string;
   line_total: string;
 };
@@ -301,7 +301,7 @@ export function InvoicesViewerPanel({
               const qty = parseAmount(line.quantity);
               const markedUpUnitPrice = qty !== 0
                 ? formatDecimal(parseAmount(line.line_total) / qty)
-                : line.unit_cost;
+                : line.unit_price;
               const unit = line.unit || "ea";
               const costCodeLabel = line.cost_code_code || "—";
               const cells: React.ReactNode[] = [
@@ -309,11 +309,11 @@ export function InvoicesViewerPanel({
                 line.description || "—",
                 Number(line.quantity).toFixed(2),
                 unit,
-                `$${Number(line.unit_cost).toFixed(2)}`,
+                `$${Number(line.unit_price).toFixed(2)}`,
                 `${line.markup_percent}%`,
                 <>
                   <span className={roTableStyles.mobileBreakdown}>
-                    {Number(line.quantity).toFixed(2)} {unit} × ${Number(line.unit_cost).toFixed(2)}
+                    {Number(line.quantity).toFixed(2)} {unit} × ${Number(line.unit_price).toFixed(2)}
                     {parseAmount(line.markup_percent) !== 0 ? ` + ${line.markup_percent}%` : ""}
                   </span>
                   <span>${line.line_total}</span>

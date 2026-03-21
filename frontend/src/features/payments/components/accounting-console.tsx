@@ -1,14 +1,27 @@
 "use client";
 
 /**
- * Accounting console — tabbed hub for invoices (AR), bills (AP), and receipts.
+ * Accounting console — tabbed hub for AR (invoices), AP (bills), and receipts.
  *
- * Tab 1: Invoices — org-wide invoice browser with inline payment recording (AR).
- * Tab 2: Bills — org-wide vendor bill browser with inline payment recording (AP).
- * Tab 3: Receipts — org-wide receipt browser with inline payment recording (AP).
+ * Minimal orchestrator — owns only tab state. Each tab component is
+ * self-contained with its own data fetching and mutation logic.
  *
- * Every payment is anchored to a document — no standalone payment view.
- * URL stays at /accounting (no sub-routes). Tab state is local.
+ * Parent: app/accounting/page.tsx
+ *
+ * ## Page layout
+ *
+ * ┌─────────────────────────────────────┐
+ * │ Tab bar (Invoices / Bills / Rcpts)  │
+ * ├─────────────────────────────────────┤
+ * │ Tab content (one at a time):        │
+ * │   ├── InvoicesTab                   │
+ * │   ├── BillsTab                      │
+ * │   └── ReceiptsTab                   │
+ * └─────────────────────────────────────┘
+ *
+ * ## State (useState)
+ *
+ * - activeTab — "invoices" | "bills" | "receipts"
  */
 
 import { useState } from "react";

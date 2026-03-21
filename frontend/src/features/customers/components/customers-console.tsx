@@ -1,16 +1,73 @@
 "use client";
 
 /**
- * Top-level customer management page. Lists all customers with search/filter controls,
- * provides modal-based editing of customer details, and supports inline project creation
- * that routes the user into the new project workspace.
+ * Customer management console — root component for the /customers page.
+ *
+ * Pure orchestrator — owns no domain state itself. Composes single-purpose
+ * hooks, wires their outputs into child components, and handles cross-hook
+ * coordination (modal mutual exclusion, combined refresh, deep-link routing).
+ *
+ * Parent: app/customers/page.tsx
+ *
+ * ## Page layout
+ *
+ * ┌─────────────────────────────────────────┐
+ * │ Onboarding Banner (conditional)         │
+ * ├─────────────────────────────────────────┤
+ * │ Quick Add Section                       │
+ * │   └── QuickAddConsole                   │
+ * ├─────────────────────────────────────────┤
+ * │ Browse Section                          │
+ * │   ├── CustomersFilters                  │
+ * │   ├── Status message (conditional)      │
+ * │   ├── CustomersList                     │
+ * │   └── Pagination (conditional)          │
+ * └─────────────────────────────────────────┘
+ *
+ * Modals (overlay, one at a time):
+ *   ├── CustomerEditorForm
+ *   └── CustomerProjectCreateForm
+ *
+ * ## Hook dependency graph
+ *
+ * useCustomerListFetch (owns customer data — the root)
+ *   ├── useCustomerFilters       (reads customerRows)
+ *   ├── useCustomerEditor        (reads + writes customerRows, writes statusMessage)
+ *   └── useProjectCreator        (reads customerRows, writes statusMessage)
+ * useProjectsByCustomer          (independent — own fetch, own refresh)
+ *
+ * ## Functions
+ *
+ * - refreshAll()
+ *     Calls listFetch.refresh() + projectIndex.refresh(). Passed to
+ *     QuickAddConsole so both data sources reload after a new customer.
+ *
+ * ## Effect: scoped customer deep-link
+ *
+ * Deps: [listFetch.customerRows, searchParams, editor]
+ *
+ * On initial load, if the URL has ?customer=<id> and a matching row
+ * exists, opens the editor for that customer. Fires once — a ref
+ * prevents re-triggering on subsequent row updates.
+ *
+ * ## Orchestration (in JSX)
+ *
+ * - Modal mutual exclusion: opening the editor closes the project
+ *   creator, and vice versa.
+ * - onBrowseCustomer: sets search query, resets page to 1, clears
+ *   activity filter to "all" so archived customers are findable.
+ * - Pagination: inline prev/next controls wired to listFetch.setPage.
  */
 
 import { canDo } from "@/shared/session/rbac";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import Link from "next/link";
+import { useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 
-import { useCustomerList } from "../hooks/use-customer-list";
+import { useCustomerListFetch } from "../hooks/use-customer-list-fetch";
+import { useCustomerFilters } from "../hooks/use-customer-filters";
+import { useProjectsByCustomer } from "../hooks/use-projects-by-customer";
 import { useCustomerEditor } from "../hooks/use-customer-editor";
 import { useProjectCreator } from "../hooks/use-project-creator";
 
@@ -18,42 +75,54 @@ import { CustomerEditorForm } from "./customer-editor-form";
 import { CustomersFilters } from "./customers-filters";
 import { CustomersList } from "./customers-list";
 import { CustomerProjectCreateForm } from "./customer-project-create-form";
-import { QuickAddConsole } from "./quick-add-console";
+import { QuickAddConsole } from "./quick-add/quick-add-console";
 import styles from "./customers-console.module.css";
 
 /** Root console component for customer CRUD, filtering, and project creation. */
 export function CustomersConsole() {
-  const { token, capabilities, organization } = useSharedSessionAuth();
+  const { token: authToken, capabilities, organization } = useSharedSessionAuth();
   const canMutateCustomers = canDo(capabilities, "customers", "create");
   const canMutateProjects = canDo(capabilities, "projects", "create");
   const showOnboarding = organization != null && organization.onboardingCompleted !== true;
 
-  // Editor is declared first so the list hook can call back into it for scoped customers.
-  // We use a ref to break the circular dependency (list needs editor.open, editor needs list.rows).
-  const editorOpenRef = { current: null as ((id: string) => void) | null };
-
-  const list = useCustomerList(token, {
-    onScopedCustomerFound: (customer) => editorOpenRef.current?.(String(customer.id)),
-  });
+  const listFetch = useCustomerListFetch(authToken);
+  const filters = useCustomerFilters(listFetch.customerRows);
+  const projectIndex = useProjectsByCustomer(authToken);
 
   const editor = useCustomerEditor({
-    token,
-    normalizedBaseUrl: list.normalizedBaseUrl,
+    authToken,
     canMutate: canMutateCustomers,
-    rows: list.rows,
-    setRows: list.setRows,
-    setStatusMessage: list.setStatusMessage,
+    customerRows: listFetch.customerRows,
+    setCustomerRows: listFetch.setCustomerRows,
+    setStatusMessage: listFetch.setStatusMessage,
   });
-
-  editorOpenRef.current = editor.open;
 
   const projectCreator = useProjectCreator({
-    token,
-    normalizedBaseUrl: list.normalizedBaseUrl,
+    authToken,
     canMutate: canMutateProjects,
-    rows: list.rows,
-    setStatusMessage: list.setStatusMessage,
+    customerRows: listFetch.customerRows,
+    setStatusMessage: listFetch.setStatusMessage,
   });
+
+  // Deep-link: ?customer=id opens the editor on initial load.
+  const searchParams = useSearchParams();
+  const scopedHandledRef = useRef(false);
+
+  useEffect(() => {
+    if (scopedHandledRef.current) return;
+    const param = searchParams.get("customer");
+    if (!param || !/^\d+$/.test(param)) return;
+    const match = listFetch.customerRows.find((r) => r.id === Number(param));
+    if (match) {
+      editor.open(String(match.id));
+      scopedHandledRef.current = true;
+    }
+  }, [listFetch.customerRows, searchParams, editor]);
+
+  function refreshAll() {
+    listFetch.refresh();
+    projectIndex.refresh();
+  }
 
   return (
     <section className={styles.section}>
@@ -74,11 +143,11 @@ export function CustomersConsole() {
           <h3 className={styles.quickAddTitle}>Quick Add Customer</h3>
         </div>
         <QuickAddConsole
-          onCustomerCreated={list.refresh}
+          onCustomerCreated={refreshAll}
           onBrowseCustomer={(searchTerm) => {
-            list.setQuery(searchTerm);
-            list.setPage(1);
-            list.setActivityFilter("all");
+            listFetch.setQuery(searchTerm);
+            listFetch.setPage(1);
+            filters.setActivityFilter("all");
           }}
         />
       </div>
@@ -88,24 +157,24 @@ export function CustomersConsole() {
         <h3 className={styles.browseSectionTitle}>Browse Customers</h3>
 
         <CustomersFilters
-          query={list.query}
+          query={listFetch.query}
           onQueryChange={(next) => {
-            list.setQuery(next);
-            list.setPage(1);
+            listFetch.setQuery(next);
+            listFetch.setPage(1);
           }}
-          activityFilter={list.activityFilter}
-          onActivityFilterChange={list.setActivityFilter}
-          projectFilter={list.projectFilter}
-          onProjectFilterChange={list.setProjectFilter}
+          activityFilter={filters.activityFilter}
+          onActivityFilterChange={filters.setActivityFilter}
+          projectFilter={filters.projectFilter}
+          onProjectFilterChange={filters.setProjectFilter}
         />
 
-        {list.statusMessage ? <p className={styles.statusMessage}>{list.statusMessage}</p> : null}
+        {listFetch.statusMessage ? <p className={styles.statusMessage}>{listFetch.statusMessage}</p> : null}
 
         <CustomersList
-          rows={list.rows}
-          filteredRows={list.filteredRows}
-          query={list.query}
-          projectsByCustomer={list.projectsByCustomer}
+          rows={listFetch.customerRows}
+          filteredRows={filters.filteredRows}
+          query={listFetch.query}
+          projectsByCustomer={projectIndex.projectsByCustomer}
           onEdit={(id) => {
             projectCreator.close();
             editor.open(id);
@@ -116,24 +185,24 @@ export function CustomersConsole() {
           }}
         />
 
-        {list.totalPages > 1 ? (
+        {listFetch.totalPages > 1 ? (
           <nav className={styles.pagination} aria-label="Customer list pagination">
             <button
               type="button"
               className={styles.paginationButton}
-              disabled={list.page <= 1}
-              onClick={() => list.setPage((p) => Math.max(1, p - 1))}
+              disabled={listFetch.page <= 1}
+              onClick={() => listFetch.setPage((p) => Math.max(1, p - 1))}
             >
               Previous
             </button>
             <span className={styles.paginationInfo}>
-              Page {list.page} of {list.totalPages} ({list.totalCount} customers)
+              Page {listFetch.page} of {listFetch.totalPages} ({listFetch.totalCount} customers)
             </span>
             <button
               type="button"
               className={styles.paginationButton}
-              disabled={list.page >= list.totalPages}
-              onClick={() => list.setPage((p) => Math.min(list.totalPages, p + 1))}
+              disabled={listFetch.page >= listFetch.totalPages}
+              onClick={() => listFetch.setPage((p) => Math.min(listFetch.totalPages, p + 1))}
             >
               Next
             </button>
@@ -146,8 +215,8 @@ export function CustomersConsole() {
       {editor.isOpen && editor.editingCustomer ? (
         <div
           className={styles.modalOverlay}
-          onMouseDown={editor.handleOverlayMouseDown}
-          onMouseUp={editor.handleOverlayMouseUp}
+          onMouseDown={editor.backdropDismiss.onMouseDown}
+          onMouseUp={editor.backdropDismiss.onMouseUp}
         >
           <section className={styles.modalCard} role="dialog" aria-modal="true" aria-label="Edit customer">
             <button type="button" className={styles.modalClose} onClick={editor.close}>
@@ -179,8 +248,8 @@ export function CustomersConsole() {
       {projectCreator.isOpen && projectCreator.customer ? (
         <div
           className={styles.modalOverlay}
-          onMouseDown={editor.handleOverlayMouseDown}
-          onMouseUp={editor.handleOverlayMouseUp}
+          onMouseDown={projectCreator.backdropDismiss.onMouseDown}
+          onMouseUp={projectCreator.backdropDismiss.onMouseUp}
         >
           <section className={styles.modalCard} role="dialog" aria-modal="true" aria-label="Create project">
             <button type="button" className={styles.modalClose} onClick={projectCreator.close}>
@@ -196,7 +265,7 @@ export function CustomersConsole() {
               onProjectStatusChange={projectCreator.setProjectStatus}
               onSubmit={projectCreator.handleCreate}
               readOnly={!canMutateProjects}
-              formMessage={list.statusMessage}
+              formMessage={listFetch.statusMessage}
             />
           </section>
         </div>

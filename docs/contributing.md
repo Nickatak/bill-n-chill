@@ -12,6 +12,10 @@ Last reviewed: 2026-03-04
   - [View Docstrings](#view-docstrings)
   - [Commit Style](#commit-style)
   - [Review Focus](#review-focus)
+- [Frontend Console Component Docstrings](#frontend-console-component-docstrings)
+- [Frontend Hook Docstrings](#frontend-hook-docstrings)
+- [Frontend Variable Naming](#frontend-variable-naming)
+- [Frontend useEffect Conventions](#frontend-useeffect-conventions)
 - [RBAC Patterns](#rbac-patterns)
 - [Call Chain Documentation](#call-chain-documentation)
 - [Architecture and Modeling Conventions (Meta Choices)](#architecture-and-modeling-conventions-meta-choices)
@@ -124,6 +128,215 @@ def some_view(request, ...):
 - API contract compatibility
 - Security and validation checks
 - Test coverage for modified behavior
+
+## Frontend Console Component Docstrings
+
+Console components are orchestrators — they compose hooks, wire state between them, and render the page layout. Their module docstrings should document the hook dependency graph, any local effects/functions, and include an ASCII layout showing the visual structure.
+
+```typescript
+/**
+ * One-line summary — root component for the /page-name page.
+ *
+ * Brief description of the component's role (orchestrator, no domain
+ * state of its own, etc.).
+ *
+ * Parent: app/page-name/page.tsx
+ *
+ * ## Page layout
+ *
+ * ┌─────────────────────────────────────────┐
+ * │ Section A (conditional)                 │
+ * ├─────────────────────────────────────────┤
+ * │ Section B                               │
+ * │   ├── ChildComponent                    │
+ * │   └── OtherChild                        │
+ * └─────────────────────────────────────────┘
+ *
+ * Modals (overlay, one at a time):
+ *   ├── ModalFormA
+ *   └── ModalFormB
+ *
+ * ## Hook dependency graph
+ *
+ * useDataFetch (owns the data — the root)
+ *   ├── useFilters       (reads rows)
+ *   ├── useEditor        (reads + writes rows, writes statusMessage)
+ *   └── useCreator       (reads rows, writes statusMessage)
+ * useOtherFetch          (independent)
+ *
+ * ## Functions
+ *
+ * - refreshAll()
+ *     What it does, why it exists.
+ *
+ * ## Effect: description
+ *
+ * Deps: [dep1, dep2]
+ *
+ * What triggers it, what it does, fire-once behavior if any.
+ *
+ * ## Orchestration (in JSX)
+ *
+ * Notable wiring that isn't obvious from reading the template:
+ * modal mutual exclusion, combined callbacks, filter resets, etc.
+ */
+```
+
+**Rules:**
+
+- **Page layout** uses box-drawing characters for sections and tree notation (`├──`, `└──`) for child components. Mark conditional renders and mutual exclusion.
+- **Hook dependency graph** shows which hooks depend on which, and what state they share. The root data hook goes first.
+- **Functions / Effects** follow the same conventions as hook docstrings.
+- **Orchestration** documents non-obvious JSX wiring — the stuff you can't see by scanning the template.
+
+## Frontend Hook Docstrings
+
+React hooks are not linear — they declare state, functions, and effects that React orchestrates across renders. Because the code can't be read top-to-bottom as a flow, the **module-level docstring is the primary documentation** and must serve as a complete map of the file.
+
+Every hook file should have a module docstring following this structure:
+
+```typescript
+/**
+ * One-line summary of what this hook does.
+ *
+ * Brief context paragraph — what it owns, who consumes it, and how it
+ * relates to sibling hooks in the same feature.
+ *
+ * Consumer: ParentComponent (composed alongside useSiblingHook, ...).
+ *
+ * ## State (useState)
+ *
+ * - fieldName  — what it holds, who reads/writes it
+ * - otherField — what it holds, notable default if non-obvious
+ *
+ * ## Functions
+ *
+ * - functionName(params)
+ *     What it does, when it's called, what state it mutates.
+ *     Note if it's only invoked by an effect (not called directly).
+ *
+ * - otherFunction()
+ *     What it does.
+ *
+ * ## Effect (one section per useEffect)
+ *
+ * Deps: [dep1, dep2, dep3]
+ *
+ * What triggers it, what it does, cleanup behavior if any.
+ * Note debounce/timer patterns here.
+ */
+```
+
+**Rules:**
+
+- **State** lists every `useState` with a short description. Group related fields (e.g. pagination: page, totalPages, totalCount).
+- **Functions** describes every named function in the hook body. Note whether a function is consumer-facing (returned in the bag) or internal (only called by an effect).
+- **Effect** gets one subsection per `useEffect`. List the dependency array and describe the trigger→action→cleanup cycle. This is where non-obvious behavior (debounce, one-time initialization, best-effort fetches) is documented.
+- **Refs** (if any) get their own section: name, what they hold, why a ref instead of state (i.e. "needs to persist across renders without triggering re-render").
+- **Memos** (if any) get their own section: name, what they derive, dependency array.
+
+### Section Dividers
+
+Hook bodies use `// --- Label ---` dividers with blank lines above and below to create visual sections. This compensates for JS/TS lacking Python's enforced whitespace conventions.
+
+Standard sections, in order:
+
+1. `// --- State ---` — `useState` declarations, grouped by concern (e.g. pagination fields together)
+2. `// --- Functions ---` — named functions (internal helpers, API callers)
+3. `// --- Effects ---` — `useEffect` blocks, each with its own `/** Effect: ... */` label
+4. `// --- Exposed helpers ---` — small consumer-facing functions (e.g. `refresh()`) that don't fit in Functions
+5. `// --- Return bag ---` — the return statement
+
+Not every hook needs all five sections. Omit sections that don't apply (e.g. a filter-only hook with no effects). The point is breathing room and scanability, not ceremony.
+
+### Return Bag Grouping
+
+The return object groups values by role, with inline comments separating the groups:
+
+```typescript
+return {
+    // State
+    customerRows,
+    query,
+    page,
+
+    // Setters
+    setCustomerRows,
+    setQuery,
+    setPage,
+
+    // Helpers
+    refresh,
+};
+```
+
+- **State** — read-only values the consumer displays
+- **Setters** — mutation handles (`set*`) the consumer or sibling hooks call
+- **Helpers** — action functions (e.g. `refresh()`, `handleSave()`)
+
+TypeScript infers the return type automatically — don't declare an explicit return type. The bag changes often during development and keeping a separate type in sync is friction for no safety gain.
+
+### Function-level JSDoc
+
+The exported function itself gets a shorter JSDoc covering the contract:
+
+```typescript
+/**
+ * Brief summary of the hook's purpose.
+ *
+ * @param paramName - What the param is.
+ * @returns What the return bag contains (high-level).
+ */
+export function useSomeHook(paramName: string) {
+```
+
+Internal helper functions get one-liner JSDoc comments:
+
+```typescript
+/** Fetch a page of records from the API. */
+async function loadRecords(...) {
+```
+
+## Frontend Variable Naming
+
+Prefer explicit, domain-specific names over generic ones. Variable names should say what the value *is*, not just its shape or role.
+
+**Rules:**
+
+- **No generic collection names.** `items`, `data`, `list`, `result` — these say nothing about what they hold. Use the domain term: `customers`, `projects`, `invoices`.
+- **Qualify ambiguous primitives.** A bare `token` could be anything — use `authToken`. A bare `id` in a context with multiple entities — use `customerId`, `projectId`.
+- **Match the backend naming** where possible. If the API returns `display_name`, the local variable holding it should be `displayName`, not `name` or `label`.
+
+Examples:
+```typescript
+// Bad
+const items = (payload.data as CustomerRow[]) ?? [];
+const token = useSharedSessionAuth().token;
+
+// Good
+const customers = (payload.data as CustomerRow[]) ?? [];
+const { token: authToken } = useSharedSessionAuth();
+```
+
+This applies to hook arguments, local variables, and destructured values. Parameters in option types (`UseCustomerEditorOptions`) follow the same rule: `authToken`, not `token`.
+
+## Frontend useEffect Conventions
+
+- **Inline short effects** (under ~10-15 lines). Keep the callback body and its dependency array visually co-located so the "what" and "when" stay together.
+- **Extract long effects** into a named function when the body exceeds ~10-15 lines, then pass the function to `useEffect`.
+- **Label every effect** with a JSDoc comment above it: `/** Effect: <name> — <what triggers it and what it does>. */` This ties the inline code to the corresponding section in the module docstring, and disambiguates when a hook has multiple effects.
+
+```typescript
+/** Effect: debounced fetch — loads customers 250ms after query/page/refreshKey changes. */
+useEffect(() => {
+  if (!authToken) return;
+  const timer = window.setTimeout(() => {
+    void loadCustomers(query, page);
+  }, 250);
+  return () => window.clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [authToken, query, page, refreshKey]);
+```
 
 ## Frontend CSS Conventions
 

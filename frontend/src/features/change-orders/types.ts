@@ -12,7 +12,7 @@ export type OriginEstimateLineItem = {
   description: string;
   quantity: string;
   unit: string;
-  unit_cost: string;
+  unit_price: string;
   markup_percent: string;
   line_total: string;
 };
@@ -126,7 +126,7 @@ export type ChangeOrderRecord = {
       description: string;
       quantity: string;
       unit: string;
-      unit_cost: string;
+      unit_price: string;
       markup_percent: string;
       line_total: string;
     }>;

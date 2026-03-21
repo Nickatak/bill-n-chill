@@ -1,20 +1,79 @@
 "use client";
 
 /**
- * Estimates console -- the primary internal workspace for managing estimates
- * within a project. Provides version-tree browsing, family-grouped estimate
- * history, draft creation/editing, status transitions, and duplication
- * workflows.
+ * Estimates console -- orchestrator for the internal estimate workspace.
+ *
+ * Pure orchestrator — composes single-purpose hooks, wires their outputs
+ * into child components, and owns cross-cutting coordination (data loading,
+ * mutations, family collision logic, status transitions).
+ *
+ * Parent: app/projects/[projectId]/estimates/page.tsx
+ *
+ * ## Page layout
+ *
+ * ┌─────────────────────────────────────────────────┐
+ * │ EstimatesViewerPanel                            │
+ * │   ├── Status filter pills                       │
+ * │   ├── Family-grouped estimate tree               │
+ * │   ├── Status transition controls                 │
+ * │   └── Status event history                       │
+ * ├─────────────────────────────────────────────────┤
+ * │ EstimatesWorkspacePanel                          │
+ * │   ├── Workspace header (context badge)           │
+ * │   ├── Duplicate dialog                           │
+ * │   ├── Family collision prompt                    │
+ * │   └── Estimate composer (sheet form)             │
+ * └─────────────────────────────────────────────────┘
+ *
+ * ## Hook dependency graph
+ *
+ * useLineItems             (standalone — line item CRUD primitives)
+ * useEstimateFormFields    (reads organizationDefaults, lineItem setters)
+ *   └── hydrateFromEstimate / resetFormFields used by console orchestration
+ * usePolicyContract        (standalone — fetches policy, drives status config)
+ * useStatusFilters         (standalone — status filter pill state)
+ * useCreatorFlash          (standalone — composer flash animation)
+ *
+ * ## Functions
+ *
+ * - loadDependencies()         — Fetches projects, cost codes, org defaults
+ * - loadEstimates(options?)    — Fetches estimates for selected project
+ * - loadStatusEvents(options?) — Fetches status event history
+ * - handleSelectEstimate()     — Selects estimate, hydrates form
+ * - clearSelectedEstimateState() — Resets selection + form to blank draft
+ * - startNewEstimate()         — Clears selection and flashes composer
+ * - handleCreateEstimate()     — Create or save-draft form submission
+ * - handleDuplicateEstimate()  — Clone as standalone with custom title
+ * - handleUpdateEstimateStatus() — Apply status transition
+ * - handleAddEstimateStatusNote() — Append note without transition
+ * - cloneEstimateRevision()    — Clone as new version in family
+ * - handleFamilyCardQuickAction() — Route CO/revision quick actions
+ * - handleSortLineItems()      — Column sort with toggle direction
+ *
+ * ## Effects
+ *
+ * - Sync printable state with estimate selection
+ * - Keep selectedEstimateIdRef in sync for async callbacks
+ * - Keep estimateStatusFiltersRef in sync for filter-aware loads
+ * - Fetch dependencies on auth token
+ * - Reload estimates on project change
+ * - Sync scoped project ID from props
+ * - Seed estimate date defaults on first render (in form fields hook)
+ * - Load status events on estimate selection change
+ * - Sync org defaults to form fields on first load
+ *
+ * ## Orchestration (in JSX)
+ *
+ * - Viewer panel receives all lifecycle props (filters, families, status controls)
+ * - Workspace panel receives form fields, line items, and mutation handlers
+ * - Collision confirm/dismiss wired inline to form field + submit coordination
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
+import { apiBaseUrl } from "@/shared/api/base";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
-import {
-  defaultApiBaseUrl,
-  fetchEstimatePolicyContract,
-  normalizeApiBaseUrl,
-} from "../api";
+import { fetchEstimatePolicyContract } from "../api";
 import { usePolicyContract } from "@/shared/hooks/use-policy-contract";
 import { useStatusFilters } from "@/shared/hooks/use-status-filters";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
@@ -22,12 +81,7 @@ import { canDo } from "@/shared/session/rbac";
 import { usePrintable } from "@/shared/shell/printable-context";
 import styles from "./estimates-console.module.css";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  formatDateInputFromIso,
-  formatDateTimeDisplay,
-  todayDateInput,
-  addDaysToDateInput,
-} from "@/shared/date-format";
+import { todayDateInput, addDaysToDateInput } from "@/shared/date-format";
 import {
   ApiResponse,
   CostCode,
@@ -38,12 +92,16 @@ import {
   ProjectRecord,
 } from "../types";
 import {
+  computeEstimateStatusCounts,
+  computeLineTotal,
   emptyLine,
-  mapEstimateLineItemsToInputs,
+  filterVisibleFamilies,
+  groupEstimateFamilies,
   normalizeFamilyTitle,
   readEstimateApiError,
   resolveAutoSelectEstimate,
   resolveEstimateValidationDeltaDays,
+  toNumber,
   validateEstimateLineItems,
 } from "../helpers";
 import type { OrganizationDocumentDefaults } from "./estimate-sheet";
@@ -51,19 +109,13 @@ import { EstimatesViewerPanel } from "./estimates-viewer-panel";
 import { EstimatesWorkspacePanel } from "./estimates-workspace-panel";
 import { useLineItems } from "@/shared/hooks/use-line-items";
 import { useMediaQuery } from "@/shared/hooks/use-media-query";
+import { useEstimateFormFields } from "../hooks/use-estimate-form-fields";
 
 // ---------------------------------------------------------------------------
 // Types & constants
 // ---------------------------------------------------------------------------
 
-type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amount";
 type EstimateStatusValue = string;
-type EstimateFamilyCollisionPrompt = {
-  title: string;
-  latestEstimateId: number | null;
-  latestVersion: number | null;
-  familySize: number | null;
-};
 type LoadEstimatesOptions = {
   preserveSelection?: boolean;
   preferredEstimateId?: number | null;
@@ -124,22 +176,64 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const canMutateEstimates = canDo(capabilities, "estimates", "create");
   const canSendEstimates = canDo(capabilities, "estimates", "send");
   const canApproveEstimates = canDo(capabilities, "estimates", "approve");
+
+  // -------------------------------------------------------------------------
+  // Message state
+  // -------------------------------------------------------------------------
+
   const [formErrorMessage, setFormErrorMessage] = useState("");
   const [formSuccessMessage, setFormSuccessMessage] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [actionTone, setActionTone] = useState<"error" | "success" | "info">("info");
 
+  // -------------------------------------------------------------------------
+  // Data state
+  // -------------------------------------------------------------------------
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [costCodes, setCostCodes] = useState<CostCode[]>([]);
   const [organizationDefaults, setOrganizationDefaults] =
     useState<OrganizationDocumentDefaults | null>(null);
-
   const [estimates, setEstimates] = useState<EstimateRecord[]>([]);
   const [selectedEstimateId, setSelectedEstimateId] = useState("");
+  const selectedEstimateIdRef = useRef("");
 
-  const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+  // -------------------------------------------------------------------------
+  // Line items (shared hook)
+  // -------------------------------------------------------------------------
+
+  const {
+    items: lineItems, setItems: setLineItems,
+    setNextId: setNextLineId,
+    add: addLineRaw, remove: removeLineRaw,
+    update: updateLineRaw, move: moveLineRaw,
+    duplicate: duplicateLineRaw, reset: resetLines,
+  } = useLineItems<EstimateLineInput>({ createEmpty: emptyLine });
+
+  // -------------------------------------------------------------------------
+  // Form fields (extracted hook)
+  // -------------------------------------------------------------------------
+
+  const formFields = useEstimateFormFields({
+    organizationDefaults,
+    selectedEstimateIdRef,
+    setLineItems,
+    setNextLineId,
+    resetLines,
+  });
+
+  // -------------------------------------------------------------------------
+  // Policy contract
+  // -------------------------------------------------------------------------
+
+  const [estimateQuickActionByStatus, setEstimateQuickActionByStatus] = useState<
+    Record<string, "change_order" | "revision">
+  >(ESTIMATE_QUICK_ACTION_BY_STATUS_FALLBACK);
+  const [defaultEstimateStatusFilters, setDefaultEstimateStatusFilters] = useState<string[]>(
+    ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK,
+  );
+
   const {
     statuses: estimateStatuses,
     statusLabels: estimateStatusLabels,
@@ -149,7 +243,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     fallbackStatuses: ESTIMATE_STATUSES_FALLBACK,
     fallbackLabels: ESTIMATE_STATUS_LABELS_FALLBACK,
     fallbackTransitions: ESTIMATE_ALLOWED_STATUS_TRANSITIONS_FALLBACK,
-    baseUrl: normalizedBaseUrl,
+    baseUrl: apiBaseUrl,
     token,
     onLoaded(contract, base) {
       // Domain-specific: quick-action map and filter reconciliation.
@@ -177,39 +271,18 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     },
   });
 
-  const [estimateQuickActionByStatus, setEstimateQuickActionByStatus] = useState<
-    Record<string, "change_order" | "revision">
-  >(ESTIMATE_QUICK_ACTION_BY_STATUS_FALLBACK);
+  // -------------------------------------------------------------------------
+  // Status lifecycle state
+  // -------------------------------------------------------------------------
+
   const [selectedStatus, setSelectedStatus] = useState<EstimateStatusValue>("draft");
   const [statusNote, setStatusNote] = useState("");
   const [statusEvents, setStatusEvents] = useState<EstimateStatusEventRecord[]>([]);
-  const [estimateTitle, setEstimateTitle] = useState("");
-  const [familyCollisionPrompt, setFamilyCollisionPrompt] =
-    useState<EstimateFamilyCollisionPrompt | null>(null);
-  const [confirmedFamilyTitleKey, setConfirmedFamilyTitleKey] = useState("");
-  const [termsText, setTermsText] = useState("");
-  const [taxPercent, setTaxPercent] = useState("0");
-  const {
-    items: lineItems, setItems: setLineItems,
-    setNextId: setNextLineId,
-    add: addLineRaw, remove: removeLineRaw,
-    update: updateLineRaw, move: moveLineRaw,
-    duplicate: duplicateLineRaw, reset: resetLines,
-  } = useLineItems<EstimateLineInput>({ createEmpty: emptyLine });
-  const [lineSortKey, setLineSortKey] = useState<LineSortKey | null>(null);
-  const [lineSortDirection, setLineSortDirection] = useState<"asc" | "desc">("asc");
-  const [estimateDate, setEstimateDate] = useState("");
-  const [validThrough, setValidThrough] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const submitGuard = useRef(false);
-  const selectedEstimateIdRef = useRef("");
-  const [openFamilyHistory, setOpenFamilyHistory] = useState<Set<string>>(() => new Set());
-  const duplicateDialogRef = useRef<HTMLDialogElement | null>(null);
-  const [duplicateTitle, setDuplicateTitle] = useState("");
-  const [isViewerExpanded, setIsViewerExpanded] = useState(true);
-  const [defaultEstimateStatusFilters, setDefaultEstimateStatusFilters] = useState<string[]>(
-    ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK,
-  );
+
+  // -------------------------------------------------------------------------
+  // Status filters (shared hook)
+  // -------------------------------------------------------------------------
+
   const viewerStatuses = estimateStatuses.filter(s => !ESTIMATE_SYSTEM_ONLY_STATUSES.has(s));
   const {
     filters: estimateStatusFilters,
@@ -223,6 +296,14 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const estimateStatusFiltersRef = useRef<EstimateStatusValue[]>(
     ESTIMATE_DEFAULT_STATUS_FILTERS_FALLBACK,
   );
+
+  // -------------------------------------------------------------------------
+  // UI state & refs
+  // -------------------------------------------------------------------------
+
+  const [openFamilyHistory, setOpenFamilyHistory] = useState<Set<string>>(() => new Set());
+  const duplicateDialogRef = useRef<HTMLDialogElement | null>(null);
+  const [isViewerExpanded, setIsViewerExpanded] = useState(true);
   const { ref: estimateComposerRef, flash: flashCreator } = useCreatorFlash();
   const { setPrintable } = usePrintable();
 
@@ -333,15 +414,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     return statusLabelByValue[status] ?? status;
   }
 
-  function formatEventDate(dateValue: string): string {
-    return formatDateTimeDisplay(dateValue, dateValue);
-  }
-
-  function toNumber(value: string): number {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-
   /** Determine the quick-action kind for a given estimate status (CO link or revision clone). */
   function quickActionKindForStatus(status: string): "change_order" | "revision" | null {
     return estimateQuickActionByStatus[status] ?? null;
@@ -367,7 +439,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     const sourceWasSent = sourceEstimate.status === "sent";
     setActionMessage("Cloning estimate version...");
     try {
-      const response = await fetch(`${normalizedBaseUrl}/estimates/${sourceEstimate.id}/clone-version/`, {
+      const response = await fetch(`${apiBaseUrl}/estimates/${sourceEstimate.id}/clone-version/`, {
         method: "POST",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({}),
@@ -411,86 +483,22 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     await cloneEstimateRevision(sourceEstimate);
   }
 
-  const lineTotals = useMemo(
-    () =>
-      lineItems.map((line) => {
-        const quantity = toNumber(line.quantity);
-        const unitCost = toNumber(line.unitCost);
-        const markup = toNumber(line.markupPercent);
-        const base = quantity * unitCost;
-        return base + base * (markup / 100);
-      }),
-    [lineItems],
-  );
+  const lineTotals = useMemo(() => lineItems.map(computeLineTotal), [lineItems]);
 
   const lineValidation = useMemo(() => validateEstimateLineItems(lineItems), [lineItems]);
   const subtotal = lineTotals.reduce((sum, value) => sum + value, 0);
-  const taxRate = toNumber(taxPercent);
+  const taxRate = toNumber(formFields.taxPercent);
   const taxAmount = subtotal * (taxRate / 100);
   const totalAmount = subtotal + taxAmount;
-  const estimateFamilies = useMemo(() => {
-    const families = new Map<string, EstimateRecord[]>();
-    for (const estimate of estimates) {
-      const title = (estimate.title || "").trim() || "Untitled";
-      const existing = families.get(title);
-      if (existing) {
-        existing.push(estimate);
-      } else {
-        families.set(title, [estimate]);
-      }
-    }
-    return Array.from(families.entries())
-      .map(([title, items]) => ({
-        title,
-        items: [...items].sort((a, b) => a.version - b.version),
-      }))
-      .sort((a, b) => {
-        const latestA = a.items[a.items.length - 1];
-        const latestB = b.items[b.items.length - 1];
-        const lastActionA = new Date(latestA?.updated_at || latestA?.created_at || 0).getTime();
-        const lastActionB = new Date(latestB?.updated_at || latestB?.created_at || 0).getTime();
-        return lastActionB - lastActionA;
-      });
-  }, [estimates]);
-  const estimateStatusCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const family of estimateFamilies) {
-      const latest = family.items[family.items.length - 1];
-      if (latest?.status) {
-        counts[latest.status] = (counts[latest.status] || 0) + 1;
-      }
-    }
-    return counts;
-  }, [estimateFamilies]);
-
-  const visibleEstimateFamilies = useMemo(() => {
-    if (estimateStatusFilters.length === 0) {
-      return [];
-    }
-    return estimateFamilies.filter((family) => {
-      const latest = family.items[family.items.length - 1];
-      if (!latest?.status) {
-        return false;
-      }
-      return estimateStatusFilters.includes(latest.status as EstimateStatusValue);
-    });
-  }, [estimateFamilies, estimateStatusFilters]);
+  const estimateFamilies = useMemo(() => groupEstimateFamilies(estimates), [estimates]);
+  const estimateStatusCounts = useMemo(() => computeEstimateStatusCounts(estimateFamilies), [estimateFamilies]);
+  const visibleEstimateFamilies = useMemo(
+    () => filterVisibleFamilies(estimateFamilies, estimateStatusFilters),
+    [estimateFamilies, estimateStatusFilters],
+  );
 
 
-  const loadEstimateIntoForm = useCallback((estimate: EstimateRecord) => {
-    const estimateTerms = (estimate.terms_text || "").trim();
-    setEstimateTitle(estimate.title || "Untitled");
-    setTermsText(estimateTerms || organizationDefaults?.estimate_terms_and_conditions || "");
-    setTaxPercent(String(estimate.tax_percent ?? "0"));
-    setValidThrough(estimate.valid_through ?? "");
-    const mapped = mapEstimateLineItemsToInputs(estimate.line_items ?? []);
-    setLineItems(mapped);
-    setNextLineId(mapped.length + 1);
-    const createdDate = formatDateInputFromIso(estimate.created_at);
-    if (createdDate) {
-      setEstimateDate(createdDate);
-    }
-  }, [organizationDefaults?.estimate_terms_and_conditions, setLineItems, setNextLineId]);
+  const loadEstimateIntoForm = formFields.hydrateFromEstimate;
 
   const handleSelectEstimate = useCallback((estimate: EstimateRecord) => {
     const nextEstimateId = String(estimate.id);
@@ -500,16 +508,16 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     if (!isSameEstimate) {
       setStatusEvents([]);
     }
-    setLineSortKey(null);
-    setLineSortDirection("asc");
+    formFields.setLineSortKey(null);
+    formFields.setLineSortDirection("asc");
     setFormErrorMessage("");
     setFormSuccessMessage("");
     setActionMessage("");
-    setFamilyCollisionPrompt(null);
-    setConfirmedFamilyTitleKey("");
+    formFields.setFamilyCollisionPrompt(null);
+    formFields.setConfirmedFamilyTitleKey("");
     loadEstimateIntoForm(estimate);
-    setDuplicateTitle(`${estimate.title || "Estimate"} Copy`);
-  }, [loadEstimateIntoForm]);
+    formFields.setDuplicateTitle(`${estimate.title || "Estimate"} Copy`);
+  }, [loadEstimateIntoForm, formFields]);
 
   // Keep the ref in sync so async callbacks always see the latest selection.
   useEffect(() => {
@@ -523,28 +531,14 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
 
   const clearSelectedEstimateState = useCallback(() => {
-    const nextEstimateDate = todayDateInput();
-    const nextValidThrough = addDaysToDateInput(
-      nextEstimateDate,
-      resolveEstimateValidationDeltaDays(organizationDefaults),
-    );
     setSelectedEstimateId("");
     selectedEstimateIdRef.current = "";
     setSelectedStatus("");
     setStatusNote("");
     setStatusEvents([]);
-    setEstimateTitle("");
-    setFamilyCollisionPrompt(null);
-    setConfirmedFamilyTitleKey("");
-    setTermsText(organizationDefaults?.estimate_terms_and_conditions || "");
-    setTaxPercent("0");
-    resetLines();
-    setLineSortKey(null);
-    setLineSortDirection("asc");
-    setEstimateDate(nextEstimateDate);
-    setValidThrough(nextValidThrough);
+    formFields.resetFormFields();
     duplicateDialogRef.current?.close();
-  }, [organizationDefaults, resetLines]);
+  }, [formFields]);
 
   /** Reset the composer to a blank draft. */
   function startNewEstimate() {
@@ -566,47 +560,17 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     });
   }
 
-
-  /** Update the title and clear stale family-collision prompts when the title diverges. */
-  function handleEstimateTitleChange(value: string) {
-    setEstimateTitle(value);
-    const nextKey = normalizeFamilyTitle(value);
-    if (confirmedFamilyTitleKey && confirmedFamilyTitleKey !== nextKey) {
-      setConfirmedFamilyTitleKey("");
-    }
-    if (familyCollisionPrompt && normalizeFamilyTitle(familyCollisionPrompt.title) !== nextKey) {
-      setFamilyCollisionPrompt(null);
-    }
-  }
-
-  // Seed the estimate date and valid-through defaults on first render.
-  useEffect(() => {
-    if (estimateDate) {
-      return;
-    }
-    const nextEstimateDate = todayDateInput();
-    setEstimateDate(nextEstimateDate);
-    if (!selectedEstimateIdRef.current && !validThrough) {
-      setValidThrough(
-        addDaysToDateInput(
-          nextEstimateDate,
-          resolveEstimateValidationDeltaDays(organizationDefaults),
-        ),
-      );
-    }
-  }, [estimateDate, organizationDefaults, validThrough]);
-
   const loadDependencies = useCallback(async () => {
     setActionMessage("");
     try {
       const [projectsRes, codesRes, organizationRes] = await Promise.all([
-        fetch(`${normalizedBaseUrl}/projects/`, {
+        fetch(`${apiBaseUrl}/projects/`, {
           headers: buildAuthHeaders(token),
         }),
-        fetch(`${normalizedBaseUrl}/cost-codes/`, {
+        fetch(`${apiBaseUrl}/cost-codes/`, {
           headers: buildAuthHeaders(token),
         }),
-        fetch(`${normalizedBaseUrl}/organization/`, {
+        fetch(`${apiBaseUrl}/organization/`, {
           headers: buildAuthHeaders(token),
         }),
       ]);
@@ -633,8 +597,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setCostCodes(codeRows);
       if (organizationRes.ok && organizationData) {
         setOrganizationDefaults(organizationData);
-        setTermsText((current) => current || organizationData.estimate_terms_and_conditions || "");
-        setValidThrough((current) => {
+        formFields.setTermsText((current) => current || organizationData.estimate_terms_and_conditions || "");
+        formFields.setValidThrough((current) => {
           if (selectedEstimateIdRef.current || current) {
             return current;
           }
@@ -660,7 +624,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     } catch {
       setActionMessage("Could not reach project and cost-code endpoints.");
     }
-  }, [normalizedBaseUrl, scopedProjectId, token]);
+  }, [apiBaseUrl, scopedProjectId, token, formFields]);
 
   const loadEstimates = useCallback(async (options?: LoadEstimatesOptions) => {
     const projectId = Number(selectedProjectId);
@@ -681,7 +645,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     }
 
     try {
-      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
+      const response = await fetch(`${apiBaseUrl}/projects/${projectId}/estimates/`, {
         headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
@@ -726,7 +690,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   }, [
     clearSelectedEstimateState,
     handleSelectEstimate,
-    normalizedBaseUrl,
+    apiBaseUrl,
     scopedEstimateId,
     selectedProjectId,
     token,
@@ -779,8 +743,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
   function moveLineItem(localId: number, direction: "up" | "down") {
     moveLineRaw(localId, direction);
-    setLineSortKey(null);
-    setLineSortDirection("asc");
+    formFields.setLineSortKey(null);
+    formFields.setLineSortDirection("asc");
   }
 
   function removeLineItem(localId: number) {
@@ -801,11 +765,11 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   }
 
   /** Sort line items by the given column key, toggling direction on repeat clicks. */
-  function handleSortLineItems(key: LineSortKey) {
+  function handleSortLineItems(key: typeof formFields.lineSortKey & string) {
     if (isReadOnly) {
       return;
     }
-    const nextDirection = lineSortKey === key && lineSortDirection === "asc" ? "desc" : "asc";
+    const nextDirection = formFields.lineSortKey === key && formFields.lineSortDirection === "asc" ? "desc" : "asc";
     const directionFactor = nextDirection === "asc" ? 1 : -1;
 
     function lineAmount(line: EstimateLineInput): number {
@@ -843,8 +807,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       });
       return sorted;
     });
-    setLineSortKey(key);
-    setLineSortDirection(nextDirection);
+    formFields.setLineSortKey(key);
+    formFields.setLineSortDirection(nextDirection);
   }
 
   const canCreateEstimate = useMemo(
@@ -866,23 +830,23 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     allowExistingTitleFamily: boolean;
   }) {
     setActionMessage("");
-    submitGuard.current = true;
-    setIsSubmitting(true);
+    formFields.submitGuard.current = true;
+    formFields.setIsSubmitting(true);
     try {
-      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
+      const response = await fetch(`${apiBaseUrl}/projects/${projectId}/estimates/`, {
         method: "POST",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
           title,
           allow_existing_title_family: allowExistingTitleFamily,
-          valid_through: validThrough || null,
-          tax_percent: taxPercent,
+          valid_through: formFields.validThrough || null,
+          tax_percent: formFields.taxPercent,
           line_items: lineItems.map((line) => ({
             cost_code: Number(line.costCodeId),
             description: line.description,
             quantity: line.quantity,
             unit: line.unit,
-            unit_cost: line.unitCost,
+            unit_price: line.unitCost,
             markup_percent: line.markupPercent,
           })),
         }),
@@ -891,7 +855,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       if (!response.ok) {
         if (response.status === 409 && payload.error?.code === "estimate_family_exists") {
           const conflictMeta = payload.error?.meta ?? {};
-          setFamilyCollisionPrompt({
+          formFields.setFamilyCollisionPrompt({
             title,
             latestEstimateId:
               typeof conflictMeta.latest_estimate_id === "number"
@@ -901,13 +865,13 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
               typeof conflictMeta.latest_version === "number" ? conflictMeta.latest_version : null,
             familySize: typeof conflictMeta.family_size === "number" ? conflictMeta.family_size : null,
           });
-          setConfirmedFamilyTitleKey("");
+          formFields.setConfirmedFamilyTitleKey("");
         } else if (
           response.status === 409 &&
           payload.error?.code === "estimate_family_approved_locked"
         ) {
-          setFamilyCollisionPrompt(null);
-          setConfirmedFamilyTitleKey("");
+          formFields.setFamilyCollisionPrompt(null);
+          formFields.setConfirmedFamilyTitleKey("");
         }
         setFormErrorMessage(
           readEstimateApiError(payload, "Create estimate failed. Check values and try again."),
@@ -922,14 +886,14 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setFormErrorMessage("");
       setFormSuccessMessage(`Created estimate #${created.id} v${created.version}.`);
         loadEstimateIntoForm(created);
-      setFamilyCollisionPrompt(null);
-      setConfirmedFamilyTitleKey("");
+      formFields.setFamilyCollisionPrompt(null);
+      formFields.setConfirmedFamilyTitleKey("");
       flashCreator();
     } catch {
       setFormErrorMessage("Could not reach estimate create endpoint.");
     } finally {
-      submitGuard.current = false;
-      setIsSubmitting(false);
+      formFields.submitGuard.current = false;
+      formFields.setIsSubmitting(false);
     }
   }
 
@@ -938,7 +902,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     event.preventDefault();
     setFormErrorMessage("");
     setFormSuccessMessage("");
-    if (submitGuard.current) {
+    if (formFields.submitGuard.current) {
       return;
     }
     if (!canMutateEstimates) {
@@ -955,7 +919,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       return;
     }
 
-    const trimmedTitle = estimateTitle.trim();
+    const trimmedTitle = formFields.estimateTitle.trim();
     if (!trimmedTitle) {
       setFormErrorMessage("Estimate title is required.");
       return;
@@ -969,22 +933,22 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
     if (isEditingDraft && selectedEstimate) {
       setActionMessage("");
-      submitGuard.current = true;
-      setIsSubmitting(true);
+      formFields.submitGuard.current = true;
+      formFields.setIsSubmitting(true);
       try {
-        const response = await fetch(`${normalizedBaseUrl}/estimates/${selectedEstimate.id}/`, {
+        const response = await fetch(`${apiBaseUrl}/estimates/${selectedEstimate.id}/`, {
           method: "PATCH",
           headers: buildAuthHeaders(token, { contentType: "application/json" }),
           body: JSON.stringify({
             title: trimmedTitle,
-            valid_through: validThrough || null,
-            tax_percent: taxPercent,
+            valid_through: formFields.validThrough || null,
+            tax_percent: formFields.taxPercent,
             line_items: lineItems.map((line) => ({
               cost_code: Number(line.costCodeId),
               description: line.description,
               quantity: line.quantity,
               unit: line.unit,
-              unit_cost: line.unitCost,
+              unit_price: line.unitCost,
               markup_percent: line.markupPercent,
             })),
           }),
@@ -1007,8 +971,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       } catch {
         setFormErrorMessage("Could not reach estimate update endpoint.");
       } finally {
-        submitGuard.current = false;
-        setIsSubmitting(false);
+        formFields.submitGuard.current = false;
+        formFields.setIsSubmitting(false);
       }
       return;
     }
@@ -1021,17 +985,17 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       existingFamily?.items.some((estimate) => estimate.status === "approved"),
     );
     const promptMatchesCurrentTitle =
-      familyCollisionPrompt &&
-      normalizeFamilyTitle(familyCollisionPrompt.title) === normalizedTitle;
+      formFields.familyCollisionPrompt &&
+      normalizeFamilyTitle(formFields.familyCollisionPrompt.title) === normalizedTitle;
     if (existingFamily && familyHasApprovedVersion) {
-      setConfirmedFamilyTitleKey("");
-      setFamilyCollisionPrompt(null);
+      formFields.setConfirmedFamilyTitleKey("");
+      formFields.setFamilyCollisionPrompt(null);
       setFormErrorMessage(
         `The estimate family "${existingFamily.title}" is locked because it already has an approved version. Use a new title or create a change order instead.`,
       );
       return;
     }
-    if (existingFamily && confirmedFamilyTitleKey !== normalizedTitle) {
+    if (existingFamily && formFields.confirmedFamilyTitleKey !== normalizedTitle) {
       if (promptMatchesCurrentTitle) {
         await submitNewEstimateWithTitle({
           projectId,
@@ -1041,7 +1005,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         return;
       }
       const latest = existingFamily.items[existingFamily.items.length - 1];
-      setFamilyCollisionPrompt({
+      formFields.setFamilyCollisionPrompt({
         title: existingFamily.title,
         latestEstimateId: latest?.id ?? null,
         latestVersion: latest?.version ?? null,
@@ -1067,18 +1031,18 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setActionMessage("Select an existing estimate version before duplicating.");
       return;
     }
-    if (!duplicateTitle.trim()) {
+    if (!formFields.duplicateTitle.trim()) {
       setActionMessage("Duplicate title is required.");
       return;
     }
 
     setActionMessage("");
     try {
-      const response = await fetch(`${normalizedBaseUrl}/estimates/${estimateId}/duplicate/`, {
+      const response = await fetch(`${apiBaseUrl}/estimates/${estimateId}/duplicate/`, {
         method: "POST",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
-          title: duplicateTitle.trim(),
+          title: formFields.duplicateTitle.trim(),
         }),
       });
       const payload: ApiResponse = await response.json();
@@ -1116,7 +1080,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
     setActionMessage("");
     try {
-      const response = await fetch(`${normalizedBaseUrl}/estimates/${estimateId}/`, {
+      const response = await fetch(`${apiBaseUrl}/estimates/${estimateId}/`, {
         method: "PATCH",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({ status: selectedStatus, status_note: statusNote }),
@@ -1162,7 +1126,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
     setActionMessage("");
     try {
-      const response = await fetch(`${normalizedBaseUrl}/estimates/${estimateId}/`, {
+      const response = await fetch(`${apiBaseUrl}/estimates/${estimateId}/`, {
         method: "PATCH",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({ status_note: statusNote }),
@@ -1202,7 +1166,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       }
 
       try {
-        const response = await fetch(`${normalizedBaseUrl}/estimates/${estimateId}/status-events/`, {
+        const response = await fetch(`${apiBaseUrl}/estimates/${estimateId}/status-events/`, {
           headers: buildAuthHeaders(token),
         });
         const payload: ApiResponse = await response.json();
@@ -1220,7 +1184,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         }
       }
     },
-    [normalizedBaseUrl, selectedEstimateId, token],
+    [apiBaseUrl, selectedEstimateId, token],
   );
 
   // Load status events whenever the selected estimate changes.
@@ -1283,22 +1247,22 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         selectedEstimate={selectedEstimate}
         onStartNew={startNewEstimate}
         onOpenDuplicate={() => {
-          setDuplicateTitle(`${selectedEstimate?.title || "Estimate"} Copy`);
+          formFields.setDuplicateTitle(`${selectedEstimate?.title || "Estimate"} Copy`);
           duplicateDialogRef.current?.showModal();
         }}
         actionMessage={actionMessage}
         actionTone={actionTone}
         duplicateDialogRef={duplicateDialogRef}
-        duplicateTitle={duplicateTitle}
-        onDuplicateTitleChange={setDuplicateTitle}
+        duplicateTitle={formFields.duplicateTitle}
+        onDuplicateTitleChange={formFields.setDuplicateTitle}
         onConfirmDuplicate={handleDuplicateEstimate}
         selectedProject={selectedProject}
-        familyCollisionPrompt={familyCollisionPrompt}
-        estimateTitle={estimateTitle}
+        familyCollisionPrompt={formFields.familyCollisionPrompt}
+        estimateTitle={formFields.estimateTitle}
         selectedProjectId={selectedProjectId}
         onConfirmCollision={(projectId, title) => {
-          setConfirmedFamilyTitleKey(normalizeFamilyTitle(title));
-          setFamilyCollisionPrompt(null);
+          formFields.setConfirmedFamilyTitleKey(normalizeFamilyTitle(title));
+          formFields.setFamilyCollisionPrompt(null);
           void submitNewEstimateWithTitle({
             projectId,
             title,
@@ -1306,18 +1270,18 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
           });
         }}
         onDismissCollision={() => {
-          setConfirmedFamilyTitleKey("");
-          setFamilyCollisionPrompt(null);
+          formFields.setConfirmedFamilyTitleKey("");
+          formFields.setFamilyCollisionPrompt(null);
         }}
         canMutateEstimates={canMutateEstimates}
         role={role}
         estimateComposerRef={estimateComposerRef}
         organizationDefaults={organizationDefaults}
         estimateId={selectedEstimateId}
-        estimateDate={estimateDate}
-        validThrough={validThrough}
-        termsText={termsText}
-        taxPercent={taxPercent}
+        estimateDate={formFields.estimateDate}
+        validThrough={formFields.validThrough}
+        termsText={formFields.termsText}
+        taxPercent={formFields.taxPercent}
         lineItems={lineItems}
         lineTotals={lineTotals}
         subtotal={subtotal}
@@ -1325,17 +1289,17 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         totalAmount={totalAmount}
         costCodes={costCodes}
         canSubmit={canCreateEstimate}
-        isSubmitting={isSubmitting}
+        isSubmitting={formFields.isSubmitting}
         isEditingDraft={isEditingDraft}
         readOnly={isReadOnly}
         formErrorMessage={formErrorMessage}
         formSuccessMessage={formSuccessMessage}
         lineValidation={lineValidation}
-        lineSortKey={lineSortKey}
-        lineSortDirection={lineSortDirection}
-        onTitleChange={handleEstimateTitleChange}
-        onValidThroughChange={setValidThrough}
-        onTaxPercentChange={setTaxPercent}
+        lineSortKey={formFields.lineSortKey}
+        lineSortDirection={formFields.lineSortDirection}
+        onTitleChange={formFields.handleEstimateTitleChange}
+        onValidThroughChange={formFields.setValidThrough}
+        onTaxPercentChange={formFields.setTaxPercent}
         onLineItemChange={updateLineItem}
         onAddLineItem={addLineItem}
         onMoveLineItem={moveLineItem}

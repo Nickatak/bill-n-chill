@@ -128,7 +128,7 @@
 }
 
 .formStatusLink {
-  composes: subtle from '../../../shared/styles/links.module.css';
+  composes: subtle from '../../../../shared/styles/links.module.css';
   font-size: 0.88rem;
   color: var(--status-green-text);
 }
@@ -391,7 +391,7 @@
 }
 
 .duplicateViewLink {
-  composes: subtle from '../../../shared/styles/links.module.css';
+  composes: subtle from '../../../../shared/styles/links.module.css';
   display: inline-flex;
   align-items: center;
   font-size: 0.88rem;

@@ -252,4 +252,30 @@ describe("VendorBillsConsole", () => {
       expect(billCalls.length).toBeGreaterThanOrEqual(1);
     }, { timeout: 3000 });
   });
+
+  it("shows filter hint when no bills match", async () => {
+    setupDefaultFetch({ vendorBills: [] });
+    render(<VendorBillsConsole scopedProjectId={7} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("No bills match the selected status/due filters.")).toBeInTheDocument();
+    }, { timeout: 3000 });
+  });
+
+  it("displays bill data in the viewer table", async () => {
+    setupDefaultFetch({
+      vendorBills: [
+        makeVendorBill({ id: 42, vendor_name: "Acme Lumber", bill_number: "INV-001", total: "5000.00" }),
+      ],
+    });
+    render(<VendorBillsConsole scopedProjectId={7} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Acme Lumber")).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    expect(screen.getByText("INV-001")).toBeInTheDocument();
+    // Total and Balance columns both show $5000.00
+    expect(screen.getAllByText("$5000.00").length).toBeGreaterThanOrEqual(1);
+  });
 });

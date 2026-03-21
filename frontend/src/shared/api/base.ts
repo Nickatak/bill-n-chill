@@ -21,3 +21,6 @@ export const serverApiBaseUrl =
 export function normalizeApiBaseUrl(baseUrl: string): string {
   return baseUrl.trim().replace(/\/$/, "");
 }
+
+/** Pre-normalized default API base URL — use this in hooks instead of memoizing. */
+export const apiBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);

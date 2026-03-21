@@ -6,7 +6,7 @@
  * data and handlers are received via props -- no hooks or side effects
  * live here.
  *
- * Extracted from change-orders-console.tsx to reduce component size.
+ * Parent: ChangeOrdersConsole
  */
 
 import Link from "next/link";

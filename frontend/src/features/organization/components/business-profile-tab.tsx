@@ -4,6 +4,8 @@
  * "My Business" tab — identity fields for the organization profile.
  * Covers: display name, logo upload, phone, website, license #, tax ID, billing address.
  * All fields gated by `org_identity.edit` capability (owner-only).
+ *
+ * Parent: OrganizationConsole
  */
 
 import { ChangeEvent, FormEvent, useRef, useState } from "react";

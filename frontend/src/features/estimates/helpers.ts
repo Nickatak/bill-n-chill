@@ -205,7 +205,7 @@ export function mapEstimateLineItemsToInputs(
     description: item.description || "",
     quantity: String(item.quantity ?? ""),
     unit: item.unit || "ea",
-    unitCost: String(item.unit_cost ?? ""),
+    unitCost: String(item.unit_price ?? ""),
     markupPercent: String(item.markup_percent ?? ""),
   }));
 }
@@ -245,7 +245,7 @@ export function mapPublicEstimateLineItems(
     description: item.description || "",
     quantity: String(item.quantity ?? ""),
     unit: item.unit || "ea",
-    unitCost: String(item.unit_cost ?? ""),
+    unitCost: String(item.unit_price ?? ""),
     markupPercent: String(item.markup_percent ?? ""),
   }));
 }
@@ -310,4 +310,94 @@ export function isNotatedStatusEvent(event: EstimateStatusEventRecord): boolean 
     return true;
   }
   return event.from_status === event.to_status && (event.note || "").trim().length > 0;
+}
+
+// ---------------------------------------------------------------------------
+// Numeric parsing
+// ---------------------------------------------------------------------------
+
+/** Parse a string to a finite number, returning 0 for non-numeric input. */
+export function toNumber(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** Compute the total for a single line item (quantity × unitCost × (1 + markup%)). */
+export function computeLineTotal(line: EstimateLineInput): number {
+  const quantity = toNumber(line.quantity);
+  const unitCost = toNumber(line.unitCost);
+  const markup = toNumber(line.markupPercent);
+  const base = quantity * unitCost;
+  return base + base * (markup / 100);
+}
+
+// ---------------------------------------------------------------------------
+// Family grouping and filtering
+// ---------------------------------------------------------------------------
+
+export type EstimateFamily = {
+  title: string;
+  items: EstimateRecord[];
+};
+
+/**
+ * Group estimates by title into families, sorted by version within each
+ * family and by most-recent activity across families.
+ */
+export function groupEstimateFamilies(estimates: EstimateRecord[]): EstimateFamily[] {
+  const families = new Map<string, EstimateRecord[]>();
+  for (const estimate of estimates) {
+    const title = (estimate.title || "").trim() || "Untitled";
+    const existing = families.get(title);
+    if (existing) {
+      existing.push(estimate);
+    } else {
+      families.set(title, [estimate]);
+    }
+  }
+  return Array.from(families.entries())
+    .map(([title, items]) => ({
+      title,
+      items: [...items].sort((a, b) => a.version - b.version),
+    }))
+    .sort((a, b) => {
+      const latestA = a.items[a.items.length - 1];
+      const latestB = b.items[b.items.length - 1];
+      const lastActionA = new Date(latestA?.updated_at || latestA?.created_at || 0).getTime();
+      const lastActionB = new Date(latestB?.updated_at || latestB?.created_at || 0).getTime();
+      return lastActionB - lastActionA;
+    });
+}
+
+/**
+ * Count how many families have each status as their latest version's status.
+ */
+export function computeEstimateStatusCounts(families: EstimateFamily[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const family of families) {
+    const latest = family.items[family.items.length - 1];
+    if (latest?.status) {
+      counts[latest.status] = (counts[latest.status] || 0) + 1;
+    }
+  }
+  return counts;
+}
+
+/**
+ * Filter families to those whose latest version's status is in the active filter set.
+ */
+export function filterVisibleFamilies(
+  families: EstimateFamily[],
+  statusFilters: string[],
+): EstimateFamily[] {
+  if (statusFilters.length === 0) {
+    return [];
+  }
+  return families.filter((family) => {
+    const latest = family.items[family.items.length - 1];
+    if (!latest?.status) {
+      return false;
+    }
+    return statusFilters.includes(latest.status);
+  });
 }

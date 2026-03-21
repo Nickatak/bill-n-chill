@@ -43,7 +43,7 @@ export type EstimateLineItemRecord = {
   description: string;
   quantity: string;
   unit: string;
-  unit_cost: string;
+  unit_price: string;
   markup_percent: string;
 };
 

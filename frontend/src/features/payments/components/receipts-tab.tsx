@@ -8,6 +8,8 @@
  *
  * Desktop: dense document list (grid rows) with payment rows nested.
  * Mobile:  card list with search.
+ *
+ * Parent: AccountingConsole
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";

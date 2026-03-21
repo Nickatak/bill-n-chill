@@ -5,7 +5,7 @@
  * tree, status transition controls, and status event history. All data and
  * handlers are received via props — no hooks or side effects live here.
  *
- * Extracted from estimates-console.tsx to reduce component size.
+ * Parent: EstimatesConsole
  */
 
 import Link from "next/link";

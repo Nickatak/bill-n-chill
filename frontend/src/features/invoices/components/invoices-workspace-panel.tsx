@@ -5,7 +5,7 @@
  * Pure presentational component: all state and handlers live in the parent
  * InvoicesConsole and are passed down as props.
  *
- * Extracted from invoices-console.tsx to reduce component size.
+ * Parent: InvoicesConsole
  */
 "use client";
 

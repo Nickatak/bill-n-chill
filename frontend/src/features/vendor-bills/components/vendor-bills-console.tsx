@@ -1,10 +1,73 @@
 "use client";
 
 /**
- * Vendor bills (accounts payable) console. Lets users browse, create, edit,
- * and manage the lifecycle of vendor bills for a selected project. Includes
- * line items, duplicate detection, status transitions driven by a policy
- * contract, and a "recreate as new" workflow.
+ * Vendor bills (accounts payable) console. Orchestrates bill browsing,
+ * creation, editing, and lifecycle management for a selected project.
+ *
+ * Parent: `/app/projects/[projectId]/bills/page.tsx`
+ *
+ * ## Page layout
+ *
+ * ┌─────────────────────────────────────────────┐
+ * │  Viewer Panel                                │
+ * │  ┌─ panelHeader (title + hide/show form) ─┐ │
+ * │  │  statusFilters (pill bar)               │ │
+ * │  │  bill table (desktop) / card list (mob) │ │
+ * │  │    └─ expandedSections (inline viewer)  │ │
+ * │  └────────────────────────────────────────┘  │
+ * │  Workspace Panel (collapsible)               │
+ * │  ┌─ workspaceToolbar (context + actions) ─┐  │
+ * │  │  billDocument form (WYSIWYG)           │  │
+ * │  │    header → dates → lines → summary    │  │
+ * │  │    notes → submit                      │  │
+ * │  │  duplicateCandidates (impact card)     │  │
+ * │  └───────────────────────────────────────┘   │
+ * └─────────────────────────────────────────────┘
+ *
+ * ## Hook dependency graph
+ *
+ * useSharedSessionAuth → token, role, capabilities
+ * usePolicyContract    → billStatuses, billStatusLabels, allowedStatusTransitions
+ * useStatusFilters     → billStatusFilters, toggleBillStatusFilter
+ * useVendorBillForm    → create/edit field state, line items, hydrate, reset
+ * useVendorBillViewer  → viewer state, accordions, snapshots
+ * useStatusMessage     → formMessage/formTone
+ * useCombobox          → vendor picker
+ * useCreatorFlash      → bill form flash animation
+ *
+ * ## Functions
+ *
+ * - loadDependencies()              — bootstrap: fetch projects + vendors
+ * - loadVendorBills()               — fetch bills for selected project
+ * - createVendorBill(payload)       — POST new bill (handles 409 dupes)
+ * - handleCreateVendorBill(event)   — validate + delegate to createVendorBill
+ * - handleSaveVendorBill(event)     — PATCH existing bill
+ * - handleSubmitVendorBillForm(e)   — unified submit router
+ * - handleSelectVendorBill(id)      — select bill, hydrate, load snapshots
+ * - handleStartNewVendorBill()      — switch to create mode
+ * - handleRecreateAsNewDraftTemplate() — copy bill into create form
+ * - handleQuickVendorBillStatus(s)  — PATCH status transition
+ * - handleUpdateVendorBillStatus()  — validate + delegate to quick status
+ * - handleUpdateVendorBillNote()    — PATCH note-only (notate snapshot)
+ * - statusDisplayLabel(status)      — policy-aware label lookup
+ * - statusBadgeClass(status)        — CSS class for table badge
+ * - statusPillClass(status)         — CSS class for status pill
+ * - commitVendor(vendor)            — combobox commit delegate
+ * - renderExpandedSections(bill)    — inline viewer sections JSX
+ *
+ * ## Effects
+ *
+ * - Bootstrap: load projects/vendors once authenticated
+ * - Date defaults: ensure sensible dates on mount
+ * - Reload bills: when selectedProjectId changes
+ * - Filter fallback: if selected bill is hidden by filter change
+ * - Viewer sync: reset next-status when selected bill changes
+ *
+ * ## Orchestration (in JSX)
+ *
+ * Viewer panel renders filtered bills as a table (desktop) or card list
+ * (mobile), each with inline expandable sections. Workspace panel renders
+ * the WYSIWYG bill form that adapts between create/edit based on selection.
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
@@ -13,7 +76,7 @@ import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import { useCombobox } from "@/shared/hooks/use-combobox";
 import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
 import { useSearchParams } from "next/navigation";
-import { formatDateDisplay, todayDateInput, futureDateInput } from "@/shared/date-format";
+import { formatDateDisplay } from "@/shared/date-format";
 import { readApiErrorMessage } from "@/shared/api/error";
 import {
   collapseToggleButtonStyles as collapseButtonStyles,
@@ -24,30 +87,29 @@ import creatorStyles from "@/shared/document-creator/creator-foundation.module.c
 import { MobileLineItemCard } from "@/shared/document-creator/mobile-line-card";
 import mobileCardStyles from "@/shared/document-creator/mobile-line-card.module.css";
 import {
-  defaultApiBaseUrl,
   fetchVendorBillPolicyContract,
-  normalizeApiBaseUrl,
 } from "../api";
+import { apiBaseUrl } from "@/shared/api/base";
 import { usePolicyContract } from "@/shared/hooks/use-policy-contract";
 import { useStatusFilters } from "@/shared/hooks/use-status-filters";
 import {
-  VendorBillLineFormRow,
   createEmptyVendorBillLineRow,
   defaultBillStatusFilters,
 } from "../helpers";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { canDo } from "@/shared/session/rbac";
-import {
+import type {
   ApiResponse,
   ProjectRecord,
   VendorBillLineInput,
   VendorBillPolicyContract,
   VendorBillPayload,
   VendorBillRecord,
-  VendorBillSnapshotRecord,
   VendorBillStatus,
   VendorRecord,
 } from "../types";
+import { useVendorBillForm } from "../hooks/use-vendor-bill-form";
+import { useVendorBillViewer } from "../hooks/use-vendor-bill-viewer";
 import styles from "./vendor-bills-console.module.css";
 
 // ---------------------------------------------------------------------------
@@ -97,7 +159,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const isMobile = useMediaQuery("(max-width: 700px)");
   const { token, role, capabilities } = useSharedSessionAuth();
   const { message: formMessage, tone: formTone, setSuccess: setFormSuccess, setError: setFormError, clear: clearFormMessage } = useStatusMessage();
-  const [viewerErrorMessage, setViewerErrorMessage] = useState("");
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [vendors, setVendors] = useState<VendorRecord[]>([]);
@@ -105,9 +166,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [selectedVendorBillId, setSelectedVendorBillId] = useState("");
-  const [snapshots, setSnapshots] = useState<VendorBillSnapshotRecord[]>([]);
 
-  const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const {
     statuses: billStatuses,
     statusLabels: billStatusLabels,
@@ -117,14 +176,14 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     fallbackStatuses: VENDOR_BILL_STATUSES_FALLBACK,
     fallbackLabels: VENDOR_BILL_STATUS_LABELS_FALLBACK,
     fallbackTransitions: VENDOR_BILL_ALLOWED_STATUS_TRANSITIONS_FALLBACK,
-    baseUrl: normalizedBaseUrl,
+    baseUrl: apiBaseUrl,
     token,
     onLoaded(contract) {
       setBillStatusFilters((current) => {
         const retained = current.filter((s) => contract.statuses.includes(s));
         return retained.length ? retained : defaultBillStatusFilters(contract.statuses);
       });
-      setStatus((current) =>
+      billForm.setStatus((current) =>
         contract.statuses.includes(current) ? current : (contract.default_create_status || contract.statuses[0] || VENDOR_BILL_STATUSES_FALLBACK[0]),
       );
     },
@@ -139,49 +198,52 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     defaultFilters: defaultBillStatusFilters(VENDOR_BILL_STATUSES_FALLBACK),
   });
 
-
-  const [newVendorId, setNewVendorId] = useState("");
-  const [newBillNumber, setNewBillNumber] = useState("");
-  const [newReceivedDate, setNewReceivedDate] = useState(todayDateInput());
-  const [newIssueDate, setNewIssueDate] = useState("");
-  const [newDueDate, setNewDueDate] = useState("");
-  const [newTaxAmount, setNewTaxAmount] = useState("0.00");
-  const [newShippingAmount, setNewShippingAmount] = useState("0.00");
-  const [newNotes, setNewNotes] = useState("");
-  const [newLineItems, setNewLineItems] = useState<VendorBillLineFormRow[]>([
-    createEmptyVendorBillLineRow(),
-  ]);
-
-  const [vendorId, setVendorId] = useState("");
-  const [billNumber, setBillNumber] = useState("");
-  const [receivedDate, setReceivedDate] = useState(todayDateInput());
-  const [issueDate, setIssueDate] = useState("");
-  const [dueDate, setDueDate] = useState("");
-  const [taxAmount, setTaxAmount] = useState("0.00");
-  const [shippingAmount, setShippingAmount] = useState("0.00");
-  const [notes, setNotes] = useState("");
-  const [lineItems, setLineItems] = useState<VendorBillLineFormRow[]>([createEmptyVendorBillLineRow()]);
-  const [status, setStatus] = useState<string>("received");
-  const [viewerNextStatus, setViewerNextStatus] = useState<string>("");
-  const [viewerNote, setViewerNote] = useState<string>("");
-
-  const [duplicateCandidates, setDuplicateCandidates] = useState<VendorBillRecord[]>([]);
-
-
-  // Accordion section state for inline viewer expansion
-  const [isStatusSectionOpen, setIsStatusSectionOpen] = useState(true);
-  const [isLineItemsSectionOpen, setIsLineItemsSectionOpen] = useState(false);
-  const [isDetailsSectionOpen, setIsDetailsSectionOpen] = useState(false);
-  const [isHistorySectionOpen, setIsHistorySectionOpen] = useState(false);
-
-  // Workspace visibility + flash animation
-  const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(true);
-  const { ref: billFormRef, flash: flashCreator } = useCreatorFlash<HTMLFormElement>();
   // -------------------------------------------------------------------------
   // Derived values
   // -------------------------------------------------------------------------
 
   const activeVendors = vendors.filter((vendor) => vendor.is_active);
+  const canMutateVendorBills = canDo(capabilities, "vendor_bills", "create");
+  const canApproveVendorBills = canDo(capabilities, "vendor_bills", "approve");
+  const isEditingMode = Boolean(selectedVendorBillId);
+
+  // -------------------------------------------------------------------------
+  // Composed hooks
+  // -------------------------------------------------------------------------
+
+  const billForm = useVendorBillForm({
+    isEditingMode,
+    activeVendors,
+  });
+
+  const viewer = useVendorBillViewer({
+    authToken: token,
+  });
+
+  // -------------------------------------------------------------------------
+  // Destructure hook returns for JSX compatibility
+  // -------------------------------------------------------------------------
+
+  const {
+    formVendorId, formBillNumber, formReceivedDate, formIssueDate, formDueDate,
+    formTaxAmount, formShippingAmount, formNotes, formLineItems,
+    computedSubtotal, computedTotal, duplicateCandidates,
+    setFormVendorId, setFormBillNumber, setFormReceivedDate,
+    setFormIssueDate, setFormDueDate, setFormTaxAmount,
+    setFormShippingAmount, setFormNotes,
+    updateFormLineItem, removeFormLineItem, addFormLineItem,
+  } = billForm;
+
+  const {
+    viewerNextStatus, viewerNote, viewerErrorMessage, snapshots,
+    isStatusSectionOpen, isLineItemsSectionOpen, isDetailsSectionOpen, isHistorySectionOpen,
+    setViewerNextStatus, setViewerNote, setViewerErrorMessage,
+    setIsStatusSectionOpen, setIsLineItemsSectionOpen, setIsDetailsSectionOpen, setIsHistorySectionOpen,
+  } = viewer;
+
+  // -------------------------------------------------------------------------
+  // More derived values (depend on hooks)
+  // -------------------------------------------------------------------------
 
   const billStatusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -197,13 +259,11 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
     return true;
   });
-  const canMutateVendorBills = canDo(capabilities, "vendor_bills", "create");
-  const canApproveVendorBills = canDo(capabilities, "vendor_bills", "approve");
+
   const selectedProject =
     projects.find((project) => String(project.id) === selectedProjectId) ?? null;
   const selectedVendorBill =
     vendorBills.find((vendorBill) => String(vendorBill.id) === selectedVendorBillId) ?? null;
-  const isEditingMode = Boolean(selectedVendorBillId);
   const workspaceIsLockedByStatus = selectedVendorBill ? selectedVendorBill.status !== "received" : false;
   const workspaceIsLocked = !canMutateVendorBills || workspaceIsLockedByStatus;
   const workspaceBadgeLabel = !selectedVendorBill
@@ -220,22 +280,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     ? `#${selectedVendorBill.id} — ${selectedVendorBill.bill_number || "Untitled"}`
     : "New vendor bill";
   const vendorOptions = vendors;
-  const formVendorId = isEditingMode ? vendorId : newVendorId;
-  const formBillNumber = isEditingMode ? billNumber : newBillNumber;
-  const formReceivedDate = isEditingMode ? receivedDate : newReceivedDate;
-  const formIssueDate = isEditingMode ? issueDate : newIssueDate;
-  const formDueDate = isEditingMode ? dueDate : newDueDate;
-  const formTaxAmount = isEditingMode ? taxAmount : newTaxAmount;
-  const formShippingAmount = isEditingMode ? shippingAmount : newShippingAmount;
-  const formNotes = isEditingMode ? notes : newNotes;
-  const formLineItems = isEditingMode ? lineItems : newLineItems;
-  const formTaxAmountValue = Number(formTaxAmount || 0);
-  const formShippingAmountValue = Number(formShippingAmount || 0);
-  const computedSubtotal = useMemo(
-    () => formLineItems.reduce((sum, row) => sum + (Number(row.quantity) || 0) * (Number(row.unit_price) || 0), 0),
-    [formLineItems],
-  );
-  const computedTotal = computedSubtotal + formTaxAmountValue + formShippingAmountValue;
   const selectedVendor = vendorOptions.find((v) => String(v.id) === formVendorId) ?? null;
   const quickStatusOptions = (selectedVendorBill
     ? allowedStatusTransitions[selectedVendorBill.status] ?? []
@@ -244,6 +288,10 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     if (status === "approved") return canApproveVendorBills;
     return true;
   });
+
+  // Workspace visibility + flash animation
+  const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(true);
+  const { ref: billFormRef, flash: flashCreator } = useCreatorFlash<HTMLFormElement>();
 
   // -------------------------------------------------------------------------
   // Display helpers
@@ -259,134 +307,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   function commitVendor(vendor: VendorRecord | null) {
     setFormVendorId(vendor ? String(vendor.id) : "");
     vendorCombobox.close(vendor !== null);
-  }
-
-  // --- Form field delegates ---
-  // Each setter routes to either the "new bill" or "edit bill" state based on mode.
-
-  /** Routes vendor ID changes to the correct create/edit state. */
-  function setFormVendorId(value: string) {
-    if (isEditingMode) {
-      setVendorId(value);
-    } else {
-      setNewVendorId(value);
-    }
-  }
-
-  function setFormBillNumber(value: string) {
-    if (isEditingMode) {
-      setBillNumber(value);
-    } else {
-      setNewBillNumber(value);
-    }
-  }
-
-  function setFormReceivedDate(value: string) {
-    if (isEditingMode) {
-      setReceivedDate(value);
-    } else {
-      setNewReceivedDate(value);
-    }
-  }
-
-  function setFormIssueDate(value: string) {
-    if (isEditingMode) {
-      setIssueDate(value);
-    } else {
-      setNewIssueDate(value);
-    }
-  }
-
-  function setFormDueDate(value: string) {
-    if (isEditingMode) {
-      setDueDate(value);
-    } else {
-      setNewDueDate(value);
-    }
-  }
-
-  function setFormTaxAmount(value: string) {
-    if (isEditingMode) {
-      setTaxAmount(value);
-    } else {
-      setNewTaxAmount(value);
-    }
-  }
-
-  function setFormShippingAmount(value: string) {
-    if (isEditingMode) {
-      setShippingAmount(value);
-    } else {
-      setNewShippingAmount(value);
-    }
-  }
-
-  function setFormNotes(value: string) {
-    if (isEditingMode) {
-      setNotes(value);
-    } else {
-      setNewNotes(value);
-    }
-  }
-
-  function setFormLineItems(next: VendorBillLineFormRow[]) {
-    if (isEditingMode) {
-      setLineItems(next);
-    } else {
-      setNewLineItems(next);
-    }
-  }
-
-  /** Patches a single line item row by index. */
-  function updateFormLineItem(index: number, patch: Partial<VendorBillLineFormRow>) {
-    const next = [...formLineItems];
-    next[index] = { ...next[index], ...patch };
-    setFormLineItems(next);
-  }
-
-  /** Removes a line item row, keeping at least one row. */
-  function removeFormLineItem(index: number) {
-    const current = formLineItems;
-    setFormLineItems(
-      current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : current,
-    );
-  }
-
-  /** Appends a new blank line item row to the form. */
-  function addFormLineItem() {
-    setFormLineItems([...formLineItems, createEmptyVendorBillLineRow()]);
-  }
-
-  function handleSubmitVendorBillForm(event: FormEvent<HTMLFormElement>) {
-    if (!canMutateVendorBills) {
-      event.preventDefault();
-      setFormError(`Role ${role} is read-only for vendor bill mutations.`);
-      return;
-    }
-    if (isEditingMode) {
-      void handleSaveVendorBill(event);
-      return;
-    }
-    void handleCreateVendorBill(event);
-  }
-
-  /** Populates the edit form fields from a vendor bill record. */
-  function hydrate(item: VendorBillRecord) {
-    setVendorId(String(item.vendor));
-    setBillNumber(item.bill_number);
-    setReceivedDate(item.received_date ?? "");
-    setIssueDate(item.issue_date ?? "");
-    setDueDate(item.due_date ?? "");
-    setTaxAmount(item.tax_amount);
-    setShippingAmount(item.shipping_amount);
-    setNotes(item.notes);
-    setStatus(item.status);
-    const mapped = (item.line_items ?? []).map((row) => ({
-      description: row.description,
-      quantity: row.quantity,
-      unit_price: row.unit_price,
-    }));
-    setLineItems(mapped.length > 0 ? mapped : [createEmptyVendorBillLineRow()]);
   }
 
   /** Returns the display label for a bill status, using policy-provided labels. */
@@ -632,10 +552,10 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   async function loadDependencies() {
     try {
       const [projectsResponse, vendorsResponse] = await Promise.all([
-        fetch(`${normalizedBaseUrl}/projects/`, {
+        fetch(`${apiBaseUrl}/projects/`, {
           headers: buildAuthHeaders(token),
         }),
-        fetch(`${normalizedBaseUrl}/vendors/`, {
+        fetch(`${apiBaseUrl}/vendors/`, {
           headers: buildAuthHeaders(token),
         }),
       ]);
@@ -649,7 +569,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
       const projectRows = (projectsPayload.data as ProjectRecord[]) ?? [];
       const vendorRows = (vendorsPayload.data as VendorRecord[]) ?? [];
-      const activeVendors = vendorRows.filter((row) => row.is_active);
+      const loadedActiveVendors = vendorRows.filter((row) => row.is_active);
       setProjects(projectRows);
       setVendors(vendorRows);
 
@@ -669,10 +589,10 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
           setSelectedProjectId(String(projectRows[0].id));
         }
       }
-      if (activeVendors[0]) {
-        setNewVendorId(String(activeVendors[0].id));
+      if (loadedActiveVendors[0]) {
+        billForm.setNewVendorId(String(loadedActiveVendors[0].id));
       } else if (vendorRows[0]) {
-        setNewVendorId(String(vendorRows[0].id));
+        billForm.setNewVendorId(String(vendorRows[0].id));
       }
     } catch {
       setFormError("Could not reach projects/vendors endpoints.");
@@ -688,7 +608,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
 
     try {
-      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/vendor-bills/`, {
+      const response = await fetch(`${apiBaseUrl}/projects/${projectId}/vendor-bills/`, {
         headers: buildAuthHeaders(token),
       });
       const payload: ApiResponse = await response.json();
@@ -707,12 +627,12 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       const preferred = sortedRows.find((row) => row.status !== "void") ?? sortedRows[0];
       if (preferred) {
         setSelectedVendorBillId(String(preferred.id));
-        hydrate(preferred);
-        setViewerNote("");
-        void loadSnapshots(preferred.id);
+        billForm.hydrate(preferred);
+        viewer.setViewerNote("");
+        void viewer.loadSnapshots(preferred.id);
       } else {
         setSelectedVendorBillId("");
-        setSnapshots([]);
+        viewer.setSnapshots([]);
       }
       clearFormMessage();
     } catch {
@@ -727,7 +647,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   /** POSTs a new vendor bill to the API, handling duplicate detection. */
   async function createVendorBill(payloadBody: VendorBillPayload) {
     const response = await fetch(
-      `${normalizedBaseUrl}/projects/${payloadBody.projectId}/vendor-bills/`,
+      `${apiBaseUrl}/projects/${payloadBody.projectId}/vendor-bills/`,
       {
         method: "POST",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
@@ -750,7 +670,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
     if (response.status === 409 && payload.error?.code === "duplicate_detected") {
       const duplicateData = payload.data as { duplicate_candidates?: VendorBillRecord[] };
-      setDuplicateCandidates(duplicateData.duplicate_candidates ?? []);
+      billForm.setDuplicateCandidates(duplicateData.duplicate_candidates ?? []);
       setFormError("Duplicate blocked: void existing matching bill(s) before reusing this bill number.");
       return;
     }
@@ -766,13 +686,13 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       current.includes(created.status) ? current : [...current, created.status],
     );
     setSelectedVendorBillId(String(created.id));
-    hydrate(created);
-    setViewerNote("");
-    void loadSnapshots(created.id);
-    setNewBillNumber("");
-    setNewNotes("");
-    setNewLineItems([createEmptyVendorBillLineRow()]);
-    setDuplicateCandidates([]);
+    billForm.hydrate(created);
+    viewer.setViewerNote("");
+    void viewer.loadSnapshots(created.id);
+    billForm.setNewBillNumber("");
+    billForm.setNewNotes("");
+    billForm.setNewLineItems([createEmptyVendorBillLineRow()]);
+    billForm.setDuplicateCandidates([]);
     setFormSuccess(`Created vendor bill #${created.id}.`);
   }
 
@@ -781,7 +701,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     event.preventDefault();
     clearFormMessage();
     const projectId = Number(selectedProjectId);
-    const vendor = Number(newVendorId);
+    const vendor = Number(billForm.newVendorId);
     if (!projectId) {
       setFormError("Select a project first.");
       return;
@@ -794,19 +714,19 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       setFormError("Selected vendor is inactive. Pick an active vendor.");
       return;
     }
-    if (!newBillNumber.trim()) {
+    if (!billForm.newBillNumber.trim()) {
       setFormError("Bill number is required.");
       return;
     }
-    if (!newIssueDate) {
+    if (!billForm.newIssueDate) {
       setFormError("Issue date is required.");
       return;
     }
-    if (!newDueDate) {
+    if (!billForm.newDueDate) {
       setFormError("Due date is required.");
       return;
     }
-    const normalizedLineItems: VendorBillLineInput[] = newLineItems
+    const normalizedLineItems: VendorBillLineInput[] = billForm.newLineItems
       .filter((row) => row.description || row.unit_price)
       .map((row) => ({
         description: row.description,
@@ -816,73 +736,52 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     await createVendorBill({
       projectId,
       vendor,
-      bill_number: newBillNumber,
-      received_date: newReceivedDate || null,
-      issue_date: newIssueDate,
-      due_date: newDueDate,
+      bill_number: billForm.newBillNumber,
+      received_date: billForm.newReceivedDate || null,
+      issue_date: billForm.newIssueDate,
+      due_date: billForm.newDueDate,
       subtotal: computedSubtotal.toFixed(2),
-      tax_amount: newTaxAmount,
-      shipping_amount: newShippingAmount,
+      tax_amount: billForm.newTaxAmount,
+      shipping_amount: billForm.newShippingAmount,
       total: computedTotal.toFixed(2),
-      notes: newNotes,
+      notes: billForm.newNotes,
       line_items: normalizedLineItems,
     });
   }
 
-  /** Fetches the snapshot (status history) records for a vendor bill. */
-  async function loadSnapshots(vendorBillId: number) {
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/vendor-bills/${vendorBillId}/snapshots/`, {
-        headers: buildAuthHeaders(token),
-      });
-      if (response.ok) {
-        const json = await response.json();
-        setSnapshots(json.data ?? []);
-      } else {
-        setSnapshots([]);
-      }
-    } catch {
-      setSnapshots([]);
+  function handleSubmitVendorBillForm(event: FormEvent<HTMLFormElement>) {
+    if (!canMutateVendorBills) {
+      event.preventDefault();
+      setFormError(`Role ${role} is read-only for vendor bill mutations.`);
+      return;
     }
+    if (isEditingMode) {
+      void handleSaveVendorBill(event);
+      return;
+    }
+    void handleCreateVendorBill(event);
   }
 
   /** Selects a vendor bill from the list and hydrates the edit form. */
   function handleSelectVendorBill(id: string) {
     setSelectedVendorBillId(id);
-    setViewerErrorMessage("");
+    viewer.resetOnSelect();
     clearFormMessage();
-    // Reset accordion sections to defaults on selection change
-    setIsStatusSectionOpen(true);
-    setIsLineItemsSectionOpen(false);
-    setIsDetailsSectionOpen(false);
     const selected = vendorBills.find((row) => String(row.id) === id);
     if (!selected) return;
 
-    hydrate(selected);
-    setViewerNote("");
-    void loadSnapshots(selected.id);
+    billForm.hydrate(selected);
+    viewer.setViewerNote("");
+    void viewer.loadSnapshots(selected.id);
     flashCreator();
   }
 
   /** Resets the form to create-mode with default values for a new bill. */
   function handleStartNewVendorBill() {
-    const today = todayDateInput();
-    const due = futureDateInput();
     setSelectedVendorBillId("");
     clearFormMessage();
-    setViewerErrorMessage("");
-    setDuplicateCandidates([]);
-    setNewBillNumber("");
-    setNewReceivedDate(today);
-    setNewIssueDate(today);
-    setNewDueDate(due);
-    setNewTaxAmount("0.00");
-    setNewShippingAmount("0.00");
-    setNewNotes("");
-    setNewLineItems([createEmptyVendorBillLineRow()]);
-    if (activeVendors[0]) {
-      setNewVendorId(String(activeVendors[0].id));
-    }
+    viewer.clearViewer();
+    billForm.resetCreateForm();
     flashCreator();
   }
 
@@ -891,7 +790,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     event.preventDefault();
     clearFormMessage();
     const vendorBillId = Number(selectedVendorBillId);
-    const vendor = Number(vendorId);
+    const vendor = Number(billForm.vendorId);
     if (!vendorBillId) {
       setFormError("Select a vendor bill first.");
       return;
@@ -900,47 +799,47 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       setFormError("Select a vendor first.");
       return;
     }
-    if (!billNumber.trim()) {
+    if (!billForm.billNumber.trim()) {
       setFormError("Bill number is required.");
       return;
     }
-    if (!issueDate) {
+    if (!billForm.issueDate) {
       setFormError("Issue date is required.");
       return;
     }
-    if (!dueDate) {
+    if (!billForm.dueDate) {
       setFormError("Due date is required.");
       return;
     }
     try {
-      const response = await fetch(`${normalizedBaseUrl}/vendor-bills/${vendorBillId}/`, {
+      const response = await fetch(`${apiBaseUrl}/vendor-bills/${vendorBillId}/`, {
         method: "PATCH",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
           vendor,
-          bill_number: billNumber,
-          received_date: receivedDate || null,
-          issue_date: issueDate,
-          due_date: dueDate,
+          bill_number: billForm.billNumber,
+          received_date: billForm.receivedDate || null,
+          issue_date: billForm.issueDate,
+          due_date: billForm.dueDate,
           subtotal: computedSubtotal.toFixed(2),
-          tax_amount: taxAmount,
-          shipping_amount: shippingAmount,
+          tax_amount: billForm.taxAmount,
+          shipping_amount: billForm.shippingAmount,
           total: computedTotal.toFixed(2),
-          notes,
-          line_items: lineItems
+          notes: billForm.notes,
+          line_items: billForm.lineItems
             .filter((row) => row.description || row.unit_price)
             .map((row) => ({
               description: row.description,
               quantity: row.quantity,
               unit_price: row.unit_price,
             })),
-          status,
+          status: billForm.status,
         }),
       });
       const payload: ApiResponse = await response.json();
       if (response.status === 409 && payload.error?.code === "duplicate_detected") {
         const duplicateData = payload.data as { duplicate_candidates?: VendorBillRecord[] };
-        setDuplicateCandidates(duplicateData.duplicate_candidates ?? []);
+        billForm.setDuplicateCandidates(duplicateData.duplicate_candidates ?? []);
         setFormError("Duplicate blocked: void existing matching bill(s) before reusing this bill number.");
         return;
       }
@@ -953,7 +852,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       setVendorBills((current) =>
         current.map((vendorBill) => (vendorBill.id === updated.id ? updated : vendorBill)),
       );
-      setDuplicateCandidates([]);
+      billForm.setDuplicateCandidates([]);
       setFormSuccess(`Saved vendor bill #${updated.id}.`);
     } catch {
       setFormError("Could not reach vendor bill detail endpoint.");
@@ -973,7 +872,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
     setViewerErrorMessage("");
     try {
-      const response = await fetch(`${normalizedBaseUrl}/vendor-bills/${vendorBillId}/`, {
+      const response = await fetch(`${apiBaseUrl}/vendor-bills/${vendorBillId}/`, {
         method: "PATCH",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({ status: nextStatus, status_note: viewerNote }),
@@ -985,12 +884,12 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       }
       const updated = payload.data as VendorBillRecord;
       setVendorBills((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-      hydrate(updated);
+      billForm.hydrate(updated);
       setViewerErrorMessage("");
       setViewerNextStatus("");
-      setViewerNote("");
+      viewer.setViewerNote("");
       setFormSuccess(`Updated status to ${updated.status}.`);
-      void loadSnapshots(updated.id);
+      void viewer.loadSnapshots(updated.id);
     } catch {
       setViewerErrorMessage("Could not reach vendor bill quick status endpoint.");
     }
@@ -1011,7 +910,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     if (!vendorBillId) return;
     setViewerErrorMessage("");
     try {
-      const response = await fetch(`${normalizedBaseUrl}/vendor-bills/${vendorBillId}/`, {
+      const response = await fetch(`${apiBaseUrl}/vendor-bills/${vendorBillId}/`, {
         method: "PATCH",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({ status_note: viewerNote }),
@@ -1023,10 +922,10 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       }
       const updated = payload.data as VendorBillRecord;
       setVendorBills((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-      hydrate(updated);
-      setViewerNote("");
+      billForm.hydrate(updated);
+      viewer.setViewerNote("");
       setFormSuccess("Note recorded.");
-      void loadSnapshots(updated.id);
+      void viewer.loadSnapshots(updated.id);
     } catch {
       setViewerErrorMessage("Could not reach vendor bill endpoint.");
     }
@@ -1043,24 +942,8 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       setFormError("Selected vendor bill could not be found.");
       return;
     }
-    setNewVendorId(String(selected.vendor));
-    setNewBillNumber("");
-    setNewReceivedDate(selected.received_date ?? "");
-    setNewIssueDate(selected.issue_date ?? "");
-    setNewDueDate(selected.due_date ?? "");
-    setNewTaxAmount(selected.tax_amount);
-    setNewShippingAmount(selected.shipping_amount);
-    setNewNotes(selected.notes || "");
-    const copiedLineItems = (selected.line_items ?? []).map((row) => ({
-      description: row.description,
-      quantity: row.quantity,
-      unit_price: row.unit_price,
-    }));
-    setNewLineItems(
-      copiedLineItems.length > 0 ? copiedLineItems : [createEmptyVendorBillLineRow()],
-    );
+    billForm.populateCreateFromBill(selected);
     setSelectedVendorBillId("");
-    setDuplicateCandidates([]);
     setFormSuccess(`Copied bill #${selected.id} into create form. Enter a new bill number.`);
     flashCreator();
     setIsWorkspaceExpanded(true);
@@ -1084,14 +967,8 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   // Ensure date fields have sensible defaults on mount.
   useEffect(() => {
-    const today = todayDateInput();
-    const due = futureDateInput();
-    setNewReceivedDate((current) => current || today);
-    setNewIssueDate((current) => current || today);
-    setNewDueDate((current) => current || due);
-    setReceivedDate((current) => current || today);
-    setIssueDate((current) => current || today);
-    setDueDate((current) => current || due);
+    billForm.ensureDateDefaults();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Reload vendor bills whenever the selected project changes.
@@ -1122,9 +999,9 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     }
     const fallbackVendorBill = filteredVendorBills[0];
     setSelectedVendorBillId(String(fallbackVendorBill.id));
-    hydrate(fallbackVendorBill);
-    setViewerNote("");
-    void loadSnapshots(fallbackVendorBill.id);
+    billForm.hydrate(fallbackVendorBill);
+    viewer.setViewerNote("");
+    void viewer.loadSnapshots(fallbackVendorBill.id);
   }, [filteredVendorBills, selectedVendorBillId]);
 
   // Keep the viewer's next-status picker in sync with the selected bill's allowed transitions.

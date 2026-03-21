@@ -4,6 +4,8 @@
  *
  * Pure presentational component: all state and handlers live in the parent
  * EstimatesConsole and are passed down as props.
+ *
+ * Parent: EstimatesConsole
  */
 "use client";
 

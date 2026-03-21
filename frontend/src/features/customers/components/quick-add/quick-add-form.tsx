@@ -2,12 +2,15 @@
 
 /**
  * Presentational form for customer quick-add intake.
- * Renders customer and optional project fields; all behavior lives in the controller hook.
+ * Renders customer and optional project fields; all behavior lives in the
+ * controller hook.
+ *
+ * Parent: QuickAddConsole
  */
 
 import { FormEventHandler, ReactNode, RefObject } from "react";
 
-import { LeadFieldErrors } from "../hooks/use-quick-add-controller";
+import { LeadFieldErrors } from "../../hooks/use-quick-add-controller";
 import styles from "./quick-add-console.module.css";
 
 type QuickAddFormProps = {

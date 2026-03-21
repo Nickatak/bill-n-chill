@@ -7,6 +7,8 @@
  * Bills page. Receives projectId and allocation targets from the parent
  * console so it doesn't duplicate project selection or target fetching.
  *
+ * Parent: QuickEntryTabs
+ *
  * Layout: payment list → selected detail card → create/edit workspace.
  */
 

@@ -1,91 +1,97 @@
 "use client";
 
 /**
- * Vendor directory console. Supports paginated browsing, search/filter, CRUD for
- * individual vendor records, duplicate-detection with override, and bulk CSV import.
- * Vendors are B2B subcontractor/trade relationships used for AP bills.
+ * Vendor directory console — root component for the /vendors page.
+ *
+ * Pure orchestrator — composes hooks for list fetching, form CRUD
+ * (with duplicate detection), filtering, and CSV import.
+ *
+ * Parent: app/vendors/page.tsx
+ *
+ * ## Page layout
+ *
+ * ┌─────────────────────────────────────────────────────┐
+ * │ Header (title + stat pills)                         │
+ * ├─────────────────────────────────────────────────────┤
+ * │ Status banner (conditional)                         │
+ * ├──────────────────────┬──────────────────────────────┤
+ * │ Existing Vendors     │ Create/Edit Form             │
+ * │   ├── Search input   │   ├── Name, Email, Phone     │
+ * │   ├── Activity pills │   ├── Tax ID, Notes          │
+ * │   ├── Vendor table   │   ├── Active status (edit)   │
+ * │   ├── Pagination     │   ├── Duplicate override     │
+ * │   └── Duplicate      │   └── Submit / Reset         │
+ * │       candidates     ├──────────────────────────────┤
+ * │       (conditional)  │ CSV Import (collapsible)     │
+ * └──────────────────────┴──────────────────────────────┘
+ *
+ * ## Hook dependency graph
+ *
+ * useApiList (shared — owns list data, selection, status messaging)
+ *   ├── useVendorFilters   (reads vendors)
+ *   ├── useVendorForm      (reads + writes vendors, reads selectedId)
+ *   └── useVendorCsvImport (calls refreshVendors after apply)
+ * usePagination            (reads filteredRows)
+ *
+ * ## Effect: filter reset
+ *
+ * Deps: [activityFilter, searchTerm, resetPage]
+ *
+ * Resets pagination to page 1 when filters change so the user
+ * always sees the first matching results.
+ *
+ * ## Orchestration (in JSX)
+ *
+ * - useApiList's onSuccess resets page, clears duplicate state and
+ *   import results.
+ * - Form submit dispatches to form.handleSubmit which internally
+ *   routes to create (with 409 handling) or PATCH based on selection.
+ * - Duplicate candidates panel with "Create Anyway" button appears
+ *   below the list when a 409 is received.
  */
 
-import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { canDo } from "@/shared/session/rbac";
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { usePagination } from "@/shared/hooks/use-pagination";
-import { useApiList } from "@/shared/hooks/use-api-list";
-
-import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
-import { ApiResponse, VendorCsvImportResult, VendorPayload, VendorRecord } from "../types";
+import { useApiList } from "@/shared/hooks/use-api-list";
+import { usePagination } from "@/shared/hooks/use-pagination";
+import { useEffect } from "react";
+
+import { useVendorForm } from "../hooks/use-vendor-form";
+import { useVendorFilters } from "../hooks/use-vendor-filters";
+import { useVendorCsvImport } from "../hooks/use-vendor-csv-import";
+import type { VendorRecord } from "../types";
 import segmented from "../../../shared/styles/segmented.module.css";
 import styles from "./vendors-console.module.css";
-type ActivityFilter = "active" | "all";
 
 /** Full CRUD console for vendor records with search, pagination, and CSV import. */
 export function VendorsConsole() {
-  const { token, authMessage, capabilities } = useSharedSessionAuth();
+  const { token: authToken, authMessage, capabilities } = useSharedSessionAuth();
   const canMutateVendors = canDo(capabilities, "vendors", "create");
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("active");
-  const [name, setName] = useState("");
-  const [vendorEmail, setVendorEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [taxIdLast4, setTaxIdLast4] = useState("");
-  const [notes, setNotes] = useState("");
-  const [isActive, setIsActive] = useState(true);
-  const [duplicateOverrideOnSave, setDuplicateOverrideOnSave] = useState(false);
-
-  const [duplicateCandidates, setDuplicateCandidates] = useState<VendorRecord[]>([]);
-  const [pendingCreatePayload, setPendingCreatePayload] = useState<VendorPayload | null>(null);
-  const [importCsvText, setImportCsvText] = useState(
-    "name,email,phone,tax_id_last4,notes\n",
-  );
-  const [importResult, setImportResult] = useState<VendorCsvImportResult | null>(null);
-  const [importExpanded, setImportExpanded] = useState(false);
-
-  const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
-
   const {
-    items: rows,
-    setItems: setRows,
+    items: vendors,
+    setItems: setVendors,
     selectedId,
     setSelectedId,
     refresh: refreshVendors,
-    status: { message: statusMessage, tone: statusTone, setNeutral: setNeutralStatus, setSuccess: setSuccessStatus, setError: setErrorStatus },
+    status: {
+      message: statusMessage,
+      tone: statusTone,
+      setNeutral: setNeutralStatus,
+      setSuccess: setSuccessStatus,
+      setError: setErrorStatus,
+    },
   } = useApiList<VendorRecord>({
     endpoint: "/vendors/",
-    token,
+    token: authToken,
     autoSelect: false,
     onSuccess() {
       resetPage();
-      setDuplicateCandidates([]);
-      setPendingCreatePayload(null);
-      setImportResult(null);
     },
   });
 
-  const orderedRows = useMemo(
-    () =>
-      [...rows].sort((left, right) => {
-        if (left.name !== right.name) {
-          return left.name.localeCompare(right.name);
-        }
-        return left.id - right.id;
-      }),
-    [rows],
-  );
-  const filteredRows = useMemo(() => {
-    const needle = searchTerm.trim().toLowerCase();
-    return orderedRows.filter((row) => {
-      if (activityFilter === "active" && !row.is_active) {
-        return false;
-      }
-      if (!needle) {
-        return true;
-      }
-      const haystack = `${row.id} ${row.name} ${row.email} ${row.phone} ${row.tax_id_last4}`.toLowerCase();
-      return haystack.includes(needle);
-    });
-  }, [activityFilter, orderedRows, searchTerm]);
+  const filters = useVendorFilters(vendors);
+
   const {
     pageItems: pagedRows,
     currentPage: currentPageSafe,
@@ -94,195 +100,30 @@ export function VendorsConsole() {
     nextPage,
     resetPage,
     setCurrentPage,
-  } = usePagination(filteredRows, 6);
+  } = usePagination(filters.filteredRows, 6);
 
-  const selectedVendor = useMemo(
-    () => rows.find((row) => String(row.id) === selectedId) ?? null,
-    [rows, selectedId],
-  );
-  const activeCount = useMemo(() => rows.filter((row) => row.is_active).length, [rows]);
-  const inactiveCount = rows.length - activeCount;
+  const form = useVendorForm({
+    authToken,
+    canMutate: canMutateVendors,
+    vendors,
+    setVendors,
+    selectedId,
+    setSelectedId,
+    setCurrentPage,
+    status: { setNeutral: setNeutralStatus, setSuccess: setSuccessStatus, setError: setErrorStatus },
+  });
 
-  /** Reset all vendor form fields to their empty defaults. */
-  function clearFormFields() {
-    setName("");
-    setVendorEmail("");
-    setPhone("");
-    setTaxIdLast4("");
-    setNotes("");
-    setIsActive(true);
-  }
+  const csvImport = useVendorCsvImport({
+    authToken,
+    canMutate: canMutateVendors,
+    status: { setNeutral: setNeutralStatus, setSuccess: setSuccessStatus, setError: setErrorStatus },
+    refreshVendors,
+  });
 
-  /** Switch the detail panel to "create new vendor" mode. */
-  function startCreateMode() {
-    setSelectedId("");
-    clearFormFields();
-    setDuplicateOverrideOnSave(false);
-    setDuplicateCandidates([]);
-    setPendingCreatePayload(null);
-  }
-
-  /** Populate the form fields from a vendor record. */
-  function hydrate(item: VendorRecord) {
-    setName(item.name);
-    setVendorEmail(item.email);
-    setPhone(item.phone);
-    setTaxIdLast4(item.tax_id_last4);
-    setNotes(item.notes);
-    setIsActive(item.is_active);
-  }
-
-
-  /** Select a vendor row and populate the edit form. */
-  function handleSelect(id: string) {
-    setSelectedId(id);
-    const item = rows.find((row) => String(row.id) === id);
-    if (!item) {
-      return;
-    }
-    hydrate(item);
-    setDuplicateOverrideOnSave(false);
-  }
-
-  /** POST a new vendor. Handles 409 duplicate-detection by surfacing candidates to the user. */
-  async function createVendor(
-    payloadBody: VendorPayload,
-    options?: { duplicate_override?: boolean },
-  ) {
-    const response = await fetch(`${normalizedBaseUrl}/vendors/`, {
-      method: "POST",
-      headers: buildAuthHeaders(token, { contentType: "application/json" }),
-      body: JSON.stringify({ ...payloadBody, ...options }),
-    });
-    const payload: ApiResponse = await response.json();
-
-    if (response.status === 409 && payload.error?.code === "duplicate_detected") {
-      const duplicateData = payload.data as { duplicate_candidates?: VendorRecord[] };
-      const candidates = duplicateData.duplicate_candidates ?? [];
-      setDuplicateCandidates(candidates);
-      setPendingCreatePayload(payloadBody);
-      setErrorStatus("Potential duplicate vendor found. Review candidates below.");
-      return;
-    }
-
-    if (!response.ok) {
-      setErrorStatus(payload.error?.message ?? "Create vendor failed.");
-      return;
-    }
-
-    const created = payload.data as VendorRecord;
-    setRows((current) => {
-      const nextRows = [...current, created];
-      setCurrentPage(Math.ceil(nextRows.length / 6));
-      return nextRows;
-    });
-    setSelectedId(String(created.id));
-    hydrate(created);
-    setDuplicateOverrideOnSave(false);
-    setDuplicateCandidates([]);
-    setPendingCreatePayload(null);
-    setSuccessStatus(`Created vendor #${created.id}.`);
-  }
-
-  /** Retry the pending create with duplicate_override after user confirmation. */
-  async function handleCreateAnyway() {
-    if (!pendingCreatePayload) {
-      setErrorStatus("No duplicate candidate payload to resolve.");
-      return;
-    }
-
-    setNeutralStatus("Creating duplicate vendor by override...");
-    await createVendor(pendingCreatePayload, { duplicate_override: true });
-  }
-
-  /** Unified form submit handler: creates a new vendor or PATCHes the selected one. */
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!canMutateVendors) {
-      setErrorStatus("Your role is read-only for vendor mutations.");
-      return;
-    }
-    const payloadBody: VendorPayload = {
-      name: name.trim(),
-      email: vendorEmail.trim(),
-      phone: phone.trim(),
-      tax_id_last4: taxIdLast4.trim(),
-      notes: notes.trim(),
-      is_active: selectedVendor ? isActive : true,
-    };
-
-    if (!selectedVendor) {
-      setNeutralStatus("Creating vendor...");
-      await createVendor(
-        payloadBody,
-        duplicateOverrideOnSave ? { duplicate_override: true } : undefined,
-      );
-      return;
-    }
-
-    setNeutralStatus("Saving vendor...");
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/vendors/${selectedVendor.id}/`, {
-        method: "PATCH",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
-        body: JSON.stringify({
-          ...payloadBody,
-          duplicate_override: duplicateOverrideOnSave,
-        }),
-      });
-      const payload: ApiResponse = await response.json();
-      if (response.status === 409 && payload.error?.code === "duplicate_detected") {
-        const duplicateData = payload.data as { duplicate_candidates?: VendorRecord[] };
-        setDuplicateCandidates(duplicateData.duplicate_candidates ?? []);
-        setErrorStatus("Potential duplicate found. Enable override and save again if intentional.");
-        return;
-      }
-      if (!response.ok) {
-        setErrorStatus(payload.error?.message ?? "Save failed.");
-        return;
-      }
-      const updated = payload.data as VendorRecord;
-      setRows((current) => current.map((row) => (row.id === updated.id ? updated : row)));
-      setDuplicateCandidates([]);
-      setPendingCreatePayload(null);
-      setDuplicateOverrideOnSave(false);
-      setSuccessStatus(`Saved vendor #${updated.id}.`);
-    } catch {
-      setErrorStatus("Could not reach vendor detail endpoint.");
-    }
-  }
-
-  /** Run a CSV import (preview or apply) and reload vendors on successful apply. */
-  async function runCsvImport(dryRun: boolean) {
-    setNeutralStatus(dryRun ? "Previewing vendor CSV import..." : "Applying vendor CSV import...");
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/vendors/import-csv/`, {
-        method: "POST",
-        headers: buildAuthHeaders(token, { contentType: "application/json" }),
-        body: JSON.stringify({ csv_text: importCsvText, dry_run: dryRun }),
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setErrorStatus(payload.error?.message ?? "Vendor CSV import failed.");
-        return;
-      }
-      const result = payload.data as VendorCsvImportResult;
-      setImportResult(result);
-      setSuccessStatus(
-        `${dryRun ? "Previewed" : "Applied"} ${result.total_rows} row(s): create ${result.created_count}, update ${result.updated_count}, errors ${result.error_count}.`,
-      );
-      if (!dryRun) {
-        await refreshVendors();
-      }
-    } catch {
-      setErrorStatus("Could not reach vendor CSV import endpoint.");
-    }
-  }
-
-  // Reset to page 1 when filters change so the user always sees the first matching results
+  /** Effect: filter reset — resets pagination when filters change. */
   useEffect(() => {
     resetPage();
-  }, [activityFilter, searchTerm, resetPage]);
+  }, [filters.activityFilter, filters.searchTerm, resetPage]);
 
   return (
     <section className={styles.console}>
@@ -291,13 +132,13 @@ export function VendorsConsole() {
           <h2 className={styles.headerTitle}>Vendor Directory</h2>
         </div>
         <div className={styles.headerStats}>
-          <span className={styles.headerStatPill}>Total {rows.length}</span>
-          <span className={styles.headerStatPill}>Active {activeCount}</span>
-          <span className={styles.headerStatPill}>Inactive {inactiveCount}</span>
+          <span className={styles.headerStatPill}>Total {vendors.length}</span>
+          <span className={styles.headerStatPill}>Active {filters.activeCount}</span>
+          <span className={styles.headerStatPill}>Inactive {filters.inactiveCount}</span>
         </div>
       </header>
 
-      {!token ? <p className={styles.authNotice}>{authMessage}</p> : null}
+      {!authToken ? <p className={styles.authNotice}>{authMessage}</p> : null}
 
       {statusMessage ? (
         <p
@@ -313,42 +154,42 @@ export function VendorsConsole() {
         </p>
       ) : null}
 
-      {token ? (
+      {authToken ? (
         <div className={styles.layout}>
           <section className={`${styles.panel} ${styles.existingPanel}`}>
             <div className={styles.panelHeader}>
               <h3 className={styles.panelTitle}>Existing Vendors</h3>
               <span className={styles.countBadge}>
-                {filteredRows.length}/{rows.length}
+                {filters.filteredRows.length}/{vendors.length}
               </span>
             </div>
             <div className={styles.filterRow}>
               <input
                 className={styles.searchInput}
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
+                value={filters.searchTerm}
+                onChange={(event) => filters.setSearchTerm(event.target.value)}
                 placeholder="Search by name, email, phone, or tax ID"
                 aria-label="Search vendors"
               />
               <div className={segmented.group} role="group" aria-label="Vendor activity filter">
                 <button
                   type="button"
-                  className={`${segmented.option} ${activityFilter === "active" ? segmented.optionActive : ""}`}
-                  onClick={() => setActivityFilter("active")}
+                  className={`${segmented.option} ${filters.activityFilter === "active" ? segmented.optionActive : ""}`}
+                  onClick={() => filters.setActivityFilter("active")}
                 >
                   Active
                 </button>
                 <button
                   type="button"
-                  className={`${segmented.option} ${activityFilter === "all" ? segmented.optionActive : ""}`}
-                  onClick={() => setActivityFilter("all")}
+                  className={`${segmented.option} ${filters.activityFilter === "all" ? segmented.optionActive : ""}`}
+                  onClick={() => filters.setActivityFilter("all")}
                 >
                   All
                 </button>
               </div>
             </div>
 
-            {filteredRows.length > 0 ? (
+            {filters.filteredRows.length > 0 ? (
               <>
                 <div className={styles.tableWrap}>
                   <table className={styles.table}>
@@ -366,7 +207,7 @@ export function VendorsConsole() {
                           <tr
                             key={row.id}
                             className={isSelectedRow ? styles.rowSelected : ""}
-                            onClick={() => handleSelect(String(row.id))}
+                            onClick={() => form.handleSelect(String(row.id))}
                           >
                             <td>
                               <span className={styles.rowPrimary}>
@@ -417,24 +258,24 @@ export function VendorsConsole() {
                   </button>
                 </div>
               </>
-            ) : rows.length > 0 ? (
+            ) : vendors.length > 0 ? (
               <p className={styles.emptyState}>No vendors match the current filter.</p>
             ) : (
               <p className={styles.emptyState}>No vendors yet. Create one using the form, or import via CSV.</p>
             )}
 
-            {duplicateCandidates.length > 0 ? (
+            {form.duplicateCandidates.length > 0 ? (
               <section className={styles.duplicateCard}>
                 <p className={styles.duplicateTitle}>Duplicate candidates</p>
                 <ul className={styles.duplicateList}>
-                  {duplicateCandidates.map((candidate) => (
+                  {form.duplicateCandidates.map((candidate) => (
                     <li key={candidate.id}>
                       <strong>#{candidate.id}</strong> {candidate.name} ({candidate.email || "no-email"})
                     </li>
                   ))}
                 </ul>
-                {pendingCreatePayload ? (
-                  <button type="button" className={styles.primaryButton} onClick={handleCreateAnyway}>
+                {form.pendingCreatePayload ? (
+                  <button type="button" className={styles.primaryButton} onClick={form.handleCreateAnyway}>
                     Create Anyway
                   </button>
                 ) : null}
@@ -445,14 +286,14 @@ export function VendorsConsole() {
           <div className={styles.layoutRight}>
             <form
               className={styles.panel}
-              onSubmit={handleSubmit}
+              onSubmit={form.handleSubmit}
             >
               <div className={styles.panelHeader}>
                 <h3 className={styles.panelTitle}>
-                  {selectedVendor ? `Edit: ${selectedVendor.name}` : "New Vendor"}
+                  {form.selectedVendor ? `Edit: ${form.selectedVendor.name}` : "New Vendor"}
                 </h3>
-                {selectedVendor ? (
-                  <button type="button" className={styles.newButton} onClick={startCreateMode}>
+                {form.selectedVendor ? (
+                  <button type="button" className={styles.newButton} onClick={form.startCreateMode}>
                     + New
                   </button>
                 ) : null}
@@ -460,30 +301,30 @@ export function VendorsConsole() {
               <label className={styles.field}>
                 <span>Name</span>
                 <input
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
+                  value={form.name}
+                  onChange={(event) => form.setName(event.target.value)}
                   required
                 />
               </label>
               <label className={styles.field}>
                 <span>Email</span>
                 <input
-                  value={vendorEmail}
-                  onChange={(event) => setVendorEmail(event.target.value)}
+                  value={form.vendorEmail}
+                  onChange={(event) => form.setVendorEmail(event.target.value)}
                 />
               </label>
               <label className={styles.field}>
                 <span>Phone</span>
                 <input
-                  value={phone}
-                  onChange={(event) => setPhone(event.target.value)}
+                  value={form.phone}
+                  onChange={(event) => form.setPhone(event.target.value)}
                 />
               </label>
               <label className={styles.field}>
                 <span>Tax ID (last 4)</span>
                 <input
-                  value={taxIdLast4}
-                  onChange={(event) => setTaxIdLast4(event.target.value)}
+                  value={form.taxIdLast4}
+                  onChange={(event) => form.setTaxIdLast4(event.target.value)}
                   inputMode="numeric"
                   maxLength={4}
                 />
@@ -491,17 +332,17 @@ export function VendorsConsole() {
               <label className={styles.field}>
                 <span>Notes</span>
                 <textarea
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
+                  value={form.notes}
+                  onChange={(event) => form.setNotes(event.target.value)}
                   rows={4}
                 />
               </label>
-              {selectedVendor ? (
+              {form.selectedVendor ? (
                 <label className={styles.field}>
                   <span>Active status</span>
                   <select
-                    value={isActive ? "true" : "false"}
-                    onChange={(event) => setIsActive(event.target.value === "true")}
+                    value={form.isActive ? "true" : "false"}
+                    onChange={(event) => form.setIsActive(event.target.value === "true")}
                   >
                     <option value="true">Active</option>
                     <option value="false">Inactive</option>
@@ -511,8 +352,8 @@ export function VendorsConsole() {
               <label className={styles.overrideRow}>
                 <input
                   type="checkbox"
-                  checked={duplicateOverrideOnSave}
-                  onChange={(event) => setDuplicateOverrideOnSave(event.target.checked)}
+                  checked={form.duplicateOverrideOnSave}
+                  onChange={(event) => form.setDuplicateOverrideOnSave(event.target.checked)}
                 />
                 <span className={styles.overrideBody}>
                   <strong className={styles.overrideTitle}>Allow duplicate vendor identity</strong>
@@ -523,10 +364,10 @@ export function VendorsConsole() {
               </label>
               <div className={styles.formActions}>
                 <button type="submit" className={styles.primaryButton} disabled={!canMutateVendors}>
-                  {selectedVendor ? "Save Vendor" : "Create Vendor"}
+                  {form.selectedVendor ? "Save Vendor" : "Create Vendor"}
                 </button>
-                {selectedVendor ? (
-                  <button type="button" className={styles.ghostButton} onClick={() => hydrate(selectedVendor)}>
+                {form.selectedVendor ? (
+                  <button type="button" className={styles.ghostButton} onClick={() => form.hydrate(form.selectedVendor!)}>
                     Reset Fields
                   </button>
                 ) : null}
@@ -537,38 +378,38 @@ export function VendorsConsole() {
               <button
                 type="button"
                 className={styles.importToggle}
-                onClick={() => setImportExpanded((current) => !current)}
-                aria-expanded={importExpanded}
+                onClick={() => csvImport.setIsExpanded((current) => !current)}
+                aria-expanded={csvImport.isExpanded}
               >
                 <h3 className={styles.panelTitle}>CSV Import</h3>
-                <span className={styles.importToggleArrow}>{importExpanded ? "\u25B2" : "\u25BC"}</span>
+                <span className={styles.importToggleArrow}>{csvImport.isExpanded ? "\u25B2" : "\u25BC"}</span>
               </button>
-              {importExpanded ? (
+              {csvImport.isExpanded ? (
                 <>
                   <label className={styles.field}>
                     <span>CSV text</span>
                     <textarea
-                      value={importCsvText}
-                      onChange={(event) => setImportCsvText(event.target.value)}
+                      value={csvImport.csvText}
+                      onChange={(event) => csvImport.setCsvText(event.target.value)}
                       rows={7}
                     />
                   </label>
                   <div className={styles.formActions}>
-                    <button type="button" className={styles.secondaryButton} onClick={() => void runCsvImport(true)} disabled={!canMutateVendors}>
+                    <button type="button" className={styles.secondaryButton} onClick={() => void csvImport.runImport(true)} disabled={!canMutateVendors}>
                       Preview
                     </button>
-                    <button type="button" className={styles.primaryButton} onClick={() => void runCsvImport(false)} disabled={!canMutateVendors}>
+                    <button type="button" className={styles.primaryButton} onClick={() => void csvImport.runImport(false)} disabled={!canMutateVendors}>
                       Apply
                     </button>
                   </div>
-                  {importResult ? (
+                  {csvImport.importResult ? (
                     <div className={styles.importResult}>
                       <p className={styles.importHint}>
-                        Rows: {importResult.total_rows} | Create: {importResult.created_count} | Update:{" "}
-                        {importResult.updated_count} | Errors: {importResult.error_count}
+                        Rows: {csvImport.importResult.total_rows} | Create: {csvImport.importResult.created_count} | Update:{" "}
+                        {csvImport.importResult.updated_count} | Errors: {csvImport.importResult.error_count}
                       </p>
                       <ul className={styles.resultRows}>
-                        {importResult.rows.map((row) => (
+                        {csvImport.importResult.rows.map((row) => (
                           <li
                             key={`${row.row_number}-${row.name ?? "none"}-${row.status}`}
                             className={`${styles.resultRow} ${

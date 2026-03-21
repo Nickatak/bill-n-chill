@@ -4,6 +4,8 @@
  * "My Team" tab — membership management + invite creation.
  * Merges what were separate "Memberships" and "Invite Members" sections
  * into a single tab: "who works here and how do I add more people."
+ *
+ * Parent: OrganizationConsole
  */
 
 import { FormEvent, useState } from "react";

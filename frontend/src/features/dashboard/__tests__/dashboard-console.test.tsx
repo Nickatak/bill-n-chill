@@ -70,8 +70,8 @@ function makeChangeImpact(overrides: Record<string, unknown> = {}) {
   return {
     generated_at: "2026-03-09T00:00:00Z",
     date_filter: { date_from: "2026-01-01", date_to: "2026-03-09" },
-    approved_change_order_count: 2,
-    approved_change_order_total: "5000.00",
+    approved_change_orders_count: 2,
+    approved_change_orders_total: "5000.00",
     projects: [],
     ...overrides,
   };
@@ -208,8 +208,8 @@ describe("DashboardConsole", () => {
   it("renders change order impact section", async () => {
     setupDashboardFetch({
       changeImpact: makeChangeImpact({
-        approved_change_order_count: 4,
-        approved_change_order_total: "12500.00",
+        approved_change_orders_count: 4,
+        approved_change_orders_total: "12500.00",
       }),
     });
     render(<DashboardConsole />);
@@ -226,7 +226,7 @@ describe("DashboardConsole", () => {
 
   it("hides change impact when zero approved COs", async () => {
     setupDashboardFetch({
-      changeImpact: makeChangeImpact({ approved_change_order_count: 0 }),
+      changeImpact: makeChangeImpact({ approved_change_orders_count: 0 }),
     });
     render(<DashboardConsole />);
 

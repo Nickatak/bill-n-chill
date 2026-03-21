@@ -34,8 +34,8 @@ function makeCustomer(overrides: Partial<CustomerRow> = {}): CustomerRow {
     email: "jane@example.com",
     billing_address: "123 Main St",
     is_archived: false,
-    project_count: 2,
-    active_project_count: 1,
+    projects_count: 2,
+    active_projects_count: 1,
     created_at: "2026-01-15T10:00:00Z",
     ...overrides,
   };

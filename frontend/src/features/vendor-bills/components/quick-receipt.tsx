@@ -10,6 +10,8 @@
  * Supports optional photo scanning: user uploads a receipt image,
  * backend sends it to Gemini Vision for best-effort field extraction,
  * and the form prefills with whatever comes back.
+ *
+ * Parent: QuickEntryTabs
  */
 
 import { ChangeEvent, FormEvent, useRef, useState } from "react";

@@ -4,6 +4,8 @@
  * Public-facing estimate approval preview for customer decision flow.
  * Renders a read-only estimate document via a tokenized public URL and
  * provides approve/reject controls for estimates in "sent" status.
+ *
+ * Parent: app/estimate/[publicRef]/page.tsx
  */
 
 import { useEffect, useMemo, useState } from "react";

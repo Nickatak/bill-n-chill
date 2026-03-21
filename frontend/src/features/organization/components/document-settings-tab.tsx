@@ -4,6 +4,8 @@
  * "Document Settings" tab — help email, due/valid deltas, and T&Cs
  * with Invoice / Estimate / Change Order sub-tabs.
  * Gated by `org_presets.edit` capability (owner + PM).
+ *
+ * Parent: OrganizationConsole
  */
 
 import { FormEvent, useState } from "react";

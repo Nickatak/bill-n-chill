@@ -2,8 +2,10 @@
 
 /**
  * Top-level quick-add console that composes the customer intake workflow.
- * Bridges shared-session auth into the quick-add controller, renders status feedback,
- * and orchestrates the duplicate-resolution and form sub-components.
+ * Bridges shared-session auth into the quick-add controller, renders status
+ * feedback, and orchestrates the duplicate-resolution and form sub-components.
+ *
+ * Parent: CustomersConsole
  */
 
 import { useEffect, useRef } from "react";
@@ -12,7 +14,7 @@ import Link from "next/link";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { DuplicateResolutionPanel } from "./duplicate-resolution-panel";
 import { QuickAddForm } from "./quick-add-form";
-import { useQuickAddController } from "../hooks/use-quick-add-controller";
+import { useQuickAddController } from "../../hooks/use-quick-add-controller";
 import styles from "./quick-add-console.module.css";
 
 type QuickAddConsoleProps = {

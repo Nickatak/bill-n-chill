@@ -6,10 +6,11 @@ import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-li
 // ---------------------------------------------------------------------------
 
 const mockFetch = vi.hoisted(() => vi.fn());
+const mockSearchParamsGet = vi.hoisted(() => vi.fn((_key: string): string | null => null));
 
 vi.mock("next/navigation", () => ({
   useSearchParams: vi.fn(() => ({
-    get: vi.fn(() => null),
+    get: mockSearchParamsGet,
   })),
 }));
 
@@ -82,23 +83,26 @@ function makeFinancialSummary(overrides: Record<string, unknown> = {}) {
 // ---------------------------------------------------------------------------
 
 /**
- * Route-aware fetch mock. The component fires up to 4 requests on mount
- * (projects list, financial summary, estimates, change orders).
+ * Route-aware fetch mock. The component fires up to 7 requests on mount
+ * (projects list, financial summary, estimates, change orders, vendor bills,
+ * invoices for counts, invoices for allocation targets).
  */
 function setupDefaultFetch(overrides: {
   projects?: unknown[];
   summary?: Record<string, unknown>;
   estimates?: unknown[];
   changeOrders?: unknown[];
+  vendorBills?: unknown[];
+  invoices?: unknown[];
 } = {}) {
   mockFetch.mockImplementation((url: string) => {
-    if (url.includes("/projects/") && url.includes("/financial-summary/")) {
+    if (url.includes("/financial-summary/")) {
       return Promise.resolve({
         ok: true,
         json: () => Promise.resolve({ data: overrides.summary ?? makeFinancialSummary() }),
       });
     }
-    if (url.includes("/projects/") && url.includes("/estimates/")) {
+    if (url.includes("/estimates/")) {
       return Promise.resolve({
         ok: true,
         json: () =>
@@ -110,7 +114,7 @@ function setupDefaultFetch(overrides: {
           }),
       });
     }
-    if (url.includes("/projects/") && url.includes("/change-orders/")) {
+    if (url.includes("/change-orders/")) {
       return Promise.resolve({
         ok: true,
         json: () =>
@@ -121,7 +125,19 @@ function setupDefaultFetch(overrides: {
           }),
       });
     }
-    if (url.includes("/projects/")) {
+    if (url.includes("/vendor-bills/")) {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ data: overrides.vendorBills ?? [] }),
+      });
+    }
+    if (url.includes("/invoices/")) {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ data: overrides.invoices ?? [] }),
+      });
+    }
+    if (url.includes("/projects")) {
       return Promise.resolve({
         ok: true,
         json: () =>
@@ -141,6 +157,7 @@ function setupDefaultFetch(overrides: {
 describe("ProjectsConsole", () => {
   beforeEach(() => {
     mockFetch.mockReset();
+    mockSearchParamsGet.mockImplementation(() => null);
   });
 
   afterEach(() => {
@@ -374,6 +391,7 @@ describe("ProjectsConsole", () => {
     expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/1/estimates");
     expect(screen.getByRole("link", { name: /Change Orders/ })).toHaveAttribute("href", "/projects/1/change-orders");
     expect(screen.getByRole("link", { name: /Invoices/ })).toHaveAttribute("href", "/projects/1/invoices");
+    expect(screen.getByRole("link", { name: /Bills/ })).toHaveAttribute("href", "/projects/1/bills");
   });
 
   // ---------------------------------------------------------------------------
@@ -575,6 +593,191 @@ describe("ProjectsConsole", () => {
     // on_hold and completed NOT available from prospect
     expect(within(editForm).queryByRole("button", { name: "on hold" })).not.toBeInTheDocument();
     expect(within(editForm).queryByRole("button", { name: "completed" })).not.toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Financial metrics
+  // ---------------------------------------------------------------------------
+
+  it("displays financial metrics with correct dollar amounts", async () => {
+    setupDefaultFetch({
+      summary: makeFinancialSummary({
+        accepted_contract_total: "25000.00",
+        invoiced_to_date: "10000.00",
+        paid_to_date: "5000.00",
+        ar_outstanding: "5000.00",
+      }),
+    });
+    render(<ProjectsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("$25,000.00")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("$10,000.00")).toBeInTheDocument();
+    // Paid and Outstanding both $5,000.00
+    expect(screen.getAllByText("$5,000.00")).toHaveLength(2);
+    // Remaining to Invoice: 25000 - 10000 = 15000
+    expect(screen.getByText("$15,000.00")).toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Bill and invoice status count badges
+  // ---------------------------------------------------------------------------
+
+  it("displays bill and invoice status count badges", async () => {
+    setupDefaultFetch({
+      vendorBills: [
+        { status: "received" },
+        { status: "received" },
+        { status: "approved" },
+        { status: "disputed" },
+      ],
+      invoices: [
+        { id: 1, status: "draft", balance_due: "5000.00" },
+        { id: 2, status: "sent", balance_due: "10000.00" },
+        { id: 3, status: "sent", balance_due: "8000.00" },
+        { id: 4, status: "partially_paid", balance_due: "3000.00" },
+      ],
+    });
+    render(<ProjectsConsole />);
+
+    // Bill badges: R{received} D{disputed} A{approved}
+    await waitFor(() => {
+      const billsLink = screen.getByRole("link", { name: /Bills/ });
+      expect(within(billsLink).getByText("R2")).toBeInTheDocument();
+    });
+    const billsLink = screen.getByRole("link", { name: /Bills/ });
+    expect(within(billsLink).getByText("D1")).toBeInTheDocument();
+    expect(within(billsLink).getByText("A1")).toBeInTheDocument();
+
+    // Invoice badges: D{draft} S{sent} P{partially_paid}
+    const invoicesLink = screen.getByRole("link", { name: /Invoices/ });
+    expect(within(invoicesLink).getByText("D1")).toBeInTheDocument();
+    expect(within(invoicesLink).getByText("S2")).toBeInTheDocument();
+    expect(within(invoicesLink).getByText("P1")).toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Search by customer name and project ID
+  // ---------------------------------------------------------------------------
+
+  it("search filters by customer display name", async () => {
+    setupDefaultFetch({
+      projects: [
+        makeProject({ id: 1, name: "Kitchen Remodel", customer_display_name: "Jane Doe" }),
+        makeProject({ id: 2, name: "Deck Build", customer_display_name: "Bob Smith" }),
+      ],
+    });
+    render(<ProjectsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Deck Build/)).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("Search projects"), {
+      target: { value: "Bob" },
+    });
+
+    // After search + fallback reselection, Deck Build should be selected
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/2/estimates");
+    });
+    expect(screen.queryAllByText(/Kitchen Remodel/)).toHaveLength(0);
+  });
+
+  it("search filters by project ID", async () => {
+    setupDefaultFetch({
+      projects: [
+        makeProject({ id: 1, name: "Kitchen Remodel" }),
+        makeProject({ id: 2, name: "Deck Build" }),
+      ],
+    });
+    render(<ProjectsConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Deck Build/)).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("Search projects"), {
+      target: { value: "2" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/2/estimates");
+    });
+    expect(screen.queryAllByText(/Kitchen Remodel/)).toHaveLength(0);
+  });
+
+  // ---------------------------------------------------------------------------
+  // URL scoping
+  // ---------------------------------------------------------------------------
+
+  it("customer URL scope filters to matching customer projects", async () => {
+    mockSearchParamsGet.mockImplementation((key: string) => (key === "customer" ? "10" : null));
+    setupDefaultFetch({
+      projects: [
+        makeProject({ id: 1, name: "Kitchen Remodel", customer: 10, customer_display_name: "Jane Doe" }),
+        makeProject({ id: 2, name: "Deck Build", customer: 20, customer_display_name: "Bob Smith" }),
+      ],
+    });
+    render(<ProjectsConsole />);
+
+    // Wait for project 1 to be selected (pipeline link confirms selection)
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/1/estimates");
+    });
+
+    // Project from customer 20 should not appear
+    expect(screen.queryByText(/Deck Build/)).not.toBeInTheDocument();
+  });
+
+  it("project URL scope pre-selects and expands filter for non-default status", async () => {
+    mockSearchParamsGet.mockImplementation((key: string) => (key === "project" ? "2" : null));
+    setupDefaultFetch({
+      projects: [
+        makeProject({ id: 1, name: "Kitchen Remodel", status: "active" }),
+        makeProject({ id: 2, name: "Old Bathroom", status: "completed" }),
+      ],
+    });
+    render(<ProjectsConsole />);
+
+    // Project 2 pre-selected despite being "completed" (not in default filters)
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/2/estimates");
+    });
+
+    // "Old Bathroom" visible because filter was expanded to include "completed"
+    // Appears in both card and overview title, so use getAllByText
+    expect(screen.getAllByText(/Old Bathroom/).length).toBeGreaterThanOrEqual(1);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Filter fallback
+  // ---------------------------------------------------------------------------
+
+  it("falls back to first visible project when filter hides selected", async () => {
+    setupDefaultFetch({
+      projects: [
+        makeProject({ id: 1, name: "Kitchen Remodel", status: "active" }),
+        makeProject({ id: 2, name: "Deck Build", status: "prospect" }),
+      ],
+    });
+    render(<ProjectsConsole />);
+
+    // Project 1 (active) auto-selected
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/1/estimates");
+    });
+
+    // Toggle off "active" — project 1 becomes hidden
+    const filtersContainer = screen.getByText("Project status filter").parentElement!;
+    fireEvent.click(within(filtersContainer).getByRole("button", { name: /active/i }));
+
+    // Should fall back to project 2 (first visible prospect)
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/2/estimates");
+    });
   });
 
 });

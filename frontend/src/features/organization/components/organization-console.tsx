@@ -3,12 +3,53 @@
 /**
  * Organization console — slim orchestrator with 3-tab layout.
  *
- * Tab 1: My Business — identity fields (name, logo, phone, etc.)
- * Tab 2: My Team — memberships + invites
- * Tab 3: Document Settings — help email, due/valid deltas, T&Cs
+ * Fetches profile, memberships, and invites on mount, then passes
+ * data down to tab components. Each tab owns its own mutation logic;
+ * this console just provides the data + callbacks.
  *
- * Fetches all data on mount, then passes props down to tab components.
- * URL stays at /ops/organization (no sub-routes).
+ * Parent: app/ops/organization/page.tsx
+ *
+ * ## Page layout
+ *
+ * ┌─────────────────────────────────────┐
+ * │ Error banner (conditional)          │
+ * ├─────────────────────────────────────┤
+ * │ Tab bar (Business / Team / Docs)    │
+ * ├─────────────────────────────────────┤
+ * │ Tab content (one at a time):        │
+ * │   ├── BusinessProfileTab            │
+ * │   ├── TeamTab                       │
+ * │   └── DocumentSettingsTab           │
+ * └─────────────────────────────────────┘
+ *
+ * ## State (useState)
+ *
+ * - activeTab    — "business" | "team" | "documents"
+ * - errorMessage — error display string
+ * - loading      — true until parallel fetch settles
+ * - profile      — OrganizationProfile from /organization/
+ * - memberships  — array from /organization/memberships/
+ * - invites      — array from /organization/invites/ (best-effort)
+ * - rolePolicy   — RBAC policy from membership or profile response
+ *
+ * ## Functions
+ *
+ * - handleProfileUpdate(profile, policy?)
+ *     Updates local profile state and syncs org name to the client
+ *     session so the toolbar reflects the change immediately.
+ *
+ * ## Effect: onboarding flag
+ *
+ * Deps: []
+ *
+ * Sets localStorage "onboarding:org-visited" on mount.
+ *
+ * ## Effect: data fetch
+ *
+ * Deps: [hasSession, normalizedBaseUrl, token]
+ *
+ * Parallel fetch of profile + memberships + invites (invites is
+ * best-effort). Uses ignore flag for race-condition cleanup.
  */
 
 import { useEffect, useState } from "react";

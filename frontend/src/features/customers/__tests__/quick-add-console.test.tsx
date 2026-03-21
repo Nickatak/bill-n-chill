@@ -35,7 +35,7 @@ vi.stubGlobal("fetch", mockFetch);
 // jsdom doesn't implement scrollIntoView
 Element.prototype.scrollIntoView = vi.fn();
 
-import { QuickAddConsole } from "../components/quick-add-console";
+import { QuickAddConsole } from "../components/quick-add/quick-add-console";
 
 // ---------------------------------------------------------------------------
 // Helpers

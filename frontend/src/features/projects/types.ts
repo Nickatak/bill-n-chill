@@ -115,8 +115,8 @@ export type PortfolioSnapshot = {
 export type ChangeImpactProject = {
   project_id: number;
   project_name: string;
-  approved_change_order_count: number;
-  approved_change_order_total: string;
+  approved_change_orders_count: number;
+  approved_change_orders_total: string;
 };
 
 export type ChangeImpactSummary = {
@@ -125,8 +125,8 @@ export type ChangeImpactSummary = {
     date_from: string;
     date_to: string;
   };
-  approved_change_order_count: number;
-  approved_change_order_total: string;
+  approved_change_orders_count: number;
+  approved_change_orders_total: string;
   projects: ChangeImpactProject[];
 };
 

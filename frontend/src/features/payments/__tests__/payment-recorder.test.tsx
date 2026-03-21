@@ -371,6 +371,108 @@ describe("PaymentRecorder", () => {
     });
   });
 
+  it("hides heading and copy when hideHeader is true", async () => {
+    setupPaymentFetch({ payments: [] });
+    renderRecorder({ hideHeader: true });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Record Payment" })).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("Inbound Payments")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Record payments received/)).not.toBeInTheDocument();
+  });
+
+  it("hides payment list and shows only create form when createOnly is true", async () => {
+    setupPaymentFetch({
+      payments: [makePayment({ id: 1, amount: "5000.00", reference_number: "REF-001" })],
+    });
+    renderRecorder({ createOnly: true });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Record Payment" })).toBeInTheDocument();
+    });
+
+    // Payment list should not render even though data exists
+    expect(screen.queryByText("Payment #1")).not.toBeInTheDocument();
+    expect(screen.queryByText("#REF-001")).not.toBeInTheDocument();
+    // No mode badge or "Record New Payment" toggle in createOnly mode
+    expect(screen.queryByText("+ Record New Payment")).not.toBeInTheDocument();
+  });
+
+  it("executes quick status transition via PATCH", async () => {
+    setupPaymentFetch({
+      payments: [makePayment({ status: "pending" })],
+    });
+    renderRecorder();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Settled" })).toBeInTheDocument();
+    });
+
+    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
+      if (opts?.method === "PATCH") {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            data: makePayment({ id: 1, status: "settled" }),
+          }),
+        });
+      }
+      if (url.includes("/contracts/payments/")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: {} }) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Settled" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Payment #1 → Settled/)).toBeInTheDocument();
+    });
+  });
+
+  it("hides quick status actions for void (terminal) payments", async () => {
+    setupPaymentFetch({
+      payments: [makePayment({ status: "void" })],
+    });
+    renderRecorder();
+
+    await waitFor(() => {
+      expect(screen.getByText("Payment #1")).toBeInTheDocument();
+    });
+
+    // Void is terminal — no transitions available
+    expect(screen.queryByRole("button", { name: "Settled" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Void" })).not.toBeInTheDocument();
+  });
+
+  it("shows network error when create fetch rejects", async () => {
+    setupPaymentFetch({ payments: [] });
+    renderRecorder();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Record Payment" })).toBeInTheDocument();
+    });
+
+    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
+      if (opts?.method === "POST") {
+        return Promise.reject(new Error("Network error"));
+      }
+      if (url.includes("/contracts/payments/")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: {} }) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
+    });
+
+    const form = screen.getByRole("button", { name: "Record Payment" }).closest("form")!;
+    fireEvent.submit(form);
+
+    await waitFor(() => {
+      expect(screen.getByText("Could not reach payment create endpoint.")).toBeInTheDocument();
+    });
+  });
+
   it("shows API error on create failure", async () => {
     setupPaymentFetch({ payments: [] });
     renderRecorder();

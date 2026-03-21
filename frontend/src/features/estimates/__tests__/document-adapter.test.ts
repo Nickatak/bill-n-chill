@@ -182,7 +182,7 @@ describe("createEstimateDocumentAdapter", () => {
             description: "Demo work",
             quantity: "2",
             unit: "day",
-            unit_cost: "1500.00",
+            unit_price: "1500.00",
             markup_percent: "15",
           },
           {
@@ -190,7 +190,7 @@ describe("createEstimateDocumentAdapter", () => {
             description: "Cabinets",
             quantity: "1",
             unit: "lot",
-            unit_cost: "2000.00",
+            unit_price: "2000.00",
             markup_percent: "10",
           },
         ],

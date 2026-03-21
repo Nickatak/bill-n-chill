@@ -4,6 +4,8 @@
  * Filterable timeline of audit and workflow events for a single project.
  * Queries the unified project timeline endpoint which merges estimate,
  * invoice, change order, payment, and vendor bill audit records.
+ *
+ * Parent: app/projects/[projectId]/audit-trail/page.tsx
  */
 
 import Link from "next/link";

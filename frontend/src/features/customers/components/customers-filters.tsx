@@ -3,6 +3,8 @@
 /**
  * Compact filter bar for the customer list: free-text search and inline
  * segmented controls for activity and project ownership filtering.
+ *
+ * Parent: CustomersConsole
  */
 
 import segmented from "../../../shared/styles/segmented.module.css";

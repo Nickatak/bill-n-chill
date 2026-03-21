@@ -1,8 +1,37 @@
 "use client";
 
 /**
- * Authenticated dashboard landing page. Shows portfolio health, attention
- * items that need action, and approved change order impact across projects.
+ * Authenticated dashboard landing page — read-only report hub.
+ *
+ * Fetches three report endpoints in parallel on mount and renders
+ * a portfolio snapshot, an attention feed, and change order impact.
+ * No mutations, no form state — purely display.
+ *
+ * Parent: app/dashboard/page.tsx
+ *
+ * ## Page layout
+ *
+ * ┌─────────────────────────────────────────┐
+ * │ Portfolio (metric cards + project table) │
+ * ├─────────────────────────────────────────┤
+ * │ Needs Attention (linked feed items)     │
+ * ├─────────────────────────────────────────┤
+ * │ Change Order Impact (conditional)       │
+ * └─────────────────────────────────────────┘
+ *
+ * ## State (useState)
+ *
+ * - portfolio     — PortfolioSnapshot from /reports/portfolio/
+ * - attentionFeed — AttentionFeed from /reports/attention-feed/
+ * - changeImpact  — ChangeImpactSummary from /reports/change-impact/
+ * - loading       — true until all three fetches settle
+ *
+ * ## Effect: data fetch
+ *
+ * Deps: [token]
+ *
+ * Fires on mount. Uses Promise.allSettled so each report renders
+ * independently — a failed endpoint doesn't block the others.
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
@@ -78,7 +107,7 @@ export function DashboardConsole() {
   }
 
   const hasAttentionItems = attentionFeed && attentionFeed.item_count > 0;
-  const hasChangeImpact = changeImpact && changeImpact.approved_change_order_count > 0;
+  const hasChangeImpact = changeImpact && changeImpact.approved_change_orders_count > 0;
 
   return (
     <div className={styles.dashboard}>
@@ -186,12 +215,12 @@ export function DashboardConsole() {
           <div className={styles.metricGrid}>
             <div className={styles.metricCard}>
               <span className={styles.metricLabel}>Approved COs</span>
-              <strong className={styles.metricValue}>{changeImpact.approved_change_order_count}</strong>
+              <strong className={styles.metricValue}>{changeImpact.approved_change_orders_count}</strong>
             </div>
             <div className={styles.metricCard}>
               <span className={styles.metricLabel}>Total Contract Growth</span>
               <strong className={styles.metricValue}>
-                {formatCurrency(Number(changeImpact.approved_change_order_total))}
+                {formatCurrency(Number(changeImpact.approved_change_orders_total))}
               </strong>
             </div>
           </div>

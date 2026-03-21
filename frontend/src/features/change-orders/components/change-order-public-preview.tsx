@@ -4,6 +4,8 @@
  * Public-facing change-order preview for customer decision flow.
  * Renders a read-only change-order document via a tokenized public URL and
  * provides approve/reject controls for change orders in "pending_approval" status.
+ *
+ * Parent: app/change-order/[publicRef]/page.tsx
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -310,7 +312,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
                                   <td>{line.description || "—"}</td>
                                   <td>{line.quantity}</td>
                                   <td>{line.unit}</td>
-                                  <td>${line.unit_cost}</td>
+                                  <td>${line.unit_price}</td>
                                   <td>{line.markup_percent}%</td>
                                   <td>${line.line_total}</td>
                                 </tr>

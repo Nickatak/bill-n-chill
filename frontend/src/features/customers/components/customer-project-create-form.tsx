@@ -2,8 +2,10 @@
 
 /**
  * Controlled form for creating a new project under a specific customer.
- * Rendered inside a modal dialog from CustomersConsole. Allows the user to
- * set a project name, optional site address, and initial status (prospect/active).
+ * Allows the user to set a project name, site address, and initial status
+ * (prospect/active). Rendered inside a modal dialog.
+ *
+ * Parent: CustomersConsole (modal)
  */
 
 import { FormEventHandler } from "react";

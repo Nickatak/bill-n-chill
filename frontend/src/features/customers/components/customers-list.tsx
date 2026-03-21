@@ -4,6 +4,8 @@
  * Customer list with an expandable per-row project accordion. Uses a div-based
  * grid layout that renders as a 3-column table on desktop and stacked cards
  * on mobile.
+ *
+ * Parent: CustomersConsole
  */
 
 import { useState } from "react";

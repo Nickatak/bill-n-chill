@@ -5,7 +5,7 @@
  * Pure presentational component: all state and handlers live in the parent
  * ChangeOrdersConsole and are passed down as props.
  *
- * Extracted from change-orders-console.tsx to reduce component size.
+ * Parent: ChangeOrdersConsole
  */
 "use client";
 
@@ -220,7 +220,7 @@ export function ChangeOrdersWorkspacePanel({
                 columns={["Cost code", "Description", "Qty", "Unit", "Unit cost", "Markup %", "Line total"]}
                 rows={selectedViewerEstimate.line_items.map((line) => {
                   const qty = Number(line.quantity || 0);
-                  const unitCost = Number(line.unit_cost || 0);
+                  const unitCost = Number(line.unit_price || 0);
                   const unit = line.unit || "ea";
                   const costCodeLabel = [line.cost_code_code, line.cost_code_name].filter(Boolean).join(" — ") || "—";
                   return {

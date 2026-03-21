@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  computeEstimateStatusCounts,
+  computeLineTotal,
   emptyLine,
   estimateStatusLabel,
+  filterVisibleFamilies,
   formatStatusAction,
+  groupEstimateFamilies,
   isNotatedStatusEvent,
   mapEstimateLineItemsToInputs,
   mapLineCostCodes,
@@ -12,7 +16,9 @@ import {
   readEstimateApiError,
   resolveAutoSelectEstimate,
   resolveEstimateValidationDeltaDays,
+  toNumber,
 } from "../helpers";
+import type { EstimateLineInput } from "../types";
 import type {
   EstimateLineItemRecord,
   EstimatePolicyContract,
@@ -315,7 +321,7 @@ describe("mapEstimateLineItemsToInputs", () => {
         description: "Demo work",
         quantity: "2",
         unit: "day",
-        unit_cost: "1500.00",
+        unit_price: "1500.00",
         markup_percent: "15",
       },
       {
@@ -324,7 +330,7 @@ describe("mapEstimateLineItemsToInputs", () => {
         description: "Framing",
         quantity: "40",
         unit: "hr",
-        unit_cost: "75.00",
+        unit_price: "75.00",
         markup_percent: "10",
       },
     ];
@@ -361,7 +367,7 @@ describe("mapEstimateLineItemsToInputs", () => {
         description: "Item",
         quantity: "1",
         unit: "",
-        unit_cost: "100",
+        unit_price: "100",
         markup_percent: "0",
       },
     ];
@@ -445,7 +451,7 @@ describe("mapPublicEstimateLineItems", () => {
           description: "Demo work",
           quantity: "2",
           unit: "day",
-          unit_cost: "500.00",
+          unit_price: "500.00",
           markup_percent: "10",
         },
       ],
@@ -625,5 +631,169 @@ describe("isNotatedStatusEvent", () => {
     expect(
       isNotatedStatusEvent(event({ from_status: "sent", to_status: "sent", note: "   " })),
     ).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// toNumber
+// ---------------------------------------------------------------------------
+
+describe("toNumber", () => {
+  it("parses a valid number string", () => {
+    expect(toNumber("42")).toBe(42);
+    expect(toNumber("3.14")).toBe(3.14);
+  });
+
+  it("returns 0 for empty string", () => {
+    expect(toNumber("")).toBe(0);
+  });
+
+  it("returns 0 for non-numeric string", () => {
+    expect(toNumber("abc")).toBe(0);
+  });
+
+  it("returns 0 for NaN-producing input", () => {
+    expect(toNumber("NaN")).toBe(0);
+  });
+
+  it("returns 0 for Infinity", () => {
+    expect(toNumber("Infinity")).toBe(0);
+  });
+
+  it("handles negative numbers", () => {
+    expect(toNumber("-10")).toBe(-10);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeLineTotal
+// ---------------------------------------------------------------------------
+
+describe("computeLineTotal", () => {
+  function line(overrides: Partial<EstimateLineInput> = {}): EstimateLineInput {
+    return {
+      localId: 1,
+      costCodeId: "1",
+      description: "Test",
+      quantity: "1",
+      unit: "ea",
+      unitCost: "100",
+      markupPercent: "0",
+      ...overrides,
+    };
+  }
+
+  it("computes base total without markup", () => {
+    expect(computeLineTotal(line({ quantity: "2", unitCost: "50" }))).toBe(100);
+  });
+
+  it("applies markup percent", () => {
+    expect(computeLineTotal(line({ quantity: "1", unitCost: "100", markupPercent: "10" }))).toBe(110);
+  });
+
+  it("handles zero quantity", () => {
+    expect(computeLineTotal(line({ quantity: "0", unitCost: "100" }))).toBe(0);
+  });
+
+  it("handles non-numeric values as 0", () => {
+    expect(computeLineTotal(line({ quantity: "abc", unitCost: "100" }))).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// groupEstimateFamilies
+// ---------------------------------------------------------------------------
+
+describe("groupEstimateFamilies", () => {
+  function estimate(overrides: Partial<EstimateRecord>): EstimateRecord {
+    return {
+      id: 1,
+      title: "Kitchen",
+      version: 1,
+      status: "draft",
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+      ...overrides,
+    } as EstimateRecord;
+  }
+
+  it("groups estimates by title", () => {
+    const estimates = [
+      estimate({ id: 1, title: "Kitchen", version: 1 }),
+      estimate({ id: 2, title: "Kitchen", version: 2 }),
+      estimate({ id: 3, title: "Bathroom", version: 1 }),
+    ];
+    const families = groupEstimateFamilies(estimates);
+    expect(families).toHaveLength(2);
+    const kitchen = families.find((f) => f.title === "Kitchen");
+    expect(kitchen?.items).toHaveLength(2);
+    expect(kitchen?.items[0].version).toBe(1);
+    expect(kitchen?.items[1].version).toBe(2);
+  });
+
+  it("sorts versions ascending within a family", () => {
+    const estimates = [
+      estimate({ id: 2, title: "Kitchen", version: 3 }),
+      estimate({ id: 1, title: "Kitchen", version: 1 }),
+      estimate({ id: 3, title: "Kitchen", version: 2 }),
+    ];
+    const families = groupEstimateFamilies(estimates);
+    expect(families[0].items.map((e) => e.version)).toEqual([1, 2, 3]);
+  });
+
+  it("uses 'Untitled' for empty title", () => {
+    const estimates = [estimate({ id: 1, title: "" })];
+    const families = groupEstimateFamilies(estimates);
+    expect(families[0].title).toBe("Untitled");
+  });
+
+  it("returns empty array for no estimates", () => {
+    expect(groupEstimateFamilies([])).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeEstimateStatusCounts
+// ---------------------------------------------------------------------------
+
+describe("computeEstimateStatusCounts", () => {
+  it("counts latest version status per family", () => {
+    const families = [
+      { title: "A", items: [{ status: "draft" }, { status: "sent" }] as EstimateRecord[] },
+      { title: "B", items: [{ status: "approved" }] as EstimateRecord[] },
+      { title: "C", items: [{ status: "sent" }] as EstimateRecord[] },
+    ];
+    const counts = computeEstimateStatusCounts(families);
+    expect(counts).toEqual({ sent: 2, approved: 1 });
+  });
+
+  it("returns empty object for no families", () => {
+    expect(computeEstimateStatusCounts([])).toEqual({});
+  });
+});
+
+// ---------------------------------------------------------------------------
+// filterVisibleFamilies
+// ---------------------------------------------------------------------------
+
+describe("filterVisibleFamilies", () => {
+  const families = [
+    { title: "A", items: [{ status: "draft" }] as EstimateRecord[] },
+    { title: "B", items: [{ status: "sent" }] as EstimateRecord[] },
+    { title: "C", items: [{ status: "approved" }] as EstimateRecord[] },
+  ];
+
+  it("filters by latest status matching filter set", () => {
+    const result = filterVisibleFamilies(families, ["draft", "sent"]);
+    expect(result).toHaveLength(2);
+    expect(result.map((f) => f.title)).toEqual(["A", "B"]);
+  });
+
+  it("returns empty array when filters are empty", () => {
+    expect(filterVisibleFamilies(families, [])).toEqual([]);
+  });
+
+  it("returns all families when all statuses are in filter", () => {
+    expect(filterVisibleFamilies(families, ["draft", "sent", "approved"])).toHaveLength(3);
   });
 });

@@ -5,8 +5,8 @@ export type CustomerRow = {
   email: string;
   billing_address: string;
   is_archived: boolean;
-  project_count?: number;
-  active_project_count?: number;
+  projects_count?: number;
+  active_projects_count?: number;
   has_project?: boolean;
   has_active_or_on_hold_project?: boolean;
   created_at: string;
@@ -19,6 +19,14 @@ export type ApiResponse = {
     code?: string;
     message?: string;
     fields?: Record<string, string[]>;
+  };
+};
+
+export type PaginatedCustomerResponse = ApiResponse & {
+  pagination_metadata?: {
+    page?: number;
+    total_pages?: number;
+    total_count?: number;
   };
 };
 

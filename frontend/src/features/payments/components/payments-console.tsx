@@ -1,25 +1,87 @@
 "use client";
 
 /**
- * Inbound payments console — standalone page at /payments.
+ * Inbound payments console -- standalone page at /payments.
  *
- * Form-first layout for quickly recording money received from clients.
- * Project select is a dropdown inside the form. Payment history for the
- * selected project lives below as a compact reference list.
+ * Orchestrator that composes single-purpose hooks and wires their outputs
+ * into the JSX template. Owns combobox wiring, cross-hook coordination,
+ * and API mutation handlers (create, update, allocate, quick-status).
  *
- * Outbound payments live on the Bills page (/bills) via PaymentRecorder.
+ * Parent: app/payments/page.tsx
+ *
+ * ## Page layout
+ *
+ * ┌─────────────────────────────────────────┐
+ * │ Status banner (conditional)             │
+ * ├─────────────────────────────────────────┤
+ * │ Record Payment form (create / edit)     │
+ * │   ├── Customer combobox                 │
+ * │   ├── Project combobox                  │
+ * │   ├── Amount / Method / Date / Ref      │
+ * │   ├── Status (edit only)                │
+ * │   ├── Notes                             │
+ * │   └── Allocation disclosure (create)    │
+ * ├─────────────────────────────────────────┤
+ * │ Selected payment detail card            │
+ * │   ├── Metrics row                       │
+ * │   ├── Quick status actions              │
+ * │   ├── Existing allocations              │
+ * │   └── Allocate-to-invoice form          │
+ * ├─────────────────────────────────────────┤
+ * │ Payment History                         │
+ * │   ├── Search + status filter pills      │
+ * │   ├── Payment card list                 │
+ * │   └── Pagination                        │
+ * └─────────────────────────────────────────┘
+ *
+ * ## Hook dependency graph
+ *
+ * usePaymentData   (owns entity lists, policy contract, data loading)
+ *   ├── usePaymentForm     (reads defaultCreateMethod for reset)
+ *   └── usePaymentFilters  (reads allPayments)
+ *
+ * ## Functions
+ *
+ * - resetToCreate()
+ *     Clears form fields, selection state, and combobox queries.
+ *     Wraps form.resetToCreate() with data + combobox clearing.
+ *
+ * - handleSelectPayment(payment)
+ *     Sets selected payment, hydrates form from record.
+ *
+ * - handleSubmit(event)
+ *     Routes to handleCreate or handleUpdate based on workspace mode.
+ *
+ * - handleCreate()
+ *     POST /payments/, optional one-step allocation, updates list.
+ *
+ * - handleUpdate()
+ *     PATCH /payments/:id/, updates list in place.
+ *
+ * - handleQuickStatus(nextStatus)
+ *     PATCH /payments/:id/ with just status field.
+ *
+ * - handleAllocate(event)
+ *     POST /payments/:id/allocate/, refreshes invoices.
+ *
+ * ## Effects
+ *
+ * - Combobox hydration: syncs display text when data arrives for URL-scoped selections.
+ * - Policy method sync: updates form method when policy contract loads.
+ *
+ * ## Orchestration (in JSX)
+ *
+ * - Customer combobox clears project on change.
+ * - Project combobox feeds allocation targets.
+ * - Form submit button label changes based on allocation state.
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { apiBaseUrl } from "@/shared/api/base";
+import { FormEvent, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCombobox } from "@/shared/hooks/use-combobox";
-import { todayDateInput, formatDateDisplay } from "@/shared/date-format";
-import {
-  defaultApiBaseUrl,
-  fetchPaymentPolicyContract,
-  normalizeApiBaseUrl,
-} from "../api";
+import { formatDateDisplay } from "@/shared/date-format";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { canDo } from "@/shared/session/rbac";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
@@ -31,12 +93,13 @@ import type {
   CustomerRecord,
   PaymentAllocateResult,
   PaymentMethod,
-  PaymentPolicyContract,
   PaymentRecord,
   PaymentStatus,
   ProjectRecord,
-  InvoiceRecord,
 } from "../types";
+import { usePaymentData } from "../hooks/use-payment-data";
+import { usePaymentForm } from "../hooks/use-payment-form";
+import { usePaymentFilters } from "../hooks/use-payment-filters";
 import styles from "./payments-console.module.css";
 
 // ---------------------------------------------------------------------------
@@ -45,17 +108,6 @@ import styles from "./payments-console.module.css";
 
 const DIRECTION = "inbound" as const;
 
-const PAYMENT_STATUS_LABELS_FALLBACK: Record<string, string> = {
-  pending: "Pending",
-  settled: "Settled",
-  void: "Void",
-};
-const PAYMENT_METHODS_FALLBACK = ["check", "zelle", "ach", "cash", "wire", "card", "other"];
-const PAYMENT_ALLOWED_TRANSITIONS_FALLBACK: Record<string, string[]> = {
-  pending: ["settled", "void"],
-  settled: ["void"],
-  void: [],
-};
 const PAYMENT_STATUSES_DISPLAY = ["pending", "settled", "void"];
 
 // ---------------------------------------------------------------------------
@@ -83,7 +135,6 @@ export function PaymentsConsole() {
   const canAllocatePayments = canDo(capabilities, "payments", "allocate");
   const canMutatePayments = canCreatePayments || canEditPayments;
 
-  const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
   const { message: statusMessage, tone: statusTone, setNeutral, setSuccess, setError } = useStatusMessage();
 
   // -- URL params (deep-link from other pages) --
@@ -93,15 +144,42 @@ export function PaymentsConsole() {
   const scopedCustomerId = urlCustomerId && /^\d+$/.test(urlCustomerId) ? urlCustomerId : null;
   const scopedProjectId = urlProjectId && /^\d+$/.test(urlProjectId) ? urlProjectId : null;
 
-  // -- Customers --
-  const [customers, setCustomers] = useState<CustomerRecord[]>([]);
-  const [selectedCustomerId, setSelectedCustomerId] = useState(scopedCustomerId ?? "");
-  const selectedCustomer = customers.find((c) => String(c.id) === selectedCustomerId) ?? null;
+  // -------------------------------------------------------------------------
+  // Hooks
+  // -------------------------------------------------------------------------
 
-  // -- Projects --
-  const [projects, setProjects] = useState<ProjectRecord[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState(scopedProjectId ?? "");
-  const selectedProject = projects.find((p) => String(p.id) === selectedProjectId) ?? null;
+  const data = usePaymentData(token, scopedCustomerId, scopedProjectId);
+  const form = usePaymentForm();
+  const filters = usePaymentFilters(data.allPayments);
+
+  // Destructure for JSX readability
+  const {
+    customers, selectedCustomerId, selectedCustomer,
+    projects, selectedProjectId, selectedProject,
+    allPayments, selectedPaymentId,
+    invoices,
+    paymentStatusLabels, paymentMethods, paymentAllowedTransitions, defaultCreateMethod,
+    setSelectedCustomerId, setSelectedProjectId, setAllPayments, setSelectedPaymentId,
+    loadInvoices,
+  } = data;
+
+  const {
+    workspaceMode, formMethod, formStatus, formAmount, formPaymentDate,
+    formReferenceNumber, formNotes, showAllocation, allocTargetId, allocAmount,
+    setFormMethod, setFormStatus, setFormAmount, setFormPaymentDate,
+    setFormReferenceNumber, setFormNotes, setShowAllocation, setAllocTargetId, setAllocAmount,
+    hydrateFromPayment,
+  } = form;
+
+  const {
+    inboundPayments, paymentStatusTotals, searchedPayments, paymentNeedle,
+    paymentStatusFilters, paymentSearch, setPaymentSearch,
+    togglePaymentStatusFilter,
+  } = filters;
+
+  // -------------------------------------------------------------------------
+  // Combobox wiring
+  // -------------------------------------------------------------------------
 
   function projectDisplayLabel(p: ProjectRecord): string {
     return `${p.name} — ${p.customer_display_name}`;
@@ -161,75 +239,9 @@ export function PaymentsConsole() {
   function commitCustomer(customer: CustomerRecord | null) { commitCustomerRef.current(customer); }
   function commitProject(project: ProjectRecord | null) { commitProjectRef.current(project); }
 
-  // -- Policy --
-  const [paymentStatusLabels, setPaymentStatusLabels] = useState<Record<string, string>>(PAYMENT_STATUS_LABELS_FALLBACK);
-  const [paymentMethods, setPaymentMethods] = useState<string[]>(PAYMENT_METHODS_FALLBACK);
-  const [paymentAllowedTransitions, setPaymentAllowedTransitions] = useState<Record<string, string[]>>(PAYMENT_ALLOWED_TRANSITIONS_FALLBACK);
-  const [defaultCreateMethod, setDefaultCreateMethod] = useState<string>(PAYMENT_METHODS_FALLBACK[0]);
-
-  // -- Payments --
-  const [allPayments, setAllPayments] = useState<PaymentRecord[]>([]);
-  const [selectedPaymentId, setSelectedPaymentId] = useState("");
-  const [paymentStatusFilters, setPaymentStatusFilters] = useState<string[]>(["pending", "settled"]);
-  const [paymentSearch, setPaymentSearch] = useState("");
-
-  // -- Allocation targets (invoices for inbound) --
-  const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
-
-  // -- Form --
-  const [workspaceMode, setWorkspaceMode] = useState<"create" | "edit">("create");
-  const [formMethod, setFormMethod] = useState<PaymentMethod>("check");
-  const [formStatus, setFormStatus] = useState<PaymentStatus>("settled");
-  const [formAmount, setFormAmount] = useState("");
-  const [formPaymentDate, setFormPaymentDate] = useState(todayDateInput());
-  const [formReferenceNumber, setFormReferenceNumber] = useState("");
-  const [formNotes, setFormNotes] = useState("");
-
-  // -- Allocation (disclosure) --
-  const [showAllocation, setShowAllocation] = useState(false);
-  const [allocTargetId, setAllocTargetId] = useState("");
-  const [allocAmount, setAllocAmount] = useState("");
-
   // -------------------------------------------------------------------------
   // Derived
   // -------------------------------------------------------------------------
-
-  const inboundPayments = useMemo(
-    () => allPayments.filter((p) => p.direction === DIRECTION),
-    [allPayments],
-  );
-
-  const paymentStatusTotals = useMemo(() => {
-    const totals = new Map<string, number>();
-    for (const p of inboundPayments) {
-      totals.set(p.status, (totals.get(p.status) ?? 0) + 1);
-    }
-    return totals;
-  }, [inboundPayments]);
-
-  const statusFilteredPayments = useMemo(() => {
-    if (!paymentStatusFilters.length) return [];
-    return inboundPayments.filter((p) => paymentStatusFilters.includes(p.status));
-  }, [inboundPayments, paymentStatusFilters]);
-
-  const paymentNeedle = paymentSearch.trim().toLowerCase();
-  const searchedPayments = useMemo(() => {
-    if (!paymentNeedle) return statusFilteredPayments;
-    return statusFilteredPayments.filter((p) => {
-      const haystack = [
-        String(p.id),
-        p.method,
-        p.status,
-        p.amount,
-        p.payment_date,
-        p.reference_number,
-        p.notes,
-        p.customer_name,
-        p.project_name,
-      ].join(" ").toLowerCase();
-      return haystack.includes(paymentNeedle);
-    });
-  }, [statusFilteredPayments, paymentNeedle]);
 
   const { page: paymentPage, totalPages: paymentTotalPages, totalCount: paymentTotalCount, paginatedItems: paginatedPayments, setPage: setPaymentPage } = useClientPagination(searchedPayments);
 
@@ -260,163 +272,27 @@ export function PaymentsConsole() {
     [allocationTargets],
   );
 
-  // -------------------------------------------------------------------------
-  // Helpers
-  // -------------------------------------------------------------------------
-
   function statusLabel(value: string): string {
     return paymentStatusLabels[value] ?? value;
   }
 
+  // -------------------------------------------------------------------------
+  // Cross-hook coordination
+  // -------------------------------------------------------------------------
+
+  /** Reset form, selection, and comboboxes back to create mode. */
   function resetToCreate() {
-    setWorkspaceMode("create");
+    form.resetToCreate(defaultCreateMethod);
     setSelectedPaymentId("");
     setSelectedCustomerId("");
     customerCombobox.setQuery("");
     setSelectedProjectId("");
     projectCombobox.setQuery("");
-    setFormMethod(defaultCreateMethod);
-    setFormStatus("settled");
-    setFormAmount("");
-    setFormPaymentDate(todayDateInput());
-    setFormReferenceNumber("");
-    setFormNotes("");
-    setShowAllocation(false);
-    setAllocTargetId("");
-    setAllocAmount("");
   }
-
-  function hydrateFromPayment(payment: PaymentRecord) {
-    setWorkspaceMode("edit");
-    setFormMethod(payment.method);
-    setFormStatus(payment.status);
-    setFormAmount(payment.amount);
-    setFormPaymentDate(payment.payment_date);
-    setFormReferenceNumber(payment.reference_number);
-    setFormNotes(payment.notes);
-    setShowAllocation(false);
-    setAllocTargetId("");
-    setAllocAmount("");
-  }
-
-  function togglePaymentStatusFilter(status: string) {
-    setPaymentStatusFilters((current) =>
-      current.includes(status)
-        ? current.filter((s) => s !== status)
-        : [...current, status],
-    );
-  }
-
-  // -------------------------------------------------------------------------
-  // Data loading
-  // -------------------------------------------------------------------------
-
-  const loadPaymentPolicy = useCallback(async () => {
-    try {
-      const response = await fetchPaymentPolicyContract({ baseUrl: normalizedBaseUrl, token });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok || !payload.data || Array.isArray(payload.data)) return;
-
-      const contract = payload.data as PaymentPolicyContract;
-      if (!Array.isArray(contract.statuses) || !contract.statuses.length ||
-          !Array.isArray(contract.methods) || !contract.methods.length ||
-          !contract.allowed_status_transitions) return;
-
-      const normalizedTransitions = contract.statuses.reduce<Record<string, string[]>>((acc, s) => {
-        const next = contract.allowed_status_transitions[s];
-        acc[s] = Array.isArray(next) ? next : [];
-        return acc;
-      }, {});
-
-      const nextDefaultMethod = contract.default_create_method || contract.methods[0] || PAYMENT_METHODS_FALLBACK[0];
-
-      setPaymentStatusLabels({ ...PAYMENT_STATUS_LABELS_FALLBACK, ...(contract.status_labels || {}) });
-      setPaymentMethods(contract.methods);
-      setPaymentAllowedTransitions(normalizedTransitions);
-      setDefaultCreateMethod(nextDefaultMethod);
-      setFormMethod((c) => (contract.methods.includes(c) ? c : nextDefaultMethod));
-    } catch {
-      // Best-effort; static fallback remains active.
-    }
-  }, [normalizedBaseUrl, token]);
-
-  const loadCustomers = useCallback(async () => {
-    if (!token) return;
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/customers/`, {
-        headers: buildAuthHeaders(token),
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) return;
-      const rows = (payload.data as CustomerRecord[]) ?? [];
-      setCustomers(rows);
-    } catch {
-      // silent
-    }
-  }, [normalizedBaseUrl, token]);
-
-  const loadProjects = useCallback(async () => {
-    if (!token) return;
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/projects/`, {
-        headers: buildAuthHeaders(token),
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) return;
-      const rows = (payload.data as ProjectRecord[]) ?? [];
-      setProjects(rows);
-      // Validate scoped project ID still exists; don't auto-select (project is optional)
-      setSelectedProjectId((current) => {
-        if (current && rows.some((r) => String(r.id) === current)) return current;
-        return "";
-      });
-    } catch {
-      // silent
-    }
-  }, [normalizedBaseUrl, token]);
-
-  const loadPayments = useCallback(async () => {
-    if (!token) return;
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/payments/`, {
-        headers: buildAuthHeaders(token),
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) return;
-      const rows = (payload.data as PaymentRecord[]) ?? [];
-      setAllPayments(rows);
-    } catch {
-      // silent
-    }
-  }, [normalizedBaseUrl, token]);
-
-  const loadInvoices = useCallback(async (projectId?: number) => {
-    const resolvedId = projectId ?? Number(selectedProjectId);
-    if (!token || !resolvedId) return;
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/projects/${resolvedId}/invoices/`, {
-        headers: buildAuthHeaders(token),
-      });
-      const payload: ApiResponse = await response.json();
-      if (response.ok) {
-        setInvoices((payload.data as InvoiceRecord[]) ?? []);
-      }
-    } catch {
-      // silent
-    }
-  }, [normalizedBaseUrl, selectedProjectId, token]);
 
   // -------------------------------------------------------------------------
   // Effects
   // -------------------------------------------------------------------------
-
-  useEffect(() => {
-    if (!token) return;
-    void loadPaymentPolicy();
-    void loadCustomers();
-    void loadProjects();
-    void loadPayments();
-  }, [loadPaymentPolicy, loadCustomers, loadProjects, loadPayments, token]);
 
   // Hydrate combobox display text when data arrives for URL-scoped selections
   useEffect(() => {
@@ -433,15 +309,15 @@ export function PaymentsConsole() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally depends on .query only, not the full combobox object
   }, [projects, selectedProjectId, projectCombobox.query]);
 
-  // Load invoices (allocation targets) when project selection changes
+  // Sync form method when policy contract loads with valid methods
+  const policyMethodSynced = useRef(false);
   useEffect(() => {
-    const projectId = Number(selectedProjectId);
-    if (!token || !projectId) {
-      setInvoices([]);
-      return;
+    if (policyMethodSynced.current) return;
+    if (paymentMethods.length > 0) {
+      setFormMethod((c) => (paymentMethods.includes(c) ? c : defaultCreateMethod));
+      policyMethodSynced.current = true;
     }
-    void loadInvoices(projectId);
-  }, [loadInvoices, selectedProjectId, token]);
+  }, [paymentMethods, defaultCreateMethod, setFormMethod]);
 
   // -------------------------------------------------------------------------
   // Handlers
@@ -476,7 +352,7 @@ export function PaymentsConsole() {
     setNeutral("Recording payment...");
     try {
       const projectId = Number(selectedProjectId) || null;
-      const response = await fetch(`${normalizedBaseUrl}/payments/`, {
+      const response = await fetch(`${apiBaseUrl}/payments/`, {
         method: "POST",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
@@ -502,7 +378,7 @@ export function PaymentsConsole() {
       const wantAllocate = allocTargetId && allocAmount && allocAmount !== "0.00";
       if (wantAllocate && canAllocatePayments) {
         try {
-          const allocResponse = await fetch(`${normalizedBaseUrl}/payments/${created.id}/allocate/`, {
+          const allocResponse = await fetch(`${apiBaseUrl}/payments/${created.id}/allocate/`, {
             method: "POST",
             headers: buildAuthHeaders(token, { contentType: "application/json" }),
             body: JSON.stringify({
@@ -560,7 +436,7 @@ export function PaymentsConsole() {
 
     setNeutral("Saving payment...");
     try {
-      const response = await fetch(`${normalizedBaseUrl}/payments/${paymentId}/`, {
+      const response = await fetch(`${apiBaseUrl}/payments/${paymentId}/`, {
         method: "PATCH",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
@@ -596,7 +472,7 @@ export function PaymentsConsole() {
     if (!paymentId) return;
 
     try {
-      const response = await fetch(`${normalizedBaseUrl}/payments/${paymentId}/`, {
+      const response = await fetch(`${apiBaseUrl}/payments/${paymentId}/`, {
         method: "PATCH",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({ status: nextStatus }),
@@ -629,7 +505,7 @@ export function PaymentsConsole() {
     }
 
     try {
-      const response = await fetch(`${normalizedBaseUrl}/payments/${paymentId}/allocate/`, {
+      const response = await fetch(`${apiBaseUrl}/payments/${paymentId}/allocate/`, {
         method: "POST",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({

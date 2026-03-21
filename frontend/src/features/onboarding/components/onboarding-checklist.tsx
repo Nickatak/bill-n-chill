@@ -1,12 +1,56 @@
 "use client";
 
 /**
- * Guided onboarding checklist with two workflow tracks:
- * - Individual Contractors: org → customer → project → invoice (direct)
- * - Remodelers / GCs: org → customer → project → estimate → send → invoice
+ * Guided onboarding checklist with two workflow tracks.
+ *
+ * Tracks:
+ * - Individual Contractors: org → customer → project → estimate (opt) → invoice → payment
+ * - Remodelers / GCs: org → customer → project → estimate → send → CO (opt) → invoice → bill → payment
  *
  * Auto-detects progress by probing list endpoints and localStorage flags.
- * Tab selection persists to localStorage.
+ * Tab selection persists to localStorage. Optional steps have dashed borders
+ * and are excluded from progress calculations.
+ *
+ * Parent: app/onboarding/page.tsx
+ *
+ * ## Page layout
+ *
+ * ┌─────────────────────────────────────┐
+ * │ Tab bar (Individual / Remodeler)    │
+ * ├─────────────────────────────────────┤
+ * │ Progress bar + label                │
+ * ├─────────────────────────────────────┤
+ * │ Step cards (ordered list)           │
+ * │   ├── Step 1: Organization          │
+ * │   ├── Step 2: Customer              │
+ * │   ├── ...                           │
+ * │   └── Step N: (varies by track)     │
+ * ├─────────────────────────────────────┤
+ * │ GuideArrowOverlay                   │
+ * └─────────────────────────────────────┘
+ *
+ * ## State (useState)
+ *
+ * - completedSteps  — Set of step keys detected as done (API probes + localStorage)
+ * - firstProjectId  — first detected project ID for deep-linking step hrefs
+ * - loading         — true until progress detection finishes
+ * - activeTab       — "individual" | "remodeler"; initialized from localStorage
+ *
+ * ## Functions
+ *
+ * - switchTab(tab)
+ *     Updates activeTab and persists to localStorage.
+ *
+ * - checkProgress() (useCallback)
+ *     Probes /customers/, /projects/, /invoices/ and checks localStorage
+ *     for org-visited. Sets completedSteps and firstProjectId.
+ *
+ * ## Effect: progress detection
+ *
+ * Deps: [checkProgress, token]
+ *
+ * Fires on mount. Calls checkProgress to probe endpoints and detect
+ * which onboarding steps the user has already completed.
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";

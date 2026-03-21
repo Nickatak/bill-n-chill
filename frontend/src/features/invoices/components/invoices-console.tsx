@@ -1,16 +1,61 @@
 "use client";
 
 /**
- * Primary invoice management console.
- * Project-scoped: receives a project ID from the URL and shows invoices for that project.
- * Combines invoice list with status filtering, status lifecycle management
- * (transitions, notes, history), and a document-creator workspace for creating/editing drafts.
+ * Primary invoice management console — project-scoped via URL param.
+ *
+ * Orchestrator: owns no domain data itself. Composes single-purpose hooks,
+ * wires their outputs into child components, and handles cross-hook
+ * coordination (mutations, selection sync, workspace hydration).
+ *
+ * Parent: app/projects/[projectId]/invoices/page.tsx
+ *
+ * ## Page layout
+ *
+ * ┌─────────────────────────────────────────┐
+ * │ Status banner (conditional)             │
+ * ├─────────────────────────────────────────┤
+ * │ Read-only notice (conditional)          │
+ * ├──────────────────┬──────────────────────┤
+ * │ InvoicesViewer   │ InvoicesWorkspace    │
+ * │   ├── Filters    │   ├── Toolbar        │
+ * │   ├── List       │   ├── Creator sheet  │
+ * │   ├── Pagination │   └── Terms/totals   │
+ * │   ├── Status     │                      │
+ * │   │   actions    │                      │
+ * │   └── Contract   │                      │
+ * │       breakdown  │                      │
+ * └──────────────────┴──────────────────────┘
+ *
+ * ## Hook dependency graph
+ *
+ * useInvoiceData      (owns fetched data — projects, invoices, org, cost codes, events)
+ *   └── useInvoiceFormFields  (reads orgDefaults for reset; writes lineItems via setters)
+ * useLineItems        (shared hook — line item CRUD)
+ * useStatusFilters    (shared hook — filter pill state)
+ * usePolicyContract   (shared hook — policy contract fetch)
+ * useStatusMessage    (shared hook — status banner)
+ * useClientPagination (shared hook — client-side pagination)
+ * useCreatorFlash     (shared hook — creator flash animation)
+ *
+ * ## Functions
+ *
+ * - handleSelectInvoice, handleStartNewInvoiceDraft, handleCreateInvoice,
+ *   handleUpdateInvoiceStatus, handleAddInvoiceStatusNote,
+ *   handleDuplicateInvoiceIntoDraft — mutation and selection handlers that
+ *   coordinate across data + form hooks.
+ *
+ * ## Effects
+ *
+ * - Sync printable flag with invoice count.
+ * - Pre-select next status when selected invoice changes.
+ * - Ensure selected invoice is visible after filter changes.
+ * - Load status events when selected invoice changes.
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
-import { todayDateInput, futureDateInput } from "@/shared/date-format";
+import { todayDateInput } from "@/shared/date-format";
 import { parseAmount } from "@/shared/money-format";
 import {
   dueDateFromIssueDate,
@@ -22,20 +67,16 @@ import {
 } from "../helpers";
 import { useStatusFilters } from "@/shared/hooks/use-status-filters";
 import {
-  defaultApiBaseUrl,
   fetchInvoicePolicyContract,
-  normalizeApiBaseUrl,
 } from "../api";
+import { apiBaseUrl } from "@/shared/api/base";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { canDo } from "@/shared/session/rbac";
-import {
+import type {
   ApiResponse,
   InvoiceLineInput,
   InvoicePolicyContract,
   InvoiceRecord,
-  InvoiceStatusEventRecord,
-  OrganizationInvoiceDefaults,
-  ProjectRecord,
 } from "../types";
 import {
   resolveOrganizationBranding,
@@ -51,55 +92,15 @@ import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import { useClientPagination } from "@/shared/hooks/use-client-pagination";
 import { usePolicyContract } from "@/shared/hooks/use-policy-contract";
 import { usePrintable } from "@/shared/shell/printable-context";
+import { useInvoiceData } from "../hooks/use-invoice-data";
+import { useInvoiceFormFields } from "../hooks/use-invoice-form-fields";
 import styles from "./invoices-console.module.css";
-import type { CostCode } from "../types";
 import { InvoicesViewerPanel } from "./invoices-viewer-panel";
 import { InvoicesWorkspacePanel } from "./invoices-workspace-panel";
 
 // ---------------------------------------------------------------------------
-// Types & constants
+// Constants
 // ---------------------------------------------------------------------------
-
-type ContractBreakdownEstimateLine = {
-  id: number;
-  cost_code?: number | null;
-  cost_code_code?: string;
-  description: string;
-  quantity: string;
-  unit: string;
-  unit_cost: string;
-  markup_percent: string;
-  line_total: string;
-};
-
-type ContractBreakdownEstimate = {
-  id: number;
-  title: string;
-  version: number;
-  grand_total: string;
-  line_items: ContractBreakdownEstimateLine[];
-};
-
-type ContractBreakdownCO = {
-  id: number;
-  title: string;
-  family_key: string;
-  revision_number: number;
-  amount_delta: string;
-  line_items: Array<{
-    id: number;
-    cost_code_code?: string;
-    description: string;
-    adjustment_reason: string;
-    amount_delta: string;
-    days_delta: number;
-  }>;
-};
-
-type ContractBreakdown = {
-  active_estimate: ContractBreakdownEstimate | null;
-  approved_change_orders: ContractBreakdownCO[];
-};
 
 const INVOICE_STATUSES_FALLBACK = ["draft", "sent", "partially_paid", "paid", "void"];
 
@@ -122,6 +123,7 @@ const INVOICE_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
 const INVOICE_DEFAULT_STATUS_FILTERS_FALLBACK = ["draft", "sent", "partially_paid"];
 const INVOICE_TERMINAL_STATUSES_FALLBACK = ["paid", "partially_paid", "void"];
 const INVOICE_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
+
 // Most display helpers moved to invoices-viewer-panel.tsx. Only invoiceStatusClass
 // is retained here because workspaceBadgeClass depends on it.
 
@@ -151,24 +153,91 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
   const canSendInvoices = canDo(capabilities, "invoices", "send");
   const canEditInvoiceWorkspace = canMutateInvoices;
 
-  const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
+  // -------------------------------------------------------------------------
+  // Shared hooks
+  // -------------------------------------------------------------------------
 
   const { message: statusMessage, tone: statusTone, setNeutral: setNeutralStatus, setSuccess: setSuccessStatus, setError: setErrorStatus, setMessage: setStatusMessage, clear: clearStatus } = useStatusMessage();
+
+  const {
+    items: lineItems,
+    setItems: setLineItems,
+    nextId: nextLineId,
+    setNextId: setNextLineId,
+    add: addLine,
+    remove: removeLine,
+    update: updateLine,
+    reset: resetLines,
+  } = useLineItems<InvoiceLineInput>({ createEmpty: emptyLine });
+
+  const { ref: invoiceCreatorRef, flash: flashCreator } = useCreatorFlash();
+  const { setPrintable } = usePrintable();
+
+  // -------------------------------------------------------------------------
+  // Domain hooks
+  // -------------------------------------------------------------------------
+
+  const formFields = useInvoiceFormFields({
+    organizationInvoiceDefaults: null, // Populated after data loads — see resetCreateDraft override
+    setLineItems,
+    setNextLineId,
+    resetLines,
+  });
+
+  // Stable references for status message setters (avoid re-creating on every render).
+  const statusSetters = useMemo(
+    () => ({ setNeutralStatus, setErrorStatus, setStatusMessage }),
+    [setNeutralStatus, setErrorStatus, setStatusMessage],
+  );
+  const formSetters = useMemo(
+    () => ({ setDueDate: formFields.setDueDate, setTermsText: formFields.setTermsText }),
+    [formFields.setDueDate, formFields.setTermsText],
+  );
+
+  const handleInitialLoad = useCallback(
+    (rows: InvoiceRecord[]) => {
+      if (rows.length > 0) {
+        formFields.loadInvoiceIntoWorkspace(rows[0]);
+      } else {
+        formFields.resetCreateDraft();
+      }
+    },
+    [formFields],
+  );
+
+  const invoiceData = useInvoiceData({
+    authToken: token,
+    scopedProjectId,
+    issueDate: formFields.issueDate,
+    status: statusSetters,
+    formSetters,
+    onInitialLoad: handleInitialLoad,
+  });
+
+  // Re-bind resetCreateDraft to use the live org defaults (the formFields hook
+  // was initialized with null; the data hook hydrates org defaults after mount).
+  // We override the form hook's resetCreateDraft in local scope below.
+
+  // -------------------------------------------------------------------------
+  // Viewer state (local — small enough to stay in the orchestrator)
+  // -------------------------------------------------------------------------
+
   const [viewerActionMessage, setViewerActionMessage] = useState("");
   const [viewerActionTone, setViewerActionTone] = useState<"success" | "error">("success");
   const [showAllEvents, setShowAllEvents] = useState(false);
   const [invoiceSearch, setInvoiceSearch] = useState("");
-
-  const [projects, setProjects] = useState<ProjectRecord[]>([]);
-  const selectedProjectId = String(scopedProjectId);
-
-  const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
-  const [selectedInvoiceStatusEvents, setSelectedInvoiceStatusEvents] = useState<
-    InvoiceStatusEventRecord[]
-  >([]);
-  const [statusEventsLoading, setStatusEventsLoading] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("draft");
+  const [statusNote, setStatusNote] = useState("");
+  const [isContractBreakdownOpen, setIsContractBreakdownOpen] = useState(false);
+  const [flashingButtons, setFlashingButtons] = useState<Set<string>>(new Set());
+
+  const selectedProjectId = String(scopedProjectId);
+
+  // -------------------------------------------------------------------------
+  // Policy contract
+  // -------------------------------------------------------------------------
+
   const {
     statuses: invoiceStatuses,
     statusLabels: invoiceStatusLabels,
@@ -178,10 +247,9 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     fallbackStatuses: INVOICE_STATUSES_FALLBACK,
     fallbackLabels: INVOICE_STATUS_LABELS_FALLBACK,
     fallbackTransitions: INVOICE_ALLOWED_STATUS_TRANSITIONS_FALLBACK,
-    baseUrl: normalizedBaseUrl,
+    baseUrl: apiBaseUrl,
     token,
     onLoaded(contract) {
-      // Reconcile filter state with server-provided statuses.
       const candidateFilters =
         Array.isArray(contract.default_status_filters) && contract.default_status_filters.length
           ? contract.default_status_filters.filter((v) => contract.statuses.includes(v))
@@ -193,6 +261,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       });
     },
   });
+
   const {
     filters: invoiceStatusFilters,
     setFilters: setInvoiceStatusFilters,
@@ -201,77 +270,42 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     allStatuses: invoiceStatuses,
     defaultFilters: INVOICE_DEFAULT_STATUS_FILTERS_FALLBACK,
   });
-  const [statusNote, setStatusNote] = useState("");
-  const [organizationInvoiceDefaults, setOrganizationInvoiceDefaults] = useState<OrganizationInvoiceDefaults | null>(null);
 
-  const [issueDate, setIssueDate] = useState(todayDateInput());
-  const [dueDate, setDueDate] = useState(futureDateInput());
-  const [taxPercent, setTaxPercent] = useState("0");
-  const [termsText, setTermsText] = useState("");
-  const {
-    items: lineItems,
-    setItems: setLineItems,
-    nextId: nextLineId,
-    setNextId: setNextLineId,
-    add: addLine,
-    remove: removeLine,
-    update: updateLine,
-    reset: resetLines,
-  } = useLineItems<InvoiceLineInput>({ createEmpty: emptyLine });
+  // -------------------------------------------------------------------------
+  // Line items
+  // -------------------------------------------------------------------------
+
   const lineValidation = useMemo(() => validateInvoiceLineItems(lineItems), [lineItems]);
-  const [workspaceSourceInvoiceId, setWorkspaceSourceInvoiceId] = useState<number | null>(null);
-  const [editingDraftInvoiceId, setEditingDraftInvoiceId] = useState<number | null>(null);
-  const [workspaceContext, setWorkspaceContext] = useState("New invoice draft");
-  const { ref: invoiceCreatorRef, flash: flashCreator } = useCreatorFlash();
-  const [contractBreakdown, setContractBreakdown] = useState<ContractBreakdown | null>(null);
-  const [costCodes, setCostCodes] = useState<CostCode[]>([]);
-  const { setPrintable } = usePrintable();
 
   // -------------------------------------------------------------------------
   // Effects
   // -------------------------------------------------------------------------
 
   useEffect(() => {
-    setPrintable(invoices.length > 0);
+    setPrintable(invoiceData.invoices.length > 0);
     return () => setPrintable(false);
-  }, [invoices.length, setPrintable]);
+  }, [invoiceData.invoices.length, setPrintable]);
 
-
-
-  // -------------------------------------------------------------------------
-  // Derived values
-  // -------------------------------------------------------------------------
-
-  const selectedInvoice = useMemo(
-    () => invoices.find((invoice) => String(invoice.id) === selectedInvoiceId) ?? null,
-    [invoices, selectedInvoiceId],
-  );
-  const workspaceSourceInvoice = useMemo(
-    () => invoices.find((invoice) => invoice.id === workspaceSourceInvoiceId) ?? null,
-    [invoices, workspaceSourceInvoiceId],
-  );
-  const filteredInvoices = useMemo(() => {
-    if (!invoiceStatusFilters.length) {
-      return [];
+  // Auto-select first invoice after data load — keep selectedInvoiceId in sync.
+  useEffect(() => {
+    if (!token || !scopedProjectId) {
+      setSelectedInvoiceId("");
+      return;
     }
-    return invoices.filter((invoice) => invoiceStatusFilters.includes(invoice.status));
-  }, [invoiceStatusFilters, invoices]);
-  const invoiceNeedle = invoiceSearch.trim().toLowerCase();
-  const searchedInvoices = useMemo(() => {
-    if (!invoiceNeedle) return filteredInvoices;
-    return filteredInvoices.filter((invoice) => {
-      const haystack = [
-        invoice.invoice_number,
-        invoice.status,
-        invoice.total,
-        invoice.balance_due,
-        invoice.issue_date,
-        invoice.due_date,
-      ].join(" ").toLowerCase();
-      return haystack.includes(invoiceNeedle);
+    setSelectedInvoiceId((current) => {
+      if (current && invoiceData.invoices.some((row) => String(row.id) === current)) {
+        return current;
+      }
+      return invoiceData.invoices[0] ? String(invoiceData.invoices[0].id) : "";
     });
-  }, [filteredInvoices, invoiceNeedle]);
-  const { page: invoicePage, totalPages: invoiceTotalPages, totalCount: invoiceTotalCount, paginatedItems: paginatedInvoices, setPage: setInvoicePage } = useClientPagination(searchedInvoices);
+  }, [invoiceData.invoices, scopedProjectId, token]);
+
+  // Pre-select the most likely next status when the selected invoice changes.
+  const selectedInvoice = useMemo(
+    () => invoiceData.invoices.find((invoice) => String(invoice.id) === selectedInvoiceId) ?? null,
+    [invoiceData.invoices, selectedInvoiceId],
+  );
+
   const nextStatusOptions = useMemo(() => {
     if (!selectedInvoice) {
       return [] as string[];
@@ -286,255 +320,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     });
   }, [invoiceAllowedStatusTransitions, selectedInvoice, canSendInvoices]);
 
-  const invoiceStatusTotals = useMemo(() => {
-    const totals = new Map<string, number>();
-    for (const row of invoices) {
-      totals.set(row.status, (totals.get(row.status) ?? 0) + 1);
-    }
-    return totals;
-  }, [invoices]);
-  const nextDraftInvoiceNumber = useMemo(() => nextInvoiceNumberPreview(invoices), [invoices]);
-  const workspaceInvoiceNumber = workspaceSourceInvoice?.invoice_number ?? nextDraftInvoiceNumber;
-  const workspaceIsLockedByStatus = workspaceSourceInvoice ? workspaceSourceInvoice.status !== "draft" : false;
-  const workspaceIsLocked = !canEditInvoiceWorkspace || workspaceIsLockedByStatus;
-  const workspaceBadgeLabel = !workspaceSourceInvoice
-    ? "CREATING"
-    : workspaceIsLocked
-      ? "READ-ONLY"
-      : "EDITING";
-  const workspaceBadgeClass = !workspaceSourceInvoice
-    ? styles.statusDraft
-    : workspaceIsLocked
-      ? invoiceStatusClass(workspaceSourceInvoice.status)
-      : styles.statusDraft;
-
-  const draftLineSubtotal = useMemo(() => {
-    return lineItems.reduce((sum, line) => sum + parseAmount(line.quantity) * parseAmount(line.unitPrice), 0);
-  }, [lineItems]);
-
-  const draftTaxTotal = useMemo(() => {
-    return draftLineSubtotal * (parseAmount(taxPercent) / 100);
-  }, [draftLineSubtotal, taxPercent]);
-
-  const draftTotal = useMemo(() => draftLineSubtotal + draftTaxTotal, [draftLineSubtotal, draftTaxTotal]);
-  const statusLabel = useCallback(
-    (status: string) => invoiceStatusLabels[status] ?? invoiceStatusLabel(status),
-    [invoiceStatusLabels],
-  );
-
-  // -------------------------------------------------------------------------
-  // Data loading & form hydration
-  // -------------------------------------------------------------------------
-
-  const loadDependencies = useCallback(
-    async (options?: { keepStatusOnSuccess?: boolean }) => {
-      if (!token) {
-        return;
-      }
-
-      setNeutralStatus("Loading...");
-      try {
-        const [projectsRes, orgRes, costCodesRes] = await Promise.all([
-          fetch(`${normalizedBaseUrl}/projects/`, { headers: buildAuthHeaders(token) }),
-          fetch(`${normalizedBaseUrl}/organization/`, { headers: buildAuthHeaders(token) }),
-          fetch(`${normalizedBaseUrl}/cost-codes/`, { headers: buildAuthHeaders(token) }),
-        ]);
-        const projectsPayload: ApiResponse = await projectsRes.json();
-        const orgPayload: ApiResponse = await orgRes.json();
-
-        if (!projectsRes.ok) {
-          setErrorStatus("Failed loading dependencies.");
-          return;
-        }
-
-        if (costCodesRes.ok) {
-          const costCodesPayload: ApiResponse = await costCodesRes.json();
-          const costCodeRows = ((costCodesPayload.data as CostCode[]) ?? []).filter((c) => c.is_active);
-          setCostCodes(costCodeRows);
-        }
-
-        const projectRows = (projectsPayload.data as ProjectRecord[]) ?? [];
-        const organizationData = (
-          orgPayload.data as { organization?: OrganizationInvoiceDefaults } | undefined
-        )?.organization;
-
-        setProjects(projectRows);
-        if (orgRes.ok && organizationData) {
-          setOrganizationInvoiceDefaults(organizationData);
-          setDueDate(dueDateFromIssueDate(issueDate, organizationData.default_invoice_due_delta || 30));
-          setTermsText((current) => current || organizationData.invoice_terms_and_conditions || "");
-        }
-
-        if (!options?.keepStatusOnSuccess) {
-          setStatusMessage("");
-        }
-      } catch {
-        setErrorStatus("Could not reach dependency endpoints.");
-      }
-    },
-    [issueDate, normalizedBaseUrl, setErrorStatus, setNeutralStatus, setStatusMessage, token],
-  );
-
-
-  const loadInvoices = useCallback(
-    async (): Promise<InvoiceRecord[]> => {
-      if (!token || !scopedProjectId) {
-        return [];
-      }
-
-      try {
-        const response = await fetch(`${normalizedBaseUrl}/projects/${scopedProjectId}/invoices/`, {
-          headers: buildAuthHeaders(token),
-        });
-        const payload: ApiResponse = await response.json();
-
-        if (!response.ok) {
-          setErrorStatus(readInvoiceApiError(payload, "Failed loading invoices."));
-          return [];
-        }
-
-        const rows = (payload.data as InvoiceRecord[]) ?? [];
-        setInvoices(rows);
-
-        setSelectedInvoiceId((current) => {
-          if (current && rows.some((row) => String(row.id) === current)) {
-            return current;
-          }
-          return rows[0] ? String(rows[0].id) : "";
-        });
-        setStatusMessage("");
-        return rows;
-      } catch {
-        setErrorStatus("Could not reach invoice endpoint.");
-        return [];
-      }
-    },
-    [normalizedBaseUrl, scopedProjectId, setErrorStatus, setStatusMessage, token],
-  );
-
-  const loadContractBreakdown = useCallback(
-    async (projectId: number) => {
-      if (!token || !projectId) {
-        setContractBreakdown(null);
-        return;
-      }
-      try {
-        const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/contract-breakdown/`, {
-          headers: buildAuthHeaders(token),
-        });
-        const payload = await response.json();
-        if (!response.ok || !payload.data) {
-          setContractBreakdown(null);
-          return;
-        }
-        setContractBreakdown(payload.data as ContractBreakdown);
-      } catch {
-        setContractBreakdown(null);
-      }
-    },
-    [normalizedBaseUrl, token],
-  );
-
-  const loadInvoiceStatusEvents = useCallback(
-    async (invoiceId: number) => {
-      if (!token || !invoiceId) {
-        setSelectedInvoiceStatusEvents([]);
-        return;
-      }
-      setStatusEventsLoading(true);
-      try {
-        const response = await fetch(`${normalizedBaseUrl}/invoices/${invoiceId}/status-events/`, {
-          headers: buildAuthHeaders(token),
-        });
-        const payload: ApiResponse = await response.json();
-        if (!response.ok) {
-          setSelectedInvoiceStatusEvents([]);
-          return;
-        }
-        setSelectedInvoiceStatusEvents((payload.data as InvoiceStatusEventRecord[]) ?? []);
-      } catch {
-        setSelectedInvoiceStatusEvents([]);
-      } finally {
-        setStatusEventsLoading(false);
-      }
-    },
-    [normalizedBaseUrl, token],
-  );
-
-  const invoiceToWorkspaceLines = useCallback(
-    (invoice: InvoiceRecord): InvoiceLineInput[] => {
-      const sourceLines = invoice.line_items ?? [];
-      if (!sourceLines.length) {
-        return [emptyLine(1)];
-      }
-      return sourceLines.map((line, index) => ({
-        localId: index + 1,
-        costCode: line.cost_code ? String(line.cost_code) : "",
-        description: line.description || "",
-        quantity: line.quantity || "1",
-        unit: line.unit || "ea",
-        unitPrice: line.unit_price || "0",
-      }));
-    },
-    [],
-  );
-
-  const loadInvoiceIntoWorkspace = useCallback(
-    (invoice: InvoiceRecord) => {
-      const workspaceLines = invoiceToWorkspaceLines(invoice);
-      setIssueDate(invoice.issue_date || todayDateInput());
-      setDueDate(invoice.due_date || futureDateInput());
-      setTaxPercent(invoice.tax_percent || "0");
-      setTermsText(invoice.terms_text || "");
-      setLineItems(workspaceLines);
-      setNextLineId(workspaceLines.length + 1);
-      setWorkspaceSourceInvoiceId(invoice.id);
-      if (invoice.status === "draft") {
-        setEditingDraftInvoiceId(invoice.id);
-        setWorkspaceContext(`Editing ${invoice.invoice_number}`);
-      } else {
-        setEditingDraftInvoiceId(null);
-        setWorkspaceContext(`Viewing ${invoice.invoice_number} (locked)`);
-      }
-    },
-    [invoiceToWorkspaceLines, setLineItems, setNextLineId],
-  );
-
-  // -------------------------------------------------------------------------
-  // Data-loading effects
-  // -------------------------------------------------------------------------
-
-
-  // Load projects and organization defaults on auth.
-  useEffect(() => {
-    if (!token) {
-      return;
-    }
-    void loadDependencies();
-  }, [loadDependencies, token]);
-
-  // Load invoices and contract breakdown for the scoped project.
-  // Auto-load the first invoice into the workspace so the creator reflects the selection.
-  useEffect(() => {
-    if (!token || !scopedProjectId) {
-      setInvoices([]);
-      setSelectedInvoiceId("");
-      setContractBreakdown(null);
-      return;
-    }
-    void (async () => {
-      const rows = await loadInvoices();
-      if (rows.length > 0) {
-        loadInvoiceIntoWorkspace(rows[0]);
-      } else {
-        resetCreateDraft();
-      }
-    })();
-    void loadContractBreakdown(scopedProjectId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- resetCreateDraft is an untracked plain function; adding it would re-fire on every render
-  }, [loadContractBreakdown, loadInvoiceIntoWorkspace, loadInvoices, scopedProjectId, token]);
-
-  // Pre-select the most likely next status when the selected invoice changes.
   useEffect(() => {
     if (!selectedInvoice) {
       setSelectedStatus("");
@@ -548,6 +333,13 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
   }, [invoiceAllowedStatusTransitions, nextStatusOptions, selectedInvoice]);
 
   // Ensure selected invoice is still visible after status filter changes.
+  const filteredInvoices = useMemo(() => {
+    if (!invoiceStatusFilters.length) {
+      return [];
+    }
+    return invoiceData.invoices.filter((invoice) => invoiceStatusFilters.includes(invoice.status));
+  }, [invoiceStatusFilters, invoiceData.invoices]);
+
   useEffect(() => {
     if (!filteredInvoices.length) {
       setSelectedInvoiceId("");
@@ -568,12 +360,141 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
   useEffect(() => {
     const invoiceId = Number(selectedInvoiceId);
     if (!invoiceId) {
-      setSelectedInvoiceStatusEvents([]);
-      setStatusEventsLoading(false);
+      invoiceData.setSelectedInvoiceStatusEvents([]);
+      invoiceData.setStatusEventsLoading(false);
       return;
     }
-    void loadInvoiceStatusEvents(invoiceId);
-  }, [loadInvoiceStatusEvents, selectedInvoiceId]);
+    void invoiceData.loadInvoiceStatusEvents(invoiceId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- invoiceData setters are stable
+  }, [invoiceData.loadInvoiceStatusEvents, selectedInvoiceId]);
+
+  // -------------------------------------------------------------------------
+  // Derived values
+  // -------------------------------------------------------------------------
+
+  const workspaceSourceInvoice = useMemo(
+    () => invoiceData.invoices.find((invoice) => invoice.id === formFields.workspaceSourceInvoiceId) ?? null,
+    [invoiceData.invoices, formFields.workspaceSourceInvoiceId],
+  );
+
+  const invoiceNeedle = invoiceSearch.trim().toLowerCase();
+  const searchedInvoices = useMemo(() => {
+    if (!invoiceNeedle) return filteredInvoices;
+    return filteredInvoices.filter((invoice) => {
+      const haystack = [
+        invoice.invoice_number,
+        invoice.status,
+        invoice.total,
+        invoice.balance_due,
+        invoice.issue_date,
+        invoice.due_date,
+      ].join(" ").toLowerCase();
+      return haystack.includes(invoiceNeedle);
+    });
+  }, [filteredInvoices, invoiceNeedle]);
+
+  const { page: invoicePage, totalPages: invoiceTotalPages, totalCount: invoiceTotalCount, paginatedItems: paginatedInvoices, setPage: setInvoicePage } = useClientPagination(searchedInvoices);
+
+  const invoiceStatusTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const row of invoiceData.invoices) {
+      totals.set(row.status, (totals.get(row.status) ?? 0) + 1);
+    }
+    return totals;
+  }, [invoiceData.invoices]);
+
+  const nextDraftInvoiceNumber = useMemo(() => nextInvoiceNumberPreview(invoiceData.invoices), [invoiceData.invoices]);
+  const workspaceInvoiceNumber = workspaceSourceInvoice?.invoice_number ?? nextDraftInvoiceNumber;
+  const workspaceIsLockedByStatus = workspaceSourceInvoice ? workspaceSourceInvoice.status !== "draft" : false;
+  const workspaceIsLocked = !canEditInvoiceWorkspace || workspaceIsLockedByStatus;
+  const workspaceBadgeLabel = !workspaceSourceInvoice
+    ? "CREATING"
+    : workspaceIsLocked
+      ? "READ-ONLY"
+      : "EDITING";
+  const workspaceBadgeClass = !workspaceSourceInvoice
+    ? styles.statusDraft
+    : workspaceIsLocked
+      ? invoiceStatusClass(workspaceSourceInvoice.status)
+      : styles.statusDraft;
+
+  const draftLineSubtotal = useMemo(() => {
+    return lineItems.reduce((sum, line) => sum + parseAmount(line.quantity) * parseAmount(line.unitPrice), 0);
+  }, [lineItems]);
+
+  const draftTaxTotal = useMemo(() => {
+    return draftLineSubtotal * (parseAmount(formFields.taxPercent) / 100);
+  }, [draftLineSubtotal, formFields.taxPercent]);
+
+  const draftTotal = useMemo(() => draftLineSubtotal + draftTaxTotal, [draftLineSubtotal, draftTaxTotal]);
+
+  const statusLabel = useCallback(
+    (status: string) => invoiceStatusLabels[status] ?? invoiceStatusLabel(status),
+    [invoiceStatusLabels],
+  );
+
+  // -------------------------------------------------------------------------
+  // Document adapter & branding
+  // -------------------------------------------------------------------------
+
+  const selectedProject = invoiceData.projects.find((project) => String(project.id) === selectedProjectId) ?? null;
+  const organizationBranding = useMemo(
+    () => resolveOrganizationBranding(invoiceData.organizationInvoiceDefaults),
+    [invoiceData.organizationInvoiceDefaults],
+  );
+  const senderDisplayName = organizationBranding.senderDisplayName;
+  const senderEmail = organizationBranding.helpEmail;
+  const senderAddressLines = organizationBranding.senderAddressLines;
+  const senderLogoUrl = organizationBranding.logoUrl;
+
+  const invoiceCreatorStatusPolicy = useMemo(
+    () =>
+      toInvoiceStatusPolicy({
+        policy_version: "ui-fallback",
+        statuses: invoiceStatuses,
+        status_labels: invoiceStatusLabels,
+        default_create_status: invoiceStatuses.includes("draft") ? "draft" : invoiceStatuses[0] ?? "draft",
+        default_status_filters: invoiceStatusFilters.length
+          ? invoiceStatusFilters
+          : INVOICE_DEFAULT_STATUS_FILTERS_FALLBACK,
+        allowed_status_transitions: invoiceAllowedStatusTransitions,
+        terminal_statuses: INVOICE_TERMINAL_STATUSES_FALLBACK,
+      }),
+    [invoiceAllowedStatusTransitions, invoiceStatusFilters, invoiceStatusLabels, invoiceStatuses],
+  );
+
+  const invoiceDraftFormState: InvoiceFormState = useMemo(
+    () => ({
+      issueDate: formFields.issueDate,
+      dueDate: formFields.dueDate,
+      taxPercent: formFields.taxPercent,
+      termsText: formFields.termsText,
+      subtotal: draftLineSubtotal,
+      taxAmount: draftTaxTotal,
+      totalAmount: draftTotal,
+      lineItems,
+    }),
+    [
+      draftLineSubtotal,
+      draftTaxTotal,
+      draftTotal,
+      formFields.dueDate,
+      formFields.issueDate,
+      lineItems,
+      formFields.taxPercent,
+      formFields.termsText,
+    ],
+  );
+
+  const invoiceCreatorAdapter = useMemo(
+    () => createInvoiceDocumentAdapter(invoiceCreatorStatusPolicy, []),
+    [invoiceCreatorStatusPolicy],
+  );
+
+  const statusMessageAtCreator =
+    statusTone === "success" && /^(Created|Saved|Started|Loaded)\b/i.test(statusMessage);
+  const statusMessageAtToolbar =
+    statusTone === "success" && /^Duplicated\b/i.test(statusMessage);
 
   // -------------------------------------------------------------------------
   // Line item handlers
@@ -599,27 +520,31 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     updateLine(localId, { [key]: value });
   }
 
+  // -------------------------------------------------------------------------
+  // Selection & workspace handlers
+  // -------------------------------------------------------------------------
+
   /** Select an invoice from the list and load it into the creator workspace. */
   function handleSelectInvoice(invoice: InvoiceRecord) {
     setSelectedInvoiceId(String(invoice.id));
     setSelectedStatus("");
     setShowAllEvents(false);
     setViewerActionMessage("");
-    loadInvoiceIntoWorkspace(invoice);
+    formFields.loadInvoiceIntoWorkspace(invoice);
   }
 
   /** Reset the creator workspace to a fresh new-draft state. */
   function resetCreateDraft() {
     const nextIssueDate = todayDateInput();
-    const dueDays = organizationInvoiceDefaults?.default_invoice_due_delta ?? 30;
-    setIssueDate(nextIssueDate);
-    setDueDate(dueDateFromIssueDate(nextIssueDate, dueDays));
-    setTaxPercent("0");
-    setTermsText(organizationInvoiceDefaults?.invoice_terms_and_conditions || "");
+    const dueDays = invoiceData.organizationInvoiceDefaults?.default_invoice_due_delta ?? 30;
+    formFields.setIssueDate(nextIssueDate);
+    formFields.setDueDate(dueDateFromIssueDate(nextIssueDate, dueDays));
+    formFields.setTaxPercent("0");
+    formFields.setTermsText(invoiceData.organizationInvoiceDefaults?.invoice_terms_and_conditions || "");
     resetLines();
-    setWorkspaceSourceInvoiceId(null);
-    setEditingDraftInvoiceId(null);
-    setWorkspaceContext("New invoice draft");
+    formFields.setWorkspaceSourceInvoiceId(null);
+    formFields.setEditingDraftInvoiceId(null);
+    formFields.setWorkspaceContext("New invoice draft");
   }
 
   // -------------------------------------------------------------------------
@@ -654,16 +579,16 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       return;
     }
 
-    if (editingDraftInvoiceId) {
+    if (formFields.editingDraftInvoiceId) {
       setNeutralStatus("Saving draft invoice...");
       try {
-        const currentDraft = invoices.find((invoice) => invoice.id === editingDraftInvoiceId);
+        const currentDraft = invoiceData.invoices.find((invoice) => invoice.id === formFields.editingDraftInvoiceId);
         if (!currentDraft) {
           setErrorStatus("Draft context is stale. Re-select the invoice and try again.");
           return;
         }
         const updatePayload = invoiceCreatorAdapter.toUpdatePayload(invoiceDraftFormState, currentDraft);
-        const response = await fetch(`${normalizedBaseUrl}/invoices/${editingDraftInvoiceId}/`, {
+        const response = await fetch(`${apiBaseUrl}/invoices/${formFields.editingDraftInvoiceId}/`, {
           method: "PATCH",
           headers: buildAuthHeaders(token, { contentType: "application/json" }),
           body: JSON.stringify(updatePayload),
@@ -674,13 +599,13 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
           return;
         }
         const updated = payload.data as InvoiceRecord;
-        setInvoices((current) =>
+        invoiceData.setInvoices((current) =>
           current.map((invoice) => (invoice.id === updated.id ? updated : invoice)),
         );
-        setWorkspaceSourceInvoiceId(updated.id);
+        formFields.setWorkspaceSourceInvoiceId(updated.id);
         setSelectedInvoiceId(String(updated.id));
         setSelectedStatus("");
-        setWorkspaceContext(`Editing ${updated.invoice_number}`);
+        formFields.setWorkspaceContext(`Editing ${updated.invoice_number}`);
         setSuccessStatus(`Saved ${updated.invoice_number} draft.`);
         flashCreator();
         return;
@@ -693,7 +618,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     setNeutralStatus("Creating invoice...");
     try {
       const createPayload = invoiceCreatorAdapter.toCreatePayload(invoiceDraftFormState);
-      const response = await fetch(`${normalizedBaseUrl}/projects/${scopedProjectId}/invoices/`, {
+      const response = await fetch(`${apiBaseUrl}/projects/${scopedProjectId}/invoices/`, {
         method: "POST",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify(createPayload),
@@ -706,10 +631,10 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       }
 
       const created = payload.data as InvoiceRecord;
-      await loadInvoices();
+      await invoiceData.loadInvoices();
       setSelectedInvoiceId(String(created.id));
       setSelectedStatus("");
-      loadInvoiceIntoWorkspace(created);
+      formFields.loadInvoiceIntoWorkspace(created);
       setSuccessStatus(`Created ${created.invoice_number} (${statusLabel(created.status)}).`);
       flashCreator();
     } catch {
@@ -745,7 +670,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       } else if (shouldAutoSendNote) {
         patchPayload.status_note = selectedInvoice.status === "draft" ? "Invoice sent." : "Invoice re-sent.";
       }
-      const response = await fetch(`${normalizedBaseUrl}/invoices/${invoiceId}/`, {
+      const response = await fetch(`${apiBaseUrl}/invoices/${invoiceId}/`, {
         method: "PATCH",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify(patchPayload),
@@ -758,12 +683,12 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       }
 
       const updated = payload.data as InvoiceRecord;
-      setInvoices((current) =>
+      invoiceData.setInvoices((current) =>
         current.map((invoice) => (invoice.id === updated.id ? updated : invoice)),
       );
       setSelectedStatus("");
       setStatusNote("");
-      await loadInvoiceStatusEvents(updated.id);
+      await invoiceData.loadInvoiceStatusEvents(updated.id);
       const emailNote = updated.status === "sent" && payload.email_sent === false ? " No email sent — customer has no email on file." : "";
       const msg = `Updated ${updated.invoice_number} to ${statusLabel(updated.status)}. History updated.${emailNote}`;
       setSuccessStatus(msg);
@@ -795,7 +720,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
 
     setNeutralStatus("Adding invoice status note...");
     try {
-      const response = await fetch(`${normalizedBaseUrl}/invoices/${invoiceId}/`, {
+      const response = await fetch(`${apiBaseUrl}/invoices/${invoiceId}/`, {
         method: "PATCH",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify({
@@ -808,12 +733,12 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
         return;
       }
       const updated = payload.data as InvoiceRecord;
-      setInvoices((current) =>
+      invoiceData.setInvoices((current) =>
         current.map((invoice) => (invoice.id === updated.id ? updated : invoice)),
       );
       setSelectedStatus("");
       setStatusNote("");
-      await loadInvoiceStatusEvents(updated.id);
+      await invoiceData.loadInvoiceStatusEvents(updated.id);
       const msg = `Added status note on ${updated.invoice_number}. History updated.`;
       setSuccessStatus(msg);
       setViewerActionMessage(msg);
@@ -832,11 +757,11 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       setErrorStatus("Select an invoice first.");
       return;
     }
-    const nextDraftLines = invoiceToWorkspaceLines(selectedInvoice);
+    const nextDraftLines = formFields.invoiceToWorkspaceLines(selectedInvoice);
     const nextIssueDate = todayDateInput();
     const nextDueDate = dueDateFromIssueDate(
       nextIssueDate,
-      organizationInvoiceDefaults?.default_invoice_due_delta ?? 30,
+      invoiceData.organizationInvoiceDefaults?.default_invoice_due_delta ?? 30,
     );
     const nextTaxPercent = selectedInvoice.tax_percent || "0";
     const nextTermsText = selectedInvoice.terms_text || "";
@@ -856,7 +781,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
         lineItems: nextDraftLines,
       };
       const createPayload = invoiceCreatorAdapter.toCreatePayload(duplicateFormState);
-      const response = await fetch(`${normalizedBaseUrl}/projects/${scopedProjectId}/invoices/`, {
+      const response = await fetch(`${apiBaseUrl}/projects/${scopedProjectId}/invoices/`, {
         method: "POST",
         headers: buildAuthHeaders(token, { contentType: "application/json" }),
         body: JSON.stringify(createPayload),
@@ -867,10 +792,10 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
         return;
       }
       const created = payload.data as InvoiceRecord;
-      await loadInvoices();
+      await invoiceData.loadInvoices();
       setSelectedInvoiceId(String(created.id));
       setSelectedStatus("");
-      loadInvoiceIntoWorkspace(created);
+      formFields.loadInvoiceIntoWorkspace(created);
       setSuccessStatus(`Duplicated as ${created.invoice_number}.`);
       flashCreator();
     } catch {
@@ -879,70 +804,8 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
   }
 
   // -------------------------------------------------------------------------
-  // Document adapter & branding
-  // -------------------------------------------------------------------------
-
-  const selectedProject = projects.find((project) => String(project.id) === selectedProjectId) ?? null;
-  const organizationBranding = useMemo(
-    () => resolveOrganizationBranding(organizationInvoiceDefaults),
-    [organizationInvoiceDefaults],
-  );
-  const senderDisplayName = organizationBranding.senderDisplayName;
-  const senderEmail = organizationBranding.helpEmail;
-  const senderAddressLines = organizationBranding.senderAddressLines;
-  const senderLogoUrl = organizationBranding.logoUrl;
-  const invoiceCreatorStatusPolicy = useMemo(
-    () =>
-      toInvoiceStatusPolicy({
-        policy_version: "ui-fallback",
-        statuses: invoiceStatuses,
-        status_labels: invoiceStatusLabels,
-        default_create_status: invoiceStatuses.includes("draft") ? "draft" : invoiceStatuses[0] ?? "draft",
-        default_status_filters: invoiceStatusFilters.length
-          ? invoiceStatusFilters
-          : INVOICE_DEFAULT_STATUS_FILTERS_FALLBACK,
-        allowed_status_transitions: invoiceAllowedStatusTransitions,
-        terminal_statuses: INVOICE_TERMINAL_STATUSES_FALLBACK,
-      }),
-    [invoiceAllowedStatusTransitions, invoiceStatusFilters, invoiceStatusLabels, invoiceStatuses],
-  );
-  const invoiceDraftFormState: InvoiceFormState = useMemo(
-    () => ({
-      issueDate,
-      dueDate,
-      taxPercent,
-      termsText,
-      subtotal: draftLineSubtotal,
-      taxAmount: draftTaxTotal,
-      totalAmount: draftTotal,
-      lineItems,
-    }),
-    [
-      draftLineSubtotal,
-      draftTaxTotal,
-      draftTotal,
-      dueDate,
-      issueDate,
-      lineItems,
-      taxPercent,
-      termsText,
-    ],
-  );
-  const invoiceCreatorAdapter = useMemo(
-    () => createInvoiceDocumentAdapter(invoiceCreatorStatusPolicy, []),
-    [invoiceCreatorStatusPolicy],
-  );
-  const statusMessageAtCreator =
-    statusTone === "success" && /^(Created|Saved|Started|Loaded)\b/i.test(statusMessage);
-  const statusMessageAtToolbar =
-    statusTone === "success" && /^Duplicated\b/i.test(statusMessage);
-
-  // -------------------------------------------------------------------------
   // Contract breakdown (read-only reference)
   // -------------------------------------------------------------------------
-
-  const [isContractBreakdownOpen, setIsContractBreakdownOpen] = useState(false);
-  const [flashingButtons, setFlashingButtons] = useState<Set<string>>(new Set());
 
   function duplicateContractLineToInvoice(lineKey: string, fields: Omit<InvoiceLineInput, "localId">) {
     const id = nextLineId;
@@ -957,8 +820,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       });
     }, 500);
   }
-
-  // renderDuplicateButton and renderContractBreakdown moved to invoices-viewer-panel.tsx.
 
   // -------------------------------------------------------------------------
   // Render
@@ -998,7 +859,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
             invoiceStatusTotals={invoiceStatusTotals}
             statusLabel={statusLabel}
             paginatedInvoices={paginatedInvoices}
-            invoices={invoices}
+            invoices={invoiceData.invoices}
             invoiceNeedle={invoiceNeedle}
             selectedInvoiceId={selectedInvoiceId}
             onSelectInvoice={handleSelectInvoice}
@@ -1017,15 +878,15 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
             viewerActionTone={viewerActionTone}
             onUpdateStatus={handleUpdateInvoiceStatus}
             onAddStatusNote={handleAddInvoiceStatusNote}
-            selectedInvoiceStatusEvents={selectedInvoiceStatusEvents}
-            statusEventsLoading={statusEventsLoading}
+            selectedInvoiceStatusEvents={invoiceData.selectedInvoiceStatusEvents}
+            statusEventsLoading={invoiceData.statusEventsLoading}
             showAllEvents={showAllEvents}
             setShowAllEvents={setShowAllEvents}
-            contractBreakdown={contractBreakdown}
+            contractBreakdown={invoiceData.contractBreakdown}
             isContractBreakdownOpen={isContractBreakdownOpen}
             setIsContractBreakdownOpen={setIsContractBreakdownOpen}
             workspaceIsLocked={workspaceIsLocked}
-            costCodes={costCodes}
+            costCodes={invoiceData.costCodes}
             flashingButtons={flashingButtons}
             onDuplicateContractLine={duplicateContractLineToInvoice}
           />
@@ -1035,10 +896,10 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
             canMutateInvoices={canMutateInvoices}
             workspaceSourceInvoice={workspaceSourceInvoice}
             workspaceIsLocked={workspaceIsLocked}
-            workspaceContext={workspaceContext}
+            workspaceContext={formFields.workspaceContext}
             workspaceBadgeLabel={workspaceBadgeLabel}
             workspaceBadgeClass={workspaceBadgeClass}
-            editingDraftInvoiceId={editingDraftInvoiceId}
+            editingDraftInvoiceId={formFields.editingDraftInvoiceId}
             onStartNewDraft={handleStartNewInvoiceDraft}
             onDuplicateIntoDraft={handleDuplicateInvoiceIntoDraft}
             statusMessageAtToolbar={statusMessageAtToolbar}
@@ -1052,25 +913,25 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
             senderLogoUrl={senderLogoUrl}
             selectedProject={selectedProject}
             workspaceInvoiceNumber={workspaceInvoiceNumber}
-            issueDate={issueDate}
-            onIssueDateChange={setIssueDate}
-            dueDate={dueDate}
-            onDueDateChange={setDueDate}
+            issueDate={formFields.issueDate}
+            onIssueDateChange={formFields.setIssueDate}
+            dueDate={formFields.dueDate}
+            onDueDateChange={formFields.setDueDate}
             lineItems={lineItems}
             lineValidation={lineValidation}
-            costCodes={costCodes}
+            costCodes={invoiceData.costCodes}
             onAddLineItem={addLineItem}
             onRemoveLineItem={removeLineItem}
             onUpdateLineItem={updateLineItem}
             draftLineSubtotal={draftLineSubtotal}
             draftTaxTotal={draftTaxTotal}
             draftTotal={draftTotal}
-            taxPercent={taxPercent}
-            onTaxPercentChange={setTaxPercent}
+            taxPercent={formFields.taxPercent}
+            onTaxPercentChange={formFields.setTaxPercent}
             onSubmit={handleCreateInvoice}
             statusMessageAtCreator={statusMessageAtCreator}
-            termsText={termsText}
-            organizationInvoiceDefaults={organizationInvoiceDefaults}
+            termsText={formFields.termsText}
+            organizationInvoiceDefaults={invoiceData.organizationInvoiceDefaults}
           />
       </>
       ) : null}

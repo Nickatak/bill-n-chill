@@ -2,6 +2,8 @@
  * Estimate document creator sheet used for both creating and editing estimates.
  * Delegates layout to the shared DocumentCreator and renders header, meta,
  * line-item table, totals, terms, and footer sections via slot renderers.
+ *
+ * Parent: EstimatesWorkspacePanel
  */
 
 import { FormEvent } from "react";

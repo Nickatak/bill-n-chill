@@ -1,9 +1,54 @@
 "use client";
 
 /**
- * Primary project hub that lets users browse, select, and manage projects.
- * Shows a paginated/filterable project list, a financial snapshot with scope
- * control and billing tree, and an inline project profile editor.
+ * Primary project hub — browse, select, and manage projects.
+ *
+ * Three-panel layout: filterable project list (left), financial snapshot
+ * with scope control and billing tree (center), and inline project
+ * profile editor (right). All state is local — no extracted hooks yet.
+ *
+ * Parent: app/projects/page.tsx
+ *
+ * ## Page layout
+ *
+ * ┌──────────────┬──────────────────────────────────┐
+ * │ Project list │ Financial snapshot                │
+ * │   ├── Search │   ├── Contract / AR / AP metrics  │
+ * │   ├── Status │   ├── Estimate status counts      │
+ * │   │   pills  │   ├── CO / Invoice / Bill counts  │
+ * │   └── Cards  │   ├── Quick-entry tabs             │
+ * │              │   └── Billing tree (scoped links)  │
+ * │              ├──────────────────────────────────┤
+ * │              │ Profile editor (collapsible)      │
+ * │              │   ├── Project name                │
+ * │              │   ├── Status selector             │
+ * │              │   └── Save                        │
+ * └──────────────┴──────────────────────────────────┘
+ *
+ * ## State (useState) — 14 calls
+ *
+ * Data: projects, summary, estimate/CO/bill/invoice status counts,
+ *       acceptedEstimateTotal, invoiceAllocationTargets
+ * Selection: selectedProjectId, isProjectEditOpen
+ * Filters: projectSearch, projectStatusFilters
+ * Form: projectName, projectStatus
+ *
+ * ## Functions
+ *
+ * - loadProjects() — fetches all projects, auto-selects based on URL scope
+ * - loadFinancialSummary() — fetches /projects/:id/financial-summary/
+ * - loadStatusCounts() — fetches status breakdowns for estimates, COs, bills, invoices
+ * - hydrateForm(project) — populates name + status fields
+ * - handleProjectSave(event) — PATCHes project profile
+ * - toggleProjectStatusFilter(status) — toggles a status pill in/out
+ *
+ * ## Effects (5)
+ *
+ * 1. Fetch projects on mount (deps: [token])
+ * 2. Fetch financial summary when selection changes (deps: [selectedProjectId, token])
+ * 3. Fetch status counts when selection changes (deps: [selectedProjectId, token])
+ * 4. Fetch allocation targets when selection changes (deps: [selectedProjectId, token])
+ * 5. Auto-select scoped project from URL params (deps: [projects, scopedProjectId])
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";

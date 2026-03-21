@@ -4,6 +4,8 @@
  * Public-facing invoice preview rendered via a tokenized URL.
  * Fetches the invoice by public token and displays it in the shared document viewer shell,
  * including sender/recipient context, line items, totals, terms, and a test payment section.
+ *
+ * Parent: app/invoice/[publicRef]/page.tsx
  */
 
 import { useEffect, useMemo, useState } from "react";
