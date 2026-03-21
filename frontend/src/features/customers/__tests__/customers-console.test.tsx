@@ -29,6 +29,13 @@ vi.mock("@/shared/session/use-shared-session", () => ({
   useSharedSessionAuth: mockUseSharedSessionAuth,
 }));
 
+vi.mock("@/shared/session/rbac", () => ({
+  hasAnyRole: vi.fn((role: string, roles: string[]) => roles.includes(role)),
+  canDo: vi.fn((caps: Record<string, string[]> | undefined, resource: string, action: string) =>
+    Boolean(caps?.[resource]?.includes(action)),
+  ),
+}));
+
 vi.mock("@/shared/phone-format", () => ({
   formatPhone: (v: string) => v,
 }));
@@ -104,7 +111,7 @@ function setupDefaultFetch(overrides: Record<string, unknown> = {}) {
         json: () =>
           Promise.resolve({
             data: overrides.customers ?? CUSTOMER_ROWS,
-            meta: { page: 1, total_pages: 1, total_count: (overrides.customers as unknown[] ?? CUSTOMER_ROWS).length },
+            pagination_metadata: { page: 1, total_pages: 1, total_count: (overrides.customers as unknown[] ?? CUSTOMER_ROWS).length },
           }),
       });
     }
@@ -209,7 +216,7 @@ describe("CustomersConsole", () => {
           json: () =>
             Promise.resolve({
               data: CUSTOMER_ROWS,
-              meta: { page: 1, total_pages: 1, total_count: 2 },
+              pagination_metadata: { page: 1, total_pages: 1, total_count: 2 },
             }),
         });
       }
@@ -281,7 +288,7 @@ describe("CustomersConsole", () => {
           json: () =>
             Promise.resolve({
               data: CUSTOMER_ROWS,
-              meta: { page: 1, total_pages: 3, total_count: 75 },
+              pagination_metadata: { page: 1, total_pages: 3, total_count: 75 },
             }),
         });
       }
@@ -375,7 +382,7 @@ describe("CustomersConsole", () => {
             json: () =>
               Promise.resolve({
                 data: [{ ...CUSTOMER_ROWS[1], id: 3, display_name: "Page 2 Person" }],
-                meta: { page: 2, total_pages: 3, total_count: 75 },
+                pagination_metadata: { page: 2, total_pages: 3, total_count: 75 },
               }),
           });
         }
@@ -384,7 +391,7 @@ describe("CustomersConsole", () => {
           json: () =>
             Promise.resolve({
               data: CUSTOMER_ROWS,
-              meta: { page: 1, total_pages: 3, total_count: 75 },
+              pagination_metadata: { page: 1, total_pages: 3, total_count: 75 },
             }),
         });
       }
@@ -465,7 +472,7 @@ describe("CustomersConsole", () => {
           json: () =>
             Promise.resolve({
               data: CUSTOMER_ROWS,
-              meta: { page: 1, total_pages: 1, total_count: 2 },
+              pagination_metadata: { page: 1, total_pages: 1, total_count: 2 },
             }),
         });
       }
@@ -501,7 +508,7 @@ describe("CustomersConsole", () => {
           json: () =>
             Promise.resolve({
               data: CUSTOMER_ROWS,
-              meta: { page: 1, total_pages: 1, total_count: 2 },
+              pagination_metadata: { page: 1, total_pages: 1, total_count: 2 },
             }),
         });
       }
@@ -549,7 +556,7 @@ describe("CustomersConsole", () => {
           ok: true,
           json: () => Promise.resolve({
             data: CUSTOMER_ROWS,
-            meta: { page: 1, total_pages: 1, total_count: 2 },
+            pagination_metadata: { page: 1, total_pages: 1, total_count: 2 },
           }),
         });
       }
@@ -592,7 +599,7 @@ describe("CustomersConsole", () => {
           ok: true,
           json: () => Promise.resolve({
             data: CUSTOMER_ROWS,
-            meta: { page: 1, total_pages: 1, total_count: 2 },
+            pagination_metadata: { page: 1, total_pages: 1, total_count: 2 },
           }),
         });
       }
@@ -628,7 +635,7 @@ describe("CustomersConsole", () => {
           ok: true,
           json: () => Promise.resolve({
             data: CUSTOMER_ROWS,
-            meta: { page: 1, total_pages: 1, total_count: 2 },
+            pagination_metadata: { page: 1, total_pages: 1, total_count: 2 },
           }),
         });
       }
@@ -832,7 +839,7 @@ describe("CustomersConsole", () => {
           json: () =>
             Promise.resolve({
               data: [],
-              meta: { page: 1, total_pages: 1, total_count: 0 },
+              pagination_metadata: { page: 1, total_pages: 1, total_count: 0 },
             }),
         });
       }
@@ -863,7 +870,7 @@ describe("CustomersConsole", () => {
           json: () =>
             Promise.resolve({
               data: [],
-              meta: { page: 1, total_pages: 1, total_count: 0 },
+              pagination_metadata: { page: 1, total_pages: 1, total_count: 0 },
             }),
         });
       }
