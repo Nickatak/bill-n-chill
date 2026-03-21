@@ -253,13 +253,16 @@ describe("VendorsConsole", () => {
 
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Acme Supply" } });
 
-    // First POST returns 409 with duplicate candidates
+    // POST returns 409 — duplicate name is blocked outright (no override)
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 409,
       json: () =>
         Promise.resolve({
-          error: { code: "duplicate_detected", message: "Potential duplicate." },
+          error: {
+            code: "duplicate_detected",
+            message: 'A vendor with this name already exists. To distinguish them, add a location or qualifier (e.g. "ABC Plumbing — Westside").',
+          },
           data: {
             duplicate_candidates: [makeVendor({ id: 99, name: "Acme Supply" })],
           },
@@ -269,24 +272,12 @@ describe("VendorsConsole", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create Vendor" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Duplicate candidates")).toBeInTheDocument();
+      expect(screen.getByText("Existing vendor with this name")).toBeInTheDocument();
       expect(screen.getByText(/Acme Supply/)).toBeInTheDocument();
     });
 
-    // "Create Anyway" resolves with override
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          data: makeVendor({ id: 50, name: "Acme Supply" }),
-        }),
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Create Anyway" }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Created vendor #50/)).toBeInTheDocument();
-    });
+    // No "Create Anyway" button — duplicates are blocked
+    expect(screen.queryByRole("button", { name: "Create Anyway" })).not.toBeInTheDocument();
   });
 
   it("shows pagination when vendors exceed page size", async () => {
