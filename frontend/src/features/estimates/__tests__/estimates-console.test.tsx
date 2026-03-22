@@ -489,7 +489,7 @@ describe("EstimatesConsole", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm Send to Customer" }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Updated estimate #42 to sent/)).toBeInTheDocument();
+      expect(screen.getByText(/Sent estimate #42/)).toBeInTheDocument();
     }, { timeout: 3000 });
 
     // Confirmation panel should be closed
@@ -541,7 +541,7 @@ describe("EstimatesConsole", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm Mark Approved" }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Updated estimate #42 to approved/)).toBeInTheDocument();
+      expect(screen.getByText(/Marked estimate #42 as approved/)).toBeInTheDocument();
     }, { timeout: 3000 });
   });
 
