@@ -10,6 +10,7 @@ from core.models.shared_operations.organization_membership import OrganizationMe
 from core.models.shared_operations.project import Project
 from core.models.shared_operations.role_template import RoleTemplate
 from core.models.shared_operations.signing_ceremony import SigningCeremonyRecord
+from core.models.shared_operations.push_subscription import PushSubscription
 from core.models.shared_operations.vendor import Vendor
 
 __all__ = [
@@ -26,6 +27,7 @@ __all__ = [
     "RoleTemplate",
     "Project",
     "CostCode",
+    "PushSubscription",
     "SigningCeremonyRecord",
     "Vendor",
 ]

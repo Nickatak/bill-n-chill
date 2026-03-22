@@ -15,6 +15,7 @@ from core.serializers import (
     InvoiceWriteSerializer,
 )
 from core.utils.email import send_document_sent_email
+from core.utils.push import build_document_decision_payload, send_push_to_user
 from core.utils.request import get_client_ip
 from core.utils.signing import compute_document_content_hash
 from core.views.accounts_receivable.invoice_ingress import (
@@ -279,6 +280,17 @@ def public_invoice_decision_view(request, public_token: str):
             note=str(request.data.get("note", "") or "").strip(),
             access_session=ceremony_session,
         )
+
+    # Fire push notification to document owner (best-effort, non-blocking).
+    customer_name = invoice.project.customer.display_name
+    push_payload = build_document_decision_payload(
+        document_type="invoice",
+        document_title=invoice.invoice_number,
+        customer_name=customer_name,
+        decision=decision_type,
+        url=f"/projects/{invoice.project_id}/invoices",
+    )
+    send_push_to_user(invoice.created_by_id, push_payload)
 
     refreshed = _prefetch_invoice_qs(
         Invoice.objects.filter(id=invoice.id)

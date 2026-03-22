@@ -121,7 +121,18 @@ self.addEventListener("push", (event) => {
     data: { url: data.url || "/" },
   };
 
-  event.waitUntil(self.registration.showNotification(data.title || "Bill n Chill", options));
+  event.waitUntil(
+    Promise.all([
+      // Show background notification
+      self.registration.showNotification(data.title || "Bill n Chill", options),
+      // Post message to any open tabs for live data updates
+      self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+        for (const client of clients) {
+          client.postMessage({ type: "PUSH_RECEIVED", payload: data });
+        }
+      }),
+    ])
+  );
 });
 
 // ---------------------------------------------------------------------------

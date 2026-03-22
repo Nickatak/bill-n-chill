@@ -22,6 +22,7 @@ from core.policies import get_change_order_policy_contract
 from core.serializers import ChangeOrderSerializer, ChangeOrderStatusEventSerializer, ChangeOrderWriteSerializer, EstimateLineItemSerializer
 from core.serializers import ChangeOrderSerializer as _ChangeOrderSerializerForHash
 from core.utils.money import MONEY_ZERO, quantize_money
+from core.utils.push import build_document_decision_payload, send_push_to_user
 from core.utils.request import get_client_ip
 from core.utils.signing import compute_document_content_hash
 from core.views.change_orders.change_orders_helpers import (
@@ -260,6 +261,17 @@ def public_change_order_decision_view(request, public_token):
             ip_address=client_ip,
             user_agent=client_ua,
         )
+
+    # Fire push notification to document owner (best-effort, non-blocking).
+    customer_name = change_order.project.customer.display_name
+    push_payload = build_document_decision_payload(
+        document_type="change_order",
+        document_title=change_order.title,
+        customer_name=customer_name,
+        decision=decision,
+        url=f"/projects/{change_order.project_id}/estimates",
+    )
+    send_push_to_user(change_order.requested_by_id, push_payload)
 
     refreshed = _prefetch_change_order_qs(ChangeOrder.objects.filter(id=change_order.id)).get()
 

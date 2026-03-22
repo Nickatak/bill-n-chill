@@ -72,14 +72,16 @@ import type {
 import { BusinessProfileTab } from "./business-profile-tab";
 import { TeamTab } from "./team-tab";
 import { DocumentSettingsTab } from "./document-settings-tab";
+import { NotificationsTab } from "./notifications-tab";
 import styles from "./organization-console.module.css";
 
-type OrgTab = "business" | "team" | "documents";
+type OrgTab = "business" | "team" | "documents" | "notifications";
 
 const TABS: Array<{ key: OrgTab; label: string }> = [
   { key: "business", label: "My Business" },
   { key: "team", label: "My Team" },
   { key: "documents", label: "Document Settings" },
+  { key: "notifications", label: "Notifications" },
 ];
 
 const FALLBACK_EDITABLE_ROLES = ["owner", "pm", "bookkeeping", "worker", "viewer"];
@@ -271,6 +273,10 @@ export function OrganizationConsole() {
                 onProfileUpdate={handleProfileUpdate}
                 onError={setErrorMessage}
               />
+            ) : null}
+
+            {activeTab === "notifications" ? (
+              <NotificationsTab authToken={authToken} />
             ) : null}
           </div>
         ) : null}

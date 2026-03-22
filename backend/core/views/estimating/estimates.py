@@ -19,6 +19,7 @@ from core.serializers import (
     EstimateWriteSerializer,
 )
 from core.utils.email import send_document_sent_email
+from core.utils.push import build_document_decision_payload, send_push_to_user
 from core.utils.request import get_client_ip
 from core.utils.signing import compute_document_content_hash
 from core.views.estimating.estimates_helpers import (
@@ -216,6 +217,17 @@ def public_estimate_decision_view(request, public_token):
             note=str(request.data.get("note", "") or "").strip(),
             access_session=ceremony_session,
         )
+
+    # Fire push notification to document owner (best-effort, non-blocking).
+    customer_name = estimate.project.customer.display_name
+    push_payload = build_document_decision_payload(
+        document_type="estimate",
+        document_title=estimate.title,
+        customer_name=customer_name,
+        decision=decision,
+        url=f"/projects/{estimate.project_id}/estimates",
+    )
+    send_push_to_user(estimate.created_by_id, push_payload)
 
     estimate_data = EstimateSerializer(estimate).data
     organization = _resolve_organization_for_public_actor(estimate.created_by)

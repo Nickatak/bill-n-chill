@@ -90,6 +90,7 @@ from core.views.public_signing import (
     public_request_otp_view,
     public_verify_otp_view,
 )
+from core.views.push import push_status_view, push_subscribe_view, push_unsubscribe_view
 from core.views.shared_operations.vendors import vendor_detail_view, vendors_import_csv_view, vendors_list_create_view
 
 __all__ = [
@@ -174,4 +175,7 @@ __all__ = [
     "vendor_bill_contract_view",
     "vendor_bill_detail_view",
     "vendor_bill_snapshots_view",
+    "push_status_view",
+    "push_subscribe_view",
+    "push_unsubscribe_view",
 ]
