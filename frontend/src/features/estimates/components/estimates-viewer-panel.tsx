@@ -256,7 +256,7 @@ function EstimateActionPanel({
               onClick={handleConfirm}
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Sending..." : `Confirm ${actionLabel(pendingAction, pendingOption.label)}`}
+              {isSubmitting ? <span className={styles.sendingDots}>Sending</span> : `Confirm ${actionLabel(pendingAction, pendingOption.label)}`}
             </button>
           </div>
         </div>
