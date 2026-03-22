@@ -57,7 +57,8 @@ def public_change_order_detail_view(request, public_token):
 
     Flow:
         1. Look up change order by public token.
-        2. Serialize with public context and ceremony consent text.
+        2. Reject draft documents (not yet sent to customer).
+        3. Serialize with public context and ceremony consent text.
 
     URL: ``GET /api/v1/public/change-order/<public_token>/detail/``
 
@@ -68,7 +69,7 @@ def public_change_order_detail_view(request, public_token):
         { "data": { ..., "project_context": {...}, "ceremony_consent_text": "..." } }
 
     Errors:
-        - 404: Change order not found.
+        - 404: Change order not found or still in draft status.
     """
     try:
         change_order = _prefetch_change_order_qs(

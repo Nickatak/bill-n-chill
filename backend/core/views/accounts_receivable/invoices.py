@@ -84,9 +84,10 @@ def public_invoice_detail_view(request, public_token: str):
 
     Flow:
         1. Look up the invoice by public token.
-        2. Resolve the organization from the invoice creator.
-        3. Attach project context, organization context, and ceremony consent.
-        4. Return the enriched serialized invoice.
+        2. Reject draft documents (not yet sent to customer).
+        3. Resolve the organization from the invoice creator.
+        4. Attach project context, organization context, and ceremony consent.
+        5. Return the enriched serialized invoice.
 
     URL: ``GET /api/v1/public/invoices/<public_token>/``
 
@@ -97,7 +98,7 @@ def public_invoice_detail_view(request, public_token: str):
         { "data": { ..., "project_context": { ... }, "organization_context": { ... } } }
 
     Errors:
-        - 404: Invoice not found for the given token.
+        - 404: Invoice not found or still in draft status.
     """
     try:
         invoice = _prefetch_invoice_qs(

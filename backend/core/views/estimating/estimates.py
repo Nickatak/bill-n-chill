@@ -59,8 +59,9 @@ def public_estimate_detail_view(request, public_token):
 
     Flow:
         1. Look up estimate by public token.
-        2. Resolve organization from the estimate creator.
-        3. Attach project context, org context, and ceremony consent.
+        2. Reject draft documents (not yet sent to customer).
+        3. Resolve organization from the estimate creator.
+        4. Attach project context, org context, and ceremony consent.
 
     URL: ``GET /api/v1/public/estimate/<public_token>/detail/``
 
@@ -71,7 +72,7 @@ def public_estimate_detail_view(request, public_token):
         { "data": { ..., "project_context": {...}, "organization_context": {...} } }
 
     Errors:
-        - 404: Estimate not found.
+        - 404: Estimate not found or still in draft status.
     """
     try:
         estimate = _prefetch_estimate_qs(Estimate.objects.all()).get(public_token=public_token)
