@@ -952,6 +952,45 @@
   background: var(--accent-hover);
 }
 
+.lifecycleActionButtonActive {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-border);
+}
+
+.actionButtons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.actionConfirmPanel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  background: var(--accent-lighter);
+}
+
+.actionConfirmMessage {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: var(--font-base);
+}
+
+.actionConfirmDetail {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+}
+
+.actionConfirmActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .lifecycleLinkAction {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);

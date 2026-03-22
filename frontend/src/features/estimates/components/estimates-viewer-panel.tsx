@@ -2,12 +2,14 @@
  * Presentational component for the estimates viewer panel.
  *
  * Renders the lifecycle section: status filter pills, family-grouped estimate
- * tree, status transition controls, and status event history. All data and
- * handlers are received via props — no hooks or side effects live here.
+ * tree, action buttons with confirmation, and status event history. All data
+ * and handlers are received via props — no hooks or side effects live here
+ * (except the action confirmation panel which owns local UI state).
  *
  * Parent: EstimatesConsole
  */
 
+import { useState } from "react";
 import Link from "next/link";
 import { formatDateTimeDisplay } from "@/shared/date-format";
 import { formatDecimal } from "@/shared/money-format";
@@ -19,14 +21,6 @@ import styles from "./estimates-console.module.css";
 // ---------------------------------------------------------------------------
 // Pure display helpers (no component state dependency)
 // ---------------------------------------------------------------------------
-
-/** Build the public-facing estimate URL from a public ref token. */
-function publicEstimateHref(publicRef?: string): string {
-  if (!publicRef) {
-    return "";
-  }
-  return `/estimate/${publicRef}`;
-}
 
 /** Parse a numeric string, returning 0 for non-finite values. */
 function toNumber(value: string): number {
@@ -56,6 +50,208 @@ const statusClasses: Record<string, string> = {
   void: styles.statusArchived,
   archived: styles.statusArchived,
 };
+
+// ---------------------------------------------------------------------------
+// Action button definitions
+// ---------------------------------------------------------------------------
+
+/** Map a status transition to a user-facing action label. */
+function actionLabel(statusValue: string, optionLabel: string): string {
+  switch (statusValue) {
+    case "sent": return optionLabel === "Re-send" ? "Re-send" : "Send to Customer";
+    case "approved": return "Mark Approved";
+    case "rejected": return "Mark Rejected";
+    case "void": return "Void Estimate";
+    default: return optionLabel;
+  }
+}
+
+/** Build the confirmation message for an action. */
+function actionConfirmationMessage(
+  statusValue: string,
+  optionLabel: string,
+  estimate: EstimateRecord,
+  customerName: string,
+  customerEmail: string,
+): string {
+  const docLabel = `estimate #${estimate.id} v${estimate.version}`;
+  const isResend = optionLabel === "Re-send";
+  if (statusValue === "sent") {
+    const verb = isResend ? "Re-send" : "Send";
+    return `${verb} ${docLabel} to ${customerName || "customer"}.`;
+  }
+  if (statusValue === "approved") return `Mark ${docLabel} as approved.`;
+  if (statusValue === "rejected") return `Mark ${docLabel} as rejected.`;
+  if (statusValue === "void") return `Void ${docLabel}. This cannot be undone.`;
+  return `Transition ${docLabel} to ${optionLabel.toLowerCase()}.`;
+}
+
+/** Build the email notice for send/re-send actions. */
+function emailNotice(customerEmail: string): string {
+  if (customerEmail) return `Email notification will be sent to ${customerEmail}.`;
+  return "No email on file — customer won't be notified automatically.";
+}
+
+/** Action confirmation panel — owns its own expanded/collapsed state. */
+function EstimateActionPanel({
+  selectedEstimate,
+  nextStatusOptions,
+  selectedProject,
+  selectedStatus,
+  setSelectedStatus,
+  statusNote,
+  setStatusNote,
+  actionMessage,
+  actionTone,
+  handleUpdateEstimateStatus,
+  handleAddEstimateStatusNote,
+  canSubmitStatusNote,
+}: {
+  selectedEstimate: EstimateRecord;
+  nextStatusOptions: Array<{ value: string; label: string }>;
+  selectedProject: ProjectRecord | null;
+  selectedStatus: string;
+  setSelectedStatus: (status: string) => void;
+  statusNote: string;
+  setStatusNote: (note: string) => void;
+  actionMessage: string;
+  actionTone: string;
+  handleUpdateEstimateStatus: () => void;
+  handleAddEstimateStatusNote: () => void;
+  canSubmitStatusNote: boolean;
+}) {
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const customerName = selectedProject?.customer_display_name || "";
+  const customerEmail = (selectedProject?.customer_email || "").trim();
+
+  function handleActionClick(statusValue: string) {
+    if (pendingAction === statusValue) {
+      setPendingAction(null);
+      setSelectedStatus("");
+      return;
+    }
+    setPendingAction(statusValue);
+    setSelectedStatus(statusValue);
+  }
+
+  function handleConfirm() {
+    handleUpdateEstimateStatus();
+    setPendingAction(null);
+  }
+
+  function handleCancel() {
+    setPendingAction(null);
+    setSelectedStatus("");
+    setStatusNote("");
+  }
+
+  const pendingOption = nextStatusOptions.find((o) => o.value === pendingAction);
+
+  return (
+    <div className={styles.lifecycleGrid}>
+      {nextStatusOptions.length > 0 ? (
+        <div className={styles.actionButtons}>
+          {nextStatusOptions.map((option) => {
+            const label = actionLabel(option.value, option.label);
+            const isActive = pendingAction === option.value;
+            const isPrimary = option.value === "sent";
+            return (
+              <button
+                key={option.value}
+                type="button"
+                className={`${styles.lifecycleActionButton} ${
+                  isPrimary ? styles.lifecycleActionButtonPrimary : ""
+                } ${isActive ? styles.lifecycleActionButtonActive : ""}`}
+                onClick={() => handleActionClick(option.value)}
+                aria-pressed={isActive}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {pendingAction && pendingOption ? (
+        <div className={styles.actionConfirmPanel}>
+          <p className={styles.actionConfirmMessage}>
+            {actionConfirmationMessage(
+              pendingAction,
+              pendingOption.label,
+              selectedEstimate,
+              customerName,
+              customerEmail,
+            )}
+          </p>
+          {(pendingAction === "sent") ? (
+            <p className={styles.actionConfirmDetail}>
+              {emailNotice(customerEmail)}
+            </p>
+          ) : null}
+          <label className={styles.lifecycleField}>
+            <span className={styles.lifecycleFieldLabel}>Note (optional)</span>
+            <textarea
+              className={styles.statusNote}
+              value={statusNote}
+              onChange={(event) => setStatusNote(event.target.value)}
+              placeholder="Optional note for this action"
+              rows={2}
+            />
+          </label>
+          <div className={styles.actionConfirmActions}>
+            <button
+              type="button"
+              className={styles.lifecycleActionButton}
+              onClick={handleCancel}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={`${styles.lifecycleActionButton} ${styles.lifecycleActionButtonPrimary}`}
+              onClick={handleConfirm}
+            >
+              Confirm {actionLabel(pendingAction, pendingOption.label)}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {!pendingAction ? (
+        <label className={styles.lifecycleField}>
+          <span className={styles.lifecycleFieldLabel}>Status note</span>
+          <textarea
+            className={styles.statusNote}
+            value={statusNote}
+            onChange={(event) => setStatusNote(event.target.value)}
+            placeholder="Add note for this estimate"
+            rows={3}
+          />
+        </label>
+      ) : null}
+
+      {actionMessage && actionTone === "success" ? (
+        <p className={styles.actionSuccess}>{actionMessage}</p>
+      ) : null}
+      {actionMessage && actionTone === "error" ? (
+        <p className={styles.actionError}>{actionMessage}</p>
+      ) : null}
+
+      {!pendingAction ? (
+        <div className={styles.lifecycleActions}>
+          <button
+            type="button"
+            className={styles.lifecycleActionButton}
+            onClick={handleAddEstimateStatusNote}
+            disabled={!canSubmitStatusNote}
+          >
+            Add Estimate Status Note
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -97,7 +293,7 @@ export type EstimatesViewerPanelProps = {
   quickActionTitleForStatus: (status: string) => string;
 
   // Status lifecycle (only relevant when an estimate is selected)
-  isTerminalEstimateStatus: boolean;
+  selectedEstimate: EstimateRecord | null;
   nextStatusOptions: Array<{ value: string; label: string }>;
   selectedStatus: string;
   setSelectedStatus: (status: string) => void;
@@ -105,7 +301,6 @@ export type EstimatesViewerPanelProps = {
   setStatusNote: (note: string) => void;
   actionMessage: string;
   actionTone: string;
-  canSubmitStatusUpdate: boolean;
   canSubmitStatusNote: boolean;
   handleUpdateEstimateStatus: () => void;
   handleAddEstimateStatusNote: () => void;
@@ -139,7 +334,7 @@ export function EstimatesViewerPanel({
   formatEstimateStatus,
   quickActionKindForStatus,
   quickActionTitleForStatus,
-  isTerminalEstimateStatus,
+  selectedEstimate,
   nextStatusOptions,
   selectedStatus,
   setSelectedStatus,
@@ -147,7 +342,6 @@ export function EstimatesViewerPanel({
   setStatusNote,
   actionMessage,
   actionTone,
-  canSubmitStatusUpdate,
   canSubmitStatusNote,
   handleUpdateEstimateStatus,
   handleAddEstimateStatusNote,
@@ -268,7 +462,7 @@ export function EstimatesViewerPanel({
                               Last action: {formatEstimateLastActionDate(latest)}
                             </span>
                           </div>
-                          {(!isViewingHistory && latest.public_ref) || (quickActionKind === "change_order" && selectedProjectId) ? (
+                          {quickActionKind === "change_order" && selectedProjectId ? (
                             <div className={styles.familyLinkBar}>
                               {quickActionKind === "change_order" && selectedProjectId ? (
                                 <Link
@@ -279,19 +473,6 @@ export function EstimatesViewerPanel({
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   View Change Orders →
-                                </Link>
-                              ) : null}
-                              {!isViewingHistory && latest.public_ref ? (
-                                <Link
-                                  href={publicEstimateHref(latest.public_ref)}
-                                  className={`${styles.familyPublicLink} ${styles.familyLinkBarEnd}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  aria-label={`Open customer view for estimate #${latest.id}`}
-                                  title="Open customer view"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  Customer View →
                                 </Link>
                               ) : null}
                             </div>
@@ -349,18 +530,6 @@ export function EstimatesViewerPanel({
                                       {formatEstimateLastActionDate(estimate)}
                                     </span>
                                   </button>
-                                  {isSelected && estimate.public_ref ? (
-                                    <Link
-                                      href={publicEstimateHref(estimate.public_ref)}
-                                      className={styles.historyPublicLink}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      aria-label={`Open customer view for estimate #${estimate.id}`}
-                                      title="Open customer view"
-                                    >
-                                      Customer View →
-                                    </Link>
-                                  ) : null}
                                 </div>
                               );
                             })}
@@ -377,82 +546,21 @@ export function EstimatesViewerPanel({
             )}
           </div>
 
-          {/* Status & Actions — intentionally not extracted to a shared component.
-              See invoices-console.tsx for rationale. */}
-          {selectedEstimateId ? (
-            <>
-              <div className={styles.lifecycleGrid}>
-                {!isTerminalEstimateStatus ? (
-                  <div className={styles.statusPicker}>
-                    <span className={styles.lifecycleFieldLabel}>Next status</span>
-                    <div className={styles.statusPills}>
-                      {nextStatusOptions.map((option) => {
-                        const isSelected = selectedStatus === option.value;
-                        return (
-                          <button
-                            key={option.value}
-                            type="button"
-                            className={`${styles.statusPill} ${
-                              isSelected ? statusClasses[option.value] ?? "" : styles.statusPillInactive
-                            } ${isSelected ? styles.statusPillActive : ""}`}
-                            onClick={() => setSelectedStatus(option.value)}
-                            aria-pressed={isSelected}
-                          >
-                            {option.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {selectedStatus === "sent" && !selectedProject?.customer_email?.trim() ? (
-                      <p className={styles.actionError}>WARNING: This customer has no email on file and will not receive an automated email.</p>
-                    ) : null}
-                    {nextStatusOptions.length === 0 ? (
-                      <p className={styles.inlineHint}>No next statuses available for this estimate.</p>
-                    ) : null}
-                  </div>
-                ) : null}
-                <label className={styles.lifecycleField}>
-                  Status note
-                  <textarea
-                    className={styles.statusNote}
-                    value={statusNote}
-                    onChange={(event) => setStatusNote(event.target.value)}
-                    placeholder={
-                      isTerminalEstimateStatus
-                        ? "Add note for this terminal estimate status"
-                        : "Optional note for this transition"
-                    }
-                    rows={3}
-                  />
-                </label>
-              </div>
-              {actionMessage && actionTone === "success" ? (
-                <p className={styles.actionSuccess}>{actionMessage}</p>
-              ) : null}
-              {actionMessage && actionTone === "error" ? (
-                <p className={styles.actionError}>{actionMessage}</p>
-              ) : null}
-              <div className={styles.lifecycleActions}>
-                {canSubmitStatusUpdate ? (
-                  <button
-                    type="button"
-                    className={`${styles.lifecycleActionButton} ${styles.lifecycleActionButtonPrimary}`}
-                    onClick={handleUpdateEstimateStatus}
-                    disabled={!canSubmitStatusUpdate}
-                  >
-                    Update Selected Estimate Status
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  className={styles.lifecycleActionButton}
-                  onClick={handleAddEstimateStatusNote}
-                  disabled={!canSubmitStatusNote}
-                >
-                  Add Estimate Status Note
-                </button>
-              </div>
-            </>
+          {selectedEstimateId && selectedEstimate ? (
+            <EstimateActionPanel
+              selectedEstimate={selectedEstimate}
+              nextStatusOptions={nextStatusOptions}
+              selectedProject={selectedProject}
+              selectedStatus={selectedStatus}
+              setSelectedStatus={setSelectedStatus}
+              statusNote={statusNote}
+              setStatusNote={setStatusNote}
+              actionMessage={actionMessage}
+              actionTone={actionTone}
+              handleUpdateEstimateStatus={handleUpdateEstimateStatus}
+              handleAddEstimateStatusNote={handleAddEstimateStatusNote}
+              canSubmitStatusNote={canSubmitStatusNote}
+            />
           ) : null}
 
           {selectedEstimateId && statusEvents.length > 0 ? (
