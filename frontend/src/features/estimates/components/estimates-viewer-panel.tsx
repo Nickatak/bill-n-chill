@@ -216,6 +216,18 @@ function EstimateActionPanel({
         </div>
       ) : null}
 
+      {nextStatusOptions.length === 0 && selectedEstimate.status === "approved" && selectedProject ? (
+        <div className={styles.actionButtons}>
+          <Link
+            href={`/projects/${selectedProject.id}/change-orders?origin_estimate=${selectedEstimate.id}`}
+            className={`${styles.lifecycleActionButton} ${styles.actionButtonApproved}`}
+            style={{ flex: "1 1 100%", display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            View Change Orders
+          </Link>
+        </div>
+      ) : null}
+
       {pendingAction && pendingOption ? (
         <div className={styles.actionConfirmPanel}>
           <p className={styles.actionConfirmMessage}>

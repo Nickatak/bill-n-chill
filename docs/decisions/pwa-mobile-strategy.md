@@ -38,6 +38,10 @@ When a customer acts on a public document link (approves, rejects, disputes), th
 - Notifications triggered on document status events (the audit event infrastructure already exists)
 - Notification content: document type, customer name, action taken
 
+**Live page updates via service worker:**
+
+When the SW receives a push event for a document status change (e.g. customer approved an estimate), it can also post a message to any open app tab via `clients.matchAll()` + `client.postMessage()`. The tab receives the message and updates the displayed data in-place — the user sees the status flip to "Approved" without refreshing. This means the push notification system does double duty: background notifications when the app isn't focused, and live data updates when it is. The hook points already exist — the backend decision endpoints record status events that can trigger the push.
+
 **Not in scope (yet):**
 - Notification preferences / granularity settings
 - In-app notification center / history
