@@ -133,6 +133,7 @@ function EstimateActionPanel({
 }) {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [shareMessage, setShareMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const customerName = selectedProject?.customer_display_name || "";
   const customerEmail = (selectedProject?.customer_email || "").trim();
 
@@ -148,6 +149,9 @@ function EstimateActionPanel({
   }
 
   async function handleConfirm() {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
     const updated = await handleUpdateEstimateStatus();
     if (!updated) return; // failed — error message shown by handler
     setPendingAction(null);
@@ -174,6 +178,9 @@ function EstimateActionPanel({
           // Clipboard API not available
         }
       }
+    }
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -247,8 +254,9 @@ function EstimateActionPanel({
               type="button"
               className={`${styles.lifecycleActionButton} ${actionButtonColorClass(pendingAction)}`}
               onClick={handleConfirm}
+              disabled={isSubmitting}
             >
-              Confirm {actionLabel(pendingAction, pendingOption.label)}
+              {isSubmitting ? "Sending..." : `Confirm ${actionLabel(pendingAction, pendingOption.label)}`}
             </button>
           </div>
         </div>
